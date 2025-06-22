@@ -5,6 +5,7 @@ import cors from 'cors';
 
 import { BotManager } from '@starships/bridge-core';
 import { createDispatchRouter } from './routes/dispatch';
+import redeployRoute from './routes/redeploy';
 
 const app: Express = express();
 const PORT = Number(process.env.PORT) || 4000;
@@ -25,6 +26,9 @@ botManager
 
 // Routes
 app.use(createDispatchRouter(botManager));
+
+// Redeploy webhook (secured via REDEPLOY_SECRET)
+app.use('/redeploy', redeployRoute);
 
 // Health
 app.get('/', (_req, res) => res.send('starships.ai bridge server running'));

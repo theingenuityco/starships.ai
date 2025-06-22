@@ -1,17 +1,37 @@
-// TODO: Implement Express server and routing logic
+import 'dotenv/config';
+import express, { Express } from 'express';
+import bodyParser from 'body-parser';
+import cors from 'cors';
 
-import express, { Request, Response } from 'express';
+import { BotManager } from '@starships/bridge-core';
+import { createDispatchRouter } from './routes/dispatch';
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const app: Express = express();
+const PORT = Number(process.env.PORT) || 4000;
 
-app.get('/', (_req: Request, res: Response) => {
-  res.send('starships.ai server placeholder');
-});
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
+
+// Boot bots
+const botManager = new BotManager();
+botManager
+  .startAll()
+  .then(() => console.log('[server] all bots started'))
+  .catch((err: unknown) => {
+    console.error('[server] failed to start bots', err);
+    process.exit(1);
+  });
+
+// Routes
+app.use(createDispatchRouter(botManager));
+
+// Health
+app.get('/', (_req, res) => res.send('starships.ai bridge server running'));
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Bridge server listening on port ${PORT}`);
   });
 }
 

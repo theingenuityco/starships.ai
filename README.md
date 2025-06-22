@@ -1,8 +1,8 @@
-# starships.ai – Discord × Autonomous Agents Bridge
+# starships.ai – Multi-Channel AI Agent Platform
 
-starships.ai is a TypeScript monorepo that turns a fleet of **Discord bots** into fully-fledged **Open WebUI** agents (or any ChatGPT-compatible backend). Each "persona" runs in its own Discord client and responds to @mentions, while an optional HTTP endpoint lets external services dispatch autonomous messages.
+starships.ai is a TypeScript monorepo that provides a flexible HTTP API for AI agents with persistent memory and Neo4j-backed storage. The platform supports multiple AI agents with customizable personalities and can be integrated with any chat platform through adapters.
 
-> **Project status:** Early technical foundation (Phase 1). Expect rapid changes and breaking refactors.
+> **Project status:** Core platform ready. Adapters for Discord, Slack, and other platforms are planned.
 
 ---
 
@@ -10,8 +10,10 @@ starships.ai is a TypeScript monorepo that turns a fleet of **Discord bots** int
 
 | Package | Version | Description |
 |---------|---------|-------------|
-| `@starships/bridge-core` | `workspace:*` | Library that handles all Discord ↔ LLM plumbing: persona registry, in-memory conversation memory, message routing and Discord client lifecycle. |
-| `@starships/server` | `workspace:*` | Express.js web-server that boots all personas via `BotManager` and exposes HTTP endpoints such as `/dispatch` & `/redeploy`. |
+| `@starships/server` | `workspace:*` | Express.js server that provides HTTP API for AI agents, memory management, and administrative endpoints. |
+| `@starships/agent-engine` | `workspace:*` | Core AI chat logic with memory management and LLM provider abstractions. |
+| `@starships/neo4j-models` | `workspace:*` | Neo4j database models and repositories for agents, users, channels, and models. |
+| `@starships/protocol` | `workspace:*` | Shared TypeScript interfaces and types for API contracts. |
 
 ## Tech Stack
 
@@ -51,41 +53,81 @@ starships.ai is a TypeScript monorepo that turns a fleet of **Discord bots** int
 
 ## Environment Variables
 
-The bridge is configured purely via environment variables so it can run anywhere (Docker, serverless, bare-metal).
+The platform is configured via environment variables for flexible deployment.
 
 | Variable | Required | Example | Purpose |
 |----------|----------|---------|---------|
-| `AGENTS_JSON` | One of | `[{"id":"agent-1","name":"R2-D2","model":"gpt-4o","botToken":"…"}]` | Inline JSON array describing active personas (see `AgentConfig` type) |
-| `PERSONA_REGISTRY_URL` | One of | `https://registry.your-domain.com/agents` | Remote endpoint that returns the same JSON array as above |
-| `OPEN_WEBUI_BASE_URL` | Optional | `http://localhost:3000` | Base URL of Open WebUI (defaults to `http://localhost:3000`) |
-| `OPEN_WEBUI_API_KEY` | Optional | `sk-…` | API key forwarded as `Authorization: Bearer …` header when talking to Open WebUI |
-| `PORT` | Optional | `4000` | Port for the Express server (`@starships/server`) |
-| `REDEPLOY_SECRET` | Optional | `super-secret‐token` | Bearer token required by the `/redeploy` webhook |
+| `NEO4J_URI` | Optional | `bolt://localhost:7687` | Neo4j connection URI (defaults to localhost) |
+| `NEO4J_USERNAME` | Optional | `neo4j` | Neo4j database username |
+| `NEO4J_PASSWORD` | Optional | `password` | Neo4j database password |
+| `NEO4J_DATABASE` | Optional | `neo4j` | Neo4j database name |
+| `PORT` | Optional | `4000` | Port for the Express server |
+| `REDEPLOY_SECRET` | Optional | `super-secret-token` | Bearer token required by the `/redeploy` webhook |
+| `OPENAI_API_KEY` | Optional | `sk-...` | OpenAI API key (when using OpenAI provider) |
+| `PROVIDER` | Optional | `openai\|mock` | LLM provider to use (defaults to mock) |
 
-If both `AGENTS_JSON` *and* `PERSONA_REGISTRY_URL` are missing the server will refuse to start.
+The server will auto-seed with default agents if none exist in the database.
 
 ---
 
 ## HTTP API (server package)
 
-### `POST /dispatch`
-Send an autonomous message **from** an agent **to** a Discord channel.
+### `GET /v1/agents`
+List all available agents.
 
-```jsonc
-// request body
+**Response:**
+```json
+[
+  {
+    "id": "agent-1",
+    "name": "Assistant",
+    "model": "gpt-4",
+    "systemPrompt": "You are a helpful AI assistant."
+  }
+]
+```
+
+### `POST /v1/chat`
+Send a message to an agent and get a response.
+
+**Request:**
+```json
 {
-  "agent_id": "agent-1",      // must match an id from the persona registry
-  "channel_id": "1234567890", // Discord channel ID
-  "message": "Hello, world!"   // raw text
+  "agent_id": "agent-1",
+  "user_id": "user-123",
+  "channel_id": "channel-456",  // optional
+  "message": "Hello, world!",
+  "stream": false               // optional, enables SSE streaming
 }
 ```
-Responses:
-* `200 OK { ok: true }` — message forwarded
-* `404` — unknown agent or channel
-* `400` — missing fields
+
+**Response:**
+```json
+{
+  "reply": "Hello! How can I help you today?",
+  "usage": {                    // optional, if provided by LLM
+    "prompt_tokens": 10,
+    "completion_tokens": 8
+  }
+}
+```
+
+### `POST /v1/memory/reset`
+Clear conversation memory for a specific session.
+
+**Request:**
+```json
+{
+  "agent_id": "agent-1",
+  "user_id": "user-123",
+  "channel_id": "channel-456"  // optional
+}
+```
+
+**Response:** `204 No Content`
 
 ### `POST /redeploy`
-An optional health / ping endpoint for CI-CD pipelines. If `REDEPLOY_SECRET` is set it must be provided as a **Bearer** token in the `Authorization` header.
+Administrative webhook endpoint. If `REDEPLOY_SECRET` is set it must be provided as a **Bearer** token in the `Authorization` header.
 
 ---
 

@@ -18,13 +18,13 @@ services:
       - neo4j_import:/var/lib/neo4j/import
       - neo4j_plugins:/plugins
     networks:
-      - mcp-network
+      - starships-network
 
-  mcp-server:
+  server:
     build:
       context: ../../
-      dockerfile: packages/mcp-server/Dockerfile.neo4j
-    container_name: mcp-server
+      dockerfile: packages/server/Dockerfile.neo4j
+    container_name: starships-server
     environment:
       - NODE_ENV=production
       - PORT=4000
@@ -37,7 +37,7 @@ services:
     depends_on:
       - neo4j
     networks:
-      - mcp-network
+      - starships-network
     restart: unless-stopped
 
 volumes:
@@ -47,5 +47,5 @@ volumes:
   neo4j_plugins:
 
 networks:
-  mcp-network:
+  starships-network:
     driver: bridge 

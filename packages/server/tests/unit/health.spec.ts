@@ -5,6 +5,6 @@ describe("Health check", () => {
     await api()
       .get("/")
       .expect(200)
-      .expect("mcp-server running");
+      .expect("starships.ai server running");
   });
 }); 

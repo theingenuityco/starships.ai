@@ -1,0 +1,35 @@
+# Node / pnpm workspace
+node_modules/
+.pnpm-debug.log*
+
+# Build outputs
+**/dist/
+**/build/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Logs
+*.log
+
+# Environment files
+.env
+# Ignore all env files except example template
+!*.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE / Editor settings
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Turborepo cache
+.turbo/
+
+# Misc
+coverage/ 

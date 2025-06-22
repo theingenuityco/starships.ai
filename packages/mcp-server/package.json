@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@starships/agent-engine": "workspace:*",
+    "@starships/neo4j-models": "workspace:*",
     "@starships/protocol": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",

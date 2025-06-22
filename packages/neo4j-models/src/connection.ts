@@ -1,0 +1,144 @@
+import neo4j, { Driver, Session, auth, ManagedTransaction } from 'neo4j-driver';
+
+export interface Neo4jConfig {
+  uri: string;
+  username: string;
+  password: string;
+  database?: string;
+}
+
+export class Neo4jConnection {
+  private driver: Driver | null = null;
+  private config: Neo4jConfig;
+
+  constructor(config: Neo4jConfig) {
+    this.config = config;
+  }
+
+  async connect(): Promise<void> {
+    if (this.driver) {
+      return; // Already connected
+    }
+
+    try {
+      this.driver = neo4j.driver(
+        this.config.uri,
+        auth.basic(this.config.username, this.config.password)
+      );
+
+      // Verify connectivity
+      await this.driver.verifyConnectivity();
+      console.log('Successfully connected to Neo4j database');
+    } catch (error) {
+      console.error('Failed to connect to Neo4j:', error);
+      throw error;
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.driver) {
+      await this.driver.close();
+      this.driver = null;
+      console.log('Disconnected from Neo4j database');
+    }
+  }
+
+  getSession(): Session {
+    if (!this.driver) {
+      throw new Error('Neo4j driver is not connected. Call connect() first.');
+    }
+    
+    return this.driver.session({
+      database: this.config.database || 'neo4j'
+    });
+  }
+
+  async executeQuery<T = any>(
+    cypher: string, 
+    parameters: any = {}
+  ): Promise<T[]> {
+    const session = this.getSession();
+    
+    try {
+      const result = await session.executeRead((tx: ManagedTransaction) => 
+        tx.run(cypher, parameters)
+      );
+      
+      return result.records.map(record => record.toObject() as T);
+    } finally {
+      await session.close();
+    }
+  }
+
+  async executeWrite<T = any>(
+    cypher: string, 
+    parameters: any = {}
+  ): Promise<T[]> {
+    const session = this.getSession();
+    
+    try {
+      const result = await session.executeWrite((tx: ManagedTransaction) => 
+        tx.run(cypher, parameters)
+      );
+      
+      return result.records.map(record => record.toObject() as T);
+    } finally {
+      await session.close();
+    }
+  }
+
+  async initializeSchema(): Promise<void> {
+    const session = this.getSession();
+    
+    try {
+      // Create constraints for unique IDs
+      const constraints = [
+        'CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE',
+        'CREATE CONSTRAINT model_id_unique IF NOT EXISTS FOR (m:Model) REQUIRE m.id IS UNIQUE',
+        'CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE',
+        'CREATE CONSTRAINT channel_id_unique IF NOT EXISTS FOR (c:Channel) REQUIRE c.id IS UNIQUE',
+      ];
+
+      for (const constraint of constraints) {
+        await session.run(constraint);
+      }
+
+      // Create indexes for common queries
+      const indexes = [
+        'CREATE INDEX agent_name_index IF NOT EXISTS FOR (a:Agent) ON (a.name)',
+        'CREATE INDEX user_username_index IF NOT EXISTS FOR (u:User) ON (u.username)',
+        'CREATE INDEX user_email_index IF NOT EXISTS FOR (u:User) ON (u.email)',
+        'CREATE INDEX channel_guild_index IF NOT EXISTS FOR (c:Channel) ON (c.guildId)',
+        'CREATE INDEX model_provider_index IF NOT EXISTS FOR (m:Model) ON (m.provider)',
+      ];
+
+      for (const index of indexes) {
+        await session.run(index);
+      }
+
+      console.log('Neo4j schema initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Neo4j schema:', error);
+      throw error;
+    } finally {
+      await session.close();
+    }
+  }
+}
+
+// Singleton instance
+let connectionInstance: Neo4jConnection | null = null;
+
+export function createConnection(config: Neo4jConfig): Neo4jConnection {
+  if (!connectionInstance) {
+    connectionInstance = new Neo4jConnection(config);
+  }
+  return connectionInstance;
+}
+
+export function getConnection(): Neo4jConnection {
+  if (!connectionInstance) {
+    throw new Error('Neo4j connection not initialized. Call createConnection() first.');
+  }
+  return connectionInstance;
+} 

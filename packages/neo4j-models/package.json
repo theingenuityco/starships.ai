@@ -1,0 +1,23 @@
+{
+  "name": "@starships/neo4j-models",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@starships/protocol": "workspace:*",
+    "neo4j-driver": "^5.27.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.2",
+    "tsx": "^4.7.0"
+  }
+} 

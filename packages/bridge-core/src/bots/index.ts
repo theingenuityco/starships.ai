@@ -1,3 +1,3 @@
 // TODO: Bots implementations will be added here.
 
-export {}; 
+export { BotManager } from "./botManager"; 

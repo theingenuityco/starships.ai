@@ -11,7 +11,7 @@
     "lint": "turbo run lint",
     "build": "turbo run build",
     "start": "pnpm --filter @starships/server start",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "turbo run test"
   },
   "dependencies": {
     "discord.js": "^14.20.0",
@@ -27,6 +27,7 @@
     "ts-node": "^10.9.1",
     "eslint": "^8.50.0",
     "prettier": "^3.0.2",
+    "eslint-config-prettier": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^6.11.0",
     "@typescript-eslint/parser": "^6.11.0",
     "@types/node": "^20.9.1",

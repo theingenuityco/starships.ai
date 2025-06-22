@@ -7,7 +7,7 @@ import memoryRouter from "./routes/memory";
 
 dotenv.config();
 
-const app = express();
+const app: import("express").Express = express();
 app.use(cors());
 app.use(express.json());
 
@@ -18,7 +18,13 @@ app.use("/v1/chat", chatRouter);
 app.use("/v1/memory", memoryRouter);
 
 const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
-app.listen(port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`mcp-server listening on ${port}`);
-}); 
+
+// Only start the HTTP server if this file is executed directly (e.g. `node dist/index.js`)
+if (require.main === module) {
+  app.listen(port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`mcp-server listening on ${port}`);
+  });
+}
+
+export { app }; 

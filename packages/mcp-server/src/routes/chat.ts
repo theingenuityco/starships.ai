@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { MemoryStore, chat as agentChat } from "@starships/agent-engine";
+import { chat as agentChat } from "@starships/agent-engine";
+import store from "../store";
 import type { ChatRequest } from "@starships/protocol";
 
 const router: import("express").Router = Router();
-const store = new MemoryStore();
 
 router.post("/", async (req, res) => {
   try {

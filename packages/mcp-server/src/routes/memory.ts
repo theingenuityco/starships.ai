@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { MemoryStore } from "@starships/agent-engine";
+import store from "../store";
 
 const router: import("express").Router = Router();
-const store = new MemoryStore();
 
 router.post("/reset", (req, res) => {
   const { agent_id, user_id, channel_id } = req.body as {

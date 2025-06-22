@@ -40,4 +40,34 @@ router.post("/", async (req, res) => {
   }
 });
 
+// Update agent
+router.put("/:id", async (req, res) => {
+  try {
+    const { RepositoryFactory } = await import("@starships/neo4j-models");
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const updated = await agentRepo.update(req.params.id, req.body);
+    if (!updated) {
+      return res.status(404).json({ error: "Agent not found" });
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// Delete agent
+router.delete("/:id", async (req, res) => {
+  try {
+    const { RepositoryFactory } = await import("@starships/neo4j-models");
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const deleted = await agentRepo.delete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Agent not found" });
+    }
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 export default router; 

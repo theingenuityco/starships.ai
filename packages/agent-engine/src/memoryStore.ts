@@ -1,4 +1,4 @@
-import type { MemoryEntry, SessionKey } from "./types";
+import type { MemoryEntry, SessionKey } from "@starships/protocol";
 
 /**
  * Simple in-memory conversation memory. Not suitable for production, but

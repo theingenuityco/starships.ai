@@ -63,24 +63,15 @@ importers:
 
   packages/agent-engine:
     dependencies:
+      '@starships/neo4j-models':
+        specifier: workspace:*
+        version: link:../neo4j-models
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
       axios:
         specifier: ^1.10.0
         version: 1.10.0
-
-  packages/bridge-core:
-    dependencies:
-      axios:
-        specifier: ^1.10.0
-        version: 1.10.0
-      discord.js:
-        specifier: ^14.20.0
-        version: 14.20.0
-      dotenv:
-        specifier: ^16.5.0
-        version: 16.5.0
 
   packages/mcp-server:
     dependencies:
@@ -151,9 +142,6 @@ importers:
 
   packages/server:
     dependencies:
-      '@starships/bridge-core':
-        specifier: workspace:*
-        version: link:../bridge-core
       body-parser:
         specifier: ^2.2.0
         version: 2.2.0

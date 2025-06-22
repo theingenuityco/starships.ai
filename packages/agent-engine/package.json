@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",
+    "@starships/neo4j-models": "workspace:*",
     "axios": "^1.10.0"
   }
 } 

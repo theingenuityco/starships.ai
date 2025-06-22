@@ -1,16 +1,18 @@
 import { buildPrompt } from "./prompt/builder";
 import { MemoryStore } from "./memoryStore";
-import { PersonaRegistry } from "./personaRegistry";
 import { MockLLMProvider } from "./llm/mock";
 import { LLMProvider } from "./llm/provider";
-import type { ChatRequest, ChatResponse } from "@starships/protocol";
-import type { MemoryEntry } from "./types";
+import { RepositoryFactory } from "@starships/neo4j-models";
+import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
 // TODO: swap provider implementation by ENV later
 const provider: LLMProvider = new MockLLMProvider();
 
 export async function chat(req: ChatRequest, store: MemoryStore): Promise<ChatResponse> {
-  const agent = await PersonaRegistry.getAgent(req.agent_id);
+  // Use Neo4j to get agent instead of PersonaRegistry
+  const agentRepo = RepositoryFactory.getAgentRepository();
+  const agent = await agentRepo.findById(req.agent_id);
+  
   if (!agent) {
     throw new Error(`Agent ${req.agent_id} not found`);
   }
@@ -29,4 +31,4 @@ export async function chat(req: ChatRequest, store: MemoryStore): Promise<ChatRe
   return { reply: result.reply, usage: result.usage };
 }
 
-export { MemoryStore, PersonaRegistry }; 
+export { MemoryStore }; 

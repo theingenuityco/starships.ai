@@ -1,4 +1,4 @@
-import type { MemoryEntry } from "../types";
+import type { MemoryEntry } from "@starships/protocol";
 
 export function buildPrompt(systemPrompt: string | undefined, memory: MemoryEntry[], userMessage: string) {
   const messages = [] as Array<{ role: "system" | "assistant" | "user"; content: string }>;

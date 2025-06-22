@@ -16,10 +16,10 @@ node_modules/
 .env
 # Ignore all env files except example template
 !*.env.example
-+.env.local
-+.env.development.local
-+.env.test.local
-+.env.production.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # IDE / Editor settings
 .vscode/

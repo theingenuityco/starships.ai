@@ -10,9 +10,13 @@ export interface Agent {
 export interface Model {
   id: string;
   name: string;
-  provider: string;
+  provider: 'openai' | 'anthropic';
   maxTokens?: number;
   temperature?: number;
+  embeddingModel?: string;
+  supportsStreaming?: boolean;
+  supportsTools?: boolean;
+  costPer1kTokens?: number;
 }
 
 export interface User {

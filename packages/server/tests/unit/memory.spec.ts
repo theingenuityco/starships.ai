@@ -1,6 +1,5 @@
 import { api } from "../testUtils";
 import store from "../../src/store";
-import { MemoryStore } from "@starships/agent-engine";
 
 describe("POST /v1/memory/reset", () => {
   it("should clear memory and return 204", async () => {
@@ -12,7 +11,7 @@ describe("POST /v1/memory/reset", () => {
       channel_id: "ch-1",
     };
 
-    const expectedKey = MemoryStore.makeKey(payload.user_id, payload.agent_id, payload.channel_id);
+    const expectedKey = store.makeKey(payload.agent_id, payload.user_id, payload.channel_id);
 
     await api().post("/v1/memory/reset").send(payload).expect(204);
 

@@ -3,29 +3,54 @@
 // @ts-ignore
 // eslint-disable-next-line no-undef
 
-import type { ChatRequest, ChatResponse } from "@starships/protocol";
+import type { ChatRequest, ChatResponse, MemoryEntry, MemorySearchResult } from "@starships/protocol";
 
 // Simple in-memory store implementation to satisfy interface
-class MockMemoryStore {
-  private readonly store = new Map<string, any[]>();
-  static makeKey(userId: string, agentId: string, channelId: string): string {
-    return `${userId}:${agentId}:${channelId}`;
+class MockLangChainMemoryStore {
+  private readonly store = new Map<string, MemoryEntry[]>();
+  
+  makeKey(agentId: string, userId: string, channelId?: string): string {
+    return channelId ? `${agentId}:${userId}:${channelId}` : `${agentId}:${userId}`;
   }
-  get(key: string) {
+  
+  async get(key: string): Promise<MemoryEntry[]> {
     return this.store.get(key) ?? [];
   }
-  append(key: string, entry: any) {
-    const current = this.get(key);
+  
+  async append(key: string, entry: MemoryEntry): Promise<void> {
+    const current = await this.get(key);
     this.store.set(key, [...current, entry]);
   }
-  clear(key: string) {
+  
+  async clear(key: string): Promise<void> {
     this.store.delete(key);
+  }
+  
+  async semanticSearch(sessionKey: string, query: string, limit: number = 5): Promise<MemorySearchResult> {
+    const entries = await this.get(sessionKey);
+    // Simple mock: return entries that contain query text
+    const filteredEntries = entries
+      .filter(entry => entry.content.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, limit)
+      .map(entry => ({
+        ...entry,
+        importance: 0.8,
+      }));
+    
+    return {
+      entries: filteredEntries,
+      relevanceScores: filteredEntries.map(() => 0.8),
+    };
+  }
+  
+  async saveIndex(): Promise<void> {
+    // Mock implementation - no-op
   }
 }
 
 const loadAgents = jest.fn<Promise<any[]>, []>();
 
-const chat = jest.fn(async (req: ChatRequest, _store: MockMemoryStore): Promise<ChatResponse> => {
+const chat = jest.fn(async (req: ChatRequest, _store: MockLangChainMemoryStore): Promise<ChatResponse> => {
   return {
     reply: `echo:${req.message}`,
   } as ChatResponse;
@@ -36,5 +61,5 @@ export const PersonaRegistry = {
   getAgent: jest.fn(async (id: string) => ({ id, name: `Agent ${id}`, model: "gpt-4o" })),
 };
 
-export const MemoryStore = MockMemoryStore as unknown as typeof import("@starships/agent-engine").MemoryStore;
+export const LangChainMemoryStore = MockLangChainMemoryStore as unknown as typeof import("@starships/agent-engine").LangChainMemoryStore;
 export { chat }; 

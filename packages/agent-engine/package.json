@@ -10,7 +10,17 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@langchain/anthropic": "^0.3.23",
+    "@langchain/community": "^0.3.47",
+    "@langchain/core": "^0.3.61",
+    "@langchain/openai": "^0.5.15",
+    "@starships/neo4j-models": "workspace:*",
     "@starships/protocol": "workspace:*",
-    "@starships/neo4j-models": "workspace:*"
+    "faiss-node": "^0.5.1",
+    "langchain": "^0.3.29",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0"
   }
-} 
+}

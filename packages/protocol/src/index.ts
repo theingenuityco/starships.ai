@@ -20,6 +20,7 @@ export interface AgentConfig {
   id: string;
   name: string;
   model: string;
+  provider?: 'openai' | 'anthropic';
   systemPrompt?: string;
 }
 
@@ -27,6 +28,17 @@ export interface MemoryEntry {
   role: "user" | "assistant" | "system";
   content: string;
   timestamp?: number;
+}
+
+export interface EnhancedMemoryEntry extends MemoryEntry {
+  embedding?: number[];
+  importance?: number;
+  summary?: string;
+}
+
+export interface MemorySearchResult {
+  entries: EnhancedMemoryEntry[];
+  relevanceScores: number[];
 }
 
 export type SessionKey = string;
@@ -41,5 +53,9 @@ export interface LLMResult {
 }
 
 export interface LLMProvider {
-  complete(prompt: LLMChatPrompt, opts?: { stream?: boolean }): Promise<LLMResult>;
+  complete(prompt: LLMChatPrompt, opts?: { 
+    stream?: boolean; 
+    temperature?: number; 
+    maxTokens?: number; 
+  }): Promise<LLMResult>;
 } 

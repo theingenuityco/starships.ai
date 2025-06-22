@@ -2,7 +2,7 @@ import type { MemoryEntry, SessionKey } from "@starships/protocol";
 
 /**
  * Simple in-memory conversation memory. Not suitable for production, but
- * perfect for testing and as a drop-in until we plug Redis or a vector store.
+ * perfect for testing and as a drop-in until we plug a vector store.
  */
 export class MemoryStore {
   private readonly store = new Map<SessionKey, MemoryEntry[]>();

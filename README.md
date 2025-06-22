@@ -19,7 +19,7 @@ starships.ai is a TypeScript monorepo that provides a flexible HTTP API for AI a
 
 * **Monorepo tooling:** [pnpm Workspaces](https://pnpm.io/workspaces) + [Turborepo](https://turbo.build)
 * **Language:** TypeScript 5 (strict) with project references
-* **Runtime libs:** discord.js v14, express v5, axios, ioredis (TBD), dotenv
+* **Runtime libs:** discord.js v14, express v5, dotenv
 * **Quality:** ESLint + Prettier (enforced by `turbo run lint`)
 
 ---
@@ -149,7 +149,7 @@ docker run -p 4000:4000 --env-file .env starships.ai
 
 ## Roadmap
 
-* Vector-store backed `MemoryStore` (Redis or pgvector)
+* Vector-store backed `MemoryStore` (pgvector)
 * Slash-command support for persona & memory management
 * Automated tests (unit + integration)
 * Helm chart / Terraform module for cloud-native deploys

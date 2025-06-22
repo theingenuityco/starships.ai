@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { Neo4jAgentService } from "../services/Neo4jAgentService";
 
 const router: Router = Router();
@@ -8,6 +8,7 @@ router.get("/", async (_req, res) => {
     const agents = await Neo4jAgentService.loadAgents();
     res.json(agents);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: (err as Error).message });
   }
 });
@@ -17,10 +18,11 @@ router.get("/:id", async (req, res) => {
   try {
     const agent = await Neo4jAgentService.getAgent(req.params.id);
     if (!agent) {
-      return res.status(404).json({ error: "Agent not found" });
+      res.status(404).json({ error: "Agent not found" });
     }
     res.json(agent);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: (err as Error).message });
   }
 });
@@ -30,12 +32,13 @@ router.post("/", async (req, res) => {
   try {
     const { name, model, systemPrompt } = req.body;
     if (!name || !model) {
-      return res.status(400).json({ error: "name and model are required" });
+      res.status(400).json({ error: "name and model are required" });
     }
     
     const agent = await Neo4jAgentService.createAgent({ name, model, systemPrompt });
     res.status(201).json(agent);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: (err as Error).message });
   }
 });
@@ -47,10 +50,11 @@ router.put("/:id", async (req, res) => {
     const agentRepo = RepositoryFactory.getAgentRepository();
     const updated = await agentRepo.update(req.params.id, req.body);
     if (!updated) {
-      return res.status(404).json({ error: "Agent not found" });
+      res.status(404).json({ error: "Agent not found" });
     }
     res.json(updated);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: (err as Error).message });
   }
 });
@@ -62,10 +66,11 @@ router.delete("/:id", async (req, res) => {
     const agentRepo = RepositoryFactory.getAgentRepository();
     const deleted = await agentRepo.delete(req.params.id);
     if (!deleted) {
-      return res.status(404).json({ error: "Agent not found" });
+      res.status(404).json({ error: "Agent not found" });
     }
     res.status(204).send();
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: (err as Error).message });
   }
 });

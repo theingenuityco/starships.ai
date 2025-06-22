@@ -1,6 +1,5 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import chatRouter from "./routes/chat";
 import agentsRouter from "./routes/agents";
@@ -14,11 +13,12 @@ const app: express.Express = express();
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
 app.use(express.json());
 
 // Health check
-app.get("/", (_req, res) => res.send("starships.ai server running"));
+app.get("/", (_req: Request, res: Response) => {
+  res.send("starships.ai server running");
+});
 
 // API routes
 app.use("/v1/agents", agentsRouter);

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { chat as agentChat } from "@starships/agent-engine";
-import store from "../store";
 import type { ChatRequest } from "@starships/protocol";
+import store from "../store";
 
 const router: Router = Router();
 

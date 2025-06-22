@@ -3,6 +3,7 @@ name: Publish Docker Image to GHCR
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 permissions:
   contents: read

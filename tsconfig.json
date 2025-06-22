@@ -12,6 +12,9 @@
   "exclude": ["node_modules"],
   "references": [
     { "path": "./packages/bridge-core" },
-    { "path": "./packages/server" }
+    { "path": "./packages/server" },
+    { "path": "./packages/protocol" },
+    { "path": "./packages/agent-engine" },
+    { "path": "./packages/mcp-server" }
   ]
 } 

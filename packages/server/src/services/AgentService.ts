@@ -2,6 +2,9 @@ import { RepositoryFactory, Agent, createConnection, Neo4jConfig } from '@starsh
 import { AgentConfig } from '@starships/protocol';
 import { env } from '../config/environment';
 
+/**
+ * Service for managing AI agents with Neo4j persistence
+ */
 export class AgentService {
   private static isInitialized = false;
 
@@ -21,7 +24,6 @@ export class AgentService {
     await connection.connect();
     await connection.initializeSchema();
     
-    // Seed with default agents if none exist
     await this.seedDefaultAgents();
     
     this.isInitialized = true;
@@ -33,7 +35,6 @@ export class AgentService {
     const agentRepo = RepositoryFactory.getAgentRepository();
     const agents = await agentRepo.findAll();
     
-    // Convert Neo4j Agent to AgentConfig
     return agents.map(this.convertToAgentConfig);
   }
 
@@ -85,10 +86,9 @@ export class AgentService {
     const existingAgents = await agentRepo.findAll();
     
     if (existingAgents.length > 0) {
-      return; // Already seeded
+      return;
     }
 
-    // Default agents - using environment configuration
     const defaultAgents = [
       {
         name: 'Assistant',
@@ -110,7 +110,5 @@ export class AgentService {
     for (const agentData of defaultAgents) {
       await agentRepo.create(agentData);
     }
-
-    // Default agents seeded successfully
   }
 } 

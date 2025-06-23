@@ -8,6 +8,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { MemoryEntry, EnhancedMemoryEntry, MemorySearchResult, SessionKey } from "@starships/protocol";
 
+/**
+ * LangChain-based memory store with vector similarity search
+ */
 export class LangChainMemoryStore {
   private bufferMemories = new Map<SessionKey, BufferMemory>();
   private vectorStore: FaissStore | null = null;
@@ -25,20 +28,16 @@ export class LangChainMemoryStore {
 
   private async initializeVectorStore() {
     try {
-      // Try to load existing index
       if (fs.existsSync(this.indexPath)) {
         this.vectorStore = await FaissStore.load(this.indexPath, this.embeddings);
       } else {
-        // Create new vector store
         const docs = [new Document({ pageContent: "Initial document", metadata: {} })];
         this.vectorStore = await FaissStore.fromDocuments(docs, this.embeddings);
         
-        // Ensure directory exists
         fs.mkdirSync(path.dirname(this.indexPath), { recursive: true });
       }
     } catch (error) {
       console.error("Failed to initialize vector store:", error);
-      // Create empty vector store as fallback
       const docs = [new Document({ pageContent: "Initial document", metadata: {} })];
       this.vectorStore = await FaissStore.fromDocuments(docs, this.embeddings);
     }
@@ -64,7 +63,6 @@ export class LangChainMemoryStore {
   }
 
   async append(sessionKey: SessionKey, entry: MemoryEntry): Promise<void> {
-    // Get or create buffer memory
     let bufferMemory = this.bufferMemories.get(sessionKey);
     if (!bufferMemory) {
       bufferMemory = new BufferMemory({
@@ -74,14 +72,12 @@ export class LangChainMemoryStore {
       this.bufferMemories.set(sessionKey, bufferMemory);
     }
 
-    // Add to buffer memory
     if (entry.role === "user") {
       await bufferMemory.chatHistory.addMessage(new HumanMessage(entry.content));
     } else if (entry.role === "assistant") {
       await bufferMemory.chatHistory.addMessage(new AIMessage(entry.content));
     }
 
-    // Add to vector store for semantic search
     await this.addToVectorStore(sessionKey, entry);
   }
 
@@ -111,7 +107,6 @@ export class LangChainMemoryStore {
     try {
       const results = await this.vectorStore.similaritySearchWithScore(query, limit);
       
-      // Filter by session key and minimum relevance score
       const filteredResults = results.filter(([doc, score]) => 
         doc.metadata.sessionKey === sessionKey && score > 0.7
       );
@@ -120,7 +115,7 @@ export class LangChainMemoryStore {
         role: doc.metadata.role,
         content: doc.pageContent,
         timestamp: doc.metadata.timestamp,
-        importance: 1 - (doc.metadata.timestamp ? (Date.now() - doc.metadata.timestamp) / (1000 * 60 * 60 * 24) : 0), // Decay over time
+        importance: 1 - (doc.metadata.timestamp ? (Date.now() - doc.metadata.timestamp) / (1000 * 60 * 60 * 24) : 0),
       }));
 
       const relevanceScores = filteredResults.map(([, score]) => score);
@@ -140,25 +135,19 @@ export class LangChainMemoryStore {
     }
 
     try {
-      // Filter out documents with the specific session key
-      // Since FAISS doesn't support deletion, we need to rebuild the index
       const allDocs = await this.getAllDocuments();
       const filteredDocs = allDocs.filter(doc => doc.metadata.sessionKey !== sessionKey);
       
       if (filteredDocs.length > 0) {
-        // Rebuild the vector store without the deleted session's documents
         this.vectorStore = await FaissStore.fromDocuments(filteredDocs, this.embeddings);
       } else {
-        // If no documents remain, create a new empty store
         const emptyDoc = new Document({ pageContent: "Initial document", metadata: {} });
         this.vectorStore = await FaissStore.fromDocuments([emptyDoc], this.embeddings);
       }
       
-      // Save the updated index
       await this.saveIndex();
     } catch (error) {
       console.error("Failed to clear vector store for session:", error);
-      // Continue gracefully - buffer memory is still cleared
     }
   }
 
@@ -168,9 +157,7 @@ export class LangChainMemoryStore {
     }
     
     try {
-      // This is a workaround since FAISS doesn't provide direct access to all documents
-      // We'll use similarity search with a generic query to get a broad set of documents
-      const results = await this.vectorStore.similaritySearch("", 1000); // Get up to 1000 docs
+      const results = await this.vectorStore.similaritySearch("", 1000);
       return results;
     } catch (error) {
       console.error("Failed to retrieve documents from vector store:", error);

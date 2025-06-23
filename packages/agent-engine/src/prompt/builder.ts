@@ -1,24 +1,31 @@
-import type { MemoryEntry } from "@starships/protocol";
+import type { MemoryEntry, LLMChatPrompt } from "@starships/protocol";
 
+/**
+ * Build LLM chat prompt from system prompt, memory, and current message
+ */
 export function buildPrompt(
   systemPrompt: string | undefined, 
   memory: MemoryEntry[], 
-  userMessage: string, 
-  relevantContext: string = ""
-) {
-  const messages = [] as Array<{ role: "system" | "assistant" | "user"; content: string }>;
-  
-  let finalSystemPrompt = systemPrompt || "";
+  currentMessage: string,
+  relevantContext?: string
+): LLMChatPrompt {
+  const messages: LLMChatPrompt['messages'] = [];
+
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
+  }
+
   if (relevantContext) {
-    finalSystemPrompt += `\n\nRelevant context from conversation history:\n${relevantContext}`;
+    messages.push({ role: "system", content: `Relevant context from conversation history:\n${relevantContext}` });
   }
+
+  const memoryMessages = memory.map(entry => ({
+    role: entry.role,
+    content: entry.content,
+  }));
   
-  if (finalSystemPrompt) {
-    messages.push({ role: "system", content: finalSystemPrompt });
-  }
-  
-  // flatten memory into chat format
-  memory.forEach((m) => messages.push({ role: m.role, content: m.content }));
-  messages.push({ role: "user", content: userMessage });
+  messages.push(...memoryMessages);
+  messages.push({ role: "user" as const, content: currentMessage });
+
   return { messages };
 } 

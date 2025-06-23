@@ -1,16 +1,17 @@
 import { LangChainMemoryStore } from "@starships/agent-engine";
 
-// A single shared LangChainMemoryStore instance for the entire server process
 let store: LangChainMemoryStore | null = null;
 
-function getStore(): LangChainMemoryStore {
+/**
+ * Get singleton memory store instance
+ */
+export default function getStore(): LangChainMemoryStore {
   if (!store) {
     store = new LangChainMemoryStore();
   }
   return store;
 }
 
-// Graceful shutdown handler to save vector index
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, saving vector index...');
   if (store) {
@@ -25,6 +26,4 @@ process.on('SIGINT', async () => {
     await store.saveIndex();
   }
   process.exit(0);
-});
-
-export default getStore; 
+}); 

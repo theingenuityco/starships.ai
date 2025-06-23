@@ -1,19 +1,19 @@
-import { Router, Request, Response } from "express";
+import { Router } from "express";
 import { AgentService } from "../services/AgentService";
+import type { AgentConfig } from "@starships/protocol";
 
 const router: Router = Router();
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   try {
     const agents = await AgentService.loadAgents();
     res.json(agents);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: (err as Error).message });
+  } catch (error) {
+    console.error("Error loading agents:", error);
+    res.status(500).json({ error: "Failed to load agents" });
   }
 });
 
-// Get single agent by ID
 router.get("/:id", async (req, res) => {
   try {
     const agent = await AgentService.getAgent(req.params.id);
@@ -22,55 +22,49 @@ router.get("/:id", async (req, res) => {
     } else {
       res.json(agent);
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: (err as Error).message });
+  } catch (error) {
+    console.error("Error getting agent:", error);
+    res.status(500).json({ error: "Failed to get agent" });
   }
 });
 
-// Create new agent
 router.post("/", async (req, res) => {
   try {
-    const { name, model, systemPrompt } = req.body;
-    if (!name || !model) {
-      res.status(400).json({ error: "name and model are required" });
-    } else {
-      const agent = await AgentService.createAgent({ name, model, systemPrompt });
-      res.status(201).json(agent);
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: (err as Error).message });
+    const agentData = req.body as Omit<AgentConfig, 'id'>;
+    const agent = await AgentService.createAgent(agentData);
+    res.status(201).json(agent);
+  } catch (error) {
+    console.error("Error creating agent:", error);
+    res.status(500).json({ error: "Failed to create agent" });
   }
 });
 
-// Update agent
 router.put("/:id", async (req, res) => {
   try {
-    const updated = await AgentService.updateAgent(req.params.id, req.body);
-    if (!updated) {
+    const updates = req.body as Partial<AgentConfig>;
+    const agent = await AgentService.updateAgent(req.params.id, updates);
+    if (!agent) {
       res.status(404).json({ error: "Agent not found" });
     } else {
-      res.json(updated);
+      res.json(agent);
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: (err as Error).message });
+  } catch (error) {
+    console.error("Error updating agent:", error);
+    res.status(500).json({ error: "Failed to update agent" });
   }
 });
 
-// Delete agent
 router.delete("/:id", async (req, res) => {
   try {
     const deleted = await AgentService.deleteAgent(req.params.id);
     if (!deleted) {
       res.status(404).json({ error: "Agent not found" });
     } else {
-      res.status(204).send();
+      res.json({ message: "Agent deleted successfully" });
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: (err as Error).message });
+  } catch (error) {
+    console.error("Error deleting agent:", error);
+    res.status(500).json({ error: "Failed to delete agent" });
   }
 });
 

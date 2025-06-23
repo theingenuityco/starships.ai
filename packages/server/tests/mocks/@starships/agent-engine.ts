@@ -5,7 +5,9 @@
 
 import type { ChatRequest, ChatResponse, MemoryEntry, MemorySearchResult } from "@starships/protocol";
 
-// Simple in-memory store implementation to satisfy interface
+/**
+ * Mock in-memory store for testing
+ */
 class MockLangChainMemoryStore {
   private readonly store = new Map<string, MemoryEntry[]>();
   

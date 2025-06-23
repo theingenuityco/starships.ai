@@ -35,7 +35,9 @@ app.use("/redeploy", redeployRouter);
 
 const port = env.PORT;
 
-// Initialize Neo4j and start server
+/**
+ * Initialize database and start HTTP server
+ */
 async function startServer() {
   try {
     // Skip Neo4j initialization during tests

@@ -4,13 +4,14 @@ import { ProviderFactory } from "./llm/provider-factory";
 import { RepositoryFactory } from "@starships/models";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
+/**
+ * Process chat request through agent with memory and context
+ */
 export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promise<ChatResponse> {
-  // Initialize provider factory if not already done
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
   ProviderFactory.initialize(agentRepo, llmRepo);
   
-  // Get agent from repository
   const agent = await agentRepo.findById(req.agent_id);
   
   if (!agent) {
@@ -20,7 +21,6 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
   const memory = await store.get(sessionKey);
 
-  // Semantic search for relevant context when memory is large
   let relevantContext = "";
   if (memory.length > 10) {
     const searchResult = await store.semanticSearch(sessionKey, req.message, 5);
@@ -33,10 +33,8 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
 
   const prompt = buildPrompt(agent.systemPrompt, memory, req.message, relevantContext);
   
-  // Get provider and complete request
   const provider = await ProviderFactory.getProvider(req.agent_id);
   
-  // Get LLM config for temperature and maxTokens
   const llm = await llmRepo.findById(agent.model);
   const opts = {
     stream: req.stream,
@@ -46,7 +44,6 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   
   const result = await provider.complete(prompt, opts);
 
-  // Persist memory
   const userTimestamp = Date.now();
   await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
   

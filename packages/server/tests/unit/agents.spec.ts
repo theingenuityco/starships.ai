@@ -17,6 +17,6 @@ describe("GET /v1/agents", () => {
   it("should handle errors from registry", async () => {
     (AgentService.loadAgents as jest.Mock).mockRejectedValueOnce(new Error("boom"));
     const res = await api().get("/v1/agents").expect(500);
-    expect(res.body).toEqual({ error: "boom" });
+    expect(res.body).toEqual({ error: "Failed to load agents" });
   });
 }); 

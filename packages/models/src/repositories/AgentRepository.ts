@@ -2,6 +2,9 @@ import { getConnection } from '../connection';
 import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Neo4j-based agent repository
+ */
 export class AgentRepository implements AgentRepositoryInterface {
   async findAll(): Promise<Agent[]> {
     const connection = getConnection();
@@ -42,7 +45,6 @@ export class AgentRepository implements AgentRepositoryInterface {
   async update(id: string, updates: Partial<Agent>): Promise<Agent | null> {
     const connection = getConnection();
     
-    // Build SET clause dynamically
     const setClause = Object.keys(updates)
       .filter(key => key !== 'id' && key !== 'createdAt')
       .map(key => `a.${key} = $${key}`)
@@ -93,6 +95,5 @@ export class AgentRepository implements AgentRepositoryInterface {
     );
     return result.map(record => record.a);
   }
-
 
 } 

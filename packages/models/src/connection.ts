@@ -7,6 +7,9 @@ export interface Neo4jConfig {
   database?: string;
 }
 
+/**
+ * Neo4j database connection manager
+ */
 export class Neo4jConnection {
   private driver: Driver | null = null;
   private config: Neo4jConfig;
@@ -17,7 +20,7 @@ export class Neo4jConnection {
 
   async connect(): Promise<void> {
     if (this.driver) {
-      return; // Already connected
+      return;
     }
 
     try {
@@ -26,9 +29,7 @@ export class Neo4jConnection {
         auth.basic(this.config.username, this.config.password)
       );
 
-      // Verify connectivity
       await this.driver.verifyConnectivity();
-      // Successfully connected to Neo4j database
     } catch (error) {
       console.error('Failed to connect to Neo4j:', error);
       throw error;
@@ -39,7 +40,6 @@ export class Neo4jConnection {
     if (this.driver) {
       await this.driver.close();
       this.driver = null;
-      // Disconnected from Neo4j database
     }
   }
 
@@ -91,7 +91,6 @@ export class Neo4jConnection {
     const session = this.getSession();
     
     try {
-      // Create constraints for unique IDs
       const constraints = [
         'CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE',
         'CREATE CONSTRAINT llm_id_unique IF NOT EXISTS FOR (l:LLM) REQUIRE l.id IS UNIQUE',
@@ -103,7 +102,6 @@ export class Neo4jConnection {
         await session.run(constraint);
       }
 
-      // Create indexes for common queries
       const indexes = [
         'CREATE INDEX agent_name_index IF NOT EXISTS FOR (a:Agent) ON (a.name)',
         'CREATE INDEX user_username_index IF NOT EXISTS FOR (u:User) ON (u.username)',
@@ -116,7 +114,6 @@ export class Neo4jConnection {
         await session.run(index);
       }
 
-      // Neo4j schema initialized successfully
     } catch (error) {
       console.error('Failed to initialize Neo4j schema:', error);
       throw error;
@@ -126,7 +123,6 @@ export class Neo4jConnection {
   }
 }
 
-// Singleton instance
 let connectionInstance: Neo4jConnection | null = null;
 
 export function createConnection(config: Neo4jConfig): Neo4jConnection {

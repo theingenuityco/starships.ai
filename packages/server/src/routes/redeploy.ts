@@ -1,6 +1,5 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
 
-// Async handler wrapper for Express v5 compatibility
 const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
@@ -8,8 +7,8 @@ const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextF
 const router: Router = express.Router();
 
 /**
- * POST /redeploy – secure webhook endpoint to acknowledge redeploy pings.
- * If REDEPLOY_SECRET is set, expects Authorization: Bearer <secret> header.
+ * Secure webhook endpoint to acknowledge redeploy pings
+ * Requires Authorization: Bearer <secret> header if REDEPLOY_SECRET is set
  */
 router.post('/', asyncHandler((req: Request, res: Response) => {
   const expectedSecret = process.env.REDEPLOY_SECRET;
@@ -22,9 +21,6 @@ router.post('/', asyncHandler((req: Request, res: Response) => {
 
   console.log('[WEBHOOK] Redeploy ping received.');
   res.status(200).send('Redeploy acknowledged.');
-
-  // Optional: trigger a graceful container restart. Uncomment if desired.
-  // setTimeout(() => process.exit(0), 100);
 }));
 
 export default router; 

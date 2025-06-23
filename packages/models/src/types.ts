@@ -17,20 +17,22 @@ export interface LLM {
   supportsStreaming?: boolean;
   supportsTools?: boolean;
   costPer1kTokens?: number;
+  createdAt: string;
 }
 
 export interface User {
   id: string;
   username: string;
   email?: string;
+  displayName?: string;
   createdAt: string;
 }
 
 export interface Channel {
   id: string;
   name: string;
-  type: string;
   guildId?: string;
+  type: 'text' | 'voice' | 'dm';
   createdAt: string;
 }
 
@@ -69,4 +71,18 @@ export interface ChannelRepository extends Repository<Channel> {
 
 export interface LLMRepository extends Repository<LLM> {
   findByProvider(provider: string): Promise<LLM[]>;
+}
+
+export interface AgentChannelRelationship {
+  agentId: string;
+  channelId: string;
+  deployedAt: string;
+  isActive: boolean;
+}
+
+export interface UserInteractionRelationship {
+  userId: string;
+  agentId: string;
+  lastInteraction: string;
+  messageCount: number;
 } 

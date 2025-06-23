@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
 import { Neo4jAgentService } from "../services/Neo4jAgentService";
-import { RepositoryFactory } from "@starships/neo4j-models";
 
 const router: Router = Router();
 
@@ -48,8 +47,7 @@ router.post("/", async (req, res) => {
 // Update agent
 router.put("/:id", async (req, res) => {
   try {
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const updated = await agentRepo.update(req.params.id, req.body);
+    const updated = await Neo4jAgentService.updateAgent(req.params.id, req.body);
     if (!updated) {
       res.status(404).json({ error: "Agent not found" });
     } else {
@@ -64,8 +62,7 @@ router.put("/:id", async (req, res) => {
 // Delete agent
 router.delete("/:id", async (req, res) => {
   try {
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const deleted = await agentRepo.delete(req.params.id);
+    const deleted = await Neo4jAgentService.deleteAgent(req.params.id);
     if (!deleted) {
       res.status(404).json({ error: "Agent not found" });
     } else {

@@ -1,8 +1,8 @@
 import { getConnection } from '../connection';
-import { Channel, ChannelRepository as IChannelRepository } from '../types';
+import { Channel, ChannelRepository as ChannelRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class ChannelRepository implements IChannelRepository {
+export class ChannelRepository implements ChannelRepositoryInterface {
   async findAll(): Promise<Channel[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ c: Channel }>(

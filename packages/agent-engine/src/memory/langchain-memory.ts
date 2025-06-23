@@ -135,8 +135,47 @@ export class LangChainMemoryStore {
   async clear(sessionKey: SessionKey): Promise<void> {
     this.bufferMemories.delete(sessionKey);
     
-    // Note: Removing from vector store would require rebuilding the entire index
-    // For now, we just clear the buffer memory
+    if (!this.vectorStore) {
+      return;
+    }
+
+    try {
+      // Filter out documents with the specific session key
+      // Since FAISS doesn't support deletion, we need to rebuild the index
+      const allDocs = await this.getAllDocuments();
+      const filteredDocs = allDocs.filter(doc => doc.metadata.sessionKey !== sessionKey);
+      
+      if (filteredDocs.length > 0) {
+        // Rebuild the vector store without the deleted session's documents
+        this.vectorStore = await FaissStore.fromDocuments(filteredDocs, this.embeddings);
+      } else {
+        // If no documents remain, create a new empty store
+        const emptyDoc = new Document({ pageContent: "Initial document", metadata: {} });
+        this.vectorStore = await FaissStore.fromDocuments([emptyDoc], this.embeddings);
+      }
+      
+      // Save the updated index
+      await this.saveIndex();
+    } catch (error) {
+      console.error("Failed to clear vector store for session:", error);
+      // Continue gracefully - buffer memory is still cleared
+    }
+  }
+
+  private async getAllDocuments(): Promise<Document[]> {
+    if (!this.vectorStore) {
+      return [];
+    }
+    
+    try {
+      // This is a workaround since FAISS doesn't provide direct access to all documents
+      // We'll use similarity search with a generic query to get a broad set of documents
+      const results = await this.vectorStore.similaritySearch("", 1000); // Get up to 1000 docs
+      return results;
+    } catch (error) {
+      console.error("Failed to retrieve documents from vector store:", error);
+      return [];
+    }
   }
 
   async saveIndex(): Promise<void> {

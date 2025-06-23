@@ -1,5 +1,6 @@
 import { RepositoryFactory, Agent, createConnection, Neo4jConfig } from '@starships/neo4j-models';
 import { AgentConfig } from '@starships/protocol';
+import { env } from '../config/environment';
 
 export class Neo4jAgentService {
   private static isInitialized = false;
@@ -54,6 +55,22 @@ export class Neo4jAgentService {
     return this.convertToAgentConfig(agent);
   }
 
+  static async updateAgent(id: string, updates: Partial<AgentConfig>): Promise<AgentConfig | null> {
+    await this.initialize();
+    
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const updated = await agentRepo.update(id, updates);
+    
+    return updated ? this.convertToAgentConfig(updated) : null;
+  }
+
+  static async deleteAgent(id: string): Promise<boolean> {
+    await this.initialize();
+    
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    return await agentRepo.delete(id);
+  }
+
   private static convertToAgentConfig(agent: Agent): AgentConfig {
     return {
       id: agent.id,
@@ -71,21 +88,21 @@ export class Neo4jAgentService {
       return; // Already seeded
     }
 
-    // Default agents - you can customize these or load from environment
+    // Default agents - using environment configuration
     const defaultAgents = [
       {
         name: 'Assistant',
-        model: 'gpt-4',
+        model: env.DEFAULT_CHAT_MODEL,
         systemPrompt: 'You are a helpful AI assistant.'
       },
       {
         name: 'Code Helper',
-        model: 'gpt-4',
+        model: env.DEFAULT_CHAT_MODEL,
         systemPrompt: 'You are an expert software developer who helps with coding questions and provides clean, efficient solutions.'
       },
       {
         name: 'Creative Writer',
-        model: 'gpt-4',
+        model: env.DEFAULT_CHAT_MODEL,
         systemPrompt: 'You are a creative writing assistant who helps with storytelling, character development, and creative content.'
       }
     ];

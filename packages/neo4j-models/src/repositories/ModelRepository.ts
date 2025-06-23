@@ -1,8 +1,8 @@
 import { getConnection } from '../connection';
-import { Model, ModelRepository as IModelRepository } from '../types';
+import { Model, ModelRepository as ModelRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class ModelRepository implements IModelRepository {
+export class ModelRepository implements ModelRepositoryInterface {
   async findAll(): Promise<Model[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ m: Model }>(

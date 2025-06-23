@@ -1,8 +1,8 @@
 import { getConnection } from '../connection';
-import { User, UserRepository as IUserRepository } from '../types';
+import { User, UserRepository as UserRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class UserRepository implements IUserRepository {
+export class UserRepository implements UserRepositoryInterface {
   async findAll(): Promise<User[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ u: User }>(
@@ -88,18 +88,7 @@ export class UserRepository implements IUserRepository {
     return result[0]?.deletedCount > 0;
   }
 
-  // Helper method to create interaction relationship
-  async interactWith(userId: string, agentId: string): Promise<void> {
-    const connection = getConnection();
-    await connection.executeWrite(
-      `MATCH (u:User), (a:Agent)
-       WHERE u.id = $userId AND a.id = $agentId
-       MERGE (u)-[r:INTERACTS_WITH]->(a)
-       SET r.lastInteraction = $lastInteraction,
-           r.interactionCount = COALESCE(r.interactionCount, 0) + 1`,
-      { userId: userId, agentId: agentId, lastInteraction: new Date().toISOString() }
-    );
-  }
+
 
   async joinChannel(userId: string, channelId: string, role?: string): Promise<void> {
     const connection = getConnection();

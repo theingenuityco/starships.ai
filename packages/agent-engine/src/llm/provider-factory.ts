@@ -28,13 +28,13 @@ export class ProviderFactory {
       // Get model config
       const model = await this.modelRepository.findById(agent.model);
       if (!model) {
-        // Fallback to default model
+        // Fallback to default model from environment
         const defaultModel = {
-          id: 'default-openai-gpt4',
+          id: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
           name: process.env.DEFAULT_CHAT_MODEL || 'gpt-4',
-          provider: 'openai' as const,
-          temperature: 0.7,
-          maxTokens: 4096,
+          provider: (process.env.DEFAULT_PROVIDER as 'openai' | 'anthropic') || 'openai',
+          temperature: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
+          maxTokens: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
         };
         
         const provider = new LangChainProvider(defaultModel);

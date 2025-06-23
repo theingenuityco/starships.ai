@@ -6,8 +6,6 @@ const config: Config = {
   roots: ["<rootDir>/tests"],
   moduleNameMapper: {
     "^@starships/agent-engine$": "<rootDir>/tests/mocks/@starships/agent-engine.ts",
-    "^@starships/neo4j-models$": "<rootDir>/tests/mocks/@starships/neo4j-models.ts",
-    "^@starships/protocol$": "<rootDir>/tests/mocks/@starships/protocol.ts",
   },
   clearMocks: true,
   coverageDirectory: "coverage",

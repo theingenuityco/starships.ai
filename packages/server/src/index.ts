@@ -6,6 +6,7 @@ import agentsRouter from "./routes/agents";
 import memoryRouter from "./routes/memory";
 import redeployRouter from "./routes/redeploy";
 import { Neo4jAgentService } from "./services/Neo4jAgentService";
+import { env } from "./config/environment";
 
 dotenv.config();
 
@@ -28,7 +29,7 @@ app.use("/v1/memory", memoryRouter);
 // Admin routes
 app.use("/redeploy", redeployRouter);
 
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+const port = env.PORT;
 
 // Initialize Neo4j and start server
 async function startServer() {

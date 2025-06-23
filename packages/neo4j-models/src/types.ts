@@ -34,35 +34,12 @@ export interface Channel {
   createdAt: string;
 }
 
-// Neo4j Relationship Types
-export interface InteractsWithRelationship {
-  type: 'INTERACTS_WITH';
-  properties?: {
-    lastInteraction?: string;
-    interactionCount?: number;
-  };
-}
-
-export interface UsesRelationship {
-  type: 'USES';
-  properties?: {
-    configuredAt?: string;
-  };
-}
-
+// Neo4j Relationship Types (keeping only essential ones)
 export interface ActiveInRelationship {
   type: 'ACTIVE_IN';
   properties?: {
     joinedAt?: string;
     role?: string;
-  };
-}
-
-export interface DeployedInRelationship {
-  type: 'DEPLOYED_IN';
-  properties?: {
-    deployedAt?: string;
-    status?: string;
   };
 }
 

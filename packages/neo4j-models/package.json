@@ -12,7 +12,7 @@
   "dependencies": {
     "@starships/protocol": "workspace:*",
     "neo4j-driver": "^5.27.0",
-    "uuid": "^10.0.0"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",

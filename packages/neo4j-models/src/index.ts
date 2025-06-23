@@ -4,9 +4,12 @@ export { Neo4jConnection, Neo4jConfig, createConnection, getConnection } from '.
 // Types (interfaces only)
 export type {
   Agent, Model, User, Channel,
-  InteractsWithRelationship, UsesRelationship, ActiveInRelationship, DeployedInRelationship,
-  Repository, AgentRepository as IAgentRepository, UserRepository as IUserRepository, 
-  ChannelRepository as IChannelRepository, ModelRepository as IModelRepository
+  ActiveInRelationship,
+  Repository, 
+  AgentRepository as AgentRepositoryInterface, 
+  UserRepository as UserRepositoryInterface, 
+  ChannelRepository as ChannelRepositoryInterface, 
+  ModelRepository as ModelRepositoryInterface
 } from './types';
 
 // Repository implementations

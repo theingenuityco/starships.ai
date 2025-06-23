@@ -1,8 +1,8 @@
 import { getConnection } from '../connection';
-import { Agent, AgentRepository as IAgentRepository } from '../types';
+import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class AgentRepository implements IAgentRepository {
+export class AgentRepository implements AgentRepositoryInterface {
   async findAll(): Promise<Agent[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ a: Agent }>(
@@ -94,26 +94,5 @@ export class AgentRepository implements IAgentRepository {
     return result.map(record => record.a);
   }
 
-  // Helper method to create relationships
-  async deployToChannel(agentId: string, channelId: string): Promise<void> {
-    const connection = getConnection();
-    await connection.executeWrite(
-      `MATCH (a:Agent), (c:Channel)
-       WHERE a.id = $agentId AND c.id = $channelId
-       MERGE (a)-[r:DEPLOYED_IN]->(c)
-       SET r.deployedAt = $deployedAt, r.status = 'active'`,
-      { agentId: agentId, channelId: channelId, deployedAt: new Date().toISOString() }
-    );
-  }
 
-  async linkToModel(agentId: string, modelId: string): Promise<void> {
-    const connection = getConnection();
-    await connection.executeWrite(
-      `MATCH (a:Agent), (m:Model)
-       WHERE a.id = $agentId AND m.id = $modelId
-       MERGE (a)-[r:USES]->(m)
-       SET r.configuredAt = $configuredAt`,
-      { agentId: agentId, modelId: modelId, configuredAt: new Date().toISOString() }
-    );
-  }
 } 

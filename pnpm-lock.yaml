@@ -69,6 +69,9 @@ importers:
       '@types/uuid':
         specifier: ^10.0.0
         version: 10.0.0
+      tsx:
+        specifier: ^4.7.0
+        version: 4.20.3
 
   packages/neo4j-models:
     dependencies:
@@ -79,8 +82,8 @@ importers:
         specifier: ^5.27.0
         version: 5.28.1
       uuid:
-        specifier: ^10.0.0
-        version: 10.0.0
+        specifier: ^11.1.0
+        version: 11.1.0
     devDependencies:
       '@types/uuid':
         specifier: ^10.0.0

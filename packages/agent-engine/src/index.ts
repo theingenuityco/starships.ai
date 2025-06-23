@@ -47,9 +47,11 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   const result = await provider.complete(prompt, opts);
 
   // Persist memory
-  const now = Date.now();
-  await store.append(sessionKey, { role: "user", content: req.message, timestamp: now } as MemoryEntry);
-  await store.append(sessionKey, { role: "assistant", content: result.reply, timestamp: now } as MemoryEntry);
+  const userTimestamp = Date.now();
+  await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
+  
+  const assistantTimestamp = Date.now();
+  await store.append(sessionKey, { role: "assistant", content: result.reply, timestamp: assistantTimestamp } as MemoryEntry);
 
   return { reply: result.reply, usage: result.usage };
 }

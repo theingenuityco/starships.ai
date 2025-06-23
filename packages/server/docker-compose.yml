@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   neo4j:
-    image: neo4j:5.27.0
+    image: neo4j:5.26.8
     container_name: neo4j-mcp
     environment:
       - NEO4J_AUTH=neo4j/mcppassword

@@ -1,14 +1,18 @@
+import dotenv from "dotenv";
+import path from "path";
+
+// Load environment variables from the root .env file
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import chatRouter from "./routes/chat";
 import agentsRouter from "./routes/agents";
 import memoryRouter from "./routes/memory";
 import redeployRouter from "./routes/redeploy";
 import { Neo4jAgentService } from "./services/Neo4jAgentService";
 import { env } from "./config/environment";
-
-dotenv.config();
 
 const app: express.Express = express();
 

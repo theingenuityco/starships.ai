@@ -1,5 +1,5 @@
 import { Router } from "express";
-import store from "../store";
+import getStore from "../store";
 
 const router: Router = Router();
 
@@ -9,6 +9,7 @@ router.post("/reset", async (req, res) => {
     user_id: string;
     channel_id?: string;
   };
+  const store = getStore();
   const key = store.makeKey(agent_id, user_id, channel_id);
   await store.clear(key);
   res.status(204).send();

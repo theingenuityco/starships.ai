@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { chat as agentChat } from "@starships/agent-engine";
 import type { ChatRequest } from "@starships/protocol";
-import store from "../store";
+import getStore from "../store";
 
 const router: Router = Router();
 
@@ -27,6 +27,7 @@ const validateChatRequest = (req: any, res: any, next: any) => {
 router.post("/", validateChatRequest, async (req, res) => {
   try {
     const body = req.body as ChatRequest;
+    const store = getStore();
     const result = await agentChat(body, store);
     res.json(result);
   } catch (err) {
@@ -45,6 +46,7 @@ router.delete("/:sessionKey/memory", async (req: any, res: any) => {
       return res.status(400).json({ error: 'sessionKey is required' });
     }
     
+    const store = getStore();
     await store.clear(sessionKey);
     res.json({ message: 'Memory cleared successfully' });
   } catch (err) {

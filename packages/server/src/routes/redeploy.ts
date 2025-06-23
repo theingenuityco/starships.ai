@@ -1,12 +1,16 @@
-import express, { Router } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
+
+const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
 
 const router: Router = express.Router();
 
 /**
- * POST /redeploy – secure webhook endpoint to acknowledge redeploy pings.
- * If REDEPLOY_SECRET is set, expects Authorization: Bearer <secret> header.
+ * Secure webhook endpoint to acknowledge redeploy pings
+ * Requires Authorization: Bearer <secret> header if REDEPLOY_SECRET is set
  */
-router.post('/', (req, res) => {
+router.post('/', asyncHandler((req: Request, res: Response) => {
   const expectedSecret = process.env.REDEPLOY_SECRET;
   const providedAuth = req.headers.authorization;
 
@@ -17,9 +21,6 @@ router.post('/', (req, res) => {
 
   console.log('[WEBHOOK] Redeploy ping received.');
   res.status(200).send('Redeploy acknowledged.');
-
-  // Optional: trigger a graceful container restart. Uncomment if desired.
-  // setTimeout(() => process.exit(0), 100);
-});
+}));
 
 export default router; 

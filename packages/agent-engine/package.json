@@ -1,0 +1,27 @@
+{
+  "name": "@starships/agent-engine",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@langchain/anthropic": "^0.3.23",
+    "@langchain/community": "^0.3.47",
+    "@langchain/core": "^0.3.61",
+    "@langchain/openai": "^0.5.15",
+    "@starships/models": "workspace:*",
+    "@starships/protocol": "workspace:*",
+    "faiss-node": "^0.5.1",
+    "langchain": "^0.3.29",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.7.0"
+  }
+}

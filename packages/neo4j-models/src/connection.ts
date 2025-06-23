@@ -28,7 +28,7 @@ export class Neo4jConnection {
 
       // Verify connectivity
       await this.driver.verifyConnectivity();
-      console.log('Successfully connected to Neo4j database');
+      // Successfully connected to Neo4j database
     } catch (error) {
       console.error('Failed to connect to Neo4j:', error);
       throw error;
@@ -39,7 +39,7 @@ export class Neo4jConnection {
     if (this.driver) {
       await this.driver.close();
       this.driver = null;
-      console.log('Disconnected from Neo4j database');
+      // Disconnected from Neo4j database
     }
   }
 
@@ -116,7 +116,7 @@ export class Neo4jConnection {
         await session.run(index);
       }
 
-      console.log('Neo4j schema initialized successfully');
+      // Neo4j schema initialized successfully
     } catch (error) {
       console.error('Failed to initialize Neo4j schema:', error);
       throw error;

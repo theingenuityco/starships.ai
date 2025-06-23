@@ -26,8 +26,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apk add --no-cache curl
 
 # Copy built artifacts and dependencies
-COPY --from=base /app/packages/mcp-server/dist ./dist
-COPY --from=base /app/packages/mcp-server/package.json ./package.json
+# MCP server package removed
 
 # Copy neo4j-models package
 COPY --from=base /app/packages/neo4j-models ./packages/neo4j-models

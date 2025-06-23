@@ -13,39 +13,40 @@ export type {
 export { AgentRepository, UserRepository, ChannelRepository, ModelRepository } from './repositories';
 
 // Factory for creating repositories
-export class RepositoryFactory {
-  private static agentRepo: import('./repositories/AgentRepository').AgentRepository;
-  private static userRepo: import('./repositories/UserRepository').UserRepository;
-  private static channelRepo: import('./repositories/ChannelRepository').ChannelRepository;
-  private static modelRepo: import('./repositories/ModelRepository').ModelRepository;
+import { AgentRepository } from './repositories/AgentRepository';
+import { UserRepository } from './repositories/UserRepository';
+import { ChannelRepository } from './repositories/ChannelRepository';
+import { ModelRepository } from './repositories/ModelRepository';
 
-  static getAgentRepository(): import('./repositories/AgentRepository').AgentRepository {
+export class RepositoryFactory {
+  private static agentRepo: AgentRepository;
+  private static userRepo: UserRepository;
+  private static channelRepo: ChannelRepository;
+  private static modelRepo: ModelRepository;
+
+  static getAgentRepository(): AgentRepository {
     if (!this.agentRepo) {
-      const { AgentRepository } = require('./repositories/AgentRepository');
       this.agentRepo = new AgentRepository();
     }
     return this.agentRepo;
   }
 
-  static getUserRepository(): import('./repositories/UserRepository').UserRepository {
+  static getUserRepository(): UserRepository {
     if (!this.userRepo) {
-      const { UserRepository } = require('./repositories/UserRepository');
       this.userRepo = new UserRepository();
     }
     return this.userRepo;
   }
 
-  static getChannelRepository(): import('./repositories/ChannelRepository').ChannelRepository {
+  static getChannelRepository(): ChannelRepository {
     if (!this.channelRepo) {
-      const { ChannelRepository } = require('./repositories/ChannelRepository');
       this.channelRepo = new ChannelRepository();
     }
     return this.channelRepo;
   }
 
-  static getModelRepository(): import('./repositories/ModelRepository').ModelRepository {
+  static getModelRepository(): ModelRepository {
     if (!this.modelRepo) {
-      const { ModelRepository } = require('./repositories/ModelRepository');
       this.modelRepo = new ModelRepository();
     }
     return this.modelRepo;

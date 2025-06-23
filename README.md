@@ -64,7 +64,11 @@ The platform is configured via environment variables for flexible deployment.
 | `PORT` | Optional | `4000` | Port for the Express server |
 | `REDEPLOY_SECRET` | Optional | `super-secret-token` | Bearer token required by the `/redeploy` webhook |
 | `OPENAI_API_KEY` | Optional | `sk-...` | OpenAI API key (when using OpenAI provider) |
-| `PROVIDER` | Optional | `openai\|mock` | LLM provider to use (defaults to mock) |
+| `ANTHROPIC_API_KEY` | Optional | `sk-ant-...` | Anthropic API key (when using Anthropic provider) |
+| `DEFAULT_LLM_PROVIDER` | Optional | `openai\|anthropic` | LLM provider to use (defaults to openai) |
+| `DEFAULT_CHAT_MODEL` | Optional | `gpt-4` | Default chat model to use |
+| `DEFAULT_EMBEDDING_MODEL` | Optional | `text-embedding-3-small` | Default embedding model for semantic search |
+| `FAISS_INDEX_PATH` | Optional | `./data/faiss_index` | Path to store FAISS vector indices |
 
 The server will auto-seed with default agents if none exist in the database.
 
@@ -149,10 +153,10 @@ docker run -p 4000:4000 --env-file .env starships.ai
 
 ## Roadmap
 
-* Vector-store backed `MemoryStore` (pgvector)
 * Slash-command support for persona & memory management
 * Automated tests (unit + integration)
 * Helm chart / Terraform module for cloud-native deploys
+* Additional LLM provider integrations
 
 Contributions are welcome 🛸
 

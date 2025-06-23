@@ -94,6 +94,6 @@ export class Neo4jAgentService {
       await agentRepo.create(agentData);
     }
 
-    console.log(`Seeded ${defaultAgents.length} default agents`);
+    // Default agents seeded successfully
   }
 } 

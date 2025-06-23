@@ -19,7 +19,7 @@ describe("POST /v1/chat", () => {
   it("should handle agent not found", async () => {
     (mockChat as jest.Mock).mockRejectedValueOnce(new Error("Agent not found"));
 
-    const res = await api().post("/v1/chat").send(body).expect(400);
+    const res = await api().post("/v1/chat").send(body).expect(404);
     expect(res.body).toEqual({ error: "Agent not found" });
   });
 }); 

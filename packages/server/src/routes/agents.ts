@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Neo4jAgentService } from "../services/Neo4jAgentService";
+import { RepositoryFactory } from "@starships/neo4j-models";
 
 const router: Router = Router();
 
@@ -19,8 +20,9 @@ router.get("/:id", async (req, res) => {
     const agent = await Neo4jAgentService.getAgent(req.params.id);
     if (!agent) {
       res.status(404).json({ error: "Agent not found" });
+    } else {
+      res.json(agent);
     }
-    res.json(agent);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: (err as Error).message });
@@ -33,10 +35,10 @@ router.post("/", async (req, res) => {
     const { name, model, systemPrompt } = req.body;
     if (!name || !model) {
       res.status(400).json({ error: "name and model are required" });
+    } else {
+      const agent = await Neo4jAgentService.createAgent({ name, model, systemPrompt });
+      res.status(201).json(agent);
     }
-    
-    const agent = await Neo4jAgentService.createAgent({ name, model, systemPrompt });
-    res.status(201).json(agent);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: (err as Error).message });
@@ -46,13 +48,13 @@ router.post("/", async (req, res) => {
 // Update agent
 router.put("/:id", async (req, res) => {
   try {
-    const { RepositoryFactory } = await import("@starships/neo4j-models");
     const agentRepo = RepositoryFactory.getAgentRepository();
     const updated = await agentRepo.update(req.params.id, req.body);
     if (!updated) {
       res.status(404).json({ error: "Agent not found" });
+    } else {
+      res.json(updated);
     }
-    res.json(updated);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: (err as Error).message });
@@ -62,13 +64,13 @@ router.put("/:id", async (req, res) => {
 // Delete agent
 router.delete("/:id", async (req, res) => {
   try {
-    const { RepositoryFactory } = await import("@starships/neo4j-models");
     const agentRepo = RepositoryFactory.getAgentRepository();
     const deleted = await agentRepo.delete(req.params.id);
     if (!deleted) {
       res.status(404).json({ error: "Agent not found" });
+    } else {
+      res.status(204).send();
     }
-    res.status(204).send();
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: (err as Error).message });

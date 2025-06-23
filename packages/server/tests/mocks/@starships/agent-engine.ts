@@ -48,18 +48,13 @@ class MockLangChainMemoryStore {
   }
 }
 
-const loadAgents = jest.fn<Promise<any[]>, []>();
-
 const chat = jest.fn(async (req: ChatRequest, _store: MockLangChainMemoryStore): Promise<ChatResponse> => {
   return {
     reply: `echo:${req.message}`,
   } as ChatResponse;
 });
 
-export const PersonaRegistry = {
-  loadAgents,
-  getAgent: jest.fn(async (id: string) => ({ id, name: `Agent ${id}`, model: "gpt-4o" })),
-};
+// PersonaRegistry removed - agents are now managed via Neo4j
 
 export const LangChainMemoryStore = MockLangChainMemoryStore as unknown as typeof import("@starships/agent-engine").LangChainMemoryStore;
 export { chat }; 

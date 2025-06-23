@@ -1,0 +1,59 @@
+# ---- Base Stage ----
+FROM node:20-alpine AS base
+WORKDIR /app
+
+# Enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy project files into the container
+COPY . .
+
+# Install dependencies with a frozen lockfile
+RUN pnpm install --frozen-lockfile
+
+# Build the models and mcp-server packages
+RUN pnpm turbo run build --filter=@starships/models...
+RUN pnpm turbo run build --filter=@starships/mcp-server...
+
+# ---- Runtime Stage ----
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+# Enable pnpm via corepack
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Install curl for health checks (optional)
+RUN apk add --no-cache curl
+
+# Copy built artifacts and dependencies
+# MCP server package removed
+
+# Copy models package
+COPY --from=base /app/packages/models ./packages/models
+
+# Copy protocol package
+COPY --from=base /app/packages/protocol ./packages/protocol
+
+# Copy agent-engine package (still needed for some types)
+COPY --from=base /app/packages/agent-engine ./packages/agent-engine
+
+# Copy node_modules from the build stage
+COPY --from=base /app/node_modules ./node_modules
+
+# Create a non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Change ownership of the app directory
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# Expose the application port
+EXPOSE 4000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:4000/ || exit 1
+
+# Start the application
+CMD ["node", "dist/index.js"] 

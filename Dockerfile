@@ -32,7 +32,7 @@ COPY --from=base /app/packages/bridge-core ./packages/bridge-core
 COPY --from=base /app/node_modules ./node_modules
 
 # Expose the application port
-EXPOSE 3000
+EXPOSE 4000
 
 # Start the application
 CMD ["node", "dist/index.js"] 

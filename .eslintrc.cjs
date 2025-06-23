@@ -11,6 +11,12 @@ module.exports = {
     node: true,
     es2020: true,
   },
+  overrides: [
+    {
+      files: ['**/*.spec.ts', '**/*.test.ts'],
+      env: { jest: true },
+    },
+  ],
   parserOptions: {
     ecmaVersion: 2020,
     sourceType: 'module',

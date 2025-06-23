@@ -7,7 +7,7 @@ export interface Agent {
   createdAt: string;
 }
 
-export interface Model {
+export interface LLM {
   id: string;
   name: string;
   provider: 'openai' | 'anthropic';
@@ -67,6 +67,6 @@ export interface ChannelRepository extends Repository<Channel> {
   findByType(type: string): Promise<Channel[]>;
 }
 
-export interface ModelRepository extends Repository<Model> {
-  findByProvider(provider: string): Promise<Model[]>;
+export interface LLMRepository extends Repository<LLM> {
+  findByProvider(provider: string): Promise<LLM[]>;
 } 

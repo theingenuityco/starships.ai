@@ -1,15 +1,15 @@
 import { LangChainProvider } from "./langchain-provider";
 import { LLMProvider } from "@starships/protocol";
-import { AgentRepository, ModelRepository } from "@starships/neo4j-models";
+import { AgentRepository, LLMRepository } from "@starships/neo4j-models";
 
 export class ProviderFactory {
   private static providers = new Map<string, LLMProvider>();
   private static agentRepository: AgentRepository;
-  private static modelRepository: ModelRepository;
+  private static llmRepository: LLMRepository;
 
-  static initialize(agentRepo: AgentRepository, modelRepo: ModelRepository) {
+  static initialize(agentRepo: AgentRepository, llmRepo: LLMRepository) {
     this.agentRepository = agentRepo;
-    this.modelRepository = modelRepo;
+    this.llmRepository = llmRepo;
   }
 
   static async getProvider(agentId: string): Promise<LLMProvider> {
@@ -25,9 +25,9 @@ export class ProviderFactory {
         throw new Error(`Agent not found: ${agentId}`);
       }
 
-      // Get model config
-      const model = await this.modelRepository.findById(agent.model);
-      if (!model) {
+      // Get LLM config
+      const llm = await this.llmRepository.findById(agent.model);
+      if (!llm) {
         // Fallback to default model from environment
         const defaultModel = {
           id: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
@@ -43,7 +43,7 @@ export class ProviderFactory {
       }
 
       // Create LangChain provider instance
-      const provider = new LangChainProvider(model);
+      const provider = new LangChainProvider(llm);
       
       // Cache and return
       this.providers.set(agentId, provider);

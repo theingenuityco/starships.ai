@@ -2,16 +2,16 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import { LLMProvider, LLMChatPrompt, LLMResult } from "@starships/protocol";
-import { Model } from "@starships/neo4j-models";
+import { LLM } from "@starships/neo4j-models";
 
 export class LangChainProvider implements LLMProvider {
   private model: ChatOpenAI | ChatAnthropic;
 
-  constructor(modelConfig: Model) {
-    this.model = this.createModel(modelConfig);
+  constructor(llmConfig: LLM) {
+    this.model = this.createModel(llmConfig);
   }
 
-  private createModel(config: Model): ChatOpenAI | ChatAnthropic {
+  private createModel(config: LLM): ChatOpenAI | ChatAnthropic {
     switch (config.provider) {
       case 'openai':
         return new ChatOpenAI({

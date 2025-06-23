@@ -3,29 +3,29 @@ export { Neo4jConnection, Neo4jConfig, createConnection, getConnection } from '.
 
 // Types (interfaces only)
 export type {
-  Agent, Model, User, Channel,
+  Agent, LLM, User, Channel,
   ActiveInRelationship,
   Repository, 
   AgentRepository as AgentRepositoryInterface, 
   UserRepository as UserRepositoryInterface, 
   ChannelRepository as ChannelRepositoryInterface, 
-  ModelRepository as ModelRepositoryInterface
+  LLMRepository as LLMRepositoryInterface
 } from './types';
 
 // Repository implementations
-export { AgentRepository, UserRepository, ChannelRepository, ModelRepository } from './repositories';
+export { AgentRepository, UserRepository, ChannelRepository, LLMRepository } from './repositories';
 
 // Factory for creating repositories
 import { AgentRepository } from './repositories/AgentRepository';
 import { UserRepository } from './repositories/UserRepository';
 import { ChannelRepository } from './repositories/ChannelRepository';
-import { ModelRepository } from './repositories/ModelRepository';
+import { LLMRepository } from './repositories/LLMRepository';
 
 export class RepositoryFactory {
   private static agentRepo: AgentRepository;
   private static userRepo: UserRepository;
   private static channelRepo: ChannelRepository;
-  private static modelRepo: ModelRepository;
+  private static llmRepo: LLMRepository;
 
   static getAgentRepository(): AgentRepository {
     if (!this.agentRepo) {
@@ -48,10 +48,10 @@ export class RepositoryFactory {
     return this.channelRepo;
   }
 
-  static getModelRepository(): ModelRepository {
-    if (!this.modelRepo) {
-      this.modelRepo = new ModelRepository();
+  static getLLMRepository(): LLMRepository {
+    if (!this.llmRepo) {
+      this.llmRepo = new LLMRepository();
     }
-    return this.modelRepo;
+    return this.llmRepo;
   }
 } 

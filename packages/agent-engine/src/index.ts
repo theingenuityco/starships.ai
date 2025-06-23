@@ -7,8 +7,8 @@ import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol
 export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promise<ChatResponse> {
   // Initialize provider factory if not already done
   const agentRepo = RepositoryFactory.getAgentRepository();
-  const modelRepo = RepositoryFactory.getModelRepository();
-  ProviderFactory.initialize(agentRepo, modelRepo);
+  const llmRepo = RepositoryFactory.getLLMRepository();
+  ProviderFactory.initialize(agentRepo, llmRepo);
   
   // Get agent from repository
   const agent = await agentRepo.findById(req.agent_id);
@@ -36,12 +36,12 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   // Get provider and complete request
   const provider = await ProviderFactory.getProvider(req.agent_id);
   
-  // Get model config for temperature and maxTokens
-  const model = await modelRepo.findById(agent.model);
+  // Get LLM config for temperature and maxTokens
+  const llm = await llmRepo.findById(agent.model);
   const opts = {
     stream: req.stream,
-    temperature: model?.temperature,
-    maxTokens: model?.maxTokens,
+    temperature: llm?.temperature,
+    maxTokens: llm?.maxTokens,
   };
   
   const result = await provider.complete(prompt, opts);

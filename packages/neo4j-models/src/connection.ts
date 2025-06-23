@@ -94,7 +94,7 @@ export class Neo4jConnection {
       // Create constraints for unique IDs
       const constraints = [
         'CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE',
-        'CREATE CONSTRAINT model_id_unique IF NOT EXISTS FOR (m:Model) REQUIRE m.id IS UNIQUE',
+        'CREATE CONSTRAINT llm_id_unique IF NOT EXISTS FOR (l:LLM) REQUIRE l.id IS UNIQUE',
         'CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE',
         'CREATE CONSTRAINT channel_id_unique IF NOT EXISTS FOR (c:Channel) REQUIRE c.id IS UNIQUE',
       ];
@@ -109,7 +109,7 @@ export class Neo4jConnection {
         'CREATE INDEX user_username_index IF NOT EXISTS FOR (u:User) ON (u.username)',
         'CREATE INDEX user_email_index IF NOT EXISTS FOR (u:User) ON (u.email)',
         'CREATE INDEX channel_guild_index IF NOT EXISTS FOR (c:Channel) ON (c.guildId)',
-        'CREATE INDEX model_provider_index IF NOT EXISTS FOR (m:Model) ON (m.provider)',
+        'CREATE INDEX llm_provider_index IF NOT EXISTS FOR (l:LLM) ON (l.provider)',
       ];
 
       for (const index of indexes) {

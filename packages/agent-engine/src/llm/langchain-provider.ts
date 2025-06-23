@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import { LLMProvider, LLMChatPrompt, LLMResult } from "@starships/protocol";
-import { LLM } from "@starships/neo4j-models";
+import { LLM } from "@starships/models";
 
 export class LangChainProvider implements LLMProvider {
   private model: ChatOpenAI | ChatAnthropic;

@@ -1,12 +1,12 @@
 import { api } from "../testUtils";
-import { Neo4jAgentService } from "../../src/services/Neo4jAgentService";
+import { AgentService } from "../../src/services/AgentService";
 
-// Mock Neo4jAgentService
-jest.mock("../../src/services/Neo4jAgentService");
+// Mock AgentService
+jest.mock("../../src/services/AgentService");
 
 describe("GET /v1/agents", () => {
   it("should return list of agents", async () => {
-    (Neo4jAgentService.loadAgents as jest.Mock).mockResolvedValueOnce([
+    (AgentService.loadAgents as jest.Mock).mockResolvedValueOnce([
       { id: "agent-1", name: "Agent One" },
     ]);
 
@@ -15,7 +15,7 @@ describe("GET /v1/agents", () => {
   });
 
   it("should handle errors from registry", async () => {
-    (Neo4jAgentService.loadAgents as jest.Mock).mockRejectedValueOnce(new Error("boom"));
+    (AgentService.loadAgents as jest.Mock).mockRejectedValueOnce(new Error("boom"));
     const res = await api().get("/v1/agents").expect(500);
     expect(res.body).toEqual({ error: "boom" });
   });

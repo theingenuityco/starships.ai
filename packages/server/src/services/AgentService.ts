@@ -1,8 +1,8 @@
-import { RepositoryFactory, Agent, createConnection, Neo4jConfig } from '@starships/neo4j-models';
+import { RepositoryFactory, Agent, createConnection, Neo4jConfig } from '@starships/models';
 import { AgentConfig } from '@starships/protocol';
 import { env } from '../config/environment';
 
-export class Neo4jAgentService {
+export class AgentService {
   private static isInitialized = false;
 
   static async initialize(): Promise<void> {

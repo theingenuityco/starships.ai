@@ -50,9 +50,9 @@ importers:
       '@langchain/openai':
         specifier: ^0.5.15
         version: 0.5.15(@langchain/core@0.3.61)
-      '@starships/neo4j-models':
+      '@starships/models':
         specifier: workspace:*
-        version: link:../neo4j-models
+        version: link:../models
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -73,7 +73,7 @@ importers:
         specifier: ^4.7.0
         version: 4.20.3
 
-  packages/neo4j-models:
+  packages/models:
     dependencies:
       '@starships/protocol':
         specifier: workspace:*
@@ -99,9 +99,9 @@ importers:
       '@starships/agent-engine':
         specifier: workspace:*
         version: link:../agent-engine
-      '@starships/neo4j-models':
+      '@starships/models':
         specifier: workspace:*
-        version: link:../neo4j-models
+        version: link:../models
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol

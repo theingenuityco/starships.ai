@@ -11,8 +11,8 @@ COPY . .
 # Install dependencies with a frozen lockfile
 RUN pnpm install --frozen-lockfile
 
-# Build the neo4j-models and mcp-server packages
-RUN pnpm turbo run build --filter=@starships/neo4j-models...
+# Build the models and mcp-server packages
+RUN pnpm turbo run build --filter=@starships/models...
 RUN pnpm turbo run build --filter=@starships/mcp-server...
 
 # ---- Runtime Stage ----
@@ -28,8 +28,8 @@ RUN apk add --no-cache curl
 # Copy built artifacts and dependencies
 # MCP server package removed
 
-# Copy neo4j-models package
-COPY --from=base /app/packages/neo4j-models ./packages/neo4j-models
+# Copy models package
+COPY --from=base /app/packages/models ./packages/models
 
 # Copy protocol package
 COPY --from=base /app/packages/protocol ./packages/protocol

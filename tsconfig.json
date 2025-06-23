@@ -14,6 +14,6 @@
     { "path": "./packages/server" },
     { "path": "./packages/protocol" },
     { "path": "./packages/agent-engine" },
-    { "path": "./packages/neo4j-models" }
+    { "path": "./packages/models" }
   ]
 } 

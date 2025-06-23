@@ -1,7 +1,7 @@
 import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
-import { RepositoryFactory } from "@starships/neo4j-models";
+import { RepositoryFactory } from "@starships/models";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
 export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promise<ChatResponse> {

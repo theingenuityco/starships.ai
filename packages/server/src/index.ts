@@ -11,7 +11,7 @@ import chatRouter from "./routes/chat";
 import agentsRouter from "./routes/agents";
 import memoryRouter from "./routes/memory";
 import redeployRouter from "./routes/redeploy";
-import { Neo4jAgentService } from "./services/Neo4jAgentService";
+import { AgentService } from "./services/AgentService";
 import { env } from "./config/environment";
 
 const app: express.Express = express();
@@ -40,7 +40,7 @@ async function startServer() {
   try {
     // Skip Neo4j initialization during tests
     if (process.env.NODE_ENV !== 'test') {
-      await Neo4jAgentService.initialize();
+      await AgentService.initialize();
       console.log('Neo4j connection initialized');
     }
     

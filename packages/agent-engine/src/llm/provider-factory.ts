@@ -1,6 +1,6 @@
 import { LangChainProvider } from "./langchain-provider";
 import { LLMProvider } from "@starships/protocol";
-import { AgentRepository, LLMRepository } from "@starships/neo4j-models";
+import { AgentRepository, LLMRepository } from "@starships/models";
 
 export class ProviderFactory {
   private static providers = new Map<string, LLMProvider>();

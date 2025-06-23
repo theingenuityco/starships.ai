@@ -1,5 +1,5 @@
 {
-  "name": "@starships/neo4j-models",
+  "name": "@starships/models",
   "version": "0.0.0",
   "private": true,
   "main": "dist/index.js",

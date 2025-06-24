@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Agent, agentAPI } from '@/lib/api'
 import { AgentCard } from './AgentCard'
 import { Loader2 } from 'lucide-react'
+import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 
 interface AgentSelectorProps {
   selectedAgent: Agent | null
@@ -24,7 +25,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect }: AgentSelectorPro
         setError(null)
       } catch (err) {
         console.error('Failed to fetch agents:', err)
-        setError('Failed to load agents. Please try again.')
+        setError(ERROR_TEXT.FAILED_TO_LOAD_AGENTS)
       } finally {
         setLoading(false)
       }
@@ -37,7 +38,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect }: AgentSelectorPro
     return (
       <div className="flex items-center justify-center p-6">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
+        <span className="ml-2 text-sm text-muted-foreground">{LOADING_TEXT.AGENTS}</span>
       </div>
     )
   }
@@ -86,7 +87,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect }: AgentSelectorPro
               />
             </svg>
           </div>
-          <p className="text-sm text-muted-foreground">No agents available</p>
+          <p className="text-sm text-muted-foreground">{AGENT_TEXT.NO_AGENTS_AVAILABLE}</p>
         </div>
       </div>
     )
@@ -94,7 +95,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect }: AgentSelectorPro
 
   return (
     <div className="p-4 space-y-3">
-      <h2 className="text-lg font-semibold px-2">Available Agents</h2>
+      <h2 className="text-lg font-semibold px-2">{AGENT_TEXT.SECTION_TITLE}</h2>
       <div className="space-y-2">
         {agents.map((agent) => (
           <AgentCard

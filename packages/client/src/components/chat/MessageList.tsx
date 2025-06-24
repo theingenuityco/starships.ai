@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react'
 import { Message } from '@/lib/api'
 import { MessageBubble } from './MessageBubble'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { CHAT_TEXT, LOADING_TEXT } from '@/constants/text'
 
 interface MessageListProps {
   messages: Message[]
@@ -15,6 +17,7 @@ export function MessageList({ messages, loading, error }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
+  // TODO: Add cleanup to prevent memory leaks
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -37,7 +40,7 @@ export function MessageList({ messages, loading, error }: MessageListProps) {
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center">
           <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">Loading messages...</p>
+          <p className="text-sm text-muted-foreground">{LOADING_TEXT.MESSAGES}</p>
         </div>
       </div>
     )
@@ -62,9 +65,9 @@ export function MessageList({ messages, loading, error }: MessageListProps) {
               />
             </svg>
           </div>
-          <h3 className="font-medium mb-1">Start a conversation</h3>
+          <h3 className="font-medium mb-1">{CHAT_TEXT.START_CONVERSATION_TITLE}</h3>
           <p className="text-sm text-muted-foreground">
-            Send a message to begin chatting with this agent
+            {CHAT_TEXT.START_CONVERSATION_MESSAGE}
           </p>
         </div>
       </div>
@@ -72,8 +75,8 @@ export function MessageList({ messages, loading, error }: MessageListProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <ScrollArea className="h-full">
+      <div className="p-4 space-y-4">
         {messages.map((message) => (
           <MessageBubble
             key={message.id}
@@ -82,6 +85,6 @@ export function MessageList({ messages, loading, error }: MessageListProps) {
         ))}
         <div ref={messagesEndRef} />
       </div>
-    </div>
+    </ScrollArea>
   )
 } 

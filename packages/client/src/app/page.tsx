@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Agent } from '@/lib/api'
+import { UI_TEXT } from '@/constants/text'
 
 export default function HomePage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -14,10 +16,15 @@ export default function HomePage() {
       {/* Agent Selection Sidebar */}
       <div className="w-80 border-r border-border bg-card">
         <div className="p-6 border-b border-border">
-          <h1 className="text-2xl font-bold">Starships AI</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Choose an AI agent to start chatting
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">{UI_TEXT.APP_TITLE}</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {UI_TEXT.APP_SUBTITLE}
+              </p>
+            </div>
+            <ThemeToggle />
+          </div>
         </div>
         <AgentSelector
           selectedAgent={selectedAgent}
@@ -54,9 +61,9 @@ export default function HomePage() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-semibold mb-2">Welcome to Starships AI</h2>
+              <h2 className="text-xl font-semibold mb-2">{UI_TEXT.WELCOME_TITLE}</h2>
               <p className="text-muted-foreground">
-                Select an AI agent from the sidebar to start a conversation
+                {UI_TEXT.WELCOME_MESSAGE}
               </p>
             </div>
           </div>

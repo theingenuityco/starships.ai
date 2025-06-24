@@ -2,6 +2,8 @@
 
 import { useState, useRef, KeyboardEvent } from 'react'
 import { Send, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CHAT_TEXT } from '@/constants/text'
 
 interface MessageInputProps {
   onSendMessage: (message: string) => Promise<void>
@@ -57,7 +59,7 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
           value={message}
           onChange={handleTextareaChange}
           onKeyPress={handleKeyPress}
-          placeholder="Type your message..."
+          placeholder={CHAT_TEXT.MESSAGE_PLACEHOLDER}
           disabled={disabled || sending}
           className="
             w-full min-h-[44px] max-h-[120px] p-3 rounded-lg border border-border
@@ -69,22 +71,19 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
         />
       </div>
       
-      <button
+      <Button
         onClick={handleSubmit}
         disabled={!message.trim() || disabled || sending}
-        className="
-          w-11 h-11 rounded-lg bg-primary text-primary-foreground
-          flex items-center justify-center transition-colors
-          hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2
-          disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary
-        "
+        size="icon"
+        className="h-11 w-11"
+        title={sending ? CHAT_TEXT.SENDING_MESSAGE : 'Send message'}
       >
         {sending ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <Send className="w-5 h-5" />
+          <Send className="h-4 w-4" />
         )}
-      </button>
+      </Button>
     </div>
   )
 } 

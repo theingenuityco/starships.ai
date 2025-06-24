@@ -832,6 +832,84 @@ function validateEnvironment(): EnvironmentConfig {
 }
 ```
 
+## Troubleshooting
+
+### Common Development Issues
+
+#### Neo4j Returns Empty Objects
+
+**Symptom**: API endpoints return arrays of empty objects `[{}, {}, {}]` instead of actual data.
+
+**Root Cause**: Neo4j wraps node data in a `properties` field, but the code is trying to access the raw node object.
+
+**Example Issue**:
+```typescript
+// ❌ Wrong - Returns empty objects
+return result.records.map(record => record.toObject() as T);
+```
+
+**Solution**: Extract properties from Neo4j nodes correctly:
+```typescript
+// ✅ Correct - Extracts actual data
+return result.records.map(record => {
+  const obj = record.toObject();
+  const processedObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value && typeof value === 'object' && value.properties) {
+      // This is a Neo4j node, extract its properties
+      processedObj[key] = value.properties;
+    } else {
+      // This is a regular value or relationship
+      processedObj[key] = value;
+    }
+  }
+  return processedObj as T;
+});
+```
+
+**Prevention**: Always use the `Neo4jConnection` class methods in `packages/models/src/connection.ts` which handle this automatically.
+
+#### Database Connection Issues
+
+**Symptom**: `Neo4j connection not initialized` errors.
+
+**Root Cause**: The database connection wasn't established before repository access.
+
+**Solution**:
+```typescript
+// Ensure initialization in your service
+await AgentService.initialize();
+```
+
+#### Build Errors After Model Changes
+
+**Symptom**: TypeScript compilation errors after updating data models.
+
+**Solution**:
+```bash
+# Clean and rebuild all packages
+pnpm clean
+pnpm build
+
+# Or rebuild specific package
+cd packages/models && npm run build
+cd packages/server && npm run build
+```
+
+#### Tests Failing Due to Database State
+
+**Symptom**: Tests pass individually but fail when run together.
+
+**Root Cause**: Test data not being cleaned up between tests.
+
+**Solution**:
+```typescript
+// Clean up in test teardown
+afterEach(async () => {
+  await testAgent && repository.delete(testAgent.id);
+});
+```
+
 ## Release Process
 
 ### Version Management

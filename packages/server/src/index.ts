@@ -1,10 +1,3 @@
-import dotenv from "dotenv";
-import path from "path";
-
-// Load environment variables from the root .env file
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
-
-
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import chatRouter from "./routes/chat";

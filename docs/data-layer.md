@@ -416,7 +416,21 @@ export class Neo4jConnection {
         tx.run(cypher, parameters)
       );
       
-      return result.records.map(record => record.toObject() as T);
+      return result.records.map(record => {
+        const obj = record.toObject();
+        // Extract properties from Neo4j nodes
+        const processedObj: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value && typeof value === 'object' && value.properties) {
+            // This is a Neo4j node, extract its properties
+            processedObj[key] = value.properties;
+          } else {
+            // This is a regular value or relationship
+            processedObj[key] = value;
+          }
+        }
+        return processedObj as T;
+      });
     } finally {
       await session.close();
     }
@@ -430,7 +444,21 @@ export class Neo4jConnection {
         tx.run(cypher, parameters)
       );
       
-      return result.records.map(record => record.toObject() as T);
+      return result.records.map(record => {
+        const obj = record.toObject();
+        // Extract properties from Neo4j nodes
+        const processedObj: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value && typeof value === 'object' && value.properties) {
+            // This is a Neo4j node, extract its properties
+            processedObj[key] = value.properties;
+          } else {
+            // This is a regular value or relationship
+            processedObj[key] = value;
+          }
+        }
+        return processedObj as T;
+      });
     } finally {
       await session.close();
     }
@@ -701,6 +729,62 @@ async executeInTransaction<T>(
   }
 }
 ```
+
+## Neo4j Data Extraction
+
+### Important: Property Extraction Pattern
+
+Neo4j returns node data wrapped in metadata. When using `RETURN a` (where `a` is a node alias), the result structure looks like:
+
+```json
+{
+  "a": {
+    "identity": { "low": 0, "high": 0 },
+    "labels": ["Agent"],
+    "properties": {
+      "id": "agent-123",
+      "name": "Assistant", 
+      "model": "gpt-4",
+      "systemPrompt": "You are helpful...",
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    "elementId": "4:..."
+  }
+}
+```
+
+**Critical**: The actual entity data is in the `properties` field, not the root object.
+
+### Common Pitfall: Empty Objects
+
+❌ **Wrong - This returns empty objects:**
+```typescript
+return result.records.map(record => record.toObject() as T);
+// This gives you: { identity: {...}, labels: [...], properties: {...} }
+```
+
+✅ **Correct - Extract properties from nodes:**
+```typescript
+return result.records.map(record => {
+  const obj = record.toObject();
+  const processedObj: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value && typeof value === 'object' && value.properties) {
+      // This is a Neo4j node, extract its properties
+      processedObj[key] = value.properties;
+    } else {
+      // This is a regular value or relationship
+      processedObj[key] = value;
+    }
+  }
+  return processedObj as T;
+});
+```
+
+This pattern ensures that:
+- **Node data**: `record.a` becomes the actual agent properties
+- **Relationships**: Remain as-is for relationship queries
+- **Scalar values**: Remain unchanged (counts, strings, etc.)
 
 ## Testing Strategies
 

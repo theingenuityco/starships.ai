@@ -64,7 +64,21 @@ export class Neo4jConnection {
         tx.run(cypher, parameters)
       );
       
-      return result.records.map(record => record.toObject() as T);
+      return result.records.map(record => {
+        const obj = record.toObject();
+        // Extract properties from Neo4j nodes
+        const processedObj: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value && typeof value === 'object' && value.properties) {
+            // This is a Neo4j node, extract its properties
+            processedObj[key] = value.properties;
+          } else {
+            // This is a regular value or relationship
+            processedObj[key] = value;
+          }
+        }
+        return processedObj as T;
+      });
     } finally {
       await session.close();
     }
@@ -81,7 +95,21 @@ export class Neo4jConnection {
         tx.run(cypher, parameters)
       );
       
-      return result.records.map(record => record.toObject() as T);
+      return result.records.map(record => {
+        const obj = record.toObject();
+        // Extract properties from Neo4j nodes
+        const processedObj: any = {};
+        for (const [key, value] of Object.entries(obj)) {
+          if (value && typeof value === 'object' && value.properties) {
+            // This is a Neo4j node, extract its properties
+            processedObj[key] = value.properties;
+          } else {
+            // This is a regular value or relationship
+            processedObj[key] = value;
+          }
+        }
+        return processedObj as T;
+      });
     } finally {
       await session.close();
     }

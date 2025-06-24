@@ -1,8 +1,7 @@
 'use client'
 
 import { Agent } from '@/lib/api'
-import { formatDate } from '@/lib/utils'
-import { Bot, Clock } from 'lucide-react'
+import { Bot } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AGENT_TEXT } from '@/constants/text'
@@ -44,12 +43,13 @@ export function AgentCard({ agent, isSelected, onClick }: AgentCardProps) {
             </h3>
             
             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-              {agent.description}
+              {agent.systemPrompt || `${agent.model} model`}
             </p>
             
             <div className="flex items-center mt-2 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3 mr-1" />
-              <span>{AGENT_TEXT.CREATED_PREFIX} {formatDate(agent.createdAt)}</span>
+              <span className="bg-secondary/50 px-2 py-1 rounded text-xs">
+                {agent.model}
+              </span>
             </div>
           </div>
         </div>

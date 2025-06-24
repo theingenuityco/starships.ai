@@ -14,13 +14,12 @@ const api = axios.create({
 // TODO: Add request/response interceptors for logging and error handling
 // TODO: Add retry logic for failed requests
 
-// Types matching backend protocol
+// Types matching backend protocol (AgentConfig from @starships/protocol)
 export interface Agent {
   id: string
   name: string
-  description: string
-  createdAt: string
-  updatedAt: string
+  model: string
+  systemPrompt?: string
 }
 
 export interface Message {
@@ -71,17 +70,17 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
 // API functions
 export const agentAPI = {
   getAll: (): Promise<Agent[]> => 
-    api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data),
+    api.get('/v1/agents').then((res: AxiosResponse<Agent[]>) => res.data),
   
   getById: (id: string): Promise<Agent> =>
-    api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data),
+    api.get(`/v1/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data),
 }
 
 export const chatAPI = {
   // Send message directly to /v1/chat endpoint
   sendMessage: async (request: ChatRequest): Promise<Message> => {
     const backendRequest = toBackendRequest(request)
-    const response = await api.post('/api/chat', backendRequest)
+    const response = await api.post('/v1/chat', backendRequest)
     const backendResponse = response.data as ChatBackendResponse
     
     // Convert backend response to client Message format
@@ -96,7 +95,7 @@ export const chatAPI = {
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>
-    api.delete(`/api/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
+    api.delete(`/v1/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
 }
 
 // Utility function for generating client-side IDs

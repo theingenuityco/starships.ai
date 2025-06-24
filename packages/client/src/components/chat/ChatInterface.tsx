@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Agent, Message, chatAPI } from '@/lib/api'
+import { getChatHistory, saveChatHistory, generateSessionId } from '@/lib/storage'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
-import { generateId } from '@/lib/utils'
+import { ERROR_TEXT } from '@/constants/text'
 
 interface ChatInterfaceProps {
   agent: Agent
@@ -18,49 +19,39 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
   const [error, setError] = useState<string | null>(null)
   const currentSessionId = useRef<string | null>(sessionId)
 
-  // Initialize chat session when agent changes
+  // Initialize session when agent changes  
   useEffect(() => {
     if (!sessionId && agent) {
       initializeSession()
     }
   }, [agent, sessionId])
 
-  // Fetch messages when session changes
+  // Load messages when session changes
   useEffect(() => {
     if (sessionId) {
-      fetchMessages(sessionId)
+      loadMessages(sessionId)
     } else {
       setMessages([])
     }
   }, [sessionId])
 
-  const initializeSession = async () => {
-    try {
-      setLoading(true)
-      const session = await chatAPI.createSession({
-        agentId: agent.id,
-        userId: 'user-1' // In a real app, this would come from auth context
-      })
-      currentSessionId.current = session.id
-      onSessionCreated(session.id)
-      setError(null)
-    } catch (err) {
-      console.error('Failed to create chat session:', err)
-      setError('Failed to start chat session. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+  const initializeSession = () => {
+    // TODO: Add debouncing for rapid agent switching
+    const newSessionId = generateSessionId(agent.id, 'user-1') // Hardcoded user ID for now
+    currentSessionId.current = newSessionId
+    onSessionCreated(newSessionId)
+    setError(null)
   }
 
-  const fetchMessages = async (channelId: string) => {
+  const loadMessages = (sessionId: string) => {
     try {
       setLoading(true)
-      const fetchedMessages = await chatAPI.getMessages(channelId)
-      setMessages(fetchedMessages)
+      const storedMessages = getChatHistory(sessionId)
+      setMessages(storedMessages)
       setError(null)
     } catch (err) {
-      console.error('Failed to fetch messages:', err)
-      setError('Failed to load messages. Please try again.')
+      console.error('Failed to load messages:', err)
+      setError(ERROR_TEXT.FAILED_TO_LOAD_MESSAGES)
     } finally {
       setLoading(false)
     }
@@ -68,40 +59,50 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
 
   const handleSendMessage = async (content: string) => {
     if (!currentSessionId.current) {
-      setError('No active chat session')
+      setError(ERROR_TEXT.NO_ACTIVE_SESSION)
       return
     }
 
-    // Add user message immediately (optimistic update)
+    const sessionId = currentSessionId.current
+    
+    // Create user message with sending state
     const userMessage: Message = {
-      id: generateId(),
+      id: Math.random().toString(36).substring(2) + Date.now().toString(36),
       content,
       role: 'user',
       timestamp: new Date().toISOString(),
-      channelId: currentSessionId.current
+      sessionId: sessionId,
+      sending: true // Mark as sending
     }
 
-    setMessages(prev => [...prev, userMessage])
+    // Add user message immediately (optimistic update)
+    const updatedMessages = [...messages, userMessage]
+    setMessages(updatedMessages)
 
     try {
-      // Send message to API
-      const response = await chatAPI.sendMessage({
-        content,
-        channelId: currentSessionId.current
+      // Send message to backend
+      const assistantMessage = await chatAPI.sendMessage({
+        agentId: agent.id,
+        userId: 'user-1', // Hardcoded user ID for now
+        sessionId: sessionId,
+        message: content
       })
 
-      // Replace optimistic message with server response
-      setMessages(prev => 
-        prev.map(msg => msg.id === userMessage.id ? response : msg)
-      )
+      // Update user message to remove sending state and add assistant message
+      const finalUserMessage = { ...userMessage, sending: false }
+      const finalMessages = [...messages, finalUserMessage, assistantMessage]
+      setMessages(finalMessages)
+      saveChatHistory(sessionId, finalMessages)
       
       setError(null)
     } catch (err) {
       console.error('Failed to send message:', err)
-      setError('Failed to send message. Please try again.')
+      // TODO: Implement specific error types and better error handling
+      setError(ERROR_TEXT.FAILED_TO_SEND_MESSAGE)
       
-      // Remove failed message
-      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id))
+      // Remove failed user message on error
+      setMessages(messages)
+      saveChatHistory(sessionId, messages)
     }
   }
 
@@ -124,6 +125,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
 
       {/* Messages */}
       <div className="flex-1 overflow-hidden">
+        {/* TODO: Add accessibility improvements (ARIA labels, keyboard nav) */}
         <MessageList 
           messages={messages} 
           loading={loading} 

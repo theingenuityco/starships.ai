@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CommandDeck } from '@/components/command-deck/CommandDeck';
+import { AuthGate } from '@/components/auth/AuthGate';
 import { useStarshipStore } from '@/store/starship-store';
 import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
 import { useState, useEffect } from 'react';
@@ -59,52 +60,56 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   if (isDashboard) {
     // Dashboard page - full screen experience with integrated command deck
     return (
-      <div className="h-screen relative">
-        <CommandDeck />
-        <AnimatePresence mode="wait">
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="h-full w-full"
-          >
-            {children}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      <AuthGate>
+        <div className="h-screen relative">
+          <CommandDeck />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full w-full"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </AuthGate>
     );
   }
 
   // Regular pages with command deck overlay (no margin adjustments)
   return (
-    <div className="h-screen relative">
-      <CommandDeck />
-      
-      {/* Mobile Toggle Button (only shown when CommandDeck is hidden on mobile) */}
-      {isMobile && commandDeck.visibility !== 'expanded' && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          onClick={expandCommandDeck}
-          className="fixed top-4 left-4 z-50 p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
-          aria-label="Open navigation menu"
-        >
-          <Menu className="w-5 h-5" />
-        </motion.button>
-      )}
-      
-      <AnimatePresence mode="wait">
-        <motion.main 
-          key={pathname}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="h-full w-full md:pl-16"
-        >
-          {children}
-        </motion.main>
-      </AnimatePresence>
-    </div>
+    <AuthGate>
+      <div className="h-screen relative">
+        <CommandDeck />
+        
+        {/* Mobile Toggle Button (only shown when CommandDeck is hidden on mobile) */}
+        {isMobile && commandDeck.visibility !== 'expanded' && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={expandCommandDeck}
+            className="fixed top-4 left-4 z-50 p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="w-5 h-5" />
+          </motion.button>
+        )}
+        
+        <AnimatePresence mode="wait">
+          <motion.main 
+            key={pathname}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="h-full w-full md:pl-16"
+          >
+            {children}
+          </motion.main>
+        </AnimatePresence>
+      </div>
+    </AuthGate>
   );
 } 

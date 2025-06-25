@@ -20,6 +20,7 @@ export interface Agent {
   name: string
   model: string
   systemPrompt?: string
+  description?: string
 }
 
 export interface Message {

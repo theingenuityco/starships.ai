@@ -6,6 +6,7 @@ import { CommandDeck } from '@/components/command-deck/CommandDeck';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { useStarshipStore } from '@/store/starship-store';
 import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
+import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 
@@ -39,9 +40,10 @@ const LoadingSpinner = () => (
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const { commandDeck, expandCommandDeck } = useStarshipStore();
+  const { isAuthenticated, isLoading } = useAuth();
   const isDashboard = pathname === '/';
   
-  // Enable keyboard shortcuts
+  // Enable keyboard shortcuts only for authenticated users
   useCommandDeckKeyboard();
 
   // Mobile detection
@@ -58,24 +60,19 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, []);
 
   if (isDashboard) {
-    // Dashboard page - full screen experience with integrated command deck
+    // Landing page route - no CommandDeck, no authentication required
     return (
-      <AuthGate>
-        <div className="h-screen relative">
-          <CommandDeck />
-          <AnimatePresence mode="wait">
-            <motion.div
-              key="dashboard"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-full w-full"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </AuthGate>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key="landing"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="h-full w-full"
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
     );
   }
 

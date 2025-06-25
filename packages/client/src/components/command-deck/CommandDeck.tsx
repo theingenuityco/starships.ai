@@ -1,0 +1,180 @@
+'use client';
+
+/*
+ * COMMAND DECK NAVIGATION COMPONENT
+ * =================================
+ * 
+ * ACCESSIBILITY TODOS - PHASE 4 FUTURE ENHANCEMENTS:
+ * 
+ * 1. KEYBOARD NAVIGATION:
+ *    - TODO: Add arrow key navigation for menu items
+ *    - TODO: Implement proper focus management for mobile menu
+ *    - TODO: Add keyboard shortcuts (Alt+C for crew, Alt+E for expeditions, etc.)
+ *    - TODO: Ensure proper tab order and focus indicators
+ * 
+ * 2. SCREEN READER SUPPORT:
+ *    - TODO: Add proper ARIA labels for all interactive elements
+ *    - TODO: Implement live regions for dynamic content updates
+ *    - TODO: Add role="navigation" and aria-label for main nav
+ *    - TODO: Provide context for route changes to screen readers
+ * 
+ * 3. REDUCED MOTION SUPPORT:
+ *    - TODO: Respect prefers-reduced-motion for animations
+ *    - TODO: Provide non-animated alternatives for essential info
+ *    - TODO: Add motion toggle in settings
+ * 
+ * 4. HIGH CONTRAST MODE:
+ *    - TODO: Test and enhance Windows High Contrast mode compatibility
+ *    - TODO: Ensure sufficient color contrast ratios (WCAG AA)
+ *    - TODO: Add forced-colors media query support
+ * 
+ * 5. MOBILE ACCESSIBILITY:
+ *    - TODO: Ensure touch targets meet 44px minimum size
+ *    - TODO: Add haptic feedback for mobile interactions
+ *    - TODO: Test with mobile screen readers (VoiceOver, TalkBack)
+ */
+
+import { motion } from 'motion/react';
+import { useStarshipStore } from '@/store/starship-store';
+import { useProximityDetection } from '@/hooks/useProximityDetection';
+import { CommandDeckNavigation } from './CommandDeckNavigation';
+import { CommandDeckDashboard } from './CommandDeckDashboard';
+import { useEffect, useRef, useState } from 'react';
+
+export function CommandDeck() {
+  const { 
+    commandDeck, 
+    setCommandDeckVisibility, 
+    updateProximityState,
+    expandCommandDeck,
+    collapseCommandDeck,
+    setCommandDeckFocus,
+    setCommandDeckHover
+  } = useStarshipStore();
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // md breakpoint
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Left edge proximity detection
+  const { proximityState } = useProximityDetection({
+    nearThreshold: 150,
+    engageThreshold: 75,
+    debounceMs: 100,
+    mode: 'left-edge'
+  });
+
+  // Ref for the command deck element
+  const commandDeckRef = useRef<HTMLDivElement>(null);
+
+  // Handle proximity state changes for auto-expand
+  useEffect(() => {
+    if (!isMobile && proximityState === 'engaged' && commandDeck.visibility === 'collapsed') {
+      setCommandDeckVisibility('partial');
+    }
+  }, [proximityState, commandDeck.visibility, isMobile, setCommandDeckVisibility]);
+
+  // Handle hover state changes
+  const handleMouseEnter = () => {
+    setCommandDeckHover(true);
+    if (commandDeck.visibility === 'collapsed') {
+      setCommandDeckVisibility('partial');
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setCommandDeckHover(false);
+    if (commandDeck.visibility === 'partial') {
+      setCommandDeckVisibility('collapsed');
+    }
+  };
+
+
+
+  // Animation variants
+  const mobileVariants = {
+    hidden: {
+      x: '-100%',
+      width: '100vw',
+      opacity: 0
+    },
+    expanded: {
+      x: '0%',
+      width: '100vw',
+      opacity: 1
+    }
+  };
+
+  const desktopVariants = {
+    collapsed: {
+      x: '0%',
+      width: '64px',
+      opacity: 1
+    },
+    partial: {
+      x: '0%',
+      width: '280px', // Reduced from 320px to prevent overflow
+      opacity: 1
+    },
+    expanded: {
+      x: '0%',
+      width: '100vw',
+      opacity: 1
+    }
+  };
+
+  const commandDeckVariants = isMobile ? mobileVariants : desktopVariants;
+
+  // Get current visibility state (adjust for mobile)
+  const currentVisibility = isMobile 
+    ? (commandDeck.visibility === 'expanded' ? 'expanded' : 'hidden')
+    : commandDeck.visibility;
+
+  return (
+    <motion.div
+      ref={commandDeckRef}
+      className="fixed left-0 top-0 h-full bg-card border-r border-border z-40 flex"
+      initial={isMobile ? "hidden" : "collapsed"}
+      animate={currentVisibility}
+      variants={commandDeckVariants}
+      transition={{
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+        duration: 0.3
+      }}
+      onMouseEnter={!isMobile ? handleMouseEnter : undefined}
+      onMouseLeave={!isMobile ? handleMouseLeave : undefined}
+    >
+      {/* Left: Navigation & Quick Controls */}
+      <div className={`${isMobile ? 'w-full' : 'w-full max-w-[280px]'} flex-shrink-0 h-full overflow-hidden`}>
+        <CommandDeckNavigation 
+          visibility={commandDeck.visibility}
+          onExpand={expandCommandDeck}
+          onCollapse={collapseCommandDeck}
+          isMobile={isMobile}
+        />
+      </div>
+
+      {/* Right: Full Dashboard (Only when expanded on desktop) */}
+      {!isMobile && commandDeck.visibility === 'expanded' && (
+        <motion.div
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="flex-1 h-full bg-background/95 backdrop-blur-sm"
+        >
+          <CommandDeckDashboard onCollapse={collapseCommandDeck} />
+        </motion.div>
+      )}
+    </motion.div>
+  );
+} 

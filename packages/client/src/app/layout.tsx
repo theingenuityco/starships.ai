@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
+import { QueryProvider } from '@/providers/query-provider'
+import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -21,17 +23,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          {/* TODO: Add error boundaries for crash protection */}
-          <div className="min-h-screen bg-background">
-            {children}
-          </div>
+          <QueryProvider>
+            <div className="min-h-screen bg-background">
+              <ClientLayout>{children}</ClientLayout>
+            </div>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

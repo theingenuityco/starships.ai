@@ -46,8 +46,8 @@ export function CommandDeck() {
     commandDeck, 
     setCommandDeckVisibility, 
     updateProximityState,
-    expandCommandDeck,
-    collapseCommandDeck,
+            expandCommandDeck,
+        collapseCommandDeck,
     setCommandDeckFocus,
     setCommandDeckHover
   } = useStarshipStore();
@@ -76,6 +76,8 @@ export function CommandDeck() {
   // Ref for the command deck element
   const commandDeckRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
+  const isClickingRef = useRef(false);
+  const collapseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle proximity state changes for auto-expand
   useEffect(() => {
@@ -84,11 +86,20 @@ export function CommandDeck() {
     }
   }, [proximityState, commandDeck.visibility, isMobile, setCommandDeckVisibility]);
 
+  // Clear any pending collapse timeout
+  const clearCollapseTimeout = () => {
+    if (collapseTimeoutRef.current) {
+      clearTimeout(collapseTimeoutRef.current);
+      collapseTimeoutRef.current = null;
+    }
+  };
+
   // Handle hover state changes
   const handleMouseEnter = () => {
-    if (!isMobile) {
+    if (!isMobile && !isClickingRef.current) {
       isHoveredRef.current = true;
       setCommandDeckHover(true);
+      clearCollapseTimeout();
       if (commandDeck.visibility === 'collapsed') {
         setCommandDeckVisibility('partial');
       }
@@ -99,19 +110,96 @@ export function CommandDeck() {
     if (!isMobile) {
       isHoveredRef.current = false;
       setCommandDeckHover(false);
-      // Only auto-collapse if we're in partial state (auto-expanded by hover)
-      // Don't collapse if user manually expanded to 'expanded' state
-      if (commandDeck.visibility === 'partial') {
-        // Add a small delay to prevent flicker when moving between child elements
-        setTimeout(() => {
-          // Check if we're still not hovered and in partial state
-          if (!isHoveredRef.current && commandDeck.visibility === 'partial') {
-            setCommandDeckVisibility('collapsed');
-          }
-        }, 150);
-      }
+      clearCollapseTimeout();
+      
+      // Schedule collapse check regardless of current visibility
+      // This ensures we always try to collapse when leaving hover area
+      collapseTimeoutRef.current = setTimeout(() => {
+        // Get fresh state at execution time
+        const currentState = useStarshipStore.getState();
+        const currentVisibility = currentState.commandDeck.visibility;
+        
+        // Only collapse if:
+        // 1. Not currently clicking
+        // 2. Still not hovered (double check)
+        // 3. In partial state (hover-expanded, not manually expanded)
+        if (!isClickingRef.current && 
+            !isHoveredRef.current && 
+            currentVisibility === 'partial') {
+          setCommandDeckVisibility('collapsed');
+        }
+      }, 200);
     }
   };
+
+  // Handle click interactions to prevent hover interference
+  const handleMouseDown = () => {
+    isClickingRef.current = true;
+    clearCollapseTimeout();
+  };
+
+  const handleMouseUp = () => {
+    // Reset click state after a short delay to allow click handlers to complete
+    setTimeout(() => {
+      isClickingRef.current = false;
+    }, 100);
+  };
+
+  // Add click handler to prevent event bubbling issues
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't interfere with button clicks inside the navigation
+    if ((e.target as HTMLElement).closest('button')) {
+      clearCollapseTimeout();
+    }
+  };
+
+  // Wrapped expand/collapse functions that clear timeouts
+  const handleExpandCommandDeck = () => {
+    clearCollapseTimeout();
+    isClickingRef.current = true;
+    expandCommandDeck();
+    setTimeout(() => {
+      isClickingRef.current = false;
+    }, 200);
+  };
+
+  const handleCollapseCommandDeck = () => {
+    clearCollapseTimeout();
+    isClickingRef.current = true;
+    collapseCommandDeck();
+    setTimeout(() => {
+      isClickingRef.current = false;
+    }, 200);
+  };
+
+  // Periodic check to ensure navigation doesn't get stuck
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Only run this check if we're not on mobile and not currently hovering
+      if (!isMobile && !isHoveredRef.current && !isClickingRef.current) {
+        const currentState = useStarshipStore.getState();
+        // If we're in partial state but not hovered, collapse it
+        if (currentState.commandDeck.visibility === 'partial') {
+          // Check if the element is actually being hovered by DOM state
+          const element = commandDeckRef.current;
+          if (element && !element.matches(':hover')) {
+            setCommandDeckVisibility('collapsed');
+          }
+        }
+      }
+    }, 1000); // Check every second
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isMobile, setCommandDeckVisibility]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearCollapseTimeout();
+    };
+  }, []);
 
 
 
@@ -169,13 +257,16 @@ export function CommandDeck() {
       }}
       onMouseEnter={!isMobile ? handleMouseEnter : undefined}
       onMouseLeave={!isMobile ? handleMouseLeave : undefined}
+      onMouseDown={!isMobile ? handleMouseDown : undefined}
+      onMouseUp={!isMobile ? handleMouseUp : undefined}
+      onClick={!isMobile ? handleClick : undefined}
     >
       {/* Left: Navigation & Quick Controls */}
       <div className={`${isMobile ? 'w-full' : 'w-full max-w-[280px]'} flex-shrink-0 h-full overflow-hidden`}>
         <CommandDeckNavigation 
           visibility={commandDeck.visibility}
-          onExpand={expandCommandDeck}
-          onCollapse={collapseCommandDeck}
+          onExpand={handleExpandCommandDeck}
+          onCollapse={handleCollapseCommandDeck}
           isMobile={isMobile}
         />
       </div>
@@ -187,7 +278,7 @@ export function CommandDeck() {
           animate={{ opacity: 1, x: 0 }}
           className="flex-1 h-full bg-background/95 backdrop-blur-sm"
         >
-          <CommandDeckDashboard onCollapse={collapseCommandDeck} />
+          <CommandDeckDashboard onCollapse={handleCollapseCommandDeck} />
         </motion.div>
       )}
     </motion.div>

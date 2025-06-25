@@ -118,7 +118,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
           </div>
           <div>
             <h2 className="font-semibold">{agent.name}</h2>
-            <p className="text-sm text-muted-foreground">{agent.description}</p>
+            <p className="text-sm text-muted-foreground">{agent.systemPrompt || 'AI Assistant'}</p>
           </div>
         </div>
       </div>

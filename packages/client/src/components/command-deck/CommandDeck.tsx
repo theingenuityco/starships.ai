@@ -75,6 +75,7 @@ export function CommandDeck() {
 
   // Ref for the command deck element
   const commandDeckRef = useRef<HTMLDivElement>(null);
+  const isHoveredRef = useRef(false);
 
   // Handle proximity state changes for auto-expand
   useEffect(() => {
@@ -85,16 +86,30 @@ export function CommandDeck() {
 
   // Handle hover state changes
   const handleMouseEnter = () => {
-    setCommandDeckHover(true);
-    if (commandDeck.visibility === 'collapsed') {
-      setCommandDeckVisibility('partial');
+    if (!isMobile) {
+      isHoveredRef.current = true;
+      setCommandDeckHover(true);
+      if (commandDeck.visibility === 'collapsed') {
+        setCommandDeckVisibility('partial');
+      }
     }
   };
 
   const handleMouseLeave = () => {
-    setCommandDeckHover(false);
-    if (commandDeck.visibility === 'partial') {
-      setCommandDeckVisibility('collapsed');
+    if (!isMobile) {
+      isHoveredRef.current = false;
+      setCommandDeckHover(false);
+      // Only auto-collapse if we're in partial state (auto-expanded by hover)
+      // Don't collapse if user manually expanded to 'expanded' state
+      if (commandDeck.visibility === 'partial') {
+        // Add a small delay to prevent flicker when moving between child elements
+        setTimeout(() => {
+          // Check if we're still not hovered and in partial state
+          if (!isHoveredRef.current && commandDeck.visibility === 'partial') {
+            setCommandDeckVisibility('collapsed');
+          }
+        }, 150);
+      }
     }
   };
 

@@ -3,7 +3,10 @@
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import { CommandDeck } from '@/components/command-deck/CommandDeck';
-import { useStarship } from '@/components/state/starship-context';
+import { useStarshipStore } from '@/store/starship-store';
+import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
+import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -34,46 +37,70 @@ const LoadingSpinner = () => (
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
-  const { isLoading } = useStarship();
+  const { commandDeck, expandCommandDeck } = useStarshipStore();
   const isDashboard = pathname === '/';
+  
+  // Enable keyboard shortcuts
+  useCommandDeckKeyboard();
 
-  // Show loading state
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (isDashboard) {
-    // Dashboard page - full screen with enhanced transitions
+    // Dashboard page - full screen experience with integrated command deck
     return (
-      <AnimatePresence mode="wait">
-        <motion.div
-          key="dashboard"
-          variants={dashboardVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={{ duration: 0.4, ease: "easeInOut" }}
-          className="min-h-screen"
-        >
-          {children}
-        </motion.div>
-      </AnimatePresence>
+      <div className="h-screen relative">
+        <CommandDeck />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="dashboard"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="h-full w-full"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     );
   }
 
-  // Regular pages - with CommandDeck navbar and enhanced transitions
+  // Regular pages with command deck overlay (no margin adjustments)
   return (
-    <div className="flex flex-col h-screen">
+    <div className="h-screen relative">
       <CommandDeck />
+      
+      {/* Mobile Toggle Button (only shown when CommandDeck is hidden on mobile) */}
+      {isMobile && commandDeck.visibility !== 'expanded' && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          onClick={expandCommandDeck}
+          className="fixed top-4 left-4 z-50 p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </motion.button>
+      )}
+      
       <AnimatePresence mode="wait">
         <motion.main 
           key={pathname}
-          variants={pageVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="flex-1 overflow-hidden"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="h-full w-full md:pl-16"
         >
           {children}
         </motion.main>

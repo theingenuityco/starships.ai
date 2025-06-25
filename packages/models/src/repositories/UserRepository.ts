@@ -38,6 +38,15 @@ export class UserRepository implements UserRepositoryInterface {
     return result.length > 0 ? result[0].u : null;
   }
 
+  async findByKindeId(kindeId: string): Promise<User | null> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ u: User }>(
+      'MATCH (u:User) WHERE u.kindeId = $kindeId RETURN u',
+      { kindeId: kindeId }
+    );
+    return result.length > 0 ? result[0].u : null;
+  }
+
   async create(entity: Omit<User, 'id' | 'createdAt'>): Promise<User> {
     const connection = getConnection();
     const id = uuidv4();
@@ -46,11 +55,22 @@ export class UserRepository implements UserRepositoryInterface {
     const result = await connection.executeWrite<{ u: User }>(
       `CREATE (u:User {
         id: $id,
+        kindeId: $kindeId,
         username: $username,
         email: $email,
+        displayName: $displayName,
+        avatar: $avatar,
         createdAt: $createdAt
       }) RETURN u`,
-      { id: id, createdAt: createdAt, username: entity.username, email: entity.email }
+      { 
+        id: id, 
+        createdAt: createdAt, 
+        kindeId: entity.kindeId,
+        username: entity.username, 
+        email: entity.email,
+        displayName: entity.displayName,
+        avatar: entity.avatar
+      }
     );
     
     return result[0].u;
@@ -72,7 +92,14 @@ export class UserRepository implements UserRepositoryInterface {
       `MATCH (u:User) WHERE u.id = $id
        SET ${setClause}
        RETURN u`,
-      { id: id, username: updates.username, email: updates.email }
+      { 
+        id: id, 
+        kindeId: updates.kindeId,
+        username: updates.username, 
+        email: updates.email,
+        displayName: updates.displayName,
+        avatar: updates.avatar
+      }
     );
     
     return result.length > 0 ? result[0].u : null;

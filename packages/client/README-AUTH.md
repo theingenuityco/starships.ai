@@ -86,13 +86,52 @@ Visit `http://localhost:3000/api/auth/health` to verify configuration.
 - **UserProfile**: Shows user info with dropdown menu
 - **AuthProvider**: Provides auth context to the app
 
+## User Synchronization System ✅
+
+**Automatic User Sync**: Users are now automatically synchronized between Kinde and your Neo4j database:
+
+### How It Works
+1. **User logs in via Kinde** → Authentication handled by Kinde
+2. **Auto-sync triggers** → User data synced to your Neo4j database  
+3. **App uses your data** → All functionality uses your database user records
+
+### Real User Data
+- ❌ **Removed**: All hardcoded `'user-1'` values
+- ✅ **Added**: Real user IDs from your database
+- ✅ **Added**: User relationships and chat history tied to real users
+- ✅ **Added**: Automatic user creation/updates on login
+
+### Data Flow
+```
+Kinde Login → Auto-Sync to Neo4j → App Uses Your Database
+     ↓              ↓                      ↓
+  auth only    user creation/update    real user data
+```
+
+### Usage in Components
+```typescript
+import { useAuth } from '@/hooks/useAuth'
+
+function MyComponent() {
+  const { userId, syncedUser, isLoading } = useAuth()
+  
+  // userId = your Neo4j database user ID (not Kinde)
+  // Use this for all API calls and business logic
+  
+  if (isLoading) return <div>Syncing user...</div>
+  
+  return <div>Welcome, {syncedUser?.displayName}!</div>
+}
+```
+
 ## Next Steps
 
-After authentication is working:
-1. Replace hardcoded `'user-1'` with real user IDs
-2. Implement user-scoped chat history
+Advanced features to implement:
+1. ✅ ~~Replace hardcoded user IDs~~ **COMPLETED**
+2. ✅ ~~User-scoped chat history~~ **COMPLETED** 
 3. Add user preferences and settings
 4. Implement role-based access control
+5. Add user profile management UI
 
 ## Troubleshooting
 

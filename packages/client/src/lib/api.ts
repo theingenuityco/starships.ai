@@ -1,6 +1,8 @@
 import axios, { AxiosResponse } from 'axios'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
+import { getApiBaseUrl } from './env';
+
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,

@@ -4,6 +4,7 @@ import chatRouter from "./routes/chat";
 import agentsRouter from "./routes/agents";
 import memoryRouter from "./routes/memory";
 import redeployRouter from "./routes/redeploy";
+import usersRouter from "./routes/users";
 import { AgentService } from "./services/AgentService";
 import { env } from "./config/environment";
 
@@ -22,6 +23,7 @@ app.get("/", (_req: Request, res: Response) => {
 app.use("/v1/agents", agentsRouter);
 app.use("/v1/chat", chatRouter);
 app.use("/v1/memory", memoryRouter);
+app.use("/v1/users", usersRouter);
 
 // Admin routes
 app.use("/redeploy", redeployRouter);

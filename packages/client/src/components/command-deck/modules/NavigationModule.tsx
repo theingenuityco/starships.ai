@@ -7,6 +7,8 @@ import {
   Cpu, Zap, BarChart3, ChevronRight, Maximize2 
 } from 'lucide-react';
 import { QuickActionModule } from './QuickActionModule';
+import { UserProfile } from '@/components/auth/UserProfile';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface NavigationModuleProps {
   moduleId?: string;
@@ -97,24 +99,29 @@ export function NavigationModule({
             </button>
           ) : (
             <>
-              <h2 className="text-lg font-semibold truncate">Command Deck</h2>
-              {visibility === 'expanded' ? (
-                <button
-                  onClick={onCollapse}
-                  className="p-1 rounded hover:bg-accent flex-shrink-0 ml-2"
-                  aria-label="Collapse command deck"
-                >
-                  <ChevronRight className="w-4 h-4 rotate-180" />
-                </button>
-              ) : (
-                <button
-                  onClick={onExpand}
-                  className="p-1 rounded hover:bg-accent flex-shrink-0 ml-2"
-                  aria-label="Expand command deck"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-              )}
+              <div className="flex items-center justify-between w-full">
+                <h2 className="text-lg font-semibold truncate">Command Deck</h2>
+                <div className="flex items-center gap-1">
+                  <ThemeToggle />
+                  {visibility === 'expanded' ? (
+                    <button
+                      onClick={onCollapse}
+                      className="p-1 rounded hover:bg-accent flex-shrink-0"
+                      aria-label="Collapse command deck"
+                    >
+                      <ChevronRight className="w-4 h-4 rotate-180" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={onExpand}
+                      className="p-1 rounded hover:bg-accent flex-shrink-0"
+                      aria-label="Expand command deck"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </motion.div>
@@ -197,7 +204,14 @@ export function NavigationModule({
         )}
       </motion.div>
 
-
+      {/* User Profile Section at Bottom */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className={`border-t border-border ${isCollapsed ? 'p-2' : 'p-3'}`}
+      >
+        <UserProfile mode={isCollapsed ? 'collapsed' : 'expanded'} />
+      </motion.div>
     </div>
   );
 }

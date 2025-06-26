@@ -7,28 +7,37 @@ const router: Router = Router();
 
 // Validation middleware for chat requests
 const validateChatRequest = (req: any, res: any, next: any) => {
-  const { agent_id, user_id, message } = req.body;
+  const { agent_id, message } = req.body;
   
   if (!agent_id || typeof agent_id !== 'string') {
     return res.status(400).json({ error: 'agent_id is required and must be a string' });
-  }
-  
-  if (!user_id || typeof user_id !== 'string') {
-    return res.status(400).json({ error: 'user_id is required and must be a string' });
   }
   
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'message is required and must be a string' });
   }
   
+  // Note: user_id is now derived from the authenticated user (req.user)
+  // and does not need to be provided by the client
+  
   next();
 };
 
 router.post("/", validateChatRequest, async (req, res) => {
   try {
-    const body = req.body as ChatRequest;
+    // Build chat request using authenticated user ID from middleware
+    const chatRequest: ChatRequest = {
+      agent_id: req.body.agent_id,
+      user_id: req.user.id, // Use authenticated user ID, not client-provided
+      message: req.body.message,
+      channel_id: req.body.channel_id,
+      stream: false
+    };
+    
+    console.log(`[CHAT] Processing message for authenticated user: ${req.user.id}`);
+    
     const store = getStore();
-    const result = await agentChat(body, store);
+    const result = await agentChat(chatRequest, store);
     res.json(result);
   } catch (err) {
     console.error('Chat error:', err);

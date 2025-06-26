@@ -7,6 +7,7 @@ import redeployRouter from "./routes/redeploy";
 import usersRouter from "./routes/users";
 import { AgentService } from "./services/AgentService";
 import { env } from "./config/environment";
+import { authMiddleware } from "./middleware/auth";
 
 const app: express.Express = express();
 
@@ -19,10 +20,12 @@ app.get("/", (_req: Request, res: Response) => {
   res.send("starships.ai server running");
 });
 
-// API routes
-app.use("/v1/agents", agentsRouter);
-app.use("/v1/chat", chatRouter);
-app.use("/v1/memory", memoryRouter);
+// API routes - protected with authentication middleware
+app.use("/v1/agents", authMiddleware, agentsRouter);
+app.use("/v1/chat", authMiddleware, chatRouter);
+app.use("/v1/memory", authMiddleware, memoryRouter);
+
+// User routes - mixed protection (sync is public, others protected)
 app.use("/v1/users", usersRouter);
 
 // Admin routes

@@ -20,6 +20,7 @@ export interface Agent {
   name: string
   model: string
   systemPrompt?: string
+  description?: string
 }
 
 export interface Message {
@@ -29,6 +30,17 @@ export interface Message {
   timestamp: string
   sessionId: string
   sending?: boolean // For loading states
+}
+
+// User Interface (from backend)
+export interface SyncedUser {
+  id: string
+  kindeId?: string
+  username: string
+  email?: string
+  displayName?: string
+  avatar?: string
+  createdAt: string
 }
 
 // Backend request/response types (snake_case)
@@ -96,6 +108,27 @@ export const chatAPI = {
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>
     api.delete(`/v1/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
+}
+
+export const userAPI = {
+  // Sync Kinde user to backend database
+  syncUser: async (userData: {
+    kindeId: string
+    email: string
+    name?: string
+    avatar?: string
+  }): Promise<SyncedUser> => {
+    const response = await api.post('/v1/users/sync', userData)
+    return response.data as SyncedUser
+  },
+
+  // Get user by ID
+  getById: (id: string): Promise<SyncedUser> =>
+    api.get(`/v1/users/${id}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+
+  // Get user by Kinde ID
+  getByKindeId: (kindeId: string): Promise<SyncedUser> =>
+    api.get(`/v1/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
 }
 
 // Utility function for generating client-side IDs

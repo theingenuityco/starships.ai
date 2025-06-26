@@ -1,7 +1,7 @@
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { LoginLink, LogoutLink, RegisterLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { useEffect, useState } from "react";
-import { userAPI, type SyncedUser } from "@/lib/api";
+import { userAPI, type SyncedUser, setTokenProvider } from "@/lib/api";
 
 /**
  * Custom hook for accessing Kinde authentication state and synced user data
@@ -13,7 +13,9 @@ export function useAuth() {
     isAuthenticated,
     isLoading: kindeLoading,
     getToken,
-    getClaim
+    getClaim,
+    getAccessTokenRaw,
+    accessTokenRaw
   } = useKindeBrowserClient();
 
   const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null);
@@ -54,6 +56,43 @@ export function useAuth() {
 
     syncUser();
   }, [isAuthenticated, user?.id]); // Fixed: Only depend on auth state and user ID
+
+  // Set up token provider for API client authentication
+  useEffect(() => {
+    console.log('[AUTH] Setting up token provider, isAuthenticated:', isAuthenticated, 'kindeLoading:', kindeLoading);
+    
+    // Critical: Only set up token provider after loading is complete
+    if (!kindeLoading) {
+      setTokenProvider(async () => {
+        if (isAuthenticated) {
+          try {
+            console.log('[AUTH] Attempting to get access token...');
+            
+            // Try multiple token methods for compatibility
+            let accessToken = null;
+            if (getAccessTokenRaw) {
+              accessToken = getAccessTokenRaw();
+              console.log('[AUTH] getAccessTokenRaw result:', accessToken ? 'Token present' : 'No token');
+            } else if (accessTokenRaw) {
+              accessToken = accessTokenRaw;
+              console.log('[AUTH] accessTokenRaw result:', accessToken ? 'Token present' : 'No token');
+            } else {
+              accessToken = await getToken();
+              console.log('[AUTH] getToken result:', accessToken ? 'Token present' : 'No token');
+            }
+            
+            console.log('[AUTH] Access token retrieved for API:', accessToken ? 'Token present' : 'No token');
+            return accessToken;
+          } catch (error) {
+            console.error('[AUTH] Failed to get access token:', error);
+            return null;
+          }
+        }
+        console.log('[AUTH] Not authenticated, returning null token');
+        return null;
+      });
+    }
+  }, [isAuthenticated, kindeLoading, getToken, getAccessTokenRaw, accessTokenRaw]);
 
   const isLoading = kindeLoading || syncLoading;
 

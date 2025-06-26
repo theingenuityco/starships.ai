@@ -1,3 +1,10 @@
+// Use centralized environment configuration
+const { getServerConfig, getClientConfig } = require('@starships/env-config/dist');
+
+// Load environment configuration using our centralized package
+const serverEnv = getServerConfig();
+const clientEnv = getClientConfig();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
@@ -11,11 +18,17 @@ const nextConfig = {
   },
   env: {
     // Kinde environment variables with dynamic defaults for deployment
-    KINDE_SITE_URL: process.env.KINDE_SITE_URL ?? `https://${process.env.VERCEL_URL}`,
+    KINDE_CLIENT_ID: serverEnv.KINDE_CLIENT_ID,
+    KINDE_CLIENT_SECRET: serverEnv.KINDE_CLIENT_SECRET,
+    KINDE_ISSUER_URL: serverEnv.KINDE_ISSUER_URL,
+    KINDE_SITE_URL: serverEnv.KINDE_SITE_URL ?? `https://${process.env.VERCEL_URL}`,
     KINDE_POST_LOGOUT_REDIRECT_URL:
-      process.env.KINDE_POST_LOGOUT_REDIRECT_URL ?? `https://${process.env.VERCEL_URL}`,
+      serverEnv.KINDE_POST_LOGOUT_REDIRECT_URL ?? `https://${process.env.VERCEL_URL}`,
     KINDE_POST_LOGIN_REDIRECT_URL:
-      process.env.KINDE_POST_LOGIN_REDIRECT_URL ?? `https://${process.env.VERCEL_URL}`
+      serverEnv.KINDE_POST_LOGIN_REDIRECT_URL ?? `https://${process.env.VERCEL_URL}`,
+    KINDE_DEBUG_MODE: serverEnv.KINDE_DEBUG_MODE ? 'true' : 'false',
+    // Public environment variables (exposed to browser)
+    NEXT_PUBLIC_API_URL: clientEnv.NEXT_PUBLIC_API_URL,
   }
 }
 

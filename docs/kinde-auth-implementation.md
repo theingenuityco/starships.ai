@@ -2,7 +2,15 @@
 
 ## Overview
 
-This document covers the complete implementation of Kinde authentication in the Starships AI application. The implementation provides secure authentication using Kinde's hosted UI while maintaining the existing space-themed design and functionality. This includes enhanced user profile management, improved navigation behavior, and seamless theme integration.
+This document covers the complete implementation of Kinde authentication in the Starships AI application. The implementation provides secure authentication using Kinde's hosted UI with **full API protection via JWT token validation**. All backend APIs are now secured and automatically scope data to the authenticated user.
+
+## 🔐 Security Status: COMPLETE & SECURE
+
+✅ **Token-Based API Authentication**: All APIs validate Kinde JWT tokens  
+✅ **User Identity from Tokens**: User ID derived from cryptographically verified tokens  
+✅ **Zero Client Trust**: Server never trusts client-sent user IDs  
+✅ **Automatic Data Scoping**: All API calls scoped to authenticated user only  
+✅ **Production Ready**: Follows security best practices
 
 ## Architecture
 
@@ -12,13 +20,56 @@ This document covers the complete implementation of Kinde authentication in the 
 3. **User Authenticates** → Via Kinde's UI (supports email, social logins, etc.)
 4. **Kinde Redirects Back** → User lands on Command Deck with full access
 5. **Session Management** → Handled automatically by Kinde SDK
+6. **API Security** → All API calls include JWT tokens, validated server-side
 
-### Protected Routes
-- **Command Deck (/)**: Protected - requires authentication
-- **All Module Pages**: Protected via Command Deck access
-- **Login UI**: Shown automatically for unauthenticated users
+### Secure API Flow
+1. **Frontend** → Gets JWT token from Kinde
+2. **API Request** → Automatically includes `Bearer {token}` header
+3. **Server Middleware** → Validates token signature & issuer
+4. **User Resolution** → Looks up user in Neo4j by Kinde ID from token
+5. **Request Processing** → All data automatically scoped to authenticated user
+
+### Protected Routes & APIs
+- **Frontend Routes**:
+  - **Command Deck (/)**: Protected - requires authentication
+  - **All Module Pages**: Protected via Command Deck access
+  - **Login UI**: Shown automatically for unauthenticated users
+
+- **Backend APIs** (All JWT Protected):
+  - **`/v1/agents`**: User's agents only - token-scoped
+  - **`/v1/chat`**: Messages tied to authenticated user only
+  - **`/v1/memory`**: Session data scoped to authenticated user
+  - **`/v1/users/me`**: Current authenticated user profile
+  - **`/v1/users/sync`**: Public endpoint for initial user creation
 
 ## Implementation Components
+
+### 0. API Security Middleware ⭐ NEW
+**File**: `packages/server/src/middleware/auth.ts`
+```typescript
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // 1. Extract Bearer token from Authorization header
+  const token = req.headers.authorization?.replace('Bearer ', '')
+  
+  // 2. Validate JWT signature & issuer using Kinde's JWKS
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer: kindeIssuerUrl,
+  })
+  
+  // 3. Look up user in Neo4j database by Kinde ID
+  const user = await UserService.getUserByKindeId(payload.sub)
+  
+  // 4. Attach user to request for route handlers
+  req.user = user
+  req.kindeId = payload.sub
+}
+```
+
+**Security Features**:
+- **JWT Signature Validation**: Uses Kinde's public keys (JWKS)
+- **Issuer Verification**: Ensures tokens are from `[KINDE-ISSUER-URL]`
+- **User Database Lookup**: Real user data from Neo4j, not just token claims
+- **Automatic User Attachment**: `req.user` available in all protected routes
 
 ### 1. Auth API Route
 **File**: `packages/client/src/app/api/auth/[kindeAuth]/route.ts`
@@ -31,11 +82,24 @@ export const GET = handleAuth();
 - Required for OAuth flow to work properly
 - Routes are separated from backend API (`/api/v1/*`) to prevent conflicts
 
-### 2. Auth Hook
+### 2. Auth Hook (Enhanced)
 **File**: `packages/client/src/hooks/useAuth.ts`
 - Provides unified access to authentication state
 - Exports user info, loading states, and auth components
-- Includes convenience properties for user display
+- **NEW**: Automatically configures API client with tokens
+- **NEW**: Sets up token provider for axios interceptors
+
+```typescript
+// Setup token provider for API client
+useEffect(() => {
+  setTokenProvider(async () => {
+    if (isAuthenticated) {
+      return await getToken()
+    }
+    return null
+  })
+}, [isAuthenticated, getToken])
+```
 
 ### 3. Auth Components
 
@@ -89,6 +153,18 @@ KINDE_DEBUG_MODE=true
 NEXT_PUBLIC_API_URL=http://localhost:4000
 ```
 
+**Backend** (`packages/server/.env` or system environment):
+```env
+# Required for JWT token validation
+KINDE_ISSUER_URL=https://your_subdomain.kinde.com
+KINDE_CLIENT_ID=your_kinde_client_id
+
+# Neo4j database connection (for user lookup)
+NEO4J_URI=[NEO4J-LOCAL-URL]
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your_[DEFAULT-PASSWORD]
+```
+
 ### Kinde Dashboard Setup
 1. Create a Kinde application
 2. Set allowed callback URLs:
@@ -106,11 +182,38 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 - Added Kinde environment variables with dynamic defaults
 - Supports Vercel preview deployments
 
-### Backend API Integration
+### Backend API Integration ⭐ ENHANCED
 **File**: `packages/client/src/lib/api.ts`
 - Updated all API calls to use `/api/v1/*` prefix
+- **NEW**: Automatic token injection via axios interceptors
+- **NEW**: Token provider system for dynamic token retrieval
 - Maintains existing chat and backend functionality
 - Preserves all hardcoded values as requested
+
+```typescript
+// Request interceptor to add authentication token
+api.interceptors.request.use(
+  async (config) => {
+    console.log('[API] Request interceptor running for:', config.url)
+    if (getTokenFunction) {
+      const token = await getTokenFunction()
+      console.log('[API] Token from provider:', token ? 'Token present' : 'No token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+        console.log('[API] Authorization header added')
+      } else {
+        console.log('[API] No token available, skipping Authorization header')
+      }
+    } else {
+      console.log('[API] No token provider configured')
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+```
 
 ## Integration Points
 
@@ -168,11 +271,39 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 - CSRF protection
 - Rate limiting
 
-### Application Security
-- Protected routes via `AuthGate`
-- Server-side session validation
-- Automatic token refresh
-- Secure logout flows
+### Application Security ⭐ ENHANCED
+- **Frontend**: Protected routes via `AuthGate`
+- **Backend**: JWT token validation on all API endpoints
+- **Token-Based Auth**: User identity derived from cryptographically secure tokens
+- **Zero Client Trust**: Server never trusts client-sent user IDs
+- **Automatic Data Scoping**: All API responses scoped to authenticated user
+- **Database Integration**: Real user data from Neo4j, not just token claims
+
+### Secure API Request Format
+```typescript
+// OLD (VULNERABLE):
+chatAPI.sendMessage({
+  agentId: "agent-123",
+  userId: "user-456",  // ❌ Client could lie about this
+  message: "Hello"
+})
+
+// NEW (SECURE):
+chatAPI.sendMessage({
+  agentId: "agent-123",
+  message: "Hello"      // ✅ User ID derived from JWT token
+})
+// Request automatically includes: Authorization: Bearer {jwt-token}
+// Server extracts user ID from validated token
+```
+
+### Security Testing Results
+```bash
+✅ curl /v1/agents + valid token → 200 OK (user's agents)
+✅ curl /v1/chat + valid token → 200 OK (AI response)
+❌ curl /v1/agents (no token) → 401 Unauthorized
+❌ curl /v1/agents + invalid token → 401 Invalid token
+```
 
 ## Development
 
@@ -227,6 +358,95 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 - Check Kinde dashboard callback URLs
 - Verify environment variables are set correctly
 
+#### ⭐ "Missing or invalid Authorization header" - API Token Issues
+**Problem**: Frontend makes API calls but backend returns `401 Unauthorized` with "Missing or invalid Authorization header"
+
+**Root Cause**: The `getToken()` function in Kinde's browser client returns `null` if called before authentication is fully loaded.
+
+**Solution**: 
+1. **Check `isLoading` state** - Only set up token provider after `!kindeLoading`
+2. **Use correct token function** - Try `getAccessTokenRaw()` first for raw JWT strings
+3. **Add proper error handling** - Gracefully handle token retrieval failures
+
+**Fixed Implementation**:
+```typescript
+// In useAuth.ts
+useEffect(() => {
+  // Critical: Only set up token provider after loading is complete
+  if (!kindeLoading) {
+    setTokenProvider(async () => {
+      if (isAuthenticated) {
+        try {
+          // Try getAccessTokenRaw first (for raw JWT string), fallback to getToken
+          let accessToken = null
+          if (getAccessTokenRaw) {
+            accessToken = getAccessTokenRaw()
+          } else if (accessTokenRaw) {
+            accessToken = accessTokenRaw
+          } else {
+            accessToken = await getToken()
+          }
+          return accessToken
+        } catch (error) {
+          console.error('[AUTH] Failed to get access token:', error)
+          return null
+        }
+      }
+      return null
+    })
+  }
+}, [isAuthenticated, kindeLoading, getToken, getAccessTokenRaw, accessTokenRaw])
+```
+
+**Debugging Steps**:
+1. Open browser dev tools → Console tab
+2. Look for these logs when navigating to protected pages:
+   ```
+   [AUTH] Setting up token provider, isAuthenticated: true, kindeLoading: false
+   [API] Token provider set
+   [AUTH] Attempting to get access token...
+   [AUTH] Access token retrieved for API: Token present
+   [API] Request interceptor running for: /v1/agents
+   [API] Authorization header added
+   ```
+3. Check Network tab - requests should include `Authorization: Bearer eyJhbGciOiJSUzI1...`
+
+**Common Mistakes**:
+- ❌ Setting token provider while `kindeLoading: true`
+- ❌ Using only `getToken()` without checking for `getAccessTokenRaw()`
+- ❌ Not handling async token retrieval properly
+- ❌ Forgetting to include all dependencies in useEffect
+
+#### API Calls Fail with 401 After Login
+**Symptoms**: User can login but API calls return `401 Unauthorized`
+
+**Checklist**:
+1. ✅ Check if Authorization header is being sent:
+   ```bash
+   # Should see: Authorization: Bearer eyJhbGciOiJSUzI1...
+   curl -H "Authorization: Bearer [AUTH-TOKEN]" http://localhost:4000/v1/agents
+   ```
+
+2. ✅ Verify token is valid:
+   ```bash
+   # Check JWT structure
+   echo "[AUTH-TOKEN]" | base64 -d
+   ```
+
+3. ✅ Check server middleware is applied:
+   ```typescript
+   // In packages/server/src/index.ts
+   app.use('/v1/agents', authMiddleware, agentRoutes)
+   app.use('/v1/chat', authMiddleware, chatRoutes)
+   app.use('/v1/memory', authMiddleware, memoryRoutes)
+   ```
+
+4. ✅ Verify Kinde environment variables on server:
+   ```bash
+   echo $KINDE_ISSUER_URL
+   echo $KINDE_CLIENT_ID
+   ```
+
 #### Authentication Not Working
 - Check environment variables are loaded
 - Verify Kinde application configuration
@@ -236,6 +456,17 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 - Confirm user is authenticated
 - Check network requests for user data
 - Verify component is wrapped in `AuthProvider`
+
+#### Backend Token Validation Failing
+- Check server logs for JWT validation errors
+- Ensure `KINDE_ISSUER_URL` matches your Kinde domain exactly
+- Verify user exists in Neo4j database (auto-created on first login)
+
+#### Common Token Issues
+- ❌ Setting token provider while `kindeLoading: true`
+- ❌ Using only `getToken()` without checking `getAccessTokenRaw()`
+- ❌ Missing dependencies in useEffect
+- ❌ Not handling async token retrieval properly
 
 ### Health Check
 Visit `/api/auth/health` to verify configuration:

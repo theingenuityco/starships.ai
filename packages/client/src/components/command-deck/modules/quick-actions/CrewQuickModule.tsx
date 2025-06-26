@@ -7,6 +7,7 @@ interface CrewQuickModuleProps {
 
 export function CrewQuickModule({ data, onAction }: CrewQuickModuleProps) {
   // Mock crew data - replace with real crew data from store
+  // TODO: Replace with actual crew metrics from backend
   const totalCrew = 15;
   const activeCrew = 12;
   const onMission = 3;

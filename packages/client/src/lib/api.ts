@@ -10,9 +10,48 @@ const api = axios.create({
   },
 })
 
-// TODO: Implement specific error types and better error handling
-// TODO: Add request/response interceptors for logging and error handling
-// TODO: Add retry logic for failed requests
+// Token provider function for dynamic token retrieval
+let getTokenFunction: (() => Promise<string | null>) | null = null
+
+export const setTokenProvider = (tokenProvider: () => Promise<string | null>) => {
+  getTokenFunction = tokenProvider
+  console.log('[API] Token provider set')
+}
+
+// Request interceptor to add authentication token
+api.interceptors.request.use(
+  async (config) => {
+    console.log('[API] Request interceptor running for:', config.url)
+    if (getTokenFunction) {
+      const token = await getTokenFunction()
+      console.log('[API] Token from provider:', token ? 'Token present' : 'No token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+        console.log('[API] Authorization header added')
+      } else {
+        console.log('[API] No token available, skipping Authorization header')
+      }
+    } else {
+      console.log('[API] No token provider configured')
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// Response interceptor for auth error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.error('[API] Authentication failed:', error.response.data)
+      // TODO: Trigger logout or token refresh
+    }
+    return Promise.reject(error)
+  }
+)
 
 // Types matching backend protocol (AgentConfig from @starships/protocol)
 export interface Agent {
@@ -46,7 +85,6 @@ export interface SyncedUser {
 // Backend request/response types (snake_case)
 interface ChatBackendRequest {
   agent_id: string
-  user_id: string
   channel_id?: string
   message: string
   stream?: boolean
@@ -60,10 +98,9 @@ interface ChatBackendResponse {
   }
 }
 
-// Client-friendly request type (camelCase)
+// Client-friendly request type (camelCase) - user_id now derived from auth token
 export interface ChatRequest {
   agentId: string
-  userId: string
   sessionId?: string
   message: string
 }
@@ -72,7 +109,6 @@ export interface ChatRequest {
 function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   return {
     agent_id: req.agentId,
-    user_id: req.userId,
     channel_id: req.sessionId,
     message: req.message,
     stream: false
@@ -101,7 +137,7 @@ export const chatAPI = {
       content: backendResponse.reply,
       role: 'assistant',
       timestamp: new Date().toISOString(),
-      sessionId: request.sessionId || `${request.agentId}:${request.userId}`
+      sessionId: request.sessionId || `agent-${request.agentId}`
     }
   },
 

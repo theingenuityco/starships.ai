@@ -94,7 +94,6 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       
       const assistantMessage = await chatAPI.sendMessage({
         agentId: agent.id,
-        userId: userId, // Use real user ID from auth
         sessionId: sessionId,
         message: content
       })

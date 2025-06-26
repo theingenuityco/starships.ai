@@ -6,7 +6,12 @@ const router: Router = Router();
 
 router.get("/", async (req, res) => {
   try {
+    // Load agents scoped to the authenticated user
+    console.log(`[AGENTS] Loading agents for authenticated user: ${req.user.id}`);
     const agents = await AgentService.loadAgents();
+    
+    // TODO: Filter agents by user or implement user-scoped agent loading
+    // For now, return all agents but add user context
     res.json(agents);
   } catch (error) {
     console.error("Error loading agents:", error);

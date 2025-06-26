@@ -6,6 +6,7 @@ import { getChatHistory, saveChatHistory, generateSessionId } from '@/lib/storag
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { ERROR_TEXT } from '@/constants/text'
+import { useAuth } from '@/hooks/useAuth'
 
 interface ChatInterfaceProps {
   agent: Agent
@@ -14,17 +15,18 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterfaceProps) {
+  const { userId, isAuthenticated, isLoading } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const currentSessionId = useRef<string | null>(sessionId)
 
-  // Initialize session when agent changes  
+  // Initialize session when agent changes and user is available
   useEffect(() => {
-    if (!sessionId && agent) {
+    if (!sessionId && agent && userId && isAuthenticated) {
       initializeSession()
     }
-  }, [agent, sessionId])
+  }, [agent, sessionId, userId, isAuthenticated])
 
   // Load messages when session changes
   useEffect(() => {
@@ -36,8 +38,13 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
   }, [sessionId])
 
   const initializeSession = () => {
+    if (!userId) {
+      setError('User not authenticated')
+      return
+    }
+    
     // TODO: Add debouncing for rapid agent switching
-    const newSessionId = generateSessionId(agent.id, 'user-1') // Hardcoded user ID for now
+    const newSessionId = generateSessionId(agent.id, userId) // Use real user ID from auth
     currentSessionId.current = newSessionId
     onSessionCreated(newSessionId)
     setError(null)
@@ -81,9 +88,13 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
 
     try {
       // Send message to backend
+      if (!userId) {
+        throw new Error('User not authenticated')
+      }
+      
       const assistantMessage = await chatAPI.sendMessage({
         agentId: agent.id,
-        userId: 'user-1', // Hardcoded user ID for now
+        userId: userId, // Use real user ID from auth
         sessionId: sessionId,
         message: content
       })
@@ -106,6 +117,24 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
     }
   }
 
+  // Show loading state while auth is loading
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <div className="text-muted-foreground">Loading user session...</div>
+      </div>
+    )
+  }
+
+  // Show auth required state
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center">
+        <div className="text-muted-foreground">Authentication required</div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -118,7 +147,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
           </div>
           <div>
             <h2 className="font-semibold">{agent.name}</h2>
-            <p className="text-sm text-muted-foreground">{agent.description}</p>
+            <p className="text-sm text-muted-foreground">{agent.systemPrompt || 'AI Assistant'}</p>
           </div>
         </div>
       </div>
@@ -137,7 +166,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       <div className="border-t border-border bg-card p-4">
         <MessageInput 
           onSendMessage={handleSendMessage}
-          disabled={!currentSessionId.current || loading}
+          disabled={!currentSessionId.current || loading || !userId}
         />
       </div>
     </div>

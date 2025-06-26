@@ -22,9 +22,11 @@ export interface LLM {
 
 export interface User {
   id: string;
+  kindeId?: string;
   username: string;
   email?: string;
   displayName?: string;
+  avatar?: string;
   createdAt: string;
 }
 
@@ -62,6 +64,7 @@ export interface AgentRepository extends Repository<Agent> {
 export interface UserRepository extends Repository<User> {
   findByEmail(email: string): Promise<User | null>;
   findByUsername(username: string): Promise<User | null>;
+  findByKindeId(kindeId: string): Promise<User | null>;
 }
 
 export interface ChannelRepository extends Repository<Channel> {

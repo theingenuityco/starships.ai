@@ -129,3 +129,161 @@ CREATE (u:User {
 6. ✅ **Scalable** - Handles user migration and growth
 
 The implementation successfully bridges Kinde authentication with your application's data needs while maintaining a clean separation of concerns. 
+
+# Centralized Environment Variable Implementation Summary
+
+## Overview
+
+Successfully implemented a centralized environment variable management system for the starships.ai monorepo using the new `@starships/env-config` package.
+
+## What Was Implemented
+
+### 1. Created `@starships/env-config` Package
+- **Location**: `packages/env-config/`
+- **Purpose**: Centralized environment variable loading, validation, and type safety
+- **Key Features**:
+  - Loads from root `.env` file only
+  - TypeScript interfaces for all environment variables
+  - Runtime validation (LLM provider keys, production requirements)
+  - Separate server and client configurations
+
+### 2. Centralized All Environment Variables
+- **Before**: Separate `.env` files in `packages/client/` and root
+- **After**: Single root `.env` file containing all variables
+- **Variables Added**: 
+  - Kinde authentication (used by both server and client)
+  - Client-specific variables (`NEXT_PUBLIC_API_URL`)
+  - All existing server variables
+
+### 3. Updated Package Dependencies
+
+#### Server Package (`packages/server/`)
+- **Added**: `@starships/env-config` dependency
+- **Removed**: Direct `dotenv` usage and path resolution
+- **Migration**: Simplified `src/config/environment.ts` to use `getServerConfig()`
+
+#### Client Package (`packages/client/`)
+- **Added**: `@starships/env-config` dependency
+- **Removed**: `dotenv` dependency and manual `.env` loading
+- **Migration**: Updated `next.config.js` to use env-config package
+
+### 4. Type-Safe Environment Access
+
+#### Server Packages
+```typescript
+import { getServerConfig } from '@starships/env-config';
+const env = getServerConfig();
+// env.PORT, env.KINDE_CLIENT_ID, etc. - all type-safe
+```
+
+#### Client Package
+```typescript
+import { env, getApiBaseUrl } from '@starships/client/src/lib/env';
+// Type-safe access with browser/server context awareness
+```
+
+### 5. Next.js Integration
+- **`next.config.js`**: Uses `@starships/env-config` to load variables at build time
+- **Runtime**: Variables exposed through Next.js `env` configuration
+- **Client Utils**: `src/lib/env.ts` provides typed access with context awareness
+
+## Benefits Achieved
+
+### ✅ Single Source of Truth
+- All environment variables defined in root `.env`
+- No more duplication across packages
+- Consistent variable names and values
+
+### ✅ Type Safety
+- All environment variables have TypeScript interfaces
+- Compile-time checking prevents typos
+- IDE autocomplete for all variables
+
+### ✅ Runtime Validation
+- Required variables validated at startup
+- LLM provider configuration validation
+- Production-specific requirements enforced
+
+### ✅ Developer Experience
+- One file to manage (`/.env`)
+- Clear error messages for missing variables
+- Consistent import patterns across packages
+
+### ✅ Maintainability
+- Changes only needed in one place
+- Package-specific environment logic eliminated
+- Clear separation of server vs client variables
+
+## File Structure
+
+```
+starships.ai/
+├── .env                          # Single source of truth
+├── .env.example                  # Updated with all variables
+├── packages/
+│   ├── env-config/               # New centralized package
+│   │   ├── src/
+│   │   │   ├── types.ts         # TypeScript interfaces
+│   │   │   ├── loader.ts        # Loading and validation logic
+│   │   │   └── index.ts         # Exports
+│   │   └── package.json
+│   ├── server/
+│   │   ├── src/config/environment.ts  # Simplified to use env-config
+│   │   └── package.json              # Added env-config dependency
+│   └── client/
+│       ├── next.config.js            # Uses env-config package
+│       ├── src/lib/env.ts            # Type-safe client utilities
+│       └── package.json              # Added env-config, removed dotenv
+```
+
+## Migration Completed
+
+### From Old System:
+- ❌ Multiple `.env` files per package
+- ❌ Manual `dotenv.config()` calls
+- ❌ Inconsistent variable access
+- ❌ No type safety
+- ❌ No validation
+
+### To New System:
+- ✅ Single root `.env` file
+- ✅ Centralized `@starships/env-config` package
+- ✅ Type-safe environment access
+- ✅ Runtime validation
+- ✅ Consistent imports across packages
+
+## Usage Examples
+
+### Server (Node.js) Usage
+```typescript
+import { getServerConfig } from '@starships/env-config';
+
+const env = getServerConfig();
+console.log(`Server running on port ${env.PORT}`);
+console.log(`Using ${env.DEFAULT_LLM_PROVIDER} provider`);
+```
+
+### Client (Next.js) Usage
+```typescript
+import { env, getApiBaseUrl } from '@starships/client/src/lib/env';
+
+const apiUrl = getApiBaseUrl();           // Smart fallback logic
+const kindeId = env.kinde.CLIENT_ID;      // Server-side only
+const publicUrl = env.client.NEXT_PUBLIC_API_URL; // Browser-safe
+```
+
+## Testing
+
+- ✅ Server package builds successfully
+- ✅ Client package builds successfully
+- ✅ Environment variables properly loaded
+- ✅ Type checking passes
+- ✅ No more dependency on scattered `.env` files
+
+## Next Steps
+
+1. **Team Onboarding**: Update development guide with new environment setup
+2. **Deployment**: Ensure production systems use root `.env` configuration
+3. **Documentation**: Team members should copy `.env.example` to `.env` and configure their values
+
+The centralized environment variable system is now fully implemented and functional across the entire monorepo. 

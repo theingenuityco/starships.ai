@@ -3,6 +3,8 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { QueryProvider } from '@/providers/query-provider'
+import { AuthProvider } from '@/providers/auth-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
 
@@ -30,11 +32,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <QueryProvider>
-            <div className="min-h-screen bg-background">
-              <ClientLayout>{children}</ClientLayout>
-            </div>
-          </QueryProvider>
+          <AuthProvider>
+            <QueryProvider>
+              <TooltipProvider>
+                <div className="min-h-screen bg-background">
+                  <ClientLayout>{children}</ClientLayout>
+                </div>
+              </TooltipProvider>
+            </QueryProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -4,7 +4,6 @@ import { useStarshipStore } from '@/store/starship-store';
 import { useEffect, useState } from 'react';
 
 // Import route-specific quick action modules
-import { AetherCortexQuickModule } from './quick-actions/AetherCortexQuickModule';
 import { CrewQuickModule } from './quick-actions/CrewQuickModule';
 import { DriveQuickModule } from './quick-actions/DriveQuickModule';
 import { ExpeditionQuickModule } from './quick-actions/ExpeditionQuickModule';
@@ -40,7 +39,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
       // Add dynamic insights based on route
       if (Math.random() > 0.8) {
         const routeInsights = {
-          '/core': ['System optimization detected', 'Power efficiency improved', 'Core temperature optimal'],
           '/crew': ['Crew morale high', 'New assignment available', 'Training session completed'],
           '/expeditions': ['Route analysis complete', 'New sector discovered', 'Mission parameters updated'],
           '/sibil': ['Pattern recognition enhanced', 'Prediction accuracy increased', 'New data correlation found'],
@@ -73,8 +71,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
     };
 
     switch (pathname) {
-      case '/core':
-        return <AetherCortexQuickModule {...moduleProps} />;
       case '/crew':
         return <CrewQuickModule {...moduleProps} />;
       case '/drive':
@@ -92,7 +88,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
 
   const getModuleTitle = () => {
     switch (pathname) {
-      case '/core': return 'Aether Core';
       case '/crew': return 'Crew Status';
       case '/drive': return 'Drive Systems';
       case '/expeditions': return 'Mission Control';
@@ -104,7 +99,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
 
   const getModuleIcon = () => {
     switch (pathname) {
-      case '/core': return '⚡';
       case '/crew': return '👥';
       case '/drive': return '🚀';
       case '/expeditions': return '🎯';

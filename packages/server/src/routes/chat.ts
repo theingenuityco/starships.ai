@@ -2,6 +2,7 @@ import { Router } from "express";
 import { chat as agentChat } from "@starships/agent-engine";
 import type { ChatRequest } from "@starships/protocol";
 import getStore from "../store";
+import { authMiddleware } from "../middleware/auth";
 
 const router: Router = Router();
 
@@ -23,7 +24,7 @@ const validateChatRequest = (req: any, res: any, next: any) => {
   next();
 };
 
-router.post("/", validateChatRequest, async (req, res) => {
+router.post("/", authMiddleware, validateChatRequest, async (req, res) => {
   try {
     // Build chat request using authenticated user ID from middleware
     const chatRequest: ChatRequest = {
@@ -47,7 +48,7 @@ router.post("/", validateChatRequest, async (req, res) => {
 });
 
 // DELETE endpoint for memory management
-router.delete("/:sessionKey/memory", async (req: any, res: any) => {
+router.delete("/:sessionKey/memory", authMiddleware, async (req: any, res: any) => {
   try {
     const { sessionKey } = req.params;
     

@@ -17,7 +17,8 @@ import {
   GoalRepository,
   ConstraintRepository,
   ConceptRepository,
-  MetaAnchorRepository
+  MetaAnchorRepository,
+  createConnection
 } from '@starships/models';
 
 // Route imports
@@ -30,6 +31,14 @@ import redeployRoutes from './routes/redeploy';
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize Neo4j database connection
+const dbConnection = createConnection({
+  uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
+  username: process.env.NEO4J_USERNAME || 'neo4j',
+  password: process.env.NEO4J_PASSWORD || 'password',
+  database: process.env.NEO4J_DATABASE || 'neo4j'
+});
 
 // Initialize store and repositories
 const store = getStore();
@@ -78,7 +87,17 @@ app.use('/api', starshipRoutes);
 app.use('/api', redeployRoutes);
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  try {
+    // Initialize database connection
+    await dbConnection.connect();
+    await dbConnection.initializeSchema();
+    console.log('✅ Neo4j database connected and schema initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize database:', error);
+    process.exit(1);
+  }
+  
   console.log(`🚀 Aether Core Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🛸 Starships ready for launch!`);

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, type Starship, type CodexProjection } from '@/lib/api';
+import type { Goal, Constraint, PendingChange, GoalFormData, ConstraintFormData } from '@/components/consciousness/VisionChamber/shared/types';
 
 interface CommandDeckState {
   visibility: 'collapsed' | 'partial' | 'expanded';
@@ -28,6 +29,13 @@ interface StarshipState {
     confidence: number;
   };
   
+  // Goals and Constraints state (synced with API)
+  goals: Goal[];
+  constraints: Constraint[];
+  
+  // Maker-Checker Flow state
+  pendingChanges: PendingChange[];
+  
   // Legacy fields for backward compatibility (derived from active starship)
   get class(): 'scout' | 'cruiser';
   get powerLevel(): number;
@@ -45,6 +53,21 @@ interface StarshipActions {
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
   getProjection: (lens: 'telos' | 'ethos' | 'full') => Promise<CodexProjection | null>;
+  
+  // Goals and Constraints actions
+  loadGoalsAndConstraints: () => Promise<void>;
+  createGoal: (data: GoalFormData) => Promise<void>;
+  updateGoal: (id: string, changes: Partial<Goal>) => Promise<void>;
+  deleteGoal: (id: string) => Promise<void>;
+  createConstraint: (data: ConstraintFormData) => Promise<void>;
+  updateConstraint: (id: string, changes: Partial<Constraint>) => Promise<void>;
+  deleteConstraint: (id: string) => Promise<void>;
+  
+  // Maker-Checker Flow actions
+  queueChange: (change: Omit<PendingChange, 'id' | 'timestamp'>) => void;
+  removeFromQueue: (changeId: string) => void;
+  clearQueue: () => void;
+  applyQueuedChanges: () => Promise<void>;
   
   // Command deck actions (preserved)
   setCommandDeckVisibility: (visibility: CommandDeckState['visibility']) => void;
@@ -83,6 +106,11 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           lastUpdated: new Date(),
           confidence: 0
         },
+        
+        // Initial goals and constraints state
+        goals: [],
+        constraints: [],
+        pendingChanges: [],
 
         // Computed properties for backward compatibility
         get class() {
@@ -271,6 +299,168 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           } catch (error) {
             console.error('Failed to get projection:', error);
             return null;
+          }
+        },
+
+        // Goals and Constraints actions
+        loadGoalsAndConstraints: async () => {
+          const activeStarshipId = get().activeStarshipId;
+          if (!activeStarshipId) return;
+
+          try {
+            const response = await starshipAPI.getProjection(activeStarshipId, 'full');
+            if (response.projection) {
+              // Map API response to our internal Goal/Constraint interfaces
+              const goals: Goal[] = (response.projection.goals || []).map(g => ({
+                ...g,
+                status: g.status as Goal['status'], // Cast to proper union type
+                codexId: 'temp', // TODO: Get actual codexId from API
+                priority: 5, // TODO: Get from API or provide default
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }));
+              
+              const constraints: Constraint[] = (response.projection.constraints || []).map(c => ({
+                ...c,
+                codexId: 'temp', // TODO: Get actual codexId from API  
+                severity: 'medium' as const, // TODO: Get from API or provide default
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              }));
+              
+              set({ goals, constraints });
+            }
+          } catch (error) {
+            console.error('Failed to load goals and constraints:', error);
+            set({ error: 'Failed to load goals and constraints' });
+          }
+        },
+
+        createGoal: async (data) => {
+          // For now, add to pending changes queue
+          // Future: Direct API call when backend supports it
+          const changeId = `goal_create_${Date.now()}`;
+          get().queueChange({
+            type: 'goal',
+            operation: 'create',
+            target: 'new',
+            changes: data,
+            after: data,
+            source: 'user'
+          });
+        },
+
+        updateGoal: async (id, changes) => {
+          const existingGoal = get().goals.find(g => g.id === id);
+          if (!existingGoal) return;
+
+          get().queueChange({
+            type: 'goal',
+            operation: 'update',
+            target: id,
+            changes,
+            before: existingGoal,
+            after: { ...existingGoal, ...changes },
+            source: 'user'
+          });
+        },
+
+        deleteGoal: async (id) => {
+          const existingGoal = get().goals.find(g => g.id === id);
+          if (!existingGoal) return;
+
+          get().queueChange({
+            type: 'goal',
+            operation: 'delete',
+            target: id,
+            changes: {},
+            before: existingGoal,
+            source: 'user'
+          });
+        },
+
+        createConstraint: async (data) => {
+          get().queueChange({
+            type: 'constraint',
+            operation: 'create',
+            target: 'new',
+            changes: data,
+            after: data,
+            source: 'user'
+          });
+        },
+
+        updateConstraint: async (id, changes) => {
+          const existingConstraint = get().constraints.find(c => c.id === id);
+          if (!existingConstraint) return;
+
+          get().queueChange({
+            type: 'constraint',
+            operation: 'update',
+            target: id,
+            changes,
+            before: existingConstraint,
+            after: { ...existingConstraint, ...changes },
+            source: 'user'
+          });
+        },
+
+        deleteConstraint: async (id) => {
+          const existingConstraint = get().constraints.find(c => c.id === id);
+          if (!existingConstraint) return;
+
+          get().queueChange({
+            type: 'constraint',
+            operation: 'delete',
+            target: id,
+            changes: {},
+            before: existingConstraint,
+            source: 'user'
+          });
+        },
+
+        // Maker-Checker Flow actions
+        queueChange: (change) => {
+          const changeWithId = {
+            ...change,
+            id: `change_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString()
+          };
+
+          set((state) => ({
+            pendingChanges: [...state.pendingChanges, changeWithId]
+          }));
+        },
+
+        removeFromQueue: (changeId) => {
+          set((state) => ({
+            pendingChanges: state.pendingChanges.filter(c => c.id !== changeId)
+          }));
+        },
+
+        clearQueue: () => {
+          set({ pendingChanges: [] });
+        },
+
+        applyQueuedChanges: async () => {
+          const activeStarshipId = get().activeStarshipId;
+          const changes = get().pendingChanges;
+          
+          if (!activeStarshipId || changes.length === 0) return;
+
+          try {
+            // Group changes by type and apply via updateCodex
+            // For now, this is a placeholder - backend needs maker-checker endpoints
+            console.log('Applying queued changes:', changes);
+            
+            // Clear queue after successful application
+            get().clearQueue();
+            
+            // Reload data to reflect changes
+            await get().loadGoalsAndConstraints();
+          } catch (error) {
+            console.error('Failed to apply queued changes:', error);
+            set({ error: 'Failed to apply changes' });
           }
         },
 

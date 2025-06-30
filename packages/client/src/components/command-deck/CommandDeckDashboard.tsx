@@ -3,9 +3,7 @@ import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useState } from 'react';
 
 // Import consciousness modules
-import { AetherCortex } from '@/components/consciousness/AetherCortex';
-import { CodexInterface } from '@/components/consciousness/CodexInterface';
-import { VisionInterface } from '@/components/consciousness/VisionInterface';
+import { VisionChamber } from '@/components/consciousness/VisionChamber';
 
 // Import dashboard modules
 import { SystemOverview } from './dashboard/SystemOverview';  
@@ -38,28 +36,12 @@ const AVAILABLE_MODULES: ModuleConfig[] = [
   },
   // Consciousness Modules
   {
-    id: 'aether-cortex',
-    title: 'Aether Cortex',
-    component: AetherCortex,
+    id: 'vision-chamber',
+    title: 'Vision Chamber',
+    component: VisionChamber,
     defaultSize: 'large',
     category: 'consciousness',
     priority: 1
-  },
-  {
-    id: 'vision-interface',
-    title: 'Vision Interface',
-    component: VisionInterface,
-    defaultSize: 'medium',
-    category: 'consciousness',
-    priority: 2
-  },
-  {
-    id: 'codex-interface',
-    title: 'Codex Interface',
-    component: CodexInterface,
-    defaultSize: 'medium',
-    category: 'consciousness',
-    priority: 3
   },
   // System Modules
   {
@@ -68,7 +50,7 @@ const AVAILABLE_MODULES: ModuleConfig[] = [
     component: SystemOverview,
     defaultSize: 'medium',
     category: 'systems',
-    priority: 4
+    priority: 2
   },
   {
     id: 'crew-management',
@@ -76,7 +58,7 @@ const AVAILABLE_MODULES: ModuleConfig[] = [
     component: CrewManagement,
     defaultSize: 'medium',
     category: 'operations',
-    priority: 5
+    priority: 3
   },
   {
     id: 'expedition-control',
@@ -84,7 +66,7 @@ const AVAILABLE_MODULES: ModuleConfig[] = [
     component: ExpeditionControl,
     defaultSize: 'large',
     category: 'operations',
-    priority: 6
+    priority: 4
   }
 ];
 
@@ -94,7 +76,7 @@ interface CommandDeckDashboardProps {
 
 export function CommandDeckDashboard({ onCollapse }: CommandDeckDashboardProps) {
   const [activeModules, setActiveModules] = useState<string[]>([
-    'navigation', 'system-overview', 'aether-cortex', 'vision-interface', 'crew-management', 'expedition-control'
+    'navigation', 'system-overview', 'vision-chamber', 'crew-management', 'expedition-control'
   ]);
   const [moduleStates, setModuleStates] = useState<Record<string, any>>({});
 

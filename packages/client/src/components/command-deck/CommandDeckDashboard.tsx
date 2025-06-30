@@ -5,13 +5,16 @@ import { useState } from 'react';
 // Import consciousness modules
 import { AetherCortex } from '@/components/consciousness/AetherCortex';
 import { CodexInterface } from '@/components/consciousness/CodexInterface';
-import { VisionChamber } from '@/components/consciousness/VisionChamber';
+import { VisionInterface } from '@/components/consciousness/VisionInterface';
 
 // Import dashboard modules
 import { SystemOverview } from './dashboard/SystemOverview';  
 import { CrewManagement } from './dashboard/CrewManagement';
 import { ExpeditionControl } from './dashboard/ExpeditionControl';
 import { NavigationModule } from './modules/NavigationModule';
+
+// Import starship selector
+import { StarshipSelector } from './StarshipSelector';
 
 interface ModuleConfig {
   id: string;
@@ -43,9 +46,9 @@ const AVAILABLE_MODULES: ModuleConfig[] = [
     priority: 1
   },
   {
-    id: 'vision-chamber',
-    title: 'Vision Chamber',
-    component: VisionChamber,
+    id: 'vision-interface',
+    title: 'Vision Interface',
+    component: VisionInterface,
     defaultSize: 'medium',
     category: 'consciousness',
     priority: 2
@@ -91,7 +94,7 @@ interface CommandDeckDashboardProps {
 
 export function CommandDeckDashboard({ onCollapse }: CommandDeckDashboardProps) {
   const [activeModules, setActiveModules] = useState<string[]>([
-    'navigation', 'system-overview', 'aether-cortex', 'crew-management', 'expedition-control'
+    'navigation', 'system-overview', 'aether-cortex', 'vision-interface', 'crew-management', 'expedition-control'
   ]);
   const [moduleStates, setModuleStates] = useState<Record<string, any>>({});
 
@@ -112,11 +115,14 @@ export function CommandDeckDashboard({ onCollapse }: CommandDeckDashboardProps) 
     <div className="h-full flex flex-col bg-background/95 backdrop-blur-sm">
       {/* Module Bay Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
-        <div>
-          <h1 className="text-xl font-semibold">Module Bay</h1>
-          <p className="text-sm text-muted-foreground">
-            {enabledModules.length} modules active
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-xl font-semibold">Module Bay</h1>
+            <p className="text-sm text-muted-foreground">
+              {enabledModules.length} modules active
+            </p>
+          </div>
+          <StarshipSelector />
         </div>
         <button
           onClick={onCollapse}

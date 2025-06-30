@@ -84,6 +84,62 @@ export interface SyncedUser {
   createdAt: string
 }
 
+// NEW: Starship interfaces
+export interface Starship {
+  id: string
+  name: string
+  class: 'scout' | 'cruiser'
+  powerLevel: number
+  ownerId: string
+  status: 'active' | 'docked' | 'maintenance'
+  maxAgents: number
+  activeExpeditions: number
+  sibilInsights: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Codex {
+  id: string
+  starshipId: string
+  version: string
+  timestamp: string
+  author: string
+  changeSummary: string
+  isActive: boolean
+}
+
+export interface Vision {
+  id: string
+  codexId: string
+  statement: string
+  confidence: number
+  lastRefined: string
+  refinementCount: number
+  updatedAt: string
+}
+
+export interface CodexProjection {
+  vision?: string
+  goals?: Array<{
+    id: string
+    description: string
+    type: 'short_term' | 'long_term' | 'milestone'
+    status: string
+  }>
+  constraints?: Array<{
+    id: string
+    description: string
+    type: 'resource' | 'ethical' | 'technical' | 'business'
+    isActive: boolean
+  }>
+  concepts?: Array<{
+    id: string
+    description: string
+    category: string
+  }>
+}
+
 // Backend request/response types (snake_case)
 interface ChatBackendRequest {
   agent_id: string
@@ -147,6 +203,45 @@ export const chatAPI = {
   clearMemory: (sessionId: string): Promise<{ message: string }> =>
     api.delete(`/v1/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
 }
+
+// NEW: Starship API
+export const starshipAPI = {
+  // Get user's starships
+  getUserStarships: (): Promise<{ starships: Starship[] }> =>
+    api.get('/v1/starships').then(res => res.data),
+
+  // Create new starship
+  createStarship: (data: { name: string; class: 'scout' | 'cruiser' }): Promise<{ starship: Starship; codex: Codex }> =>
+    api.post('/v1/starships', data).then(res => res.data),
+
+  // Get starship details
+  getStarship: (id: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
+    api.get(`/v1/starships/${id}`).then(res => res.data),
+
+  // Deploy agent to starship
+  deployAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
+    api.post(`/v1/starships/${starshipId}/agents/${agentId}/deploy`).then(res => res.data),
+
+  // Remove agent from starship
+  removeAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
+    api.delete(`/v1/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
+
+  // Get active codex for starship
+  getCodex: (starshipId: string): Promise<{ codex: any }> =>
+    api.get(`/v1/starships/${starshipId}/codex`).then(res => res.data),
+
+  // Update codex with mutations
+  updateCodex: (starshipId: string, mutations: {
+    vision?: { statement: string };
+    goals?: Array<{ description: string; type: 'short_term' | 'long_term' | 'milestone' }>;
+    constraints?: Array<{ description: string; type: 'resource' | 'ethical' | 'technical' | 'business' }>;
+  }): Promise<{ codex: Codex }> =>
+    api.post(`/v1/starships/${starshipId}/codex/mutate`, { mutations }).then(res => res.data),
+
+  // Get projection for specific lens
+  getProjection: (starshipId: string, lens: 'telos' | 'ethos' | 'full'): Promise<{ projection: CodexProjection }> =>
+    api.get(`/v1/starships/${starshipId}/projection/${lens}`).then(res => res.data)
+};
 
 export const userAPI = {
   // Sync Kinde user to backend database

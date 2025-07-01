@@ -16,6 +16,12 @@ interface NavigationModuleProps {
 
 const navigationSections = [
   {
+    title: "Command Deck",
+    items: [
+      { href: "/command-deck", label: "Command Deck", icon: Cpu, status: "optimal" }
+    ]
+  },
+  {
     title: "Core Systems",
     items: [
       { href: "/core", label: "System Core", icon: Cpu, status: "optimal" },

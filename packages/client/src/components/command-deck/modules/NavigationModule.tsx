@@ -3,19 +3,14 @@ import Link from 'next/link';
 import { motion } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
 import { 
-  Command, Users, Rocket, BookOpen, Brain, 
-  Cpu, Zap, BarChart3, ChevronRight, Maximize2 
+  Users, Rocket, BookOpen, Brain, 
+  Cpu, Zap
 } from 'lucide-react';
-import { QuickActionModule } from './QuickActionModule';
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 interface NavigationModuleProps {
-  moduleId?: string;
   mode?: 'sidebar' | 'module';
-  visibility?: 'collapsed' | 'partial' | 'expanded';
-  onExpand?: () => void;
-  onCollapse?: () => void;
   isMobile?: boolean;
 }
 
@@ -38,19 +33,33 @@ const navigationSections = [
   }
 ];
 
+// Animation variants
+const containerVariants: any = {
+  hidden: { opacity: 0, scale: 0.9 },
+  show: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.5,
+      staggerChildren: 0.2,
+      delayChildren: 0.3
+    }
+  }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
+};
+
 export function NavigationModule({ 
-  moduleId, 
   mode = 'sidebar',
-  visibility = 'partial', 
-  onExpand, 
-  onCollapse, 
-  isMobile = false 
+  isMobile: _isMobile = false 
 }: NavigationModuleProps) {
   const pathname = usePathname();
   const { powerLevel, activeExpeditions, sibilInsights } = useStarshipStore();
 
-  const isContentVisible = mode === 'module' || isMobile || visibility === 'partial' || visibility === 'expanded';
-  const isCollapsed = mode === 'sidebar' && !isMobile && visibility === 'collapsed';
+  // Currently only one navigation state; no collapsed/expanded variants
 
   // Module mode - simplified layout
   if (mode === 'module') {
@@ -58,11 +67,11 @@ export function NavigationModule({
       <div className="h-full flex flex-col">
         <div className="flex-1 overflow-y-auto space-y-3">
           {navigationSections.map((section) => (
-            <div key={section.title} className="space-y-2">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <div key={section.title} className="space-y-3">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
                 {section.title}
               </h4>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {section.items.map((item) => (
                   <NavigationItem
                     key={item.href}
@@ -79,60 +88,31 @@ export function NavigationModule({
     );
   }
 
-  // Sidebar mode - original layout
+  // Sidebar mode - island-style layout
   return (
-    <div className="flex flex-col h-full">
+    <motion.div
+      className="flex flex-col h-full"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
       {/* Header */}
-      <div className={`${isCollapsed ? 'p-2' : 'p-3'} border-b border-border`}>
+      <motion.div className="p-3 border-b border-border/50" variants={itemVariants}>
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          variants={itemVariants}
           className="flex items-center justify-between min-w-0"
         >
-          {isCollapsed ? (
-            <button
-              onClick={onExpand}
-              className="p-2 rounded hover:bg-accent w-full flex justify-center"
-              aria-label="Expand command deck"
-            >
-              <Command className="w-4 h-4" />
-            </button>
-          ) : (
-            <>
-              <div className="flex items-center justify-between w-full">
-                <h2 className="text-lg font-semibold truncate">Command Deck</h2>
-                <div className="flex items-center gap-1">
-                  <ThemeToggle />
-                  {visibility === 'expanded' ? (
-                    <button
-                      onClick={onCollapse}
-                      className="p-1 rounded hover:bg-accent flex-shrink-0"
-                      aria-label="Collapse command deck"
-                    >
-                      <ChevronRight className="w-4 h-4 rotate-180" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={onExpand}
-                      className="p-1 rounded hover:bg-accent flex-shrink-0"
-                      aria-label="Expand command deck"
-                    >
-                      <Maximize2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+          <div className="flex items-center w-full justify-between">
+            <h2 className="text-lg font-semibold truncate">Command Deck</h2>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+            </div>
+          </div>
         </motion.div>
-      </div>
+      </motion.div>
 
       {/* Quick Status */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isContentVisible ? 1 : 0 }}
-        className="p-3 border-b border-border"
-      >
+      <motion.div variants={itemVariants} className="p-3 border-b border-border/50">
         <div className="space-y-1.5">
           <div className="flex justify-between text-sm min-w-0">
             <span className="text-muted-foreground truncate">Power</span>
@@ -150,119 +130,58 @@ export function NavigationModule({
       </motion.div>
 
       {/* Navigation Module */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-1' : 'p-3'}`}
-      >
-        {isCollapsed ? (
-          // Collapsed state - icons only
-          <div className="space-y-2">
-            {navigationSections.flatMap(section => section.items).map((item) => (
-              <CollapsedNavigationItem
-                key={item.href}
-                {...item}
-                isActive={pathname === item.href}
-              />
-            ))}
-          </div>
-        ) : (
-          // Partial/Expanded state - full navigation as module
-          <div className="space-y-3">
-            {/* Navigation List Module */}
-            <div className="bg-card/50 border border-border rounded-lg p-3">
-              {/* Navigation Module Header */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg" role="img" aria-hidden="true">🧭</span>
-                <h3 className="text-sm font-medium text-foreground">Ship Navigation</h3>
-              </div>
-              
-              {/* Navigation Sections */}
-              <div className="space-y-3">
-                {navigationSections.map((section) => (
-                  <div key={section.title}>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      {section.title}
-                    </h4>
-                    <div className="space-y-1">
-                      {section.items.map((item) => (
-                        <NavigationItem
-                          key={item.href}
-                          {...item}
-                          isActive={pathname === item.href}
-                        />
-                      ))}
-                    </div>
-                  </div>
+      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-4">
+        <div className="space-y-6">
+          {navigationSections.map((section) => (
+            <div key={section.title} className="space-y-3">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
+                {section.title}
+              </h4>
+              <div className="space-y-2">
+                {section.items.map((item) => (
+                  <NavigationItem
+                    key={item.href}
+                    {...item}
+                    isActive={pathname === item.href}
+                    compact={true}
+                  />
                 ))}
               </div>
             </div>
-
-            {/* Quick Action Module - Context-aware & Dynamic */}
-            <QuickActionModule />
-          </div>
-        )}
+          ))}
+        </div>
       </motion.div>
 
-      {/* User Profile Section at Bottom */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className={`border-t border-border ${isCollapsed ? 'p-2' : 'p-3'}`}
-      >
-        <UserProfile mode={isCollapsed ? 'collapsed' : 'expanded'} />
+      {/* User Profile Section */}
+      <motion.div variants={itemVariants} className="border-t border-border/50 p-3">
+        <UserProfile mode="expanded" />
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
 const NavigationItem = ({ href, label, icon: Icon, status, isActive, compact = false }: any) => (
   <Link href={href}>
     <motion.div
-      className={`group relative ${compact ? 'p-1.5' : 'p-2'} rounded-lg transition-all duration-200 ${
+      className={`group relative ${compact ? 'px-2 py-1.5' : 'px-2 py-2'} rounded-lg transition-all duration-200 ${
         isActive 
-          ? 'bg-primary/10 border border-primary/20' 
-          : 'hover:bg-accent/50'
+          ? 'bg-primary/10 backdrop-blur-sm border border-primary/20' 
+          : 'hover:bg-accent/30 hover:backdrop-blur-sm'
       }`}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
     >
       <div className="flex items-center gap-2 min-w-0">
         <div className="relative flex-shrink-0">
-          <Icon className={`${compact ? 'w-3 h-3' : 'w-4 h-4'} ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+          <Icon className={`${compact ? 'w-4 h-4' : 'w-4 h-4'} ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground transition-colors'}`} />
           {status === 'warning' && (
-            <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-500 rounded-full" />
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
           )}
           {status === 'active' && (
-            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           )}
         </div>
-        <span className={`font-medium ${compact ? 'text-xs' : 'text-sm'} truncate`}>{label}</span>
-      </div>
-    </motion.div>
-  </Link>
-);
-
-const CollapsedNavigationItem = ({ href, label, icon: Icon, status, isActive }: any) => (
-  <Link href={href}>
-    <motion.div
-      className={`group relative p-2 rounded-lg transition-all duration-200 flex justify-center ${
-        isActive 
-          ? 'bg-primary/10 border border-primary/20' 
-          : 'hover:bg-accent/50'
-      }`}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      title={label} // Tooltip for collapsed state
-    >
-      <div className="relative">
-        <Icon className={`w-4 h-4 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-        {status === 'warning' && (
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-500 rounded-full" />
-        )}
-        {status === 'active' && (
-          <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
-        )}
+        <span className={`font-medium ${compact ? 'text-sm' : 'text-sm'} truncate group-hover:text-foreground transition-colors`}>{label}</span>
       </div>
     </motion.div>
   </Link>

@@ -2,13 +2,14 @@
 
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { CommandDeck } from '@/components/command-deck/CommandDeck';
+import { NavigationBridge } from '@/components/command-deck/NavigationBridge';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { useStarshipStore } from '@/store/starship-store';
 import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { Menu } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -76,14 +77,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     );
   }
 
-  // Regular pages with command deck overlay (no margin adjustments)
+  // Regular pages with command deck overlay
   return (
     <AuthGate>
-      <div className="h-screen relative">
-        <CommandDeck />
+      <div className="h-screen flex relative overflow-hidden">
+        {/* Command Deck with gutter (16px) */}
+        <div className="fixed top-4 left-4 z-50 w-[280px] h-[calc(100vh-32px)]">
+          <NavigationBridge />
+        </div>
         
         {/* Mobile Toggle Button (only shown when CommandDeck is hidden on mobile) */}
-        {isMobile && commandDeck.visibility !== 'expanded' && (
+        {isMobile && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -95,13 +99,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </motion.button>
         )}
         
+        {/* Main Content Area - Always maintains position */}
         <AnimatePresence mode="wait">
           <motion.main 
             key={pathname}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="h-full w-full md:pl-16"
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={pageVariants}
+            className={cn(
+              "flex-1 min-h-full w-full transition-all duration-300 pl-[296px]"
+            )}
           >
             {children}
           </motion.main>

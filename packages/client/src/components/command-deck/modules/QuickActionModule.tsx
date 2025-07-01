@@ -23,7 +23,7 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
   // Dynamic state for evolving data
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [insights, setInsights] = useState<string[]>([]);
+  const [insights, setInsights] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
 
   // Simulate real-time updates like the original consciousness popups
   useEffect(() => {
@@ -47,7 +47,12 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
         };
         
         const currentInsights = routeInsights[pathname as keyof typeof routeInsights] || ['System status updated'];
-        const newInsight = currentInsights[Math.floor(Math.random() * currentInsights.length)];
+        const newInsightText = currentInsights[Math.floor(Math.random() * currentInsights.length)];
+        const newInsight = {
+          id: `${Date.now()}-${Math.random()}`,
+          text: newInsightText,
+          timestamp: Date.now()
+        };
         
         setInsights(prev => [newInsight, ...prev].slice(0, 3));
       }
@@ -161,14 +166,14 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
             <div className="space-y-1">
               {insights.slice(0, 2).map((insight, index) => (
                 <motion.div
-                  key={insight}
+                  key={insight.id}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
                   className="text-xs text-primary/80 flex items-center gap-1"
                 >
                   <div className="w-1 h-1 bg-primary rounded-full" />
-                  {insight}
+                  {insight.text}
                 </motion.div>
               ))}
             </div>

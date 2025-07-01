@@ -162,6 +162,6 @@ export class StarshipRepository implements StarshipRepositoryInterface {
     );
 
     const { maxAgents, deployedCount } = result[0] || { maxAgents: 0, deployedCount: 0 };
-    return maxAgents - deployedCount;
+    return maxAgents - Number(deployedCount);
   }
 } 

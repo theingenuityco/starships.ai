@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { VisionChamber } from '@/components/consciousness/VisionChamber';
+import { VisionChamber } from '@/components/vision-chamber/VisionChamber';
 
 export const metadata: Metadata = {
   title: 'Vision Chamber | Starships.ai',

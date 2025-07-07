@@ -1,30 +1,35 @@
+'use client';
+
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
-import { 
-  Users, Rocket, BookOpen, Brain, 
-  Cpu, Zap
+import {
+  Users, Rocket, BookOpen, Brain,
+  Cpu, Zap, Eye, Command
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NavigationSection } from './NavigationSection';
+import { NavigationItem } from './NavigationItem';
 
-interface NavigationModuleProps {
+interface NavigationProps {
   mode?: 'sidebar' | 'module';
   isMobile?: boolean;
 }
 
+// Updated navigation structure according to plan
 const navigationSections = [
   {
     title: "Command Deck",
     items: [
-      { href: "/command-deck", label: "Command Deck", icon: Cpu, status: "optimal" }
+      { href: "/command-deck", label: "Command Deck", icon: Command, status: "optimal" }
     ]
   },
   {
     title: "Core Systems",
     items: [
-      { href: "/core", label: "System Core", icon: Cpu, status: "optimal" },
+      { href: "/vision-chamber", label: "Vision Chamber", icon: Eye, status: "optimal" },
       { href: "/crew", label: "Crew", icon: Users, status: "optimal" },
       { href: "/drive", label: "Drive", icon: Zap, status: "warning" }
     ]
@@ -58,14 +63,12 @@ const itemVariants: any = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
 };
 
-export function NavigationModule({ 
+export function Navigation({ 
   mode = 'sidebar',
   isMobile: _isMobile = false 
-}: NavigationModuleProps) {
+}: NavigationProps) {
   const pathname = usePathname();
   const { powerLevel, activeExpeditions, sibilInsights } = useStarshipStore();
-
-  // Currently only one navigation state; no collapsed/expanded variants
 
   // Module mode - simplified layout
   if (mode === 'module') {
@@ -73,21 +76,13 @@ export function NavigationModule({
       <div className="h-full flex flex-col">
         <div className="flex-1 overflow-y-auto space-y-3">
           {navigationSections.map((section) => (
-            <div key={section.title} className="space-y-3">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
-                {section.title}
-              </h4>
-              <div className="space-y-2">
-                {section.items.map((item) => (
-                  <NavigationItem
-                    key={item.href}
-                    {...item}
-                    isActive={pathname === item.href}
-                    compact={true}
-                  />
-                ))}
-              </div>
-            </div>
+            <NavigationSection
+              key={section.title}
+              title={section.title}
+              items={section.items}
+              pathname={pathname}
+              compact={true}
+            />
           ))}
         </div>
       </div>
@@ -109,7 +104,7 @@ export function NavigationModule({
           className="flex items-center justify-between min-w-0"
         >
           <div className="flex items-center w-full justify-between">
-            <h2 className="text-lg font-semibold truncate">Command Deck</h2>
+            <h2 className="text-lg font-semibold truncate">Navigation</h2>
             <div className="flex items-center gap-1">
               <ThemeToggle />
             </div>
@@ -135,25 +130,17 @@ export function NavigationModule({
         </div>
       </motion.div>
 
-      {/* Navigation Module */}
+      {/* Navigation Sections */}
       <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-4">
         <div className="space-y-6">
           {navigationSections.map((section) => (
-            <div key={section.title} className="space-y-3">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3">
-                {section.title}
-              </h4>
-              <div className="space-y-2">
-                {section.items.map((item) => (
-                  <NavigationItem
-                    key={item.href}
-                    {...item}
-                    isActive={pathname === item.href}
-                    compact={true}
-                  />
-                ))}
-              </div>
-            </div>
+            <NavigationSection
+              key={section.title}
+              title={section.title}
+              items={section.items}
+              pathname={pathname}
+              compact={true}
+            />
           ))}
         </div>
       </motion.div>
@@ -165,30 +152,3 @@ export function NavigationModule({
     </motion.div>
   );
 }
-
-const NavigationItem = ({ href, label, icon: Icon, status, isActive, compact = false }: any) => (
-  <Link href={href}>
-    <motion.div
-      className={`group relative ${compact ? 'px-2 py-1.5' : 'px-2 py-2'} rounded-lg transition-all duration-200 ${
-        isActive 
-          ? 'bg-primary/10 backdrop-blur-sm border border-primary/20' 
-          : 'hover:bg-accent/30 hover:backdrop-blur-sm'
-      }`}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        <div className="relative flex-shrink-0">
-          <Icon className={`${compact ? 'w-4 h-4' : 'w-4 h-4'} ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground transition-colors'}`} />
-          {status === 'warning' && (
-            <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-          )}
-          {status === 'active' && (
-            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          )}
-        </div>
-        <span className={`font-medium ${compact ? 'text-sm' : 'text-sm'} truncate group-hover:text-foreground transition-colors`}>{label}</span>
-      </div>
-    </motion.div>
-  </Link>
-); 

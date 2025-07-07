@@ -197,4 +197,4 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
       )}
     </div>
   );
-} 
+}

@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { NavigationBridge } from '@/components/command-deck/NavigationBridge';
+import { Navigation } from '@/components/navigation/Navigation';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { useStarshipStore } from '@/store/starship-store';
 import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
@@ -77,16 +77,23 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     );
   }
 
-  // Regular pages with command deck overlay
+  // Regular pages with navigation sidebar
   return (
     <AuthGate>
       <div className="h-screen flex relative overflow-hidden">
-        {/* Command Deck with gutter (16px) */}
-        <div className="fixed top-4 left-4 z-50 w-[280px] h-[calc(100vh-32px)]">
-          <NavigationBridge />
-        </div>
+        {/* Navigation Sidebar with gutter (16px) */}
+        <motion.aside
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
+          className="fixed top-4 left-4 z-50 w-[280px] h-[calc(100vh-32px)] bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
+          onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
+          onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
+        >
+          <Navigation mode="sidebar" isMobile={isMobile} />
+        </motion.aside>
         
-        {/* Mobile Toggle Button (only shown when CommandDeck is hidden on mobile) */}
+        {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
         {isMobile && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
@@ -101,7 +108,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         
         {/* Main Content Area - Always maintains position */}
         <AnimatePresence mode="wait">
-          <motion.main 
+          <motion.main
             key={pathname}
             initial="initial"
             animate="animate"

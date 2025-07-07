@@ -2,13 +2,14 @@
 
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
-import { CommandDeck } from '@/components/command-deck/CommandDeck';
+import { Navigation } from '@/components/navigation/Navigation';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { useStarshipStore } from '@/store/starship-store';
 import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { Menu } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -76,14 +77,24 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     );
   }
 
-  // Regular pages with command deck overlay (no margin adjustments)
+  // Regular pages with navigation sidebar
   return (
     <AuthGate>
-      <div className="h-screen relative">
-        <CommandDeck />
+      <div className="h-screen flex relative overflow-hidden">
+        {/* Navigation Sidebar with gutter (16px) */}
+        <motion.aside
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
+          className="fixed top-4 left-4 z-50 w-[280px] h-[calc(100vh-32px)] bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
+          onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
+          onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
+        >
+          <Navigation mode="sidebar" isMobile={isMobile} />
+        </motion.aside>
         
-        {/* Mobile Toggle Button (only shown when CommandDeck is hidden on mobile) */}
-        {isMobile && commandDeck.visibility !== 'expanded' && (
+        {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
+        {isMobile && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -95,13 +106,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </motion.button>
         )}
         
+        {/* Main Content Area - Always maintains position */}
         <AnimatePresence mode="wait">
-          <motion.main 
+          <motion.main
             key={pathname}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="h-full w-full md:pl-16"
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={pageVariants}
+            className={cn(
+              "flex-1 min-h-full w-full transition-all duration-300 pl-[296px]"
+            )}
           >
             {children}
           </motion.main>

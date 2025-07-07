@@ -4,7 +4,6 @@ import { useStarshipStore } from '@/store/starship-store';
 import { useEffect, useState } from 'react';
 
 // Import route-specific quick action modules
-import { AetherCortexQuickModule } from './quick-actions/AetherCortexQuickModule';
 import { CrewQuickModule } from './quick-actions/CrewQuickModule';
 import { DriveQuickModule } from './quick-actions/DriveQuickModule';
 import { ExpeditionQuickModule } from './quick-actions/ExpeditionQuickModule';
@@ -24,7 +23,7 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
   // Dynamic state for evolving data
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isProcessing, setIsProcessing] = useState(false);
-  const [insights, setInsights] = useState<string[]>([]);
+  const [insights, setInsights] = useState<Array<{ id: string; text: string; timestamp: number }>>([]);
 
   // Simulate real-time updates like the original consciousness popups
   useEffect(() => {
@@ -40,7 +39,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
       // Add dynamic insights based on route
       if (Math.random() > 0.8) {
         const routeInsights = {
-          '/core': ['System optimization detected', 'Power efficiency improved', 'Core temperature optimal'],
           '/crew': ['Crew morale high', 'New assignment available', 'Training session completed'],
           '/expeditions': ['Route analysis complete', 'New sector discovered', 'Mission parameters updated'],
           '/sibil': ['Pattern recognition enhanced', 'Prediction accuracy increased', 'New data correlation found'],
@@ -49,7 +47,12 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
         };
         
         const currentInsights = routeInsights[pathname as keyof typeof routeInsights] || ['System status updated'];
-        const newInsight = currentInsights[Math.floor(Math.random() * currentInsights.length)];
+        const newInsightText = currentInsights[Math.floor(Math.random() * currentInsights.length)];
+        const newInsight = {
+          id: `${Date.now()}-${Math.random()}`,
+          text: newInsightText,
+          timestamp: Date.now()
+        };
         
         setInsights(prev => [newInsight, ...prev].slice(0, 3));
       }
@@ -73,8 +76,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
     };
 
     switch (pathname) {
-      case '/core':
-        return <AetherCortexQuickModule {...moduleProps} />;
       case '/crew':
         return <CrewQuickModule {...moduleProps} />;
       case '/drive':
@@ -92,7 +93,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
 
   const getModuleTitle = () => {
     switch (pathname) {
-      case '/core': return 'Aether Core';
       case '/crew': return 'Crew Status';
       case '/drive': return 'Drive Systems';
       case '/expeditions': return 'Mission Control';
@@ -104,7 +104,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
 
   const getModuleIcon = () => {
     switch (pathname) {
-      case '/core': return '⚡';
       case '/crew': return '👥';
       case '/drive': return '🚀';
       case '/expeditions': return '🎯';
@@ -167,14 +166,14 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
             <div className="space-y-1">
               {insights.slice(0, 2).map((insight, index) => (
                 <motion.div
-                  key={insight}
+                  key={insight.id}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
                   className="text-xs text-primary/80 flex items-center gap-1"
                 >
                   <div className="w-1 h-1 bg-primary rounded-full" />
-                  {insight}
+                  {insight.text}
                 </motion.div>
               ))}
             </div>

@@ -7,12 +7,17 @@ export function buildPrompt(
   systemPrompt: string | undefined, 
   memory: MemoryEntry[], 
   currentMessage: string,
-  relevantContext?: string
+  relevantContext?: string,
+  codexContext?: string
 ): LLMChatPrompt {
   const messages: LLMChatPrompt['messages'] = [];
 
   if (systemPrompt) {
     messages.push({ role: "system", content: systemPrompt });
+  }
+
+  if (codexContext) {
+    messages.push({ role: "system", content: codexContext });
   }
 
   if (relevantContext) {

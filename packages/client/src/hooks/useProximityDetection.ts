@@ -30,10 +30,19 @@ export function useProximityDetection(options: ProximityOptions = {}) {
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
   const lastMouseMoveTimeRef = useRef<number>(Date.now());
   const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
+  const isHoveringRef = useRef<boolean>(false);
 
-  // Calculate distance based on mode
+  // Store options in ref to avoid dependency issues
+  const optionsRef = useRef({ nearThreshold, engageThreshold, debounceMs, mode });
+  optionsRef.current = { nearThreshold, engageThreshold, debounceMs, mode };
+
+  // Sync isHovering state with ref
+  isHoveringRef.current = isHovering;
+
+  // Calculate distance based on mode - stable callback
   const calculateDistance = useCallback((mouseX: number, mouseY: number, rect?: DOMRect) => {
-    if (mode === 'left-edge') {
+    const currentMode = optionsRef.current.mode;
+    if (currentMode === 'left-edge') {
       // Distance from left edge of screen
       return mouseX;
     }
@@ -46,61 +55,71 @@ export function useProximityDetection(options: ProximityOptions = {}) {
     return Math.sqrt(
       Math.pow(mouseX - centerX, 2) + Math.pow(mouseY - centerY, 2)
     );
-  }, [mode]);
+  }, []);
 
-  // Determine proximity state based on distance
+  // Determine proximity state based on distance - stable callback
   const getProximityState = useCallback((distance: number, isDirectlyHovering: boolean): ProximityState => {
-    if (mode === 'element' && (isDirectlyHovering || distance <= engageThreshold)) {
+    const { engageThreshold: currentEngageThreshold, nearThreshold: currentNearThreshold, mode: currentMode } = optionsRef.current;
+    
+    if (currentMode === 'element' && (isDirectlyHovering || distance <= currentEngageThreshold)) {
       return 'engaged';
-    } else if (distance <= engageThreshold) {
+    } else if (distance <= currentEngageThreshold) {
       return 'engaged';
-    } else if (distance <= nearThreshold) {
+    } else if (distance <= currentNearThreshold) {
       return 'near';
     } else {
       return 'far';
     }
-  }, [engageThreshold, nearThreshold, mode]);
+  }, []);
 
-  // Debounced state update
+  // Debounced state update - stable callback
   const updateProximityState = useCallback((newState: ProximityState) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
+    const currentDebounceMs = optionsRef.current.debounceMs;
     debounceTimeoutRef.current = setTimeout(() => {
       setProximityState(current => {
         // Only update if state actually changed
         return current !== newState ? newState : current;
       });
-    }, debounceMs);
-  }, [debounceMs]);
+    }, currentDebounceMs);
+  }, []);
 
-  // Mouse move handler
+  // Mouse move handler - stable callback
   const handleMouseMove = useCallback((event: MouseEvent) => {
     const newPosition = { x: event.clientX, y: event.clientY };
     setMousePosition(newPosition);
     lastMouseMoveTimeRef.current = Date.now();
 
-    const rect = mode === 'element' ? targetRef.current?.getBoundingClientRect() : undefined;
+    const currentMode = optionsRef.current.mode;
+    const rect = currentMode === 'element' ? targetRef.current?.getBoundingClientRect() : undefined;
     const distance = calculateDistance(event.clientX, event.clientY, rect);
-    const newState = getProximityState(distance, isHovering);
     
+    // Use ref to get current hovering state
+    const currentHovering = isHoveringRef.current;
+    const newState = getProximityState(distance, currentHovering);
     updateProximityState(newState);
-  }, [calculateDistance, getProximityState, isHovering, updateProximityState, mode]);
+  }, []);
 
-  // Mouse enter/leave handlers for direct hovering (element mode only)
+  // Mouse enter/leave handlers for direct hovering (element mode only) - stable callbacks
   const handleMouseEnter = useCallback(() => {
-    if (mode === 'element') {
+    const currentMode = optionsRef.current.mode;
+    if (currentMode === 'element') {
       setIsHovering(true);
+      isHoveringRef.current = true;
       updateProximityState('engaged');
     }
-  }, [updateProximityState, mode]);
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
-    if (mode === 'element') {
+    const currentMode = optionsRef.current.mode;
+    if (currentMode === 'element') {
       setIsHovering(false);
+      isHoveringRef.current = false;
     }
-  }, [mode]);
+  }, []);
 
   // Set up event listeners
   useEffect(() => {
@@ -108,8 +127,11 @@ export function useProximityDetection(options: ProximityOptions = {}) {
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     
     // Only attach hover listeners for element mode
-    if (mode === 'element') {
-      const target = targetRef.current;
+    const currentMode = optionsRef.current.mode;
+    let target: HTMLElement | null = null;
+    
+    if (currentMode === 'element') {
+      target = targetRef.current;
       if (target) {
         target.addEventListener('mouseenter', handleMouseEnter);
         target.addEventListener('mouseleave', handleMouseLeave);
@@ -119,12 +141,9 @@ export function useProximityDetection(options: ProximityOptions = {}) {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       
-      if (mode === 'element') {
-        const target = targetRef.current;
-        if (target) {
-          target.removeEventListener('mouseenter', handleMouseEnter);
-          target.removeEventListener('mouseleave', handleMouseLeave);
-        }
+      if (target) {
+        target.removeEventListener('mouseenter', handleMouseEnter);
+        target.removeEventListener('mouseleave', handleMouseLeave);
       }
       
       if (debounceTimeoutRef.current) {
@@ -135,7 +154,7 @@ export function useProximityDetection(options: ProximityOptions = {}) {
         clearInterval(inactivityTimeoutRef.current);
       }
     };
-  }, [handleMouseMove, handleMouseEnter, handleMouseLeave, mode]);
+  }, []); // Empty dependency array since all callbacks are now stable
 
   // Performance: Reset to 'far' when mouse hasn't moved for a while
   useEffect(() => {
@@ -143,7 +162,7 @@ export function useProximityDetection(options: ProximityOptions = {}) {
       const now = Date.now();
       const timeSinceLastMove = now - lastMouseMoveTimeRef.current;
       
-      if (timeSinceLastMove >= 3000 && !isHovering) {
+      if (timeSinceLastMove >= 3000 && !isHoveringRef.current) {
         setProximityState(currentState => {
           return currentState !== 'far' ? 'far' : currentState;
         });
@@ -158,7 +177,7 @@ export function useProximityDetection(options: ProximityOptions = {}) {
         clearInterval(inactivityTimeoutRef.current);
       }
     };
-  }, [isHovering]);
+  }, []); // No dependencies since we use refs
 
   return {
     proximityState,

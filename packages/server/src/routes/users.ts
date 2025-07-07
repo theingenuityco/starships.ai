@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { UserService } from "../services/UserService";
 import type { Request, Response } from "express";
+import { authMiddleware } from "../middleware/auth";
 
 const router: Router = Router();
 
@@ -39,7 +40,7 @@ router.post("/sync", validateSyncRequest, async (req: any, res: any) => {
 });
 
 // GET /v1/users/:id - Get user by ID
-router.get("/:id", async (req: any, res: any) => {
+router.get("/:id", authMiddleware, async (req: any, res: any) => {
   try {
     const { id } = req.params;
     
@@ -57,7 +58,7 @@ router.get("/:id", async (req: any, res: any) => {
 });
 
 // GET /v1/users/kinde/:kindeId - Get user by Kinde ID
-router.get("/kinde/:kindeId", async (req: any, res: any) => {
+router.get("/kinde/:kindeId", authMiddleware, async (req: any, res: any) => {
   try {
     const { kindeId } = req.params;
     

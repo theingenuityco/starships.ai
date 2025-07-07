@@ -10,9 +10,9 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        // Proxy specific API endpoints to backend, excluding auth
-        source: '/api/v1/:path*',
-        destination: 'http://localhost:4000/v1/:path*'
+        // Proxy /v1/* requests to backend /api/* endpoints
+        source: '/v1/:path*',
+        destination: 'http://localhost:4000/api/:path*'
       }
     ]
   },

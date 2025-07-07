@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { AgentService } from "../services/AgentService";
 import type { AgentConfig } from "@starships/protocol";
+import { authMiddleware } from "../middleware/auth";
 
 const router: Router = Router();
 
-router.get("/", async (req, res) => {
+router.get("/", authMiddleware, async (req, res) => {
   try {
     // Load agents scoped to the authenticated user
     console.log(`[AGENTS] Loading agents for authenticated user: ${req.user.id}`);
@@ -19,7 +20,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", authMiddleware, async (req, res) => {
   try {
     const agent = await AgentService.getAgent(req.params.id);
     if (!agent) {
@@ -33,7 +34,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authMiddleware, async (req, res) => {
   try {
     const agentData = req.body as Omit<AgentConfig, 'id'>;
     const agent = await AgentService.createAgent(agentData);
@@ -44,7 +45,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", authMiddleware, async (req, res) => {
   try {
     const updates = req.body as Partial<AgentConfig>;
     const agent = await AgentService.updateAgent(req.params.id, updates);
@@ -59,7 +60,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", authMiddleware, async (req, res) => {
   try {
     const deleted = await AgentService.deleteAgent(req.params.id);
     if (!deleted) {

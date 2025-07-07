@@ -1,66 +1,33 @@
-import { Goal, Constraint, GoalFormData, ConstraintFormData } from './types';
+import { Constraint, ConstraintFormData, VisionRefinementFormData } from './types';
 
-// Keyword patterns for goal suggestion
-const GOAL_SUGGESTION_PATTERNS = {
-  // Short-term goal patterns
-  short_term: [
+// Vision refinement patterns
+const VISION_REFINEMENT_PATTERNS = {
+  clarity: [
     {
-      keywords: ['explore', 'survey', 'scan', 'investigate', 'analyze'],
-      template: 'Conduct detailed exploration of {target}',
-      priority: 7
-    },
-    {
-      keywords: ['repair', 'fix', 'maintain', 'upgrade', 'enhance'],
-      template: 'Complete {action} of ship systems',
-      priority: 8
-    },
-    {
-      keywords: ['collect', 'gather', 'acquire', 'obtain'],
-      template: 'Gather required {resources}',
-      priority: 6
-    },
-    {
-      keywords: ['contact', 'communicate', 'establish', 'diplomatic'],
-      template: 'Establish communication with {target}',
-      priority: 7
+      triggers: ['vague', 'maybe', 'might', 'possibly', 'unclear'],
+      template: 'Consider being more specific about {target}',
+      improvementType: 'clarity'
     }
   ],
-  
-  // Long-term goal patterns  
-  long_term: [
+  scope: [
     {
-      keywords: ['discover', 'find', 'locate', 'search'],
-      template: 'Discover new {target} in uncharted space',
-      priority: 5
-    },
-    {
-      keywords: ['build', 'construct', 'establish', 'create'],
-      template: 'Establish {infrastructure} for long-term operations',
-      priority: 6
-    },
-    {
-      keywords: ['peace', 'alliance', 'cooperation', 'partnership'],
-      template: 'Build lasting alliances with {target}',
-      priority: 4
-    },
-    {
-      keywords: ['knowledge', 'understanding', 'research', 'study'],
-      template: 'Advance understanding of {subject}',
-      priority: 5
+      triggers: ['everything', 'all', 'anything', 'universal'],
+      template: 'Define the specific scope of {target}',
+      improvementType: 'scope'
     }
   ],
-  
-  // Milestone patterns
-  milestone: [
+  purpose: [
     {
-      keywords: ['breakthrough', 'achievement', 'accomplish', 'complete'],
-      template: 'Achieve major breakthrough in {field}',
-      priority: 3
-    },
+      triggers: ['to do', 'for', 'about'],
+      template: 'Strengthen the purpose statement around {target}',
+      improvementType: 'purpose'
+    }
+  ],
+  action: [
     {
-      keywords: ['first', 'pioneer', 'inaugural', 'initial'],
-      template: 'Be first to {achievement}',
-      priority: 4
+      triggers: ['is', 'are', 'being', 'static'],
+      template: 'Add actionable verbs to describe {target}',
+      improvementType: 'action'
     }
   ]
 };
@@ -132,9 +99,9 @@ const CONSTRAINT_SUGGESTION_PATTERNS = {
 
 export interface InfluenceSuggestion {
   id: string;
-  type: 'goal' | 'constraint';
-  source: 'vision_change' | 'goal_completion' | 'constraint_activation';
-  suggestion: GoalFormData | ConstraintFormData;
+  type: 'constraint' | 'vision_refinement';
+  source: 'vision_change' | 'constraint_activation' | 'agent_observation';
+  suggestion: ConstraintFormData | VisionRefinementFormData;
   confidence: number; // 0-100
   reasoning: string;
   timestamp: string;
@@ -142,67 +109,48 @@ export interface InfluenceSuggestion {
 }
 
 export class AutoInfluenceEngine {
-  // Analyze vision text and suggest goals
-  static analyzeVisionForGoals(visionText: string, existingGoals: Goal[]): InfluenceSuggestion[] {
+  // Analyze vision text for refinement suggestions
+  static analyzeVisionForRefinement(visionText: string): InfluenceSuggestion[] {
     const suggestions: InfluenceSuggestion[] = [];
     const lowercaseVision = visionText.toLowerCase();
-    const words = lowercaseVision.split(/\s+/);
     
-    // Check each goal type for matches
-    Object.entries(GOAL_SUGGESTION_PATTERNS).forEach(([goalType, patterns]) => {
-      patterns.forEach((pattern, index) => {
-        const matchedKeywords = pattern.keywords.filter(keyword => 
-          lowercaseVision.includes(keyword)
+    Object.entries(VISION_REFINEMENT_PATTERNS).forEach(([type, patterns]) => {
+      patterns.forEach((pattern) => {
+        const matchedTriggers = pattern.triggers.filter(trigger =>
+          lowercaseVision.includes(trigger)
         );
         
-        if (matchedKeywords.length > 0) {
-          // Check if we already have a similar goal
-          const similarExists = existingGoals.some(goal => 
-            goal.type === goalType && 
-            matchedKeywords.some(keyword => goal.description.toLowerCase().includes(keyword))
-          );
-          
-          if (!similarExists) {
-            const target = this.extractTarget(visionText, matchedKeywords);
-            const description = pattern.template.replace('{target}', target)
-              .replace('{action}', matchedKeywords[0])
-              .replace('{resources}', target)
-              .replace('{infrastructure}', target)
-              .replace('{subject}', target)
-              .replace('{field}', target)
-              .replace('{achievement}', target);
-            
-            suggestions.push({
-              id: `goal-${Date.now()}-${index}`,
-              type: 'goal',
-              source: 'vision_change',
-              suggestion: {
-                description,
-                type: goalType as Goal['type'],
-                priority: pattern.priority,
-                targetDate: this.calculateTargetDate(goalType as Goal['type'])
-              },
-              confidence: Math.min(90, matchedKeywords.length * 25 + 40),
-              reasoning: `Detected keywords: ${matchedKeywords.join(', ')} suggesting ${goalType} goal`,
-              timestamp: new Date().toISOString(),
-              triggers: matchedKeywords
-            });
-          }
+        if (matchedTriggers.length > 0) {
+          suggestions.push({
+            id: `vision-${Date.now()}-${type}`,
+            type: 'vision_refinement',
+            source: 'vision_change',
+            suggestion: {
+              currentStatement: visionText,
+              suggestedStatement: this.generateRefinedVision(visionText, pattern),
+              improvementType: pattern.improvementType,
+              reasoning: pattern.template.replace('{target}', matchedTriggers[0])
+            } as VisionRefinementFormData,
+            confidence: Math.min(80, matchedTriggers.length * 20 + 40),
+            reasoning: `Detected ${type} improvement opportunity: ${matchedTriggers.join(', ')}`,
+            timestamp: new Date().toISOString(),
+            triggers: matchedTriggers
+          });
         }
       });
     });
     
-    return suggestions.slice(0, 3); // Limit to top 3 suggestions
+    return suggestions.slice(0, 2);
   }
   
-  // Analyze vision and goals for constraint suggestions
+  // Analyze vision for constraint suggestions
   static analyzeForConstraints(
-    visionText: string, 
-    goals: Goal[], 
+    visionText: string,
+    goals: any[], // Keep parameter for compatibility but ignore
     existingConstraints: Constraint[]
   ): InfluenceSuggestion[] {
     const suggestions: InfluenceSuggestion[] = [];
-    const combinedText = `${visionText} ${goals.map(g => g.description).join(' ')}`.toLowerCase();
+    const combinedText = visionText.toLowerCase();
     
     Object.entries(CONSTRAINT_SUGGESTION_PATTERNS).forEach(([constraintType, patterns]) => {
       patterns.forEach((pattern, index) => {
@@ -245,41 +193,18 @@ export class AutoInfluenceEngine {
     return suggestions.slice(0, 2); // Limit to top 2 suggestions
   }
   
-  // Analyze goal completion for constraint updates
-  static analyzeGoalCompletion(completedGoal: Goal, allConstraints: Constraint[]): InfluenceSuggestion[] {
-    const suggestions: InfluenceSuggestion[] = [];
+  // Generate refined vision text
+  static generateRefinedVision(visionText: string, pattern: any): string {
+    // Simple implementation - can be enhanced
+    const words = visionText.split(' ');
+    const improvements = {
+      clarity: 'Specifically focused on',
+      scope: 'Precisely defined to',
+      purpose: 'Intentionally designed to',
+      action: 'Actively working to'
+    };
     
-    // When goals are completed, some constraints might become less severe or inactive
-    if (completedGoal.type === 'short_term') {
-      const relatedConstraints = allConstraints.filter(constraint => 
-        constraint.isActive && 
-        constraint.severity !== 'low' &&
-        this.hasSharedKeywords(completedGoal.description, constraint.description)
-      );
-      
-      relatedConstraints.forEach(constraint => {
-        const newSeverity = this.reduceSeverity(constraint.severity);
-        if (newSeverity !== constraint.severity) {
-          suggestions.push({
-            id: `constraint-update-${Date.now()}`,
-            type: 'constraint',
-            source: 'goal_completion',
-            suggestion: {
-              description: constraint.description,
-              type: constraint.type,
-              severity: newSeverity,
-              isActive: newSeverity !== 'low' // Deactivate low severity constraints
-            },
-            confidence: 70,
-            reasoning: `Goal completion "${completedGoal.description}" reduces related constraint severity`,
-            timestamp: new Date().toISOString(),
-            triggers: [completedGoal.description]
-          });
-        }
-      });
-    }
-    
-    return suggestions;
+    return `${improvements[pattern.improvementType as keyof typeof improvements]} ${words.slice(1).join(' ')}`;
   }
   
   // Helper methods
@@ -305,21 +230,6 @@ export class AutoInfluenceEngine {
     return target;
   }
   
-  private static calculateTargetDate(goalType: Goal['type']): string | undefined {
-    const now = new Date();
-    switch (goalType) {
-      case 'short_term':
-        now.setDate(now.getDate() + 30); // 30 days
-        break;
-      case 'long_term':
-        now.setMonth(now.getMonth() + 6); // 6 months
-        break;
-      case 'milestone':
-        now.setMonth(now.getMonth() + 12); // 1 year
-        break;
-    }
-    return now.toISOString().split('T')[0];
-  }
   
   private static hasSharedKeywords(text1: string, text2: string): boolean {
     const words1 = text1.toLowerCase().split(/\s+/);

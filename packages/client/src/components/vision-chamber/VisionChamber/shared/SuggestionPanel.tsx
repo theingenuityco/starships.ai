@@ -8,7 +8,7 @@ import { Lightbulb, Target, Shield, CheckCircle, X, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { InfluenceSuggestion } from './auto-influence';
 import { ConstraintSeverityIndicator } from '../ConstraintsGrid/ConstraintSeverityIndicator';
-import { GoalFormData, ConstraintFormData } from './types';
+import { ConstraintFormData, VisionRefinementFormData } from './types';
 
 interface SuggestionPanelProps {
   suggestions: InfluenceSuggestion[];
@@ -39,12 +39,12 @@ export function SuggestionPanel({
 
   const getSuggestionIcon = (type: string) => {
     switch (type) {
-      case 'goal':
-        return Target;
       case 'constraint':
         return Shield;
-      default:
+      case 'vision_refinement':
         return Lightbulb;
+      default:
+        return Info;
     }
   };
 
@@ -52,10 +52,10 @@ export function SuggestionPanel({
     switch (source) {
       case 'vision_change':
         return 'Vision Analysis';
-      case 'goal_completion':
-        return 'Goal Completion';
       case 'constraint_activation':
         return 'Constraint Update';
+      case 'agent_observation':
+        return 'Agent Analysis';
       default:
         return 'Auto-Influence';
     }
@@ -68,12 +68,12 @@ export function SuggestionPanel({
   };
 
   // Type guards
-  const isGoalSuggestion = (suggestion: InfluenceSuggestion): suggestion is InfluenceSuggestion & { suggestion: GoalFormData } => {
-    return suggestion.type === 'goal';
-  };
-
   const isConstraintSuggestion = (suggestion: InfluenceSuggestion): suggestion is InfluenceSuggestion & { suggestion: ConstraintFormData } => {
     return suggestion.type === 'constraint';
+  };
+
+  const isVisionRefinementSuggestion = (suggestion: InfluenceSuggestion): suggestion is InfluenceSuggestion & { suggestion: VisionRefinementFormData } => {
+    return suggestion.type === 'vision_refinement';
   };
 
   if (suggestions.length === 0) {
@@ -135,7 +135,12 @@ export function SuggestionPanel({
                       <div className="flex items-start justify-between gap-2">
                         <div className="space-y-1">
                           <p className="text-sm font-medium text-gray-900">
-                            {suggestion.suggestion.description}
+                            {isConstraintSuggestion(suggestion)
+                              ? suggestion.suggestion.description
+                              : isVisionRefinementSuggestion(suggestion)
+                                ? `Vision refinement: ${suggestion.suggestion.improvementType}`
+                                : 'Unknown suggestion type'
+                            }
                           </p>
                           <div className="flex items-center gap-2 text-xs text-gray-600">
                             <Badge variant="outline" className="h-4 px-1">
@@ -185,14 +190,12 @@ export function SuggestionPanel({
                             <span className="font-medium">Generated:</span> {new Date(suggestion.timestamp).toLocaleString()}
                           </div>
                           
-                          {/* Goal-specific details */}
-                          {isGoalSuggestion(suggestion) && (
+                          {/* Vision refinement details */}
+                          {isVisionRefinementSuggestion(suggestion) && (
                             <div className="space-y-1">
-                              <div><span className="font-medium">Type:</span> {suggestion.suggestion.type}</div>
-                              <div><span className="font-medium">Priority:</span> {suggestion.suggestion.priority}/10</div>
-                              {suggestion.suggestion.targetDate && (
-                                <div><span className="font-medium">Target Date:</span> {suggestion.suggestion.targetDate}</div>
-                              )}
+                              <div><span className="font-medium">Current:</span> {suggestion.suggestion.currentStatement.substring(0, 100)}...</div>
+                              <div><span className="font-medium">Suggested:</span> {suggestion.suggestion.suggestedStatement.substring(0, 100)}...</div>
+                              <div><span className="font-medium">Improvement:</span> {suggestion.suggestion.improvementType}</div>
                             </div>
                           )}
                           
@@ -215,7 +218,7 @@ export function SuggestionPanel({
                           className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           <CheckCircle className="h-3 w-3 mr-1" />
-                          Accept {suggestion.type === 'goal' ? 'Goal' : 'Constraint'}
+                          Accept {suggestion.type === 'constraint' ? 'Constraint' : 'Vision Refinement'}
                         </Button>
                       </div>
                     </div>

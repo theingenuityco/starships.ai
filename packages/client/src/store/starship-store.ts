@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, type Starship, type CodexProjection } from '@/lib/api';
-import type { Goal, Constraint, PendingChange, GoalFormData, ConstraintFormData } from '@/components/consciousness/VisionChamber/shared/types';
+import type { Constraint, PendingChange, ConstraintFormData } from '@/components/vision-chamber/VisionChamber/shared/types';
 
 interface CommandDeckState {
   visibility: 'collapsed' | 'partial' | 'expanded';
@@ -29,8 +29,7 @@ interface StarshipState {
     confidence: number;
   };
   
-  // Goals and Constraints state (synced with API)
-  goals: Goal[];
+  // Constraints state (synced with API)
   constraints: Constraint[];
   
   // Maker-Checker Flow state
@@ -54,11 +53,8 @@ interface StarshipActions {
   removeAgent: (agentId: string) => Promise<void>;
   getProjection: (lens: 'telos' | 'ethos' | 'full') => Promise<CodexProjection | null>;
   
-  // Goals and Constraints actions
-  loadGoalsAndConstraints: () => Promise<void>;
-  createGoal: (data: GoalFormData) => Promise<void>;
-  updateGoal: (id: string, changes: Partial<Goal>) => Promise<void>;
-  deleteGoal: (id: string) => Promise<void>;
+  // Constraints actions
+  loadConstraints: () => Promise<void>;
   createConstraint: (data: ConstraintFormData) => Promise<void>;
   updateConstraint: (id: string, changes: Partial<Constraint>) => Promise<void>;
   deleteConstraint: (id: string) => Promise<void>;
@@ -107,8 +103,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           confidence: 0
         },
         
-        // Initial goals and constraints state
-        goals: [],
+        // Initial constraints state
         constraints: [],
         pendingChanges: [],
 
@@ -256,7 +251,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               vision: {
                 statement,
                 lastUpdated: new Date(),
-                confidence: Math.min(100, statement.length * 2)
+                confidence: Math.min(100, statement.length / 10)
               }
             });
           } catch (error) {
@@ -302,81 +297,29 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
 
-        // Goals and Constraints actions
-        loadGoalsAndConstraints: async () => {
+        // Constraints actions
+        loadConstraints: async () => {
           const activeStarshipId = get().activeStarshipId;
           if (!activeStarshipId) return;
 
           try {
             const response = await starshipAPI.getProjection(activeStarshipId, 'full');
             if (response.projection) {
-              // Map API response to our internal Goal/Constraint interfaces
-              const goals: Goal[] = (response.projection.goals || []).map(g => ({
-                ...g,
-                status: g.status as Goal['status'], // Cast to proper union type
-                codexId: 'temp', // TODO: Get actual codexId from API
-                priority: 5, // TODO: Get from API or provide default
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              }));
-              
+              // Map API response to our internal Constraint interfaces
               const constraints: Constraint[] = (response.projection.constraints || []).map(c => ({
                 ...c,
-                codexId: 'temp', // TODO: Get actual codexId from API  
+                codexId: 'temp', // TODO: Get actual codexId from API
                 severity: 'medium' as const, // TODO: Get from API or provide default
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
               }));
               
-              set({ goals, constraints });
+              set({ constraints });
             }
           } catch (error) {
-            console.error('Failed to load goals and constraints:', error);
-            set({ error: 'Failed to load goals and constraints' });
+            console.error('Failed to load constraints:', error);
+            set({ error: 'Failed to load constraints' });
           }
-        },
-
-        createGoal: async (data) => {
-          // For now, add to pending changes queue
-          // Future: Direct API call when backend supports it
-          const changeId = `goal_create_${Date.now()}`;
-          get().queueChange({
-            type: 'goal',
-            operation: 'create',
-            target: 'new',
-            changes: data,
-            after: data,
-            source: 'user'
-          });
-        },
-
-        updateGoal: async (id, changes) => {
-          const existingGoal = get().goals.find(g => g.id === id);
-          if (!existingGoal) return;
-
-          get().queueChange({
-            type: 'goal',
-            operation: 'update',
-            target: id,
-            changes,
-            before: existingGoal,
-            after: { ...existingGoal, ...changes },
-            source: 'user'
-          });
-        },
-
-        deleteGoal: async (id) => {
-          const existingGoal = get().goals.find(g => g.id === id);
-          if (!existingGoal) return;
-
-          get().queueChange({
-            type: 'goal',
-            operation: 'delete',
-            target: id,
-            changes: {},
-            before: existingGoal,
-            source: 'user'
-          });
         },
 
         createConstraint: async (data) => {
@@ -457,7 +400,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             get().clearQueue();
             
             // Reload data to reflect changes
-            await get().loadGoalsAndConstraints();
+            await get().loadConstraints();
           } catch (error) {
             console.error('Failed to apply queued changes:', error);
             set({ error: 'Failed to apply changes' });
@@ -530,7 +473,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               vision: {
                 statement,
                 lastUpdated: new Date(),
-                confidence: Math.min(100, Math.max(0, statement.length * 2))
+                confidence: Math.min(100, Math.max(0, statement.length / 10))
               }
             });
           }

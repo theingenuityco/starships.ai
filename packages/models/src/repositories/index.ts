@@ -12,7 +12,6 @@ export { LLMRepository } from './LLMRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { CodexRepository } from './CodexRepository';
 export { VisionRepository } from './VisionRepository';
-export { GoalRepository } from './GoalRepository';
 export { ConstraintRepository } from './ConstraintRepository';
 export { ConceptRepository } from './ConceptRepository';
 export { MetaAnchorRepository } from './MetaAnchorRepository';
@@ -21,7 +20,6 @@ export { MetaAnchorRepository } from './MetaAnchorRepository';
 import { StarshipRepository } from './StarshipRepository';
 import { CodexRepository } from './CodexRepository';
 import { VisionRepository } from './VisionRepository';
-import { GoalRepository } from './GoalRepository';
 import { ConstraintRepository } from './ConstraintRepository';
 import { ConceptRepository } from './ConceptRepository';
 import { MetaAnchorRepository } from './MetaAnchorRepository';
@@ -39,7 +37,6 @@ export class RepositoryFactory {
   private static starshipRepo: StarshipRepository;
   private static codexRepo: CodexRepository;
   private static visionRepo: VisionRepository;
-  private static goalRepo: GoalRepository;
   private static constraintRepo: ConstraintRepository;
   private static conceptRepo: ConceptRepository;
   private static metaAnchorRepo: MetaAnchorRepository;
@@ -94,12 +91,6 @@ export class RepositoryFactory {
     return this.visionRepo;
   }
 
-  static getGoalRepository(): GoalRepository {
-    if (!this.goalRepo) {
-      this.goalRepo = new GoalRepository();
-    }
-    return this.goalRepo;
-  }
 
   static getConstraintRepository(): ConstraintRepository {
     if (!this.constraintRepo) {

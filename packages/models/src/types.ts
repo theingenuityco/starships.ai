@@ -75,18 +75,6 @@ export interface Vision {
   updatedAt: string;
 }
 
-export interface Goal {
-  id: string;
-  codexId: string;
-  type: 'short_term' | 'long_term' | 'milestone';
-  description: string;
-  status: 'active' | 'completed' | 'paused' | 'cancelled';
-  priority: number;     // 1-10
-  targetDate?: string;
-  completedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface Constraint {
   id: string;
@@ -216,11 +204,6 @@ export interface VisionRepository extends Repository<Vision> {
   updateStatement(codexId: string, statement: string): Promise<Vision | null>;
 }
 
-export interface GoalRepository extends Repository<Goal> {
-  findByCodex(codexId: string): Promise<Goal[]>;
-  findByStatus(codexId: string, status: Goal['status']): Promise<Goal[]>;
-  updateStatus(goalId: string, status: Goal['status']): Promise<Goal | null>;
-}
 
 export interface ConstraintRepository extends Repository<Constraint> {
   findByCodex(codexId: string): Promise<Constraint[]>;

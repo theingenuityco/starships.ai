@@ -9,7 +9,6 @@ export class AetherCoreService {
   private static starshipRepo = RepositoryFactory.getStarshipRepository();
   private static codexRepo = RepositoryFactory.getCodexRepository();
   private static visionRepo = RepositoryFactory.getVisionRepository();
-  private static goalRepo = RepositoryFactory.getGoalRepository();
   private static constraintRepo = RepositoryFactory.getConstraintRepository();
   private static conceptRepo = RepositoryFactory.getConceptRepository();
   private static metaAnchorRepo = RepositoryFactory.getMetaAnchorRepository();
@@ -67,7 +66,6 @@ export class AetherCoreService {
     if (!codex) return null;
 
     const vision = await this.visionRepo.findByCodex(codex.id);
-    const goals = await this.goalRepo.findByCodex(codex.id);
     const constraints = await this.constraintRepo.findByCodex(codex.id);
     const concepts = await this.conceptRepo.findByCodex(codex.id);
 
@@ -75,7 +73,6 @@ export class AetherCoreService {
       case 'telos':
         return {
           vision: vision?.statement || '',
-          goals: goals.filter((g: any) => g.status === 'active'),
           constraints: constraints.filter((c: any) => c.isActive && c.type === 'business')
         };
       case 'ethos':
@@ -85,7 +82,7 @@ export class AetherCoreService {
           concepts: concepts.filter((c: any) => c.category === 'idea')
         };
       case 'full':
-        return { vision, goals, constraints, concepts };
+        return { vision, constraints, concepts };
       default:
         return null;
     }
@@ -97,7 +94,6 @@ export class AetherCoreService {
    */
   static async mutateCodex(starshipId: string, mutations: {
     vision?: { statement: string };
-    goals?: Array<{ description: string; type: 'short_term' | 'long_term' | 'milestone' }>;
     constraints?: Array<{ description: string; type: 'resource' | 'ethical' | 'technical' | 'business' }>;
   }, author: string) {
     // Create new codex version
@@ -119,18 +115,6 @@ export class AetherCoreService {
       });
     }
 
-    if (mutations.goals) {
-      for (const goal of mutations.goals) {
-        await this.goalRepo.create({
-          codexId: newCodex.id,
-          type: goal.type,
-          description: goal.description,
-          status: 'active',
-          priority: 5,
-          updatedAt: new Date().toISOString()
-        });
-      }
-    }
 
     if (mutations.constraints) {
       for (const constraint of mutations.constraints) {
@@ -156,9 +140,8 @@ export class AetherCoreService {
     if (!codex) return null;
 
     // Get all related entities
-    const [vision, goals, constraints, concepts] = await Promise.all([
+    const [vision, constraints, concepts] = await Promise.all([
       this.visionRepo.findByCodex(codex.id),
-      this.goalRepo.findByCodex(codex.id),
       this.constraintRepo.findByCodex(codex.id),
       this.conceptRepo.findByCodex(codex.id)
     ]);
@@ -166,7 +149,6 @@ export class AetherCoreService {
     return {
       ...codex,
       vision,
-      goals,
       constraints,
       concepts
     };

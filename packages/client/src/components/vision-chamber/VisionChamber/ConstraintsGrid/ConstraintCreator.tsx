@@ -13,7 +13,6 @@ interface ConstraintCreatorProps {
   isOpen: boolean;
   onClose: () => void;
   onConstraintCreate: (data: ConstraintFormData) => void;
-  initialCategory?: Constraint['type'];
 }
 
 const CATEGORIES = [
@@ -57,12 +56,11 @@ const SEVERITY_OPTIONS = [
 export function ConstraintCreator({
   isOpen,
   onClose,
-  onConstraintCreate,
-  initialCategory = 'resource'
+  onConstraintCreate
 }: ConstraintCreatorProps) {
   const [formData, setFormData] = useState<ConstraintFormData>({
     description: '',
-    type: initialCategory,
+    type: 'resource',
     severity: 'medium',
     isActive: true
   });
@@ -99,7 +97,7 @@ export function ConstraintCreator({
       // Reset form and close
       setFormData({
         description: '',
-        type: initialCategory,
+        type: 'resource',
         severity: 'medium',
         isActive: true
       });
@@ -116,7 +114,7 @@ export function ConstraintCreator({
   const handleCancel = () => {
     setFormData({
       description: '',
-      type: initialCategory,
+      type: 'resource',
       severity: 'medium',
       isActive: true
     });

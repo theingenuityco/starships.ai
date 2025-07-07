@@ -8,7 +8,7 @@
  * Future Integration: Aether Cortex + LangGraph + MCP Server
  */
 
-import { Goal, Constraint, GoalFormData, ConstraintFormData } from './types';
+import { Constraint, ConstraintFormData, VisionRefinementFormData } from './types';
 
 // ================================================================================================
 // MCP (Model Context Protocol) Request Structures
@@ -16,7 +16,7 @@ import { Goal, Constraint, GoalFormData, ConstraintFormData } from './types';
 
 export interface MCPRequest {
   id: string;
-  type: 'consciousness_modification' | 'goal_suggestion' | 'constraint_analysis' | 'vision_refinement';
+  type: 'consciousness_modification' | 'constraint_analysis' | 'vision_refinement';
   source: 'langchain_agent' | 'aether_cortex' | 'external_agent';
   timestamp: string;
   starshipId: string;
@@ -30,30 +30,19 @@ export interface MCPRequest {
   };
 }
 
-export type MCPRequestPayload = 
-  | ConsciousnessModificationPayload 
-  | GoalSuggestionPayload 
-  | ConstraintAnalysisPayload 
+export type MCPRequestPayload =
+  | ConsciousnessModificationPayload
+  | ConstraintAnalysisPayload
   | VisionRefinementPayload;
 
 export interface ConsciousnessModificationPayload {
   type: 'consciousness_modification';
   modifications: {
     vision?: { statement: string; reasoning: string };
-    goals?: { action: 'create' | 'update' | 'delete'; data: GoalFormData | Goal; reasoning: string }[];
     constraints?: { action: 'create' | 'update' | 'delete'; data: ConstraintFormData | Constraint; reasoning: string }[];
   };
 }
 
-export interface GoalSuggestionPayload {
-  type: 'goal_suggestion';
-  suggestions: {
-    goal: GoalFormData;
-    reasoning: string;
-    confidence: number;
-    triggers: string[];
-  }[];
-}
 
 export interface ConstraintAnalysisPayload {
   type: 'constraint_analysis';
@@ -83,11 +72,9 @@ export interface VisionRefinementPayload {
 export interface LangchainMemoryContext {
   starshipId: string;
   currentVision: string;
-  activeGoals: Goal[];
   activeConstraints: Constraint[];
   recentChanges: {
     vision?: { previous: string; current: string; timestamp: string };
-    goals?: { action: string; goal: Goal; timestamp: string }[];
     constraints?: { action: string; constraint: Constraint; timestamp: string }[];
   };
   metadata: {
@@ -125,7 +112,7 @@ export interface AgentCapability {
 export interface AgentDefinition {
   id: string;
   name: string;
-  type: 'vision_analyst' | 'goal_planner' | 'constraint_monitor' | 'consciousness_coordinator';
+  type: 'vision_analyst' | 'constraint_monitor' | 'consciousness_coordinator';
   capabilities: AgentCapability[];
   priority: number;
   status: 'active' | 'inactive' | 'training' | 'error';
@@ -251,7 +238,6 @@ export interface UseConsciousnessMonitoringHook {
   // State
   insights: {
     visionClarity: number;
-    goalAlignment: number;
     constraintBalance: number;
     overallHealth: number;
   };
@@ -269,7 +255,7 @@ export interface UseConsciousnessMonitoringHook {
   // Actions
   refreshInsights: () => Promise<void>;
   dismissAlert: (alertId: string) => void;
-  requestAnalysis: (type: 'vision' | 'goals' | 'constraints' | 'overall') => Promise<void>;
+  requestAnalysis: (type: 'vision' | 'constraints' | 'overall') => Promise<void>;
 }
 
 // ================================================================================================
@@ -310,7 +296,6 @@ export const createPlaceholderAIHooks = () => ({
   useConsciousnessMonitoring: (): UseConsciousnessMonitoringHook => ({
     insights: {
       visionClarity: 0,
-      goalAlignment: 0,
       constraintBalance: 0,
       overallHealth: 0,
     },

@@ -27,6 +27,13 @@ const SEVERITY_OPTIONS = [
   { value: 'critical', label: 'Critical', color: 'text-red-600' }
 ] as const;
 
+const TYPE_OPTIONS = [
+  { value: 'resource', label: 'Resource', color: 'text-yellow-600' },
+  { value: 'ethical', label: 'Ethical', color: 'text-blue-600' },
+  { value: 'technical', label: 'Technical', color: 'text-gray-600' },
+  { value: 'business', label: 'Business', color: 'text-green-600' }
+] as const;
+
 const SORT_OPTIONS = [
   { value: 'severity', label: 'Severity' },
   { value: 'createdAt', label: 'Date Created' },
@@ -46,7 +53,9 @@ export function ConstraintList({
   onSortChange,
   onSortOrderChange
 }: ConstraintListProps) {
-  const hasActiveFilters = (filters.severity?.length || 0) > 0 || filters.isActive !== undefined;
+  const hasActiveFilters = (filters.severity?.length || 0) > 0 ||
+                          (filters.type?.length || 0) > 0 ||
+                          filters.isActive !== undefined;
 
   const clearFilters = () => {
     onFiltersChange({});
@@ -61,6 +70,18 @@ export function ConstraintList({
     onFiltersChange({
       ...filters,
       severity: newSeverities.length > 0 ? newSeverities : undefined
+    });
+  };
+
+  const toggleTypeFilter = (type: Constraint['type']) => {
+    const currentTypes = filters.type || [];
+    const newTypes = currentTypes.includes(type)
+      ? currentTypes.filter(t => t !== type)
+      : [...currentTypes, type];
+    
+    onFiltersChange({
+      ...filters,
+      type: newTypes.length > 0 ? newTypes : undefined
     });
   };
 
@@ -109,13 +130,26 @@ export function ConstraintList({
                 Filter
                 {hasActiveFilters && (
                   <span className="ml-1 bg-primary text-primary-foreground rounded-full w-4 h-4 text-xs flex items-center justify-center">
-                    {(filters.severity?.length || 0) + (filters.isActive !== undefined ? 1 : 0)}
+                    {(filters.severity?.length || 0) + (filters.type?.length || 0) + (filters.isActive !== undefined ? 1 : 0)}
                   </span>
                 )}
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-48">
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Type</div>
+              {TYPE_OPTIONS.map((option) => (
+                <DropdownMenuCheckboxItem
+                  key={option.value}
+                  checked={filters.type?.includes(option.value) || false}
+                  onCheckedChange={() => toggleTypeFilter(option.value)}
+                >
+                  <span className={option.color}>{option.label}</span>
+                </DropdownMenuCheckboxItem>
+              ))}
+              
+              <DropdownMenuSeparator />
+              
               <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Severity</div>
               {SEVERITY_OPTIONS.map((option) => (
                 <DropdownMenuCheckboxItem

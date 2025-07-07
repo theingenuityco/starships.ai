@@ -15,7 +15,6 @@ export { LLMRepository } from './repositories/LLMRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { CodexRepository } from './repositories/CodexRepository';
 export { VisionRepository } from './repositories/VisionRepository';
-export { GoalRepository } from './repositories/GoalRepository';
 export { ConstraintRepository } from './repositories/ConstraintRepository';
 export { ConceptRepository } from './repositories/ConceptRepository';
 export { MetaAnchorRepository } from './repositories/MetaAnchorRepository';

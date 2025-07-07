@@ -1,17 +1,4 @@
 // Base types from backend (matching packages/models/src/types.ts)
-export interface Goal {
-  id: string;
-  codexId: string;
-  type: 'short_term' | 'long_term' | 'milestone';
-  description: string;
-  status: 'active' | 'completed' | 'paused' | 'cancelled';
-  priority: number;     // 1-10
-  targetDate?: string;
-  completedAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Constraint {
   id: string;
   codexId: string;
@@ -24,12 +11,6 @@ export interface Constraint {
 }
 
 // Client-side enhanced interfaces
-export interface GoalWithStatus extends Goal {
-  isNew?: boolean;
-  isModified?: boolean;
-  originalValue?: Partial<Goal>;
-}
-
 export interface ConstraintWithSeverity extends Constraint {
   isNew?: boolean;
   isModified?: boolean;
@@ -39,7 +20,7 @@ export interface ConstraintWithSeverity extends Constraint {
 // Maker-Checker Flow Types
 export interface PendingChange {
   id: string;
-  type: 'vision' | 'goal' | 'constraint';
+  type: 'vision' | 'constraint';
   operation: 'create' | 'update' | 'delete';
   target: string; // Entity ID or 'new' for creates
   changes: Record<string, any>; // The actual changes
@@ -61,18 +42,18 @@ export interface ChangeQueue {
 
 // UI State Types
 export interface VisionChamberState {
-  activeTab?: 'vision' | 'goals' | 'constraints' | 'approval';
+  activeTab?: 'vision' | 'constraints' | 'approval';
   isLoading: boolean;
   error?: string;
   expandedSections: Set<string>;
 }
 
-// Goal Creation/Editing Types
-export interface GoalFormData {
-  description: string;
-  type: Goal['type'];
-  priority: number;
-  targetDate?: string;
+// Vision Refinement Types
+export interface VisionRefinementFormData {
+  currentStatement: string;
+  suggestedStatement: string;
+  improvementType: 'clarity' | 'scope' | 'purpose' | 'action';
+  reasoning: string;
 }
 
 export interface ConstraintFormData {
@@ -83,47 +64,30 @@ export interface ConstraintFormData {
 }
 
 // Filter and Sort Types
-export interface GoalFilters {
-  status?: Goal['status'][];
-  type?: Goal['type'][];
-  priority?: { min: number; max: number };
-  hasTargetDate?: boolean;
-}
-
 export interface ConstraintFilters {
   type?: Constraint['type'][];
   severity?: Constraint['severity'][];
   isActive?: boolean;
 }
 
-export type GoalSortBy = 'priority' | 'createdAt' | 'targetDate' | 'description';
 export type ConstraintSortBy = 'severity' | 'type' | 'createdAt' | 'description';
 
 // Auto-Influence System Types
 export interface InfluenceSuggestion {
   id: string;
-  type: 'goal' | 'constraint';
-  source: 'vision_change' | 'goal_completion' | 'agent_observation';
-  suggestion: GoalFormData | ConstraintFormData;
+  type: 'constraint' | 'vision_refinement';
+  source: 'vision_change' | 'constraint_activation' | 'agent_observation';
+  suggestion: ConstraintFormData | VisionRefinementFormData;
   confidence: number; // 0-100
   reasoning: string;
   timestamp: string;
+  triggers: string[]; // Keywords that triggered this suggestion
 }
 
 // Component Props Types
 export interface VisionChamberProviderProps {
   children: React.ReactNode;
   starshipId?: string;
-}
-
-export interface GoalsMatrixProps {
-  className?: string;
-  goals: GoalWithStatus[];
-  onGoalCreate: (data: GoalFormData) => void;
-  onGoalUpdate: (id: string, changes: Partial<Goal>) => void;
-  onGoalDelete: (id: string) => void;
-  loading?: boolean;
-  error?: string;
 }
 
 export interface ConstraintsGridProps {

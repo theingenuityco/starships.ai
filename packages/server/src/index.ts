@@ -6,15 +6,14 @@
 import express from 'express';
 import cors from 'cors';
 import getStore from './store';
-import { 
-  AgentRepository, 
-  UserRepository, 
-  ChannelRepository, 
+import {
+  AgentRepository,
+  UserRepository,
+  ChannelRepository,
   LLMRepository,
   StarshipRepository,
   CodexRepository,
   VisionRepository,
-  GoalRepository,
   ConstraintRepository,
   ConceptRepository,
   MetaAnchorRepository,
@@ -53,7 +52,6 @@ const llmRepository = new LLMRepository();
 const starshipRepository = new StarshipRepository();
 const codexRepository = new CodexRepository();
 const visionRepository = new VisionRepository();
-const goalRepository = new GoalRepository();
 const constraintRepository = new ConstraintRepository();
 const conceptRepository = new ConceptRepository();
 const metaAnchorRepository = new MetaAnchorRepository();

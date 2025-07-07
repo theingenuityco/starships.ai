@@ -190,10 +190,18 @@ router.post('/starships/:id/codex/mutate', authMiddleware, async (req, res) => {
       return;
     }
 
-    // Apply mutations via AetherCoreService
+    // Reject goal mutations - goals functionality removed
+    if (mutations.goals) {
+      res.status(400).json({
+        error: 'Goal mutations no longer supported. Goals functionality has been removed from Vision Chamber.'
+      });
+      return;
+    }
+
+    // Apply mutations via AetherCoreService (vision and constraints only)
     const updatedCodex = await AetherCoreService.mutateCodex(
-      starshipId, 
-      mutations, 
+      starshipId,
+      mutations,
       req.user!.id
     );
 
@@ -222,9 +230,14 @@ router.get('/starships/:id/projection/:lens', authMiddleware, async (req, res) =
     }
 
     const projection = await AetherCoreService.getProjection(
-      starshipId, 
+      starshipId,
       lens as 'telos' | 'ethos' | 'full'
     );
+
+    // Ensure no legacy goal data is returned
+    if (projection && 'goals' in projection) {
+      delete (projection as any).goals;
+    }
 
     res.json({ projection });
   } catch (error) {

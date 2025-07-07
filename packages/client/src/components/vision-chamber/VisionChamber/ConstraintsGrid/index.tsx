@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Filter, RotateCcw } from 'lucide-react';
 import { ConstraintsGridProps, Constraint, ConstraintFilters, ConstraintSortBy } from '../shared/types';
-import { ConstraintCategories } from './ConstraintCategories';
 import { ConstraintList } from './ConstraintList';
 import { ConstraintCreator } from './ConstraintCreator';
 
@@ -19,15 +18,14 @@ export function ConstraintsGrid({
   loading = false,
   error
 }: ConstraintsGridProps) {
-  const [activeCategory, setActiveCategory] = useState<Constraint['type']>('resource');
   const [showCreator, setShowCreator] = useState(false);
   const [filters, setFilters] = useState<ConstraintFilters>({});
   const [sortBy, setSortBy] = useState<ConstraintSortBy>('severity');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  // Filter and sort constraints by active category
+  // Filter and sort all constraints (no category filtering)
   const filteredConstraints = useMemo(() => {
-    let filtered = constraints.filter(constraint => constraint.type === activeCategory);
+    let filtered = [...constraints];
 
     // Apply filters
     if (filters.severity?.length) {
@@ -35,6 +33,9 @@ export function ConstraintsGrid({
     }
     if (filters.isActive !== undefined) {
       filtered = filtered.filter(c => c.isActive === filters.isActive);
+    }
+    if (filters.type?.length) {
+      filtered = filtered.filter(c => filters.type!.includes(c.type));
     }
 
     // Apply sorting
@@ -63,19 +64,19 @@ export function ConstraintsGrid({
     });
 
     return filtered;
-  }, [constraints, activeCategory, filters, sortBy, sortOrder]);
+  }, [constraints, filters, sortBy, sortOrder]);
 
-  // Category statistics
-  const categoryStats = useMemo(() => {
-    const stats = constraints.reduce((acc, constraint) => {
-      if (!acc[constraint.type]) {
-        acc[constraint.type] = { total: 0, active: 0, critical: 0 };
-      }
-      acc[constraint.type].total++;
-      if (constraint.isActive) acc[constraint.type].active++;
-      if (constraint.severity === 'critical') acc[constraint.type].critical++;
-      return acc;
-    }, {} as Record<Constraint['type'], { total: number; active: number; critical: number }>);
+  // Overall statistics
+  const constraintStats = useMemo(() => {
+    const stats = {
+      total: constraints.length,
+      active: constraints.filter(c => c.isActive).length,
+      critical: constraints.filter(c => c.severity === 'critical').length,
+      byType: constraints.reduce((acc, constraint) => {
+        acc[constraint.type] = (acc[constraint.type] || 0) + 1;
+        return acc;
+      }, {} as Record<Constraint['type'], number>)
+    };
 
     return stats;
   }, [constraints]);
@@ -102,7 +103,24 @@ export function ConstraintsGrid({
     <Card className={`${className}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-medium">Constraints Grid</CardTitle>
+          <div>
+            <CardTitle className="text-lg font-medium">Constraints Grid</CardTitle>
+            {constraintStats.total > 0 && (
+              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                <span>{constraintStats.total} total</span>
+                <span className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  {constraintStats.active} active
+                </span>
+                {constraintStats.critical > 0 && (
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                    {constraintStats.critical} critical
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
               <Button
@@ -127,13 +145,6 @@ export function ConstraintsGrid({
             </Button>
           </div>
         </div>
-        
-        {/* Category Navigation */}
-        <ConstraintCategories
-          activeCategory={activeCategory}
-          onCategoryChange={setActiveCategory}
-          categoryStats={categoryStats}
-        />
       </CardHeader>
       
       <CardContent className="pt-0">
@@ -154,7 +165,12 @@ export function ConstraintsGrid({
         {/* Empty State */}
         {filteredConstraints.length === 0 && !loading && (
           <div className="text-center py-8 text-muted-foreground">
-            <div className="text-sm">No constraints found for {activeCategory} category</div>
+            <div className="text-sm">
+              {constraints.length === 0
+                ? "No constraints defined yet"
+                : "No constraints match current filters"
+              }
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -162,7 +178,7 @@ export function ConstraintsGrid({
               className="mt-2"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add your first {activeCategory} constraint
+              {constraints.length === 0 ? "Add your first constraint" : "Add new constraint"}
             </Button>
           </div>
         )}
@@ -174,7 +190,6 @@ export function ConstraintsGrid({
           isOpen={showCreator}
           onClose={() => setShowCreator(false)}
           onConstraintCreate={onConstraintCreate}
-          initialCategory={activeCategory}
         />
       )}
     </Card>

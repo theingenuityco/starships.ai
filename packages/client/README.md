@@ -1,6 +1,6 @@
 # Starships AI - Client
 
-A modern React-based chat interface for interacting with AI agents, built with Next.js 15, TypeScript, and shadcn/ui.
+A modern React-based starship mission control interface with clean navigation architecture and sophisticated consciousness planning tools, built with Next.js 15, TypeScript, and shadcn/ui.
 
 ## 🚀 Quick Start
 
@@ -23,40 +23,56 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript 5.8+
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **State**: React hooks + localStorage persistence
-- **HTTP Client**: Axios with automatic retry
+- **State Management**: Zustand with sophisticated starship store
+- **Animations**: Framer Motion for smooth transitions
 - **Theme**: next-themes for dark/light mode
-- **Date**: date-fns for smart timestamps
+- **Authentication**: Kinde integration
 
 ### Key Features
-- ✅ **Stateless Backend Integration**: Direct `/v1/chat` API calls
-- ✅ **Client-side Persistence**: Chat history stored locally per agent
-- ✅ **Modern UI**: shadcn/ui components with dark/light mode
-- ✅ **Smart Timestamps**: Relative time with date-fns ("2 minutes ago")
-- ✅ **Loading States**: Individual message sending indicators
+- ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components
+- ✅ **Vision Chamber Integration**: Full-screen consciousness planning with auto-influence engine
+- ✅ **Command Deck**: Mission control dashboard (placeholder for future expansion)
+- ✅ **Responsive Design**: Mobile-first with adaptive layouts
+- ✅ **Modern UI**: shadcn/ui components with glassmorphism effects
 - ✅ **Type Safety**: Full TypeScript with strict mode
-- ✅ **i18n Ready**: All text in constants for internationalization
+- ✅ **State Persistence**: Store integration maintains state across navigation
 
 ## 📁 Project Structure
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── layout.tsx         # Root layout with theme provider
-│   └── page.tsx           # Main chat interface
+├── app/                          # Next.js App Router
+│   ├── client-layout.tsx        # Main layout with navigation sidebar
+│   ├── command-deck/page.tsx    # Command Deck dashboard page
+│   ├── vision-chamber/page.tsx  # Vision Chamber full-screen page
+│   ├── crew/page.tsx            # Crew management page
+│   ├── drive/page.tsx           # Starship drive systems page
+│   ├── expeditions/page.tsx     # Expeditions management page
+│   ├── logbook/page.tsx         # Mission logbook page
+│   └── sibil/page.tsx           # AI assistant page
 ├── components/
-│   ├── agents/            # Agent selection components
-│   ├── chat/              # Chat interface components
-│   ├── ui/                # shadcn/ui components
-│   ├── theme-provider.tsx # Theme system provider
-│   └── theme-toggle.tsx   # Dark/light mode toggle
-├── constants/
-│   └── text.ts            # UI text constants (i18n ready)
-├── lib/
-│   ├── api.ts             # Backend API client
-│   ├── storage.ts         # localStorage utilities
-│   └── utils.ts           # Utilities + date formatting
-└── .env.example           # Environment configuration
+│   ├── navigation/              # Clean navigation system
+│   │   ├── Navigation.tsx       # Main navigation component
+│   │   ├── NavigationSection.tsx # Section groupings component
+│   │   ├── NavigationItem.tsx   # Individual nav items component
+│   │   └── StarshipSelector.tsx # Starship selection dropdown
+│   ├── consciousness/           # Vision Chamber implementation
+│   │   └── VisionChamber/       # 1,500+ lines sophisticated implementation
+│   │       ├── index.tsx        # Main Vision Chamber component
+│   │       ├── VisionCore/      # Core vision management
+│   │       ├── GoalsMatrix/     # Goals CRUD interface
+│   │       ├── ConstraintsGrid/ # Constraints management
+│   │       └── shared/          # Auto-influence engine & types
+│   ├── command-deck/            # Command Deck functionality
+│   │   ├── dashboard/           # Dashboard modules
+│   │   └── modules/             # Quick action modules
+│   ├── auth/                    # Authentication components
+│   ├── ui/                      # shadcn/ui components
+│   └── theme-provider.tsx       # Theme system provider
+├── store/
+│   └── starship-store.ts        # Zustand store (556 lines)
+├── hooks/                       # Custom React hooks
+└── lib/                         # Utilities and configurations
 ```
 
 ## 🔧 Development
@@ -93,45 +109,63 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - CSS custom properties for consistent theming
 - Smooth transitions between themes
 
-## 🔌 API Integration
+## 🧭 Navigation Architecture (Recently Cleaned)
 
-### Backend Communication
-```typescript
-// Client sends (camelCase)
-{
-  agentId: "agent-123",
-  userId: "user-1", 
-  sessionId: "agent-123:user-1",
-  message: "Hello"
-}
-
-// Backend receives (snake_case)
-{
-  agent_id: "agent-123",
-  user_id: "user-1",
-  channel_id: "agent-123:user-1",
-  message: "Hello"
-}
+### Before: Spaghetti Architecture
+```
+❌ src/components/command-deck/
+├── NavigationBridge.tsx           # Unnecessary wrapper
+├── CommandDeckNavigation.tsx      # Unnecessary wrapper
+├── modules/NavigationModule.tsx   # Navigation mixed in wrong folder
+└── StarshipSelector.tsx           # Navigation concern in command-deck
 ```
 
-### Endpoints Used
-- `GET /api/agents` → `GET /v1/agents` (fetch agents)
-- `POST /api/chat` → `POST /v1/chat` (send message)
-- `DELETE /api/chat/:sessionId/memory` → `DELETE /v1/chat/:sessionKey/memory` (clear history)
+### After: Clean Separation
+```
+✅ src/components/navigation/       # Dedicated navigation folder
+├── Navigation.tsx                 # Main navigation component
+├── NavigationSection.tsx         # Section groupings
+├── NavigationItem.tsx            # Individual nav items
+└── StarshipSelector.tsx          # Moved to correct location
+
+✅ src/components/command-deck/    # Pure command deck functionality
+├── dashboard/                    # Dashboard modules
+└── modules/                      # Quick action modules
+```
+
+### Route Structure
+- **Command Deck**: `/command-deck` - Mission control dashboard
+- **Vision Chamber**: `/vision-chamber` - Consciousness planning (replaces `/core`)
+- **Core Systems**: `/crew`, `/drive` - Starship management
+- **Operations**: `/expeditions`, `/logbook`, `/sibil` - Mission operations
+
+## 🧠 Vision Chamber Integration
+
+### Features
+- **Auto-Influence Engine**: 342-line pattern matching system for intelligent suggestions
+- **Goals Matrix**: Full CRUD interface for mission objectives
+- **Constraints Grid**: Category-based constraint management
+- **Maker-Checker Flow**: Change management and approval workflows
+- **Real-time Suggestions**: Context-aware recommendations based on vision changes
+
+### State Management
+- **Zustand Store**: 556-line sophisticated state management
+- **Persistence**: State maintained across navigation changes
+- **Auto-Sync**: Real-time updates between components
 
 ## 💾 Data Persistence
 
-### Chat History
-- **Storage**: localStorage per browser
-- **Key Format**: `starships-chat-agent-{agentId}:user-{userId}`
-- **Persistence**: Survives browser refresh, cleared on logout
-- **Cross-tab**: Shared across browser tabs
+### Vision & Goals
+- **Storage**: Zustand store with persistence
+- **Components**: Vision statements, goals, constraints
+- **Auto-influence**: Suggestion engine with pattern matching
+- **State Sync**: Maintained across route navigation
 
-### Session Management
-- **Session ID**: `agent-{agentId}:user-{userId}`
-- **Creation**: Automatic when selecting agent
-- **Switching**: New session per agent
-- **Cleanup**: Manual via clear chat button
+### Starship Management
+- **Starship Selection**: Multi-starship support with status tracking
+- **Power Management**: Real-time power level monitoring
+- **Expedition Tracking**: Active expedition counting
+- **Insights**: AI-generated insights and recommendations
 
 ## 🧪 Testing
 

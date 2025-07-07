@@ -84,6 +84,62 @@ export interface SyncedUser {
   createdAt: string
 }
 
+// NEW: Starship interfaces
+export interface Starship {
+  id: string
+  name: string
+  class: 'scout' | 'cruiser'
+  powerLevel: number
+  ownerId: string
+  status: 'active' | 'docked' | 'maintenance'
+  maxAgents: number
+  activeExpeditions: number
+  sibilInsights: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Codex {
+  id: string
+  starshipId: string
+  version: string
+  timestamp: string
+  author: string
+  changeSummary: string
+  isActive: boolean
+}
+
+export interface Vision {
+  id: string
+  codexId: string
+  statement: string
+  confidence: number
+  lastRefined: string
+  refinementCount: number
+  updatedAt: string
+}
+
+export interface CodexProjection {
+  vision?: string
+  goals?: Array<{
+    id: string
+    description: string
+    type: 'short_term' | 'long_term' | 'milestone'
+    status: string
+  }>
+  constraints?: Array<{
+    id: string
+    description: string
+    type: 'resource' | 'ethical' | 'technical' | 'business'
+    isActive: boolean
+  }>
+  concepts?: Array<{
+    id: string
+    description: string
+    category: string
+  }>
+}
+
 // Backend request/response types (snake_case)
 interface ChatBackendRequest {
   agent_id: string
@@ -120,17 +176,17 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
 // API functions
 export const agentAPI = {
   getAll: (): Promise<Agent[]> => 
-    api.get('/v1/agents').then((res: AxiosResponse<Agent[]>) => res.data),
+    api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data),
   
   getById: (id: string): Promise<Agent> =>
-    api.get(`/v1/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data),
+    api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data),
 }
 
 export const chatAPI = {
-  // Send message directly to /v1/chat endpoint
+  // Send message directly to /api/chat endpoint
   sendMessage: async (request: ChatRequest): Promise<Message> => {
     const backendRequest = toBackendRequest(request)
-    const response = await api.post('/v1/chat', backendRequest)
+    const response = await api.post('/api/chat', backendRequest)
     const backendResponse = response.data as ChatBackendResponse
     
     // Convert backend response to client Message format
@@ -145,8 +201,47 @@ export const chatAPI = {
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>
-    api.delete(`/v1/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
+    api.delete(`/api/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
 }
+
+// NEW: Starship API
+export const starshipAPI = {
+  // Get user's starships
+  getUserStarships: (): Promise<{ starships: Starship[] }> =>
+    api.get('/api/starships').then(res => res.data),
+
+  // Create new starship
+  createStarship: (data: { name: string; class: 'scout' | 'cruiser' }): Promise<{ starship: Starship; codex: Codex }> =>
+    api.post('/api/starships', data).then(res => res.data),
+
+  // Get starship details
+  getStarship: (id: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
+    api.get(`/api/starships/${id}`).then(res => res.data),
+
+  // Deploy agent to starship
+  deployAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
+    api.post(`/api/starships/${starshipId}/agents/${agentId}/deploy`).then(res => res.data),
+
+  // Remove agent from starship
+  removeAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
+    api.delete(`/api/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
+
+  // Get active codex for starship
+  getCodex: (starshipId: string): Promise<{ codex: any }> =>
+    api.get(`/api/starships/${starshipId}/codex`).then(res => res.data),
+
+  // Update codex with mutations
+  updateCodex: (starshipId: string, mutations: {
+    vision?: { statement: string };
+    goals?: Array<{ description: string; type: 'short_term' | 'long_term' | 'milestone' }>;
+    constraints?: Array<{ description: string; type: 'resource' | 'ethical' | 'technical' | 'business' }>;
+  }): Promise<{ codex: Codex }> =>
+    api.post(`/api/starships/${starshipId}/codex/mutate`, { mutations }).then(res => res.data),
+
+  // Get projection for specific lens
+  getProjection: (starshipId: string, lens: 'telos' | 'ethos' | 'full'): Promise<{ projection: CodexProjection }> =>
+    api.get(`/api/starships/${starshipId}/projection/${lens}`).then(res => res.data)
+};
 
 export const userAPI = {
   // Sync Kinde user to backend database
@@ -156,17 +251,17 @@ export const userAPI = {
     name?: string
     avatar?: string
   }): Promise<SyncedUser> => {
-    const response = await api.post('/v1/users/sync', userData)
+    const response = await api.post('/api/users/sync', userData)
     return response.data as SyncedUser
   },
 
   // Get user by ID
   getById: (id: string): Promise<SyncedUser> =>
-    api.get(`/v1/users/${id}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+    api.get(`/api/users/${id}`).then((res: AxiosResponse<SyncedUser>) => res.data),
 
   // Get user by Kinde ID
   getByKindeId: (kindeId: string): Promise<SyncedUser> =>
-    api.get(`/v1/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+    api.get(`/api/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
 }
 
 // Utility function for generating client-side IDs

@@ -2,14 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from '../services/UserService';
 
-// Extend Request type to include user info
-declare module 'express' {
-  interface Request {
-    user?: any;
-    kindeId?: string;
-  }
-}
-
 // Kinde JWKS endpoint for token verification
 const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
 const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));

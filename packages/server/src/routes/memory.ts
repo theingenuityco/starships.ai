@@ -1,9 +1,10 @@
 import { Router } from "express";
+import type { Request, Response } from "express";
 import getStore from "../store";
 
 const router: Router = Router();
 
-router.post("/reset", async (req, res) => {
+router.post("/reset", async (req: Request, res: Response) => {
   const { agent_id, user_id, channel_id } = req.body as {
     agent_id: string;
     user_id: string;

@@ -10,10 +10,10 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@langchain/anthropic": "^0.3.23",
-    "@langchain/community": "^0.3.47",
-    "@langchain/core": "^0.3.61",
-    "@langchain/openai": "^0.5.15",
+    "@langchain/anthropic": "^0.3.24",
+    "@langchain/community": "^0.3.48",
+    "@langchain/core": "^0.3.62",
+    "@langchain/openai": "^0.5.18",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",
     "faiss-node": "^0.5.1",
@@ -22,6 +22,6 @@
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",
-    "tsx": "^4.7.0"
+    "tsx": "^4.20.3"
   }
 }

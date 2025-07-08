@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { ServerEnvironmentConfig, ClientEnvironmentConfig, EnvironmentConfig, EnvironmentValidationError } from './types';
+import { ServerEnvironmentConfig, EnvironmentValidationError } from './types';
 
 // Load environment variables from the root .env file
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
@@ -21,6 +21,7 @@ function validateRequired(variables: Record<string, any>, required: string[]): v
 
 /**
  * Parses and validates server environment configuration
+ * This function should only be called in Node.js environments
  */
 export function loadServerEnvironment(): ServerEnvironmentConfig {
   const env = {
@@ -83,24 +84,3 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
 
   return env;
 }
-
-/**
- * Parses and validates client environment configuration
- */
-export function loadClientEnvironment(): ClientEnvironmentConfig {
-  const env = {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-  };
-
-  return env;
-}
-
-/**
- * Loads complete environment configuration
- */
-export function loadEnvironment(): EnvironmentConfig {
-  return {
-    ...loadServerEnvironment(),
-    ...loadClientEnvironment(),
-  };
-} 

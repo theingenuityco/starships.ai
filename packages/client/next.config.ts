@@ -1,12 +1,11 @@
-// Use centralized environment configuration
-const { getServerConfig, getClientConfig } = require('@starships/env-config');
+import type { NextConfig } from 'next'
+import { getServerConfig, getClientConfig } from '@starships/env-config'
 
 // Load environment configuration using our centralized package
-const serverEnv = getServerConfig();
-const clientEnv = getClientConfig();
+const serverEnv = getServerConfig()
+const clientEnv = getClientConfig()
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
@@ -32,4 +31,4 @@ const nextConfig = {
   }
 }
 
-module.exports = nextConfig 
+export default nextConfig

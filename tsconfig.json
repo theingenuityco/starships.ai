@@ -11,9 +11,11 @@
   },
   "exclude": ["node_modules"],
   "references": [
-    { "path": "./packages/server" },
     { "path": "./packages/protocol" },
+    { "path": "./packages/env-config" },
+    { "path": "./packages/models" },
     { "path": "./packages/agent-engine" },
-    { "path": "./packages/models" }
+    { "path": "./packages/server" },
+    { "path": "./packages/client" }
   ]
 } 

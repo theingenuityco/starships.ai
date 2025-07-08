@@ -1,11 +1,8 @@
-// Neo4j Node Types
-export interface Agent {
-  id: string;
-  name: string;
-  model: string;
-  systemPrompt?: string;
-  createdAt: string;
-}
+// Import Agent from protocol to avoid circular dependency
+import { Agent } from '@starships/protocol';
+
+// Re-export Agent for backward compatibility
+export { Agent };
 
 export interface LLM {
   id: string;
@@ -41,13 +38,13 @@ export interface Channel {
 // NEW: Aether Core Entities
 export interface Starship {
   id: string;
-  ownerId: string;  // Foreign key to User
+  ownerId: string; // Foreign key to User
   class: 'scout' | 'cruiser';
   name: string;
   powerLevel: number;
   activeExpeditions: number;
   sibilInsights: number;
-  maxAgents: number;  // Based on class: Scout=3, Cruiser=6
+  maxAgents: number; // Based on class: Scout=3, Cruiser=6
   status: 'active' | 'docked' | 'maintenance';
   createdAt: string;
   updatedAt: string;
@@ -55,12 +52,12 @@ export interface Starship {
 
 export interface Codex {
   id: string;
-  starshipId: string;  // Foreign key to Starship
-  version: string;     // Semantic versioning (v1.0, v1.1, etc.)
+  starshipId: string; // Foreign key to Starship
+  version: string; // Semantic versioning (v1.0, v1.1, etc.)
   timestamp: string;
-  author: string;      // user_id or agent_id who made the change
+  author: string; // user_id or agent_id who made the change
   changeSummary?: string;
-  isActive: boolean;   // Only one active version per starship
+  isActive: boolean; // Only one active version per starship
   createdAt: string;
 }
 
@@ -68,13 +65,12 @@ export interface Vision {
   id: string;
   codexId: string;
   statement: string;
-  confidence: number;   // 0-100
+  confidence: number; // 0-100
   lastRefined: string;
   refinementCount: number;
   createdAt: string;
   updatedAt: string;
 }
-
 
 export interface Constraint {
   id: string;
@@ -93,8 +89,8 @@ export interface Concept {
   name: string;
   description: string;
   category: 'person' | 'place' | 'object' | 'idea' | 'event';
-  importance: number;   // 0-1 relevance score
-  metadata: Record<string, any>;  // Flexible key-value storage
+  importance: number; // 0-1 relevance score
+  metadata: Record<string, any>; // Flexible key-value storage
   createdAt: string;
   updatedAt: string;
 }
@@ -166,6 +162,26 @@ export interface AgentRepository extends Repository<Agent> {
   findByChannel(channelId: string): Promise<Agent[]>;
   findByUser(userId: string): Promise<Agent[]>;
   findByStarship(starshipId: string): Promise<Agent[]>;
+
+  // ADD: Enhanced query methods
+  findByAuthor(authorId: string): Promise<Agent[]>;
+  findByCategory(category: string): Promise<Agent[]>;
+  findByTags(tags: string[]): Promise<Agent[]>;
+  findPublic(limit?: number, offset?: number): Promise<Agent[]>;
+  searchAgents(query: string): Promise<Agent[]>;
+
+  // ADD: Marketplace features
+  incrementUsageCount(id: string): Promise<void>;
+  updateRating(id: string, rating: number): Promise<void>;
+
+  // ADD: Advanced filtering
+  findWithFilters(filters: {
+    category?: string;
+    tags?: string[];
+    isPublic?: boolean;
+    authorId?: string;
+    starshipClass?: 'scout' | 'cruiser';
+  }): Promise<Agent[]>;
 }
 
 export interface UserRepository extends Repository<User> {
@@ -214,7 +230,6 @@ export interface VisionRepository {
   updateStatement(codexId: string, statement: string): Promise<Vision | null>;
 }
 
-
 export interface ConstraintRepository extends Repository<Constraint> {
   findByCodex(codexId: string): Promise<Constraint[]>;
   findActive(codexId: string): Promise<Constraint[]>;
@@ -244,4 +259,4 @@ export interface UserInteractionRelationship {
   agentId: string;
   lastInteraction: string;
   messageCount: number;
-} 
+}

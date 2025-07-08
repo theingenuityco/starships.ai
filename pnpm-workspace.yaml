@@ -1,2 +1,12 @@
 packages:
-  - "packages/*" 
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@tailwindcss/oxide'
+  - cpu-features
+  - esbuild
+  - faiss-node
+  - protobufjs
+  - sharp
+  - ssh2
+  - unrs-resolver

@@ -3,7 +3,14 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "composite": true
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": ["src"]
-} 
+  "include": ["src"],
+  "references": [
+    { "path": "../protocol" },
+    { "path": "../models" }
+  ]
+}

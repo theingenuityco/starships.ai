@@ -32,7 +32,7 @@ export class VisionRepository implements VisionRepositoryInterface {
     return result[0]?.v || null;
   }
 
-  async create(entity: Omit<Vision, 'id' | 'createdAt'>): Promise<Vision> {
+  async create(entity: Omit<Vision, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vision> {
     const connection = getConnection();
     const vision: Vision = {
       ...entity,

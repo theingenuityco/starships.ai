@@ -112,4 +112,20 @@ export class RepositoryFactory {
     }
     return this.metaAnchorRepo;
   }
-} 
+
+  /**
+   * Reset all repository instances - useful for testing
+   */
+  static resetAll(): void {
+    this.agentRepo = null as any;
+    this.userRepo = null as any;
+    this.channelRepo = null as any;
+    this.llmRepo = null as any;
+    this.starshipRepo = null as any;
+    this.codexRepo = null as any;
+    this.visionRepo = null as any;
+    this.constraintRepo = null as any;
+    this.conceptRepo = null as any;
+    this.metaAnchorRepo = null as any;
+  }
+}

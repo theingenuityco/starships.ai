@@ -29,9 +29,7 @@ export class AetherCoreService {
       powerLevel: 85,
       activeExpeditions: 0,
       sibilInsights: 0,
-      maxAgents: starshipData.class === 'scout' ? 3 : 6,
-      status: 'active',
-      updatedAt: new Date().toISOString()
+      status: 'active'
     });
 
     // Create initial codex
@@ -50,8 +48,7 @@ export class AetherCoreService {
       statement: '',
       confidence: 0,
       lastRefined: new Date().toISOString(),
-      refinementCount: 0,
-      updatedAt: new Date().toISOString()
+      refinementCount: 0
     });
 
     return { starship, codex };
@@ -110,8 +107,7 @@ export class AetherCoreService {
         statement: mutations.vision.statement,
         confidence: Math.min(100, mutations.vision.statement.length * 2),
         lastRefined: new Date().toISOString(),
-        refinementCount: 0,
-        updatedAt: new Date().toISOString()
+        refinementCount: 0
       });
     }
 

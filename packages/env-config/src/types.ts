@@ -25,7 +25,7 @@ export interface ServerEnvironmentConfig {
   ANTHROPIC_API_KEY?: string;
   
   // Default Model Configuration
-  DEFAULT_LLM_PROVIDER: 'openai' | 'anthropic';
+  DEFAULT_LLM_PROVIDER: 'openai' | 'anthropic' | '';
   DEFAULT_CHAT_MODEL: string;
   DEFAULT_EMBEDDING_MODEL: string;
   DEFAULT_MODEL_ID: string;

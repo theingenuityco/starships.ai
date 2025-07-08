@@ -1,21 +1,24 @@
 import { Router } from "express";
 import { chat as agentChat } from "@starships/agent-engine";
 import type { ChatRequest } from "@starships/protocol";
+import type { Request, Response } from "express";
 import getStore from "../store";
 import { authMiddleware } from "../middleware/auth";
 
 const router: Router = Router();
 
 // Validation middleware for chat requests
-const validateChatRequest = (req: any, res: any, next: any) => {
+const validateChatRequest = (req: Request, res: Response, next: any) => {
   const { agent_id, message } = req.body;
   
   if (!agent_id || typeof agent_id !== 'string') {
-    return res.status(400).json({ error: 'agent_id is required and must be a string' });
+    res.status(400).json({ error: 'agent_id is required and must be a string' });
+    return;
   }
   
   if (!message || typeof message !== 'string') {
-    return res.status(400).json({ error: 'message is required and must be a string' });
+    res.status(400).json({ error: 'message is required and must be a string' });
+    return;
   }
   
   // Note: user_id is now derived from the authenticated user (req.user)
@@ -29,13 +32,13 @@ router.post("/", authMiddleware, validateChatRequest, async (req, res) => {
     // Build chat request using authenticated user ID from middleware
     const chatRequest: ChatRequest = {
       agent_id: req.body.agent_id,
-      user_id: req.user.id, // Use authenticated user ID, not client-provided
+      user_id: req.user!.id, // Use authenticated user ID, not client-provided
       message: req.body.message,
       channel_id: req.body.channel_id,
       stream: false
     };
     
-    console.log(`[CHAT] Processing message for authenticated user: ${req.user.id}`);
+    console.log(`[CHAT] Processing message for authenticated user: ${req.user!.id}`);
     
     const store = getStore();
     const result = await agentChat(chatRequest, store);
@@ -48,12 +51,13 @@ router.post("/", authMiddleware, validateChatRequest, async (req, res) => {
 });
 
 // DELETE endpoint for memory management
-router.delete("/:sessionKey/memory", authMiddleware, async (req: any, res: any) => {
+router.delete("/:sessionKey/memory", authMiddleware, async (req, res) => {
   try {
     const { sessionKey } = req.params;
     
     if (!sessionKey) {
-      return res.status(400).json({ error: 'sessionKey is required' });
+      res.status(400).json({ error: 'sessionKey is required' });
+      return;
     }
     
     const store = getStore();

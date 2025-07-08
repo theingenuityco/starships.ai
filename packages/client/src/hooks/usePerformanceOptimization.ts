@@ -29,7 +29,7 @@ export function usePerformanceOptimization(options: PerformanceOptimizationOptio
   });
 
   const frameTimesRef = useRef<number[]>([]);
-  const animationFrameRef = useRef<number>();
+  const animationFrameRef = useRef<number | undefined>(undefined);
   const isMonitoringRef = useRef(false);
 
   // Frame rate monitoring

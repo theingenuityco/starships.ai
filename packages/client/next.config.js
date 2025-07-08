@@ -1,5 +1,5 @@
 // Use centralized environment configuration
-const { getServerConfig, getClientConfig } = require('@starships/env-config/dist');
+const { getServerConfig, getClientConfig } = require('@starships/env-config');
 
 // Load environment configuration using our centralized package
 const serverEnv = getServerConfig();

@@ -52,28 +52,33 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     KINDE_DEBUG_MODE: process.env.KINDE_DEBUG_MODE === 'true',
   };
 
-  // Validate based on provider choice
-  if (env.DEFAULT_LLM_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
-    throw new EnvironmentValidationError(
-      'OPENAI_API_KEY is required when DEFAULT_LLM_PROVIDER is openai',
-      ['OPENAI_API_KEY']
-    );
-  }
+  // Skip validation during linting or when NODE_ENV is not set
+  const isLinting = process.env.NODE_ENV === undefined || process.env.npm_lifecycle_event === 'lint';
+  
+  if (!isLinting) {
+    // Validate based on provider choice
+    if (env.DEFAULT_LLM_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
+      throw new EnvironmentValidationError(
+        'OPENAI_API_KEY is required when DEFAULT_LLM_PROVIDER is openai',
+        ['OPENAI_API_KEY']
+      );
+    }
 
-  if (env.DEFAULT_LLM_PROVIDER === 'anthropic' && !env.ANTHROPIC_API_KEY) {
-    throw new EnvironmentValidationError(
-      'ANTHROPIC_API_KEY is required when DEFAULT_LLM_PROVIDER is anthropic',
-      ['ANTHROPIC_API_KEY']
-    );
-  }
+    if (env.DEFAULT_LLM_PROVIDER === 'anthropic' && !env.ANTHROPIC_API_KEY) {
+      throw new EnvironmentValidationError(
+        'ANTHROPIC_API_KEY is required when DEFAULT_LLM_PROVIDER is anthropic',
+        ['ANTHROPIC_API_KEY']
+      );
+    }
 
-  // Validate required Kinde variables in production
-  if (process.env.NODE_ENV === 'production') {
-    validateRequired(env, [
-      'KINDE_CLIENT_ID',
-      'KINDE_CLIENT_SECRET', 
-      'KINDE_ISSUER_URL'
-    ]);
+    // Validate required Kinde variables in production
+    if (process.env.NODE_ENV === 'production') {
+      validateRequired(env, [
+        'KINDE_CLIENT_ID',
+        'KINDE_CLIENT_SECRET',
+        'KINDE_ISSUER_URL'
+      ]);
+    }
   }
 
   return env;

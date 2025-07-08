@@ -32,7 +32,7 @@ export class StarshipRepository implements StarshipRepositoryInterface {
     return result.map(record => record.s);
   }
 
-  async create(entity: Omit<Starship, 'id' | 'createdAt'>): Promise<Starship> {
+  async create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt'>): Promise<Starship> {
     const connection = getConnection();
     
     // Set maxAgents based on class

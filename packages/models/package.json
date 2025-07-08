@@ -7,7 +7,13 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test": "pnpm run test:unit && pnpm run test:integration",
+    "test:unit": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:service": "jest --testPathIgnorePatterns=integration"
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",
@@ -16,6 +22,13 @@
   },
   "devDependencies": {
     "@types/uuid": "^10.0.0",
-    "tsx": "^4.7.0"
+    "tsx": "^4.7.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.5",
+    "ts-jest": "^29.1.1",
+    "jest-environment-node": "^29.7.0",
+    "testcontainers": "^11.2.1",
+    "@testcontainers/neo4j": "^11.2.1",
+    "@types/node": "^20.9.1"
   }
 } 

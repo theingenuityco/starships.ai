@@ -15,6 +15,26 @@ const nextConfig: NextConfig = {
       }
     ]
   },
+  webpack: (config, { isServer }) => {
+    // Prevent Node.js modules from being bundled in the browser
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        os: false,
+        crypto: false,
+        stream: false,
+        assert: false,
+        http: false,
+        https: false,
+        url: false,
+        zlib: false,
+        dotenv: false, // Prevent dotenv from client bundle
+      };
+    }
+    return config;
+  },
   env: {
     // Kinde environment variables with dynamic defaults for deployment
     KINDE_CLIENT_ID: serverEnv.KINDE_CLIENT_ID,

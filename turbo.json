@@ -1,19 +1,87 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "NODE_ENV",
+    "KINDE_CLIENT_ID",
+    "KINDE_CLIENT_SECRET",
+    "KINDE_ISSUER_URL",
+    "KINDE_SITE_URL",
+    "KINDE_POST_LOGOUT_REDIRECT_URL",
+    "KINDE_POST_LOGIN_REDIRECT_URL",
+    "NEO4J_URI",
+    "NEO4J_USERNAME",
+    "NEO4J_PASSWORD"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
-    },
-    "lint": {
-      "outputs": []
-    },
-    "test": {
-      "outputs": ["coverage/**"]
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**", ".next/**", "build/**"]
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["build"]
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "lint:fix": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
+    },
+    "format": {
+      "inputs": ["$TURBO_DEFAULT$", ".prettierrc*", "prettier.config.*"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "jest.*.config.*"],
+      "outputs": ["coverage/**", "test-results/**"]
+    },
+    "test:unit": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "jest.config.*"],
+      "outputs": ["coverage/**"]
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "jest.integration.config.*"],
+      "outputs": ["coverage/**"],
+      "env": ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD"]
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["^build"]
+    },
+    "test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "jest.config.*"],
+      "outputs": ["coverage/**"]
+    },
+    "test:service": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "jest.config.*"],
+      "outputs": ["coverage/**"]
+    },
+    "clean": {
+      "cache": false,
+      "outputs": []
     }
   }
 }

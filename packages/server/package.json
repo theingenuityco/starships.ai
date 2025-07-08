@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "jest --runInBand --coverage",
-    "lint": "eslint src --ext .ts"
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs"
   },
   "dependencies": {
     "@starships/agent-engine": "workspace:*",

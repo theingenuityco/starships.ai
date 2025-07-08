@@ -3,12 +3,10 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from '../services/UserService';
 
 // Extend Request type to include user info
-declare global {
-  namespace Express {
-    interface Request {
-      user?: any;
-      kindeId?: string;
-    }
+declare module 'express' {
+  interface Request {
+    user?: any;
+    kindeId?: string;
   }
 }
 

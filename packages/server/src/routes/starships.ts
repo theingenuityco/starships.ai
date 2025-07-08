@@ -3,6 +3,7 @@
  */
 
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type { StarshipRepository, AgentRepository, CodexRepository } from '@starships/models';
 import { AetherCoreService } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
@@ -26,7 +27,7 @@ export function initializeStarshipRoutes(deps: {
 }
 
 // GET /starships - Get user's starships
-router.get('/starships', authMiddleware, async (req, res) => {
+router.get('/starships', authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const starships = await starshipRepo.findByOwner(userId);
@@ -38,7 +39,7 @@ router.get('/starships', authMiddleware, async (req, res) => {
 });
 
 // POST /starships - Create new starship
-router.post('/starships', authMiddleware, async (req, res) => {
+router.post('/starships', authMiddleware, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const { name, class: starshipClass } = req.body;
@@ -62,7 +63,7 @@ router.post('/starships', authMiddleware, async (req, res) => {
 });
 
 // GET /starships/:id - Get specific starship
-router.get('/starships/:id', authMiddleware, async (req, res) => {
+router.get('/starships/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const starshipId = req.params.id;
     const starship = await starshipRepo.findById(starshipId);
@@ -90,7 +91,7 @@ router.get('/starships/:id', authMiddleware, async (req, res) => {
 });
 
 // POST /starships/:id/agents/:agentId/deploy - Deploy agent to starship
-router.post('/starships/:id/agents/:agentId/deploy', authMiddleware, async (req, res) => {
+router.post('/starships/:id/agents/:agentId/deploy', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id: starshipId, agentId } = req.params;
     
@@ -131,7 +132,7 @@ router.post('/starships/:id/agents/:agentId/deploy', authMiddleware, async (req,
 });
 
 // DELETE /starships/:id/agents/:agentId - Remove agent from starship
-router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req, res) => {
+router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id: starshipId, agentId } = req.params;
     
@@ -158,7 +159,7 @@ router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req, res)
 });
 
 // GET /starships/:id/codex - Get active codex
-router.get('/starships/:id/codex', authMiddleware, async (req, res) => {
+router.get('/starships/:id/codex', authMiddleware, async (req: Request, res: Response) => {
   try {
     const starshipId = req.params.id;
     
@@ -178,7 +179,7 @@ router.get('/starships/:id/codex', authMiddleware, async (req, res) => {
 });
 
 // NEW: POST /starships/:id/codex/mutate - Update codex with versioning
-router.post('/starships/:id/codex/mutate', authMiddleware, async (req, res) => {
+router.post('/starships/:id/codex/mutate', authMiddleware, async (req: Request, res: Response) => {
   try {
     const starshipId = req.params.id;
     const { mutations } = req.body;
@@ -213,7 +214,7 @@ router.post('/starships/:id/codex/mutate', authMiddleware, async (req, res) => {
 });
 
 // NEW: GET /starships/:id/projection/:lens - Get lens-specific projection
-router.get('/starships/:id/projection/:lens', authMiddleware, async (req, res) => {
+router.get('/starships/:id/projection/:lens', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id: starshipId, lens } = req.params;
     

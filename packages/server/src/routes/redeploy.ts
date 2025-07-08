@@ -1,6 +1,8 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
 
-const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+type AsyncRouteHandler = (req: Request, res: Response, next: NextFunction) => Promise<void> | void;
+
+const asyncHandler = (fn: AsyncRouteHandler) => (req: Request, res: Response, next: NextFunction) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
@@ -16,7 +18,8 @@ router.post('/', asyncHandler((req: Request, res: Response) => {
 
   if (expectedSecret && providedAuth !== `Bearer ${expectedSecret}`) {
     console.warn('[WEBHOOK] Unauthorized redeploy attempt.');
-    return res.status(403).send('Forbidden');
+    res.status(403).send('Forbidden');
+    return;
   }
 
   console.log('[WEBHOOK] Redeploy ping received.');

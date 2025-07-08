@@ -6,22 +6,24 @@ import { authMiddleware } from "../middleware/auth";
 const router: Router = Router();
 
 // Validation middleware for user sync requests
-const validateSyncRequest = (req: any, res: any, next: any) => {
+const validateSyncRequest = (req: Request, res: Response, next: any) => {
   const { kindeId, email, name, avatar } = req.body;
   
   if (!kindeId || typeof kindeId !== 'string') {
-    return res.status(400).json({ error: 'kindeId is required and must be a string' });
+    res.status(400).json({ error: 'kindeId is required and must be a string' });
+    return;
   }
   
   if (!email || typeof email !== 'string') {
-    return res.status(400).json({ error: 'email is required and must be a string' });
+    res.status(400).json({ error: 'email is required and must be a string' });
+    return;
   }
   
   next();
 };
 
 // POST /v1/users/sync - Sync Kinde user to local database
-router.post("/sync", validateSyncRequest, async (req: any, res: any) => {
+router.post("/sync", validateSyncRequest, async (req: Request, res: Response) => {
   try {
     const { kindeId, email, name, avatar } = req.body;
     
@@ -40,14 +42,15 @@ router.post("/sync", validateSyncRequest, async (req: any, res: any) => {
 });
 
 // GET /v1/users/:id - Get user by ID
-router.get("/:id", authMiddleware, async (req: any, res: any) => {
+router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
     const user = await UserService.getUserById(id);
     
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
     
     res.json(user);
@@ -58,14 +61,15 @@ router.get("/:id", authMiddleware, async (req: any, res: any) => {
 });
 
 // GET /v1/users/kinde/:kindeId - Get user by Kinde ID
-router.get("/kinde/:kindeId", authMiddleware, async (req: any, res: any) => {
+router.get("/kinde/:kindeId", authMiddleware, async (req: Request, res: Response) => {
   try {
     const { kindeId } = req.params;
     
     const user = await UserService.getUserByKindeId(kindeId);
     
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      res.status(404).json({ error: 'User not found' });
+      return;
     }
     
     res.json(user);

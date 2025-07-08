@@ -27,9 +27,9 @@ export function useProximityDetection(options: ProximityOptions = {}) {
   const [isHovering, setIsHovering] = useState(false);
   
   const targetRef = useRef<HTMLElement>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const lastMouseMoveTimeRef = useRef<number>(Date.now());
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout>();
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const isHoveringRef = useRef<boolean>(false);
 
   // Store options in ref to avoid dependency issues

@@ -184,7 +184,12 @@ export interface LLMRepository extends Repository<LLM> {
 }
 
 // NEW: Aether Core Repository Interfaces
-export interface StarshipRepository extends Repository<Starship> {
+export interface StarshipRepository {
+  findAll(): Promise<Starship[]>;
+  findById(id: string): Promise<Starship | null>;
+  create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt'>): Promise<Starship>;
+  update(id: string, updates: Partial<Starship>): Promise<Starship | null>;
+  delete(id: string): Promise<boolean>;
   findByOwner(ownerId: string): Promise<Starship[]>;
   getDeployedAgents(starshipId: string): Promise<Agent[]>;
   deployAgent(starshipId: string, agentId: string): Promise<boolean>;
@@ -199,7 +204,12 @@ export interface CodexRepository extends Repository<Codex> {
   deactivateCurrentVersion(starshipId: string): Promise<void>;
 }
 
-export interface VisionRepository extends Repository<Vision> {
+export interface VisionRepository {
+  findAll(): Promise<Vision[]>;
+  findById(id: string): Promise<Vision | null>;
+  create(entity: Omit<Vision, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vision>;
+  update(id: string, updates: Partial<Vision>): Promise<Vision | null>;
+  delete(id: string): Promise<boolean>;
   findByCodex(codexId: string): Promise<Vision | null>;
   updateStatement(codexId: string, statement: string): Promise<Vision | null>;
 }

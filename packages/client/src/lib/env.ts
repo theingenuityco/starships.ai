@@ -8,36 +8,30 @@
  * 3. This file provides typed access to those variables
  */
 
-import { getServerConfig, getClientConfig } from '@starships/env-config';
+import { loadClientEnvironment } from '@starships/env-config/client';
 
-// Server-side environment (for API routes and build time)
-let serverEnv: any = null;
+// Client-side environment (browser-safe)
 let clientEnv: any = null;
 
 try {
-  // Only import on server-side (build time or API routes)
-  if (typeof window === 'undefined') {
-    serverEnv = getServerConfig();
-    clientEnv = getClientConfig();
-  }
+  // Safe to load client config in any environment
+  clientEnv = loadClientEnvironment();
 } catch (error) {
-  // Env config not available - this is expected in browser environment
+  // Fallback if config loading fails
+  console.warn('Failed to load client environment config:', error);
 }
 
 /**
  * Type-safe environment variables for the client
- * All variables are loaded from @starships/env-config and exposed via Next.js
+ * All variables are loaded from Next.js environment configuration
  */
 export const env = {
-  // Server-side variables (available in API routes and build time)
-  server: serverEnv,
-  
   // Client-side variables (available in browser via Next.js env config)
   client: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
   
-  // Kinde variables (available server-side through Next.js env config)
+  // Kinde variables (available through Next.js env config)
   kinde: {
     CLIENT_ID: process.env.KINDE_CLIENT_ID,
     CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET,
@@ -53,20 +47,25 @@ export const env = {
  * Get API base URL with fallback logic
  */
 export function getApiBaseUrl(): string {
-  // In browser, use NEXT_PUBLIC_API_URL or default to empty (proxy)
+  // Use NEXT_PUBLIC_API_URL or default to empty (proxy)
+  return env.client.NEXT_PUBLIC_API_URL || '';
+}
+
+/**
+ * Get server configuration (server-side only)
+ * This function will throw an error if called in the browser
+ */
+export async function getServerConfig() {
   if (typeof window !== 'undefined') {
-    return env.client.NEXT_PUBLIC_API_URL || '';
+    throw new Error('Server config not available in browser environment');
   }
   
-  // On server, can access server config if available
-  if (serverEnv) {
-    return clientEnv?.NEXT_PUBLIC_API_URL || `http://localhost:${serverEnv.PORT}`;
-  }
-  
-  return '';
+  // Dynamic import to prevent bundling in browser
+  const { getServerConfig } = await import('@starships/env-config');
+  return getServerConfig();
 }
 
 /**
  * Type definitions for environment variables
  */
-export type ClientEnv = typeof env; 
+export type ClientEnv = typeof env;

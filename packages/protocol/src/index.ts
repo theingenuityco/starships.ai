@@ -107,3 +107,31 @@ export interface LLMProvider {
     }
   ): Promise<LLMResult>;
 }
+
+// NEW: Agent Templates System
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  tags: string[];
+
+  // Template configuration
+  systemPrompt: string;
+  model: string; // References LLM.id
+  temperature?: number;
+  maxTokens?: number;
+
+  // Template metadata
+  authorId: string;
+  isPublic: boolean;
+  usageCount: number;
+  rating?: number;
+
+  // Template preview
+  icon?: string;
+  previewPrompts?: string[]; // Example prompts to show what the template can do
+
+  createdAt: string;
+  updatedAt: string;
+}

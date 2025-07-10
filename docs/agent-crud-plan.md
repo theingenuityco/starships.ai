@@ -2,7 +2,7 @@
 
 ## 🔄 **LIVE IMPLEMENTATION STATUS**
 
-**Last Updated:** `2025-01-10 13:03:00 UTC`
+**Last Updated:** `2025-01-10 16:15:00 UTC`
 **Current Phase:** `Phase 3: Testing & Validation - IN PROGRESS`
 **Implementer:** `Kilo Code`
 **Started:** `2025-01-08 21:20:00 UTC`
@@ -12,19 +12,19 @@
 Phase 0: Critical Issue Resolution     [✓✓✓✓✓✓✓] 7/7 tasks (100% complete)
 Phase 1: Enhanced Model Implementation [✓✓✓✓✓✓] 6/6 tasks (100% complete)
 Phase 2: Integration with Systems      [✓✓✓✓] 4/4 tasks (100% complete)
-Phase 3: Testing & Validation         [✓✓✓⬜] 3/4 tasks (75% complete)
+Phase 3: Testing & Validation         [✓✓⬜⬜] 2/4 tasks (50% complete)
 
-Overall: [✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓] 20/20 tasks (100%)
+Overall: [✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓⬜⬜] 18/20 tasks (90%)
 ```
 
 ### **🎯 Current Task Status**
 
-**NEXT PRIORITY:** `Task 3.3.2: Agent Cloning Functionality - READY TO START`
-- **Status:** `READY TO START`
-- **Priority:** `MEDIUM`
-- **Estimated Time:** `2-3 hours`
-- **Current Focus:** `Agent Cloning & Marketplace Features`
-- **Blockers:** `None - Agent Templates System completed successfully`
+**NEXT PRIORITY:** `Task 3.3.1: Agent Templates System - IN PROGRESS`
+- **Status:** `IN PROGRESS`
+- **Priority:** `HIGH`
+- **Estimated Time:** `1-2 hours remaining`
+- **Current Focus:** `Fixing "Create from Template" functionality`
+- **Blockers:** `Missing API endpoint and client integration for template functionality`
 
 ### **🚨 CRITICAL BLOCKERS TO RESOLVE FIRST**
 ```
@@ -53,12 +53,15 @@ Task B.1: Database Migration Execution [✅ COMPLETED]
 
 #### **🎯 PRIORITY 2: Task 3.3 - Advanced Features (12-16 hours)**
 ```
-Task 3.3.1: Agent Templates System [✅ COMPLETED - 4 hours]
+Task 3.3.1: Agent Templates System [⬜ IN PROGRESS - 5-6 hours]
 ├── [✓] Create AgentTemplate interface in packages/models/src/types.ts
 ├── [✓] Implement AgentTemplateRepository and service layer
 ├── [✓] Create template selector UI components
 ├── [✓] Integrate template selection into AgentForm
 ├── [✓] Add "Create from Template" to AgentSelector
+├── [✓] Create server API endpoint for template operations
+├── [✓] Add client API methods for templates
+├── [✓] Connect UI to API endpoints
 └── [⬜] Test template functionality end-to-end
 
 Task 3.3.2: Agent Cloning Functionality [MEDIUM PRIORITY - 2-3 hours]
@@ -163,7 +166,7 @@ Day 2: Documentation & Deployment Prep
 ### **📊 SUCCESS METRICS & QUALITY GATES**
 
 #### **Completion Criteria:**
-- [ ] All 20 tasks marked as complete (currently 18/20)
+- [ ] All 20 tasks marked as complete (currently 16/20)
 - [ ] Database migration executed successfully
 - [ ] All tests passing (unit, integration, E2E)
 - [ ] Performance benchmarks met (< 2s page load)
@@ -298,7 +301,14 @@ Day 2: Documentation & Deployment Prep
 [2025-07-09 16:30] - SUCCESS - Task 3.2: Analytics & Monitoring completed! Comprehensive analytics system implemented with usage tracking, rating system, and analytics dashboard
 [2025-01-10 13:03] - UPDATED - Plan restructured with focused priority workflow for remaining 10% of implementation
 [2025-01-10 13:25] - COMPLETED - Task B.1: Database Migration Execution - Neo4j database started, migration executed successfully via cypher-shell, enhanced Agent interface now fully functional with category, tags, isPublic fields populated
-[2025-01-10 13:30] - COMPLETED - Task 3.3.1: Agent Templates System - Created AgentTemplate interface, implemented repository and service layers, built template selector UI with category filtering and search, integrated "Create from Template" functionality into AgentSelector with mock data
+[2025-01-10 13:30] - PARTIALLY COMPLETED - Task 3.3.1: Agent Templates System - Created AgentTemplate interface, implemented repository and service layers, built template selector UI with category filtering and search, integrated "Create from Template" functionality into AgentSelector with mock data
+[2025-01-10 16:15] - IDENTIFIED ISSUE - Agent Templates System - "Create from Template" button doesn't work because the server API endpoint and client API method are missing
+[2025-10-07 16:30] - CREATED - packages/server/src/routes/agent-templates.ts - Created server API endpoint for agent templates with GET / and GET /:id endpoints
+[2025-10-07 16:32] - MODIFIED - packages/server/src/index.ts - Registered agent-templates routes with Express app
+[2025-10-07 16:35] - MODIFIED - packages/client/src/lib/cache.ts - Added template cache keys and invalidation function
+[2025-10-07 16:38] - MODIFIED - packages/client/src/lib/api.ts - Added templateAPI methods (getAll, getById, createAgentFromTemplate)
+[2025-10-07 16:42] - MODIFIED - packages/client/src/components/agents/AgentTemplateSelector.tsx - Updated to use real API instead of mock data
+[2025-10-07 16:45] - MODIFIED - packages/client/src/components/agents/AgentSelector.tsx - Updated onCreateFromTemplate callback to use templateAPI
 ```
 
 ### **🔄 Quick Resume Guide**
@@ -331,6 +341,512 @@ npm run migrate
 ---
 
 # AI Agent Marketplace - Agent CRUD Implementation Plan
+
+## 🔧 **Agent Template Creation Fix Implementation Plan**
+
+### **Issue Analysis**
+
+The agent template system is partially implemented but has a critical gap:
+
+1. **Backend Implementation**:
+   - ✅ `AgentTemplateRepository` with `createAgentFromTemplate` method exists
+   - ✅ `AgentTemplateService` with `createAgentFromTemplate` method exists
+   - ✅ Factory method `RepositoryFactory.getAgentTemplateService()` exists
+
+2. **Frontend Implementation**:
+   - ✅ `AgentTemplateSelector` UI component is implemented
+   - ✅ Component is integrated into `AgentSelector`
+   - ✅ Mock data structure already defined in AgentTemplateSelector
+
+3. **Missing Pieces**:
+   - ❌ No API endpoint in the server to expose the template functionality
+   - ❌ No client API method to call this endpoint
+   - ❌ The `onCreateFromTemplate` callback in `AgentSelector` is just a placeholder with a TODO comment
+   - ❌ No integration with existing toast notification system for success/error feedback
+
+This explains why clicking "Create Agent" in the template dialog does nothing - the UI is in place, but the actual API calls to create an agent from a template are missing.
+
+4. **Existing Infrastructure That Can Be Leveraged**:
+   - ✅ Toast notification system already implemented in Task 2.4
+   - ✅ Authentication middleware already in place for API routes
+   - ✅ Cache invalidation patterns already established for other API methods
+
+### **Implementation Workflow**
+
+```mermaid
+graph TD
+    A[Current State] --> B[Server API Endpoint]
+    B --> C[Client API Method]
+    C --> D[Connect UI to API]
+    D --> E[Test End-to-End]
+
+    subgraph "Server Implementation"
+        B1[Create agent-templates.ts routes]
+        B2[Add createFromTemplate endpoint]
+        B3[Register routes in server/index.ts]
+    end
+
+    subgraph "Client Implementation"
+        C1[Add templateAPI to api.ts]
+        C2[Add createAgentFromTemplate method]
+    end
+
+    subgraph "UI Integration"
+        D1[Update AgentSelector callbacks]
+        D2[Add loading state & error handling]
+    end
+```
+
+### **Detailed Implementation Steps**
+
+#### **1. Server API Endpoint (1 hour)**
+
+**Step 1.1: Create agent-templates.ts routes file**
+
+```typescript
+// packages/server/src/routes/agent-templates.ts
+import { Router } from 'express';
+import { RepositoryFactory } from '@starships/models';
+import { authMiddleware } from '../middleware/auth';
+
+const router: Router = Router();
+
+// Get all templates
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templates = await templateService.getAllTemplates();
+    res.json(templates);
+  } catch (error) {
+    console.error('Error loading templates:', error);
+    res.status(500).json({ error: 'Failed to load templates' });
+  }
+});
+
+// Get template by ID
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const templateService = RepositoryFactory.getAgentTemplateService();
+    const template = await templateService.getTemplateById(req.params.id);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    res.json(template);
+  } catch (error) {
+    console.error('Error loading template:', error);
+    res.status(500).json({ error: 'Failed to load template' });
+  }
+});
+
+// Create agent from template
+router.post('/:templateId/create-agent', authMiddleware, async (req, res) => {
+  try {
+    const { templateId } = req.params;
+    const { agentName } = req.body;
+
+    if (!agentName || !agentName.trim()) {
+      return res.status(400).json({ error: 'Agent name is required' });
+    }
+
+    // Check if template exists first
+    const templateService = RepositoryFactory.getAgentTemplateService();
+    const template = await templateService.getTemplateById(templateId);
+
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // Create agent from template
+    const agent = await templateService.createAgentFromTemplate(
+      templateId,
+      agentName.trim(),
+      req.user!.id
+    );
+
+    // Log the creation for audit purposes
+    console.log(
+      `[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${req.user!.id}`
+    );
+
+    res.status(201).json(agent);
+  } catch (error) {
+    console.error('Error creating agent from template:', error);
+    res.status(500).json({ error: 'Failed to create agent from template' });
+  }
+});
+
+export default router;
+```
+
+**Step 1.2: Register routes in server/index.ts**
+
+```typescript
+// packages/server/src/index.ts
+// Add this import with other route imports
+import agentTemplateRoutes from './routes/agent-templates';
+
+// Add this line with other app.use statements
+app.use('/api/agent-templates', agentTemplateRoutes);
+```
+
+**Checkpoint 1: Server API Endpoint**
+
+- [ ] Created agent-templates.ts routes file
+- [ ] Added GET / endpoint to fetch all templates
+- [ ] Added GET /:id endpoint to fetch template by ID
+- [ ] Added POST /:templateId/create-agent endpoint
+- [ ] Registered routes in server/index.ts
+- [ ] Tested endpoints with Postman or curl
+
+#### **2. Client API Method (30 minutes)**
+
+**Step 2.1: Add AgentTemplate type to protocol**
+
+```typescript
+// packages/protocol/src/index.ts
+// Add this interface with other exported types
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  tags: string[];
+  systemPrompt: string;
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+  authorId: string;
+  isPublic: boolean;
+  usageCount: number;
+  rating?: number;
+  icon?: string;
+  previewPrompts?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+**Step 2.2: Add template API methods to api.ts**
+
+```typescript
+// packages/client/src/lib/api.ts
+// Add this import
+import { AgentTemplate } from '@starships/protocol';
+
+// Add this to cache.ts or within api.ts
+export const CACHE_KEYS = {
+  // Existing keys...
+  TEMPLATES_ALL: 'templates:all',
+  TEMPLATE_BY_ID: (id: string) => `template:${id}`,
+};
+
+// Add this after other API objects
+export const templateAPI = {
+  getAll: async (): Promise<AgentTemplate[]> => {
+    const cacheKey = CACHE_KEYS.TEMPLATES_ALL;
+    const cached = apiCache.get<AgentTemplate[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const data = await api
+      .get('/api/agent-templates')
+      .then((res: AxiosResponse<AgentTemplate[]>) => res.data);
+    apiCache.set(cacheKey, data);
+    return data;
+  },
+
+  getById: async (id: string): Promise<AgentTemplate> => {
+    const cacheKey = CACHE_KEYS.TEMPLATE_BY_ID(id);
+    const cached = apiCache.get<AgentTemplate>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const data = await api
+      .get(`/api/agent-templates/${id}`)
+      .then((res: AxiosResponse<AgentTemplate>) => res.data);
+    apiCache.set(cacheKey, data);
+    return data;
+  },
+
+  createAgentFromTemplate: async (templateId: string, agentName: string): Promise<Agent> => {
+    const data = await api
+      .post(`/api/agent-templates/${templateId}/create-agent`, { agentName })
+      .then((res: AxiosResponse<Agent>) => res.data);
+
+    // Invalidate agent caches since we've created a new agent
+    invalidateAgentCaches();
+    return data;
+  },
+};
+
+// Export the templateAPI
+export { templateAPI };
+```
+
+**Checkpoint 2: Client API Method**
+
+- [ ] Added AgentTemplate interface to protocol
+- [ ] Added cache keys for templates
+- [ ] Implemented templateAPI.getAll() method
+- [ ] Implemented templateAPI.getById() method
+- [ ] Implemented templateAPI.createAgentFromTemplate() method
+- [ ] Added proper cache invalidation
+
+#### **3. Connect UI to API (30 minutes)**
+
+**Step 3.1: Update AgentTemplateSelector to use real API**
+
+```typescript
+// packages/client/src/components/agents/AgentTemplateSelector.tsx
+// Add this import
+import { templateAPI } from '@/lib/api';
+
+// Replace the loadTemplates method with this:
+const loadTemplates = async () => {
+  try {
+    setLoading(true);
+    // Replace mock data with actual API call
+    const templates = await templateAPI.getAll();
+    setTemplates(templates);
+  } catch (error) {
+    console.error('Failed to load templates:', error);
+    // Fall back to mock data if API fails for better UX
+    const mockTemplates = [
+      // Use the existing mock data structure from the component
+      // This ensures users can still see templates even if API fails
+      {
+        id: '1',
+        name: 'General Assistant',
+        description:
+          'A helpful general-purpose assistant that can help with various tasks, answer questions, and provide guidance.',
+        // ... other mock data fields
+      },
+      // ... other mock templates
+    ];
+    setTemplates(mockTemplates);
+
+    // Show error toast
+    if (typeof window !== 'undefined') {
+      // Only show toast in browser environment
+      const { toast } = require('@/hooks/useToast');
+      toast?.({
+        title: 'Failed to load templates',
+        description: 'Using offline templates instead',
+        variant: 'warning',
+      });
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+**Step 3.2: Update AgentSelector to use the API**
+
+```typescript
+// packages/client/src/components/agents/AgentSelector.tsx
+// Add these imports
+import { templateAPI } from '@/lib/api';
+import { useToast } from '@/hooks/useToast';
+
+// Add this near other state variables
+const { toast } = useToast();
+const [templateLoading, setTemplateLoading] = useState(false);
+
+// Replace the placeholder implementation with this:
+onCreateFromTemplate={async (templateId, agentName) => {
+  try {
+    setTemplateLoading(true);
+    const agent = await templateAPI.createAgentFromTemplate(templateId, agentName);
+    await fetchAgents(); // Refresh the list
+
+    // Select the newly created agent
+    onAgentSelect(agent);
+
+    // Show success toast
+    toast({
+      title: "Agent Created",
+      description: `${agent.name} has been created from template`,
+      variant: "success",
+    });
+
+    // Close the template dialog if it's open
+    // This provides better UX by returning to the main view with the new agent selected
+    if (showForm) {
+      setShowForm(false);
+    }
+  } catch (error: any) {
+    console.error('Failed to create agent from template:', error);
+
+    // Show more specific error message if available
+    const errorMessage = error?.response?.data?.error ||
+                         error?.message ||
+                         "Failed to create agent from template";
+
+    toast({
+      title: "Creation Failed",
+      description: errorMessage,
+      variant: "destructive",
+    });
+  } finally {
+    setTemplateLoading(false);
+  }
+}}
+```
+
+**Step 3.3: Add loading state to the Create Agent button**
+
+```typescript
+// packages/client/src/components/agents/AgentTemplateSelector.tsx
+// Add this prop to the component
+templateLoading?: boolean;
+
+// Update the component parameters
+export function AgentTemplateSelector({
+  onSelectTemplate,
+  onCreateFromTemplate,
+  trigger,
+  templateLoading = false,
+}: AgentTemplateSelectorProps & { templateLoading?: boolean }) {
+  // ...existing code...
+
+  // Update the Create Agent button
+  <Button
+    onClick={handleCreateAgent}
+    disabled={!agentName.trim() || templateLoading}
+  >
+    {templateLoading ? (
+      <>
+        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        Creating...
+      </>
+    ) : (
+      'Create Agent'
+    )}
+  </Button>
+}
+```
+
+**Step 3.4: Pass loading state from AgentSelector to AgentTemplateSelector**
+
+```typescript
+// packages/client/src/components/agents/AgentSelector.tsx
+// In both places where AgentTemplateSelector is used, add the templateLoading prop:
+<AgentTemplateSelector
+  onSelectTemplate={...}
+  onCreateFromTemplate={...}
+  trigger={...}
+  templateLoading={templateLoading}
+/>
+```
+
+**Checkpoint 3: UI Integration**
+
+- [ ] Updated AgentTemplateSelector to use real API
+- [ ] Updated AgentSelector to use templateAPI
+- [ ] Added loading state to Create Agent button
+- [ ] Added toast notifications for success/failure
+- [ ] Passed loading state from AgentSelector to AgentTemplateSelector
+
+#### **4. Testing (30-60 minutes)**
+
+**Step 4.1: Manual Testing**
+
+1. Start the server and client
+2. Navigate to the agent management page
+3. Click "From Template" button
+4. Select a template
+5. Enter an agent name
+6. Click "Create Agent"
+7. Verify the agent is created successfully
+8. Check that the agent appears in the list
+9. Verify the agent has the correct properties from the template
+10. Verify the template's usage count has been incremented
+
+**Step 4.2: Error Handling Testing**
+
+1. Test with invalid template ID
+2. Test with empty agent name
+3. Test with server offline
+4. Test with authentication issues
+5. Test with duplicate agent name (if applicable)
+6. Test with very long agent name (boundary testing)
+
+**Step 4.3: Integration Testing**
+
+1. Verify the created agent works with existing systems:
+   - Can be deployed to a starship
+   - Can be used in chat
+   - Can be edited and updated
+   - Can be deleted
+
+**Checkpoint 4: Testing**
+
+- [ ] Tested successful agent creation from template
+- [ ] Tested error handling
+- [ ] Verified loading states work correctly
+- [ ] Verified toast notifications work correctly
+- [ ] Verified integration with existing systems
+- [ ] Verified template usage count increments
+
+### **Implementation Timeline**
+
+This fix should take approximately 2-3 hours to implement and test:
+
+- Server API endpoint: 1 hour
+- Client API method: 30 minutes
+- UI integration: 30 minutes
+- Testing: 30-60 minutes
+
+### **Potential Risks and Mitigations**
+
+| Risk                       | Impact                        | Mitigation                                                        |
+| -------------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| Authentication issues      | Users unable to create agents | Ensure proper error handling for auth failures                    |
+| Template not found         | Creation fails silently       | Add explicit check for template existence before creation         |
+| Database connection issues | API endpoints fail            | Add fallback to mock data for templates                           |
+| Type mismatches            | TypeScript errors             | Ensure AgentTemplate interface matches repository implementation  |
+| Cache invalidation issues  | Stale data shown to users     | Implement proper cache invalidation for both agents and templates |
+
+### **Live Status Tracking**
+
+| Step | Description                                  | Status         | Started | Completed | Notes                       |
+| ---- | -------------------------------------------- | -------------- | ------- | --------- | --------------------------- |
+| 1.1  | Create agent-templates.ts routes file        | ✅ Completed   | 16:30   | 16:32     |                             |
+| 1.2  | Register routes in server/index.ts           | ✅ Completed   | 16:32   | 16:33     |                             |
+| 2.1  | Add AgentTemplate type to protocol           | ✅ Completed   | 16:33   | 16:35     | Already existed in protocol |
+| 2.2  | Add template API methods to api.ts           | ✅ Completed   | 16:35   | 16:38     |                             |
+| 3.1  | Update AgentTemplateSelector to use real API | ✅ Completed   | 16:38   | 16:42     |                             |
+| 3.2  | Update AgentSelector to use the API          | ✅ Completed   | 16:42   | 16:45     |                             |
+| 3.3  | Add loading state to Create Agent button     | ⬜ Not Started |         |           |                             |
+| 3.4  | Pass loading state from AgentSelector        | ⬜ Not Started |         |           |                             |
+| 4.1  | Manual Testing                               | ⬜ Not Started |         |           |                             |
+| 4.2  | Error Handling Testing                       | ⬜ Not Started |         |           |                             |
+| 4.3  | Integration Testing                          | ⬜ Not Started |         |           |                             |
+
+### **Post-Implementation Verification**
+
+After implementing the fix, verify the following:
+
+1. **Functionality**: Agent creation from templates works end-to-end
+2. **Performance**: Template loading and agent creation are responsive (< 2s)
+3. **Error Handling**: All error cases are properly handled with user feedback
+4. **UX**: The workflow is intuitive and provides appropriate feedback
+5. **Integration**: Created agents work with all existing systems
+6. **Analytics**: Template usage counts are properly tracked
+
+### **Future Enhancements**
+
+Once the basic functionality is working, consider these enhancements:
+
+1. **Template Rating**: Allow users to rate templates they've used
+2. **Template Filtering**: Add category and tag filtering to template selector
+3. **Template Sharing**: Allow users to share their custom templates
+4. **Template Versioning**: Track template versions and allow upgrading agents
 
 ## Current State Analysis
 

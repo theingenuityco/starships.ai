@@ -65,6 +65,27 @@ export function AgentSelector({
     applyFilters()
   }, [agents, filters])
 
+  // Shared function to handle agent creation from template
+  const handleCreateFromTemplate = async (templateId: string, agentName: string) => {
+    try {
+      setLoading(true) // Prevent multiple submissions
+      // Use the real API to create agent from template
+      const { templateAPI } = await import('@/lib/api')
+      const newAgent = await templateAPI.createAgentFromTemplate(templateId, agentName)
+
+      // Refresh the agents list
+      await fetchAgents()
+
+      // Select the newly created agent
+      onAgentSelect(newAgent)
+    } catch (error) {
+      console.error('Failed to create agent from template:', error)
+      setError('Failed to create agent from template')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const fetchAgents = async () => {
     try {
       setLoading(true)
@@ -223,33 +244,23 @@ export function AgentSelector({
           {AGENT_TEXT.SECTION_TITLE}
         </h2>
         {showCreateButton && (
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3">
             <AgentTemplateSelector
               onSelectTemplate={template => {
                 // Handle template selection if needed
                 console.log('Template selected:', template)
               }}
-              onCreateFromTemplate={async (templateId, agentName) => {
-                try {
-                  // TODO: Replace with actual API call to create agent from template
-                  console.log('Creating agent from template:', templateId, agentName)
-
-                  // For now, just refresh the agents list
-                  await fetchAgents()
-                } catch (error) {
-                  console.error('Failed to create agent from template:', error)
-                }
-              }}
+              onCreateFromTemplate={handleCreateFromTemplate}
               trigger={
-                <Button variant="outline" size="sm" className="h-10">
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  From Template
+                <Button variant="outline" size="sm" className="h-10 whitespace-nowrap">
+                  <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                  <span>From Template</span>
                 </Button>
               }
             />
-            <Button onClick={handleCreateAgent} size="sm" className="h-10">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Agent
+            <Button onClick={handleCreateAgent} size="sm" className="h-10 whitespace-nowrap">
+              <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
+              <span>Create Agent</span>
             </Button>
           </div>
         )}
@@ -302,29 +313,27 @@ export function AgentSelector({
               : AGENT_TEXT.NO_AGENTS_AVAILABLE}
           </p>
           {showCreateButton && (
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col gap-3 justify-center max-w-xs mx-auto">
               <AgentTemplateSelector
                 onSelectTemplate={template => {
                   console.log('Template selected:', template)
                 }}
-                onCreateFromTemplate={async (templateId, agentName) => {
-                  try {
-                    console.log('Creating agent from template:', templateId, agentName)
-                    await fetchAgents()
-                  } catch (error) {
-                    console.error('Failed to create agent from template:', error)
-                  }
-                }}
+                onCreateFromTemplate={handleCreateFromTemplate}
                 trigger={
-                  <Button size="sm" variant="outline" className="h-10">
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    From Template
+                  <Button size="sm" variant="outline" className="h-10 w-full">
+                    <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
+                    <span className="whitespace-nowrap">From Template</span>
                   </Button>
                 }
               />
-              <Button onClick={handleCreateAgent} size="sm" variant="outline" className="h-10">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Your First Agent
+              <Button
+                onClick={handleCreateAgent}
+                size="sm"
+                variant="outline"
+                className="h-10 w-full"
+              >
+                <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="whitespace-nowrap">Create Your First Agent</span>
               </Button>
             </div>
           )}

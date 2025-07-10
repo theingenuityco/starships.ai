@@ -28,6 +28,7 @@ import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import redeployRoutes from './routes/redeploy';
+import agentTemplateRoutes from './routes/agent-templates';
 import { AgentService } from './services/AgentService';
 
 const app: express.Application = express();
@@ -102,6 +103,7 @@ initializeStarshipRoutes({
 
 // API Routes
 app.use('/api/agents', agentRoutes);
+app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
@@ -119,6 +121,11 @@ app.listen(PORT, async () => {
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();
     console.log('✅ AgentService initialized with default agents');
+
+    // Initialize AgentTemplateService (seeds default templates)
+    const templateService = RepositoryFactory.getAgentTemplateService();
+    await templateService.seedDefaultTemplates();
+    console.log('✅ AgentTemplateService initialized with default templates');
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

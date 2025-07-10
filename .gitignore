@@ -1,3 +1,6 @@
+# ai editors
+.kilocode/
+
 # Node / pnpm workspace
 node_modules/
 .pnpm-debug.log*

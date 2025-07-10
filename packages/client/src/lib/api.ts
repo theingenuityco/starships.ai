@@ -1,6 +1,7 @@
 import axios, { AxiosResponse } from 'axios'
 
 import { getApiBaseUrl } from './env'
+import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -170,40 +171,108 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   }
 }
 
-// API functions
+// API functions with caching
 export const agentAPI = {
-  getAll: (): Promise<Agent[]> =>
-    api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data),
+  getAll: async (): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_ALL
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
 
-  getById: (id: string): Promise<Agent> =>
-    api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data),
+    const data = await api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
 
-  // ADD: Missing CRUD methods (server endpoints already exist)
-  create: (
-    agent: Omit<AgentConfig, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
-  ): Promise<Agent> => api.post('/api/agents', agent).then((res: AxiosResponse<Agent>) => res.data),
+  getById: async (id: string): Promise<Agent> => {
+    const cacheKey = CACHE_KEYS.AGENT_BY_ID(id)
+    const cached = apiCache.get<Agent>(cacheKey)
+    if (cached) {
+      return cached
+    }
 
-  update: (id: string, updates: Partial<AgentConfig>): Promise<Agent> =>
-    api.put(`/api/agents/${id}`, updates).then((res: AxiosResponse<Agent>) => res.data),
+    const data = await api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
 
-  delete: (id: string): Promise<void> => api.delete(`/api/agents/${id}`).then(() => {}),
+  // CRUD methods with cache invalidation
+  create: async (agent: CreateAgentRequest): Promise<Agent> => {
+    const data = await api.post('/api/agents', agent).then((res: AxiosResponse<Agent>) => res.data)
+    invalidateAgentCaches()
+    return data
+  },
 
-  // ADD: Enhanced query methods
-  getByCategory: (category: Agent['category']): Promise<Agent[]> =>
-    api.get(`/api/agents?category=${category}`).then((res: AxiosResponse<Agent[]>) => res.data),
+  update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
+    const data = await api
+      .put(`/api/agents/${id}`, updates)
+      .then((res: AxiosResponse<Agent>) => res.data)
+    invalidateAgentCaches(id)
+    return data
+  },
 
-  getByAuthor: (authorId: string): Promise<Agent[]> =>
-    api.get(`/api/agents?authorId=${authorId}`).then((res: AxiosResponse<Agent[]>) => res.data),
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/agents/${id}`)
+    invalidateAgentCaches(id)
+  },
 
-  getPublic: (limit?: number, offset?: number): Promise<Agent[]> =>
-    api
-      .get(`/api/agents/public?limit=${limit || 50}&offset=${offset || 0}`)
-      .then((res: AxiosResponse<Agent[]>) => res.data),
+  // Enhanced query methods with caching
+  getByCategory: async (category: Agent['category']): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
 
-  search: (query: string): Promise<Agent[]> =>
-    api
+    const data = await api
+      .get(`/api/agents?category=${category}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getByAuthor: async (authorId: string): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_BY_AUTHOR(authorId)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents?authorId=${authorId}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getPublic: async (limit: number = 50, offset: number = 0): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_PUBLIC(limit, offset)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents/public?limit=${limit}&offset=${offset}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  search: async (query: string): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_SEARCH(query)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
       .get(`/api/agents/search?q=${encodeURIComponent(query)}`)
-      .then((res: AxiosResponse<Agent[]>) => res.data),
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
+    return data
+  },
 }
 
 export const chatAPI = {
@@ -243,19 +312,42 @@ export const starshipAPI = {
   }): Promise<{ starship: Starship; codex: Codex }> =>
     api.post('/api/starships', data).then(res => res.data),
 
-  // Get starship details
-  getStarship: (
+  // Get starship details with caching
+  getStarship: async (
     id: string
-  ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
-    api.get(`/api/starships/${id}`).then(res => res.data),
+  ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> => {
+    const cacheKey = CACHE_KEYS.STARSHIP_BY_ID(id)
+    const cached = apiCache.get<{ starship: Starship; agents: Agent[]; availableSlots: number }>(
+      cacheKey
+    )
+    if (cached) {
+      return cached
+    }
 
-  // Deploy agent to starship
-  deployAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
-    api.post(`/api/starships/${starshipId}/agents/${agentId}/deploy`).then(res => res.data),
+    const data = await api.get(`/api/starships/${id}`).then(res => res.data)
+    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes since starship data changes frequently
+    return data
+  },
 
-  // Remove agent from starship
-  removeAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
-    api.delete(`/api/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
+  // Deploy agent to starship with cache invalidation
+  deployAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
+    const data = await api
+      .post(`/api/starships/${starshipId}/agents/${agentId}/deploy`)
+      .then(res => res.data)
+    // Invalidate starship cache since agent deployment changes starship state
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    return data
+  },
+
+  // Remove agent from starship with cache invalidation
+  removeAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
+    const data = await api
+      .delete(`/api/starships/${starshipId}/agents/${agentId}`)
+      .then(res => res.data)
+    // Invalidate starship cache since agent removal changes starship state
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    return data
+  },
 
   // Get active codex for starship
   getCodex: (starshipId: string): Promise<{ codex: any }> =>

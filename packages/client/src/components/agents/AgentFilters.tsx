@@ -111,13 +111,13 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               <label className="block text-xs font-medium mb-2">Category</label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between h-9">
-                    <span>
+                  <Button variant="outline" className="w-full justify-between h-9 px-3">
+                    <span className="truncate mr-1">
                       {filters.category
                         ? filters.category.charAt(0).toUpperCase() + filters.category.slice(1)
                         : 'All categories'}
                     </span>
-                    <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                    <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
@@ -142,15 +142,15 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               <label className="block text-xs font-medium mb-2">Visibility</label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between h-9">
-                    <span>
+                  <Button variant="outline" className="w-full justify-between h-9 px-3">
+                    <span className="truncate mr-1">
                       {filters.isPublic === undefined
                         ? 'All agents'
                         : filters.isPublic
                           ? 'Public only'
                           : 'Private only'}
                     </span>
-                    <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                    <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">

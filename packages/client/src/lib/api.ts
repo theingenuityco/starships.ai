@@ -71,10 +71,16 @@ api.interceptors.response.use(
 )
 
 // Import Agent and related types from protocol package
-import { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
+import {
+  Agent,
+  AgentConfig,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+  AgentTemplate,
+} from '@starships/protocol'
 
 // Re-export Agent for use in other client components
-export type { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest }
+export type { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest, AgentTemplate }
 
 export interface Message {
   id: string
@@ -286,6 +292,84 @@ export const agentAPI = {
       .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
     return data
+  },
+}
+
+// NEW: Template API
+export const templateAPI = {
+  getAll: async (): Promise<AgentTemplate[]> => {
+    const cacheKey = CACHE_KEYS.TEMPLATES_ALL
+    const cached = apiCache.get<AgentTemplate[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get('/api/agent-templates')
+      .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getById: async (id: string): Promise<AgentTemplate> => {
+    const cacheKey = CACHE_KEYS.TEMPLATE_BY_ID(id)
+    const cached = apiCache.get<AgentTemplate>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agent-templates/${id}`)
+      .then((res: AxiosResponse<AgentTemplate>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getByCategory: async (category: AgentTemplate['category']): Promise<AgentTemplate[]> => {
+    const cacheKey = CACHE_KEYS.TEMPLATES_BY_CATEGORY(category)
+    const cached = apiCache.get<AgentTemplate[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agent-templates?category=${category}`)
+      .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getByAuthor: async (authorId: string): Promise<AgentTemplate[]> => {
+    const cacheKey = CACHE_KEYS.TEMPLATES_BY_AUTHOR(authorId)
+    const cached = apiCache.get<AgentTemplate[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agent-templates?authorId=${authorId}`)
+      .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  createAgentFromTemplate: async (templateId: string, agentName: string): Promise<Agent> => {
+    try {
+      const data = await api
+        .post(`/api/agent-templates/${templateId}/create-agent`, { agentName })
+        .then((res: AxiosResponse<Agent>) => res.data)
+
+      // Invalidate agent caches since we've created a new agent
+      invalidateAgentCaches()
+
+      // Also invalidate the specific template cache to update usage count
+      apiCache.invalidate(CACHE_KEYS.TEMPLATE_BY_ID(templateId))
+
+      return data
+    } catch (error) {
+      console.error('Failed to create agent from template:', error)
+      throw error // Re-throw to allow proper error handling in UI
+    }
   },
 }
 

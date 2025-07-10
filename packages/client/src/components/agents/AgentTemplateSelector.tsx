@@ -40,26 +40,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-// TODO: Import from actual API types when available
-interface AgentTemplate {
-  id: string
-  name: string
-  description: string
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
-  tags: string[]
-  systemPrompt: string
-  model: string
-  temperature?: number
-  maxTokens?: number
-  authorId: string
-  isPublic: boolean
-  usageCount: number
-  rating?: number
-  icon?: string
-  previewPrompts?: string[]
-  createdAt: string
-  updatedAt: string
-}
+import { AgentTemplate } from '@/lib/api'
 
 interface AgentTemplateSelectorProps {
   onSelectTemplate: (template: AgentTemplate) => void
@@ -108,83 +89,10 @@ export function AgentTemplateSelector({
   const loadTemplates = async () => {
     try {
       setLoading(true)
-      // TODO: Replace with actual API call
-      const mockTemplates: AgentTemplate[] = [
-        {
-          id: '1',
-          name: 'General Assistant',
-          description:
-            'A helpful general-purpose assistant that can help with various tasks, answer questions, and provide guidance.',
-          category: 'general',
-          tags: ['general', 'helpful', 'assistant', 'versatile'],
-          systemPrompt: 'You are a helpful, knowledgeable, and friendly assistant...',
-          model: 'gpt-4',
-          temperature: 0.7,
-          maxTokens: 2000,
-          authorId: 'system',
-          isPublic: true,
-          usageCount: 1250,
-          rating: 4.5,
-          icon: '🤖',
-          previewPrompts: [
-            'Help me plan my day',
-            'Explain quantum computing in simple terms',
-            'What are some healthy meal ideas?',
-          ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          name: 'Code Reviewer',
-          description:
-            'An expert code reviewer that analyzes code quality, suggests improvements, and identifies potential bugs.',
-          category: 'coding',
-          tags: ['programming', 'code-review', 'debugging', 'best-practices'],
-          systemPrompt: 'You are an expert software engineer and code reviewer...',
-          model: 'gpt-4',
-          temperature: 0.3,
-          maxTokens: 3000,
-          authorId: 'system',
-          isPublic: true,
-          usageCount: 890,
-          rating: 4.8,
-          icon: '🔍',
-          previewPrompts: [
-            'Review this JavaScript function for bugs',
-            'How can I improve this Python code?',
-            'Check this SQL query for security issues',
-          ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '3',
-          name: 'Creative Writer',
-          description:
-            'A creative writing assistant that helps with storytelling, character development, and creative content.',
-          category: 'creative',
-          tags: ['writing', 'storytelling', 'creative', 'content', 'fiction'],
-          systemPrompt: 'You are a creative writing assistant with expertise in storytelling...',
-          model: 'gpt-4',
-          temperature: 0.8,
-          maxTokens: 2500,
-          authorId: 'system',
-          isPublic: true,
-          usageCount: 675,
-          rating: 4.6,
-          icon: '✍️',
-          previewPrompts: [
-            'Help me develop a character for my story',
-            'Write an opening paragraph for a mystery novel',
-            'Give me ideas for a sci-fi short story',
-          ],
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ]
-
-      setTemplates(mockTemplates)
+      // Use the real API to fetch templates
+      const { templateAPI } = await import('@/lib/api')
+      const templates = await templateAPI.getAll()
+      setTemplates(templates)
     } catch (error) {
       console.error('Failed to load templates:', error)
     } finally {
@@ -205,7 +113,7 @@ export function AgentTemplateSelector({
         template =>
           template.name.toLowerCase().includes(query) ||
           template.description.toLowerCase().includes(query) ||
-          template.tags.some(tag => tag.toLowerCase().includes(query))
+          template.tags.some((tag: string) => tag.toLowerCase().includes(query))
       )
     }
 
@@ -218,12 +126,20 @@ export function AgentTemplateSelector({
     setShowCreateDialog(true)
   }
 
-  const handleCreateAgent = () => {
+  const handleCreateAgent = async () => {
     if (selectedTemplate && agentName.trim()) {
-      onCreateFromTemplate(selectedTemplate.id, agentName.trim())
-      setShowCreateDialog(false)
-      setSelectedTemplate(null)
-      setAgentName('')
+      try {
+        // Let the parent component handle the API call
+        onCreateFromTemplate(selectedTemplate.id, agentName.trim())
+
+        // Close dialog and reset state
+        setShowCreateDialog(false)
+        setSelectedTemplate(null)
+        setAgentName('')
+      } catch (error) {
+        console.error('Failed to create agent from template:', error)
+        // TODO: Add error handling UI
+      }
     }
   }
 
@@ -279,7 +195,7 @@ export function AgentTemplateSelector({
           <CardDescription className="mb-4 line-clamp-2">{template.description}</CardDescription>
 
           <div className="flex flex-wrap gap-1.5 mb-4">
-            {template.tags.slice(0, 3).map(tag => (
+            {template.tags.slice(0, 3).map((tag: string) => (
               <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5">
                 {tag}
               </Badge>
@@ -310,7 +226,7 @@ export function AgentTemplateSelector({
                 Example prompts:
               </p>
               <ul className="text-sm text-muted-foreground space-y-2">
-                {template.previewPrompts.slice(0, 2).map((prompt, index) => (
+                {template.previewPrompts.slice(0, 2).map((prompt: string, index: number) => (
                   <li key={index} className="truncate flex items-start">
                     <span className="mr-1.5 text-primary">•</span> {prompt}
                   </li>

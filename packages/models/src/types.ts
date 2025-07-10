@@ -260,3 +260,44 @@ export interface UserInteractionRelationship {
   lastInteraction: string;
   messageCount: number;
 }
+
+// NEW: Agent Templates System
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  tags: string[];
+
+  // Template configuration
+  systemPrompt: string;
+  model: string; // References LLM.id
+  temperature?: number;
+  maxTokens?: number;
+
+  // Template metadata
+  authorId: string;
+  isPublic: boolean;
+  usageCount: number;
+  rating?: number;
+
+  // Template preview
+  icon?: string;
+  previewPrompts?: string[]; // Example prompts to show what the template can do
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentTemplateRepository extends Repository<AgentTemplate> {
+  findByAuthor(authorId: string): Promise<AgentTemplate[]>;
+  findByCategory(category: string): Promise<AgentTemplate[]>;
+  findByTags(tags: string[]): Promise<AgentTemplate[]>;
+  findPublic(limit?: number, offset?: number): Promise<AgentTemplate[]>;
+  searchTemplates(query: string): Promise<AgentTemplate[]>;
+  incrementUsageCount(id: string): Promise<void>;
+  updateRating(id: string, rating: number): Promise<void>;
+
+  // Create agent from template
+  createAgentFromTemplate(templateId: string, agentName: string, authorId: string): Promise<Agent>;
+}

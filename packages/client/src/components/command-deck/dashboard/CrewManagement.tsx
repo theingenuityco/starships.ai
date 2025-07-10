@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Plus, UserMinus, UserCheck, Bot, Settings, Star } from 'lucide-react'
+import { Users, Plus, UserMinus, UserCheck, Bot, Settings, Star, AlertCircle } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -145,22 +145,24 @@ export function CrewManagement() {
   )
 
   return (
-    <Card className="p-6 bg-black/20 border-white/10">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-blue-400" />
-          <h3 className="font-semibold text-white">Crew Management</h3>
+    <Card className="p-8 bg-black/20 border-white/10">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-500/20 p-2 rounded-md">
+            <Users className="w-6 h-6 text-blue-400" />
+          </div>
+          <h3 className="font-semibold text-white text-lg">Crew Management</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Badge
             variant="outline"
-            className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30"
+            className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30 px-3 py-1"
           >
             {deployedAgents.length} deployed
           </Badge>
           <Badge
             variant="outline"
-            className="text-xs bg-green-500/20 text-green-400 border-green-500/30"
+            className="text-xs bg-green-500/20 text-green-400 border-green-500/30 px-3 py-1"
           >
             {availableSlots} slots free
           </Badge>
@@ -168,24 +170,25 @@ export function CrewManagement() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center">
+          <AlertCircle className="w-5 h-5 text-red-400 mr-3" />
           <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Deployed Agents */}
         {deployedAgents.length > 0 && (
           <div>
-            <h4 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+            <h4 className="text-sm font-medium text-white/80 mb-4 flex items-center gap-2">
               <UserCheck className="w-4 h-4 text-green-400" />
               Active Crew ({deployedAgents.length})
             </h4>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {deployedAgents.map(agent => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-3 p-3 bg-black/30 border border-white/10 rounded-lg"
+                  className="flex items-center gap-4 p-4 bg-black/30 border border-white/10 rounded-lg hover:bg-black/40 transition-colors"
                 >
                   <div className="text-lg">{getAgentIcon(agent.name)}</div>
                   <div className="flex-1">
@@ -255,7 +258,7 @@ export function CrewManagement() {
         {/* Available Agents */}
         {availableAgents.length > 0 && (
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-4">
               <h4 className="text-sm font-medium text-white/80 flex items-center gap-2">
                 <Bot className="w-4 h-4 text-blue-400" />
                 Available Agents ({availableAgents.length})
@@ -264,17 +267,17 @@ export function CrewManagement() {
                 onClick={() => setShowAgentManager(true)}
                 size="sm"
                 variant="outline"
-                className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 h-9"
               >
                 <Settings className="w-4 h-4 mr-2" />
                 Manage Agents
               </Button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {availableAgents.map(agent => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-3 p-3 bg-black/20 border border-white/5 rounded-lg"
+                  className="flex items-center gap-4 p-4 bg-black/20 border border-white/5 rounded-lg hover:bg-black/25 transition-colors"
                 >
                   <div className="text-lg opacity-60">{getAgentIcon(agent.name)}</div>
                   <div className="flex-1">
@@ -343,17 +346,22 @@ export function CrewManagement() {
 
         {/* Empty States */}
         {deployedAgents.length === 0 && availableAgents.length === 0 && (
-          <div className="text-center py-8">
-            <Users className="w-12 h-12 mx-auto mb-3 text-white/20" />
-            <p className="text-sm text-white/60 mb-1">No agents available</p>
-            <p className="text-xs text-white/40">Create agents to deploy to your starship</p>
+          <div className="text-center py-12 bg-black/10 rounded-lg border border-white/5">
+            <Users className="w-16 h-16 mx-auto mb-4 text-white/20" />
+            <p className="text-base text-white/60 mb-2">No agents available</p>
+            <p className="text-sm text-white/40 max-w-md mx-auto">
+              Create agents to deploy to your starship and enhance your mission capabilities
+            </p>
           </div>
         )}
 
         {deployedAgents.length === 0 && availableAgents.length > 0 && (
-          <div className="text-center py-4 border border-dashed border-white/10 rounded-lg">
-            <p className="text-sm text-white/60 mb-1">No crew deployed</p>
-            <p className="text-xs text-white/40">Deploy agents to your starship above</p>
+          <div className="text-center py-6 border border-dashed border-white/10 rounded-lg bg-black/10">
+            <UserCheck className="w-12 h-12 mx-auto mb-3 text-white/20" />
+            <p className="text-base text-white/60 mb-2">No crew deployed</p>
+            <p className="text-sm text-white/40 max-w-md mx-auto">
+              Deploy agents from the available list above to enhance your starship's capabilities
+            </p>
           </div>
         )}
       </div>

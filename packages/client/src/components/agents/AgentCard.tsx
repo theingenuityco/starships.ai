@@ -46,21 +46,21 @@ export function AgentCard({
       `}
       onClick={onClick}
     >
-      <div className="p-4">
+      <div className="p-5">
         <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 flex-1">
-            <Avatar className="h-10 w-10">
+          <div className="flex items-start space-x-4 flex-1">
+            <Avatar className="h-12 w-12 ring-2 ring-background shadow-sm">
               <AvatarFallback
                 className={`
                 ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
               `}
               >
-                <Bot className="h-5 w-5" />
+                <Bot className="h-6 w-6" />
               </AvatarFallback>
             </Avatar>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <h3
                   className={`
                   font-medium text-sm truncate
@@ -74,7 +74,12 @@ export function AgentCard({
                   {agent.category}
                 </Badge>
 
-                {!agent.isPublic && <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                {!agent.isPublic && (
+                  <span className="inline-flex items-center">
+                    <EyeOff className="w-3 h-3 text-muted-foreground mr-1" />
+                    <span className="text-xs text-muted-foreground">Private</span>
+                  </span>
+                )}
 
                 {agent.rating && (
                   <div className="flex items-center gap-1">
@@ -85,20 +90,20 @@ export function AgentCard({
               </div>
 
               {agent.description && (
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
                   {agent.description}
                 </p>
               )}
 
               {agent.tags && agent.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
+                <div className="flex flex-wrap gap-1.5 mb-3">
                   {agent.tags.slice(0, 3).map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs px-1 py-0">
+                    <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5 rounded-md">
                       {tag}
                     </Badge>
                   ))}
                   {agent.tags.length > 3 && (
-                    <Badge variant="outline" className="text-xs px-1 py-0">
+                    <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-md">
                       +{agent.tags.length - 3}
                     </Badge>
                   )}
@@ -106,18 +111,50 @@ export function AgentCard({
               )}
 
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="bg-secondary/50 px-2 py-1 rounded">{agent.model}</span>
+                <span className="bg-secondary/50 px-2.5 py-1 rounded-md font-mono">
+                  {agent.model}
+                </span>
 
-                <div className="flex items-center gap-2">
-                  <span>{agent.usageCount || 0} uses</span>
-                  <span>v{agent.version || '1.0.0'}</span>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center">
+                    <svg
+                      className="w-3 h-3 mr-1 text-muted-foreground/70"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    {agent.usageCount || 0} uses
+                  </span>
+                  <span className="flex items-center">
+                    <svg
+                      className="w-3 h-3 mr-1 text-muted-foreground/70"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                    v{agent.version || '1.0.0'}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
           {showActions && (onEdit || onDelete || onTest || onAnalytics) && (
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex items-center gap-2 ml-3">
               {onAnalytics && (
                 <Button
                   size="sm"
@@ -127,8 +164,9 @@ export function AgentCard({
                     onAnalytics(agent)
                   }}
                   title="View Analytics"
+                  className="h-8 w-8 p-0 rounded-full"
                 >
-                  <BarChart3 className="w-3 h-3" />
+                  <BarChart3 className="w-4 h-4" />
                 </Button>
               )}
 
@@ -141,8 +179,9 @@ export function AgentCard({
                     onTest(agent)
                   }}
                   title="Test Agent"
+                  className="h-8 w-8 p-0 rounded-full"
                 >
-                  <TestTube className="w-3 h-3" />
+                  <TestTube className="w-4 h-4" />
                 </Button>
               )}
 
@@ -155,8 +194,9 @@ export function AgentCard({
                     onEdit(agent)
                   }}
                   title="Edit Agent"
+                  className="h-8 w-8 p-0 rounded-full"
                 >
-                  <Edit className="w-3 h-3" />
+                  <Edit className="w-4 h-4" />
                 </Button>
               )}
 
@@ -168,10 +208,10 @@ export function AgentCard({
                     e.stopPropagation()
                     onDelete(agent)
                   }}
-                  className="text-destructive hover:text-destructive"
+                  className="text-destructive hover:text-destructive h-8 w-8 p-0 rounded-full"
                   title="Delete Agent"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               )}
             </div>

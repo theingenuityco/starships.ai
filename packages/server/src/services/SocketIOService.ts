@@ -103,9 +103,9 @@ export class SocketIOService {
       });
 
       // Handle ping/pong for connection health
-      socket.on('ping', () => {
+      socket.on('ping' as any, () => {
         this.updateConnectionState(socket.id, { last_ping: Date.now() });
-        socket.emit('pong');
+        socket.emit('pong' as any);
       });
     });
   }
@@ -138,7 +138,7 @@ export class SocketIOService {
 
   emitToUser(userId: string, event: keyof SocketIOEvents, data: any) {
     const userRoom = this.getUserRoom(userId);
-    this.io.to(userRoom).emit(event as string, data);
+    this.io.to(userRoom).emit(event, data);
   }
 
   getConnectedUsersCount(): number {

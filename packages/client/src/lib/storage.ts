@@ -68,4 +68,11 @@ export function getAllStoredSessions(): string[] {
  */
 export function generateSessionId(agentId: string, userId: string): string {
   return `agent-${agentId}:user-${userId}`
-} 
+}
+
+/**
+ * Generate a consistent session ID for Sibil/user combination
+ */
+export function generateSibilSessionId(userId: string): string {
+  return `sibil:user-${userId}`
+}

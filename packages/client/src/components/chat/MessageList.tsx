@@ -7,13 +7,19 @@ import { Loader2, AlertCircle } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { CHAT_TEXT, LOADING_TEXT } from '@/constants/text'
 
-interface MessageListProps {
-  messages: Message[]
+interface MessageListProps<T = Message> {
+  messages: T[]
   loading: boolean
   error: string | null
+  MessageComponent?: React.ComponentType<{ message: T }>
 }
 
-export function MessageList({ messages, loading, error }: MessageListProps) {
+export function MessageList<T = Message>({
+  messages,
+  loading,
+  error,
+  MessageComponent = MessageBubble as React.ComponentType<{ message: T }>
+}: MessageListProps<T>) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -78,8 +84,8 @@ export function MessageList({ messages, loading, error }: MessageListProps) {
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
         {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
+          <MessageComponent
+            key={(message as any).id}
             message={message}
           />
         ))}

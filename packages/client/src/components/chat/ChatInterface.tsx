@@ -7,6 +7,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { ERROR_TEXT } from '@/constants/text'
 import { useAuth } from '@/hooks/useAuth'
+import { Badge } from '@/components/ui/badge'
 
 interface ChatInterfaceProps {
   agent: Agent
@@ -42,7 +43,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       setError('User not authenticated')
       return
     }
-    
+
     // TODO: Add debouncing for rapid agent switching
     const newSessionId = generateSessionId(agent.id, userId) // Use real user ID from auth
     currentSessionId.current = newSessionId
@@ -71,7 +72,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
     }
 
     const sessionId = currentSessionId.current
-    
+
     // Create user message with sending state
     const userMessage: Message = {
       id: Math.random().toString(36).substring(2) + Date.now().toString(36),
@@ -79,7 +80,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       role: 'user',
       timestamp: new Date().toISOString(),
       sessionId: sessionId,
-      sending: true // Mark as sending
+      sending: true, // Mark as sending
     }
 
     // Add user message immediately (optimistic update)
@@ -91,11 +92,11 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       if (!userId) {
         throw new Error('User not authenticated')
       }
-      
+
       const assistantMessage = await chatAPI.sendMessage({
         agentId: agent.id,
         sessionId: sessionId,
-        message: content
+        message: content,
       })
 
       // Update user message to remove sending state and add assistant message
@@ -103,13 +104,13 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       const finalMessages = [...messages, finalUserMessage, assistantMessage]
       setMessages(finalMessages)
       saveChatHistory(sessionId, finalMessages)
-      
+
       setError(null)
     } catch (err) {
       console.error('Failed to send message:', err)
       // TODO: Implement specific error types and better error handling
       setError(ERROR_TEXT.FAILED_TO_SEND_MESSAGE)
-      
+
       // Remove failed user message on error
       setMessages(messages)
       saveChatHistory(sessionId, messages)
@@ -137,37 +138,41 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b border-border bg-card px-6 py-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+      <div className="border-b border-border bg-card px-8 py-5 shadow-sm">
+        <div className="flex items-center space-x-4">
+          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center ring-4 ring-primary/20">
             <span className="text-primary-foreground text-sm font-medium">
               {agent.name.charAt(0).toUpperCase()}
             </span>
           </div>
           <div>
-            <h2 className="font-semibold">{agent.name}</h2>
-            <p className="text-sm text-muted-foreground">{agent.systemPrompt || 'AI Assistant'}</p>
+            <h2 className="font-semibold text-lg">{agent.name}</h2>
+            <p className="text-sm text-muted-foreground flex items-center">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
+              {agent.systemPrompt || 'AI Assistant'}
+            </p>
+          </div>
+          <div className="ml-auto">
+            <Badge variant="outline" className="ml-auto">
+              {agent.model}
+            </Badge>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-background/50">
         {/* TODO: Add accessibility improvements (ARIA labels, keyboard nav) */}
-        <MessageList 
-          messages={messages} 
-          loading={loading} 
-          error={error}
-        />
+        <MessageList messages={messages} loading={loading} error={error} />
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-card p-4">
-        <MessageInput 
+      <div className="border-t border-border bg-card p-6">
+        <MessageInput
           onSendMessage={handleSendMessage}
           disabled={!currentSessionId.current || loading || !userId}
         />
       </div>
     </div>
   )
-} 
+}

@@ -1,8 +1,9 @@
 import axios, { AxiosResponse } from 'axios'
 
-import { getApiBaseUrl } from './env';
+import { getApiBaseUrl } from './env'
+import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = getApiBaseUrl()
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -22,7 +23,7 @@ export const setTokenProvider = (tokenProvider: () => Promise<string | null>) =>
 
 // Request interceptor to add authentication token
 api.interceptors.request.use(
-  async (config) => {
+  async config => {
     console.log('[API] Request interceptor running for:', config.url)
     if (getTokenFunction) {
       const token = await getTokenFunction()
@@ -38,15 +39,15 @@ api.interceptors.request.use(
     }
     return config
   },
-  (error) => {
+  error => {
     return Promise.reject(error)
   }
 )
 
 // Response interceptor for auth error handling
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  response => response,
+  error => {
     if (error.response?.status === 401) {
       console.error('[API] Authentication failed:', error.response.data)
       // TODO: Trigger logout or token refresh
@@ -55,14 +56,11 @@ api.interceptors.response.use(
   }
 )
 
-// Types matching backend protocol (AgentConfig from @starships/protocol)
-export interface Agent {
-  id: string
-  name: string
-  model: string
-  systemPrompt?: string
-  description?: string
-}
+// Import Agent and related types from protocol package
+import { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
+
+// Re-export Agent for use in other client components
+export type { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest }
 
 export interface Message {
   id: string
@@ -169,17 +167,112 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
     agent_id: req.agentId,
     channel_id: req.sessionId,
     message: req.message,
-    stream: false
+    stream: false,
   }
 }
 
-// API functions
+// API functions with caching
 export const agentAPI = {
-  getAll: (): Promise<Agent[]> => 
-    api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data),
-  
-  getById: (id: string): Promise<Agent> =>
-    api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data),
+  getAll: async (): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_ALL
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getById: async (id: string): Promise<Agent> => {
+    const cacheKey = CACHE_KEYS.AGENT_BY_ID(id)
+    const cached = apiCache.get<Agent>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  // CRUD methods with cache invalidation
+  create: async (agent: CreateAgentRequest): Promise<Agent> => {
+    const data = await api.post('/api/agents', agent).then((res: AxiosResponse<Agent>) => res.data)
+    invalidateAgentCaches()
+    return data
+  },
+
+  update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
+    const data = await api
+      .put(`/api/agents/${id}`, updates)
+      .then((res: AxiosResponse<Agent>) => res.data)
+    invalidateAgentCaches(id)
+    return data
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/api/agents/${id}`)
+    invalidateAgentCaches(id)
+  },
+
+  // Enhanced query methods with caching
+  getByCategory: async (category: Agent['category']): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents?category=${category}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getByAuthor: async (authorId: string): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_BY_AUTHOR(authorId)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents?authorId=${authorId}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  getPublic: async (limit: number = 50, offset: number = 0): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_PUBLIC(limit, offset)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents/public?limit=${limit}&offset=${offset}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  search: async (query: string): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_SEARCH(query)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents/search?q=${encodeURIComponent(query)}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
+    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
+    return data
+  },
 }
 
 export const chatAPI = {
@@ -188,20 +281,22 @@ export const chatAPI = {
     const backendRequest = toBackendRequest(request)
     const response = await api.post('/api/chat', backendRequest)
     const backendResponse = response.data as ChatBackendResponse
-    
+
     // Convert backend response to client Message format
     return {
       id: generateId(),
       content: backendResponse.reply,
       role: 'assistant',
       timestamp: new Date().toISOString(),
-      sessionId: request.sessionId || `agent-${request.agentId}`
+      sessionId: request.sessionId || `agent-${request.agentId}`,
     }
   },
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>
-    api.delete(`/api/chat/${sessionId}/memory`).then((res: AxiosResponse<{ message: string }>) => res.data),
+    api
+      .delete(`/api/chat/${sessionId}/memory`)
+      .then((res: AxiosResponse<{ message: string }>) => res.data),
 }
 
 // NEW: Starship API
@@ -211,37 +306,74 @@ export const starshipAPI = {
     api.get('/api/starships').then(res => res.data),
 
   // Create new starship
-  createStarship: (data: { name: string; class: 'scout' | 'cruiser' }): Promise<{ starship: Starship; codex: Codex }> =>
+  createStarship: (data: {
+    name: string
+    class: 'scout' | 'cruiser'
+  }): Promise<{ starship: Starship; codex: Codex }> =>
     api.post('/api/starships', data).then(res => res.data),
 
-  // Get starship details
-  getStarship: (id: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
-    api.get(`/api/starships/${id}`).then(res => res.data),
+  // Get starship details with caching
+  getStarship: async (
+    id: string
+  ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> => {
+    const cacheKey = CACHE_KEYS.STARSHIP_BY_ID(id)
+    const cached = apiCache.get<{ starship: Starship; agents: Agent[]; availableSlots: number }>(
+      cacheKey
+    )
+    if (cached) {
+      return cached
+    }
 
-  // Deploy agent to starship
-  deployAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
-    api.post(`/api/starships/${starshipId}/agents/${agentId}/deploy`).then(res => res.data),
+    const data = await api.get(`/api/starships/${id}`).then(res => res.data)
+    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes since starship data changes frequently
+    return data
+  },
 
-  // Remove agent from starship
-  removeAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
-    api.delete(`/api/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
+  // Deploy agent to starship with cache invalidation
+  deployAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
+    const data = await api
+      .post(`/api/starships/${starshipId}/agents/${agentId}/deploy`)
+      .then(res => res.data)
+    // Invalidate starship cache since agent deployment changes starship state
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    return data
+  },
+
+  // Remove agent from starship with cache invalidation
+  removeAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
+    const data = await api
+      .delete(`/api/starships/${starshipId}/agents/${agentId}`)
+      .then(res => res.data)
+    // Invalidate starship cache since agent removal changes starship state
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    return data
+  },
 
   // Get active codex for starship
   getCodex: (starshipId: string): Promise<{ codex: any }> =>
     api.get(`/api/starships/${starshipId}/codex`).then(res => res.data),
 
   // Update codex with mutations
-  updateCodex: (starshipId: string, mutations: {
-    vision?: { statement: string };
-    goals?: Array<{ description: string; type: 'short_term' | 'long_term' | 'milestone' }>;
-    constraints?: Array<{ description: string; type: 'resource' | 'ethical' | 'technical' | 'business' }>;
-  }): Promise<{ codex: Codex }> =>
+  updateCodex: (
+    starshipId: string,
+    mutations: {
+      vision?: { statement: string }
+      goals?: Array<{ description: string; type: 'short_term' | 'long_term' | 'milestone' }>
+      constraints?: Array<{
+        description: string
+        type: 'resource' | 'ethical' | 'technical' | 'business'
+      }>
+    }
+  ): Promise<{ codex: Codex }> =>
     api.post(`/api/starships/${starshipId}/codex/mutate`, { mutations }).then(res => res.data),
 
   // Get projection for specific lens
-  getProjection: (starshipId: string, lens: 'telos' | 'ethos' | 'full'): Promise<{ projection: CodexProjection }> =>
-    api.get(`/api/starships/${starshipId}/projection/${lens}`).then(res => res.data)
-};
+  getProjection: (
+    starshipId: string,
+    lens: 'telos' | 'ethos' | 'full'
+  ): Promise<{ projection: CodexProjection }> =>
+    api.get(`/api/starships/${starshipId}/projection/${lens}`).then(res => res.data),
+}
 
 export const userAPI = {
   // Sync Kinde user to backend database
@@ -269,4 +401,4 @@ function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
 }
 
-export default api 
+export default api

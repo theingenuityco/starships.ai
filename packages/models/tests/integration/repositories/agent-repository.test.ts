@@ -9,7 +9,7 @@ describe('AgentRepository Integration Tests', () => {
   beforeEach(async () => {
     connection = getConnection();
     agentRepository = new AgentRepository();
-    
+
     // Clean up any existing test data
     await connection.executeWrite('MATCH (n) DETACH DELETE n');
   });
@@ -19,7 +19,12 @@ describe('AgentRepository Integration Tests', () => {
       const agentData = {
         name: 'Test Agent',
         model: 'gpt-4',
-        systemPrompt: 'You are a helpful assistant'
+        systemPrompt: 'You are a helpful assistant',
+        tags: ['test'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const result = await agentRepository.create(agentData);
@@ -41,13 +46,23 @@ describe('AgentRepository Integration Tests', () => {
       const agent1Data = {
         name: 'Agent 1',
         model: 'gpt-4',
-        systemPrompt: 'You are agent 1'
+        systemPrompt: 'You are agent 1',
+        tags: ['test'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
-      
+
       const agent2Data = {
         name: 'Agent 2',
         model: 'claude-3',
-        systemPrompt: 'You are agent 2'
+        systemPrompt: 'You are agent 2',
+        tags: ['test'],
+        category: 'coding' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const agent1 = await agentRepository.create(agent1Data);
@@ -64,7 +79,12 @@ describe('AgentRepository Integration Tests', () => {
       const agentData = {
         name: 'Findable Agent',
         model: 'gpt-4',
-        systemPrompt: 'You can find me'
+        systemPrompt: 'You can find me',
+        tags: ['findable'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const createdAgent = await agentRepository.create(agentData);
@@ -86,18 +106,28 @@ describe('AgentRepository Integration Tests', () => {
       const agent1Data = {
         name: 'First Agent',
         model: 'gpt-4',
-        systemPrompt: 'First'
+        systemPrompt: 'First',
+        tags: ['first'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
-      
+
       const agent2Data = {
         name: 'Second Agent',
         model: 'claude-3',
-        systemPrompt: 'Second'
+        systemPrompt: 'Second',
+        tags: ['second'],
+        category: 'coding' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const agent1 = await agentRepository.create(agent1Data);
       // Small delay to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       const agent2 = await agentRepository.create(agent2Data);
 
       const allAgents = await agentRepository.findAll();
@@ -119,14 +149,19 @@ describe('AgentRepository Integration Tests', () => {
       const agentData = {
         name: 'Original Name',
         model: 'gpt-4',
-        systemPrompt: 'Original prompt'
+        systemPrompt: 'Original prompt',
+        tags: ['original'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const createdAgent = await agentRepository.create(agentData);
-      
+
       const updates = {
         name: 'Updated Name',
-        systemPrompt: 'Updated prompt'
+        systemPrompt: 'Updated prompt',
       };
 
       const updatedAgent = await agentRepository.update(createdAgent.id, updates);
@@ -140,9 +175,9 @@ describe('AgentRepository Integration Tests', () => {
 
     it('should return null when updating non-existent agent', async () => {
       const result = await agentRepository.update('nonexistent-id', {
-        name: 'Updated Name'
+        name: 'Updated Name',
       });
-      
+
       expect(result).toBeNull();
     });
   });
@@ -152,7 +187,12 @@ describe('AgentRepository Integration Tests', () => {
       const agentData = {
         name: 'Deletable Agent',
         model: 'gpt-4',
-        systemPrompt: 'I will be deleted'
+        systemPrompt: 'I will be deleted',
+        tags: ['deletable'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const createdAgent = await agentRepository.create(agentData);
@@ -177,19 +217,34 @@ describe('AgentRepository Integration Tests', () => {
       const agent1 = await agentRepository.create({
         name: 'Agent 1',
         model: 'gpt-4',
-        systemPrompt: 'Agent 1'
+        systemPrompt: 'Agent 1',
+        tags: ['starship'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
-      
+
       const agent2 = await agentRepository.create({
         name: 'Agent 2',
         model: 'claude-3',
-        systemPrompt: 'Agent 2'
+        systemPrompt: 'Agent 2',
+        tags: ['starship'],
+        category: 'coding' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
 
       const agent3 = await agentRepository.create({
         name: 'Agent 3',
         model: 'gpt-4',
-        systemPrompt: 'Agent 3'
+        systemPrompt: 'Agent 3',
+        tags: ['undeployed'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
 
       // Create starship and deploy agents
@@ -205,7 +260,7 @@ describe('AgentRepository Integration Tests', () => {
          CREATE (a)-[:DEPLOYED_ON]->(s)`,
         { agentId: agent1.id, starshipId }
       );
-      
+
       await connection.executeWrite(
         `MATCH (a:Agent {id: $agentId}), (s:Starship {id: $starshipId})
          CREATE (a)-[:DEPLOYED_ON]->(s)`,
@@ -215,10 +270,10 @@ describe('AgentRepository Integration Tests', () => {
       const deployedAgents = await agentRepository.findByStarship(starshipId);
 
       expect(deployedAgents).toHaveLength(2);
-      expect(deployedAgents.map(a => a.id)).toContain(agent1.id);
-      expect(deployedAgents.map(a => a.id)).toContain(agent2.id);
-      expect(deployedAgents.map(a => a.id)).not.toContain(agent3.id);
-      
+      expect(deployedAgents.map((a) => a.id)).toContain(agent1.id);
+      expect(deployedAgents.map((a) => a.id)).toContain(agent2.id);
+      expect(deployedAgents.map((a) => a.id)).not.toContain(agent3.id);
+
       // Should be ordered by name
       expect(deployedAgents[0].name).toBe('Agent 1');
       expect(deployedAgents[1].name).toBe('Agent 2');
@@ -236,19 +291,34 @@ describe('AgentRepository Integration Tests', () => {
       const agent1 = await agentRepository.create({
         name: 'Channel Agent 1',
         model: 'gpt-4',
-        systemPrompt: 'Channel agent 1'
+        systemPrompt: 'Channel agent 1',
+        tags: ['channel'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
-      
+
       const agent2 = await agentRepository.create({
         name: 'Channel Agent 2',
         model: 'claude-3',
-        systemPrompt: 'Channel agent 2'
+        systemPrompt: 'Channel agent 2',
+        tags: ['channel'],
+        category: 'coding' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
 
       const agent3 = await agentRepository.create({
         name: 'Unassigned Agent',
         model: 'gpt-4',
-        systemPrompt: 'Not in channel'
+        systemPrompt: 'Not in channel',
+        tags: ['unassigned'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
 
       // Create channel and relationships
@@ -264,7 +334,7 @@ describe('AgentRepository Integration Tests', () => {
          CREATE (a)-[:ACTIVE_IN]->(c)`,
         { agentId: agent1.id, channelId }
       );
-      
+
       await connection.executeWrite(
         `MATCH (a:Agent {id: $agentId}), (c:Channel {id: $channelId})
          CREATE (a)-[:ACTIVE_IN]->(c)`,
@@ -274,9 +344,9 @@ describe('AgentRepository Integration Tests', () => {
       const channelAgents = await agentRepository.findByChannel(channelId);
 
       expect(channelAgents).toHaveLength(2);
-      expect(channelAgents.map(a => a.id)).toContain(agent1.id);
-      expect(channelAgents.map(a => a.id)).toContain(agent2.id);
-      expect(channelAgents.map(a => a.id)).not.toContain(agent3.id);
+      expect(channelAgents.map((a) => a.id)).toContain(agent1.id);
+      expect(channelAgents.map((a) => a.id)).toContain(agent2.id);
+      expect(channelAgents.map((a) => a.id)).not.toContain(agent3.id);
     });
 
     it('should return empty array when no agents active in channel', async () => {
@@ -291,19 +361,34 @@ describe('AgentRepository Integration Tests', () => {
       const agent1 = await agentRepository.create({
         name: 'User Agent 1',
         model: 'gpt-4',
-        systemPrompt: 'User agent 1'
+        systemPrompt: 'User agent 1',
+        tags: ['user'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
-      
+
       const agent2 = await agentRepository.create({
         name: 'User Agent 2',
         model: 'claude-3',
-        systemPrompt: 'User agent 2'
+        systemPrompt: 'User agent 2',
+        tags: ['user'],
+        category: 'coding' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
 
       const agent3 = await agentRepository.create({
         name: 'Unused Agent',
         model: 'gpt-4',
-        systemPrompt: 'Not interacted with'
+        systemPrompt: 'Not interacted with',
+        tags: ['unused'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       });
 
       // Create user and relationships
@@ -319,7 +404,7 @@ describe('AgentRepository Integration Tests', () => {
          CREATE (u)-[:INTERACTS_WITH]->(a)`,
         { userId, agentId: agent1.id }
       );
-      
+
       await connection.executeWrite(
         `MATCH (u:User {id: $userId}), (a:Agent {id: $agentId})
          CREATE (u)-[:INTERACTS_WITH]->(a)`,
@@ -329,9 +414,9 @@ describe('AgentRepository Integration Tests', () => {
       const userAgents = await agentRepository.findByUser(userId);
 
       expect(userAgents).toHaveLength(2);
-      expect(userAgents.map(a => a.id)).toContain(agent1.id);
-      expect(userAgents.map(a => a.id)).toContain(agent2.id);
-      expect(userAgents.map(a => a.id)).not.toContain(agent3.id);
+      expect(userAgents.map((a) => a.id)).toContain(agent1.id);
+      expect(userAgents.map((a) => a.id)).toContain(agent2.id);
+      expect(userAgents.map((a) => a.id)).not.toContain(agent3.id);
     });
 
     it('should return empty array when user has not interacted with any agents', async () => {
@@ -345,11 +430,16 @@ describe('AgentRepository Integration Tests', () => {
       const agentData = {
         name: 'Unique Agent',
         model: 'gpt-4',
-        systemPrompt: 'I am unique'
+        systemPrompt: 'I am unique',
+        tags: ['unique'],
+        category: 'general' as const,
+        authorId: 'test-user',
+        isPublic: false,
+        version: '1.0.0',
       };
 
       const agent1 = await agentRepository.create(agentData);
-      
+
       // Try to create an agent with the same ID directly via connection
       await expect(
         connection.executeWrite(

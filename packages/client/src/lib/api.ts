@@ -48,9 +48,23 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => response,
   error => {
+    console.error('[API] Request failed:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      headers: error.response?.headers,
+    })
+
     if (error.response?.status === 401) {
-      console.error('[API] Authentication failed:', error.response.data)
+      console.error(
+        '[API] Authentication failed - token may be invalid or expired:',
+        error.response.data
+      )
       // TODO: Trigger logout or token refresh
+    } else if (error.response?.status === 500) {
+      console.error('[API] Server error occurred:', error.response.data)
     }
     return Promise.reject(error)
   }

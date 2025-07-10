@@ -7,10 +7,11 @@ import { AgentForm } from './AgentForm'
 import { AgentFilters } from './AgentFilters'
 import { AgentTester } from './AgentTester'
 import { AgentAnalytics } from './AgentAnalytics'
+import { AgentTemplateSelector } from './AgentTemplateSelector'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plus, Search } from 'lucide-react'
+import { Loader2, Plus, Search, Sparkles, Bot } from 'lucide-react'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 
 interface AgentSelectorProps {
@@ -213,27 +214,59 @@ export function AgentSelector({
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{AGENT_TEXT.SECTION_TITLE}</h2>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-xl font-semibold flex items-center">
+          <span className="bg-primary/10 p-1.5 rounded-md mr-2">
+            <Bot className="h-5 w-5 text-primary" />
+          </span>
+          {AGENT_TEXT.SECTION_TITLE}
+        </h2>
         {showCreateButton && (
-          <Button onClick={handleCreateAgent} size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Agent
-          </Button>
+          <div className="flex gap-3">
+            <AgentTemplateSelector
+              onSelectTemplate={template => {
+                // Handle template selection if needed
+                console.log('Template selected:', template)
+              }}
+              onCreateFromTemplate={async (templateId, agentName) => {
+                try {
+                  // TODO: Replace with actual API call to create agent from template
+                  console.log('Creating agent from template:', templateId, agentName)
+
+                  // For now, just refresh the agents list
+                  await fetchAgents()
+                } catch (error) {
+                  console.error('Failed to create agent from template:', error)
+                }
+              }}
+              trigger={
+                <Button variant="outline" size="sm" className="h-10">
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  From Template
+                </Button>
+              }
+            />
+            <Button onClick={handleCreateAgent} size="sm" className="h-10">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Agent
+            </Button>
+          </div>
         )}
       </div>
 
       {showFilters && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+              <Search className="w-4 h-4" />
+            </div>
             <Input
               placeholder="Search agents..."
               value={filters.searchQuery}
               onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-              className="pl-10"
+              className="pl-10 h-10 bg-background/50 border-muted"
             />
           </div>
 
@@ -247,10 +280,10 @@ export function AgentSelector({
       )}
 
       {filteredAgents.length === 0 ? (
-        <div className="text-center py-8">
-          <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-3">
+        <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
+          <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-6 h-6 text-muted-foreground"
+              className="w-8 h-8 text-muted-foreground"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -263,20 +296,41 @@ export function AgentSelector({
               />
             </svg>
           </div>
-          <p className="text-sm text-muted-foreground mb-2">
+          <p className="text-base text-muted-foreground mb-3">
             {filters.searchQuery || filters.category || filters.tags.length > 0
               ? 'No agents match your filters'
               : AGENT_TEXT.NO_AGENTS_AVAILABLE}
           </p>
           {showCreateButton && (
-            <Button onClick={handleCreateAgent} size="sm" variant="outline">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First Agent
-            </Button>
+            <div className="flex gap-3 justify-center">
+              <AgentTemplateSelector
+                onSelectTemplate={template => {
+                  console.log('Template selected:', template)
+                }}
+                onCreateFromTemplate={async (templateId, agentName) => {
+                  try {
+                    console.log('Creating agent from template:', templateId, agentName)
+                    await fetchAgents()
+                  } catch (error) {
+                    console.error('Failed to create agent from template:', error)
+                  }
+                }}
+                trigger={
+                  <Button size="sm" variant="outline" className="h-10">
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    From Template
+                  </Button>
+                }
+              />
+              <Button onClick={handleCreateAgent} size="sm" variant="outline" className="h-10">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Your First Agent
+              </Button>
+            </div>
           )}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3 mt-4">
           {filteredAgents.map(agent => (
             <AgentCard
               key={agent.id}

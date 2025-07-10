@@ -90,144 +90,111 @@ export function ModernProviderSelector({
   const selectedModelInfo = currentModels.find(m => m.id === currentModel) || currentModels[0]
 
   return (
-    <motion.div 
-      className="flex items-center gap-4"
+    <motion.div
+      className="relative"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
     >
-      {/* Provider Selection */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-muted-foreground">Provider:</span>
-        <div className="flex gap-2">
-          {Object.entries(PROVIDER_INFO).map(([key, info]) => (
-            <motion.button
-              key={key}
-              className={`
-                relative px-4 py-2 rounded-lg border transition-all duration-200
-                ${provider === key 
-                  ? 'sibil-glass border-white/20 text-white shadow-lg' 
-                  : 'border-border/50 text-muted-foreground hover:border-border'
-                }
-                ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-              `}
-              variants={providerSwitchVariants}
-              initial="inactive"
-              animate={provider === key ? "active" : "inactive"}
-              whileHover={!disabled ? "hover" : undefined}
-              whileTap={!disabled ? { scale: 0.98 } : undefined}
-              onClick={() => !disabled && onProviderChange(key as 'openai' | 'anthropic')}
-              disabled={disabled}
-            >
-              {/* Background gradient for active state */}
-              <AnimatePresence>
-                {provider === key && (
-                  <motion.div
-                    className="absolute inset-0 rounded-lg opacity-20"
-                    style={{ background: info.gradient }}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 0.2, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.2 }}
-                  />
-                )}
-              </AnimatePresence>
-              
-              <div className="relative flex items-center gap-2">
-                <div 
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: info.color }}
-                />
-                <span className="font-medium text-sm">{info.name}</span>
-              </div>
-            </motion.button>
-          ))}
-        </div>
-      </div>
-
-      {/* Model Selection */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium text-muted-foreground">Model:</span>
-        <motion.div
-          className="relative"
-          whileHover={{ scale: disabled ? 1 : 1.02 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="relative">
-            <Select value={currentModel} onValueChange={onModelChange} disabled={disabled}>
-              <SelectTrigger className="w-56 sibil-glass border-white/10 backdrop-blur-md">
-                <div className="flex items-center gap-2 w-full">
-                  {selectedModelInfo.icon}
-                  <span className="font-medium">{selectedModelInfo.name}</span>
-                  <Badge
-                    variant="secondary"
-                    className="ml-auto text-xs sibil-provider-badge"
-                    style={{
-                      backgroundColor: `color-mix(in srgb, ${PROVIDER_INFO[provider].color} 10%, transparent)`,
-                      borderColor: `color-mix(in srgb, ${PROVIDER_INFO[provider].color} 20%, transparent)`,
-                      color: PROVIDER_INFO[provider].color
-                    }}
-                  >
-                    {selectedModelInfo.badge}
-                  </Badge>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <AnimatePresence>
-                  {currentModels.map((modelOption, index) => (
-                    <motion.div
-                      key={modelOption.id}
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <SelectItem value={modelOption.id}>
-                        <div className="flex items-center gap-3 w-full">
-                          <div className="flex items-center gap-2">
-                            {modelOption.icon}
-                            <div>
-                              <div className="font-medium">{modelOption.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {modelOption.description}
-                              </div>
-                            </div>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="ml-auto text-xs"
-                            style={{
-                              borderColor: `color-mix(in srgb, ${PROVIDER_INFO[provider].color} 30%, transparent)`,
-                              color: PROVIDER_INFO[provider].color
-                            }}
-                          >
-                            {modelOption.badge}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </SelectContent>
-            </Select>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Provider Info Tooltip */}
-      <motion.div
-        className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full sibil-glass border-white/10"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.2 }}
+      <Select
+        value={`${provider}:${currentModel}`}
+        onValueChange={(value) => {
+          const [newProvider, newModel] = value.split(':') as ['openai' | 'anthropic', string]
+          if (newProvider !== provider) {
+            onProviderChange(newProvider)
+          }
+          onModelChange(newModel)
+        }}
+        disabled={disabled}
       >
-        <div 
-          className="w-1.5 h-1.5 rounded-full sibil-animate-pulse-slow"
-          style={{ backgroundColor: PROVIDER_INFO[provider].color }}
-        />
-        <span className="text-xs text-muted-foreground">
-          {PROVIDER_INFO[provider].description}
-        </span>
-      </motion.div>
+        <SelectTrigger className="w-auto min-w-[180px] h-9 sibil-glass border-white/10 backdrop-blur-md hover:border-white/20 transition-colors">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: PROVIDER_INFO[provider].color }}
+            />
+            {selectedModelInfo.icon}
+            <span className="font-medium text-sm">{selectedModelInfo.name}</span>
+            <Badge
+              variant="secondary"
+              className="text-xs font-medium"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${PROVIDER_INFO[provider].color} 15%, transparent)`,
+                borderColor: `color-mix(in srgb, ${PROVIDER_INFO[provider].color} 25%, transparent)`,
+                color: PROVIDER_INFO[provider].color
+              }}
+            >
+              {selectedModelInfo.badge}
+            </Badge>
+          </div>
+        </SelectTrigger>
+        
+        <SelectContent>
+          {/* OpenAI Models */}
+          {MODELS.openai.map((modelOption) => (
+            <SelectItem
+              key={`openai:${modelOption.id}`}
+              value={`openai:${modelOption.id}`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <div
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: PROVIDER_INFO.openai.color }}
+                />
+                {modelOption.icon}
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{modelOption.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    OpenAI • {modelOption.description}
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-xs"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${PROVIDER_INFO.openai.color} 30%, transparent)`,
+                    color: PROVIDER_INFO.openai.color
+                  }}
+                >
+                  {modelOption.badge}
+                </Badge>
+              </div>
+            </SelectItem>
+          ))}
+          
+          {/* Anthropic Models */}
+          {MODELS.anthropic.map((modelOption) => (
+            <SelectItem
+              key={`anthropic:${modelOption.id}`}
+              value={`anthropic:${modelOption.id}`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <div
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: PROVIDER_INFO.anthropic.color }}
+                />
+                {modelOption.icon}
+                <div className="flex-1">
+                  <div className="font-medium text-sm">{modelOption.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Anthropic • {modelOption.description}
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-xs"
+                  style={{
+                    borderColor: `color-mix(in srgb, ${PROVIDER_INFO.anthropic.color} 30%, transparent)`,
+                    color: PROVIDER_INFO.anthropic.color
+                  }}
+                >
+                  {modelOption.badge}
+                </Badge>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </motion.div>
   )
 }

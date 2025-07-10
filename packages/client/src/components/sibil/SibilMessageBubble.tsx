@@ -4,7 +4,7 @@ import { motion } from 'motion/react'
 import { SibilMessage } from '@/lib/sibil-api'
 import { formatTime } from '@/lib/utils'
 import { Bot, User, Loader2, Zap, Sparkles } from 'lucide-react'
-import { ContentRenderer } from './renderers/ContentRenderer'
+import { IntelligentContentRenderer } from './renderers/IntelligentContentRenderer'
 import { messageVariants, avatarVariants, streamingVariants } from '@/lib/animations'
 
 interface SibilMessageBubbleProps {
@@ -139,11 +139,11 @@ export function SibilMessageBubble({ message }: SibilMessageBubbleProps) {
             )}
             
             {/* Content Rendering */}
-            {message.structured_content && message.structured_content.length > 0 ? (
-              <ContentRenderer blocks={message.structured_content} />
-            ) : (
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-            )}
+            <IntelligentContentRenderer
+              content={message.content}
+              structured_content={message.structured_content}
+              isStreaming={isStreaming}
+            />
             
             {/* Streaming indicator */}
             {isStreaming && (

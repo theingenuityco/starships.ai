@@ -194,9 +194,9 @@ export function SibilChatInterface() {
       animate="in"
       exit="out"
     >
-      {/* Modern Header with Glassmorphism */}
+      {/* Compact Header */}
       <motion.div
-        className="border-b border-white/10 sibil-glass backdrop-blur-md px-6 py-4 relative overflow-hidden"
+        className="border-b border-white/10 sibil-glass backdrop-blur-md px-4 py-3 relative overflow-hidden"
         variants={headerVariants}
         initial="hidden"
         animate="visible"
@@ -210,55 +210,32 @@ export function SibilChatInterface() {
         />
         
         <div className="relative flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            {/* Enhanced Avatar */}
+          <div className="flex items-center space-x-3">
+            {/* Compact Avatar */}
             <motion.div
-              className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden"
+              className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden"
               style={{
                 background: 'var(--sibil-gradient-primary)'
               }}
-              whileHover={{ scale: 1.05, rotate: 5 }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Bot className="h-5 w-5 text-white" />
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                animate={{
-                  boxShadow: [
-                    '0 0 0 0 rgba(99, 102, 241, 0.4)',
-                    '0 0 0 8px rgba(99, 102, 241, 0)',
-                    '0 0 0 0 rgba(99, 102, 241, 0)'
-                  ]
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeOut"
-                }}
-              />
+              <Bot className="h-4 w-4 text-white" />
             </motion.div>
             
             <div>
               <motion.h2
-                className="font-bold text-xl sibil-gradient-text"
+                className="font-bold text-lg sibil-gradient-text"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 }}
               >
                 Sibil AI
               </motion.h2>
-              <motion.p
-                className="text-sm text-muted-foreground"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                Direct AI conversation with streaming
-              </motion.p>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <AnimatePresence>
               {(streaming || typingIndicator) && (
                 <StreamingIndicator
@@ -275,13 +252,13 @@ export function SibilChatInterface() {
               'bg-red-500'
             }`} />
             
-            <ModernProviderSelector
+            {/* <ModernProviderSelector
               provider={provider}
               model={model}
               onProviderChange={handleProviderChange}
               onModelChange={setModel}
               disabled={streaming || !isConnected}
-            />
+            /> */}
           </div>
         </div>
       </motion.div>

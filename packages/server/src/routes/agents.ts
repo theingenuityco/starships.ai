@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { AgentService } from '../services/AgentService';
-import type { AgentConfig } from '@starships/protocol';
+import type { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 
@@ -79,7 +79,12 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const agentData = req.body as Omit<AgentConfig, 'id'>;
+    const createRequest = req.body as CreateAgentRequest;
+    // Add user ID from auth context
+    const agentData = {
+      ...createRequest,
+      authorId: req.user!.id, // Override with authenticated user ID
+    };
     const agent = await AgentService.createAgent(agentData);
     res.status(201).json(agent);
   } catch (error) {
@@ -90,7 +95,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 
 router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const updates = req.body as Partial<AgentConfig>;
+    const updates = req.body as UpdateAgentRequest;
     const agent = await AgentService.updateAgent(req.params.id, updates);
     if (!agent) {
       res.status(404).json({ error: 'Agent not found' });
@@ -114,6 +119,57 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting agent:', error);
     res.status(500).json({ error: 'Failed to delete agent' });
+  }
+});
+
+// Analytics endpoints
+router.get('/:id/analytics', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const analytics = await AgentService.getAgentAnalytics(req.params.id);
+    if (!analytics) {
+      res.status(404).json({ error: 'Agent not found' });
+    } else {
+      res.json(analytics);
+    }
+  } catch (error) {
+    console.error('Error getting agent analytics:', error);
+    res.status(500).json({ error: 'Failed to get agent analytics' });
+  }
+});
+
+// Rating endpoint
+router.post('/:id/rate', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { rating } = req.body;
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+      res.status(400).json({ error: 'Rating must be a number between 1 and 5' });
+      return;
+    }
+
+    const result = await AgentService.rateAgent(req.params.id, req.user!.id, rating);
+    if (!result) {
+      res.status(404).json({ error: 'Agent not found' });
+    } else {
+      res.json(result);
+    }
+  } catch (error) {
+    console.error('Error rating agent:', error);
+    res.status(500).json({ error: 'Failed to rate agent' });
+  }
+});
+
+// Usage tracking endpoint (called internally)
+router.post('/:id/track-usage', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await AgentService.trackUsage(req.params.id, req.user!.id);
+    if (!result) {
+      res.status(404).json({ error: 'Agent not found' });
+    } else {
+      res.json({ message: 'Usage tracked successfully' });
+    }
+  } catch (error) {
+    console.error('Error tracking usage:', error);
+    res.status(500).json({ error: 'Failed to track usage' });
   }
 });
 

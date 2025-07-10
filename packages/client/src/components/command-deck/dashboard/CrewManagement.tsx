@@ -1,117 +1,120 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { Users, Plus, UserMinus, UserCheck, Bot } from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar } from '@/components/ui/avatar';
-import { useStarshipStore } from '@/store/starship-store';
-import { agentAPI, starshipAPI, type Agent } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react'
+import { Users, Plus, UserMinus, UserCheck, Bot, Settings, Star } from 'lucide-react'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Avatar } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useStarshipStore } from '@/store/starship-store'
+import { agentAPI, starshipAPI, type Agent } from '@/lib/api'
+import { AgentSelector } from '@/components/agents/AgentSelector'
+import { cn } from '@/lib/utils'
 
 interface DeployedAgent extends Agent {
-  isDeployed: boolean;
+  isDeployed: boolean
 }
 
 export function CrewManagement() {
-  const { activeStarshipId, deployAgent, removeAgent } = useStarshipStore();
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [deployedAgents, setDeployedAgents] = useState<Agent[]>([]);
-  const [availableSlots, setAvailableSlots] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [deployingAgent, setDeployingAgent] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { activeStarshipId, deployAgent, removeAgent } = useStarshipStore()
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [deployedAgents, setDeployedAgents] = useState<Agent[]>([])
+  const [availableSlots, setAvailableSlots] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [deployingAgent, setDeployingAgent] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // Agent management dialog state
+  const [showAgentManager, setShowAgentManager] = useState(false)
 
   // Load agents and starship data
   useEffect(() => {
     const loadData = async () => {
       if (!activeStarshipId) {
-        setLoading(false);
-        return;
+        setLoading(false)
+        return
       }
 
       try {
-        setLoading(true);
-        setError(null);
+        setLoading(true)
+        setError(null)
 
         // Load all agents
-        const allAgents = await agentAPI.getAll();
-        setAgents(allAgents);
+        const allAgents = await agentAPI.getAll()
+        setAgents(allAgents)
 
         // Load starship details including deployed agents
-        const starshipData = await starshipAPI.getStarship(activeStarshipId);
-        setDeployedAgents(starshipData.agents);
-        setAvailableSlots(starshipData.availableSlots);
-
+        const starshipData = await starshipAPI.getStarship(activeStarshipId)
+        setDeployedAgents(starshipData.agents)
+        setAvailableSlots(starshipData.availableSlots)
       } catch (error) {
-        console.error('Failed to load crew data:', error);
-        setError(error instanceof Error ? error.message : 'Failed to load crew data');
+        console.error('Failed to load crew data:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load crew data')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    loadData();
-  }, [activeStarshipId]);
+    loadData()
+  }, [activeStarshipId])
 
   const handleDeployAgent = async (agentId: string) => {
-    if (!activeStarshipId || availableSlots <= 0) return;
+    if (!activeStarshipId || availableSlots <= 0) return
 
-    setDeployingAgent(agentId);
+    setDeployingAgent(agentId)
     try {
-      await deployAgent(agentId);
-      
+      await deployAgent(agentId)
+
       // Refresh data
-      const starshipData = await starshipAPI.getStarship(activeStarshipId);
-      setDeployedAgents(starshipData.agents);
-      setAvailableSlots(starshipData.availableSlots);
-      
+      const starshipData = await starshipAPI.getStarship(activeStarshipId)
+      setDeployedAgents(starshipData.agents)
+      setAvailableSlots(starshipData.availableSlots)
     } catch (error) {
-      console.error('Failed to deploy agent:', error);
-      setError('Failed to deploy agent');
+      console.error('Failed to deploy agent:', error)
+      setError('Failed to deploy agent')
     } finally {
-      setDeployingAgent(null);
+      setDeployingAgent(null)
     }
-  };
+  }
 
   const handleRemoveAgent = async (agentId: string) => {
-    if (!activeStarshipId) return;
+    if (!activeStarshipId) return
 
-    setDeployingAgent(agentId);
+    setDeployingAgent(agentId)
     try {
-      await removeAgent(agentId);
-      
+      await removeAgent(agentId)
+
       // Refresh data
-      const starshipData = await starshipAPI.getStarship(activeStarshipId);
-      setDeployedAgents(starshipData.agents);
-      setAvailableSlots(starshipData.availableSlots);
-      
+      const starshipData = await starshipAPI.getStarship(activeStarshipId)
+      setDeployedAgents(starshipData.agents)
+      setAvailableSlots(starshipData.availableSlots)
     } catch (error) {
-      console.error('Failed to remove agent:', error);
-      setError('Failed to remove agent');
+      console.error('Failed to remove agent:', error)
+      setError('Failed to remove agent')
     } finally {
-      setDeployingAgent(null);
+      setDeployingAgent(null)
     }
-  };
+  }
 
   const getAgentIcon = (agentName: string) => {
-    const name = agentName.toLowerCase();
-    if (name.includes('science') || name.includes('research')) return '🔬';
-    if (name.includes('engineer') || name.includes('tech')) return '⚙️';
-    if (name.includes('navigator') || name.includes('pilot')) return '🧭';
-    if (name.includes('commander') || name.includes('captain')) return '⭐';
-    if (name.includes('medical') || name.includes('doctor')) return '⚕️';
-    return '🚀';
-  };
+    const name = agentName.toLowerCase()
+    if (name.includes('science') || name.includes('research')) return '🔬'
+    if (name.includes('engineer') || name.includes('tech')) return '⚙️'
+    if (name.includes('navigator') || name.includes('pilot')) return '🧭'
+    if (name.includes('commander') || name.includes('captain')) return '⭐'
+    if (name.includes('medical') || name.includes('doctor')) return '⚕️'
+    return '🚀'
+  }
 
   const getModelBadgeColor = (model: string) => {
-    const lowerModel = model.toLowerCase();
-    if (lowerModel.includes('gpt-4')) return 'bg-green-500/20 text-green-400 border-green-500/30';
-    if (lowerModel.includes('gpt-3.5')) return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-    if (lowerModel.includes('claude')) return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-    return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-  };
+    const lowerModel = model.toLowerCase()
+    if (lowerModel.includes('gpt-4')) return 'bg-green-500/20 text-green-400 border-green-500/30'
+    if (lowerModel.includes('gpt-3.5')) return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+    if (lowerModel.includes('claude'))
+      return 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+    return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+  }
 
   if (!activeStarshipId) {
     return (
@@ -124,7 +127,7 @@ export function CrewManagement() {
           </div>
         </div>
       </Card>
-    );
+    )
   }
 
   if (loading) {
@@ -134,12 +137,12 @@ export function CrewManagement() {
           <div className="w-6 h-6 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
         </div>
       </Card>
-    );
+    )
   }
 
   const availableAgents = agents.filter(
     agent => !deployedAgents.some(deployed => deployed.id === agent.id)
-  );
+  )
 
   return (
     <Card className="p-6 bg-black/20 border-white/10">
@@ -149,10 +152,16 @@ export function CrewManagement() {
           <h3 className="font-semibold text-white">Crew Management</h3>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
+          <Badge
+            variant="outline"
+            className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30"
+          >
             {deployedAgents.length} deployed
           </Badge>
-          <Badge variant="outline" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+          <Badge
+            variant="outline"
+            className="text-xs bg-green-500/20 text-green-400 border-green-500/30"
+          >
             {availableSlots} slots free
           </Badge>
         </div>
@@ -173,7 +182,7 @@ export function CrewManagement() {
               Active Crew ({deployedAgents.length})
             </h4>
             <div className="space-y-2">
-              {deployedAgents.map((agent) => (
+              {deployedAgents.map(agent => (
                 <div
                   key={agent.id}
                   className="flex items-center gap-3 p-3 bg-black/30 border border-white/10 rounded-lg"
@@ -184,14 +193,45 @@ export function CrewManagement() {
                       <span className="font-medium text-white text-sm">{agent.name}</span>
                       <Badge
                         variant="outline"
-                        className={cn("text-xs", getModelBadgeColor(agent.model))}
+                        className={cn('text-xs', getModelBadgeColor(agent.model))}
                       >
                         {agent.model}
                       </Badge>
+                      {/* ADD: Category badge */}
+                      {agent.category && (
+                        <Badge variant="secondary" className="text-xs">
+                          {agent.category}
+                        </Badge>
+                      )}
                     </div>
+                    {/* ADD: Enhanced description */}
                     {agent.description && (
-                      <p className="text-xs text-white/60 truncate">{agent.description}</p>
+                      <p className="text-xs text-white/60 truncate mb-1">{agent.description}</p>
                     )}
+                    {/* ADD: Tags display */}
+                    {agent.tags && agent.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {agent.tags.slice(0, 2).map(tag => (
+                          <span key={tag} className="text-xs bg-white/10 px-1 rounded">
+                            {tag}
+                          </span>
+                        ))}
+                        {agent.tags.length > 2 && (
+                          <span className="text-xs text-white/40">+{agent.tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                    {/* ADD: Usage stats */}
+                    <div className="flex items-center gap-2 text-xs text-white/50">
+                      {agent.usageCount !== undefined && <span>{agent.usageCount} uses</span>}
+                      {agent.version && <span>v{agent.version}</span>}
+                      {agent.rating && (
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                          <span>{agent.rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="outline"
@@ -215,12 +255,23 @@ export function CrewManagement() {
         {/* Available Agents */}
         {availableAgents.length > 0 && (
           <div>
-            <h4 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-blue-400" />
-              Available Agents ({availableAgents.length})
-            </h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-white/80 flex items-center gap-2">
+                <Bot className="w-4 h-4 text-blue-400" />
+                Available Agents ({availableAgents.length})
+              </h4>
+              <Button
+                onClick={() => setShowAgentManager(true)}
+                size="sm"
+                variant="outline"
+                className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Manage Agents
+              </Button>
+            </div>
             <div className="space-y-2">
-              {availableAgents.map((agent) => (
+              {availableAgents.map(agent => (
                 <div
                   key={agent.id}
                   className="flex items-center gap-3 p-3 bg-black/20 border border-white/5 rounded-lg"
@@ -231,14 +282,45 @@ export function CrewManagement() {
                       <span className="font-medium text-white/80 text-sm">{agent.name}</span>
                       <Badge
                         variant="outline"
-                        className={cn("text-xs", getModelBadgeColor(agent.model))}
+                        className={cn('text-xs', getModelBadgeColor(agent.model))}
                       >
                         {agent.model}
                       </Badge>
+                      {/* ADD: Category badge */}
+                      {agent.category && (
+                        <Badge variant="secondary" className="text-xs opacity-80">
+                          {agent.category}
+                        </Badge>
+                      )}
                     </div>
+                    {/* ADD: Enhanced description */}
                     {agent.description && (
-                      <p className="text-xs text-white/50 truncate">{agent.description}</p>
+                      <p className="text-xs text-white/50 truncate mb-1">{agent.description}</p>
                     )}
+                    {/* ADD: Tags display */}
+                    {agent.tags && agent.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {agent.tags.slice(0, 2).map(tag => (
+                          <span key={tag} className="text-xs bg-white/5 px-1 rounded opacity-80">
+                            {tag}
+                          </span>
+                        ))}
+                        {agent.tags.length > 2 && (
+                          <span className="text-xs text-white/30">+{agent.tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                    {/* ADD: Usage stats */}
+                    <div className="flex items-center gap-2 text-xs text-white/40">
+                      {agent.usageCount !== undefined && <span>{agent.usageCount} uses</span>}
+                      {agent.version && <span>v{agent.version}</span>}
+                      {agent.rating && (
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                          <span>{agent.rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <Button
                     variant="outline"
@@ -275,6 +357,27 @@ export function CrewManagement() {
           </div>
         )}
       </div>
+
+      {/* Agent Management Dialog */}
+      <Dialog open={showAgentManager} onOpenChange={setShowAgentManager}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Agent Management</DialogTitle>
+          </DialogHeader>
+          <AgentSelector
+            selectedAgent={null}
+            onAgentSelect={agent => {
+              // Optionally auto-deploy selected agent if slots available
+              if (availableSlots > 0) {
+                handleDeployAgent(agent.id)
+              }
+              setShowAgentManager(false)
+            }}
+            showCreateButton={true}
+            showFilters={true}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
-  );
-} 
+  )
+}

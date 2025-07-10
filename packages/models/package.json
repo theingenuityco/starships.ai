@@ -14,7 +14,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:service": "jest --testPathIgnorePatterns=integration",
-    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs"
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
+    "migrate": "tsx src/scripts/run-migration.ts"
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",

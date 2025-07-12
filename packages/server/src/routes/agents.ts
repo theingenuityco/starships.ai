@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { AgentService } from '../services/AgentService';
-import type { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import type {
+  Agent,
+  AgentConfig,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+} from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 
@@ -26,8 +31,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       // Default: get user's agents + public agents
       console.log(`[AGENTS] Loading agents for user: ${req.user!.id}`);
 
-      let userAgents = [];
-      let publicAgents = [];
+      let userAgents: Agent[] = [];
+      let publicAgents: Agent[] = [];
 
       try {
         console.log(`[AGENTS] Fetching user agents for: ${req.user!.id}`);
@@ -116,7 +121,11 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       ...createRequest,
       authorId: req.user!.id, // Override with authenticated user ID
     };
+    console.log(
+      `[AGENTS] Creating agent with authorId: ${agentData.authorId} for user: ${req.user!.id}`
+    );
     const agent = await AgentService.createAgent(agentData);
+    console.log(`[AGENTS] Agent created successfully: ${agent.id}, authorId: ${agent.authorId}`);
     res.status(201).json(agent);
   } catch (error) {
     console.error('Error creating agent:', error);

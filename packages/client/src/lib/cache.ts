@@ -85,13 +85,26 @@ export const CACHE_KEYS = {
 
 // Helper function to invalidate related caches when agents are modified
 export const invalidateAgentCaches = (agentId?: string) => {
+  console.log(
+    '[CACHE] Invalidating agent caches',
+    agentId ? `for agent ${agentId}` : 'for all agents'
+  )
+
   if (agentId) {
     apiCache.invalidate(CACHE_KEYS.AGENT_BY_ID(agentId))
+    console.log('[CACHE] Invalidated specific agent cache:', CACHE_KEYS.AGENT_BY_ID(agentId))
   }
 
   // Invalidate all agent list caches
   apiCache.invalidatePattern('^agents:')
+  console.log('[CACHE] Invalidated all agent list caches with pattern: ^agents:')
+
   apiCache.invalidatePattern('^starship:.*:agents$')
+  console.log('[CACHE] Invalidated all starship agent caches with pattern: ^starship:.*:agents$')
+
+  // Log remaining cache keys for debugging
+  const stats = apiCache.getStats()
+  console.log('[CACHE] Remaining cache keys after invalidation:', stats.keys)
 }
 
 // Helper function to invalidate template caches

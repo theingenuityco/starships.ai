@@ -189,7 +189,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
                       .filter(tag => !filters.tags.includes(tag))
                       .map(tag => (
                         <DropdownMenuItem key={tag} onClick={() => addTag(tag)}>
-                          {tag}
+                          {tag.charAt(0).toUpperCase() + tag.slice(1)}
                         </DropdownMenuItem>
                       ))
                   )}
@@ -209,7 +209,7 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
                     variant="secondary"
                     className="flex items-center gap-1 px-2 py-1"
                   >
-                    {tag}
+                    {tag.charAt(0).toUpperCase() + tag.slice(1)}
                     <button
                       onClick={() => removeTag(tag)}
                       className="ml-1 hover:bg-muted rounded-full"

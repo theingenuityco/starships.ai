@@ -197,10 +197,15 @@ export const agentAPI = {
     const cacheKey = CACHE_KEYS.AGENTS_ALL
     const cached = apiCache.get<Agent[]>(cacheKey)
     if (cached) {
+      console.log('[API] Using cached agents:', cached.length)
       return cached
     }
 
-    const data = await api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => res.data)
+    console.log('[API] Fetching all agents from server')
+    const data = await api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => {
+      console.log('[API] Received agents from server:', res.data.length)
+      return res.data
+    })
     apiCache.set(cacheKey, data)
     return data
   },
@@ -219,7 +224,12 @@ export const agentAPI = {
 
   // CRUD methods with cache invalidation
   create: async (agent: CreateAgentRequest): Promise<Agent> => {
-    const data = await api.post('/api/agents', agent).then((res: AxiosResponse<Agent>) => res.data)
+    console.log('[API] Creating new agent:', agent.name)
+    const data = await api.post('/api/agents', agent).then((res: AxiosResponse<Agent>) => {
+      console.log('[API] Agent created successfully:', res.data.id, 'authorId:', res.data.authorId)
+      return res.data
+    })
+    console.log('[API] Invalidating agent caches after creation')
     invalidateAgentCaches()
     return data
   },
@@ -368,6 +378,28 @@ export const templateAPI = {
       return data
     } catch (error) {
       console.error('Failed to create agent from template:', error)
+      throw error // Re-throw to allow proper error handling in UI
+    }
+  },
+
+  // Convert a public agent to a template
+  convertAgentToTemplate: async (agentId: string): Promise<AgentTemplate> => {
+    try {
+      console.log('[API] Converting agent to template:', agentId)
+      const data = await api
+        .post(`/api/agent-templates/convert-from-agent/${agentId}`)
+        .then((res: AxiosResponse<AgentTemplate>) => {
+          console.log('[API] Agent converted to template successfully:', res.data.id)
+          return res.data
+        })
+
+      // Invalidate both agent and template caches
+      invalidateAgentCaches()
+      apiCache.invalidatePattern('^templates:')
+
+      return data
+    } catch (error) {
+      console.error('Failed to convert agent to template:', error)
       throw error // Re-throw to allow proper error handling in UI
     }
   },

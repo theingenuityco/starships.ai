@@ -42,6 +42,20 @@ export function CrewManagement() {
 
         // Load all agents
         const allAgents = await agentAPI.getAll()
+        console.log('CrewManagement: Loaded agents:', allAgents)
+
+        // Check if any agents have the current user as author
+        const userInfo = await fetch('/api/auth/me')
+          .then(res => res.json())
+          .catch(() => null)
+        if (userInfo?.id) {
+          console.log('CrewManagement: Current user ID:', userInfo.id)
+          console.log(
+            'CrewManagement: Agents with matching authorId:',
+            allAgents.filter(agent => agent.authorId === userInfo.id).map(a => a.id)
+          )
+        }
+
         setAgents(allAgents)
 
         // Load starship details including deployed agents
@@ -188,7 +202,7 @@ export function CrewManagement() {
               {deployedAgents.map(agent => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-4 p-4 bg-black/30 border border-white/10 rounded-lg hover:bg-black/40 transition-colors"
+                  className="flex items-center gap-4 p-4 bg-black/30 border border-white/10 rounded-lg hover:bg-black/40 transition-colors overflow-visible"
                 >
                   <div className="text-lg">{getAgentIcon(agent.name)}</div>
                   <div className="flex-1">
@@ -203,7 +217,7 @@ export function CrewManagement() {
                       {/* ADD: Category badge */}
                       {agent.category && (
                         <Badge variant="secondary" className="text-xs">
-                          {agent.category}
+                          {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
                         </Badge>
                       )}
                     </div>
@@ -216,7 +230,7 @@ export function CrewManagement() {
                       <div className="flex flex-wrap gap-1 mb-1">
                         {agent.tags.slice(0, 2).map(tag => (
                           <span key={tag} className="text-xs bg-white/10 px-1 rounded">
-                            {tag}
+                            {tag.charAt(0).toUpperCase() + tag.slice(1)}
                           </span>
                         ))}
                         {agent.tags.length > 2 && (
@@ -277,7 +291,7 @@ export function CrewManagement() {
               {availableAgents.map(agent => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-4 p-4 bg-black/20 border border-white/5 rounded-lg hover:bg-black/25 transition-colors"
+                  className="flex items-center gap-4 p-4 bg-black/20 border border-white/5 rounded-lg hover:bg-black/25 transition-colors overflow-visible"
                 >
                   <div className="text-lg opacity-60">{getAgentIcon(agent.name)}</div>
                   <div className="flex-1">
@@ -292,7 +306,7 @@ export function CrewManagement() {
                       {/* ADD: Category badge */}
                       {agent.category && (
                         <Badge variant="secondary" className="text-xs opacity-80">
-                          {agent.category}
+                          {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
                         </Badge>
                       )}
                     </div>
@@ -305,7 +319,7 @@ export function CrewManagement() {
                       <div className="flex flex-wrap gap-1 mb-1">
                         {agent.tags.slice(0, 2).map(tag => (
                           <span key={tag} className="text-xs bg-white/5 px-1 rounded opacity-80">
-                            {tag}
+                            {tag.charAt(0).toUpperCase() + tag.slice(1)}
                           </span>
                         ))}
                         {agent.tags.length > 2 && (

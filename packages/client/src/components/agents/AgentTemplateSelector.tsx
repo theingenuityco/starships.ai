@@ -174,7 +174,7 @@ export function AgentTemplateSelector({
                     className={`text-xs ${categoryColors[template.category as keyof typeof categoryColors]}`}
                   >
                     <CategoryIcon className="w-3 h-3 mr-1" />
-                    {template.category}
+                    {template.category.charAt(0).toUpperCase() + template.category.slice(1)}
                   </Badge>
                   {template.rating && (
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -197,7 +197,7 @@ export function AgentTemplateSelector({
           <div className="flex flex-wrap gap-1.5 mb-4">
             {template.tags.slice(0, 3).map((tag: string) => (
               <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5">
-                {tag}
+                {tag.charAt(0).toUpperCase() + tag.slice(1)}
               </Badge>
             ))}
             {template.tags.length > 3 && (

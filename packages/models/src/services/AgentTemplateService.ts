@@ -79,6 +79,17 @@ export class AgentTemplateService {
     return this.templateRepository.createAgentFromTemplate(templateId, agentName.trim(), authorId);
   }
 
+  async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {
+    if (!agentId) {
+      throw new Error('Agent ID is required');
+    }
+
+    console.log('[AgentTemplateService] Creating template from agent:', agentId);
+    const result = await this.templateRepository.createTemplateFromAgent(agentId);
+    console.log('[AgentTemplateService] Template creation result:', result ? 'Success' : 'Failed');
+    return result;
+  }
+
   async rateTemplate(id: string, rating: number): Promise<void> {
     if (rating < 1 || rating > 5) {
       throw new Error('Rating must be between 1 and 5');

@@ -300,4 +300,7 @@ export interface AgentTemplateRepository extends Repository<AgentTemplate> {
 
   // Create agent from template
   createAgentFromTemplate(templateId: string, agentName: string, authorId: string): Promise<Agent>;
+
+  // Create template from public agent
+  createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null>;
 }

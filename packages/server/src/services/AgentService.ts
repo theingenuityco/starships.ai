@@ -62,7 +62,7 @@ export class AgentService {
       allowedStarshipClasses: createRequest.allowedStarshipClasses,
 
       // Auto-generated fields
-      authorId: 'system', // This will be overridden by route
+      authorId: createRequest.authorId || 'system', // Use provided authorId or default to system
       version: '1.0.0',
       createdAt: now,
       updatedAt: now,
@@ -113,8 +113,16 @@ export class AgentService {
   static async getAgentsByAuthor(authorId: string): Promise<AgentConfig[]> {
     try {
       await this.initialize();
+      console.log(`[AGENT-SERVICE] Finding agents for author: ${authorId}`);
       const agentRepo = RepositoryFactory.getAgentRepository();
       const agents = await agentRepo.findByAuthor(authorId);
+      console.log(`[AGENT-SERVICE] Found ${agents.length} agents for author: ${authorId}`);
+
+      // Log each agent's authorId to verify it matches
+      agents.forEach((agent) => {
+        console.log(`[AGENT-SERVICE] Agent ${agent.id} has authorId: ${agent.authorId}`);
+      });
+
       return agents.map(this.convertToAgentConfig);
     } catch (error: any) {
       console.error('[AGENT-SERVICE] Failed to get agents by author:', authorId, error);

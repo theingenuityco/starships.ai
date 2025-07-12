@@ -220,4 +220,55 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     const results = await this.connection.executeWrite<{ a: Agent }>(query, { agent });
     return results[0].a;
   }
+
+  async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {
+    // First get the agent
+    const query = `
+      MATCH (a:Agent {id: $agentId})
+      WHERE a.isPublic = true
+      RETURN a
+    `;
+
+    const agentResults = await this.connection.executeQuery<{ a: Agent }>(query, { agentId });
+
+    if (agentResults.length === 0) {
+      return null; // Agent not found or not public
+    }
+
+    const agent = agentResults[0].a;
+
+    // Create template from agent
+    const templateId = uuidv4();
+    const now = new Date().toISOString();
+
+    const template: AgentTemplate = {
+      id: templateId,
+      name: `${agent.name} Template`,
+      description: agent.description || '',
+      category: agent.category,
+      tags: [...(agent.tags || [])],
+      systemPrompt: agent.systemPrompt || '',
+      model: agent.model,
+      temperature: agent.temperature,
+      maxTokens: agent.maxTokens,
+      authorId: agent.authorId,
+      isPublic: true,
+      usageCount: 0,
+      rating: agent.rating,
+      icon: '🤖', // Default icon
+      previewPrompts: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const createQuery = `
+      CREATE (t:AgentTemplate $template)
+      RETURN t
+    `;
+
+    const results = await this.connection.executeWrite<{ t: AgentTemplate }>(createQuery, {
+      template,
+    });
+    return results[0].t;
+  }
 }

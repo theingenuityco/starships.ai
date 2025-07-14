@@ -135,3 +135,117 @@ export interface AgentTemplate {
   createdAt: string;
   updatedAt: string;
 }
+
+// Sibil-specific interfaces
+export interface ContentBlock {
+  type: 'text' | 'markdown' | 'code' | 'table';
+  content: string;
+  metadata?: {
+    language?: string;
+    headers?: string[];
+  };
+}
+
+export interface SibilRequest {
+  provider: 'openai' | 'anthropic';
+  model?: string;
+  message: string;
+  user_id: string;
+  session_id?: string;
+}
+
+export interface SibilResponse {
+  content: string;
+  structured_content?: ContentBlock[];
+  provider: 'openai' | 'anthropic';
+  model: string;
+  usage?: UsageStats;
+}
+
+// Streaming interfaces for Sibil
+export interface SibilStreamRequest extends SibilRequest {
+  stream: true;
+}
+
+export interface SibilStreamChunk {
+  type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
+  content?: string;
+  structured_content?: ContentBlock[];
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  usage?: UsageStats;
+  error?: string;
+  chunk_id?: string;
+  is_final?: boolean;
+  stream_id?: string;
+}
+
+export interface SibilStreamResponse {
+  stream_id: string;
+  status: 'started' | 'streaming' | 'completed' | 'error';
+}
+
+// Socket.IO Event Definitions
+export interface SocketIOEvents {
+  // Client to Server events
+  'sibil:start-stream': (request: SibilSocketRequest) => void;
+  'sibil:stop-stream': (streamId: string) => void;
+  'sibil:join-room': (userId: string) => void;
+  'sibil:leave-room': (userId: string) => void;
+
+  // Server to Client events
+  'sibil:stream-start': (streamId: string) => void;
+  'sibil:stream-chunk': (chunk: SibilSocketStreamChunk) => void;
+  'sibil:stream-complete': (response: SibilResponse) => void;
+  'sibil:stream-error': (error: SibilStreamError) => void;
+  'sibil:typing-start': () => void;
+  'sibil:typing-stop': () => void;
+  'connection-status': (status: ConnectionStatus) => void;
+}
+
+// Enhanced request for Socket.IO
+export interface SibilSocketRequest extends SibilRequest {
+  stream_id: string;
+  typewriter_enabled?: boolean;
+  typing_speed?: number; // characters per second (default: 75)
+}
+
+// Typewriter-specific types
+export interface TypewriterChunk {
+  type: 'character' | 'word' | 'line' | 'complete';
+  content: string;
+  position: number;
+  total_length?: number;
+  delay?: number; // milliseconds
+  is_code?: boolean;
+  is_markdown?: boolean;
+}
+
+// Enhanced streaming chunk for Socket.IO
+export interface SibilSocketStreamChunk extends SibilStreamChunk {
+  stream_id: string;
+  typewriter?: TypewriterChunk;
+  typing_speed?: number;
+  timestamp: number;
+}
+
+// Connection and error types
+export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'error';
+
+export interface SibilStreamError {
+  stream_id?: string;
+  error_code: string;
+  message: string;
+  timestamp: number;
+  recoverable: boolean;
+}
+
+// Socket.IO client state
+export interface SocketConnectionState {
+  connected: boolean;
+  authenticated: boolean;
+  room_joined: boolean;
+  user_id?: string;
+  connection_id?: string;
+  last_ping?: number;
+}

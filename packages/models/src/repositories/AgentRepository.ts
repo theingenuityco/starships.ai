@@ -129,7 +129,10 @@ export class AgentRepository implements AgentRepositoryInterface {
     const connection = getConnection();
     const result = await connection.executeQuery<{ a: Agent }>(
       'MATCH (a:Agent) WHERE a.isPublic = true RETURN a ORDER BY a.usageCount DESC, a.rating DESC SKIP $offset LIMIT $limit',
-      { limit, offset }
+      {
+        limit: Math.floor(Number(limit)),
+        offset: Math.floor(Number(offset)),
+      }
     );
     return result.map((record) => record.a);
   }

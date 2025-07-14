@@ -2,6 +2,9 @@ import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
 import { ChannelRepository } from './ChannelRepository';
 import { LLMRepository } from './LLMRepository';
+import { Neo4jAgentTemplateRepository } from './AgentTemplateRepository';
+import { AgentTemplateService } from '../services/AgentTemplateService';
+import { getConnection } from '../connection';
 
 export { AgentRepository } from './AgentRepository';
 export { UserRepository } from './UserRepository';
@@ -32,7 +35,7 @@ export class RepositoryFactory {
   private static userRepo: UserRepository;
   private static channelRepo: ChannelRepository;
   private static llmRepo: LLMRepository;
-  
+
   // NEW: Aether Core repository instances
   private static starshipRepo: StarshipRepository;
   private static codexRepo: CodexRepository;
@@ -40,6 +43,7 @@ export class RepositoryFactory {
   private static constraintRepo: ConstraintRepository;
   private static conceptRepo: ConceptRepository;
   private static metaAnchorRepo: MetaAnchorRepository;
+  private static agentTemplateService: AgentTemplateService;
 
   static getAgentRepository(): AgentRepository {
     if (!this.agentRepo) {
@@ -91,7 +95,6 @@ export class RepositoryFactory {
     return this.visionRepo;
   }
 
-
   static getConstraintRepository(): ConstraintRepository {
     if (!this.constraintRepo) {
       this.constraintRepo = new ConstraintRepository();
@@ -114,6 +117,17 @@ export class RepositoryFactory {
   }
 
   /**
+   * Get the AgentTemplateService instance
+   */
+  static getAgentTemplateService(): AgentTemplateService {
+    if (!this.agentTemplateService) {
+      const connection = getConnection();
+      this.agentTemplateService = new AgentTemplateService(connection);
+    }
+    return this.agentTemplateService;
+  }
+
+  /**
    * Reset all repository instances - useful for testing
    */
   static resetAll(): void {
@@ -127,5 +141,6 @@ export class RepositoryFactory {
     this.constraintRepo = null as any;
     this.conceptRepo = null as any;
     this.metaAnchorRepo = null as any;
+    this.agentTemplateService = null as any;
   }
 }

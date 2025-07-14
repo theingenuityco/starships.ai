@@ -19,8 +19,14 @@ export { ConstraintRepository } from './repositories/ConstraintRepository';
 export { ConceptRepository } from './repositories/ConceptRepository';
 export { MetaAnchorRepository } from './repositories/MetaAnchorRepository';
 
+// NEW: Agent Templates
+export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';
+
 // Factory for creating repositories
 export { RepositoryFactory } from './repositories';
 
 // NEW: Export AetherCoreService
-export { AetherCoreService } from './services/AetherCoreService'; 
+export { AetherCoreService } from './services/AetherCoreService';
+
+// NEW: Export AgentTemplateService
+export { AgentTemplateService } from './services/AgentTemplateService';

@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { AgentService } from '../services/AgentService';
-import type { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import type {
+  Agent,
+  AgentConfig,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+} from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 
@@ -19,12 +24,43 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       const tagArray = Array.isArray(tags) ? tags : [tags];
       agents = await AgentService.getAgentsByTags(tagArray as string[]);
     } else if (isPublic === 'true') {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const offset = parseInt(req.query.offset as string) || 0;
+      const limit = Math.floor(parseInt(req.query.limit as string) || 50);
+      const offset = Math.floor(parseInt(req.query.offset as string) || 0);
       agents = await AgentService.getPublicAgents(limit, offset);
     } else {
-      // Default: get user's agents
-      agents = await AgentService.getAgentsByAuthor(req.user!.id);
+      // Default: get user's agents + public agents
+      console.log(`[AGENTS] Loading agents for user: ${req.user!.id}`);
+
+      let userAgents: Agent[] = [];
+      let publicAgents: Agent[] = [];
+
+      try {
+        console.log(`[AGENTS] Fetching user agents for: ${req.user!.id}`);
+        userAgents = await AgentService.getAgentsByAuthor(req.user!.id);
+        console.log(`[AGENTS] Found ${userAgents.length} user agents`);
+      } catch (userError: any) {
+        console.error(`[AGENTS] Failed to get user agents:`, userError);
+        // Continue with empty user agents array
+      }
+
+      try {
+        console.log(`[AGENTS] Fetching public agents`);
+        publicAgents = await AgentService.getPublicAgents(50, 0);
+        console.log(`[AGENTS] Found ${publicAgents.length} public agents`);
+      } catch (publicError: any) {
+        console.error(`[AGENTS] Failed to get public agents:`, publicError);
+        // Continue with empty public agents array
+      }
+
+      // Combine and deduplicate
+      const allAgents = [...userAgents];
+      for (const publicAgent of publicAgents) {
+        if (!allAgents.find((a) => a.id === publicAgent.id)) {
+          allAgents.push(publicAgent);
+        }
+      }
+      agents = allAgents;
+      console.log(`[AGENTS] Total agents returned: ${agents.length}`);
     }
 
     res.json(agents);
@@ -37,8 +73,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // ADD: Public agents endpoint
 router.get('/public', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const limit = Math.floor(parseInt(req.query.limit as string) || 50);
+    const offset = Math.floor(parseInt(req.query.offset as string) || 0);
     const agents = await AgentService.getPublicAgents(limit, offset);
     res.json(agents);
   } catch (error) {
@@ -85,7 +121,11 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       ...createRequest,
       authorId: req.user!.id, // Override with authenticated user ID
     };
+    console.log(
+      `[AGENTS] Creating agent with authorId: ${agentData.authorId} for user: ${req.user!.id}`
+    );
     const agent = await AgentService.createAgent(agentData);
+    console.log(`[AGENTS] Agent created successfully: ${agent.id}, authorId: ${agent.authorId}`);
     res.status(201).json(agent);
   } catch (error) {
     console.error('Error creating agent:', error);

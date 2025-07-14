@@ -63,6 +63,7 @@ export interface CreateAgentRequest {
   maxTokens?: number;
   customInstructions?: string;
   allowedStarshipClasses?: ('scout' | 'cruiser')[];
+  authorId?: string;
 }
 
 export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
@@ -106,6 +107,34 @@ export interface LLMProvider {
       maxTokens?: number;
     }
   ): Promise<LLMResult>;
+}
+
+// NEW: Agent Templates System
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  tags: string[];
+
+  // Template configuration
+  systemPrompt: string;
+  model: string; // References LLM.id
+  temperature?: number;
+  maxTokens?: number;
+
+  // Template metadata
+  authorId: string;
+  isPublic: boolean;
+  usageCount: number;
+  rating?: number;
+
+  // Template preview
+  icon?: string;
+  previewPrompts?: string[]; // Example prompts to show what the template can do
+
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Sibil-specific interfaces
@@ -164,7 +193,7 @@ export interface SocketIOEvents {
   'sibil:stop-stream': (streamId: string) => void;
   'sibil:join-room': (userId: string) => void;
   'sibil:leave-room': (userId: string) => void;
-  
+
   // Server to Client events
   'sibil:stream-start': (streamId: string) => void;
   'sibil:stream-chunk': (chunk: SibilSocketStreamChunk) => void;

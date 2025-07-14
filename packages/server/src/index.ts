@@ -5,6 +5,8 @@
 
 import express from 'express';
 import cors from 'cors';
+import { createServer } from 'http';
+import { initializeSocketIO } from './socket';
 import getStore from './store';
 import {
   AgentRepository,
@@ -24,6 +26,7 @@ import {
 // Route imports
 import agentRoutes from './routes/agents';
 import chatRoutes from './routes/chat';
+import sibilRoutes from './routes/sibil';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
@@ -105,19 +108,25 @@ initializeStarshipRoutes({
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/sibil', sibilRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', redeployRoutes);
 
+// Create HTTP server and initialize Socket.IO
+const httpServer = createServer(app);
+
+// Initialize Socket.IO
+const socketService = initializeSocketIO(httpServer);
+
 // Start server
-app.listen(PORT, async () => {
+httpServer.listen(PORT, async () => {
   try {
     // Initialize database connection
     await dbConnection.connect();
     await dbConnection.initializeSchema();
     console.log('✅ Neo4j database connected and schema initialized');
-
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();
     console.log('✅ AgentService initialized with default agents');
@@ -126,6 +135,10 @@ app.listen(PORT, async () => {
     const templateService = RepositoryFactory.getAgentTemplateService();
     await templateService.seedDefaultTemplates();
     console.log('✅ AgentTemplateService initialized with default templates');
+
+    // Log Socket.IO status
+    console.log('✅ Socket.IO server initialized');
+    console.log(`📡 WebSocket connections: ${socketService.getConnectedUsersCount()}`);
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);
@@ -133,6 +146,7 @@ app.listen(PORT, async () => {
 
   console.log(`🚀 Aether Core Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔌 Socket.IO: ws://localhost:${PORT}`);
   console.log(`🛸 Starships ready for launch!`);
 });
 

@@ -74,15 +74,45 @@ export const CACHE_KEYS = {
   AGENT_BY_ID: (id: string) => `agent:${id}`,
   STARSHIP_BY_ID: (id: string) => `starship:${id}`,
   STARSHIP_AGENTS: (id: string) => `starship:${id}:agents`,
+  // Template cache keys
+  TEMPLATES_ALL: 'templates:all',
+  TEMPLATES_BY_CATEGORY: (category: string) => `templates:category:${category}`,
+  TEMPLATES_BY_AUTHOR: (authorId: string) => `templates:author:${authorId}`,
+  TEMPLATES_PUBLIC: (limit: number, offset: number) => `templates:public:${limit}:${offset}`,
+  TEMPLATES_SEARCH: (query: string) => `templates:search:${query}`,
+  TEMPLATE_BY_ID: (id: string) => `template:${id}`,
 }
 
 // Helper function to invalidate related caches when agents are modified
 export const invalidateAgentCaches = (agentId?: string) => {
+  console.log(
+    '[CACHE] Invalidating agent caches',
+    agentId ? `for agent ${agentId}` : 'for all agents'
+  )
+
   if (agentId) {
     apiCache.invalidate(CACHE_KEYS.AGENT_BY_ID(agentId))
+    console.log('[CACHE] Invalidated specific agent cache:', CACHE_KEYS.AGENT_BY_ID(agentId))
   }
 
   // Invalidate all agent list caches
   apiCache.invalidatePattern('^agents:')
+  console.log('[CACHE] Invalidated all agent list caches with pattern: ^agents:')
+
   apiCache.invalidatePattern('^starship:.*:agents$')
+  console.log('[CACHE] Invalidated all starship agent caches with pattern: ^starship:.*:agents$')
+
+  // Log remaining cache keys for debugging
+  const stats = apiCache.getStats()
+  console.log('[CACHE] Remaining cache keys after invalidation:', stats.keys)
+}
+
+// Helper function to invalidate template caches
+export const invalidateTemplateCaches = (templateId?: string) => {
+  if (templateId) {
+    apiCache.invalidate(CACHE_KEYS.TEMPLATE_BY_ID(templateId))
+  }
+
+  // Invalidate all template list caches
+  apiCache.invalidatePattern('^templates:')
 }

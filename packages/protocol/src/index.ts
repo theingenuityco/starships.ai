@@ -63,6 +63,7 @@ export interface CreateAgentRequest {
   maxTokens?: number;
   customInstructions?: string;
   allowedStarshipClasses?: ('scout' | 'cruiser')[];
+  authorId?: string;
 }
 
 export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {

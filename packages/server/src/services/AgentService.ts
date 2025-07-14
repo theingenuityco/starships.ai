@@ -1,4 +1,4 @@
-import { RepositoryFactory, Agent, createConnection, Neo4jConfig } from '@starships/models';
+import { RepositoryFactory, Agent } from '@starships/models';
 import { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { env } from '../config/environment';
 
@@ -13,29 +13,24 @@ export class AgentService {
       return;
     }
 
-    const config: Neo4jConfig = {
-      uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
-      username: process.env.NEO4J_USERNAME || 'neo4j',
-      [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[DEFAULT-PASSWORD]',
-      database: process.env.NEO4J_DATABASE || 'neo4j',
-    };
-
-    const connection = createConnection(config);
-    await connection.connect();
-    await connection.initializeSchema();
-
+    // No need to create connection here - it's already initialized in the main server
     await this.seedDefaultAgents();
 
     this.isInitialized = true;
   }
 
   static async loadAgents(): Promise<AgentConfig[]> {
-    await this.initialize();
+    try {
+      await this.initialize();
 
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await agentRepo.findAll();
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agents = await agentRepo.findAll();
 
-    return agents.map(this.convertToAgentConfig);
+      return agents.map(this.convertToAgentConfig);
+    } catch (error: any) {
+      console.error('[AGENT-SERVICE] Failed to load agents:', error);
+      throw new Error(`Failed to load agents: ${error?.message || 'Unknown error'}`);
+    }
   }
 
   static async getAgent(id: string): Promise<AgentConfig | undefined> {
@@ -67,7 +62,7 @@ export class AgentService {
       allowedStarshipClasses: createRequest.allowedStarshipClasses,
 
       // Auto-generated fields
-      authorId: 'system', // This will be overridden by route
+      authorId: createRequest.authorId || 'system', // Use provided authorId or default to system
       version: '1.0.0',
       createdAt: now,
       updatedAt: now,
@@ -116,10 +111,23 @@ export class AgentService {
   }
 
   static async getAgentsByAuthor(authorId: string): Promise<AgentConfig[]> {
-    await this.initialize();
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await agentRepo.findByAuthor(authorId);
-    return agents.map(this.convertToAgentConfig);
+    try {
+      await this.initialize();
+      console.log(`[AGENT-SERVICE] Finding agents for author: ${authorId}`);
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agents = await agentRepo.findByAuthor(authorId);
+      console.log(`[AGENT-SERVICE] Found ${agents.length} agents for author: ${authorId}`);
+
+      // Log each agent's authorId to verify it matches
+      agents.forEach((agent) => {
+        console.log(`[AGENT-SERVICE] Agent ${agent.id} has authorId: ${agent.authorId}`);
+      });
+
+      return agents.map(this.convertToAgentConfig);
+    } catch (error: any) {
+      console.error('[AGENT-SERVICE] Failed to get agents by author:', authorId, error);
+      throw new Error(`Failed to get agents by author: ${error?.message || 'Unknown error'}`);
+    }
   }
 
   static async getAgentsByTags(tags: string[]): Promise<AgentConfig[]> {
@@ -130,10 +138,15 @@ export class AgentService {
   }
 
   static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentConfig[]> {
-    await this.initialize();
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await agentRepo.findPublic(limit, offset);
-    return agents.map(this.convertToAgentConfig);
+    try {
+      await this.initialize();
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agents = await agentRepo.findPublic(limit, offset);
+      return agents.map(this.convertToAgentConfig);
+    } catch (error: any) {
+      console.error('[AGENT-SERVICE] Failed to get public agents:', error);
+      throw new Error(`Failed to get public agents: ${error?.message || 'Unknown error'}`);
+    }
   }
 
   static async searchAgents(query: string): Promise<AgentConfig[]> {

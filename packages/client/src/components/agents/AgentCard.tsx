@@ -1,7 +1,23 @@
 'use client'
 
 import { Agent } from '@/lib/api'
-import { Bot, Edit, Trash2, Eye, EyeOff, Star, TestTube, BarChart3 } from 'lucide-react'
+import {
+  Bot,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
+  Star,
+  TestTube,
+  BarChart3,
+  Code,
+  Lightbulb,
+  BarChart2,
+  HeartPulse,
+  Headphones,
+  Database,
+  PenTool,
+} from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -38,29 +54,103 @@ export function AgentCard({
     }
     return colors[category] || colors.general
   }
+
+  const getAvatarBackgroundColor = (category: Agent['category']) => {
+    const colors = {
+      general: 'bg-gray-200',
+      coding: 'bg-gray-200',
+      creative: 'bg-gray-200',
+      analysis: 'bg-gray-200',
+      support: 'bg-gray-200',
+    }
+    return colors[category] || colors.general
+  }
+  const getCategoryIcon = (category: Agent['category']) => {
+    switch (category) {
+      case 'coding':
+        return <Code className="w-3.5 h-3.5 mr-1" />
+      case 'creative':
+        return <Lightbulb className="w-3.5 h-3.5 mr-1" />
+      case 'analysis':
+        return <BarChart2 className="w-3.5 h-3.5 mr-1" />
+      case 'support':
+        return <HeartPulse className="w-3.5 h-3.5 mr-1" />
+      default:
+        return <Bot className="w-3.5 h-3.5 mr-1" />
+    }
+  }
+
+  const getAgentAvatarIcon = (agent: Agent) => {
+    // Determine icon based on agent name or category
+    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
+      return <Headphones className="h-6 w-6" />
+    } else if (
+      agent.name.toLowerCase().includes('data') ||
+      agent.name.toLowerCase().includes('analyst') ||
+      agent.category === 'analysis'
+    ) {
+      return <Database className="h-6 w-6" />
+    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
+      return <PenTool className="h-6 w-6" />
+    } else if (
+      agent.name.toLowerCase().includes('code') ||
+      agent.name.toLowerCase().includes('coding') ||
+      agent.category === 'coding'
+    ) {
+      return <Code className="h-6 w-6" />
+    } else {
+      return <Bot className="h-6 w-6" />
+    }
+  }
+
+  const getAgentAvatarContent = (agent: Agent) => {
+    // Determine emoji-like icon based on agent name or category
+    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
+      return '🎧' // Headphones emoji
+    } else if (
+      agent.name.toLowerCase().includes('data') ||
+      agent.name.toLowerCase().includes('analyst') ||
+      agent.category === 'analysis'
+    ) {
+      return '📊' // Bar chart emoji
+    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
+      return '✏️' // Pencil emoji
+    } else if (
+      agent.name.toLowerCase().includes('code') ||
+      agent.name.toLowerCase().includes('coding') ||
+      agent.category === 'coding'
+    ) {
+      return '🔍' // Magnifying glass emoji
+    } else {
+      return '🤖' // Robot emoji as default
+    }
+  }
+
   return (
     <Card
       className={`
-        cursor-pointer transition-all duration-200 hover:shadow-md
-        ${isSelected ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-accent/50'}
+        cursor-pointer transition-all duration-200 hover:shadow-md relative rounded-lg
+        ${isSelected ? 'ring-2 ring-primary bg-primary/5 border-l-4 border-l-primary' : 'hover:bg-accent/50'}
       `}
       onClick={onClick}
     >
-      <div className="p-4">
+      <div className="p-5">
         <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 flex-1">
-            <Avatar className="h-10 w-10">
+          <div className="flex items-start space-x-4 flex-1">
+            <Avatar className="h-12 w-12 ring-2 ring-background shadow-sm">
               <AvatarFallback
                 className={`
-                ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
+                ${isSelected ? 'bg-primary text-primary-foreground' : `${getAvatarBackgroundColor(agent.category)} text-foreground`}
               `}
               >
-                <Bot className="h-5 w-5" />
+                <span className="text-xl">{getAgentAvatarContent(agent)}</span>
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="flex-1 min-w-0 pr-16">
+              {' '}
+              {/* Added right padding to prevent content overlap with action buttons */}
+              <div className="flex flex-wrap items-center gap-2 mb-2">
                 <h3
                   className={`
                   font-medium text-sm truncate
@@ -70,11 +160,17 @@ export function AgentCard({
                   {agent.name}
                 </h3>
 
-                <Badge className={`text-xs ${getCategoryColor(agent.category)}`}>
-                  {agent.category}
+                <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center`}>
+                  {getCategoryIcon(agent.category)}
+                  {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
                 </Badge>
 
-                {!agent.isPublic && <EyeOff className="w-3 h-3 text-muted-foreground" />}
+                {!agent.isPublic && (
+                  <span className="inline-flex items-center">
+                    <EyeOff className="w-3 h-3 text-muted-foreground mr-1" />
+                    <span className="text-xs text-muted-foreground">Private</span>
+                  </span>
+                )}
 
                 {agent.rating && (
                   <div className="flex items-center gap-1">
@@ -83,41 +179,71 @@ export function AgentCard({
                   </div>
                 )}
               </div>
-
               {agent.description && (
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
                   {agent.description}
                 </p>
               )}
-
               {agent.tags && agent.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
+                <div className="flex flex-wrap gap-1.5 mb-3">
                   {agent.tags.slice(0, 3).map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs px-1 py-0">
-                      {tag}
+                    <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5 rounded-md">
+                      {tag.charAt(0).toUpperCase() + tag.slice(1)}
                     </Badge>
                   ))}
                   {agent.tags.length > 3 && (
-                    <Badge variant="outline" className="text-xs px-1 py-0">
+                    <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-md">
                       +{agent.tags.length - 3}
                     </Badge>
                   )}
                 </div>
               )}
-
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="bg-secondary/50 px-2 py-1 rounded">{agent.model}</span>
+                <span className="bg-secondary/50 px-2.5 py-1 rounded-md font-mono">
+                  {agent.model}
+                </span>
 
-                <div className="flex items-center gap-2">
-                  <span>{agent.usageCount || 0} uses</span>
-                  <span>v{agent.version || '1.0.0'}</span>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center">
+                    <svg
+                      className="w-3 h-3 mr-1 text-muted-foreground/70"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    {agent.usageCount || 0} uses
+                  </span>
+                  <span className="flex items-center">
+                    <svg
+                      className="w-3 h-3 mr-1 text-muted-foreground/70"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                    v{agent.version || '1.0.0'}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Action buttons positioned on the right side */}
           {showActions && (onEdit || onDelete || onTest || onAnalytics) && (
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex flex-col items-center gap-1.5 absolute top-4 right-4 z-10">
               {onAnalytics && (
                 <Button
                   size="sm"
@@ -127,8 +253,9 @@ export function AgentCard({
                     onAnalytics(agent)
                   }}
                   title="View Analytics"
+                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/20"
                 >
-                  <BarChart3 className="w-3 h-3" />
+                  <BarChart3 className="w-3.5 h-3.5" />
                 </Button>
               )}
 
@@ -141,8 +268,9 @@ export function AgentCard({
                     onTest(agent)
                   }}
                   title="Test Agent"
+                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/20"
                 >
-                  <TestTube className="w-3 h-3" />
+                  <TestTube className="w-3.5 h-3.5" />
                 </Button>
               )}
 
@@ -155,8 +283,9 @@ export function AgentCard({
                     onEdit(agent)
                   }}
                   title="Edit Agent"
+                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/20"
                 >
-                  <Edit className="w-3 h-3" />
+                  <Edit className="w-3.5 h-3.5" />
                 </Button>
               )}
 
@@ -168,10 +297,10 @@ export function AgentCard({
                     e.stopPropagation()
                     onDelete(agent)
                   }}
-                  className="text-destructive hover:text-destructive"
+                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-destructive/10 hover:text-destructive shadow-sm border border-border/20"
                   title="Delete Agent"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               )}
             </div>

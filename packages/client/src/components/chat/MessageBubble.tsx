@@ -9,15 +9,14 @@ import { IntelligentContentRenderer } from '@/components/sibil/renderers/Intelli
 interface MessageBubbleProps {
   message: Message
   streaming?: boolean
-  typewriterContent?: string
 }
 
-export function MessageBubble({ message, streaming = false, typewriterContent }: MessageBubbleProps) {
+export function MessageBubble({ message, streaming = false }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isSending = message.sending === true
   
-  // Use typewriter content during streaming, otherwise use message content
-  const displayContent = streaming && typewriterContent ? typewriterContent : message.content
+  // Use message content directly (streaming content is updated in real-time)
+  const displayContent = message.content
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>

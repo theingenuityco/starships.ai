@@ -10,12 +10,14 @@ interface StreamingIndicatorProps {
   onStop: () => void
   connectionStatus?: ConnectionStatus
   isTyping?: boolean
+  agentName?: string
 }
 
 export function StreamingIndicator({
   onStop,
   connectionStatus = 'connected',
-  isTyping = false
+  isTyping = false,
+  agentName
 }: StreamingIndicatorProps) {
   return (
     <motion.div
@@ -50,32 +52,10 @@ export function StreamingIndicator({
         'bg-red-500'
       }`} />
       
-      {/* Streaming/Typing text with dots animation */}
-      {isTyping && (
-        <motion.div className="flex items-center gap-1">
-          <span className="text-xs text-muted-foreground">Sibil is typing</span>
-          <div className="flex gap-1">
-            {[0, 1, 2].map((i) => (
-              <motion.div
-                key={i}
-                className="w-1 h-1 bg-current rounded-full"
-                animate={{ opacity: [0.3, 1, 0.3] }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  delay: i * 0.2
-                }}
-              />
-            ))}
-          </div>
-        </motion.div>
-      )}
-      
-      {!isTyping && (
-        <span className="text-xs font-medium text-blue-400 sibil-streaming-dots">
-          Streaming
-        </span>
-      )}
+      {/* Streaming text without typing message */}
+      <span className="text-xs font-medium text-blue-400 sibil-streaming-dots">
+        Streaming
+      </span>
       
       {/* Stop button with hover animation */}
       <motion.div

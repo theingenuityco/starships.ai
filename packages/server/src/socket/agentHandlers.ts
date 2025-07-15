@@ -1,6 +1,6 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketIOEvents, AgentSocketRequest, AgentSocketStreamChunk, ChatRequest } from '@starships/protocol';
-import { chat } from '@starships/agent-engine';
+import { chat, chatStream } from '@starships/agent-engine';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import getStore from '../store';
@@ -59,75 +59,78 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
           agent_id: request.agent_id,
           user_id: userId,
           message: request.message,
-          stream: false // We'll handle streaming manually for typewriter effect
+          stream: true // Enable true streaming
         };
 
         // Get memory store
         const store = getStore();
 
-        // Call agent engine
-        const response = await chat(chatRequest, store);
-
-        // Stream response with typewriter effect
+        // Use true streaming from agent engine with typewriter effect
+        let fullResponse = '';
         const typingSpeed = request.typing_speed || 75; // chars per second
         const typewriterEnabled = request.typewriter_enabled !== false;
-        const content = response.reply;
+        
+        try {
+          for await (const chunk of chatStream(chatRequest, store)) {
+            fullResponse += chunk;
+            
+            // Create typewriter chunks if enabled
+            if (typewriterEnabled) {
+              const characters = chunk.split('');
+              for (let i = 0; i < characters.length; i++) {
+                const char = characters[i];
+                const delay = 1000 / typingSpeed; // milliseconds per character
 
-        if (typewriterEnabled && content) {
-          // Character-by-character streaming
-          const characters = content.split('');
-          let accumulatedContent = '';
+                const typewriterChunk: AgentSocketStreamChunk = {
+                  stream_id: request.stream_id,
+                  agent_id: request.agent_id,
+                  type: 'content',
+                  content: char,
+                  typewriter: {
+                    type: 'character',
+                    content: char,
+                    position: fullResponse.length - chunk.length + i,
+                    total_length: fullResponse.length,
+                    delay,
+                    is_code: false, // TODO: Add code detection if needed
+                    is_markdown: false // TODO: Add markdown detection if needed
+                  },
+                  timestamp: Date.now()
+                };
 
-          for (let i = 0; i < characters.length; i++) {
-            const char = characters[i];
-            accumulatedContent += char;
-            const delay = 1000 / typingSpeed; // milliseconds per character
+                socket.emit('agent:stream-chunk', typewriterChunk);
 
-            const typewriterChunk: AgentSocketStreamChunk = {
-              stream_id: request.stream_id,
-              agent_id: request.agent_id,
-              type: 'content',
-              content: char,
-              typewriter: {
-                type: 'character',
-                content: char,
-                position: i,
-                total_length: content.length,
-                delay,
-                is_code: false, // TODO: Detect code blocks
-                is_markdown: false // TODO: Detect markdown
-              },
-              timestamp: Date.now()
-            };
-
-            socket.emit('agent:stream-chunk', typewriterChunk);
-
-            // Add delay for typewriter effect (except for last character)
-            if (i < characters.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, delay));
+                // Add small delay for typewriter effect
+                if (i < characters.length - 1) {
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                }
+              }
+            } else {
+              // Send chunk without typewriter effect
+              const streamChunk: AgentSocketStreamChunk = {
+                stream_id: request.stream_id,
+                agent_id: request.agent_id,
+                type: 'content',
+                content: chunk,
+                timestamp: Date.now()
+              };
+              socket.emit('agent:stream-chunk', streamChunk);
             }
           }
-        } else {
-          // Send content without typewriter effect
-          const chunk: AgentSocketStreamChunk = {
-            stream_id: request.stream_id,
-            agent_id: request.agent_id,
-            type: 'content',
-            content: content,
-            timestamp: Date.now()
-          };
-          socket.emit('agent:stream-chunk', chunk);
-        }
 
-        // Send completion
-        socket.emit('agent:typing-stop', request.agent_id);
-        socket.emit('agent:stream-complete', {
-          content: response.reply,
-          agent_id: request.agent_id,
-          session_id: request.session_id,
-          timestamp: new Date().toISOString(),
-          usage: response.usage
-        });
+          // Send completion
+          socket.emit('agent:typing-stop', request.agent_id);
+          socket.emit('agent:stream-complete', {
+            content: fullResponse,
+            agent_id: request.agent_id,
+            session_id: request.session_id,
+            timestamp: new Date().toISOString(),
+            usage: undefined // Usage tracking will be added later
+          });
+        } catch (streamError) {
+          console.error(`[AGENT SOCKET] Streaming error:`, streamError);
+          throw streamError;
+        }
 
         console.log(`[AGENT SOCKET] Stream completed for user ${userId}, agent ${request.agent_id}`);
 

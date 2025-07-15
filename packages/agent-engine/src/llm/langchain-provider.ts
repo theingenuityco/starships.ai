@@ -20,6 +20,12 @@ export class LangChainProvider implements LLMProvider {
     const messages = this.convertToLangChainMessages(prompt.messages);
 
     try {
+      if (opts?.stream) {
+        // For streaming, we need to return a different interface
+        // This will be handled by the streaming version below
+        throw new Error('Use completeStream for streaming responses');
+      }
+
       const response = await model.invoke(messages);
       
       const usage = (response.response_metadata?.tokenUsage || response.usage_metadata) ? {
@@ -33,6 +39,23 @@ export class LangChainProvider implements LLMProvider {
       };
     } catch (error) {
       throw new Error(`LLM completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async *completeStream(prompt: LLMChatPrompt, opts?: { temperature?: number; maxTokens?: number }): AsyncGenerator<string, void, unknown> {
+    const model = this.createModel(opts);
+    const messages = this.convertToLangChainMessages(prompt.messages);
+
+    try {
+      const stream = await model.stream(messages);
+      
+      for await (const chunk of stream) {
+        if (chunk.content) {
+          yield chunk.content as string;
+        }
+      }
+    } catch (error) {
+      throw new Error(`LLM streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

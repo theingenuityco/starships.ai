@@ -13,7 +13,6 @@ import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { useTypewriter } from '@/hooks/useTypewriter'
 import { Wifi, WifiOff, AlertCircle } from 'lucide-react'
-import { StreamingIndicator } from '@/components/sibil/StreamingIndicator'
 
 interface ChatInterfaceProps {
   agent: Agent
@@ -36,7 +35,6 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
-  const [isTyping, setIsTyping] = useState(false)
   const [currentStreamAbort, setCurrentStreamAbort] = useState<(() => void) | null>(null)
   const currentSessionId = useRef<string | null>(sessionId)
 
@@ -114,26 +112,16 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
     setError(null)
     typewriter.reset()
 
-    // Create streaming assistant message
+    // Create streaming assistant message ID but don't add the message yet
     const assistantMessageId = `assistant-${Date.now()}`
     setStreamingMessageId(assistantMessageId)
 
-    const streamingMessage: Message = {
-      id: assistantMessageId,
-      content: '',
-      role: 'assistant',
-      timestamp: new Date().toISOString(),
-      sessionId: sessionId,
-      streaming: true,
-      agentId: agent.id
-    }
-
-    const messagesWithStreaming = [
+    // Update messages with just the final user message (no empty assistant message yet)
+    const messagesWithoutStreaming = [
       ...updatedMessages.slice(0, -1), // Remove sending message
       { ...userMessage, sending: false }, // Add final user message
-      streamingMessage, // Add streaming assistant message
     ]
-    setMessages(messagesWithStreaming)
+    setMessages(messagesWithoutStreaming)
 
     // Start Socket.IO streaming
     const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
@@ -141,42 +129,50 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       message: content
     }, {
       onChunk: (chunk, accumulated) => {
-        if (chunk.typewriter) {
-          typewriter.addChunk(chunk.typewriter)
-        }
-        
-        // Update streaming message with accumulated content
-        setMessages(prev => prev.map(msg =>
-          msg.id === assistantMessageId
-            ? { ...msg, content: typewriter.displayText || accumulated }
-            : msg
-        ))
+        // Create assistant message on first chunk, then update with accumulated content
+        setMessages(prev => {
+          const hasAssistantMessage = prev.some(msg => msg.id === assistantMessageId)
+          
+          if (!hasAssistantMessage) {
+            // First chunk - create the assistant message
+            const streamingMessage: Message = {
+              id: assistantMessageId,
+              content: accumulated,
+              role: 'assistant',
+              timestamp: new Date().toISOString(),
+              sessionId: sessionId,
+              streaming: true,
+              agentId: agent.id
+            }
+            return [...prev, streamingMessage]
+          } else {
+            // Subsequent chunks - update existing message
+            return prev.map(msg =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: accumulated }
+                : msg
+            )
+          }
+        })
       },
       onComplete: (finalMessage) => {
-        // Replace streaming message with final message
-        const finalMessages = messages.map(msg =>
-          msg.id === assistantMessageId
-            ? {
-                ...finalMessage,
-                id: assistantMessageId,
-                streaming: false
-              }
-            : msg
-        )
+        // Update the streaming message to final state
+        setMessages(prev => {
+          const updatedMessages = prev.map(msg =>
+            msg.id === assistantMessageId
+              ? {
+                  ...finalMessage,
+                  id: assistantMessageId,
+                  streaming: false
+                }
+              : msg
+          )
+          
+          // Save to history
+          saveChatHistory(sessionId, updatedMessages)
+          return updatedMessages
+        })
         
-        // Update with final user message and assistant response
-        const completeMessages = [
-          ...messagesWithStreaming.slice(0, -2),
-          { ...userMessage, sending: false },
-          {
-            ...finalMessage,
-            id: assistantMessageId,
-            streaming: false
-          }
-        ]
-        
-        setMessages(completeMessages)
-        saveChatHistory(sessionId, completeMessages)
         setStreamingMessageId(null)
         setLoading(false)
         setError(null)
@@ -191,13 +187,17 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
         setLoading(false)
         
         // Save messages without the failed attempt
-        saveChatHistory(sessionId, messages)
+        setMessages(prev => {
+          const cleanMessages = prev.filter(msg => msg.id !== assistantMessageId)
+          saveChatHistory(sessionId, cleanMessages)
+          return cleanMessages
+        })
       },
       onTypingStart: () => {
-        setIsTyping(true)
+        // Removed typing indicator - content streams directly
       },
       onTypingStop: () => {
-        setIsTyping(false)
+        // Removed typing indicator - content streams directly
       }
     })
 
@@ -286,34 +286,12 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
       <div className="flex-1 overflow-hidden bg-background/50">
         {/* TODO: Add accessibility improvements (ARIA labels, keyboard nav) */}
         <MessageList
-          messages={messages.map(msg =>
-            msg.id === streamingMessageId
-              ? { ...msg, content: typewriter.displayText || msg.content }
-              : msg
-          )}
+          messages={messages}
           loading={loading}
           error={error}
         />
       </div>
 
-      {/* Streaming Indicator */}
-      {loading && streamingMessageId && (
-        <div className="px-6 py-3 border-t border-border bg-card/50">
-          <StreamingIndicator
-            onStop={() => {
-              if (currentStreamAbort) {
-                currentStreamAbort()
-                setCurrentStreamAbort(null)
-                setLoading(false)
-                setIsTyping(false)
-                setStreamingMessageId(null)
-              }
-            }}
-            connectionStatus={connectionStatus}
-            isTyping={isTyping}
-          />
-        </div>
-      )}
 
       {/* Input */}
       <div className="border-t border-border bg-card p-6">

@@ -125,6 +125,25 @@ class SocketClient {
     return this.socket?.connected || false;
   }
 
+  // Agent-specific room management
+  joinAgentRoom(agentId: string, userId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('agent:join-room', userId, agentId);
+      console.log(`[SOCKET CLIENT] Joining agent room: agent:${agentId}:${userId}`);
+    } else {
+      console.warn('[SOCKET CLIENT] Cannot join agent room - not connected');
+    }
+  }
+
+  leaveAgentRoom(agentId: string, userId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit('agent:leave-room', userId, agentId);
+      console.log(`[SOCKET CLIENT] Leaving agent room: agent:${agentId}:${userId}`);
+    } else {
+      console.warn('[SOCKET CLIENT] Cannot leave agent room - not connected');
+    }
+  }
+
   on(event: string, listener: (...args: any[]) => void) {
     this.socket?.on(event as any, listener);
   }

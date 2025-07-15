@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, KeyboardEvent } from 'react'
-import { Send, Loader2 } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CHAT_TEXT } from '@/constants/text'
 
@@ -52,7 +52,7 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
   }
 
   return (
-    <div className="flex items-end space-x-3">
+    <div className="flex items-end space-x-2">
       <div className="flex-1">
         <textarea
           ref={textareaRef}
@@ -62,9 +62,9 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
           placeholder={CHAT_TEXT.MESSAGE_PLACEHOLDER}
           disabled={disabled || sending}
           className="
-            w-full min-h-[44px] max-h-[120px] p-3 rounded-lg border border-border
-            bg-background text-foreground placeholder-muted-foreground
-            resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent
+            w-full min-h-[44px] max-h-[120px] p-3 rounded-lg
+            bg-zinc-800 text-white placeholder-zinc-500 border-none
+            resize-none focus:outline-none focus:ring-1 focus:ring-blue-500
             disabled:opacity-50 disabled:cursor-not-allowed
           "
           rows={1}
@@ -75,15 +75,15 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
         onClick={handleSubmit}
         disabled={!message.trim() || disabled || sending}
         size="icon"
-        className="h-11 w-11"
+        className="h-11 w-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         title={sending ? CHAT_TEXT.SENDING_MESSAGE : 'Send message'}
       >
         {sending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="h-4 w-4 bg-white/50 rounded-full"></div>
         ) : (
           <Send className="h-4 w-4" />
         )}
       </Button>
     </div>
   )
-} 
+}

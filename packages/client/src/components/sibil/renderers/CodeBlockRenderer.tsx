@@ -47,8 +47,8 @@ export function CodeBlockRenderer({ code, language }: CodeBlockRendererProps) {
         </Button>
       </div>
       
-      {/* Code content */}
-      <div className="rounded-b-lg overflow-hidden">
+      {/* Code content with horizontal scroll */}
+      <div className="rounded-b-lg overflow-x-auto max-w-full">
         <SyntaxHighlighter
           language={language}
           style={theme === 'dark' ? oneDark : oneLight}
@@ -58,10 +58,11 @@ export function CodeBlockRenderer({ code, language }: CodeBlockRendererProps) {
             fontSize: '13px',
             lineHeight: '1.4',
             background: 'transparent',
+            minWidth: 'max-content',
           }}
           showLineNumbers={code.split('\n').length > 5}
-          wrapLines={true}
-          wrapLongLines={true}
+          wrapLines={false}
+          wrapLongLines={false}
         >
           {code}
         </SyntaxHighlighter>

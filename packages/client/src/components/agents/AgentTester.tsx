@@ -160,7 +160,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
         // Also mark user message as no longer sending on first chunk
         setMessages(prev => prev.map(msg => {
           if (msg.id === assistantMessageId) {
-            return { ...msg, content: accumulated }
+            return {
+              ...msg,
+              content: accumulated,
+              streaming: true // Ensure streaming flag is set for proper rendering
+            }
           }
           if (msg.id === userMessage.id && msg.sending) {
             return { ...msg, sending: false }

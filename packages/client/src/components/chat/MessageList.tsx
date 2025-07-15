@@ -83,12 +83,19 @@ export function MessageList<T = Message>({
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-4">
-        {messages.map((message) => (
-          <MessageComponent
-            key={(message as any).id}
-            message={message}
-          />
-        ))}
+        {messages.map((message) => {
+          // Check if MessageComponent is MessageBubble and pass streaming prop
+          const isMessageBubble = MessageComponent === MessageBubble;
+          const streamingProp = isMessageBubble ? { streaming: (message as any).streaming } : {};
+          
+          return (
+            <MessageComponent
+              key={(message as any).id}
+              message={message}
+              {...streamingProp}
+            />
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
     </ScrollArea>

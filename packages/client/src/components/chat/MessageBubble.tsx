@@ -29,23 +29,27 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
           )}
         </div>
         
-        {/* Clean Message Content */}
+        {/* Clean Message Content with stabilized layout */}
         <div
           className={`
             px-4 py-3 break-words
-            ${isUser 
-              ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm' 
+            ${isUser
+              ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm'
               : 'bg-zinc-800 text-white rounded-t-2xl rounded-br-2xl rounded-bl-sm'
             }
             ${isSending ? 'opacity-70' : ''}
+            min-w-[200px] max-w-full
+            transition-all duration-100 ease-in-out
           `}
         >
-          {/* Content Rendering */}
-          <div className="text-sm">
-            <IntelligentContentRenderer
-              content={message.content}
-              isStreaming={streaming}
-            />
+          {/* Content Rendering with stabilized layout */}
+          <div className="text-sm overflow-hidden">
+            <div className="w-full overflow-hidden">
+              <IntelligentContentRenderer
+                content={message.content}
+                isStreaming={streaming}
+              />
+            </div>
           </div>
           
           {/* Timestamp and Status */}

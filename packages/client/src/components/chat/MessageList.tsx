@@ -23,9 +23,26 @@ export function MessageList<T = Message>({
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
+  // Use a more stable scrolling approach to prevent bouncing
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // Use requestAnimationFrame to ensure DOM has updated before scrolling
+    const scrollToBottom = () => {
+      if (messagesEndRef.current) {
+        // Use instant scroll for code blocks to prevent bouncing
+        const hasCodeBlock = messages.some(msg =>
+          typeof (msg as any).content === 'string' &&
+          (msg as any).content.includes('```')
+        );
+        
+        messagesEndRef.current.scrollIntoView({
+          behavior: hasCodeBlock ? 'auto' : 'smooth',
+          block: 'end'
+        });
+      }
+    };
+    
+    requestAnimationFrame(scrollToBottom);
+  }, [messages]);
 
   if (error) {
     return (

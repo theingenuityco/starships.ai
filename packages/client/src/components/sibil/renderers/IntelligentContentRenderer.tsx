@@ -40,7 +40,7 @@ export function IntelligentContentRenderer({
   }, [content, isStreaming]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 w-full overflow-hidden">
       {renderIntelligentContent(content, parsedSegments)}
     </div>
   );

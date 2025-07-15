@@ -116,12 +116,8 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
     const assistantMessageId = `assistant-${Date.now()}`
     setStreamingMessageId(assistantMessageId)
 
-    // Update messages with just the final user message (no empty assistant message yet)
-    const messagesWithoutStreaming = [
-      ...updatedMessages.slice(0, -1), // Remove sending message
-      { ...userMessage, sending: false }, // Add final user message
-    ]
-    setMessages(messagesWithoutStreaming)
+    // Keep the user message in sending state until first chunk arrives
+    setMessages(updatedMessages)
 
     // Start Socket.IO streaming
     const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
@@ -130,11 +126,12 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
     }, {
       onChunk: (chunk, accumulated) => {
         // Create assistant message on first chunk, then update with accumulated content
+        // Also mark user message as no longer sending on first chunk
         setMessages(prev => {
           const hasAssistantMessage = prev.some(msg => msg.id === assistantMessageId)
           
           if (!hasAssistantMessage) {
-            // First chunk - create the assistant message
+            // First chunk - create the assistant message and mark user message as sent
             const streamingMessage: Message = {
               id: assistantMessageId,
               content: accumulated,
@@ -144,7 +141,11 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
               streaming: true,
               agentId: agent.id
             }
-            return [...prev, streamingMessage]
+            return prev.map(msg =>
+              msg.id === userMessage.id && msg.sending
+                ? { ...msg, sending: false }
+                : msg
+            ).concat(streamingMessage)
           } else {
             // Subsequent chunks - update existing message
             return prev.map(msg =>

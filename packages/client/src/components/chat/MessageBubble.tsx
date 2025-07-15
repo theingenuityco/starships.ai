@@ -40,11 +40,11 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
         {/* Message Content */}
         <div className={`
           px-4 py-2 rounded-lg break-words relative
-          ${isUser 
-            ? 'bg-primary text-primary-foreground mr-2' 
+          ${isUser
+            ? 'bg-primary text-primary-foreground mr-2'
             : 'bg-muted text-foreground ml-2'
           }
-          ${isSending ? 'opacity-70' : ''}
+          ${isSending ? 'opacity-70 animate-pulse' : ''}
         `}>
           {/* Use IntelligentContentRenderer for all content */}
           <div className="text-sm">
@@ -63,7 +63,10 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
           `}>
             <span>{formatTime(message.timestamp)}</span>
             {isSending && (
-              <Loader2 className="h-3 w-3 animate-spin ml-2" />
+              <div className="flex items-center gap-1 ml-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-xs">Sending...</span>
+              </div>
             )}
           </div>
         </div>

@@ -225,7 +225,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
   }
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900">
+    <div className="flex flex-col h-full bg-zinc-900 w-full">
       {/* Clean, Modern Header */}
       <div className="border-b border-zinc-800 bg-zinc-900 px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between">

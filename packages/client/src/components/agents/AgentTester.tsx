@@ -146,8 +146,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     }
 
     setMessages(prev => [
-      ...prev.slice(0, -1), // Remove sending message
-      { ...userMessage, sending: false }, // Add final user message
+      ...prev, // Keep all messages including the sending user message
       streamingMessage, // Add streaming assistant message
     ])
 
@@ -158,11 +157,16 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     }, {
       onChunk: (chunk, accumulated) => {
         // Update streaming message with accumulated content immediately (no typewriter delay)
-        setMessages(prev => prev.map(msg =>
-          msg.id === assistantMessageId
-            ? { ...msg, content: accumulated }
-            : msg
-        ))
+        // Also mark user message as no longer sending on first chunk
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === assistantMessageId) {
+            return { ...msg, content: accumulated }
+          }
+          if (msg.id === userMessage.id && msg.sending) {
+            return { ...msg, sending: false }
+          }
+          return msg
+        }))
       },
       onComplete: (finalMessage) => {
         // Replace streaming message with final message

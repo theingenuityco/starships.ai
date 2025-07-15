@@ -76,26 +76,69 @@ function parseContentInRealTime(content: string, isStreaming: boolean): ParsedSe
     });
   }
   
-  // 3. If streaming, also detect incomplete code blocks that are being typed
+  // 3. ENHANCED: Detect incomplete code blocks immediately when streaming
   if (isStreaming) {
-    const incompleteCodeRegex = /```(\w+)?\n([\s\S]*)$/;
-    const incompleteMatch = content.match(incompleteCodeRegex);
+    // Find code blocks that start with ``` but don't have a closing ```
+    const tempRegex = /```(\w+)?\n/g;
+    let match;
     
-    if (incompleteMatch && incompleteMatch.index !== undefined) {
-      // Check if this incomplete block is not already captured as complete
-      const isAlreadyCaptured = segments.some(seg => 
-        seg.startIndex <= incompleteMatch.index! && 
-        seg.endIndex >= incompleteMatch.index! + incompleteMatch[0].length
-      );
+    while ((match = tempRegex.exec(content)) !== null) {
+      const startIndex = match.index;
+      const openingLength = match[0].length;
+      const afterMatch = content.substring(startIndex + openingLength);
       
-      if (!isAlreadyCaptured) {
-        segments.push({
-          type: 'code',
-          content: incompleteMatch[2],
-          startIndex: incompleteMatch.index,
-          endIndex: incompleteMatch.index + incompleteMatch[0].length,
-          language: incompleteMatch[1] || 'text'
-        });
+      // Check if there's a closing ``` for this opening
+      const closingMatch = afterMatch.match(/^([\s\S]*?)\n```/);
+      
+      if (!closingMatch) {
+        // No closing ``` found, this is an incomplete code block
+        // Only include content that's actually part of the code block
+        const isAlreadyCaptured = segments.some(seg =>
+          seg.type === 'code' &&
+          seg.startIndex <= startIndex &&
+          seg.endIndex > startIndex
+        );
+        
+        if (!isAlreadyCaptured) {
+          segments.push({
+            type: 'code',
+            content: afterMatch,
+            startIndex: startIndex,
+            endIndex: content.length, // Only to end of current content
+            language: match[1] || 'text'
+          });
+        }
+      }
+    }
+    
+    // 4. ENHANCED: Detect incomplete tables during streaming
+    // Look for table patterns that haven't been captured as complete
+    const incompleteTableRegex = /(\|[^|\n]*\|)(\n\|[-\s|]*\|)?(\n((?:\|[^|\n]*\|\n?)*))?(?!\n\|[-\s|]*\|)$/m;
+    const incompleteTableMatch = content.match(incompleteTableRegex);
+    
+    if (incompleteTableMatch && incompleteTableMatch.index !== undefined) {
+      // Only treat as table if we have at least a header row with multiple columns
+      const headerRow = incompleteTableMatch[1];
+      const columnCount = (headerRow.match(/\|/g) || []).length - 1;
+      
+      if (columnCount >= 2) { // At least 2 columns to be considered a table
+        // Check if this incomplete table is not already captured as complete
+        const isAlreadyCaptured = segments.some(seg =>
+          seg.type === 'table' &&
+          seg.startIndex <= incompleteTableMatch.index! &&
+          seg.endIndex >= incompleteTableMatch.index! + incompleteTableMatch[0].length
+        );
+        
+        if (!isAlreadyCaptured) {
+          const headers = headerRow.split('|').map(h => h.trim()).filter(Boolean);
+          segments.push({
+            type: 'table',
+            content: incompleteTableMatch[0],
+            startIndex: incompleteTableMatch.index,
+            endIndex: incompleteTableMatch.index + incompleteTableMatch[0].length,
+            headers
+          });
+        }
       }
     }
   }

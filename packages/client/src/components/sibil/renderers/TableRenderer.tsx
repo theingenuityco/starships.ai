@@ -10,13 +10,13 @@ interface TableRendererProps {
 
 export function TableRenderer({ content, headers }: TableRendererProps) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto max-w-full">
       <div className="prose prose-sm dark:prose-invert max-w-none">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
             table: ({ children }) => (
-              <table className="min-w-full border-collapse border border-border rounded-lg overflow-hidden">
+              <table className="min-w-full border-collapse border border-border rounded-lg overflow-hidden whitespace-nowrap">
                 {children}
               </table>
             ),

@@ -1,16 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Agent, Message, chatAPI } from '@/lib/api'
+import { Agent, chatAPI } from '@/lib/api'
+import type { Message } from '@/lib/agent-socket-api'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Send, RotateCcw, Play, Save, Trash2, Plus } from 'lucide-react'
+import { Send, RotateCcw, Play, Save, Trash2, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { agentSocketAPI } from '@/lib/agent-socket-api'
+import { useSocketConnection } from '@/hooks/useSocketConnection'
+import { useTypewriter } from '@/hooks/useTypewriter'
+import { StreamingIndicator } from '@/components/sibil/StreamingIndicator'
 
 interface AgentTesterProps {
   agent: Agent
@@ -39,11 +44,23 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const { userId } = useAuth()
   const { toast } = useToast()
 
+  // Socket.IO connection
+  const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
+  
+  // Typewriter effect
+  const typewriter = useTypewriter({
+    onComplete: () => setLoading(false)
+  })
+
   // Chat state
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [sessionId] = useState(`test-${agent.id}-${Date.now()}`)
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isTyping, setIsTyping] = useState(false)
+  const [currentStreamAbort, setCurrentStreamAbort] = useState<(() => void) | null>(null)
 
   // Test case management state
   const [testCases, setTestCases] = useState<TestCase[]>([])
@@ -89,6 +106,17 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const sendMessage = async (messageContent: string) => {
     if (!messageContent.trim() || loading) return
 
+    // Check Socket.IO connection
+    if (!isConnected) {
+      setError('Socket.IO connection required. Please check your connection and try again.')
+      toast({
+        title: 'Connection Error',
+        description: 'Socket.IO connection required. Please check your connection.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       content: messageContent.trim(),
@@ -100,44 +128,95 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
 
     setMessages(prev => [...prev, userMessage])
     setLoading(true)
+    setError(null)
+    typewriter.reset()
 
-    try {
-      const response = await chatAPI.sendMessage({
-        agentId: agent.id,
-        sessionId,
-        message: messageContent,
-      })
+    // Create streaming assistant message
+    const assistantMessageId = `assistant-${Date.now()}`
+    setStreamingMessageId(assistantMessageId)
 
-      const assistantMessage: Message = {
-        id: response.id,
-        content: response.content,
-        role: 'assistant',
-        timestamp: response.timestamp,
-        sessionId,
-      }
-
-      setMessages(prev => [
-        ...prev.slice(0, -1), // Remove sending message
-        { ...userMessage, sending: false }, // Add final user message
-        assistantMessage, // Add assistant response
-      ])
-
-      toast({
-        title: 'Success',
-        description: 'Message sent successfully',
-        variant: 'success',
-      })
-    } catch (error) {
-      console.error('Failed to send message:', error)
-      setMessages(prev => prev.slice(0, -1)) // Remove failed message
-      toast({
-        title: 'Error',
-        description: 'Failed to send message',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
+    const streamingMessage: Message = {
+      id: assistantMessageId,
+      content: '',
+      role: 'assistant',
+      timestamp: new Date().toISOString(),
+      sessionId,
+      streaming: true,
+      agentId: agent.id
     }
+
+    setMessages(prev => [
+      ...prev, // Keep all messages including the sending user message
+      streamingMessage, // Add streaming assistant message
+    ])
+
+    // Start Socket.IO streaming
+    const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
+      sessionId,
+      message: messageContent
+    }, {
+      onChunk: (chunk, accumulated) => {
+        // Update streaming message with accumulated content immediately (no typewriter delay)
+        // Also mark user message as no longer sending on first chunk
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === assistantMessageId) {
+            return {
+              ...msg,
+              content: accumulated,
+              streaming: true // Ensure streaming flag is set for proper rendering
+            }
+          }
+          if (msg.id === userMessage.id && msg.sending) {
+            return { ...msg, sending: false }
+          }
+          return msg
+        }))
+      },
+      onComplete: (finalMessage) => {
+        // Replace streaming message with final message
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? {
+                ...finalMessage,
+                id: assistantMessageId,
+                streaming: false
+              }
+            : msg
+        ))
+        setStreamingMessageId(null)
+        setLoading(false)
+        
+        toast({
+          title: 'Success',
+          description: 'Message sent successfully',
+          variant: 'success',
+        })
+      },
+      onError: (error) => {
+        console.error('Failed to send message:', error)
+        setError(`Chat failed: ${error}. Please check your connection and try again.`)
+        
+        // Remove failed streaming message
+        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+        setStreamingMessageId(null)
+        setLoading(false)
+        
+        toast({
+          title: 'Error',
+          description: `Failed to send message: ${error}`,
+          variant: 'destructive',
+        })
+      },
+      onTypingStart: () => {
+        setIsTyping(true)
+      },
+      onTypingStop: () => {
+        setIsTyping(false)
+      }
+    })
+
+    // Store abort function for stream cancellation
+    setCurrentStreamAbort(() => abort)
   }
 
   const handleSendMessage = () => {
@@ -203,44 +282,67 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   }
 
   const runTestCase = async (testCase: TestCase) => {
+    if (!isConnected) {
+      toast({
+        title: 'Connection Error',
+        description: 'Socket.IO connection required to run test cases',
+        variant: 'destructive',
+      })
+      return
+    }
+
     try {
       setLoading(true)
 
-      // Send the test input
-      const response = await chatAPI.sendMessage({
-        agentId: agent.id,
+      // Use Socket.IO streaming for test case execution
+      const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
         sessionId: `test-case-${testCase.id}-${Date.now()}`,
-        message: testCase.input,
+        message: testCase.input
+      }, {
+        onChunk: (chunk, accumulated) => {
+          // Test cases don't need real-time display, just collect the response
+        },
+        onComplete: (finalMessage) => {
+          // Create test result
+          const result: TestResult = {
+            id: `result-${Date.now()}`,
+            testCaseId: testCase.id,
+            response: finalMessage.content,
+            timestamp: new Date().toISOString(),
+            passed: false, // User will need to manually evaluate
+            notes: '',
+          }
+
+          // Update test case with result
+          const updatedCases = testCases.map(tc => (tc.id === testCase.id ? { ...tc, result } : tc))
+          saveTestCases(updatedCases)
+          setLoading(false)
+
+          toast({
+            title: 'Success',
+            description: 'Test case executed successfully',
+            variant: 'success',
+          })
+        },
+        onError: (error) => {
+          console.error('Failed to run test case:', error)
+          setLoading(false)
+          toast({
+            title: 'Error',
+            description: `Failed to run test case: ${error}`,
+            variant: 'destructive',
+          })
+        }
       })
 
-      // Create test result
-      const result: TestResult = {
-        id: `result-${Date.now()}`,
-        testCaseId: testCase.id,
-        response: response.content,
-        timestamp: new Date().toISOString(),
-        passed: false, // User will need to manually evaluate
-        notes: '',
-      }
-
-      // Update test case with result
-      const updatedCases = testCases.map(tc => (tc.id === testCase.id ? { ...tc, result } : tc))
-      saveTestCases(updatedCases)
-
-      toast({
-        title: 'Success',
-        description: 'Test case executed successfully',
-        variant: 'success',
-      })
     } catch (error) {
       console.error('Failed to run test case:', error)
+      setLoading(false)
       toast({
         title: 'Error',
         description: 'Failed to run test case',
         variant: 'destructive',
       })
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -254,36 +356,70 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="border-b border-border bg-card px-6 py-4">
+    <div className="h-full flex flex-col bg-zinc-900">
+      {/* Clean, Modern Header */}
+      <div className="border-b border-zinc-800 bg-zinc-900 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-              <span className="text-primary-foreground text-sm font-medium">
+            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
                 {agent.name.charAt(0).toUpperCase()}
               </span>
             </div>
             <div>
-              <h2 className="font-semibold">Testing: {agent.name}</h2>
+              <h2 className="font-semibold text-lg text-white">Testing: {agent.name}</h2>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="secondary">{agent.category}</Badge>
-                <Badge variant="outline">{agent.model}</Badge>
-                {agent.temperature && <Badge variant="outline">temp: {agent.temperature}</Badge>}
-                {agent.maxTokens && <Badge variant="outline">max: {agent.maxTokens}</Badge>}
+                <Badge className="bg-blue-600 text-white">{agent.category}</Badge>
+                <Badge variant="outline" className="text-zinc-400 border-zinc-700">{agent.model}</Badge>
+                {agent.temperature && <Badge variant="outline" className="text-zinc-400 border-zinc-700">temp: {agent.temperature}</Badge>}
+                {agent.maxTokens && <Badge variant="outline" className="text-zinc-400 border-zinc-700">max: {agent.maxTokens}</Badge>}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setShowTestCases(!showTestCases)} size="sm" variant="outline">
+            {/* Clean Connection Status Badge */}
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+              isConnected
+                ? 'bg-green-500/10 text-green-500'
+                : connectionStatus === 'reconnecting'
+                ? 'bg-yellow-500/10 text-yellow-500'
+                : 'bg-red-500/10 text-red-500'
+            }`}>
+              {isConnected ? (
+                <>
+                  <Wifi className="w-3 h-3" />
+                  <span>Connected</span>
+                </>
+              ) : connectionStatus === 'reconnecting' ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
+                  <span>Reconnecting</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-3 h-3" />
+                  <span>Disconnected</span>
+                </>
+              )}
+            </div>
+
+            {/* Connection Error Indicator */}
+            {connectionError && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/10 text-red-500">
+                <AlertCircle className="w-3 h-3" />
+                <span>Error</span>
+              </div>
+            )}
+            
+            <Button onClick={() => setShowTestCases(!showTestCases)} size="sm" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
               {showTestCases ? 'Hide' : 'Show'} Test Cases
             </Button>
-            <Button onClick={clearChat} size="sm" variant="outline">
+            <Button onClick={clearChat} size="sm" variant="outline" className="border-zinc-700 text-zinc-300 hover:bg-zinc-800">
               <RotateCcw className="w-4 h-4 mr-2" />
               Clear Chat
             </Button>
             {onClose && (
-              <Button onClick={onClose} size="sm" variant="ghost">
+              <Button onClick={onClose} size="sm" variant="ghost" className="text-zinc-400 hover:bg-zinc-800">
                 Close
               </Button>
             )}
@@ -295,32 +431,67 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4">
             {messages.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
+              <div className="text-center text-zinc-500 py-8">
                 <p className="mb-4">Start a conversation to test this agent</p>
                 {agent.systemPrompt && (
-                  <div className="p-4 bg-muted rounded-lg text-left max-w-2xl mx-auto">
-                    <p className="text-sm font-medium mb-2">System Prompt:</p>
-                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                  <div className="p-4 bg-zinc-800 rounded-lg text-left max-w-2xl mx-auto">
+                    <p className="text-sm font-medium mb-2 text-zinc-300">System Prompt:</p>
+                    <p className="text-xs text-zinc-400 whitespace-pre-wrap">
                       {agent.systemPrompt}
                     </p>
                   </div>
                 )}
               </div>
             ) : (
-              messages.map(message => <MessageBubble key={message.id} message={message} />)
+              messages.map(message => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  streaming={message.id === streamingMessageId}
+                />
+              ))
             )}
           </div>
 
+          {/* Streaming Indicator */}
+          {loading && streamingMessageId && (
+            <div className="px-4 py-2 border-t border-zinc-800 bg-zinc-900">
+              <div className="flex items-center gap-2 text-sm text-zinc-400">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>{agent.name} is responding...</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 ml-auto text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300"
+                  onClick={() => {
+                    if (currentStreamAbort) {
+                      currentStreamAbort()
+                      setCurrentStreamAbort(null)
+                      setLoading(false)
+                      setIsTyping(false)
+                      setStreamingMessageId(null)
+                    }
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="10" height="10" rx="1" fill="currentColor"/>
+                  </svg>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Input */}
-          <div className="border-t border-border bg-card p-4">
+          <div className="border-t border-zinc-800 bg-zinc-900 p-4">
             <div className="flex gap-2">
               <Textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Type a message to test the agent..."
-                className="flex-1 min-h-[60px] resize-none"
+                placeholder={isConnected ? "Type a message to test the agent..." : "Connect to Socket.IO to send messages..."}
+                className="flex-1 min-h-[60px] resize-none bg-zinc-800 text-white placeholder-zinc-500 border-none rounded-lg focus:ring-1 focus:ring-blue-500"
+                disabled={!isConnected}
                 onKeyPress={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
@@ -328,36 +499,48 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                   }
                 }}
               />
-              <Button onClick={handleSendMessage} disabled={!input.trim() || loading} size="sm">
+              <Button
+                onClick={handleSendMessage}
+                disabled={!input.trim() || loading || !isConnected}
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
                 <Send className="w-4 h-4" />
               </Button>
             </div>
+            
+            {/* Connection Error Message */}
+            {error && (
+              <div className="mt-2 p-2 bg-red-500/10 rounded text-sm text-red-500">
+                {error}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Test Cases Panel */}
         {showTestCases && (
           <>
-            <Separator orientation="vertical" />
-            <div className="w-96 border-l bg-muted/30 flex flex-col">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold mb-2">Test Cases</h3>
-                <p className="text-xs text-muted-foreground">
+            <Separator orientation="vertical" className="bg-zinc-800" />
+            <div className="w-96 border-l border-zinc-800 bg-zinc-900 flex flex-col">
+              <div className="p-4 border-b border-zinc-800">
+                <h3 className="font-semibold text-white mb-2">Test Cases</h3>
+                <p className="text-xs text-zinc-400">
                   Create and run test scenarios for this agent
                 </p>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Add New Test Case */}
-                <Card className="p-3">
-                  <h4 className="text-sm font-medium mb-3">Add Test Case</h4>
+                <Card className="p-4 bg-zinc-800 border-zinc-700 shadow-md">
+                  <h4 className="text-sm font-medium mb-3 text-white">Add Test Case</h4>
                   <div className="space-y-2">
                     <input
                       type="text"
                       placeholder="Test case name"
                       value={newTestCase.name || ''}
                       onChange={e => setNewTestCase(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border rounded"
+                      className="w-full px-2 py-1 text-xs bg-zinc-700 border-none rounded text-white placeholder-zinc-500 focus:ring-1 focus:ring-blue-500"
                     />
                     <select
                       value={newTestCase.category || 'functionality'}
@@ -367,7 +550,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                           category: e.target.value as TestCase['category'],
                         }))
                       }
-                      className="w-full px-2 py-1 text-xs border rounded"
+                      className="w-full px-2 py-1 text-xs bg-zinc-700 border-none rounded text-white focus:ring-1 focus:ring-blue-500"
                     >
                       <option value="functionality">Functionality</option>
                       <option value="safety">Safety</option>
@@ -377,7 +560,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                       placeholder="Test input message"
                       value={newTestCase.input || ''}
                       onChange={e => setNewTestCase(prev => ({ ...prev, input: e.target.value }))}
-                      className="w-full px-2 py-1 text-xs border rounded h-16 resize-none"
+                      className="w-full px-2 py-1 text-xs bg-zinc-700 border-none rounded h-16 resize-none text-white placeholder-zinc-500 focus:ring-1 focus:ring-blue-500"
                     />
                     <textarea
                       placeholder="Expected behavior"
@@ -385,9 +568,9 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                       onChange={e =>
                         setNewTestCase(prev => ({ ...prev, expectedBehavior: e.target.value }))
                       }
-                      className="w-full px-2 py-1 text-xs border rounded h-16 resize-none"
+                      className="w-full px-2 py-1 text-xs bg-zinc-700 border-none rounded h-16 resize-none text-white placeholder-zinc-500 focus:ring-1 focus:ring-blue-500"
                     />
-                    <Button onClick={addTestCase} size="sm" className="w-full">
+                    <Button onClick={addTestCase} size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                       <Plus className="w-3 h-3 mr-1" />
                       Add Test Case
                     </Button>
@@ -396,10 +579,10 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
 
                 {/* Existing Test Cases */}
                 {testCases.map(testCase => (
-                  <Card key={testCase.id} className="p-3">
+                  <Card key={testCase.id} className="p-4 bg-zinc-800 border-zinc-700 shadow-md">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <h4 className="text-sm font-medium">{testCase.name}</h4>
+                        <h4 className="text-sm font-medium text-white">{testCase.name}</h4>
                         <Badge className={`text-xs mt-1 ${getCategoryColor(testCase.category)}`}>
                           {testCase.category}
                         </Badge>
@@ -409,6 +592,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                           onClick={() => runTestCase(testCase)}
                           size="sm"
                           variant="outline"
+                          className="border-zinc-700 text-zinc-300 hover:bg-zinc-700"
                           disabled={loading}
                         >
                           <Play className="w-3 h-3" />
@@ -417,7 +601,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                           onClick={() => deleteTestCase(testCase.id)}
                           size="sm"
                           variant="ghost"
-                          className="text-destructive"
+                          className="text-red-400 hover:bg-red-500/10"
                         >
                           <Trash2 className="w-3 h-3" />
                         </Button>
@@ -426,20 +610,20 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
 
                     <div className="space-y-2 text-xs">
                       <div>
-                        <p className="font-medium text-muted-foreground">Input:</p>
-                        <p className="bg-muted p-2 rounded">{testCase.input}</p>
+                        <p className="font-medium text-zinc-400">Input:</p>
+                        <p className="bg-zinc-700 p-2 rounded text-zinc-300">{testCase.input}</p>
                       </div>
                       <div>
-                        <p className="font-medium text-muted-foreground">Expected:</p>
-                        <p className="bg-muted p-2 rounded">{testCase.expectedBehavior}</p>
+                        <p className="font-medium text-zinc-400">Expected:</p>
+                        <p className="bg-zinc-700 p-2 rounded text-zinc-300">{testCase.expectedBehavior}</p>
                       </div>
 
                       {testCase.result && (
                         <div>
-                          <p className="font-medium text-muted-foreground">Last Result:</p>
-                          <div className="bg-muted p-2 rounded">
-                            <p className="mb-1">{testCase.result.response}</p>
-                            <p className="text-xs text-muted-foreground">
+                          <p className="font-medium text-zinc-400">Last Result:</p>
+                          <div className="bg-zinc-700 p-2 rounded">
+                            <p className="mb-1 text-zinc-300">{testCase.result.response}</p>
+                            <p className="text-xs text-zinc-500">
                               {new Date(testCase.result.timestamp).toLocaleString()}
                             </p>
                           </div>

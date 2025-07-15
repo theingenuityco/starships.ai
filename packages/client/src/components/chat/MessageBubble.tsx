@@ -1,9 +1,8 @@
 'use client'
 
-import { Message } from '@/lib/api'
+import type { Message } from '@/lib/agent-socket-api'
 import { formatTime } from '@/lib/utils'
-import { Bot, User, Loader2 } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Bot, User } from 'lucide-react'
 import { IntelligentContentRenderer } from '@/components/sibil/renderers/IntelligentContentRenderer'
 
 interface MessageBubbleProps {
@@ -15,62 +14,49 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
   const isUser = message.role === 'user'
   const isSending = message.sending === true
   
-  // Use message content directly (streaming content is updated in real-time)
-  const displayContent = message.content
-  
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`flex max-w-[80%] ${isUser ? 'flex-row-reverse' : 'flex-row'} items-start`}>
-        {/* Avatar */}
-        <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarFallback className={`
-            ${isUser 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted text-muted-foreground'
-            }
-          `}>
-            {isUser ? (
-              <User className="h-4 w-4" />
-            ) : (
-              <Bot className="h-4 w-4" />
-            )}
-          </AvatarFallback>
-        </Avatar>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+      <div className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse mr-4' : 'flex-row'} items-start gap-2`}>
+        {/* Simple Avatar */}
+        <div 
+          className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 
+            ${isUser ? 'bg-blue-600' : 'bg-zinc-700'}`}
+        >
+          {isUser ? (
+            <User className="h-4 w-4 text-white" />
+          ) : (
+            <Bot className="h-4 w-4 text-white" />
+          )}
+        </div>
         
-        {/* Message Content */}
-        <div className={`
-          px-4 py-2 rounded-lg break-words relative overflow-hidden
-          ${isUser
-            ? 'bg-primary text-primary-foreground mr-2'
-            : 'bg-muted text-foreground ml-2'
-          }
-          ${isSending ? 'opacity-70 animate-pulse' : ''}
-        `}>
-          {/* Use IntelligentContentRenderer for all content */}
-          <div className="text-sm overflow-x-auto">
+        {/* Clean Message Content */}
+        <div
+          className={`
+            px-4 py-3 break-words
+            ${isUser 
+              ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm' 
+              : 'bg-zinc-800 text-white rounded-t-2xl rounded-br-2xl rounded-bl-sm'
+            }
+            ${isSending ? 'opacity-70' : ''}
+          `}
+        >
+          {/* Content Rendering */}
+          <div className="text-sm">
             <IntelligentContentRenderer
-              content={displayContent}
+              content={message.content}
               isStreaming={streaming}
             />
           </div>
           
-          <div className={`
-            text-xs mt-1 flex items-center justify-between
-            ${isUser 
-              ? 'text-primary-foreground/70' 
-              : 'text-muted-foreground'
-            }
-          `}>
-            <span>{formatTime(message.timestamp)}</span>
+          {/* Timestamp and Status */}
+          <div className="text-xs mt-2 text-white/70 flex justify-between">
+            {!isSending && (<span>{formatTime(message.timestamp)}</span>)}
             {isSending && (
-              <div className="flex items-center gap-1 ml-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span className="text-xs">Sending...</span>
-              </div>
+              <span>Sending</span>
             )}
           </div>
         </div>
       </div>
     </div>
   )
-} 
+}

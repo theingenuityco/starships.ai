@@ -107,6 +107,14 @@ export interface LLMProvider {
       maxTokens?: number;
     }
   ): Promise<LLMResult>;
+  
+  completeStream(
+    prompt: LLMChatPrompt,
+    opts?: {
+      temperature?: number;
+      maxTokens?: number;
+    }
+  ): AsyncGenerator<string, void, unknown>;
 }
 
 // NEW: Agent Templates System

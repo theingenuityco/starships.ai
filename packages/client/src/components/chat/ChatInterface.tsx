@@ -225,30 +225,28 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="border-b border-border bg-card px-8 py-5 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center ring-4 ring-primary/20">
-            <span className="text-primary-foreground text-sm font-medium">
-              {agent.name.charAt(0).toUpperCase()}
-            </span>
+    <div className="flex flex-col h-full bg-zinc-900">
+      {/* Clean, Modern Header */}
+      <div className="border-b border-zinc-800 bg-zinc-900 px-6 py-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+          
+            <div>
+              <h2 className="font-semibold text-lg text-white">{agent.name}</h2>
+              <p className="text-sm text-zinc-400 flex items-center">
+                {agent.systemPrompt || 'AI Assistant'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-semibold text-lg">{agent.name}</h2>
-            <p className="text-sm text-muted-foreground flex items-center">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-2"></span>
-              {agent.systemPrompt || 'AI Assistant'}
-            </p>
-          </div>
-          <div className="ml-auto flex items-center gap-3">
-            {/* Enhanced Connection Status Badge */}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs border ${
+          
+          <div className="flex items-center gap-3">
+            {/* Clean Connection Status Badge */}
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
               isConnected
-                ? 'bg-green-50 border-green-200 text-green-700'
+                ? 'bg-green-500/10 text-green-500'
                 : connectionStatus === 'reconnecting'
-                ? 'bg-yellow-50 border-yellow-200 text-yellow-700'
-                : 'bg-red-50 border-red-200 text-red-700'
+                ? 'bg-yellow-500/10 text-yellow-500'
+                : 'bg-red-500/10 text-red-500'
             }`}>
               {isConnected ? (
                 <>
@@ -257,8 +255,8 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
                 </>
               ) : connectionStatus === 'reconnecting' ? (
                 <>
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  <span>Reconnecting...</span>
+                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
+                  <span>Reconnecting</span>
                 </>
               ) : (
                 <>
@@ -270,22 +268,17 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
 
             {/* Connection Error Indicator */}
             {connectionError && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-red-50 border border-red-200 text-red-700">
+              <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/10 text-red-500">
                 <AlertCircle className="w-3 h-3" />
                 <span>Error</span>
               </div>
             )}
-            
-            <Badge variant="outline">
-              {agent.model}
-            </Badge>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-hidden bg-background/50">
-        {/* TODO: Add accessibility improvements (ARIA labels, keyboard nav) */}
+      <div className="flex-1 overflow-hidden bg-zinc-900">
         <MessageList
           messages={messages}
           loading={loading}
@@ -293,9 +286,8 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
         />
       </div>
 
-
       {/* Input */}
-      <div className="border-t border-border bg-card p-6">
+      <div className="border-t border-zinc-800 bg-zinc-900 p-4">
         <MessageInput
           onSendMessage={handleSendMessage}
           disabled={!currentSessionId.current || loading || !userId || !isConnected}
@@ -303,7 +295,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
         
         {/* Connection Error Message */}
         {error && (
-          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          <div className="mt-3 p-3 bg-red-500/10 rounded text-sm text-red-500">
             {error}
           </div>
         )}

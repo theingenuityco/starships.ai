@@ -1,8 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
-import { starshipAPI, type Starship, type CodexProjection } from '@/lib/api';
-import type { Constraint, PendingChange, ConstraintFormData } from '@/components/vision-chamber/VisionChamber/shared/types';
+import { starshipAPI, visionAPI, type Starship, type CodexProjection } from '@/lib/api';
 
 interface CommandDeckState {
   visibility: 'collapsed' | 'partial' | 'expanded';
@@ -22,18 +21,10 @@ interface StarshipState {
   // Command deck state (preserved)
   commandDeck: CommandDeckState;
   
-  // Vision state (now synced with API)
-  vision: {
-    statement: string;
-    lastUpdated: Date;
-    confidence: number;
-  };
-  
-  // Constraints state (synced with API)
-  constraints: Constraint[];
-  
-  // Maker-Checker Flow state
-  pendingChanges: PendingChange[];
+  // SIMPLIFIED VISION STATE (BREAKING CHANGE)
+  vision: string;  // CHANGED: was complex object with statement, confidence, lastUpdated
+  visionLoading: boolean;
+  visionError: string | null;
   
   // Legacy fields for backward compatibility (derived from active starship)
   get class(): 'scout' | 'cruiser';
@@ -48,22 +39,13 @@ interface StarshipActions {
   loadUserStarships: () => Promise<void>;
   createStarship: (data: { name: string; class: 'scout' | 'cruiser' }) => Promise<void>;
   setActiveStarship: (starshipId: string | null) => void;
-  updateVisionAPI: (statement: string) => Promise<void>;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
   getProjection: (lens: 'telos' | 'ethos' | 'full') => Promise<CodexProjection | null>;
   
-  // Constraints actions
-  loadConstraints: () => Promise<void>;
-  createConstraint: (data: ConstraintFormData) => Promise<void>;
-  updateConstraint: (id: string, changes: Partial<Constraint>) => Promise<void>;
-  deleteConstraint: (id: string) => Promise<void>;
-  
-  // Maker-Checker Flow actions
-  queueChange: (change: Omit<PendingChange, 'id' | 'timestamp'>) => void;
-  removeFromQueue: (changeId: string) => void;
-  clearQueue: () => void;
-  applyQueuedChanges: () => Promise<void>;
+  // SIMPLIFIED VISION ACTIONS (BREAKING CHANGE)
+  loadVision: (starshipId: string) => Promise<void>;
+  saveVision: (starshipId: string, vision: string) => Promise<void>;
   
   // Command deck actions (preserved)
   setCommandDeckVisibility: (visibility: CommandDeckState['visibility']) => void;
@@ -97,15 +79,10 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           isHovered: false
         },
         
-        vision: {
-          statement: '',
-          lastUpdated: new Date(),
-          confidence: 0
-        },
-        
-        // Initial constraints state
-        constraints: [],
-        pendingChanges: [],
+        // SIMPLIFIED VISION STATE
+        vision: '',  // CHANGED: was complex object
+        visionLoading: false,
+        visionError: null,
 
         // Computed properties for backward compatibility
         get class() {
@@ -159,36 +136,17 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             const response = await starshipAPI.getUserStarships();
             const starships = response.starships;
             
-            set({ 
+            set({
               starships,
               loading: false,
               // Auto-select first starship if none selected and starships exist
               activeStarshipId: get().activeStarshipId || (starships.length > 0 ? starships[0].id : null)
             });
-
-            // Load vision for active starship
-            const activeStarshipId = get().activeStarshipId;
-            if (activeStarshipId) {
-              try {
-                const response = await starshipAPI.getProjection(activeStarshipId, 'telos');
-                if (response.projection.vision) {
-                  set({
-                    vision: {
-                      statement: response.projection.vision,
-                      lastUpdated: new Date(),
-                      confidence: Math.min(100, response.projection.vision.length * 2)
-                    }
-                  });
-                }
-              } catch (visionError) {
-                console.error('Failed to load vision:', visionError);
-              }
-            }
             
           } catch (error) {
-            set({ 
+            set({
               error: error instanceof Error ? error.message : 'Failed to load starships',
-              loading: false 
+              loading: false
             });
           }
         },
@@ -199,65 +157,22 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             const response = await starshipAPI.createStarship(data);
             const newStarships = [...get().starships, response.starship];
             
-            set({ 
+            set({
               starships: newStarships,
               activeStarshipId: response.starship.id,
               loading: false,
-              vision: {
-                statement: '',
-                lastUpdated: new Date(),
-                confidence: 0
-              }
+              vision: ''
             });
           } catch (error) {
-            set({ 
+            set({
               error: error instanceof Error ? error.message : 'Failed to create starship',
-              loading: false 
+              loading: false
             });
           }
         },
 
         setActiveStarship: (starshipId) => {
           set({ activeStarshipId: starshipId });
-          
-          // Load vision for new active starship
-          if (starshipId) {
-            starshipAPI.getProjection(starshipId, 'telos')
-              .then(response => {
-                if (response.projection.vision) {
-                  set({
-                    vision: {
-                      statement: response.projection.vision,
-                      lastUpdated: new Date(),
-                      confidence: Math.min(100, response.projection.vision.length * 2)
-                    }
-                  });
-                }
-              })
-              .catch(error => console.error('Failed to load vision:', error));
-          }
-        },
-
-        updateVisionAPI: async (statement) => {
-          const activeStarshipId = get().activeStarshipId;
-          if (!activeStarshipId) return;
-
-          try {
-            await starshipAPI.updateCodex(activeStarshipId, {
-              vision: { statement }
-            });
-            
-            set({
-              vision: {
-                statement,
-                lastUpdated: new Date(),
-                confidence: Math.min(100, statement.length / 10)
-              }
-            });
-          } catch (error) {
-            console.error('Failed to update vision:', error);
-            set({ error: 'Failed to update vision' });
-          }
         },
 
         deployAgent: async (agentId) => {
@@ -297,113 +212,24 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
 
-        // Constraints actions
-        loadConstraints: async () => {
-          const activeStarshipId = get().activeStarshipId;
-          if (!activeStarshipId) return;
-
+        // SIMPLIFIED VISION ACTIONS (CRITICAL: BYPASS DATABASE)
+        loadVision: async (starshipId: string) => {
+          set({ visionLoading: true, visionError: null });
           try {
-            const response = await starshipAPI.getProjection(activeStarshipId, 'full');
-            if (response.projection) {
-              // Map API response to our internal Constraint interfaces
-              const constraints: Constraint[] = (response.projection.constraints || []).map(c => ({
-                ...c,
-                codexId: 'temp', // TODO: Get actual codexId from API
-                severity: 'medium' as const, // TODO: Get from API or provide default
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              }));
-              
-              set({ constraints });
-            }
+            const data = await visionAPI.get(starshipId);
+            set({ vision: data.vision || '', visionLoading: false });
           } catch (error) {
-            console.error('Failed to load constraints:', error);
-            set({ error: 'Failed to load constraints' });
+            set({ visionError: 'Failed to load vision', visionLoading: false });
           }
         },
-
-        createConstraint: async (data) => {
-          get().queueChange({
-            type: 'constraint',
-            operation: 'create',
-            target: 'new',
-            changes: data,
-            after: data,
-            source: 'user'
-          });
-        },
-
-        updateConstraint: async (id, changes) => {
-          const existingConstraint = get().constraints.find(c => c.id === id);
-          if (!existingConstraint) return;
-
-          get().queueChange({
-            type: 'constraint',
-            operation: 'update',
-            target: id,
-            changes,
-            before: existingConstraint,
-            after: { ...existingConstraint, ...changes },
-            source: 'user'
-          });
-        },
-
-        deleteConstraint: async (id) => {
-          const existingConstraint = get().constraints.find(c => c.id === id);
-          if (!existingConstraint) return;
-
-          get().queueChange({
-            type: 'constraint',
-            operation: 'delete',
-            target: id,
-            changes: {},
-            before: existingConstraint,
-            source: 'user'
-          });
-        },
-
-        // Maker-Checker Flow actions
-        queueChange: (change) => {
-          const changeWithId = {
-            ...change,
-            id: `change_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            timestamp: new Date().toISOString()
-          };
-
-          set((state) => ({
-            pendingChanges: [...state.pendingChanges, changeWithId]
-          }));
-        },
-
-        removeFromQueue: (changeId) => {
-          set((state) => ({
-            pendingChanges: state.pendingChanges.filter(c => c.id !== changeId)
-          }));
-        },
-
-        clearQueue: () => {
-          set({ pendingChanges: [] });
-        },
-
-        applyQueuedChanges: async () => {
-          const activeStarshipId = get().activeStarshipId;
-          const changes = get().pendingChanges;
-          
-          if (!activeStarshipId || changes.length === 0) return;
-
+        
+        saveVision: async (starshipId: string, vision: string) => {
+          set({ visionLoading: true, visionError: null });
           try {
-            // Group changes by type and apply via updateCodex
-            // For now, this is a placeholder - backend needs maker-checker endpoints
-            console.log('Applying queued changes:', changes);
-            
-            // Clear queue after successful application
-            get().clearQueue();
-            
-            // Reload data to reflect changes
-            await get().loadConstraints();
+            await visionAPI.save(starshipId, vision);
+            set({ vision, visionLoading: false });
           } catch (error) {
-            console.error('Failed to apply queued changes:', error);
-            set({ error: 'Failed to apply changes' });
+            set({ visionError: 'Failed to save vision', visionLoading: false });
           }
         },
 
@@ -464,19 +290,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
 
         // Legacy actions for backward compatibility
         updateVision: (statement) => {
-          // Use API version if starship is active, otherwise local only
-          const activeStarshipId = get().activeStarshipId;
-          if (activeStarshipId) {
-            get().updateVisionAPI(statement);
-          } else {
-            set({
-              vision: {
-                statement,
-                lastUpdated: new Date(),
-                confidence: Math.min(100, Math.max(0, statement.length / 10))
-              }
-            });
-          }
+          set({ vision: statement });
         },
 
         navigateTo: (route) =>
@@ -496,4 +310,4 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
       name: 'starship-store'
     }
   )
-); 
+);

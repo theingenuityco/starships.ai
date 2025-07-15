@@ -30,6 +30,7 @@ import sibilRoutes from './routes/sibil';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
+import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import { AgentService } from './services/AgentService';
@@ -104,6 +105,11 @@ initializeStarshipRoutes({
   codexRepository,
 });
 
+// Initialize vision routes with dependencies
+initializeVisionRoutes({
+  starshipRepository
+});
+
 // API Routes
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
@@ -112,6 +118,7 @@ app.use('/api/sibil', sibilRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
+app.use('/api', visionRoutes);
 app.use('/api', redeployRoutes);
 
 // Create HTTP server and initialize Socket.IO

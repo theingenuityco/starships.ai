@@ -505,6 +505,15 @@ export const starshipAPI = {
     api.get(`/api/starships/${starshipId}/projection/${lens}`).then(res => res.data),
 }
 
+// NEW: Vision API
+export const visionAPI = {
+  get: (starshipId: string): Promise<{ vision: string }> =>
+    api.get(`/api/starships/${starshipId}/vision`).then(res => res.data),
+  
+  save: (starshipId: string, vision: string): Promise<{ success: boolean }> =>
+    api.post(`/api/starships/${starshipId}/vision`, { vision }).then(res => res.data)
+};
+
 export const userAPI = {
   // Sync Kinde user to backend database
   syncUser: async (userData: {

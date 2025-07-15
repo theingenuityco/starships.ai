@@ -126,6 +126,28 @@ export class SocketIOService {
     return `user:${userId}`;
   }
 
+  // Agent-specific room management
+  getAgentRoom(agentId: string, userId: string): string {
+    return `agent:${agentId}:${userId}`;
+  }
+
+  joinAgentRoom(socket: any, agentId: string, userId: string): void {
+    const room = this.getAgentRoom(agentId, userId);
+    socket.join(room);
+    console.log(`[SOCKET.IO] User ${userId} joined agent room: ${room}`);
+  }
+
+  leaveAgentRoom(socket: any, agentId: string, userId: string): void {
+    const room = this.getAgentRoom(agentId, userId);
+    socket.leave(room);
+    console.log(`[SOCKET.IO] User ${userId} left agent room: ${room}`);
+  }
+
+  emitToAgentRoom(agentId: string, userId: string, event: keyof SocketIOEvents, data: any) {
+    const agentRoom = this.getAgentRoom(agentId, userId);
+    this.io.to(agentRoom).emit(event, data);
+  }
+
   getConnectionState(socketId: string): SocketConnectionState | undefined {
     return this.connections.get(socketId);
   }

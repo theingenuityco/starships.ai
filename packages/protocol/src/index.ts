@@ -188,19 +188,35 @@ export interface SibilStreamResponse {
 
 // Socket.IO Event Definitions
 export interface SocketIOEvents {
-  // Client to Server events
+  // Sibil Client to Server events
   'sibil:start-stream': (request: SibilSocketRequest) => void;
   'sibil:stop-stream': (streamId: string) => void;
   'sibil:join-room': (userId: string) => void;
   'sibil:leave-room': (userId: string) => void;
 
-  // Server to Client events
+  // Sibil Server to Client events
   'sibil:stream-start': (streamId: string) => void;
   'sibil:stream-chunk': (chunk: SibilSocketStreamChunk) => void;
   'sibil:stream-complete': (response: SibilResponse) => void;
   'sibil:stream-error': (error: SibilStreamError) => void;
   'sibil:typing-start': () => void;
   'sibil:typing-stop': () => void;
+
+  // Agent Chat Client to Server events
+  'agent:start-stream': (request: AgentSocketRequest) => void;
+  'agent:stop-stream': (streamId: string) => void;
+  'agent:join-room': (userId: string, agentId: string) => void;
+  'agent:leave-room': (userId: string, agentId: string) => void;
+
+  // Agent Chat Server to Client events
+  'agent:stream-start': (streamId: string, agentId: string) => void;
+  'agent:stream-chunk': (chunk: AgentSocketStreamChunk) => void;
+  'agent:stream-complete': (response: AgentChatResponse) => void;
+  'agent:stream-error': (error: AgentStreamError) => void;
+  'agent:typing-start': (agentId: string) => void;
+  'agent:typing-stop': (agentId: string) => void;
+
+  // Common events
   'connection-status': (status: ConnectionStatus) => void;
 }
 
@@ -249,4 +265,41 @@ export interface SocketConnectionState {
   user_id?: string;
   connection_id?: string;
   last_ping?: number;
+}
+
+// Agent Chat Socket.IO Interfaces
+export interface AgentSocketRequest {
+  agent_id: string;
+  session_id: string;
+  message: string;
+  stream_id: string;
+  typewriter_enabled?: boolean;
+  typing_speed?: number; // characters per second (default: 75)
+  user_id: string; // From auth context
+}
+
+export interface AgentSocketStreamChunk {
+  stream_id: string;
+  agent_id: string;
+  type: 'content' | 'complete' | 'error';
+  content?: string;
+  typewriter?: TypewriterChunk;
+  timestamp: number;
+}
+
+export interface AgentChatResponse {
+  content: string;
+  agent_id: string;
+  session_id: string;
+  timestamp: string;
+  usage?: UsageStats;
+}
+
+export interface AgentStreamError {
+  stream_id?: string;
+  agent_id?: string;
+  error_code: string;
+  message: string;
+  timestamp: number;
+  recoverable: boolean;
 }

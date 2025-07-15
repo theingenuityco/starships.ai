@@ -1,5 +1,6 @@
 import { SocketIOService } from '../services/SocketIOService';
 import { setupSibilHandlers } from './sibilHandlers';
+import { setupAgentHandlers } from './agentHandlers';
 import type { Server as HTTPServer } from 'http';
 
 export function initializeSocketIO(httpServer: HTTPServer) {
@@ -10,6 +11,9 @@ export function initializeSocketIO(httpServer: HTTPServer) {
 
   // Setup Sibil-specific handlers
   setupSibilHandlers(io);
+
+  // Setup Agent-specific handlers
+  setupAgentHandlers(io);
 
   console.log('[SOCKET.IO] Socket.IO server initialized successfully');
   return socketService;

@@ -4,14 +4,20 @@ import { Message } from '@/lib/api'
 import { formatTime } from '@/lib/utils'
 import { Bot, User, Loader2 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { IntelligentContentRenderer } from '@/components/sibil/renderers/IntelligentContentRenderer'
 
 interface MessageBubbleProps {
   message: Message
+  streaming?: boolean
+  typewriterContent?: string
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, streaming = false, typewriterContent }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isSending = message.sending === true
+  
+  // Use typewriter content during streaming, otherwise use message content
+  const displayContent = streaming && typewriterContent ? typewriterContent : message.content
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -41,7 +47,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           }
           ${isSending ? 'opacity-70' : ''}
         `}>
-          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          {/* Use IntelligentContentRenderer for all content */}
+          <div className="text-sm">
+            <IntelligentContentRenderer
+              content={displayContent}
+              isStreaming={streaming}
+            />
+          </div>
           
           <div className={`
             text-xs mt-1 flex items-center justify-between

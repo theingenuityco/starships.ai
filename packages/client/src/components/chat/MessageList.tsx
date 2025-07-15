@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Message } from '@/lib/api'
+import type { Message } from '@/lib/agent-socket-api'
 import { MessageBubble } from './MessageBubble'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -23,19 +23,35 @@ export function MessageList<T = Message>({
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
-  // TODO: Add cleanup to prevent memory leaks
+  // Use a more stable scrolling approach to prevent bouncing
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // Use requestAnimationFrame to ensure DOM has updated before scrolling
+    const scrollToBottom = () => {
+      if (messagesEndRef.current) {
+        // Use instant scroll for code blocks to prevent bouncing
+        const hasCodeBlock = messages.some(msg =>
+          typeof (msg as any).content === 'string' &&
+          (msg as any).content.includes('```')
+        );
+        
+        messagesEndRef.current.scrollIntoView({
+          behavior: hasCodeBlock ? 'auto' : 'smooth',
+          block: 'end'
+        });
+      }
+    };
+    
+    requestAnimationFrame(scrollToBottom);
+  }, [messages]);
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center">
-          <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-3">
-            <AlertCircle className="w-6 h-6 text-destructive" />
+          <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+            <AlertCircle className="w-6 h-6 text-red-500" />
           </div>
-          <p className="text-sm text-destructive">{error}</p>
+          <p className="text-sm text-red-500">{error}</p>
         </div>
       </div>
     )
@@ -45,8 +61,10 @@ export function MessageList<T = Message>({
     return (
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center">
-          <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">{LOADING_TEXT.MESSAGES}</p>
+          <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-3">
+            <Loader2 className="w-6 h-6 text-blue-500" />
+          </div>
+          <p className="text-sm text-zinc-400">{LOADING_TEXT.MESSAGES}</p>
         </div>
       </div>
     )
@@ -56,9 +74,9 @@ export function MessageList<T = Message>({
     return (
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center">
-          <div className="w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-8 h-8 text-muted-foreground"
+              className="w-8 h-8 text-zinc-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -71,8 +89,8 @@ export function MessageList<T = Message>({
               />
             </svg>
           </div>
-          <h3 className="font-medium mb-1">{CHAT_TEXT.START_CONVERSATION_TITLE}</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="font-medium text-white mb-1">{CHAT_TEXT.START_CONVERSATION_TITLE}</h3>
+          <p className="text-sm text-zinc-400">
             {CHAT_TEXT.START_CONVERSATION_MESSAGE}
           </p>
         </div>
@@ -82,15 +100,22 @@ export function MessageList<T = Message>({
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
-        {messages.map((message) => (
-          <MessageComponent
-            key={(message as any).id}
-            message={message}
-          />
-        ))}
+      <div className="p-4">
+        {messages.map((message) => {
+          // Check if MessageComponent is MessageBubble and pass streaming prop
+          const isMessageBubble = MessageComponent === MessageBubble;
+          const streamingProp = isMessageBubble ? { streaming: (message as any).streaming } : {};
+          
+          return (
+            <MessageComponent
+              key={(message as any).id}
+              message={message}
+              {...streamingProp}
+            />
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
     </ScrollArea>
   )
-} 
+}

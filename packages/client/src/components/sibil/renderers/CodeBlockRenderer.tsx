@@ -27,7 +27,7 @@ export function CodeBlockRenderer({ code, language }: CodeBlockRendererProps) {
   }
 
   return (
-    <div className="relative group">
+    <div className="relative group w-full overflow-hidden">
       {/* Language label and copy button */}
       <div className="flex items-center justify-between bg-muted px-3 py-2 rounded-t-lg border-b">
         <span className="text-xs font-medium text-muted-foreground uppercase">
@@ -47,24 +47,28 @@ export function CodeBlockRenderer({ code, language }: CodeBlockRendererProps) {
         </Button>
       </div>
       
-      {/* Code content */}
-      <div className="rounded-b-lg overflow-hidden">
-        <SyntaxHighlighter
-          language={language}
-          style={theme === 'dark' ? oneDark : oneLight}
-          customStyle={{
-            margin: 0,
-            padding: '12px',
-            fontSize: '13px',
-            lineHeight: '1.4',
-            background: 'transparent',
-          }}
-          showLineNumbers={code.split('\n').length > 5}
-          wrapLines={true}
-          wrapLongLines={true}
-        >
-          {code}
-        </SyntaxHighlighter>
+      {/* Code content with horizontal scroll and fixed layout */}
+      <div className="rounded-b-lg overflow-x-auto max-w-full">
+        <div className="min-h-[30px]"> {/* Minimum height to prevent layout shifts */}
+          <SyntaxHighlighter
+            language={language}
+            style={theme === 'dark' ? oneDark : oneLight}
+            customStyle={{
+              margin: 0,
+              padding: '12px',
+              fontSize: '13px',
+              lineHeight: '1.4',
+              background: 'transparent',
+              minWidth: 'max-content',
+              transition: 'all 100ms ease-in-out', // Smooth transitions
+            }}
+            showLineNumbers={code.split('\n').length > 5}
+            wrapLines={false}
+            wrapLongLines={false}
+          >
+            {code}
+          </SyntaxHighlighter>
+        </div>
       </div>
     </div>
   )

@@ -150,7 +150,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
             // Subsequent chunks - update existing message
             return prev.map(msg =>
               msg.id === assistantMessageId
-                ? { ...msg, content: accumulated }
+                ? { ...msg, content: accumulated, streaming: true }
                 : msg
             )
           }

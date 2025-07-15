@@ -39,7 +39,7 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
         
         {/* Message Content */}
         <div className={`
-          px-4 py-2 rounded-lg break-words relative
+          px-4 py-2 rounded-lg break-words relative overflow-hidden
           ${isUser
             ? 'bg-primary text-primary-foreground mr-2'
             : 'bg-muted text-foreground ml-2'
@@ -47,7 +47,7 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
           ${isSending ? 'opacity-70 animate-pulse' : ''}
         `}>
           {/* Use IntelligentContentRenderer for all content */}
-          <div className="text-sm">
+          <div className="text-sm overflow-x-auto">
             <IntelligentContentRenderer
               content={displayContent}
               isStreaming={streaming}

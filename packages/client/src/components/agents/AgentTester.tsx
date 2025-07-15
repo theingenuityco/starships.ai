@@ -157,14 +157,10 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       message: messageContent
     }, {
       onChunk: (chunk, accumulated) => {
-        if (chunk.typewriter) {
-          typewriter.addChunk(chunk.typewriter)
-        }
-        
-        // Update streaming message with accumulated content
+        // Update streaming message with accumulated content immediately (no typewriter delay)
         setMessages(prev => prev.map(msg =>
           msg.id === assistantMessageId
-            ? { ...msg, content: typewriter.displayText || accumulated }
+            ? { ...msg, content: accumulated }
             : msg
         ))
       },
@@ -446,7 +442,6 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                   key={message.id}
                   message={message}
                   streaming={message.id === streamingMessageId}
-                  typewriterContent={message.id === streamingMessageId ? typewriter.displayText : undefined}
                 />
               ))
             )}
@@ -467,6 +462,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                 }}
                 connectionStatus={connectionStatus}
                 isTyping={isTyping}
+                agentName={agent.name}
               />
             </div>
           )}

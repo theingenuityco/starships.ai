@@ -102,7 +102,6 @@ app.get('/health/db', async (req, res) => {
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
-  codexRepository,
 });
 
 // Initialize vision routes with dependencies

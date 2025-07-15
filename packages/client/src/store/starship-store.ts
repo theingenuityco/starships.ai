@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
-import { starshipAPI, visionAPI, type Starship, type CodexProjection } from '@/lib/api';
+import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
 
 interface CommandDeckState {
   visibility: 'collapsed' | 'partial' | 'expanded';
@@ -41,7 +41,6 @@ interface StarshipActions {
   setActiveStarship: (starshipId: string | null) => void;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
-  getProjection: (lens: 'telos' | 'ethos' | 'full') => Promise<CodexProjection | null>;
   
   // SIMPLIFIED VISION ACTIONS (BREAKING CHANGE)
   loadVision: (starshipId: string) => Promise<void>;
@@ -199,18 +198,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
 
-        getProjection: async (lens) => {
-          const activeStarshipId = get().activeStarshipId;
-          if (!activeStarshipId) return null;
-
-          try {
-            const response = await starshipAPI.getProjection(activeStarshipId, lens);
-            return response.projection;
-          } catch (error) {
-            console.error('Failed to get projection:', error);
-            return null;
-          }
-        },
 
         // SIMPLIFIED VISION ACTIONS (CRITICAL: BYPASS DATABASE)
         loadVision: async (starshipId: string) => {

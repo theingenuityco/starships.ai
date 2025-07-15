@@ -4,8 +4,8 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { StarshipRepository, AgentRepository, CodexRepository } from '@starships/models';
-import { AetherCoreService } from '@starships/models';
+import type { StarshipRepository, AgentRepository } from '@starships/models';
+import { VisionFileService } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 
 const router: Router = Router();
@@ -13,17 +13,14 @@ const router: Router = Router();
 // Temporary in-memory repositories until we connect the full dependency injection
 // TODO: Replace with proper dependency injection pattern
 let starshipRepo: StarshipRepository;
-let agentRepo: AgentRepository; 
-let codexRepo: CodexRepository;
+let agentRepo: AgentRepository;
 
 export function initializeStarshipRoutes(deps: {
   starshipRepository: StarshipRepository;
   agentRepository: AgentRepository;
-  codexRepository: CodexRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
-  codexRepo = deps.codexRepository;
 }
 
 // GET /starships - Get user's starships
@@ -49,13 +46,21 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       return;
     }
 
-    // Use AetherCoreService for initialization (includes codex creation)
-    const result = await AetherCoreService.initializeStarship(userId, {
+    // Create starship directly (bypassing codex system)
+    const starship = await starshipRepo.create({
+      ownerId: userId,
       name,
-      class: starshipClass
+      class: starshipClass,
+      powerLevel: 85,
+      activeExpeditions: 0,
+      sibilInsights: 0,
+      status: 'active'
     });
 
-    res.status(201).json(result);
+    // Create empty vision file for the new starship
+    await VisionFileService.createEmptyVision(starship.id);
+
+    res.status(201).json({ starship });
   } catch (error) {
     console.error('Error creating starship:', error);
     res.status(500).json({ error: 'Failed to create starship' });
@@ -158,93 +163,5 @@ router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req: Requ
   }
 });
 
-// GET /starships/:id/codex - Get active codex
-router.get('/starships/:id/codex', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const starshipId = req.params.id;
-    
-    // Verify starship ownership
-    const starship = await starshipRepo.findById(starshipId);
-    if (!starship || starship.ownerId !== req.user!.id) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
-    const codex = await AetherCoreService.getActiveCodex(starshipId);
-    res.json({ codex });
-  } catch (error) {
-    console.error('Error fetching codex:', error);
-    res.status(500).json({ error: 'Failed to fetch codex' });
-  }
-});
-
-// NEW: POST /starships/:id/codex/mutate - Update codex with versioning
-router.post('/starships/:id/codex/mutate', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const starshipId = req.params.id;
-    const { mutations } = req.body;
-    
-    // Verify starship ownership
-    const starship = await starshipRepo.findById(starshipId);
-    if (!starship || starship.ownerId !== req.user!.id) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
-    // Reject goal mutations - goals functionality removed
-    if (mutations.goals) {
-      res.status(400).json({
-        error: 'Goal mutations no longer supported. Goals functionality has been removed from Vision Chamber.'
-      });
-      return;
-    }
-
-    // Apply mutations via AetherCoreService (vision and constraints only)
-    const updatedCodex = await AetherCoreService.mutateCodex(
-      starshipId,
-      mutations,
-      req.user!.id
-    );
-
-    res.json({ codex: updatedCodex });
-  } catch (error) {
-    console.error('Error mutating codex:', error);
-    res.status(500).json({ error: 'Failed to update codex' });
-  }
-});
-
-// NEW: GET /starships/:id/projection/:lens - Get lens-specific projection
-router.get('/starships/:id/projection/:lens', authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { id: starshipId, lens } = req.params;
-    
-    // Verify starship ownership
-    const starship = await starshipRepo.findById(starshipId);
-    if (!starship || starship.ownerId !== req.user!.id) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
-    }
-
-    if (!['telos', 'ethos', 'full'].includes(lens)) {
-      res.status(400).json({ error: 'Invalid lens. Must be telos, ethos, or full' });
-      return;
-    }
-
-    const projection = await AetherCoreService.getProjection(
-      starshipId,
-      lens as 'telos' | 'ethos' | 'full'
-    );
-
-    // Ensure no legacy goal data is returned
-    if (projection && 'goals' in projection) {
-      delete (projection as any).goals;
-    }
-
-    res.json({ projection });
-  } catch (error) {
-    console.error('Error fetching projection:', error);
-    res.status(500).json({ error: 'Failed to fetch projection' });
-  }
-});
 
 export default router; 

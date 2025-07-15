@@ -22,8 +22,9 @@ export default function CrewPage() {
 
   return (
     <AuthGate>
-      <div className="flex h-full">
-        <div className="w-[350px] border-r bg-card shadow-sm">
+      <div className="grid grid-cols-[350px_1fr] h-full">
+        {/* Left sidebar - fixed width */}
+        <div className="border-r bg-card shadow-sm overflow-hidden">
           <div className="p-6 h-full flex flex-col">
             <h2 className="text-xl font-semibold mb-6 flex items-center">
               <span className="bg-primary/10 p-2 rounded-md mr-3 shadow-sm">
@@ -41,7 +42,9 @@ export default function CrewPage() {
             </div>
           </div>
         </div>
-        <div className="flex-1 flex flex-col bg-background">
+        
+        {/* Right content area */}
+        <div className="bg-background overflow-hidden">
           {selectedAgent ? (
             <ChatInterface
               agent={selectedAgent}

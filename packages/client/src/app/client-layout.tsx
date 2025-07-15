@@ -82,16 +82,18 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     <AuthGate>
       <div className="h-screen flex relative overflow-hidden">
         {/* Navigation Sidebar with gutter (16px) */}
-        <motion.aside
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
-          className="fixed top-4 left-4 z-50 w-[280px] h-[calc(100vh-32px)] bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
-          onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
-          onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
-        >
-          <Navigation mode="sidebar" isMobile={isMobile} />
-        </motion.aside>
+        <div className="fixed top-4 left-4 bottom-4 w-[300px] z-50">
+          <motion.aside
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
+            className="w-full h-full bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
+            onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
+            onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
+          >
+            <Navigation mode="sidebar" isMobile={isMobile} />
+          </motion.aside>
+        </div>
         
         {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
         {isMobile && (
@@ -115,8 +117,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             exit="exit"
             variants={pageVariants}
             className={cn(
-              "flex-1 min-h-full w-full transition-all duration-300 pl-[296px]"
+              "flex-1 min-h-full w-full transition-all duration-300",
+              // Position content next to navigation with fixed margin
+              "ml-[320px]"
             )}
+            style={{ width: 'calc(100% - 320px)' }}
           >
             {children}
           </motion.main>

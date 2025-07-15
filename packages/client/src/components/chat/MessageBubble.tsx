@@ -16,7 +16,7 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse mr-4' : 'flex-row'} items-start gap-2`}>
+      <div className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse mr-20' : 'flex-row ml-2'} items-start gap-2`}>
         {/* Simple Avatar */}
         <div 
           className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 

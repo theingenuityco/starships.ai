@@ -30,6 +30,7 @@ import sibilRoutes from './routes/sibil';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
+import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import mcpRoutes from './routes/mcp';
@@ -103,7 +104,11 @@ app.get('/health/db', async (req, res) => {
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
-  codexRepository,
+});
+
+// Initialize vision routes with dependencies
+initializeVisionRoutes({
+  starshipRepository
 });
 
 // API Routes
@@ -115,6 +120,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/mcp', mcpRoutes);
 app.use('/api', starshipRoutes);
+app.use('/api', visionRoutes);
 app.use('/api', redeployRoutes);
 
 // Create HTTP server and initialize Socket.IO

@@ -21,11 +21,15 @@ export class AetherCoreService {
     name: string;
     class: 'scout' | 'cruiser';
   }): Promise<{ starship: Starship; codex: Codex }> {
+    // Generate unique slug for the starship
+    const slug = await this.starshipRepo.generateUniqueSlug(starshipData.name, ownerId);
+    
     // Create starship
     const starship = await this.starshipRepo.create({
       ownerId,
       name: starshipData.name,
       class: starshipData.class,
+      slug,
       powerLevel: 85,
       activeExpeditions: 0,
       sibilInsights: 0,

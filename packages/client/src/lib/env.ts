@@ -47,8 +47,18 @@ export const env = {
  * Get API base URL with fallback logic
  */
 export function getApiBaseUrl(): string {
-  // Use NEXT_PUBLIC_API_URL or default to empty (proxy)
-  return env.client.NEXT_PUBLIC_API_URL || '';
+  // Use NEXT_PUBLIC_API_URL or default to server URL in development
+  if (env.client.NEXT_PUBLIC_API_URL) {
+    return env.client.NEXT_PUBLIC_API_URL;
+  }
+  
+  // In development, point to the server directly
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:4000';
+  }
+  
+  // In production, use empty string for Next.js proxy
+  return '';
 }
 
 /**

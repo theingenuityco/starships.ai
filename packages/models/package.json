@@ -19,11 +19,13 @@
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",
+    "fs-extra": "^11.3.0",
     "neo4j-driver": "^5.28.1",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@testcontainers/neo4j": "^11.2.1",
+    "@types/fs-extra": "^11.0.4",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.10",
     "@types/uuid": "^10.0.0",

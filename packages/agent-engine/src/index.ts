@@ -1,7 +1,7 @@
 import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
-import { RepositoryFactory, AetherCoreService } from "@starships/models";
+import { RepositoryFactory, VisionFileService } from "@starships/models";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
 // MCP Integration placeholder - will be properly implemented when types are available
@@ -14,6 +14,15 @@ interface MCPContext {
  * Process chat request through agent with memory and context
  */
 export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promise<ChatResponse> {
+  console.log('🚀 [AGENT-ENGINE] Starting chat request:', {
+    agent_id: req.agent_id,
+    user_id: req.user_id,
+    channel_id: req.channel_id,
+    message: req.message,
+    stream: req.stream,
+    timestamp: new Date().toISOString()
+  });
+
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
   const starshipRepo = RepositoryFactory.getStarshipRepository();
@@ -23,34 +32,70 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   const agent = await agentRepo.findById(req.agent_id);
   
   if (!agent) {
+    console.error('❌ [AGENT-ENGINE] Agent not found:', req.agent_id);
     throw new Error(`Agent ${req.agent_id} not found`);
   }
 
-  // NEW: Load starship codex context for deployed agents
+  console.log('✅ [AGENT-ENGINE] Agent found:', {
+    id: agent.id,
+    name: agent.name,
+    model: agent.model,
+    systemPrompt: agent.systemPrompt?.substring(0, 100) + '...'
+  });
+
+  // SIMPLE VISION CONTEXT LOADING
+  console.log('🔍 [AGENT-ENGINE] Starting vision context loading...');
   let codexContext = "";
   try {
     const userStarships = await starshipRepo.findByOwner(req.user_id);
+    console.log('📊 [AGENT-ENGINE] User starships found:', userStarships.length);
+    
     if (userStarships.length > 0) {
-      // Use first starship as active (TODO: support starship selection)
       const activeStarship = userStarships[0];
+      console.log('🚢 [AGENT-ENGINE] Active starship:', {
+        id: activeStarship.id,
+        name: activeStarship.name,
+        class: activeStarship.class
+      });
       
-      // Check if agent is deployed on this starship
-      const isAgentDeployed = await AetherCoreService.isAgentDeployedOnStarship(
-        activeStarship.id, 
-        req.agent_id
-      );
+      // Check if agent is deployed
+      const deployedAgents = await starshipRepo.getDeployedAgents(activeStarship.id);
+      const isAgentDeployed = deployedAgents.some(agent => agent.id === req.agent_id);
+      console.log('🤖 [AGENT-ENGINE] Agent deployment check:', {
+        isDeployed: isAgentDeployed,
+        deployedAgents: deployedAgents.map(a => a.id),
+        requestedAgent: req.agent_id
+      });
       
       if (isAgentDeployed) {
-        // Get Telos projection for mission-focused context
-        const projection = await AetherCoreService.getProjection(activeStarship.id, 'telos');
-        if (projection) {
-          codexContext = formatCodexContext(activeStarship, projection);
+        // BLOCK AGENT IF NO VISION
+        const hasVision = await VisionFileService.hasVisionContent(activeStarship.id);
+        console.log('👁️ [AGENT-ENGINE] Vision check:', { hasVision });
+        
+        if (!hasVision) {
+          console.error('❌ [AGENT-ENGINE] Vision required but not found');
+          throw new Error('Vision required: Please create a vision statement in the Vision Chamber before using agents.');
         }
+        
+        // LOAD VISION FROM FILE
+        const vision = await VisionFileService.readVision(activeStarship.id);
+        console.log('📖 [AGENT-ENGINE] Vision loaded:', {
+          length: vision?.length || 0,
+          preview: vision?.substring(0, 100) + '...'
+        });
+        
+        if (vision) {
+          codexContext = `\n\nSTARSHIP VISION:\n${vision}\n\nProvide responses aligned with this vision.\n`;
+        }
+      } else {
+        console.log('⚠️ [AGENT-ENGINE] Agent not deployed, skipping vision loading');
       }
+    } else {
+      console.log('⚠️ [AGENT-ENGINE] No starships found for user');
     }
   } catch (error) {
-    console.error('Failed to load starship context:', error);
-    // Continue without codex context - graceful degradation
+    console.error('❌ [AGENT-ENGINE] Vision loading failed:', error);
+    throw error; // Re-throw to block agent
   }
 
   // NEW: Load MCP tools context for agent
@@ -65,10 +110,20 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
 
   const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
   const memory = await store.get(sessionKey);
+  console.log('🧠 [AGENT-ENGINE] Memory loaded:', {
+    sessionKey,
+    memoryEntries: memory.length,
+    recentEntries: memory.slice(-3).map(m => `${m.role}: ${m.content.substring(0, 50)}...`)
+  });
 
   let relevantContext = "";
   if (memory.length > 10) {
     const searchResult = await store.semanticSearch(sessionKey, req.message, 5);
+    console.log('🔍 [AGENT-ENGINE] Semantic search results:', {
+      entriesFound: searchResult.entries.length,
+      entries: searchResult.entries.map(e => `${e.role}: ${e.content.substring(0, 50)}...`)
+    });
+    
     if (searchResult.entries.length > 0) {
       relevantContext = searchResult.entries
         .map(entry => `${entry.role}: ${entry.content}`)
@@ -77,6 +132,15 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   }
 
   // NEW: Enhanced prompt with codex and MCP context
+  console.log('📝 [AGENT-ENGINE] Building prompt with:', {
+    hasSystemPrompt: !!agent.systemPrompt,
+    memoryEntries: memory.length,
+    hasRelevantContext: !!relevantContext,
+    hasCodexContext: !!codexContext,
+    codexContextLength: codexContext.length,
+    hasMcpContext: !!mcpContext
+  });
+
   const prompt = buildPrompt(
     agent.systemPrompt,
     memory,
@@ -86,7 +150,15 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     mcpContext     // NEW MCP PARAMETER
   );
   
+  console.log('✅ [AGENT-ENGINE] Prompt built:', {
+    totalMessages: prompt.messages.length,
+    systemMessages: prompt.messages.filter(m => m.role === 'system').length,
+    userMessages: prompt.messages.filter(m => m.role === 'user').length,
+    assistantMessages: prompt.messages.filter(m => m.role === 'assistant').length
+  });
+  
   const provider = await ProviderFactory.getProvider(req.agent_id);
+  console.log('🤖 [AGENT-ENGINE] Provider loaded for agent:', req.agent_id);
   
   const llm = await llmRepo.findById(agent.model);
   const opts = {
@@ -95,12 +167,31 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     maxTokens: llm?.maxTokens,
   };
   
+  console.log('⚙️ [AGENT-ENGINE] LLM configuration:', {
+    modelId: agent.model,
+    modelName: llm?.name,
+    temperature: llm?.temperature,
+    maxTokens: llm?.maxTokens,
+    stream: req.stream
+  });
+  
   if (req.stream) {
     throw new Error('Use chatStream for streaming responses');
   }
 
+  console.log('🚀 [AGENT-ENGINE] Sending request to LLM provider...');
+  const startTime = Date.now();
   const result = await provider.complete(prompt, opts);
+  const endTime = Date.now();
+  
+  console.log('✅ [AGENT-ENGINE] LLM response received:', {
+    responseTime: `${endTime - startTime}ms`,
+    replyLength: result.reply.length,
+    replyPreview: result.reply.substring(0, 200) + '...',
+    usage: result.usage
+  });
 
+<<<<<<< HEAD
   // NEW: Process MCP tool calls if present
   let finalReply = result.reply;
   try {
@@ -114,19 +205,39 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     // Continue with original response
   }
 
+=======
+  console.log('💾 [AGENT-ENGINE] Storing messages in memory...');
+>>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
   const userTimestamp = Date.now();
   await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
   
   const assistantTimestamp = Date.now();
   await store.append(sessionKey, { role: "assistant", content: finalReply, timestamp: assistantTimestamp } as MemoryEntry);
 
+<<<<<<< HEAD
   return { reply: finalReply, usage: result.usage };
+=======
+  console.log('🎉 [AGENT-ENGINE] Chat completed successfully:', {
+    finalReplyLength: result.reply.length,
+    totalProcessingTime: `${Date.now() - startTime}ms`
+  });
+
+  return { reply: result.reply, usage: result.usage };
+>>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
 }
 
 /**
  * Process chat request through agent with streaming support
  */
 async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): AsyncGenerator<string, void, unknown> {
+  console.log('🌊 [AGENT-ENGINE-STREAM] Starting streaming chat request:', {
+    agent_id: req.agent_id,
+    user_id: req.user_id,
+    channel_id: req.channel_id,
+    message: req.message,
+    timestamp: new Date().toISOString()
+  });
+
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
   const starshipRepo = RepositoryFactory.getStarshipRepository();
@@ -136,30 +247,53 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   const agent = await agentRepo.findById(req.agent_id);
   
   if (!agent) {
+    console.error('❌ [AGENT-ENGINE-STREAM] Agent not found:', req.agent_id);
     throw new Error(`Agent ${req.agent_id} not found`);
   }
 
-  // Load starship codex context for deployed agents
+  console.log('✅ [AGENT-ENGINE-STREAM] Agent found:', {
+    id: agent.id,
+    name: agent.name,
+    model: agent.model
+  });
+
+  // SIMPLE VISION CONTEXT LOADING (consistent with non-streaming)
   let codexContext = "";
   try {
     const userStarships = await starshipRepo.findByOwner(req.user_id);
+    
     if (userStarships.length > 0) {
       const activeStarship = userStarships[0];
       
-      const isAgentDeployed = await AetherCoreService.isAgentDeployedOnStarship(
-        activeStarship.id,
-        req.agent_id
-      );
+      // Check if agent is deployed
+      const deployedAgents = await starshipRepo.getDeployedAgents(activeStarship.id);
+      const isAgentDeployed = deployedAgents.some(agent => agent.id === req.agent_id);
       
       if (isAgentDeployed) {
-        const projection = await AetherCoreService.getProjection(activeStarship.id, 'telos');
-        if (projection) {
-          codexContext = formatCodexContext(activeStarship, projection);
+        // BLOCK AGENT IF NO VISION
+        const hasVision = await VisionFileService.hasVisionContent(activeStarship.id);
+        
+        if (!hasVision) {
+          console.error('❌ [AGENT-ENGINE-STREAM] Vision required but not found');
+          throw new Error('Vision required: Please create a vision statement in the Vision Chamber before using agents.');
         }
+        
+        // LOAD VISION FROM FILE
+        const vision = await VisionFileService.readVision(activeStarship.id);
+        
+        if (vision) {
+          codexContext = `\n\nSTARSHIP VISION:\n${vision}\n\nProvide responses aligned with this vision.\n`;
+          console.log('✅ [AGENT-ENGINE-STREAM] Vision context loaded');
+        }
+      } else {
+        console.log('⚠️ [AGENT-ENGINE-STREAM] Agent not deployed - vision skipped');
       }
+    } else {
+      console.log('⚠️ [AGENT-ENGINE-STREAM] No starships found - vision skipped');
     }
   } catch (error) {
-    console.error('Failed to load starship context:', error);
+    console.error('❌ [AGENT-ENGINE-STREAM] Vision loading failed:', error);
+    throw error; // Re-throw to block agent
   }
 
   // Load MCP tools context for agent
@@ -173,16 +307,34 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
 
   const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
   const memory = await store.get(sessionKey);
+  console.log('🧠 [AGENT-ENGINE-STREAM] Memory loaded:', {
+    sessionKey,
+    memoryEntries: memory.length,
+    recentEntries: memory.slice(-3).map(m => `${m.role}: ${m.content.substring(0, 50)}...`)
+  });
 
   let relevantContext = "";
   if (memory.length > 10) {
     const searchResult = await store.semanticSearch(sessionKey, req.message, 5);
+    console.log('🔍 [AGENT-ENGINE-STREAM] Semantic search results:', {
+      entriesFound: searchResult.entries.length,
+      entries: searchResult.entries.map(e => `${e.role}: ${e.content.substring(0, 50)}...`)
+    });
+    
     if (searchResult.entries.length > 0) {
       relevantContext = searchResult.entries
         .map(entry => `${entry.role}: ${entry.content}`)
         .join('\n');
     }
   }
+
+  console.log('📝 [AGENT-ENGINE-STREAM] Building prompt with:', {
+    hasSystemPrompt: !!agent.systemPrompt,
+    memoryEntries: memory.length,
+    hasRelevantContext: !!relevantContext,
+    hasCodexContext: !!codexContext,
+    codexContextLength: codexContext.length
+  });
 
   const prompt = buildPrompt(
     agent.systemPrompt,
@@ -193,7 +345,15 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     mcpContext
   );
   
+  console.log('✅ [AGENT-ENGINE-STREAM] Prompt built:', {
+    totalMessages: prompt.messages.length,
+    systemMessages: prompt.messages.filter(m => m.role === 'system').length,
+    userMessages: prompt.messages.filter(m => m.role === 'user').length,
+    assistantMessages: prompt.messages.filter(m => m.role === 'assistant').length
+  });
+  
   const provider = await ProviderFactory.getProvider(req.agent_id);
+  console.log('🤖 [AGENT-ENGINE-STREAM] Provider loaded for agent:', req.agent_id);
   
   const llm = await llmRepo.findById(agent.model);
   const opts = {
@@ -201,18 +361,42 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     maxTokens: llm?.maxTokens,
   };
   
+  console.log('⚙️ [AGENT-ENGINE-STREAM] LLM configuration:', {
+    modelId: agent.model,
+    modelName: llm?.name,
+    temperature: llm?.temperature,
+    maxTokens: llm?.maxTokens
+  });
+  
   // Store user message before streaming
+  console.log('💾 [AGENT-ENGINE-STREAM] Storing user message in memory...');
   const userTimestamp = Date.now();
   await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
   
   let fullResponse = "";
+  let chunkCount = 0;
+  
+  console.log('🌊 [AGENT-ENGINE-STREAM] Starting streaming response...');
+  const streamStartTime = Date.now();
   
   // Stream the response
   for await (const chunk of provider.completeStream(prompt, opts)) {
     fullResponse += chunk;
+    chunkCount++;
+    
+    // Log every 10th chunk to avoid spam
+    if (chunkCount % 10 === 0) {
+      console.log(`🔄 [AGENT-ENGINE-STREAM] Chunk ${chunkCount}:`, {
+        chunkLength: chunk.length,
+        totalLength: fullResponse.length,
+        elapsedTime: `${Date.now() - streamStartTime}ms`
+      });
+    }
+    
     yield chunk;
   }
   
+<<<<<<< HEAD
   // Process MCP tool calls after streaming completes
   let finalResponse = fullResponse;
   try {
@@ -229,39 +413,28 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   } catch (error) {
     console.error('Failed to process MCP tool calls in stream:', error);
   }
+=======
+  const streamEndTime = Date.now();
+  console.log('✅ [AGENT-ENGINE-STREAM] Streaming completed:', {
+    totalChunks: chunkCount,
+    totalResponseLength: fullResponse.length,
+    streamingTime: `${streamEndTime - streamStartTime}ms`,
+    responsePreview: fullResponse.substring(0, 200) + '...'
+  });
+>>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
   
   // Store assistant message after streaming completes
+  console.log('💾 [AGENT-ENGINE-STREAM] Storing assistant message in memory...');
   const assistantTimestamp = Date.now();
+<<<<<<< HEAD
   await store.append(sessionKey, { role: "assistant", content: finalResponse, timestamp: assistantTimestamp } as MemoryEntry);
+=======
+  await store.append(sessionKey, { role: "assistant", content: fullResponse, timestamp: assistantTimestamp } as MemoryEntry);
+  
+  console.log('🎉 [AGENT-ENGINE-STREAM] Streaming chat completed successfully');
+>>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
 }
 
-// NEW: Format codex context for prompt injection
-function formatCodexContext(starship: any, projection: any): string {
-  let context = `\n\nSTARSHIP CONTEXT - ${starship.class.charAt(0).toUpperCase() + starship.class.slice(1)} Class Vessel\n`;
-  context += `Starship: ${starship.name}\n`;
-  
-  if (projection.vision) {
-    context += `Mission Vision: ${projection.vision}\n`;
-  }
-  
-  if (projection.goals && projection.goals.length > 0) {
-    context += `Active Goals:\n`;
-    projection.goals.forEach((goal: any) => {
-      context += `- ${goal.description} (${goal.type})\n`;
-    });
-  }
-  
-  if (projection.constraints && projection.constraints.length > 0) {
-    context += `Mission Constraints:\n`;
-    projection.constraints.forEach((constraint: any) => {
-      context += `- ${constraint.description}\n`;
-    });
-  }
-  
-  context += `\nProvide responses that align with this starship's mission and constraints.`;
-  
-  return context;
-}
 
 // MCP Integration Functions (placeholder implementations)
 async function getMCPContext(userId: string, agentId: string): Promise<MCPContext> {

@@ -26,10 +26,24 @@ export class Neo4jConnection {
     try {
       this.driver = neo4j.driver(
         this.config.uri,
-        auth.basic(this.config.username, this.config.password)
+        auth.basic(this.config.username, this.config.password),
+        {
+          connectionTimeout: 5000, // 5 second timeout
+          maxConnectionLifetime: 30000, // 30 second max lifetime
+          maxConnectionPoolSize: 100,
+          connectionAcquisitionTimeout: 10000 // 10 second acquisition timeout
+        }
       );
 
-      await this.driver.verifyConnectivity();
+      // Add timeout to connectivity check
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Neo4j connection timeout')), 5000);
+      });
+
+      await Promise.race([
+        this.driver.verifyConnectivity(),
+        timeoutPromise
+      ]);
     } catch (error) {
       console.error('Failed to connect to Neo4j:', error);
       throw error;
@@ -125,6 +139,7 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE',
         'CREATE CONSTRAINT channel_id_unique IF NOT EXISTS FOR (c:Channel) REQUIRE c.id IS UNIQUE',
         'CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE',
+        'CREATE CONSTRAINT starship_slug_owner_unique IF NOT EXISTS FOR (s:Starship) REQUIRE (s.slug, s.ownerId) IS UNIQUE',
         'CREATE CONSTRAINT codex_id_unique IF NOT EXISTS FOR (c:Codex) REQUIRE c.id IS UNIQUE',
         'CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE',
         'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',

@@ -449,3 +449,5 @@ export interface MCPHealthResult {
 
 // Enhanced SocketIOEvents to include MCP events
 export interface EnhancedSocketIOEvents extends SocketIOEvents, MCPSocketEvents {}
+// Export starship-related types
+export * from './types/starship';

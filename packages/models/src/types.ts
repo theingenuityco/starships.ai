@@ -304,3 +304,173 @@ export interface AgentTemplateRepository extends Repository<AgentTemplate> {
   // Create template from public agent
   createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null>;
 }
+
+// MCP (Model Context Protocol) Types
+export interface MCPServer {
+  id: string;
+  userId: string;
+  agentId?: string;
+  name: string;
+  containerImage: string;
+  status: 'running' | 'stopped' | 'error' | 'starting';
+  environment: Record<string, string>;
+  limits: {
+    memory: string;
+    cpu: string;
+    timeout: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MCPTool {
+  id: string;
+  serverId: string;
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+  permissions: string[];
+  category: 'system' | 'data' | 'communication' | 'analysis' | 'custom';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MCPContainer {
+  id: string;
+  serverId: string;
+  userId: string;
+  dockerId: string;
+  status: 'running' | 'stopped' | 'error';
+  image: string;
+  ports: Record<string, number>;
+  resourceUsage: {
+    memory: string;
+    cpu: string;
+  };
+  createdAt: string;
+  lastActivity: string;
+}
+
+export interface MCPPermission {
+  id: string;
+  userId: string;
+  toolName: string;
+  granted: boolean;
+  grantedBy: string;
+  grantedAt: string;
+  expiresAt?: string;
+}
+
+export interface AgentMCPPermission {
+  id: string;
+  userId: string;
+  agentId: string;
+  toolName: string;
+  granted: boolean;
+  grantedAt: string;
+  grantedBy: string;
+}
+
+export interface AgentToolCredentials {
+  id: string;
+  userId: string;
+  agentId: string;
+  toolName: string;
+  encryptedCredentials: string; // Encrypted JSON of credentials
+  createdAt: string;
+  updatedAt: string;
+}
+
+// MCP Repository interfaces
+export interface MCPRepository {
+  // Server management
+  createMCPServer(server: Omit<MCPServer, 'id' | 'createdAt' | 'updatedAt'>): Promise<MCPServer>;
+  findMCPServerByUser(userId: string): Promise<MCPServer[]>;
+  findMCPServerByAgent(agentId: string): Promise<MCPServer | null>;
+  updateMCPServer(id: string, updates: Partial<MCPServer>): Promise<MCPServer | null>;
+  deleteMCPServer(id: string): Promise<boolean>;
+  
+  // Tool management
+  createTool(tool: Omit<MCPTool, 'id' | 'createdAt' | 'updatedAt'>): Promise<MCPTool>;
+  findToolsByServer(serverId: string): Promise<MCPTool[]>;
+  findToolByName(serverId: string, name: string): Promise<MCPTool | null>;
+  updateTool(id: string, updates: Partial<MCPTool>): Promise<MCPTool | null>;
+  deleteTool(id: string): Promise<boolean>;
+  
+  // Container management
+  createContainer(container: Omit<MCPContainer, 'id' | 'createdAt'>): Promise<MCPContainer>;
+  findContainersByUser(userId: string): Promise<MCPContainer[]>;
+  findContainerByServer(serverId: string): Promise<MCPContainer | null>;
+  updateContainer(id: string, updates: Partial<MCPContainer>): Promise<MCPContainer | null>;
+  deleteContainer(id: string): Promise<boolean>;
+  
+  // Permission management
+  grantPermission(permission: Omit<MCPPermission, 'id' | 'grantedAt'>): Promise<MCPPermission>;
+  revokePermission(userId: string, toolName: string): Promise<boolean>;
+  checkPermission(userId: string, toolName: string): Promise<boolean>;
+  listUserPermissions(userId: string): Promise<MCPPermission[]>;
+  
+  // Agent-specific permissions
+  grantAgentPermission(permission: Omit<AgentMCPPermission, 'id' | 'grantedAt'>): Promise<AgentMCPPermission>;
+  revokeAgentPermission(userId: string, agentId: string, toolName: string): Promise<boolean>;
+  checkAgentPermission(userId: string, agentId: string, toolName: string): Promise<boolean>;
+  listAgentPermissions(userId: string, agentId: string): Promise<AgentMCPPermission[]>;
+  
+  // Agent-specific credentials
+  setAgentCredentials(credentials: Omit<AgentToolCredentials, 'id' | 'createdAt' | 'updatedAt'>): Promise<AgentToolCredentials>;
+  getAgentCredentials(userId: string, agentId: string, toolName: string): Promise<AgentToolCredentials | null>;
+  updateAgentCredentials(userId: string, agentId: string, toolName: string, encryptedCredentials: string): Promise<AgentToolCredentials | null>;
+  deleteAgentCredentials(userId: string, agentId: string, toolName: string): Promise<boolean>;
+}
+
+// MCP Relationships
+export interface OwnsServerRelationship {
+  type: 'OWNS_MCP_SERVER';
+  properties?: {
+    ownedSince?: string;
+  };
+}
+
+export interface HasServerRelationship {
+  type: 'HAS_MCP_SERVER';
+  properties?: {
+    attachedAt?: string;
+  };
+}
+
+export interface ProvidesToolRelationship {
+  type: 'PROVIDES_TOOL';
+  properties?: {
+    addedAt?: string;
+  };
+}
+
+export interface RunsInContainerRelationship {
+  type: 'RUNS_IN_CONTAINER';
+  properties?: {
+    startedAt?: string;
+  };
+}
+
+export interface HasPermissionRelationship {
+  type: 'HAS_PERMISSION';
+  properties?: {
+    grantedAt?: string;
+    grantedBy?: string;
+  };
+}
+
+export interface ForToolRelationship {
+  type: 'FOR_TOOL';
+  properties?: {
+    toolName?: string;
+  };
+}
+
+export interface HasCredentialsRelationship {
+  type: 'HAS_AGENT_TOOL_CREDENTIALS';
+  properties?: {
+    createdAt?: string;
+    updatedAt?: string;
+  };
+}

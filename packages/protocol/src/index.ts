@@ -311,3 +311,141 @@ export interface AgentStreamError {
   timestamp: number;
   recoverable: boolean;
 }
+
+// MCP (Model Context Protocol) Interfaces
+export interface MCPConfiguration {
+  id: string;
+  userId: string;
+  agentId?: string;
+  name: string;
+  containerImage: string;
+  tools: MCPToolConfig[];
+  resources: MCPResourceConfig[];
+  environment: Record<string, string>;
+  limits: {
+    memory: string;
+    cpu: string;
+    timeout: number;
+  };
+  // Agent-specific permissions and credentials
+  agentPermissions: Record<string, string[]>; // agentId -> toolNames[]
+  agentToolCredentials: Record<string, Record<string, any>>; // agentId -> toolName -> credentials
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MCPToolConfig {
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+  permissions: string[];
+  category: 'system' | 'data' | 'communication' | 'analysis' | 'custom';
+}
+
+export interface MCPResourceConfig {
+  name: string;
+  type: 'file' | 'database' | 'api' | 'service';
+  uri: string;
+  permissions: string[];
+}
+
+export interface MCPToolCall {
+  id: string;
+  toolName: string;
+  parameters: Record<string, any>;
+  agentId: string;  // CRITICAL: Always include agentId for permission + credential checks
+  userId: string;
+  timestamp: string;
+  context?: {
+    conversationId?: string;
+    messageId?: string;
+  };
+}
+
+export interface MCPToolResult {
+  id: string;
+  toolCallId: string;
+  success: boolean;
+  result?: any;
+  error?: string;
+  executionTime: number;
+  timestamp: string;
+  logs?: string[];
+}
+
+export interface MCPStatus {
+  serverId: string;
+  status: 'running' | 'stopped' | 'error' | 'starting';
+  containerInfo: {
+    id: string;
+    status: string;
+    uptime: number;
+    resourceUsage: {
+      memory: string;
+      cpu: string;
+    };
+  };
+  availableTools: string[];
+  lastActivity: string;
+}
+
+export interface MCPToolSchema {
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+  agentCredentialsConfigured?: boolean;
+}
+
+// Export MCP Socket.IO Events
+export interface MCPSocketEvents {
+  // MCP Configuration
+  'mcp:configure': (config: MCPConfiguration) => void;
+  'mcp:configuration-result': (result: { success: boolean; serverId?: string; error?: string }) => void;
+  
+  // Tool Execution
+  'mcp:tool-execute': (toolCall: MCPToolCall) => void;
+  'mcp:tool-result': (result: MCPToolResult) => void;
+  'mcp:tool-stream': (chunk: MCPToolStreamChunk) => void;
+  
+  // Status and Monitoring
+  'mcp:status-update': (status: MCPStatus) => void;
+  'mcp:container-logs': (logs: MCPContainerLogs) => void;
+  'mcp:health-check': (serverId: string) => void;
+  'mcp:health-result': (result: MCPHealthResult) => void;
+  
+  // Agent-specific events
+  'mcp:agent-tools-available': (agentId: string, tools: MCPToolSchema[]) => void;
+  'mcp:agent-permission-updated': (agentId: string, toolName: string, granted: boolean) => void;
+  'mcp:agent-credentials-updated': (agentId: string, toolName: string, configured: boolean) => void;
+}
+
+export interface MCPToolStreamChunk {
+  toolCallId: string;
+  type: 'stdout' | 'stderr' | 'result' | 'error' | 'complete';
+  content: string;
+  timestamp: number;
+}
+
+export interface MCPContainerLogs {
+  serverId: string;
+  containerId: string;
+  logs: string;
+  timestamp: number;
+  level: 'info' | 'warn' | 'error' | 'debug';
+}
+
+export interface MCPHealthResult {
+  serverId: string;
+  healthy: boolean;
+  uptime: number;
+  resourceUsage: {
+    memory: string;
+    cpu: string;
+  };
+  availableTools: number;
+  lastActivity: string;
+  error?: string;
+}
+
+// Enhanced SocketIOEvents to include MCP events
+export interface EnhancedSocketIOEvents extends SocketIOEvents, MCPSocketEvents {}

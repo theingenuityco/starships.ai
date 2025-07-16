@@ -1,0 +1,35 @@
+{
+  "name": "@starships/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "jest --runInBand --coverage",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs"
+  },
+  "dependencies": {
+    "@starships/protocol": "workspace:*",
+    "@starships/models": "workspace:*",
+    "@starships/env-config": "workspace:*",
+    "dockerode": "^4.0.7",
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.1.0"
+  },
+  "devDependencies": {
+    "@types/dockerode": "^3.3.42",
+    "@types/express": "^5.0.3",
+    "@types/cors": "^2.8.19",
+    "@types/node": "^22.10.6",
+    "@types/jest": "^30.0.0",
+    "@types/uuid": "^10.0.0",
+    "jest": "^30.0.4",
+    "ts-jest": "^29.4.0",
+    "tsx": "^4.20.3",
+    "uuid": "^11.1.0"
+  }
+}

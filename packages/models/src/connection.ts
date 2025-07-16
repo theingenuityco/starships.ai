@@ -130,6 +130,13 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
         'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
         'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
+        // MCP-specific constraints
+        'CREATE CONSTRAINT mcp_server_id_unique IF NOT EXISTS FOR (m:MCPServer) REQUIRE m.id IS UNIQUE',
+        'CREATE CONSTRAINT mcp_tool_id_unique IF NOT EXISTS FOR (t:MCPTool) REQUIRE t.id IS UNIQUE',
+        'CREATE CONSTRAINT mcp_container_id_unique IF NOT EXISTS FOR (c:MCPContainer) REQUIRE c.id IS UNIQUE',
+        'CREATE CONSTRAINT mcp_permission_id_unique IF NOT EXISTS FOR (p:MCPPermission) REQUIRE p.id IS UNIQUE',
+        'CREATE CONSTRAINT agent_mcp_permission_unique IF NOT EXISTS FOR (p:AgentMCPPermission) REQUIRE (p.userId, p.agentId, p.toolName) IS UNIQUE',
+        'CREATE CONSTRAINT agent_tool_credentials_unique IF NOT EXISTS FOR (c:AgentToolCredentials) REQUIRE (c.userId, c.agentId, c.toolName) IS UNIQUE',
       ];
 
       for (const constraint of constraints) {
@@ -151,6 +158,15 @@ export class Neo4jConnection {
         'CREATE INDEX concept_codex_index IF NOT EXISTS FOR (concept:Concept) ON (concept.codexId)',
         'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
         'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
+        // MCP-specific indexes
+        'CREATE INDEX mcp_server_user_index IF NOT EXISTS FOR (m:MCPServer) ON (m.userId)',
+        'CREATE INDEX mcp_server_agent_index IF NOT EXISTS FOR (m:MCPServer) ON (m.agentId)',
+        'CREATE INDEX mcp_tool_server_index IF NOT EXISTS FOR (t:MCPTool) ON (t.serverId)',
+        'CREATE INDEX mcp_container_user_index IF NOT EXISTS FOR (c:MCPContainer) ON (c.userId)',
+        'CREATE INDEX mcp_container_server_index IF NOT EXISTS FOR (c:MCPContainer) ON (c.serverId)',
+        'CREATE INDEX mcp_permission_user_tool_index IF NOT EXISTS FOR (p:MCPPermission) ON (p.userId, p.toolName)',
+        'CREATE INDEX agent_permission_lookup IF NOT EXISTS FOR (p:AgentMCPPermission) ON (p.userId, p.agentId)',
+        'CREATE INDEX agent_tool_credentials_lookup IF NOT EXISTS FOR (c:AgentToolCredentials) ON (c.userId, c.agentId, c.toolName)',
       ];
 
       for (const index of indexes) {

@@ -19,6 +19,9 @@ export { ConstraintRepository } from './ConstraintRepository';
 export { ConceptRepository } from './ConceptRepository';
 export { MetaAnchorRepository } from './MetaAnchorRepository';
 
+// MCP Repository
+export { MCPRepository } from './MCPRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { CodexRepository } from './CodexRepository';
@@ -26,6 +29,7 @@ import { VisionRepository } from './VisionRepository';
 import { ConstraintRepository } from './ConstraintRepository';
 import { ConceptRepository } from './ConceptRepository';
 import { MetaAnchorRepository } from './MetaAnchorRepository';
+import { MCPRepository } from './MCPRepository';
 
 /**
  * Factory for creating singleton repository instances
@@ -43,6 +47,7 @@ export class RepositoryFactory {
   private static constraintRepo: ConstraintRepository;
   private static conceptRepo: ConceptRepository;
   private static metaAnchorRepo: MetaAnchorRepository;
+  private static mcpRepo: MCPRepository;
   private static agentTemplateService: AgentTemplateService;
 
   static getAgentRepository(): AgentRepository {
@@ -128,6 +133,16 @@ export class RepositoryFactory {
   }
 
   /**
+   * Get the MCPRepository instance
+   */
+  static getMCPRepository(): MCPRepository {
+    if (!this.mcpRepo) {
+      this.mcpRepo = new MCPRepository();
+    }
+    return this.mcpRepo;
+  }
+
+  /**
    * Reset all repository instances - useful for testing
    */
   static resetAll(): void {
@@ -141,6 +156,7 @@ export class RepositoryFactory {
     this.constraintRepo = null as any;
     this.conceptRepo = null as any;
     this.metaAnchorRepo = null as any;
+    this.mcpRepo = null as any;
     this.agentTemplateService = null as any;
   }
 }

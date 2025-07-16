@@ -32,7 +32,9 @@ import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
+import mcpRoutes from './routes/mcp';
 import { AgentService } from './services/AgentService';
+import { MCPService } from './services/MCPService';
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
@@ -111,6 +113,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/sibil', sibilRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/mcp', mcpRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', redeployRoutes);
 
@@ -135,6 +138,10 @@ httpServer.listen(PORT, async () => {
     const templateService = RepositoryFactory.getAgentTemplateService();
     await templateService.seedDefaultTemplates();
     console.log('✅ AgentTemplateService initialized with default templates');
+
+    // Initialize MCPService
+    await MCPService.initialize();
+    console.log('✅ MCPService initialized');
 
     // Log Socket.IO status
     console.log('✅ Socket.IO server initialized');

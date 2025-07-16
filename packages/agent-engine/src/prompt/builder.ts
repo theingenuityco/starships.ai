@@ -4,11 +4,12 @@ import type { MemoryEntry, LLMChatPrompt } from "@starships/protocol";
  * Build LLM chat prompt from system prompt, memory, and current message
  */
 export function buildPrompt(
-  systemPrompt: string | undefined, 
-  memory: MemoryEntry[], 
+  systemPrompt: string | undefined,
+  memory: MemoryEntry[],
   currentMessage: string,
   relevantContext?: string,
-  codexContext?: string
+  codexContext?: string,
+  mcpContext?: string
 ): LLMChatPrompt {
   const messages: LLMChatPrompt['messages'] = [];
 
@@ -18,6 +19,10 @@ export function buildPrompt(
 
   if (codexContext) {
     messages.push({ role: "system", content: codexContext });
+  }
+
+  if (mcpContext) {
+    messages.push({ role: "system", content: mcpContext });
   }
 
   if (relevantContext) {

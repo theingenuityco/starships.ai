@@ -191,7 +191,6 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     usage: result.usage
   });
 
-<<<<<<< HEAD
   // NEW: Process MCP tool calls if present
   let finalReply = result.reply;
   try {
@@ -205,25 +204,19 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     // Continue with original response
   }
 
-=======
   console.log('💾 [AGENT-ENGINE] Storing messages in memory...');
->>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
   const userTimestamp = Date.now();
   await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
   
   const assistantTimestamp = Date.now();
   await store.append(sessionKey, { role: "assistant", content: finalReply, timestamp: assistantTimestamp } as MemoryEntry);
 
-<<<<<<< HEAD
-  return { reply: finalReply, usage: result.usage };
-=======
   console.log('🎉 [AGENT-ENGINE] Chat completed successfully:', {
     finalReplyLength: result.reply.length,
     totalProcessingTime: `${Date.now() - startTime}ms`
   });
 
   return { reply: result.reply, usage: result.usage };
->>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
 }
 
 /**
@@ -396,7 +389,6 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     yield chunk;
   }
   
-<<<<<<< HEAD
   // Process MCP tool calls after streaming completes
   let finalResponse = fullResponse;
   try {
@@ -413,7 +405,6 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   } catch (error) {
     console.error('Failed to process MCP tool calls in stream:', error);
   }
-=======
   const streamEndTime = Date.now();
   console.log('✅ [AGENT-ENGINE-STREAM] Streaming completed:', {
     totalChunks: chunkCount,
@@ -421,18 +412,13 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     streamingTime: `${streamEndTime - streamStartTime}ms`,
     responsePreview: fullResponse.substring(0, 200) + '...'
   });
->>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
   
   // Store assistant message after streaming completes
   console.log('💾 [AGENT-ENGINE-STREAM] Storing assistant message in memory...');
   const assistantTimestamp = Date.now();
-<<<<<<< HEAD
-  await store.append(sessionKey, { role: "assistant", content: finalResponse, timestamp: assistantTimestamp } as MemoryEntry);
-=======
   await store.append(sessionKey, { role: "assistant", content: fullResponse, timestamp: assistantTimestamp } as MemoryEntry);
   
   console.log('🎉 [AGENT-ENGINE-STREAM] Streaming chat completed successfully');
->>>>>>> 397877d0688f0ed967af550fed1106d6cac872a0
 }
 
 

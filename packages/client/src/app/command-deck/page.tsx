@@ -1,5 +1,11 @@
 import type { Metadata } from 'next';
-import { CommandDeckContent } from '@/components/command-deck/CommandDeckContent';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { AuthGate } from '@/components/auth/AuthGate';
+import { StarshipDashboard } from '@/components/command-deck/starship/StarshipDashboard';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Info, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export const metadata: Metadata = {
   title: 'Command Deck | Starships.ai',
@@ -7,5 +13,6 @@ export const metadata: Metadata = {
 };
 
 export default function CommandDeckPage() {
-  return <CommandDeckContent />;
+  // Redirect to new ships route
+  redirect('/ships');
 }

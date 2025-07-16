@@ -41,52 +41,73 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
     const userId = req.user!.id;
     const { name, class: starshipClass } = req.body;
 
+    console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
+
     if (!name || !starshipClass) {
       res.status(400).json({ error: 'Name and class are required' });
       return;
     }
 
+    console.log('[STARSHIP-CREATE] Generating unique slug...');
+    // Generate unique slug for the starship
+    const slug = await starshipRepo.generateUniqueSlug(name, userId);
+    console.log('[STARSHIP-CREATE] Generated slug:', slug);
+    
+    console.log('[STARSHIP-CREATE] Creating starship in database...');
     // Create starship directly (bypassing codex system)
     const starship = await starshipRepo.create({
       ownerId: userId,
       name,
       class: starshipClass,
+      slug,
       powerLevel: 85,
       activeExpeditions: 0,
       sibilInsights: 0,
       status: 'active'
     });
+    console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
+    console.log('[STARSHIP-CREATE] Creating empty vision file...');
     // Create empty vision file for the new starship
     await VisionFileService.createEmptyVision(starship.id);
+    console.log('[STARSHIP-CREATE] Vision file created successfully');
 
+    console.log('[STARSHIP-CREATE] Starship creation completed successfully');
     res.status(201).json({ starship });
   } catch (error) {
-    console.error('Error creating starship:', error);
+    console.error('[STARSHIP-CREATE] Error creating starship:', error);
     res.status(500).json({ error: 'Failed to create starship' });
   }
 });
 
-// GET /starships/:id - Get specific starship
-router.get('/starships/:id', authMiddleware, async (req: Request, res: Response) => {
+// GET /starships/:idOrSlug - Get specific starship (supports both ID and slug)
+router.get('/starships/:idOrSlug', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const starshipId = req.params.id;
-    const starship = await starshipRepo.findById(starshipId);
+    const { idOrSlug } = req.params;
+    const userId = req.user!.id;
     
+    // Try to find by ID first, then by slug
+    let starship = await starshipRepo.findById(idOrSlug);
+    
+    if (!starship) {
+      // Try to find by slug
+      starship = await starshipRepo.findBySlug(idOrSlug, userId);
+    }
+
     if (!starship) {
       res.status(404).json({ error: 'Starship not found' });
       return;
     }
 
     // Check ownership
-    if (starship.ownerId !== req.user!.id) {
+    if (starship.ownerId !== userId) {
       res.status(403).json({ error: 'Access denied' });
       return;
     }
 
     // Get deployed agents
-    const agents = await starshipRepo.getDeployedAgents(starshipId);
-    const availableSlots = await starshipRepo.getAvailableSlots(starshipId);
+    const agents = await starshipRepo.getDeployedAgents(starship.id);
+    const availableSlots = await starshipRepo.getAvailableSlots(starship.id);
 
     res.json({ starship, agents, availableSlots });
   } catch (error) {

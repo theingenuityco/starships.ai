@@ -16,29 +16,27 @@ export const authMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // DEVELOPMENT BYPASS: Allow requests without auth when Kinde is not configured
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
+    // TESTING BACKDOOR: Only activate when explicitly enabled via environment variable
+    const enableTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
     const hasKindeConfig = process.env.KINDE_CLIENT_ID && process.env.KINDE_ISSUER_URL;
     
-    console.log(`[AUTH] Environment check: NODE_ENV=${process.env.NODE_ENV}, isDevelopment=${isDevelopment}, hasKindeConfig=${hasKindeConfig}`);
-    
-    if (isDevelopment && !hasKindeConfig) {
-      console.log(`[AUTH] Development bypass activated for ${req.method} ${req.path}`);
+    if (enableTestingBackdoor && !hasKindeConfig) {
+      console.log(`[AUTH] Testing backdoor activated for ${req.method} ${req.path}`);
       
-      // Create a mock user for development
+      // Create a mock user for testing
       const mockUser = {
-        id: 'dev-user-1',
-        email: 'dev@starships.ai',
-        displayName: 'Development User',
-        username: 'dev-user',
+        id: 'test-user-1',
+        email: 'test@starships.ai',
+        displayName: 'Test User',
+        username: 'test-user',
         avatar: null,
-        kindeId: 'dev-user-1',
+        kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       
       req.user = mockUser;
-      req.kindeId = 'dev-user-1';
+      req.kindeId = 'test-user-1';
       
       console.log(`[AUTH] Mock user attached: ${mockUser.id} (${mockUser.displayName})`);
       next();
@@ -66,25 +64,25 @@ export const authMiddleware = async (
       `[AUTH] Validating token for request to ${req.method} ${req.path} - token length: ${token.length}`
     );
 
-    // DEVELOPMENT BYPASS: Check for mock token
-    if (isDevelopment && !hasKindeConfig && token === 'mock-development-token') {
-      console.log(`[AUTH] Mock token detected for development bypass`);
-      // Reuse the same mock user from the bypass above
+    // TESTING BACKDOOR: Check for test token when explicitly enabled
+    if (enableTestingBackdoor && token === 'test-auth-token') {
+      console.log(`[AUTH] Test token detected for testing backdoor`);
+      // Reuse the same mock user from the backdoor above
       const mockUser = {
-        id: 'dev-user-1',
-        email: 'dev@starships.ai',
-        displayName: 'Development User',
-        username: 'dev-user',
+        id: 'test-user-1',
+        email: 'test@starships.ai',
+        displayName: 'Test User',
+        username: 'test-user',
         avatar: null,
-        kindeId: 'dev-user-1',
+        kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       
       req.user = mockUser;
-      req.kindeId = 'dev-user-1';
+      req.kindeId = 'test-user-1';
       
-      console.log(`[AUTH] Mock token validated: ${mockUser.id} (${mockUser.displayName})`);
+      console.log(`[AUTH] Test token validated: ${mockUser.id} (${mockUser.displayName})`);
       next();
       return;
     }

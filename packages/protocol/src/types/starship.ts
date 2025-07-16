@@ -2,6 +2,7 @@
 
 export interface UpdateStarshipRequest {
   name?: string;
+  slug?: string; // Optional - will be auto-generated from name if not provided
   status?: 'active' | 'docked' | 'maintenance';
   class?: 'scout' | 'cruiser';
 }
@@ -13,6 +14,7 @@ export interface UpdateStarshipStatusRequest {
 export interface StarshipResponse {
   starship: {
     id: string;
+    slug: string;
     ownerId: string;
     class: 'scout' | 'cruiser';
     name: string;
@@ -68,6 +70,7 @@ export interface StarshipDetailsResponse extends StarshipResponse {
 export interface CreateStarshipRequest {
   name: string;
   class: 'scout' | 'cruiser';
+  slug?: string; // Optional - will be auto-generated if not provided
 }
 
 export interface ApiResponse<T = any> {

@@ -27,6 +27,7 @@ vi.mock('../../lib/api', () => ({
 
 const mockStarship = {
   id: 'starship-1',
+  slug: 'test-starship',
   name: 'Test Starship',
   class: 'scout' as const,
   powerLevel: 85,

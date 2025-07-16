@@ -18,12 +18,12 @@ interface NavigationProps {
   isMobile?: boolean;
 }
 
-// Updated navigation structure according to plan
-const navigationSections = [
+// Fleet-level navigation structure
+const fleetNavigationSections = [
   {
-    title: "Command Deck",
+    title: "Fleet Command",
     items: [
-      { href: "/command-deck", label: "Command Deck", icon: Command, status: "optimal" }
+      { href: "/ships", label: "Fleet Command", icon: Command, status: "optimal" }
     ]
   },
   {
@@ -40,6 +40,27 @@ const navigationSections = [
       { href: "/expeditions", label: "Expeditions", icon: Rocket, status: "active" },
       { href: "/logbook", label: "Logbook", icon: BookOpen, status: "optimal" },
       { href: "/sibil", label: "Sibil AI", icon: Brain, status: "optimal" }
+    ]
+  }
+];
+
+// Starship-internal navigation structure - function to generate paths based on current starship
+const getStarshipNavigationSections = (starshipSlug: string) => [
+  {
+    title: "Starship Systems",
+    items: [
+      { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
+      { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
+      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "warning" }
+    ]
+  },
+  {
+    title: "Operations",
+    items: [
+      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "active" },
+      { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" },
+      { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
+      { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" }
     ]
   }
 ];
@@ -63,12 +84,28 @@ const itemVariants: any = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
 };
 
-export function Navigation({ 
+export function Navigation({
   mode = 'sidebar',
-  isMobile: _isMobile = false 
+  isMobile: _isMobile = false
 }: NavigationProps) {
   const pathname = usePathname();
   const { powerLevel, activeExpeditions, sibilInsights } = useStarshipStore();
+
+  // Determine which navigation sections to show based on current route
+  const getNavigationSections = () => {
+    // Inside starship context (/ship/<slug>/*)
+    if (pathname.startsWith('/ship/')) {
+      // Extract starship slug from path
+      const pathParts = pathname.split('/');
+      const starshipSlug = pathParts[2]; // /ship/<slug>/...
+      return getStarshipNavigationSections(starshipSlug);
+    }
+    
+    // Fleet context or other routes
+    return fleetNavigationSections;
+  };
+
+  const navigationSections = getNavigationSections();
 
   // Module mode - simplified layout
   if (mode === 'module') {

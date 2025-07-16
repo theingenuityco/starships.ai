@@ -105,6 +105,10 @@ interface StarshipActions {
   updateStarshipStatus: (id: string, status: UpdateStarshipStatusRequest['status']) => Promise<void>;
   getStarshipAgents: (id: string) => Promise<void>;
   
+  // NEW: Slug-based operations
+  getStarshipBySlug: (slug: string) => Promise<Starship | null>;
+  setActiveStarshipBySlug: (slug: string) => Promise<void>;
+  
   // Error clearing actions
   clearErrors: () => void;
   clearError: (errorType: 'update' | 'delete' | 'status' | 'agents') => void;
@@ -423,6 +427,19 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             case 'agents':
               set({ agentsError: null });
               break;
+          }
+        },
+
+        // NEW: Slug-based operations
+        getStarshipBySlug: async (slug: string): Promise<Starship | null> => {
+          const starships = get().starships;
+          return starships.find(s => s.slug === slug) || null;
+        },
+
+        setActiveStarshipBySlug: async (slug: string): Promise<void> => {
+          const starship = await get().getStarshipBySlug(slug);
+          if (starship) {
+            set({ activeStarshipId: starship.id });
           }
         },
 

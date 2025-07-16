@@ -18,13 +18,12 @@ export function useAuth() {
     accessTokenRaw,
   } = useKindeBrowserClient()
 
-  // DEVELOPMENT BYPASS: For testing starship CRUD without OAuth setup
-  const isDevelopment = process.env.NODE_ENV === 'development'
-  // Use a simple check - if kindeLoading is false and not authenticated, activate bypass
-  const bypassAuth = isDevelopment && !kindeLoading && !isAuthenticated
+  // TESTING BACKDOOR: Only activate when explicitly enabled
+  const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
+  const shouldUseTestingBackdoor = enableTestingBackdoor && !kindeLoading && !isAuthenticated
   
-  if (bypassAuth) {
-    console.log('[AUTH] Development bypass activated - no Kinde configuration found')
+  if (shouldUseTestingBackdoor) {
+    console.log('[AUTH] Testing backdoor activated - auth testing mode enabled')
   }
 
   const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
@@ -79,10 +78,10 @@ export function useAuth() {
     // Critical: Only set up token provider after loading is complete
     if (!kindeLoading) {
       setTokenProvider(async () => {
-        // DEVELOPMENT BYPASS: Provide mock token when in bypass mode
-        if (bypassAuth) {
-          console.log('[AUTH] Providing mock token for development bypass')
-          return 'mock-development-token'
+        // TESTING BACKDOOR: Provide test token when explicitly enabled
+        if (shouldUseTestingBackdoor) {
+          console.log('[AUTH] Providing test token for testing backdoor')
+          return 'test-auth-token'
         }
         
         if (isAuthenticated) {
@@ -147,12 +146,12 @@ export function useAuth() {
 
   const isLoading = kindeLoading || syncLoading
 
-  // DEVELOPMENT BYPASS: Return mock authenticated state when Kinde not configured
-  if (bypassAuth) {
+  // TESTING BACKDOOR: Return mock authenticated state when explicitly enabled
+  if (shouldUseTestingBackdoor) {
     const mockUser = {
-      id: 'dev-user-1',
-      email: 'dev@starships.ai',
-      given_name: 'Development',
+      id: 'test-user-1',
+      email: 'test@starships.ai',
+      given_name: 'Test',
       family_name: 'User',
       picture: undefined
     }
@@ -165,19 +164,19 @@ export function useAuth() {
 
       // Synced user data (mock)
       syncedUser: {
-        id: 'dev-user-1',
-        email: 'dev@starships.ai',
-        displayName: 'Development User',
-        username: 'dev-user',
+        id: 'test-user-1',
+        email: 'test@starships.ai',
+        displayName: 'Test User',
+        username: 'test-user',
         avatar: undefined,
-        kindeId: 'dev-user-1',
+        kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       },
       syncError: null,
 
       // Token management (mock)
-      getToken: async () => 'mock-token',
+      getToken: async () => 'test-auth-token',
       getClaim: () => null,
 
       // Auth components
@@ -186,9 +185,9 @@ export function useAuth() {
       RegisterLink,
 
       // Convenience properties
-      userId: 'dev-user-1',
-      userEmail: 'dev@starships.ai',
-      userName: 'Development User',
+      userId: 'test-user-1',
+      userEmail: 'test@starships.ai',
+      userName: 'Test User',
       userAvatar: undefined,
 
       // For backwards compatibility

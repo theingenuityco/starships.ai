@@ -105,6 +105,7 @@ export interface SyncedUser {
 // NEW: Starship interfaces
 export interface Starship {
   id: string
+  slug: string
   name: string
   class: 'scout' | 'cruiser'
   powerLevel: number
@@ -492,11 +493,11 @@ export const starshipAPI = {
   }): Promise<{ starship: Starship; codex: Codex }> =>
     api.post('/api/starships', data).then(res => res.data),
 
-  // Get starship details with caching
+  // Get starship details with caching (supports both ID and slug)
   getStarship: async (
-    id: string
+    idOrSlug: string
   ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> => {
-    const cacheKey = CACHE_KEYS.STARSHIP_BY_ID(id)
+    const cacheKey = CACHE_KEYS.STARSHIP_BY_ID(idOrSlug)
     const cached = apiCache.get<{ starship: Starship; agents: Agent[]; availableSlots: number }>(
       cacheKey
     )
@@ -504,9 +505,16 @@ export const starshipAPI = {
       return cached
     }
 
-    const data = await api.get(`/api/starships/${id}`).then(res => res.data)
+    const data = await api.get(`/api/starships/${idOrSlug}`).then(res => res.data)
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes since starship data changes frequently
     return data
+  },
+
+  // Get starship by slug specifically
+  getStarshipBySlug: async (
+    slug: string
+  ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> => {
+    return starshipAPI.getStarship(slug)
   },
 
   // Update starship details with cache invalidation

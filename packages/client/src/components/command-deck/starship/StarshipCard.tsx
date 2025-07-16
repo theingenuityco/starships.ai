@@ -1,20 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
-  Activity, 
-  Users, 
-  Zap, 
+import { useRouter } from 'next/navigation';
+import {
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Activity,
+  Users,
+  Zap,
   Navigation,
   Settings,
   Rocket,
   Circle,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Command
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -51,6 +53,7 @@ export function StarshipCard({
   onDelete,
   onStatusChange
 }: StarshipCardProps) {
+  const router = useRouter();
   const { starshipAgents, getStarshipAgents } = useStarshipStore();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -93,6 +96,12 @@ export function StarshipCard({
     if (!agentData) {
       getStarshipAgents(starship.id);
     }
+    // Navigate to the starship's command deck
+    router.push(`/ship/${starship.slug}/command-deck`);
+  };
+
+  const handleCommandDeckClick = () => {
+    router.push(`/ship/${starship.slug}/command-deck`);
   };
 
   if (viewMode === 'list') {
@@ -160,6 +169,11 @@ export function StarshipCard({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCommandDeckClick(); }}>
+                      <Command className="w-4 h-4 mr-2" />
+                      Command Deck
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
                       <Edit className="w-4 h-4 mr-2" />
                       Edit
@@ -230,6 +244,11 @@ export function StarshipCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCommandDeckClick(); }}>
+                    <Command className="w-4 h-4 mr-2" />
+                    Command Deck
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
                     <Edit className="w-4 h-4 mr-2" />
                     Edit

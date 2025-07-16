@@ -1,77 +1,53 @@
-# Kinde Authentication Implementation
+# Kinde Authentication Implementation Guide
 
-## Overview
+## 🎯 Document Focus
 
-This document covers the complete implementation of Kinde authentication in the Starships AI application. The implementation provides secure authentication using Kinde's hosted UI with **full API protection via JWT token validation**. All backend APIs are now secured and automatically scope data to the authenticated user.
+This guide provides step-by-step implementation of Kinde authentication with:
+- **Quick setup** - Get authentication working in minutes
+- **Development workflow** - Day-to-day development practices
+- **Essential troubleshooting** - Common setup and configuration issues
+- **Basic component usage** - How to use auth components in your app
+
+## 📋 When to Use This Guide
+
+- Setting up authentication for the first time
+- Configuring development environment
+- Learning basic component usage
+- Solving common setup issues
+
+## 📚 Related Documentation
+
+- [Authentication Integration Guide](authentication-integration.md) - Architecture and advanced patterns
+- [API Design Documentation](api-design.md) - API authentication patterns
 
 ## 🔐 Security Status: COMPLETE & SECURE
 
-✅ **Token-Based API Authentication**: All APIs validate Kinde JWT tokens  
-✅ **User Identity from Tokens**: User ID derived from cryptographically verified tokens  
-✅ **Zero Client Trust**: Server never trusts client-sent user IDs  
-✅ **Automatic Data Scoping**: All API calls scoped to authenticated user only  
+✅ **Token-Based API Authentication**: All APIs validate Kinde JWT tokens
+✅ **User Identity from Tokens**: User ID derived from cryptographically verified tokens
+✅ **Zero Client Trust**: Server never trusts client-sent user IDs
+✅ **Automatic Data Scoping**: All API calls scoped to authenticated user only
 ✅ **Production Ready**: Follows security best practices
 
-## Architecture
+## Quick Start Guide
 
-### Authentication Flow
+### Authentication Flow Overview
 1. **Unauthenticated User** → Beautiful login screen with space theme
 2. **Login Button Click** → Redirects to Kinde's hosted authentication page
 3. **User Authenticates** → Via Kinde's UI (supports email, social logins, etc.)
 4. **Kinde Redirects Back** → User lands on Command Deck with full access
 5. **Session Management** → Handled automatically by Kinde SDK
-6. **API Security** → All API calls include JWT tokens, validated server-side
 
-### Secure API Flow
-1. **Frontend** → Gets JWT token from Kinde
-2. **API Request** → Automatically includes `Bearer {token}` header
-3. **Server Middleware** → Validates token signature & issuer
-4. **User Resolution** → Looks up user in Neo4j by Kinde ID from token
-5. **Request Processing** → All data automatically scoped to authenticated user
+> **For detailed architecture and security patterns, see [Authentication Integration Guide](authentication-integration.md#authentication-overview)**
 
-### Protected Routes & APIs
-- **Frontend Routes**:
-  - **Command Deck (/)**: Protected - requires authentication
-  - **All Module Pages**: Protected via Command Deck access
-  - **Login UI**: Shown automatically for unauthenticated users
+### Protected Areas
+- **Frontend Routes**: All routes protected via AuthGate component
+- **Backend APIs**: All `/v1/*` endpoints require JWT token validation
 
-- **Backend APIs** (All JWT Protected):
-  - **`/v1/agents`**: User's agents only - token-scoped
-  - **`/v1/chat`**: Messages tied to authenticated user only
-  - **`/v1/memory`**: Session data scoped to authenticated user
-  - **`/v1/users/me`**: Current authenticated user profile
-  - **`/v1/users/sync`**: Public endpoint for initial user creation
+> **For comprehensive API security architecture, see [API Authentication](authentication-integration.md#backend-authentication-integration)**
 
-## Implementation Components
+## Essential Components
 
-### 0. API Security Middleware ⭐ NEW
-**File**: `packages/server/src/middleware/auth.ts`
-```typescript
-export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  // 1. Extract Bearer token from Authorization header
-  const token = req.headers.authorization?.replace('Bearer ', '')
-  
-  // 2. Validate JWT signature & issuer using Kinde's JWKS
-  const { payload } = await jwtVerify(token, JWKS, {
-    issuer: kindeIssuerUrl,
-  })
-  
-  // 3. Look up user in Neo4j database by Kinde ID
-  const user = await UserService.getUserByKindeId(payload.sub)
-  
-  // 4. Attach user to request for route handlers
-  req.user = user
-  req.kindeId = payload.sub
-}
-```
-
-**Security Features**:
-- **JWT Signature Validation**: Uses Kinde's public keys (JWKS)
-- **Issuer Verification**: Ensures tokens are from `[KINDE-ISSUER-URL]`
-- **User Database Lookup**: Real user data from Neo4j, not just token claims
-- **Automatic User Attachment**: `req.user` available in all protected routes
-
-### 1. Auth API Route
+### Auth API Route
 **File**: `packages/client/src/app/api/auth/[kindeAuth]/route.ts`
 ```typescript
 import { handleAuth } from "@kinde-oss/kinde-auth-nextjs/server";
@@ -80,64 +56,63 @@ export const GET = handleAuth();
 ```
 - Handles all Kinde authentication callbacks and requests
 - Required for OAuth flow to work properly
-- Routes are separated from backend API (`/api/v1/*`) to prevent conflicts
 
-### 2. Auth Hook (Enhanced)
+### Auth Hook
 **File**: `packages/client/src/hooks/useAuth.ts`
 - Provides unified access to authentication state
 - Exports user info, loading states, and auth components
-- **NEW**: Automatically configures API client with tokens
-- **NEW**: Sets up token provider for axios interceptors
+- Automatically configures API client with tokens
 
+**Basic Usage**:
 ```typescript
-// Setup token provider for API client
-useEffect(() => {
-  setTokenProvider(async () => {
-    if (isAuthenticated) {
-      return await getToken()
-    }
-    return null
-  })
-}, [isAuthenticated, getToken])
+const { isAuthenticated, user, isLoading } = useAuth()
 ```
 
-### 3. Auth Components
+### Basic Components
+
+#### AuthGate
+**File**: `packages/client/src/components/auth/AuthGate.tsx`
+```typescript
+<AuthGate>
+  <ProtectedContent />
+</AuthGate>
+```
+- Handles authentication state routing
+- Shows login UI for unauthenticated users
+- Renders protected content for authenticated users
 
 #### LoginButton
 **File**: `packages/client/src/components/auth/LoginButton.tsx`
-- Integrates with existing UI theme
+```typescript
+<LoginButton>Sign In</LoginButton>
+```
 - Redirects to Kinde's hosted login page
 - Customizable styling and content
 
 #### LogoutButton
 **File**: `packages/client/src/components/auth/LogoutButton.tsx`
+```typescript
+<LogoutButton>Sign Out</LogoutButton>
+```
 - Handles user logout via Kinde
 - Integrated into user profile dropdown
 
 #### UserProfile
 **File**: `packages/client/src/components/auth/UserProfile.tsx`
-- **NEW IMPLEMENTATION**: Now positioned at bottom of navigation sidebar
-- Shows user avatar, name, email, and online status
-- **Two modes**: collapsed (avatar only) and expanded (full info)
-- **Tooltip interface**: Professional card-style tooltip with actions
-- **Theme-aware**: Works perfectly with light/dark mode
-- **Enhanced UX**: Smooth hover effects, status indicators, and proper styling
+```typescript
+<UserProfile mode="collapsed" />
+<UserProfile mode="expanded" />
+```
+- Shows user avatar, name, email, and status
+- Two display modes: collapsed and expanded
+- Theme-aware with hover effects
 
-### 4. Auth Gate
-**File**: `packages/client/src/components/auth/AuthGate.tsx`
-- Handles authentication state routing
-- Beautiful space-themed login UI for unauthenticated users
-- Loading states with rotating rocket animation
-- Renders protected content for authenticated users
+> **For detailed component architecture and advanced patterns, see [Frontend Authentication Components](authentication-integration.md#frontend-authentication-components)**
 
-### 5. Auth Provider
-**File**: `packages/client/src/providers/auth-provider.tsx`
-- Wraps the app with Kinde authentication context
-- Provides auth state to all components
+## Configuration Setup
 
-## Configuration
+### Step 1: Environment Variables
 
-### Environment Variables
 Create `packages/client/.env.local`:
 ```env
 # Kinde Authentication Configuration
@@ -153,201 +128,88 @@ KINDE_DEBUG_MODE=true
 NEXT_PUBLIC_API_URL=http://localhost:4000
 ```
 
-**Backend** (`packages/server/.env` or system environment):
+**Backend** (`packages/server/.env`):
 ```env
 # Required for JWT token validation
 KINDE_ISSUER_URL=https://your_subdomain.kinde.com
 KINDE_CLIENT_ID=your_kinde_client_id
 
-# Neo4j database connection (for user lookup)
+# Neo4j database connection
 NEO4J_URI=[NEO4J-LOCAL-URL]
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=your_[DEFAULT-PASSWORD]
 ```
 
-### Kinde Dashboard Setup
-1. Create a Kinde application
-2. Set allowed callback URLs:
+### Step 2: Kinde Dashboard Setup
+
+1. **Create a Kinde application**
+2. **Set allowed callback URLs**:
    - `http://localhost:3000/api/auth/kinde_callback` (development)
    - `https://yourdomain.com/api/auth/kinde_callback` (production)
-3. Set allowed logout URLs:
+3. **Set allowed logout URLs**:
    - `http://localhost:3000` (development)
    - `https://yourdomain.com` (production)
 
-### Next.js Configuration
+### Step 3: Next.js Configuration
+
 **File**: `packages/client/next.config.js`
-- **IMPORTANT**: API routing updated to prevent conflicts
+- API routing configured to prevent conflicts
 - Kinde auth routes: `/api/auth/*` → Kinde handlers
 - Backend routes: `/api/v1/*` → Express server proxy
-- Added Kinde environment variables with dynamic defaults
-- Supports Vercel preview deployments
 
-### Backend API Integration ⭐ ENHANCED
-**File**: `packages/client/src/lib/api.ts`
-- Updated all API calls to use `/api/v1/*` prefix
-- **NEW**: Automatic token injection via axios interceptors
-- **NEW**: Token provider system for dynamic token retrieval
-- Maintains existing chat and backend functionality
-- Preserves all hardcoded values as requested
+### Step 4: Layout Integration
 
-```typescript
-// Request interceptor to add authentication token
-api.interceptors.request.use(
-  async (config) => {
-    console.log('[API] Request interceptor running for:', config.url)
-    if (getTokenFunction) {
-      const token = await getTokenFunction()
-      console.log('[API] Token from provider:', token ? 'Token present' : 'No token')
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-        console.log('[API] Authorization header added')
-      } else {
-        console.log('[API] No token available, skipping Authorization header')
-      }
-    } else {
-      console.log('[API] No token provider configured')
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
-```
-
-## Integration Points
-
-### Layout Integration
 **File**: `packages/client/src/app/layout.tsx`
-- Added `AuthProvider` to wrap the entire application
-- Added `TooltipProvider` for user profile tooltips
-- Maintains existing theme and query providers
-
-### Client Layout Integration
-**File**: `packages/client/src/app/client-layout.tsx`
-- Wrapped both dashboard and regular pages with `AuthGate`
-- Preserves existing Command Deck functionality
-- Maintains responsive design and animations
-
-### Command Deck Integration
-**File**: `packages/client/src/components/command-deck/modules/NavigationModule.tsx`
-- **Theme Toggle**: Restored to header next to "Command Deck" title
-- **User Profile**: Moved to bottom navigation section
-- **Enhanced Navigation**: Fixed hover behavior and state management
-- **Responsive Design**: Works in both collapsed and expanded modes
-
-### Navigation Improvements
-**File**: `packages/client/src/components/command-deck/CommandDeck.tsx`
-- **Fixed Hover Behavior**: Navigation no longer gets stuck in expanded state
-- **Improved State Management**: Better hover state tracking with refs
-- **Smooth Transitions**: 150ms delay prevents flickering
-- **Mobile Safety**: All hover logic disabled on mobile devices
-
-## User Experience
-
-### Unauthenticated Users
-- See beautiful space-themed login screen
-- Clear call-to-action: "Enter Command Deck"
-- Powered by Kinde branding
-- Smooth animations and loading states
-
-### Authenticated Users
-- Immediate access to Command Deck
-- User avatar and name visible in header
-- Profile dropdown with logout option
-- All existing functionality preserved
-
-### Loading States
-- Rotating rocket animation during auth checks
-- "Initializing starship systems..." message
-- Smooth transitions between states
-
-## Security Features
-
-### Kinde-Provided Security
-- OAuth 2.0 / OpenID Connect
-- Secure token management
-- Session handling
-- CSRF protection
-- Rate limiting
-
-### Application Security ⭐ ENHANCED
-- **Frontend**: Protected routes via `AuthGate`
-- **Backend**: JWT token validation on all API endpoints
-- **Token-Based Auth**: User identity derived from cryptographically secure tokens
-- **Zero Client Trust**: Server never trusts client-sent user IDs
-- **Automatic Data Scoping**: All API responses scoped to authenticated user
-- **Database Integration**: Real user data from Neo4j, not just token claims
-
-### Secure API Request Format
 ```typescript
-// OLD (VULNERABLE):
-chatAPI.sendMessage({
-  agentId: "agent-123",
-  userId: "user-456",  // ❌ Client could lie about this
-  message: "Hello"
-})
-
-// NEW (SECURE):
-chatAPI.sendMessage({
-  agentId: "agent-123",
-  message: "Hello"      // ✅ User ID derived from JWT token
-})
-// Request automatically includes: Authorization: Bearer {jwt-token}
-// Server extracts user ID from validated token
+<AuthProvider>
+  <TooltipProvider>
+    <ClientLayout>{children}</ClientLayout>
+  </TooltipProvider>
+</AuthProvider>
 ```
 
-### Security Testing Results
+**File**: `packages/client/src/app/client-layout.tsx`
+```typescript
+<AuthGate>
+  <Navigation />
+  <main>{children}</main>
+</AuthGate>
+```
+
+> **For detailed integration patterns and advanced configuration, see [Authentication Integration Guide](authentication-integration.md#authentication-in-different-contexts)**
+
+## Development Workflow
+
+### Local Development Setup
+
+1. **Start development server**: `pnpm dev`
+2. **Visit application**: `http://localhost:3000`
+3. **Test authentication flow**: Click "Enter Command Deck"
+4. **Check auth health**: Visit `/api/auth/health`
+
+### Basic Testing Flow
+
 ```bash
-✅ curl /v1/agents + valid token → 200 OK (user's agents)
-✅ curl /v1/chat + valid token → 200 OK (AI response)
-❌ curl /v1/agents (no token) → 401 Unauthorized
-❌ curl /v1/agents + invalid token → 401 Invalid token
+# 1. Test unauthenticated access
+curl http://localhost:3000/command-deck
+# Should redirect to login
+
+# 2. Test authenticated API calls
+curl -H "Authorization: Bearer [AUTH-TOKEN]" http://localhost:4000/v1/agents
+# Should return user's agents
+
+# 3. Test health endpoint
+curl http://localhost:3000/api/auth/health
+# Should return configuration status
 ```
 
-## Development
+### Development Environment
 
-### Testing Authentication
-1. Start the development server: `pnpm dev`
-2. Visit `http://localhost:3000`
-3. Click "Enter Command Deck" to test login flow
-4. Check auth health at `/api/auth/health`
+- **Debug Mode**: Set `KINDE_DEBUG_MODE=true` for detailed logs
+- **Network Tab**: Check browser network tab for auth requests
+- **Kinde Dashboard**: Use for user management and configuration
 
-### Debugging
-- Enable `KINDE_DEBUG_MODE=true` for detailed logs
-- Check browser network tab for auth requests
-- Use Kinde dashboard for user management
-
-## Deployment
-
-### Environment Setup
-- Set production environment variables
-- Update Kinde dashboard with production URLs
-- Test auth flow in staging environment
-
-### Vercel Deployment
-- Automatic preview URL support
-- Dynamic environment variable handling
-- No additional configuration needed
-
-## Preserved Functionality
-
-### Unchanged Features
-- ✅ All existing hardcoded `'user-1'` values preserved
-- ✅ Chat functionality unchanged
-- ✅ API integration unchanged
-- ✅ Storage scoping unchanged
-- ✅ Server code unchanged
-- ✅ Theme system preserved
-- ✅ Command Deck functionality intact
-- ✅ Responsive design maintained
-
-### Future Enhancements (TODO)
-- Replace hardcoded user IDs with authenticated user IDs
-- User-scoped chat history
-- Server-side JWT validation
-- User preferences and settings
-- Role-based access control
+> **For advanced testing strategies and debugging tools, see [Testing and Troubleshooting](authentication-integration.md#testing-and-troubleshooting)**
 
 ## Troubleshooting
 

@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { StarshipRepository, AgentRepository } from '@starships/models';
+import type { StarshipRepository, AgentRepository, Starship } from '@starships/models';
 import { VisionFileService } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 
@@ -163,5 +163,202 @@ router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req: Requ
   }
 });
 
+// PUT /starships/:id - Update starship (name, status, class)
+router.put('/starships/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const starshipId = req.params.id;
+    const userId = req.user!.id;
+    const { name, status, class: starshipClass } = req.body;
 
-export default router; 
+    // Verify starship exists and ownership
+    const starship = await starshipRepo.findById(starshipId);
+    if (!starship) {
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Validate allowed updates
+    const allowedUpdates: Partial<Starship> = {};
+    
+    if (name !== undefined) {
+      if (typeof name !== 'string' || name.trim().length === 0) {
+        res.status(400).json({ error: 'Name must be a non-empty string' });
+        return;
+      }
+      allowedUpdates.name = name.trim();
+    }
+
+    if (status !== undefined) {
+      if (!['active', 'docked', 'maintenance'].includes(status)) {
+        res.status(400).json({ error: 'Status must be one of: active, docked, maintenance' });
+        return;
+      }
+      allowedUpdates.status = status;
+    }
+
+    if (starshipClass !== undefined) {
+      if (!['scout', 'cruiser'].includes(starshipClass)) {
+        res.status(400).json({ error: 'Class must be one of: scout, cruiser' });
+        return;
+      }
+      // Check if there are deployed agents that exceed new class limits
+      if (starshipClass === 'scout') {
+        const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
+        if (deployedAgents.length > 3) {
+          res.status(400).json({
+            error: 'Cannot change to scout class: too many deployed agents (max 3 for scout)'
+          });
+          return;
+        }
+      }
+      allowedUpdates.class = starshipClass;
+      // Update maxAgents based on new class
+      allowedUpdates.maxAgents = starshipClass === 'scout' ? 3 : 6;
+    }
+
+    if (Object.keys(allowedUpdates).length === 0) {
+      res.status(400).json({ error: 'No valid updates provided' });
+      return;
+    }
+
+    const updatedStarship = await starshipRepo.update(starshipId, allowedUpdates);
+    if (!updatedStarship) {
+      res.status(500).json({ error: 'Failed to update starship' });
+      return;
+    }
+
+    res.json({ starship: updatedStarship });
+  } catch (error) {
+    console.error('Error updating starship:', error);
+    res.status(500).json({ error: 'Failed to update starship' });
+  }
+});
+
+// DELETE /starships/:id - Delete starship
+router.delete('/starships/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const starshipId = req.params.id;
+    const userId = req.user!.id;
+
+    // Verify starship exists and ownership
+    const starship = await starshipRepo.findById(starshipId);
+    if (!starship) {
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Check if starship has active expeditions (business rule)
+    if (starship.activeExpeditions > 0) {
+      res.status(400).json({
+        error: 'Cannot delete starship with active expeditions. Complete or cancel expeditions first.'
+      });
+      return;
+    }
+
+    const deleted = await starshipRepo.delete(starshipId);
+    if (!deleted) {
+      res.status(500).json({ error: 'Failed to delete starship' });
+      return;
+    }
+
+    res.json({ message: 'Starship deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting starship:', error);
+    res.status(500).json({ error: 'Failed to delete starship' });
+  }
+});
+
+// PUT /starships/:id/status - Update starship status specifically
+router.put('/starships/:id/status', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const starshipId = req.params.id;
+    const userId = req.user!.id;
+    const { status } = req.body;
+
+    if (!status || !['active', 'docked', 'maintenance'].includes(status)) {
+      res.status(400).json({ error: 'Status must be one of: active, docked, maintenance' });
+      return;
+    }
+
+    // Verify starship exists and ownership
+    const starship = await starshipRepo.findById(starshipId);
+    if (!starship) {
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Business rule: Can't set to maintenance if there are active expeditions
+    if (status === 'maintenance' && starship.activeExpeditions > 0) {
+      res.status(400).json({
+        error: 'Cannot set starship to maintenance with active expeditions'
+      });
+      return;
+    }
+
+    const updatedStarship = await starshipRepo.update(starshipId, { status });
+    if (!updatedStarship) {
+      res.status(500).json({ error: 'Failed to update starship status' });
+      return;
+    }
+
+    res.json({ starship: updatedStarship });
+  } catch (error) {
+    console.error('Error updating starship status:', error);
+    res.status(500).json({ error: 'Failed to update starship status' });
+  }
+});
+
+// GET /starships/:id/agents - Get detailed agent information for starship
+router.get('/starships/:id/agents', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const starshipId = req.params.id;
+    const userId = req.user!.id;
+
+    // Verify starship exists and ownership
+    const starship = await starshipRepo.findById(starshipId);
+    if (!starship) {
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Get deployed agents and available slots
+    const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
+    const availableSlots = await starshipRepo.getAvailableSlots(starshipId);
+
+    res.json({
+      starshipId,
+      starshipName: starship.name,
+      starshipClass: starship.class,
+      maxAgents: starship.maxAgents,
+      deployedAgents,
+      availableSlots,
+      deployedCount: deployedAgents.length
+    });
+  } catch (error) {
+    console.error('Error fetching starship agents:', error);
+    res.status(500).json({ error: 'Failed to fetch starship agents' });
+  }
+});
+
+
+export default router;

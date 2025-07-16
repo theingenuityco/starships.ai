@@ -311,3 +311,6 @@ export interface AgentStreamError {
   timestamp: number;
   recoverable: boolean;
 }
+
+// Export starship-related types
+export * from './types/starship';

@@ -16,6 +16,35 @@ export const authMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // DEVELOPMENT BYPASS: Allow requests without auth when Kinde is not configured
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production';
+    const hasKindeConfig = process.env.KINDE_CLIENT_ID && process.env.KINDE_ISSUER_URL;
+    
+    console.log(`[AUTH] Environment check: NODE_ENV=${process.env.NODE_ENV}, isDevelopment=${isDevelopment}, hasKindeConfig=${hasKindeConfig}`);
+    
+    if (isDevelopment && !hasKindeConfig) {
+      console.log(`[AUTH] Development bypass activated for ${req.method} ${req.path}`);
+      
+      // Create a mock user for development
+      const mockUser = {
+        id: 'dev-user-1',
+        email: 'dev@starships.ai',
+        displayName: 'Development User',
+        username: 'dev-user',
+        avatar: null,
+        kindeId: 'dev-user-1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      req.user = mockUser;
+      req.kindeId = 'dev-user-1';
+      
+      console.log(`[AUTH] Mock user attached: ${mockUser.id} (${mockUser.displayName})`);
+      next();
+      return;
+    }
+
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -36,6 +65,29 @@ export const authMiddleware = async (
     console.log(
       `[AUTH] Validating token for request to ${req.method} ${req.path} - token length: ${token.length}`
     );
+
+    // DEVELOPMENT BYPASS: Check for mock token
+    if (isDevelopment && !hasKindeConfig && token === 'mock-development-token') {
+      console.log(`[AUTH] Mock token detected for development bypass`);
+      // Reuse the same mock user from the bypass above
+      const mockUser = {
+        id: 'dev-user-1',
+        email: 'dev@starships.ai',
+        displayName: 'Development User',
+        username: 'dev-user',
+        avatar: null,
+        kindeId: 'dev-user-1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      req.user = mockUser;
+      req.kindeId = 'dev-user-1';
+      
+      console.log(`[AUTH] Mock token validated: ${mockUser.id} (${mockUser.displayName})`);
+      next();
+      return;
+    }
 
     // Verify JWT token using Kinde's public keys
     const { payload } = await jwtVerify(token, JWKS, {

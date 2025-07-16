@@ -18,6 +18,15 @@ export function useAuth() {
     accessTokenRaw,
   } = useKindeBrowserClient()
 
+  // DEVELOPMENT BYPASS: For testing starship CRUD without OAuth setup
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  // Use a simple check - if kindeLoading is false and not authenticated, activate bypass
+  const bypassAuth = isDevelopment && !kindeLoading && !isAuthenticated
+  
+  if (bypassAuth) {
+    console.log('[AUTH] Development bypass activated - no Kinde configuration found')
+  }
+
   const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -70,6 +79,12 @@ export function useAuth() {
     // Critical: Only set up token provider after loading is complete
     if (!kindeLoading) {
       setTokenProvider(async () => {
+        // DEVELOPMENT BYPASS: Provide mock token when in bypass mode
+        if (bypassAuth) {
+          console.log('[AUTH] Providing mock token for development bypass')
+          return 'mock-development-token'
+        }
+        
         if (isAuthenticated) {
           try {
             console.log('[AUTH] Attempting to get access token...')
@@ -131,6 +146,55 @@ export function useAuth() {
   }, [isAuthenticated, kindeLoading, getToken, getAccessTokenRaw, accessTokenRaw])
 
   const isLoading = kindeLoading || syncLoading
+
+  // DEVELOPMENT BYPASS: Return mock authenticated state when Kinde not configured
+  if (bypassAuth) {
+    const mockUser = {
+      id: 'dev-user-1',
+      email: 'dev@starships.ai',
+      given_name: 'Development',
+      family_name: 'User',
+      picture: undefined
+    }
+    
+    return {
+      // Kinde user information
+      kindeUser: mockUser,
+      isAuthenticated: true,
+      isLoading: false,
+
+      // Synced user data (mock)
+      syncedUser: {
+        id: 'dev-user-1',
+        email: 'dev@starships.ai',
+        displayName: 'Development User',
+        username: 'dev-user',
+        avatar: undefined,
+        kindeId: 'dev-user-1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      syncError: null,
+
+      // Token management (mock)
+      getToken: async () => 'mock-token',
+      getClaim: () => null,
+
+      // Auth components
+      LoginLink,
+      LogoutLink,
+      RegisterLink,
+
+      // Convenience properties
+      userId: 'dev-user-1',
+      userEmail: 'dev@starships.ai',
+      userName: 'Development User',
+      userAvatar: undefined,
+
+      // For backwards compatibility
+      user: mockUser,
+    }
+  }
 
   return {
     // Kinde user information

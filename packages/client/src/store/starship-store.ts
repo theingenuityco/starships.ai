@@ -3,6 +3,47 @@ import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
 
+// Define types locally based on protocol package
+interface UpdateStarshipRequest {
+  name?: string;
+  status?: 'active' | 'docked' | 'maintenance';
+  class?: 'scout' | 'cruiser';
+}
+
+interface UpdateStarshipStatusRequest {
+  status: 'active' | 'docked' | 'maintenance';
+}
+
+interface StarshipAgentsResponse {
+  starshipId: string;
+  starshipName: string;
+  starshipClass: 'scout' | 'cruiser';
+  maxAgents: number;
+  deployedAgents: Array<{
+    id: string;
+    name: string;
+    model: string;
+    systemPrompt?: string;
+    createdAt: string;
+    description?: string;
+    tags: string[];
+    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+    authorId: string;
+    isPublic: boolean;
+    version: string;
+    updatedAt: string;
+    usageCount: number;
+    rating?: number;
+    temperature?: number;
+    maxTokens?: number;
+    customInstructions?: string;
+    allowedStarshipClasses?: ('scout' | 'cruiser')[];
+    requiredPermissions?: string[];
+  }>;
+  availableSlots: number;
+  deployedCount: number;
+}
+
 interface CommandDeckState {
   visibility: 'collapsed' | 'partial' | 'expanded';
   proximityState: ProximityState;
@@ -15,8 +56,24 @@ interface StarshipState {
   // API-backed starship data
   starships: Starship[];
   activeStarshipId: string | null;
+  
+  // Enhanced loading states for different operations
   loading: boolean;
+  loadingStarships: boolean;
+  loadingUpdate: boolean;
+  loadingDelete: boolean;
+  loadingStatusUpdate: boolean;
+  loadingAgents: boolean;
+  
+  // Enhanced error handling
   error: string | null;
+  updateError: string | null;
+  deleteError: string | null;
+  statusUpdateError: string | null;
+  agentsError: string | null;
+  
+  // Agent data cache
+  starshipAgents: Record<string, StarshipAgentsResponse>;
   
   // Command deck state (preserved)
   commandDeck: CommandDeckState;
@@ -35,12 +92,22 @@ interface StarshipState {
 }
 
 interface StarshipActions {
-  // API actions
+  // Existing API actions
   loadUserStarships: () => Promise<void>;
   createStarship: (data: { name: string; class: 'scout' | 'cruiser' }) => Promise<void>;
   setActiveStarship: (starshipId: string | null) => void;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
+  
+  // NEW: Enhanced CRUD operations
+  updateStarship: (id: string, updates: UpdateStarshipRequest) => Promise<void>;
+  deleteStarship: (id: string) => Promise<void>;
+  updateStarshipStatus: (id: string, status: UpdateStarshipStatusRequest['status']) => Promise<void>;
+  getStarshipAgents: (id: string) => Promise<void>;
+  
+  // Error clearing actions
+  clearErrors: () => void;
+  clearError: (errorType: 'update' | 'delete' | 'status' | 'agents') => void;
   
   // SIMPLIFIED VISION ACTIONS (BREAKING CHANGE)
   loadVision: (starshipId: string) => Promise<void>;
@@ -66,8 +133,25 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
         // Initial state
         starships: [],
         activeStarshipId: null,
+        
+        // Enhanced loading states
         loading: false,
+        loadingStarships: false,
+        loadingUpdate: false,
+        loadingDelete: false,
+        loadingStatusUpdate: false,
+        loadingAgents: false,
+        
+        // Enhanced error handling
         error: null,
+        updateError: null,
+        deleteError: null,
+        statusUpdateError: null,
+        agentsError: null,
+        
+        // Agent data cache
+        starshipAgents: {},
+        
         currentRoute: '/',
         
         commandDeck: {
@@ -130,13 +214,14 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
 
         // API Actions
         loadUserStarships: async () => {
-          set({ loading: true, error: null });
+          set({ loadingStarships: true, loading: true, error: null });
           try {
             const response = await starshipAPI.getUserStarships();
             const starships = response.starships;
             
             set({
               starships,
+              loadingStarships: false,
               loading: false,
               // Auto-select first starship if none selected and starships exist
               activeStarshipId: get().activeStarshipId || (starships.length > 0 ? starships[0].id : null)
@@ -145,6 +230,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           } catch (error) {
             set({
               error: error instanceof Error ? error.message : 'Failed to load starships',
+              loadingStarships: false,
               loading: false
             });
           }
@@ -178,11 +264,22 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           const activeStarshipId = get().activeStarshipId;
           if (!activeStarshipId) return;
 
+          set({ loadingAgents: true, agentsError: null });
           try {
             await starshipAPI.deployAgent(activeStarshipId, agentId);
+            // Refresh agent data after deployment
+            const response = await starshipAPI.getStarshipAgents(activeStarshipId);
+            const currentAgents = get().starshipAgents;
+            set({
+              starshipAgents: { ...currentAgents, [activeStarshipId]: response },
+              loadingAgents: false
+            });
           } catch (error) {
             console.error('Failed to deploy agent:', error);
-            set({ error: 'Failed to deploy agent' });
+            set({
+              agentsError: error instanceof Error ? error.message : 'Failed to deploy agent',
+              loadingAgents: false
+            });
           }
         },
 
@@ -190,14 +287,144 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           const activeStarshipId = get().activeStarshipId;
           if (!activeStarshipId) return;
 
+          set({ loadingAgents: true, agentsError: null });
           try {
             await starshipAPI.removeAgent(activeStarshipId, agentId);
+            // Refresh agent data after removal
+            const response = await starshipAPI.getStarshipAgents(activeStarshipId);
+            const currentAgents = get().starshipAgents;
+            set({
+              starshipAgents: { ...currentAgents, [activeStarshipId]: response },
+              loadingAgents: false
+            });
           } catch (error) {
             console.error('Failed to remove agent:', error);
-            set({ error: 'Failed to remove agent' });
+            set({
+              agentsError: error instanceof Error ? error.message : 'Failed to remove agent',
+              loadingAgents: false
+            });
           }
         },
 
+        // NEW: Enhanced CRUD operations
+        updateStarship: async (id, updates) => {
+          set({ loadingUpdate: true, updateError: null });
+          try {
+            const response = await starshipAPI.updateStarship(id, updates);
+            const updatedStarship = response.starship;
+            
+            // Update starship in the array
+            const currentStarships = get().starships;
+            const updatedStarships = currentStarships.map(s =>
+              s.id === id ? { ...s, ...updatedStarship } : s
+            );
+            
+            set({
+              starships: updatedStarships,
+              loadingUpdate: false
+            });
+          } catch (error) {
+            set({
+              updateError: error instanceof Error ? error.message : 'Failed to update starship',
+              loadingUpdate: false
+            });
+          }
+        },
+
+        deleteStarship: async (id) => {
+          set({ loadingDelete: true, deleteError: null });
+          try {
+            await starshipAPI.deleteStarship(id);
+            
+            // Remove starship from the array
+            const currentStarships = get().starships;
+            const updatedStarships = currentStarships.filter(s => s.id !== id);
+            
+            set({
+              starships: updatedStarships,
+              loadingDelete: false,
+              // If we deleted the active starship, clear the selection
+              activeStarshipId: get().activeStarshipId === id ? null : get().activeStarshipId
+            });
+          } catch (error) {
+            set({
+              deleteError: error instanceof Error ? error.message : 'Failed to delete starship',
+              loadingDelete: false
+            });
+          }
+        },
+
+        updateStarshipStatus: async (id, status) => {
+          set({ loadingStatusUpdate: true, statusUpdateError: null });
+          try {
+            const response = await starshipAPI.updateStarshipStatus(id, status);
+            const updatedStarship = response.starship;
+            
+            // Update starship status in the array
+            const currentStarships = get().starships;
+            const updatedStarships = currentStarships.map(s =>
+              s.id === id ? { ...s, status: updatedStarship.status } : s
+            );
+            
+            set({
+              starships: updatedStarships,
+              loadingStatusUpdate: false
+            });
+          } catch (error) {
+            set({
+              statusUpdateError: error instanceof Error ? error.message : 'Failed to update starship status',
+              loadingStatusUpdate: false
+            });
+          }
+        },
+
+        getStarshipAgents: async (id) => {
+          set({ loadingAgents: true, agentsError: null });
+          try {
+            const response = await starshipAPI.getStarshipAgents(id);
+            
+            // Cache the agents data
+            const currentAgents = get().starshipAgents;
+            set({
+              starshipAgents: { ...currentAgents, [id]: response },
+              loadingAgents: false
+            });
+          } catch (error) {
+            set({
+              agentsError: error instanceof Error ? error.message : 'Failed to load starship agents',
+              loadingAgents: false
+            });
+          }
+        },
+
+        // Error clearing actions
+        clearErrors: () => {
+          set({
+            error: null,
+            updateError: null,
+            deleteError: null,
+            statusUpdateError: null,
+            agentsError: null,
+            visionError: null
+          });
+        },
+
+        clearError: (errorType) => {
+          switch (errorType) {
+            case 'update':
+              set({ updateError: null });
+              break;
+            case 'delete':
+              set({ deleteError: null });
+              break;
+            case 'status':
+              set({ statusUpdateError: null });
+              break;
+            case 'agents':
+              set({ agentsError: null });
+              break;
+          }
+        },
 
         // SIMPLIFIED VISION ACTIONS (CRITICAL: BYPASS DATABASE)
         loadVision: async (starshipId: string) => {

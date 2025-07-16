@@ -429,7 +429,57 @@ export const chatAPI = {
       .then((res: AxiosResponse<{ message: string }>) => res.data),
 }
 
-// NEW: Starship API
+// Define starship API types locally since they're not exported from protocol
+interface UpdateStarshipRequest {
+  name?: string;
+  status?: 'active' | 'docked' | 'maintenance';
+  class?: 'scout' | 'cruiser';
+}
+
+interface UpdateStarshipStatusRequest {
+  status: 'active' | 'docked' | 'maintenance';
+}
+
+interface StarshipResponse {
+  starship: Starship;
+}
+
+interface StarshipAgentsResponse {
+  starshipId: string;
+  starshipName: string;
+  starshipClass: 'scout' | 'cruiser';
+  maxAgents: number;
+  deployedAgents: Array<{
+    id: string;
+    name: string;
+    model: string;
+    systemPrompt?: string;
+    createdAt: string;
+    description?: string;
+    tags: string[];
+    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+    authorId: string;
+    isPublic: boolean;
+    version: string;
+    updatedAt: string;
+    usageCount: number;
+    rating?: number;
+    temperature?: number;
+    maxTokens?: number;
+    customInstructions?: string;
+    allowedStarshipClasses?: ('scout' | 'cruiser')[];
+    requiredPermissions?: string[];
+  }>;
+  availableSlots: number;
+  deployedCount: number;
+}
+
+interface StarshipDetailsResponse extends StarshipResponse {
+  agents: StarshipAgentsResponse['deployedAgents'];
+  availableSlots: number;
+}
+
+// NEW: Enhanced Starship API
 export const starshipAPI = {
   // Get user's starships
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
@@ -459,6 +509,52 @@ export const starshipAPI = {
     return data
   },
 
+  // Update starship details with cache invalidation
+  updateStarship: async (id: string, updates: UpdateStarshipRequest): Promise<StarshipResponse> => {
+    const data = await api
+      .put(`/api/starships/${id}`, updates)
+      .then(res => res.data)
+    // Invalidate starship cache since details changed
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
+    apiCache.invalidatePattern('^starships:') // Invalidate all starship caches
+    return data
+  },
+
+  // Delete starship with cache invalidation
+  deleteStarship: async (id: string): Promise<{ message: string }> => {
+    const data = await api
+      .delete(`/api/starships/${id}`)
+      .then(res => res.data)
+    // Invalidate all starship caches
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
+    apiCache.invalidatePattern('^starships:')
+    return data
+  },
+
+  // Update starship status specifically with cache invalidation
+  updateStarshipStatus: async (id: string, status: UpdateStarshipStatusRequest['status']): Promise<StarshipResponse> => {
+    const data = await api
+      .patch(`/api/starships/${id}/status`, { status })
+      .then(res => res.data)
+    // Invalidate starship cache since status changed
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
+    apiCache.invalidatePattern('^starships:')
+    return data
+  },
+
+  // Get detailed agent information for starship
+  getStarshipAgents: async (id: string): Promise<StarshipAgentsResponse> => {
+    const cacheKey = CACHE_KEYS.STARSHIP_AGENTS(id)
+    const cached = apiCache.get<StarshipAgentsResponse>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api.get(`/api/starships/${id}/agents`).then(res => res.data)
+    apiCache.set(cacheKey, data, 1 * 60 * 1000) // Cache for 1 minute since agent data changes frequently
+    return data
+  },
+
   // Deploy agent to starship with cache invalidation
   deployAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
     const data = await api
@@ -466,6 +562,7 @@ export const starshipAPI = {
       .then(res => res.data)
     // Invalidate starship cache since agent deployment changes starship state
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
     return data
   },
 
@@ -476,6 +573,7 @@ export const starshipAPI = {
       .then(res => res.data)
     // Invalidate starship cache since agent removal changes starship state
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
     return data
   },
 

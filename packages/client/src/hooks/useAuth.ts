@@ -18,6 +18,14 @@ export function useAuth() {
     accessTokenRaw,
   } = useKindeBrowserClient()
 
+  // TESTING BACKDOOR: Only activate when explicitly enabled
+  const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
+  const shouldUseTestingBackdoor = enableTestingBackdoor && !kindeLoading && !isAuthenticated
+  
+  if (shouldUseTestingBackdoor) {
+    console.log('[AUTH] Testing backdoor activated - auth testing mode enabled')
+  }
+
   const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -70,6 +78,12 @@ export function useAuth() {
     // Critical: Only set up token provider after loading is complete
     if (!kindeLoading) {
       setTokenProvider(async () => {
+        // TESTING BACKDOOR: Provide test token when explicitly enabled
+        if (shouldUseTestingBackdoor) {
+          console.log('[AUTH] Providing test token for testing backdoor')
+          return 'test-auth-token'
+        }
+        
         if (isAuthenticated) {
           try {
             console.log('[AUTH] Attempting to get access token...')
@@ -131,6 +145,55 @@ export function useAuth() {
   }, [isAuthenticated, kindeLoading, getToken, getAccessTokenRaw, accessTokenRaw])
 
   const isLoading = kindeLoading || syncLoading
+
+  // TESTING BACKDOOR: Return mock authenticated state when explicitly enabled
+  if (shouldUseTestingBackdoor) {
+    const mockUser = {
+      id: 'test-user-1',
+      email: 'test@starships.ai',
+      given_name: 'Test',
+      family_name: 'User',
+      picture: undefined
+    }
+    
+    return {
+      // Kinde user information
+      kindeUser: mockUser,
+      isAuthenticated: true,
+      isLoading: false,
+
+      // Synced user data (mock)
+      syncedUser: {
+        id: 'test-user-1',
+        email: 'test@starships.ai',
+        displayName: 'Test User',
+        username: 'test-user',
+        avatar: undefined,
+        kindeId: 'test-user-1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      syncError: null,
+
+      // Token management (mock)
+      getToken: async () => 'test-auth-token',
+      getClaim: () => null,
+
+      // Auth components
+      LoginLink,
+      LogoutLink,
+      RegisterLink,
+
+      // Convenience properties
+      userId: 'test-user-1',
+      userEmail: 'test@starships.ai',
+      userName: 'Test User',
+      userAvatar: undefined,
+
+      // For backwards compatibility
+      user: mockUser,
+    }
+  }
 
   return {
     // Kinde user information

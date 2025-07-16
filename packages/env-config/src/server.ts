@@ -2,9 +2,13 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { ServerEnvironmentConfig, EnvironmentValidationError } from './types';
 
-// Load environment variables from the root .env file
+// Load environment variables from the root .env file (server-side only)
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
-dotenv.config({ path: rootEnvPath });
+
+// Only run dotenv config on server-side to prevent browser TTY errors
+if (typeof window === 'undefined' && typeof process !== 'undefined') {
+  dotenv.config({ path: rootEnvPath });
+}
 
 /**
  * Validates that required environment variables are present

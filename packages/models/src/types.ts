@@ -38,6 +38,7 @@ export interface Channel {
 // NEW: Aether Core Entities
 export interface Starship {
   id: string;
+  slug: string;
   ownerId: string; // Foreign key to User
   class: 'scout' | 'cruiser';
   name: string;
@@ -203,7 +204,8 @@ export interface LLMRepository extends Repository<LLM> {
 export interface StarshipRepository {
   findAll(): Promise<Starship[]>;
   findById(id: string): Promise<Starship | null>;
-  create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt'>): Promise<Starship>;
+  findBySlug(slug: string, ownerId: string): Promise<Starship | null>;
+  create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }): Promise<Starship>;
   update(id: string, updates: Partial<Starship>): Promise<Starship | null>;
   delete(id: string): Promise<boolean>;
   findByOwner(ownerId: string): Promise<Starship[]>;
@@ -211,6 +213,8 @@ export interface StarshipRepository {
   deployAgent(starshipId: string, agentId: string): Promise<boolean>;
   removeAgent(starshipId: string, agentId: string): Promise<boolean>;
   getAvailableSlots(starshipId: string): Promise<number>;
+  generateUniqueSlug(name: string, ownerId: string): Promise<string>;
+  isSlugAvailable(slug: string, ownerId: string, excludeId?: string): Promise<boolean>;
 }
 
 export interface CodexRepository extends Repository<Codex> {

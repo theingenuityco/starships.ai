@@ -30,3 +30,5 @@ export { AetherCoreService } from './services/AetherCoreService';
 
 // NEW: Export AgentTemplateService
 export { AgentTemplateService } from './services/AgentTemplateService';
+// NEW: Export VisionFileService
+export { VisionFileService } from './services/VisionFileService';

@@ -179,7 +179,7 @@ export default function HomePage() {
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             {isAuthenticated ? (
-              <Link href="/command-deck">
+              <Link href="/ships">
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
                   Enter Command Deck
                   <ArrowRight className="w-5 h-5 ml-2" />
@@ -348,7 +348,7 @@ export default function HomePage() {
               that transforms intention into reality.
             </p>
             {isAuthenticated ? (
-              <Link href="/command-deck">
+              <Link href="/ships">
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
                   <Rocket className="w-5 h-5 mr-2" />
                   Enter Command Deck

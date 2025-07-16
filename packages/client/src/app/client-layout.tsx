@@ -77,26 +77,31 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     );
   }
 
-  // Regular pages with navigation sidebar
+  // Check if this is a route that should not show navigation
+  const shouldHideNavigation = pathname === '/ships';
+
+  // Regular pages with conditional navigation sidebar
   return (
     <AuthGate>
       <div className="h-screen flex relative overflow-hidden">
-        {/* Navigation Sidebar with gutter (16px) */}
-        <div className="fixed top-4 left-4 bottom-4 w-[300px] z-50">
-          <motion.aside
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
-            className="w-full h-full bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
-            onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
-            onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
-          >
-            <Navigation mode="sidebar" isMobile={isMobile} />
-          </motion.aside>
-        </div>
+        {/* Navigation Sidebar with gutter (16px) - conditionally rendered */}
+        {!shouldHideNavigation && (
+          <div className="fixed top-4 left-4 bottom-4 w-[300px] z-50">
+            <motion.aside
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
+              className="w-full h-full bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
+              onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
+              onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
+            >
+              <Navigation mode="sidebar" isMobile={isMobile} />
+            </motion.aside>
+          </div>
+        )}
         
         {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
-        {isMobile && (
+        {isMobile && !shouldHideNavigation && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -108,7 +113,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </motion.button>
         )}
         
-        {/* Main Content Area - Always maintains position */}
+        {/* Main Content Area - Dynamic positioning based on navigation visibility */}
         <AnimatePresence mode="wait">
           <motion.main
             key={pathname}
@@ -118,10 +123,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             variants={pageVariants}
             className={cn(
               "flex-1 min-h-full w-full transition-all duration-300",
-              // Position content next to navigation with fixed margin
-              "ml-[320px]"
+              // Position content next to navigation with fixed margin when navigation is shown
+              !shouldHideNavigation ? "ml-[320px]" : ""
             )}
-            style={{ width: 'calc(100% - 320px)' }}
+            style={{
+              width: !shouldHideNavigation ? 'calc(100% - 320px)' : '100%'
+            }}
           >
             {children}
           </motion.main>

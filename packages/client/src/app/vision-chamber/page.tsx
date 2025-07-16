@@ -1,15 +1,15 @@
 import type { Metadata } from 'next';
-import { VisionChamber } from '@/components/vision-chamber/VisionChamber';
+import { SimpleVisionChamber } from '@/components/vision-chamber/SimpleVisionChamber';
 
 export const metadata: Metadata = {
   title: 'Vision Chamber | Starships.ai',
-  description: 'Define and refine your mission vision, goals, and constraints with intelligent auto-influence suggestions'
+  description: 'Create and manage your starship vision statement'
 };
 
 export default function VisionChamberPage() {
   return (
     <div className="h-full w-full">
-      <VisionChamber className="h-full" />
+      <SimpleVisionChamber />
     </div>
   );
 }

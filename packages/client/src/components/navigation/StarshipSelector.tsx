@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { ChevronDown, Plus, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,12 @@ interface StarshipSelectorProps {
 }
 
 export function StarshipSelector({ className }: StarshipSelectorProps) {
+  const pathname = usePathname();
+  
+  // Don't show StarshipSelector when inside individual starship routes
+  if (pathname.startsWith('/ship/')) {
+    return null;
+  }
   const {
     starships,
     activeStarshipId,

@@ -16,6 +16,33 @@ export const authMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
+    // TESTING BACKDOOR: Only activate when explicitly enabled via environment variable
+    const enableTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
+    const hasKindeConfig = process.env.KINDE_CLIENT_ID && process.env.KINDE_ISSUER_URL;
+    
+    if (enableTestingBackdoor && !hasKindeConfig) {
+      console.log(`[AUTH] Testing backdoor activated for ${req.method} ${req.path}`);
+      
+      // Create a mock user for testing
+      const mockUser = {
+        id: 'test-user-1',
+        email: 'test@starships.ai',
+        displayName: 'Test User',
+        username: 'test-user',
+        avatar: null,
+        kindeId: 'test-user-1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      req.user = mockUser;
+      req.kindeId = 'test-user-1';
+      
+      console.log(`[AUTH] Mock user attached: ${mockUser.id} (${mockUser.displayName})`);
+      next();
+      return;
+    }
+
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -36,6 +63,29 @@ export const authMiddleware = async (
     console.log(
       `[AUTH] Validating token for request to ${req.method} ${req.path} - token length: ${token.length}`
     );
+
+    // TESTING BACKDOOR: Check for test token when explicitly enabled
+    if (enableTestingBackdoor && token === 'test-auth-token') {
+      console.log(`[AUTH] Test token detected for testing backdoor`);
+      // Reuse the same mock user from the backdoor above
+      const mockUser = {
+        id: 'test-user-1',
+        email: 'test@starships.ai',
+        displayName: 'Test User',
+        username: 'test-user',
+        avatar: null,
+        kindeId: 'test-user-1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      req.user = mockUser;
+      req.kindeId = 'test-user-1';
+      
+      console.log(`[AUTH] Test token validated: ${mockUser.id} (${mockUser.displayName})`);
+      next();
+      return;
+    }
 
     // Verify JWT token using Kinde's public keys
     const { payload } = await jwtVerify(token, JWKS, {

@@ -18,6 +18,7 @@ export { VisionRepository } from './repositories/VisionRepository';
 export { ConstraintRepository } from './repositories/ConstraintRepository';
 export { ConceptRepository } from './repositories/ConceptRepository';
 export { MetaAnchorRepository } from './repositories/MetaAnchorRepository';
+export { MCPServerOptionRepository } from './repositories/MCPServerOptionRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';

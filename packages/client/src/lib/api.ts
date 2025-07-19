@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from 'axios'
 
 import { getApiBaseUrl } from './env'
-import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
+import { apiCache, CACHE_KEYS, invalidateAgentCaches, invalidateMCPServerCaches } from './cache'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -79,8 +79,17 @@ import {
   AgentTemplate,
 } from '@starships/protocol'
 
-// Re-export Agent for use in other client components
+// Re-export Agent types for use in other client components
 export type { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest, AgentTemplate }
+
+// MCP Server Option interface (matching backend model)
+export interface MCPServerOption {
+  id: string // Unique identifier (e.g., "github", "puppeteer")
+  name: string // Display name (e.g., "Github", "Puppeteer")
+  command: string // Execution command (e.g., "docker", "npx", "uvx")
+  args: string[] // Command arguments array
+  env?: string // Environment variables as JSON string (optional)
+}
 
 export interface Message {
   id: string
@@ -432,52 +441,52 @@ export const chatAPI = {
 
 // Define starship API types locally since they're not exported from protocol
 interface UpdateStarshipRequest {
-  name?: string;
-  status?: 'active' | 'docked' | 'maintenance';
-  class?: 'scout' | 'cruiser';
+  name?: string
+  status?: 'active' | 'docked' | 'maintenance'
+  class?: 'scout' | 'cruiser'
 }
 
 interface UpdateStarshipStatusRequest {
-  status: 'active' | 'docked' | 'maintenance';
+  status: 'active' | 'docked' | 'maintenance'
 }
 
 interface StarshipResponse {
-  starship: Starship;
+  starship: Starship
 }
 
 interface StarshipAgentsResponse {
-  starshipId: string;
-  starshipName: string;
-  starshipClass: 'scout' | 'cruiser';
-  maxAgents: number;
+  starshipId: string
+  starshipName: string
+  starshipClass: 'scout' | 'cruiser'
+  maxAgents: number
   deployedAgents: Array<{
-    id: string;
-    name: string;
-    model: string;
-    systemPrompt?: string;
-    createdAt: string;
-    description?: string;
-    tags: string[];
-    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-    authorId: string;
-    isPublic: boolean;
-    version: string;
-    updatedAt: string;
-    usageCount: number;
-    rating?: number;
-    temperature?: number;
-    maxTokens?: number;
-    customInstructions?: string;
-    allowedStarshipClasses?: ('scout' | 'cruiser')[];
-    requiredPermissions?: string[];
-  }>;
-  availableSlots: number;
-  deployedCount: number;
+    id: string
+    name: string
+    model: string
+    systemPrompt?: string
+    createdAt: string
+    description?: string
+    tags: string[]
+    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
+    authorId: string
+    isPublic: boolean
+    version: string
+    updatedAt: string
+    usageCount: number
+    rating?: number
+    temperature?: number
+    maxTokens?: number
+    customInstructions?: string
+    allowedStarshipClasses?: ('scout' | 'cruiser')[]
+    requiredPermissions?: string[]
+  }>
+  availableSlots: number
+  deployedCount: number
 }
 
 interface StarshipDetailsResponse extends StarshipResponse {
-  agents: StarshipAgentsResponse['deployedAgents'];
-  availableSlots: number;
+  agents: StarshipAgentsResponse['deployedAgents']
+  availableSlots: number
 }
 
 // NEW: Enhanced Starship API
@@ -519,9 +528,7 @@ export const starshipAPI = {
 
   // Update starship details with cache invalidation
   updateStarship: async (id: string, updates: UpdateStarshipRequest): Promise<StarshipResponse> => {
-    const data = await api
-      .put(`/api/starships/${id}`, updates)
-      .then(res => res.data)
+    const data = await api.put(`/api/starships/${id}`, updates).then(res => res.data)
     // Invalidate starship cache since details changed
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
     apiCache.invalidatePattern('^starships:') // Invalidate all starship caches
@@ -530,9 +537,7 @@ export const starshipAPI = {
 
   // Delete starship with cache invalidation
   deleteStarship: async (id: string): Promise<{ message: string }> => {
-    const data = await api
-      .delete(`/api/starships/${id}`)
-      .then(res => res.data)
+    const data = await api.delete(`/api/starships/${id}`).then(res => res.data)
     // Invalidate all starship caches
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
     apiCache.invalidatePattern('^starships:')
@@ -540,10 +545,11 @@ export const starshipAPI = {
   },
 
   // Update starship status specifically with cache invalidation
-  updateStarshipStatus: async (id: string, status: UpdateStarshipStatusRequest['status']): Promise<StarshipResponse> => {
-    const data = await api
-      .patch(`/api/starships/${id}/status`, { status })
-      .then(res => res.data)
+  updateStarshipStatus: async (
+    id: string,
+    status: UpdateStarshipStatusRequest['status']
+  ): Promise<StarshipResponse> => {
+    const data = await api.patch(`/api/starships/${id}/status`, { status }).then(res => res.data)
     // Invalidate starship cache since status changed
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
     apiCache.invalidatePattern('^starships:')
@@ -615,10 +621,113 @@ export const starshipAPI = {
 export const visionAPI = {
   get: (starshipId: string): Promise<{ vision: string }> =>
     api.get(`/api/starships/${starshipId}/vision`).then(res => res.data),
-  
+
   save: (starshipId: string, vision: string): Promise<{ success: boolean }> =>
-    api.post(`/api/starships/${starshipId}/vision`, { vision }).then(res => res.data)
-};
+    api.post(`/api/starships/${starshipId}/vision`, { vision }).then(res => res.data),
+}
+
+// MCP Server API response types
+interface MCPServersResponse {
+  mcpServers: MCPServerOption[]
+}
+
+interface StarshipConnectorsResponse {
+  starshipId: string
+  connectedConnectors: MCPServerOption[]
+}
+
+// NEW: MCP Server API
+export const mcpServerAPI = {
+  // Get all available MCP server options with 5-minute caching
+  getAll: async (): Promise<MCPServerOption[]> => {
+    const cacheKey = CACHE_KEYS.MCP_SERVERS_ALL
+    const cached = apiCache.get<MCPServerOption[]>(cacheKey)
+    if (cached) {
+      console.log('[API] Using cached MCP servers:', cached.length)
+      return cached
+    }
+
+    console.log('[API] Fetching all MCP servers from server')
+    const data = await api
+      .get('/api/mcp-servers')
+      .then((res: AxiosResponse<MCPServersResponse>) => {
+        console.log('[API] Received MCP servers from server:', res.data.mcpServers.length)
+        return res.data.mcpServers
+      })
+
+    // Cache for 5 minutes (rarely changes)
+    apiCache.set(cacheKey, data, 5 * 60 * 1000)
+    return data
+  },
+
+  // Get connected MCP servers for a starship with 1-minute caching
+  getConnectedToStarship: async (starshipId: string): Promise<MCPServerOption[]> => {
+    const cacheKey = CACHE_KEYS.MCP_SERVERS_BY_STARSHIP(starshipId)
+    const cached = apiCache.get<MCPServerOption[]>(cacheKey)
+    if (cached) {
+      console.log(
+        '[API] Using cached connected MCP servers for starship:',
+        starshipId,
+        cached.length
+      )
+      return cached
+    }
+
+    console.log('[API] Fetching connected MCP servers for starship:', starshipId)
+    const data = await api
+      .get(`/api/starships/${starshipId}/connectors`)
+      .then((res: AxiosResponse<StarshipConnectorsResponse>) => {
+        console.log(
+          '[API] Received connected MCP servers for starship:',
+          starshipId,
+          res.data.connectedConnectors.length
+        )
+        return res.data.connectedConnectors
+      })
+
+    // Cache for 1 minute (changes more frequently)
+    apiCache.set(cacheKey, data, 1 * 60 * 1000)
+    return data
+  },
+
+  // Connect MCP server to starship with cache invalidation
+  connectToStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
+    console.log('[API] Connecting MCP server to starship:', { starshipId, mcpServerId })
+
+    try {
+      await api.post(`/api/starships/${starshipId}/connectors/${mcpServerId}`)
+      console.log('[API] Successfully connected MCP server to starship')
+
+      // Invalidate relevant caches
+      invalidateMCPServerCaches(starshipId)
+
+      // Also invalidate starship cache since connector state changed
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    } catch (error) {
+      console.error('[API] Failed to connect MCP server to starship:', error)
+      throw error
+    }
+  },
+
+  // Disconnect MCP server from starship with cache invalidation
+  disconnectFromStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
+    console.log('[API] Disconnecting MCP server from starship:', { starshipId, mcpServerId })
+
+    try {
+      await api.delete(`/api/starships/${starshipId}/connectors/${mcpServerId}`)
+      console.log('[API] Successfully disconnected MCP server from starship')
+
+      // Invalidate relevant caches
+      invalidateMCPServerCaches(starshipId)
+
+      // Also invalidate starship cache since connector state changed
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    } catch (error) {
+      console.error('[API] Failed to disconnect MCP server from starship:', error)
+      throw error
+    }
+  },
+}
 
 export const userAPI = {
   // Sync Kinde user to backend database

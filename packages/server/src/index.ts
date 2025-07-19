@@ -19,6 +19,7 @@ import {
   ConstraintRepository,
   ConceptRepository,
   MetaAnchorRepository,
+  MCPServerOptionRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
@@ -31,6 +32,7 @@ import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
+import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import { AgentService } from './services/AgentService';
@@ -62,6 +64,7 @@ const visionRepository = new VisionRepository();
 const constraintRepository = new ConstraintRepository();
 const conceptRepository = new ConceptRepository();
 const metaAnchorRepository = new MetaAnchorRepository();
+const mcpServerOptionRepository = new MCPServerOptionRepository();
 
 // Middleware
 app.use(cors());
@@ -106,7 +109,13 @@ initializeStarshipRoutes({
 
 // Initialize vision routes with dependencies
 initializeVisionRoutes({
-  starshipRepository
+  starshipRepository,
+});
+
+// Initialize MCP server routes with dependencies
+initializeMCPServerRoutes({
+  starshipRepository,
+  mcpServerOptionRepository,
 });
 
 // API Routes
@@ -118,6 +127,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
+app.use('/api', mcpServerRoutes);
 app.use('/api', redeployRoutes);
 
 // Create HTTP server and initialize Socket.IO

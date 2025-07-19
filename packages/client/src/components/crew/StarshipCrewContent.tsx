@@ -1,20 +1,26 @@
 'use client'
 
-import { useState } from 'react'
-import { Agent } from '@/lib/api'
+import { useState, useEffect } from 'react'
+import { Agent, MCPServerOption, mcpServerAPI } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
+import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ChatInterface } from '@/components/chat/ChatInterface'
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Users } from 'lucide-react';
-import Link from 'next/link';
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, Users } from 'lucide-react'
+import Link from 'next/link'
 
 interface StarshipCrewContentProps {
-  slug: string;
+  slug: string
 }
 
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // Connector state management
+  const [connectedConnectors, setConnectedConnectors] = useState<MCPServerOption[]>([])
+  const [connectorsLoading, setConnectorsLoading] = useState(false)
+  const [connectorsError, setConnectorsError] = useState<string | null>(null)
 
   const handleAgentSelect = (agent: Agent) => {
     setSelectedAgent(agent)
@@ -23,6 +29,64 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   const handleSessionCreated = (newSessionId: string) => {
     setSessionId(newSessionId)
+  }
+
+  // Fetch connected connectors on component mount and when starship changes
+  useEffect(() => {
+    fetchConnectedConnectors()
+  }, [slug])
+
+  const fetchConnectedConnectors = async () => {
+    try {
+      setConnectorsLoading(true)
+      setConnectorsError(null)
+      const connectors = await mcpServerAPI.getConnectedToStarship(slug)
+      setConnectedConnectors(connectors)
+    } catch (error) {
+      console.error('Failed to fetch connected connectors:', error)
+      setConnectorsError('Failed to load connectors. Please try again.')
+    } finally {
+      setConnectorsLoading(false)
+    }
+  }
+
+  // Handle connector changes with proper error handling and loading states
+  const handleConnectorsChange = async (newConnectors: MCPServerOption[]) => {
+    try {
+      setConnectorsLoading(true)
+      setConnectorsError(null)
+
+      // Compare with current connectors to determine what changed
+      const currentIds = new Set(connectedConnectors.map(c => c.id))
+      const newIds = new Set(newConnectors.map(c => c.id))
+
+      // Find connectors to connect (in new but not in current)
+      const toConnect = newConnectors.filter(c => !currentIds.has(c.id))
+
+      // Find connectors to disconnect (in current but not in new)
+      const toDisconnect = connectedConnectors.filter(c => !newIds.has(c.id))
+
+      // Execute connection operations
+      const operations = [
+        ...toConnect.map(connector => mcpServerAPI.connectToStarship(slug, connector.id)),
+        ...toDisconnect.map(connector => mcpServerAPI.disconnectFromStarship(slug, connector.id)),
+      ]
+
+      if (operations.length > 0) {
+        await Promise.all(operations)
+      }
+
+      // Update state with new connectors
+      setConnectedConnectors(newConnectors)
+    } catch (error) {
+      console.error('Failed to update connectors:', error)
+      setConnectorsError('Failed to update connectors. Please try again.')
+
+      // Refresh connectors to get current state
+      await fetchConnectedConnectors()
+    } finally {
+      setConnectorsLoading(false)
+    }
   }
 
   return (
@@ -53,17 +117,34 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               </span>
               Crew Console
             </h2>
-            <div className="flex-1 overflow-auto pr-1 -mr-1">
-              <AgentSelector
-                selectedAgent={selectedAgent}
-                onAgentSelect={handleAgentSelect}
-                showCreateButton={true}
-                showFilters={true}
-              />
+            <div className="flex-1 overflow-auto pr-1 -mr-1 space-y-6">
+              {/* ConnectorSelector above AgentSelector */}
+              <div className="pb-4 border-b border-border/50">
+                <ConnectorSelector
+                  starshipId={slug}
+                  selectedConnectors={connectedConnectors}
+                  onConnectorsChange={handleConnectorsChange}
+                  disabled={connectorsLoading}
+                  className="mb-0"
+                />
+                {connectorsError && (
+                  <div className="mt-2 text-sm text-destructive">{connectorsError}</div>
+                )}
+              </div>
+
+              {/* AgentSelector */}
+              <div>
+                <AgentSelector
+                  selectedAgent={selectedAgent}
+                  onAgentSelect={handleAgentSelect}
+                  showCreateButton={true}
+                  showFilters={true}
+                />
+              </div>
             </div>
           </div>
         </div>
-        
+
         {/* Right content area */}
         <div className="bg-background overflow-hidden">
           {selectedAgent ? (

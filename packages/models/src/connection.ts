@@ -31,7 +31,7 @@ export class Neo4jConnection {
           connectionTimeout: 5000, // 5 second timeout
           maxConnectionLifetime: 30000, // 30 second max lifetime
           maxConnectionPoolSize: 100,
-          connectionAcquisitionTimeout: 10000 // 10 second acquisition timeout
+          connectionAcquisitionTimeout: 10000, // 10 second acquisition timeout
         }
       );
 
@@ -40,10 +40,7 @@ export class Neo4jConnection {
         setTimeout(() => reject(new Error('Neo4j connection timeout')), 5000);
       });
 
-      await Promise.race([
-        this.driver.verifyConnectivity(),
-        timeoutPromise
-      ]);
+      await Promise.race([this.driver.verifyConnectivity(), timeoutPromise]);
     } catch (error) {
       console.error('Failed to connect to Neo4j:', error);
       throw error;
@@ -61,24 +58,21 @@ export class Neo4jConnection {
     if (!this.driver) {
       throw new Error('Neo4j driver is not connected. Call connect() first.');
     }
-    
+
     return this.driver.session({
-      database: this.config.database || 'neo4j'
+      database: this.config.database || 'neo4j',
     });
   }
 
-  async executeQuery<T = any>(
-    cypher: string, 
-    parameters: any = {}
-  ): Promise<T[]> {
+  async executeQuery<T = any>(cypher: string, parameters: any = {}): Promise<T[]> {
     const session = this.getSession();
-    
+
     try {
-      const result = await session.executeRead((tx: ManagedTransaction) => 
+      const result = await session.executeRead((tx: ManagedTransaction) =>
         tx.run(cypher, parameters)
       );
-      
-      return result.records.map(record => {
+
+      return result.records.map((record) => {
         const obj = record.toObject();
         // Extract properties from Neo4j nodes
         const processedObj: any = {};
@@ -98,18 +92,15 @@ export class Neo4jConnection {
     }
   }
 
-  async executeWrite<T = any>(
-    cypher: string, 
-    parameters: any = {}
-  ): Promise<T[]> {
+  async executeWrite<T = any>(cypher: string, parameters: any = {}): Promise<T[]> {
     const session = this.getSession();
-    
+
     try {
-      const result = await session.executeWrite((tx: ManagedTransaction) => 
+      const result = await session.executeWrite((tx: ManagedTransaction) =>
         tx.run(cypher, parameters)
       );
-      
-      return result.records.map(record => {
+
+      return result.records.map((record) => {
         const obj = record.toObject();
         // Extract properties from Neo4j nodes
         const processedObj: any = {};
@@ -131,7 +122,7 @@ export class Neo4jConnection {
 
   async initializeSchema(): Promise<void> {
     const session = this.getSession();
-    
+
     try {
       const constraints = [
         'CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE',
@@ -145,6 +136,7 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
         'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
         'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
+        'CREATE CONSTRAINT mcp_server_option_id_unique IF NOT EXISTS FOR (m:MCPServerOption) REQUIRE m.id IS UNIQUE',
       ];
 
       for (const constraint of constraints) {
@@ -166,12 +158,13 @@ export class Neo4jConnection {
         'CREATE INDEX concept_codex_index IF NOT EXISTS FOR (concept:Concept) ON (concept.codexId)',
         'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
         'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
+        'CREATE INDEX mcp_server_option_name_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.name)',
+        'CREATE INDEX mcp_server_option_command_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.command)',
       ];
 
       for (const index of indexes) {
         await session.run(index);
       }
-
     } catch (error) {
       console.error('Failed to initialize Neo4j schema:', error);
       throw error;
@@ -195,4 +188,4 @@ export function getConnection(): Neo4jConnection {
     throw new Error('Neo4j connection not initialized. Call createConnection() first.');
   }
   return connectionInstance;
-} 
+}

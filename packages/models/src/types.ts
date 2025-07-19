@@ -205,7 +205,11 @@ export interface StarshipRepository {
   findAll(): Promise<Starship[]>;
   findById(id: string): Promise<Starship | null>;
   findBySlug(slug: string, ownerId: string): Promise<Starship | null>;
-  create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }): Promise<Starship>;
+  create(
+    entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & {
+      slug?: string;
+    }
+  ): Promise<Starship>;
   update(id: string, updates: Partial<Starship>): Promise<Starship | null>;
   delete(id: string): Promise<boolean>;
   findByOwner(ownerId: string): Promise<Starship[]>;
@@ -215,6 +219,12 @@ export interface StarshipRepository {
   getAvailableSlots(starshipId: string): Promise<number>;
   generateUniqueSlug(name: string, ownerId: string): Promise<string>;
   isSlugAvailable(slug: string, ownerId: string, excludeId?: string): Promise<boolean>;
+  createSlugFromName(name: string): string;
+
+  // NEW: MCP Server Connector methods
+  getConnectedMCPServers(starshipId: string): Promise<MCPServerOption[]>;
+  connectMCPServer(starshipId: string, mcpServerId: string): Promise<boolean>;
+  disconnectMCPServer(starshipId: string, mcpServerId: string): Promise<boolean>;
 }
 
 export interface CodexRepository extends Repository<Codex> {
@@ -307,4 +317,29 @@ export interface AgentTemplateRepository extends Repository<AgentTemplate> {
 
   // Create template from public agent
   createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null>;
+}
+
+// NEW: MCP Server Option Entity
+export interface MCPServerOption {
+  id: string; // Unique identifier (e.g., "github", "puppeteer")
+  name: string; // Display name (e.g., "Github", "Puppeteer")
+  command: string; // Execution command (e.g., "docker", "npx", "uvx")
+  args: string[]; // Command arguments array
+  env?: string; // Environment variables as JSON string (optional)
+}
+
+// NEW: MCP Server Option Repository Interface
+export interface MCPServerOptionRepository extends Repository<MCPServerOption> {
+  findByCommand(command: string): Promise<MCPServerOption[]>;
+  findActive(): Promise<MCPServerOption[]>;
+  searchByName(nameQuery: string): Promise<MCPServerOption[]>;
+}
+
+// NEW: Starship-Connector Relationship
+export interface HasConnectorRelationship {
+  type: 'HAS_CONNECTOR';
+  properties?: {
+    connectedAt?: string;
+    isActive?: boolean;
+  };
 }

@@ -23,6 +23,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
+import { seedMCPServers } from '@starships/models/src/scripts/seed-mcp-servers';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -151,6 +152,10 @@ httpServer.listen(PORT, async () => {
     const templateService = RepositoryFactory.getAgentTemplateService();
     await templateService.seedDefaultTemplates();
     console.log('✅ AgentTemplateService initialized with default templates');
+
+    // Initialize MCP Server Options (seeds default connectors)
+    await seedMCPServers();
+    console.log('✅ MCP Server Options initialized with default connectors');
 
     // Log Socket.IO status
     console.log('✅ Socket.IO server initialized');

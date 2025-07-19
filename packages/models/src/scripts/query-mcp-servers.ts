@@ -89,11 +89,11 @@ async function queryMCPServers() {
     // Check for any relationships
     console.log('\n🔗 Checking for relationships...');
     const relationships = await connection.executeQuery(`
-      MATCH (n:MCPServerOption)-[r]->(m) 
-      RETURN type(r) as relationshipType, labels(m) as targetLabels, count(*) as count
+      MATCH (n:MCPServerOption)-[r]->(m)
+      RETURN type(r) as relationshipType, labels(m) as targetLabels, null as sourceLabels, count(*) as count
       UNION
-      MATCH (n:MCPServerOption)<-[r]-(m) 
-      RETURN type(r) as relationshipType, labels(m) as sourceLabels, count(*) as count
+      MATCH (n:MCPServerOption)<-[r]-(m)
+      RETURN type(r) as relationshipType, null as targetLabels, labels(m) as sourceLabels, count(*) as count
     `);
 
     if (relationships.length > 0) {

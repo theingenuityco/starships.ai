@@ -15,7 +15,10 @@
     "test:coverage": "jest --coverage",
     "test:service": "jest --testPathIgnorePatterns=integration",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
-    "migrate": "tsx src/scripts/run-migration.ts"
+    "migrate": "tsx src/scripts/run-migration.ts",
+    "seed:mcp": "tsx src/scripts/seed-mcp-servers.ts",
+    "query:mcp": "tsx src/scripts/query-mcp-servers.ts",
+    "test:mcp-seeding": "tsx src/scripts/test-mcp-seeding.ts"
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",

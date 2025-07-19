@@ -154,22 +154,30 @@ router.post(
         return;
       }
 
-      // Check if already connected
-      const connectedServers = await starshipRepo.getConnectedMCPServers(starship.id);
-      const alreadyConnected = connectedServers.some((server) => server.id === mcpServerId);
-
-      if (alreadyConnected) {
-        console.log(
-          `[MCP-SERVERS] MCP server ${mcpServerId} already connected to starship ${starship.id}`
-        );
-        res.status(409).json({ error: 'MCP server is already connected to this starship' });
-        return;
-      }
-
-      // Connect the MCP server
+      // Connect the MCP server (this method is idempotent and handles duplicates)
       const connected = await starshipRepo.connectMCPServer(starship.id, mcpServerId);
 
       if (!connected) {
+        // Check if it's because the connection already exists
+        const connectedServers = await starshipRepo.getConnectedMCPServers(starship.id);
+        const alreadyConnected = connectedServers.some((server) => server.id === mcpServerId);
+
+        if (alreadyConnected) {
+          console.log(
+            `[MCP-SERVERS] MCP server ${mcpServerId} already connected to starship ${starship.id} - returning success`
+          );
+          // Return 200 success instead of 409 conflict for idempotent operation
+          res.status(200).json({
+            message: 'MCP server already connected to this starship',
+            starshipId: starship.id,
+            mcpServerId,
+            connectedAt: new Date().toISOString(),
+            alreadyConnected: true,
+          });
+          return;
+        }
+
+        // If not a duplicate, it's a genuine failure
         console.error(
           `[MCP-SERVERS] Failed to connect MCP server ${mcpServerId} to starship ${starship.id}`
         );

@@ -77,38 +77,16 @@ export function ConnectorSelector({
   const [connectedConnectors, setConnectedConnectors] = useState<MCPServerOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [connectingIds, setConnectingIds] = useState<Set<string>>(new Set())
-
-  // Debounced search query
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery)
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [searchQuery])
 
   // Fetch data on mount and when starshipId changes
   useEffect(() => {
     fetchConnectorData()
   }, [starshipId])
 
-  // Filtered connectors based on search query
-  const filteredConnectors = useMemo(() => {
-    if (!debouncedSearchQuery) return availableConnectors
-
-    const query = debouncedSearchQuery.toLowerCase()
-    return availableConnectors.filter(
-      connector =>
-        connector.name.toLowerCase().includes(query) ||
-        connector.command.toLowerCase().includes(query) ||
-        connector.id.toLowerCase().includes(query)
-    )
-  }, [availableConnectors, debouncedSearchQuery])
+  // Use all available connectors since search is removed
+  const filteredConnectors = availableConnectors
 
   // Check if a connector is selected
   const isConnectorSelected = (connector: MCPServerOption): boolean => {
@@ -167,12 +145,12 @@ export function ConnectorSelector({
           setConnectedConnectors(prev => prev.filter(c => c.id !== connector.id))
         }
       } else {
-        // Select and connect
+        // Select and connect - let parent handle the API call
         const newSelected = [...selectedConnectors, connector]
         onConnectorsChange(newSelected)
 
+        // Update local state optimistically
         if (!isCurrentlyConnected) {
-          await mcpServerAPI.connectToStarship(starshipId, connector.id)
           setConnectedConnectors(prev => [...prev, connector])
         }
       }
@@ -195,25 +173,11 @@ export function ConnectorSelector({
   const handleClearAll = async () => {
     if (disabled) return
 
-    try {
-      setLoading(true)
+    // Let parent handle the API calls
+    onConnectorsChange([])
 
-      // Disconnect all selected connectors
-      await Promise.all(
-        selectedConnectors.map(connector =>
-          mcpServerAPI.disconnectFromStarship(starshipId, connector.id)
-        )
-      )
-
-      onConnectorsChange([])
-      setConnectedConnectors([])
-    } catch (err) {
-      console.error('Failed to clear all connectors:', err)
-      setError('Failed to disconnect all connectors')
-      await fetchConnectorData()
-    } finally {
-      setLoading(false)
-    }
+    // Update local state optimistically
+    setConnectedConnectors([])
   }
 
   // Render loading state
@@ -263,43 +227,30 @@ export function ConnectorSelector({
     <div className={cn('space-y-4', className)}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center">
-          <span className="bg-primary/10 p-2 rounded-md mr-3">
-            <Plug className="h-5 w-5 text-primary" />
-          </span>
-          Connectors
+        <div className="flex items-center gap-3">
+          <div className="flex items-center">
+            <span className="bg-primary/10 p-2 rounded-md mr-3">
+              <Plug className="h-5 w-5 text-primary" />
+            </span>
+            <h3 className="text-lg font-semibold">Connectors</h3>
+          </div>
           {selectedConnectors.length > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {selectedConnectors.length} selected
+            <Badge variant="outline" className="text-xs">
+              {selectedConnectors.length}
             </Badge>
           )}
-        </h3>
+        </div>
         {selectedConnectors.length > 0 && (
           <Button
             onClick={handleClearAll}
             size="sm"
             variant="ghost"
             disabled={disabled || loading}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground text-xs"
           >
             Clear All
           </Button>
         )}
-      </div>
-
-      {/* Search Input */}
-      <div className="relative">
-        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-          <Search className="w-4 h-4" />
-        </div>
-        <Input
-          placeholder="Search connectors..."
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          disabled={disabled}
-          className="pl-10 h-10 bg-card border-border"
-          aria-label="Search connectors"
-        />
       </div>
 
       {/* Multi-select Dropdown */}
@@ -313,24 +264,11 @@ export function ConnectorSelector({
             aria-expanded={isDropdownOpen}
             aria-haspopup="listbox"
           >
-            <div className="flex flex-wrap gap-1 flex-1 mr-2">
+            <div className="flex flex-1 mr-2">
               {selectedConnectors.length === 0 ? (
                 <span className="text-muted-foreground">Select connectors...</span>
               ) : (
-                selectedConnectors.map(connector => (
-                  <Badge
-                    key={connector.id}
-                    variant="secondary"
-                    className="flex items-center gap-1 text-xs"
-                  >
-                    {isConnectorConnected(connector) ? (
-                      <Wifi className="w-3 h-3" />
-                    ) : (
-                      <WifiOff className="w-3 h-3" />
-                    )}
-                    {connector.name}
-                  </Badge>
-                ))
+                <span className="text-foreground">Browse Connectors</span>
               )}
             </div>
             <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
@@ -344,9 +282,7 @@ export function ConnectorSelector({
           <DropdownMenuSeparator />
 
           {filteredConnectors.length === 0 ? (
-            <DropdownMenuItem disabled>
-              {debouncedSearchQuery ? 'No connectors match your search' : 'No connectors available'}
-            </DropdownMenuItem>
+            <DropdownMenuItem disabled>No connectors available</DropdownMenuItem>
           ) : (
             filteredConnectors.map(connector => {
               const isSelected = isConnectorSelected(connector)
@@ -382,9 +318,8 @@ export function ConnectorSelector({
                         {connector.command.toUpperCase()}
                       </Badge>
                       {isConnected && (
-                        <div className="flex items-center gap-1">
+                        <div title="Connected">
                           <Wifi className="w-3 h-3 text-green-500" />
-                          <span className="text-xs text-green-600">Connected</span>
                         </div>
                       )}
                     </div>
@@ -436,16 +371,11 @@ export function ConnectorSelector({
                         >
                           {connector.command.toUpperCase()}
                         </Badge>
-                        <span
-                          className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            isConnected
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-muted text-muted-foreground'
-                          )}
-                        >
-                          {isConnecting ? 'Connecting...' : isConnected ? 'Connected' : 'Available'}
-                        </span>
+                        {isConnecting && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                            Connecting...
+                          </span>
+                        )}
                       </div>
 
                       {connector.env && (

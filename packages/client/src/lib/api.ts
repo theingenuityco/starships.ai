@@ -48,14 +48,25 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => response,
   error => {
-    console.error('[API] Request failed:', {
+    // Enhanced error logging to capture all possible error scenarios
+    const errorDetails = {
+      message: error.message,
+      name: error.name,
+      code: error.code,
       url: error.config?.url,
       method: error.config?.method,
       status: error.response?.status,
       statusText: error.response?.statusText,
       data: error.response?.data,
       headers: error.response?.headers,
-    })
+      // Network error details
+      isNetworkError: !error.response,
+      isTimeout: error.code === 'ECONNABORTED',
+      // Full error object for debugging
+      fullError: error.toJSON ? error.toJSON() : 'Error not serializable',
+    }
+
+    console.error('[API] Request failed:', errorDetails)
 
     if (error.response?.status === 401) {
       console.error(
@@ -65,7 +76,25 @@ api.interceptors.response.use(
       // TODO: Trigger logout or token refresh
     } else if (error.response?.status === 500) {
       console.error('[API] Server error occurred:', error.response.data)
+    } else if (error.response?.status === 409) {
+      console.warn('[API] Conflict error (409):', error.response.data)
+
+      // Handle 409 conflicts for MCP server connections gracefully
+      if (error.config?.url?.includes('/connectors/')) {
+        console.log('[API] Interceptor handling 409 for connector operation - treating as success')
+        // Return a successful response instead of rejecting
+        return Promise.resolve({
+          status: 200,
+          statusText: 'OK',
+          data: { message: 'Already connected' },
+          headers: error.response.headers,
+          config: error.config,
+        })
+      }
+    } else if (!error.response) {
+      console.error('[API] Network error - no response received:', error.message)
     }
+
     return Promise.reject(error)
   }
 )
@@ -703,7 +732,26 @@ export const mcpServerAPI = {
 
       // Also invalidate starship cache since connector state changed
       apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    } catch (error) {
+    } catch (error: any) {
+      console.log('[API] Caught error in connectToStarship:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      })
+
+      // Handle 409 Conflict as success - connector is already connected
+      if (error.response?.status === 409) {
+        console.log('[API] MCP server already connected to starship (409) - treating as success')
+
+        // Still invalidate caches to ensure UI is up to date
+        invalidateMCPServerCaches(starshipId)
+        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+
+        console.log('[API] Successfully handled 409 conflict, returning without error')
+        return
+      }
+
       console.error('[API] Failed to connect MCP server to starship:', error)
       throw error
     }
@@ -722,7 +770,19 @@ export const mcpServerAPI = {
 
       // Also invalidate starship cache since connector state changed
       apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    } catch (error) {
+    } catch (error: any) {
+      // Handle 404 Not Found as success - connector is already disconnected
+      if (error.response?.status === 404) {
+        console.log(
+          '[API] MCP server already disconnected from starship (404) - treating as success'
+        )
+
+        // Still invalidate caches to ensure UI is up to date
+        invalidateMCPServerCaches(starshipId)
+        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+        return
+      }
+
       console.error('[API] Failed to disconnect MCP server from starship:', error)
       throw error
     }

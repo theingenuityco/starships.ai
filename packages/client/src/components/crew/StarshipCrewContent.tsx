@@ -100,8 +100,16 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               Back to Fleet
             </Link>
           </Button>
-          <div className="text-sm text-muted-foreground">
-            Starship: <span className="font-medium">{slug}</span>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="bg-primary/10 p-1.5 rounded-md">
+                <Users className="h-4 w-4 text-primary" />
+              </span>
+              <span className="text-lg font-semibold">Crew Console</span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Starship: <span className="font-medium">{slug}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -111,12 +119,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         {/* Left sidebar - fixed width */}
         <div className="border-r bg-card shadow-sm overflow-hidden">
           <div className="p-6 h-full flex flex-col">
-            <h2 className="text-xl font-semibold mb-6 flex items-center">
-              <span className="bg-primary/10 p-2 rounded-md mr-3 shadow-sm">
-                <Users className="h-5 w-5 text-primary" />
-              </span>
-              Crew Console
-            </h2>
             <div className="flex-1 overflow-auto pr-1 -mr-1 space-y-6">
               {/* ConnectorSelector above AgentSelector */}
               <div className="pb-4 border-b border-border/50">

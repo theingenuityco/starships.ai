@@ -8,13 +8,13 @@
 import { FirstOfficerAgent, LangChainMemoryStore } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
 import { SocketIOService } from './SocketIOService';
-import { 
+import {
   ExpeditionWorkflowState,
   WorkflowPhase,
-  ExpeditionProgress,
   ChatRequest,
   ChatResponse
 } from '@starships/protocol';
+import { ExpeditionProgress } from '@starships/agent-engine';
 
 export class FirstOfficerService {
   private static instance: FirstOfficerService;
@@ -60,7 +60,7 @@ export class FirstOfficerService {
       }
 
       // Initialize memory store for this expedition
-      const memoryStore = new LangChainMemoryStore(`expedition-${expeditionId}`);
+      const memoryStore = new LangChainMemoryStore();
       this.memoryStores.set(expeditionId, memoryStore);
 
       // Create First Officer Agent instance

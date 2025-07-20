@@ -85,3 +85,120 @@ export interface ApiError {
   code?: number;
   details?: any;
 }
+
+// ============================================================================
+// EXPEDITION INTEGRATION TYPES
+// ============================================================================
+
+/**
+ * Extended starship response with expedition summary
+ */
+export interface StarshipWithExpeditionsResponse extends StarshipResponse {
+  expeditionSummary: {
+    total: number;
+    active: number;
+    completed: number;
+    failed: number;
+    successRate: number;
+    averageDuration: number; // in minutes
+    recentExpeditions: Array<{
+      id: string;
+      title: string;
+      status: 'draft' | 'planning' | 'in-progress' | 'review' | 'completed' | 'failed' | 'cancelled';
+      priority: 'low' | 'medium' | 'high' | 'urgent';
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  };
+}
+
+/**
+ * Starship expedition capacity and limits
+ */
+export interface StarshipExpeditionCapacity {
+  starshipId: string;
+  starshipClass: 'scout' | 'cruiser';
+  maxConcurrentExpeditions: number; // Based on class: Scout=2, Cruiser=5
+  currentActiveExpeditions: number;
+  availableExpeditionSlots: number;
+  maxAgentsPerExpedition: number; // Based on class: Scout=2, Cruiser=4
+  totalDeployedAgents: number;
+  availableAgents: number;
+  expeditionLimits: {
+    maxTasksPerExpedition: number; // Scout=10, Cruiser=25
+    maxDurationHours: number; // Scout=24, Cruiser=168 (1 week)
+    allowedPriorities: ('low' | 'medium' | 'high' | 'urgent')[];
+  };
+}
+
+/**
+ * Starship agent availability for expeditions
+ */
+export interface StarshipAgentAvailability {
+  agentId: string;
+  agentName: string;
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  tags: string[];
+  availability: 'available' | 'busy' | 'offline';
+  currentExpeditions: string[]; // Expedition IDs
+  completedTasks: number;
+  averageTaskDuration: number; // in minutes
+  successRate: number; // percentage
+  specializations: string[];
+  workload: 'light' | 'moderate' | 'heavy';
+}
+
+/**
+ * Request to update starship expedition settings
+ */
+export interface UpdateStarshipExpeditionSettingsRequest {
+  maxConcurrentExpeditions?: number;
+  expeditionNotifications?: boolean;
+  autoAssignAgents?: boolean;
+  defaultExpeditionPriority?: 'low' | 'medium' | 'high' | 'urgent';
+  expeditionTimeoutHours?: number;
+}
+
+/**
+ * Starship expedition statistics
+ */
+export interface StarshipExpeditionStats {
+  starshipId: string;
+  timeRange: {
+    start: string;
+    end: string;
+  };
+  expeditions: {
+    total: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+    averageDuration: number;
+    successRate: number;
+  };
+  tasks: {
+    total: number;
+    completed: number;
+    failed: number;
+    averageDuration: number;
+    successRate: number;
+  };
+  agents: {
+    mostActive: Array<{
+      agentId: string;
+      agentName: string;
+      tasksCompleted: number;
+      averageQuality: number;
+    }>;
+    topPerformers: Array<{
+      agentId: string;
+      agentName: string;
+      successRate: number;
+      averageQuality: number;
+    }>;
+  };
+  categories: {
+    mostCommon: string[];
+    successRateByCategory: Record<string, number>;
+  };
+}

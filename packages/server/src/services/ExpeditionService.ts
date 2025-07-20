@@ -553,7 +553,7 @@ export class ExpeditionService {
     const starshipRepo = RepositoryFactory.getStarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
-    if (starship?.status === 'maintenance') {
+    if (starship?.status === 'inactive') {
       throw this.createError('STARSHIP_MAINTENANCE', 'Starship is in maintenance mode');
     }
   }

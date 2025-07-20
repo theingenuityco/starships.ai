@@ -111,7 +111,7 @@ export const starshipAuthMiddleware = async (
     }
 
     // Check starship status
-    if (starship.status === 'maintenance') {
+    if (starship.status === 'inactive') {
       res.status(400).json({
         success: false,
         error: 'Starship is in maintenance mode',

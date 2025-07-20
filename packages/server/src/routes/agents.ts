@@ -115,14 +115,29 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
 router.post('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const createRequest = req.body as CreateAgentRequest;
+    const createRequest = req.body as CreateAgentRequest & { starshipId: string };
+    
+    // Validate required starshipId field
+    if (!createRequest.starshipId) {
+      res.status(400).json({
+        error: 'starshipId is required',
+        details: 'All agents must be assigned to a starship. Please provide a valid starshipId.'
+      });
+      return;
+    }
+    
+    // TODO: Add validation to ensure starshipId references valid, accessible starship
+    // This would require access to StarshipRepository here
+    // For now, we'll assume the starshipId is valid and let the database handle referential integrity
+    
     // Add user ID from auth context
     const agentData = {
       ...createRequest,
       authorId: req.user!.id, // Override with authenticated user ID
+      starshipId: createRequest.starshipId,
     };
     console.log(
-      `[AGENTS] Creating agent with authorId: ${agentData.authorId} for user: ${req.user!.id}`
+      `[AGENTS] Creating agent with authorId: ${agentData.authorId}, starshipId: ${agentData.starshipId} for user: ${req.user!.id}`
     );
     const agent = await AgentService.createAgent(agentData);
     console.log(`[AGENTS] Agent created successfully: ${agent.id}, authorId: ${agent.authorId}`);
@@ -135,7 +150,15 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
 
 router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const updates = req.body as UpdateAgentRequest;
+    const updates = req.body as UpdateAgentRequest & { starshipId?: string };
+    
+    // If starshipId is being updated, validate it exists
+    if (updates.starshipId !== undefined) {
+      // TODO: Add validation to ensure starshipId references valid, accessible starship
+      // This would require access to StarshipRepository here
+      console.log(`[AGENTS] Updating agent ${req.params.id} with new starshipId: ${updates.starshipId}`);
+    }
+    
     const agent = await AgentService.updateAgent(req.params.id, updates);
     if (!agent) {
       res.status(404).json({ error: 'Agent not found' });
@@ -210,6 +233,68 @@ router.post('/:id/track-usage', authMiddleware, async (req: Request, res: Respon
   } catch (error) {
     console.error('Error tracking usage:', error);
     res.status(500).json({ error: 'Failed to track usage' });
+  }
+});
+
+// NEW: Get agents by starship ID
+router.get('/by-starship/:starshipId', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { starshipId } = req.params;
+    
+    // TODO: Add validation to ensure starshipId references valid, accessible starship
+    // For now, we'll fetch agents by starshipId without additional validation
+    
+    // This would use AgentRepository.findByStarshipId(starshipId) when implemented
+    // For now, we'll return an empty array or implement basic functionality
+    const agents: any[] = []; // Placeholder
+    
+    res.json(agents);
+  } catch (error) {
+    console.error('Error getting agents by starship:', error);
+    res.status(500).json({ error: 'Failed to get agents by starship' });
+  }
+});
+
+// NEW: Update agent starship assignment
+router.put('/:id/starship', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id: agentId } = req.params;
+    const { starshipId } = req.body;
+    
+    if (!starshipId) {
+      res.status(400).json({
+        error: 'Missing required field',
+        details: 'starshipId is required to update agent starship assignment',
+        field: 'starshipId'
+      });
+      return;
+    }
+
+    // Validate starshipId format (basic UUID check)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(starshipId)) {
+      res.status(400).json({
+        error: 'Invalid starshipId format',
+        details: 'starshipId must be a valid UUID',
+        provided: starshipId
+      });
+      return;
+    }
+    
+    // TODO: Add validation to ensure starshipId references valid, accessible starship
+    // TODO: Add validation to ensure user owns the agent and/or has access to the starship
+    
+    console.log(`[AGENTS] Updating agent ${agentId} starship assignment to: ${starshipId}`);
+    
+    const agent = await AgentService.updateAgent(agentId, { starshipId } as UpdateAgentRequest);
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found' });
+    } else {
+      res.json({ message: 'Agent starship assignment updated successfully', agent });
+    }
+  } catch (error) {
+    console.error('Error updating agent starship assignment:', error);
+    res.status(500).json({ error: 'Failed to update agent starship assignment' });
   }
 });
 

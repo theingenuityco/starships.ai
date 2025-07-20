@@ -1,7 +1,7 @@
 import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
-import { RepositoryFactory, VisionFileService } from "@starships/models";
+import { RepositoryFactory } from "@starships/models";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
 /**
@@ -20,6 +20,8 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
   const starshipRepo = RepositoryFactory.getStarshipRepository();
+  const visionRepo = RepositoryFactory.getVisionRepository();
+  const userRepo = RepositoryFactory.getUserRepository();
   
   ProviderFactory.initialize(agentRepo, llmRepo);
   
@@ -37,59 +39,170 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     systemPrompt: agent.systemPrompt?.substring(0, 100) + '...'
   });
 
-  // SIMPLE VISION CONTEXT LOADING
-  console.log('🔍 [AGENT-ENGINE] Starting vision context loading...');
-  let codexContext = "";
+  // ENHANCED USER ID RESOLUTION WITH COMPREHENSIVE FALLBACK STRATEGIES
+  console.log('🔍 [AGENT-ENGINE] Starting enhanced vision context loading...');
+  console.log('👤 [AGENT-ENGINE] Original Kinde user ID:', req.user_id);
+  
+  // Step 1: Attempt to resolve internal user ID from Kinde user ID
+  let internalUserId = req.user_id;
+  let userResolutionSuccess = false;
+  let fallbackToKindeId = false;
+  
   try {
-    const userStarships = await starshipRepo.findByOwner(req.user_id);
-    console.log('📊 [AGENT-ENGINE] User starships found:', userStarships.length);
+    console.log('🔍 [AGENT-ENGINE] Attempting to resolve internal user from Kinde ID...');
+    const user = await userRepo.findByKindeId(req.user_id);
+    if (user) {
+      internalUserId = user.id;
+      userResolutionSuccess = true;
+      console.log('✅ [AGENT-ENGINE] Internal user found successfully:', {
+        internalUserId: internalUserId,
+        username: user.username,
+        email: user.email,
+        kindeId: user.kindeId
+      });
+    } else {
+      console.warn('⚠️ [AGENT-ENGINE] No internal user found for Kinde ID');
+      console.log('🔄 [AGENT-ENGINE] Will attempt starship lookup with Kinde ID as fallback');
+      fallbackToKindeId = true;
+    }
+  } catch (userError) {
+    console.error('❌ [AGENT-ENGINE] Error during user ID resolution:', {
+      error: (userError as Error).message,
+      stack: (userError as Error).stack
+    });
+    console.log('🔄 [AGENT-ENGINE] Will attempt starship lookup with Kinde ID as fallback');
+    fallbackToKindeId = true;
+  }
+  
+  let visionContext = "";
+  let starshipLookupStrategies: string[] = [];
+  
+  // Step 2: Enhanced starship lookup with multiple strategies
+  try {
+    console.log('🚢 [AGENT-ENGINE] Starting enhanced starship lookup...');
+    
+    // Strategy 1: Use resolved internal user ID
+    if (userResolutionSuccess) {
+      starshipLookupStrategies.push(`internal-user-id:${internalUserId}`);
+    }
+    
+    // Strategy 2: Use Kinde ID as fallback (in case starships were created with Kinde IDs)
+    if (fallbackToKindeId || !userResolutionSuccess) {
+      starshipLookupStrategies.push(`kinde-id-fallback:${req.user_id}`);
+    }
+    
+    console.log('🎯 [AGENT-ENGINE] Starship lookup strategies:', starshipLookupStrategies);
+    
+    let userStarships: any[] = [];
+    let successfulStrategy = '';
+    
+    // Try each strategy until we find starships
+    for (const strategy of starshipLookupStrategies) {
+      const [strategyType, userId] = strategy.split(':');
+      console.log(`🔍 [AGENT-ENGINE] Trying strategy "${strategyType}" with user ID: ${userId}`);
+      
+      try {
+        const starshipsForStrategy = await starshipRepo.findByOwner(userId);
+        console.log(`📊 [AGENT-ENGINE] Strategy "${strategyType}" found ${starshipsForStrategy.length} starships`);
+        
+        if (starshipsForStrategy.length > 0) {
+          userStarships = starshipsForStrategy;
+          successfulStrategy = strategyType;
+          console.log(`✅ [AGENT-ENGINE] Using starships from strategy: ${strategyType}`);
+          break;
+        }
+      } catch (strategyError) {
+        console.error(`❌ [AGENT-ENGINE] Strategy "${strategyType}" failed:`, (strategyError as Error).message);
+        continue;
+      }
+    }
+    
+    console.log('📊 [AGENT-ENGINE] Final starship lookup result:', {
+      starshipsFound: userStarships.length,
+      successfulStrategy: successfulStrategy,
+      starshipDetails: userStarships.map(s => ({
+        id: s.id,
+        name: s.name,
+        class: s.class,
+        ownerId: s.ownerId,
+        status: s.status
+      }))
+    });
     
     if (userStarships.length > 0) {
-      const activeStarship = userStarships[0];
-      console.log('🚢 [AGENT-ENGINE] Active starship:', {
+      // Select the first active starship, or first starship if none are active
+      const activeStarship = userStarships.find(s => s.status === 'active') || userStarships[0];
+      console.log('🎯 [AGENT-ENGINE] Active starship selected:', {
         id: activeStarship.id,
         name: activeStarship.name,
-        class: activeStarship.class
+        class: activeStarship.class,
+        ownerId: activeStarship.ownerId,
+        status: activeStarship.status,
+        selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
       });
       
-      // Check if agent is deployed
-      const deployedAgents = await starshipRepo.getDeployedAgents(activeStarship.id);
-      const isAgentDeployed = deployedAgents.some(agent => agent.id === req.agent_id);
-      console.log('🤖 [AGENT-ENGINE] Agent deployment check:', {
-        isDeployed: isAgentDeployed,
-        deployedAgents: deployedAgents.map(a => a.id),
-        requestedAgent: req.agent_id
+      // Step 3: Enhanced vision loading with validation
+      console.log('🔍 [AGENT-ENGINE] Querying vision for starship ID:', activeStarship.id);
+      const vision = await visionRepo.findByStarship(activeStarship.id);
+      
+      console.log('👁️ [AGENT-ENGINE] Vision database lookup result:', {
+        visionFound: !!vision,
+        visionId: vision?.id,
+        starshipId: vision?.starshipId,
+        hasStatement: !!vision?.statement,
+        statementLength: vision?.statement?.length || 0,
+        refinementCount: vision?.refinementCount || 0,
+        lastRefined: vision?.lastRefined,
+        createdAt: vision?.createdAt
       });
       
-      if (isAgentDeployed) {
-        // BLOCK AGENT IF NO VISION
-        const hasVision = await VisionFileService.hasVisionContent(activeStarship.id);
-        console.log('👁️ [AGENT-ENGINE] Vision check:', { hasVision });
-        
-        if (!hasVision) {
-          console.error('❌ [AGENT-ENGINE] Vision required but not found');
-          throw new Error('Vision required: Please create a vision statement in the Vision Chamber before using agents.');
-        }
-        
-        // LOAD VISION FROM FILE
-        const vision = await VisionFileService.readVision(activeStarship.id);
-        console.log('📖 [AGENT-ENGINE] Vision loaded:', {
-          length: vision?.length || 0,
-          preview: vision?.substring(0, 100) + '...'
+      if (vision?.statement && vision.statement.trim().length > 0) {
+        console.log('📖 [AGENT-ENGINE] Vision loaded successfully from database:', {
+          length: vision.statement.length,
+          preview: vision.statement.substring(0, 150) + '...',
+          refinementCount: vision.refinementCount || 0,
+          lastRefined: vision.lastRefined
         });
         
-        if (vision) {
-          codexContext = `\n\nSTARSHIP VISION:\n${vision}\n\nProvide responses aligned with this vision.\n`;
-        }
+        visionContext = `\n\nSTARSHIP VISION:\n${vision.statement}\n\nProvide responses aligned with this vision.\n`;
+        console.log('✅ [AGENT-ENGINE] Vision context prepared successfully, length:', visionContext.length);
       } else {
-        console.log('⚠️ [AGENT-ENGINE] Agent not deployed, skipping vision loading');
+        console.log('📝 [AGENT-ENGINE] Vision exists but has no usable statement');
+        if (vision) {
+          console.log('🔍 [AGENT-ENGINE] Vision investigation details:', {
+            id: vision.id,
+            starshipId: vision.starshipId,
+            statement: vision.statement,
+            statementType: typeof vision.statement,
+            statementTrimmed: vision.statement?.trim(),
+            refinementCount: vision.refinementCount
+          });
+        }
+        console.log('⚠️ [AGENT-ENGINE] Proceeding without vision context - empty/null statement');
       }
     } else {
-      console.log('⚠️ [AGENT-ENGINE] No starships found for user');
+      console.error('❌ [AGENT-ENGINE] CRITICAL: No starships found for user with any strategy');
+      console.error('🔍 [AGENT-ENGINE] Debug information:', {
+        originalKindeId: req.user_id,
+        resolvedInternalId: internalUserId,
+        userResolutionSuccess: userResolutionSuccess,
+        strategiesAttempted: starshipLookupStrategies,
+        fallbackToKindeId: fallbackToKindeId
+      });
+      
+      // This could indicate a data inconsistency issue that needs to be addressed
+      console.log('⚠️ [AGENT-ENGINE] Proceeding without vision context - no starships found');
     }
   } catch (error) {
-    console.error('❌ [AGENT-ENGINE] Vision loading failed:', error);
-    throw error; // Re-throw to block agent
+    console.error('❌ [AGENT-ENGINE] Vision loading failed with critical error:', {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      name: (error as Error).name,
+      originalKindeId: req.user_id,
+      resolvedInternalId: internalUserId
+    });
+    // Don't block agent - continue without vision context
+    console.log('🔄 [AGENT-ENGINE] Continuing without vision context due to critical error');
   }
 
   const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
@@ -120,8 +233,8 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     hasSystemPrompt: !!agent.systemPrompt,
     memoryEntries: memory.length,
     hasRelevantContext: !!relevantContext,
-    hasCodexContext: !!codexContext,
-    codexContextLength: codexContext.length
+    hasVisionContext: !!visionContext,
+    visionContextLength: visionContext.length
   });
 
   const prompt = buildPrompt(
@@ -129,7 +242,7 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     memory,
     req.message,
     relevantContext,
-    codexContext  // NEW PARAMETER
+    visionContext
   );
   
   console.log('✅ [AGENT-ENGINE] Prompt built:', {
@@ -203,6 +316,8 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
   const starshipRepo = RepositoryFactory.getStarshipRepository();
+  const visionRepo = RepositoryFactory.getVisionRepository();
+  const userRepo = RepositoryFactory.getUserRepository();
   
   ProviderFactory.initialize(agentRepo, llmRepo);
   
@@ -219,43 +334,168 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     model: agent.model
   });
 
-  // SIMPLE VISION CONTEXT LOADING (consistent with non-streaming)
-  let codexContext = "";
+  // ENHANCED USER ID RESOLUTION WITH COMPREHENSIVE FALLBACK STRATEGIES (STREAMING)
+  console.log('🌊 [AGENT-ENGINE-STREAM] Starting enhanced vision context loading...');
+  console.log('👤 [AGENT-ENGINE-STREAM] Original Kinde user ID:', req.user_id);
+  
+  // Step 1: Attempt to resolve internal user ID from Kinde user ID
+  let internalUserId = req.user_id;
+  let userResolutionSuccess = false;
+  let fallbackToKindeId = false;
+  
   try {
-    const userStarships = await starshipRepo.findByOwner(req.user_id);
+    console.log('🔍 [AGENT-ENGINE-STREAM] Attempting to resolve internal user from Kinde ID...');
+    const user = await userRepo.findByKindeId(req.user_id);
+    if (user) {
+      internalUserId = user.id;
+      userResolutionSuccess = true;
+      console.log('✅ [AGENT-ENGINE-STREAM] Internal user found successfully:', {
+        internalUserId: internalUserId,
+        username: user.username,
+        email: user.email,
+        kindeId: user.kindeId
+      });
+    } else {
+      console.warn('⚠️ [AGENT-ENGINE-STREAM] No internal user found for Kinde ID');
+      console.log('🔄 [AGENT-ENGINE-STREAM] Will attempt starship lookup with Kinde ID as fallback');
+      fallbackToKindeId = true;
+    }
+  } catch (userError) {
+    console.error('❌ [AGENT-ENGINE-STREAM] Error during user ID resolution:', {
+      error: (userError as Error).message,
+      stack: (userError as Error).stack
+    });
+    console.log('🔄 [AGENT-ENGINE-STREAM] Will attempt starship lookup with Kinde ID as fallback');
+    fallbackToKindeId = true;
+  }
+  
+  let visionContext = "";
+  let starshipLookupStrategies: string[] = [];
+  
+  // Step 2: Enhanced starship lookup with multiple strategies
+  try {
+    console.log('🚢 [AGENT-ENGINE-STREAM] Starting enhanced starship lookup...');
+    
+    // Strategy 1: Use resolved internal user ID
+    if (userResolutionSuccess) {
+      starshipLookupStrategies.push(`internal-user-id:${internalUserId}`);
+    }
+    
+    // Strategy 2: Use Kinde ID as fallback (in case starships were created with Kinde IDs)
+    if (fallbackToKindeId || !userResolutionSuccess) {
+      starshipLookupStrategies.push(`kinde-id-fallback:${req.user_id}`);
+    }
+    
+    console.log('🎯 [AGENT-ENGINE-STREAM] Starship lookup strategies:', starshipLookupStrategies);
+    
+    let userStarships: any[] = [];
+    let successfulStrategy = '';
+    
+    // Try each strategy until we find starships
+    for (const strategy of starshipLookupStrategies) {
+      const [strategyType, userId] = strategy.split(':');
+      console.log(`🔍 [AGENT-ENGINE-STREAM] Trying strategy "${strategyType}" with user ID: ${userId}`);
+      
+      try {
+        const starshipsForStrategy = await starshipRepo.findByOwner(userId);
+        console.log(`📊 [AGENT-ENGINE-STREAM] Strategy "${strategyType}" found ${starshipsForStrategy.length} starships`);
+        
+        if (starshipsForStrategy.length > 0) {
+          userStarships = starshipsForStrategy;
+          successfulStrategy = strategyType;
+          console.log(`✅ [AGENT-ENGINE-STREAM] Using starships from strategy: ${strategyType}`);
+          break;
+        }
+      } catch (strategyError) {
+        console.error(`❌ [AGENT-ENGINE-STREAM] Strategy "${strategyType}" failed:`, (strategyError as Error).message);
+        continue;
+      }
+    }
+    
+    console.log('📊 [AGENT-ENGINE-STREAM] Final starship lookup result:', {
+      starshipsFound: userStarships.length,
+      successfulStrategy: successfulStrategy,
+      starshipDetails: userStarships.map(s => ({
+        id: s.id,
+        name: s.name,
+        class: s.class,
+        ownerId: s.ownerId,
+        status: s.status
+      }))
+    });
     
     if (userStarships.length > 0) {
-      const activeStarship = userStarships[0];
+      // Select the first active starship, or first starship if none are active
+      const activeStarship = userStarships.find(s => s.status === 'active') || userStarships[0];
+      console.log('🎯 [AGENT-ENGINE-STREAM] Active starship selected:', {
+        id: activeStarship.id,
+        name: activeStarship.name,
+        class: activeStarship.class,
+        ownerId: activeStarship.ownerId,
+        status: activeStarship.status,
+        selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
+      });
       
-      // Check if agent is deployed
-      const deployedAgents = await starshipRepo.getDeployedAgents(activeStarship.id);
-      const isAgentDeployed = deployedAgents.some(agent => agent.id === req.agent_id);
+      // Step 3: Enhanced vision loading with validation
+      console.log('🔍 [AGENT-ENGINE-STREAM] Querying vision for starship ID:', activeStarship.id);
+      const vision = await visionRepo.findByStarship(activeStarship.id);
       
-      if (isAgentDeployed) {
-        // BLOCK AGENT IF NO VISION
-        const hasVision = await VisionFileService.hasVisionContent(activeStarship.id);
+      console.log('👁️ [AGENT-ENGINE-STREAM] Vision database lookup result:', {
+        visionFound: !!vision,
+        visionId: vision?.id,
+        starshipId: vision?.starshipId,
+        hasStatement: !!vision?.statement,
+        statementLength: vision?.statement?.length || 0,
+        refinementCount: vision?.refinementCount || 0,
+        lastRefined: vision?.lastRefined,
+        createdAt: vision?.createdAt
+      });
+      
+      if (vision?.statement && vision.statement.trim().length > 0) {
+        console.log('📖 [AGENT-ENGINE-STREAM] Vision loaded successfully from database:', {
+          length: vision.statement.length,
+          preview: vision.statement.substring(0, 150) + '...',
+          refinementCount: vision.refinementCount || 0,
+          lastRefined: vision.lastRefined
+        });
         
-        if (!hasVision) {
-          console.error('❌ [AGENT-ENGINE-STREAM] Vision required but not found');
-          throw new Error('Vision required: Please create a vision statement in the Vision Chamber before using agents.');
-        }
-        
-        // LOAD VISION FROM FILE
-        const vision = await VisionFileService.readVision(activeStarship.id);
-        
-        if (vision) {
-          codexContext = `\n\nSTARSHIP VISION:\n${vision}\n\nProvide responses aligned with this vision.\n`;
-          console.log('✅ [AGENT-ENGINE-STREAM] Vision context loaded');
-        }
+        visionContext = `\n\nSTARSHIP VISION:\n${vision.statement}\n\nProvide responses aligned with this vision.\n`;
+        console.log('✅ [AGENT-ENGINE-STREAM] Vision context prepared successfully, length:', visionContext.length);
       } else {
-        console.log('⚠️ [AGENT-ENGINE-STREAM] Agent not deployed - vision skipped');
+        console.log('📝 [AGENT-ENGINE-STREAM] Vision exists but has no usable statement');
+        if (vision) {
+          console.log('🔍 [AGENT-ENGINE-STREAM] Vision investigation details:', {
+            id: vision.id,
+            starshipId: vision.starshipId,
+            statement: vision.statement,
+            statementType: typeof vision.statement,
+            statementTrimmed: vision.statement?.trim(),
+            refinementCount: vision.refinementCount
+          });
+        }
+        console.log('⚠️ [AGENT-ENGINE-STREAM] Proceeding without vision context - empty/null statement');
       }
     } else {
-      console.log('⚠️ [AGENT-ENGINE-STREAM] No starships found - vision skipped');
+      console.error('❌ [AGENT-ENGINE-STREAM] CRITICAL: No starships found for user with any strategy');
+      console.error('🔍 [AGENT-ENGINE-STREAM] Debug information:', {
+        originalKindeId: req.user_id,
+        resolvedInternalId: internalUserId,
+        userResolutionSuccess: userResolutionSuccess,
+        strategiesAttempted: starshipLookupStrategies,
+        fallbackToKindeId: fallbackToKindeId
+      });
+      
+      console.log('⚠️ [AGENT-ENGINE-STREAM] Proceeding without vision context - no starships found');
     }
   } catch (error) {
-    console.error('❌ [AGENT-ENGINE-STREAM] Vision loading failed:', error);
-    throw error; // Re-throw to block agent
+    console.error('❌ [AGENT-ENGINE-STREAM] Vision loading failed with critical error:', {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+      name: (error as Error).name,
+      originalKindeId: req.user_id,
+      resolvedInternalId: internalUserId
+    });
+    console.log('🔄 [AGENT-ENGINE-STREAM] Continuing without vision context due to critical error');
   }
 
   const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
@@ -285,8 +525,8 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     hasSystemPrompt: !!agent.systemPrompt,
     memoryEntries: memory.length,
     hasRelevantContext: !!relevantContext,
-    hasCodexContext: !!codexContext,
-    codexContextLength: codexContext.length
+    hasVisionContext: !!visionContext,
+    visionContextLength: visionContext.length
   });
 
   const prompt = buildPrompt(
@@ -294,7 +534,7 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     memory,
     req.message,
     relevantContext,
-    codexContext
+    visionContext
   );
   
   console.log('✅ [AGENT-ENGINE-STREAM] Prompt built:', {

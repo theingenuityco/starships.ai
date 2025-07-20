@@ -3,7 +3,8 @@ import { Vision, VisionRepository as VisionRepositoryInterface } from '../types'
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Neo4j-based vision repository
+ * Neo4j-based vision repository with direct starship relationships
+ * Rebuilt for Phase 2: Direct Vision → Starship relationship with starshipId FK
  */
 export class VisionRepository implements VisionRepositoryInterface {
   async findAll(): Promise<Vision[]> {
@@ -23,11 +24,11 @@ export class VisionRepository implements VisionRepositoryInterface {
     return result[0]?.v || null;
   }
 
-  async findByCodex(codexId: string): Promise<Vision | null> {
+  async findByStarship(starshipId: string): Promise<Vision | null> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ v: Vision }>(
-      'MATCH (v:Vision) WHERE v.codexId = $codexId RETURN v',
-      { codexId }
+      'MATCH (v:Vision) WHERE v.starshipId = $starshipId RETURN v',
+      { starshipId }
     );
     return result[0]?.v || null;
   }
@@ -46,12 +47,12 @@ export class VisionRepository implements VisionRepositoryInterface {
       { props: vision }
     );
 
-    // Create relationship with codex
+    // Create relationship with starship
     await connection.executeWrite(
-      `MATCH (c:Codex {id: $codexId}), (v:Vision {id: $visionId})
-       CREATE (c)-[:CONTAINS {addedAt: $timestamp}]->(v)`,
+      `MATCH (s:Starship {id: $starshipId}), (v:Vision {id: $visionId})
+       CREATE (s)-[:HAS_VISION {createdAt: $timestamp}]->(v)`,
       { 
-        codexId: vision.codexId, 
+        starshipId: vision.starshipId, 
         visionId: vision.id, 
         timestamp: vision.createdAt 
       }
@@ -60,17 +61,17 @@ export class VisionRepository implements VisionRepositoryInterface {
     return vision;
   }
 
-  async updateStatement(codexId: string, statement: string): Promise<Vision | null> {
+  async updateStatement(starshipId: string, statement: string): Promise<Vision | null> {
     const connection = getConnection();
     const result = await connection.executeWrite<{ v: Vision }>(
-      `MATCH (v:Vision) WHERE v.codexId = $codexId 
+      `MATCH (v:Vision) WHERE v.starshipId = $starshipId 
        SET v.statement = $statement, 
            v.updatedAt = $timestamp,
            v.lastRefined = $timestamp,
            v.refinementCount = v.refinementCount + 1
        RETURN v`,
       { 
-        codexId, 
+        starshipId, 
         statement, 
         timestamp: new Date().toISOString() 
       }
@@ -103,4 +104,4 @@ export class VisionRepository implements VisionRepositoryInterface {
     
     return result[0]?.deletedCount > 0;
   }
-} 
+}

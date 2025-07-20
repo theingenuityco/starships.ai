@@ -37,6 +37,13 @@ interface StarshipCreateModalProps {
 interface StarshipFormData {
   name: string;
   class: 'scout' | 'cruiser';
+  maxActiveExpeditions: number;
+}
+
+interface StarshipFormErrors {
+  name?: string;
+  class?: string;
+  maxActiveExpeditions?: string;
 }
 
 const STARSHIP_CLASSES = {
@@ -83,14 +90,15 @@ export function StarshipCreateModal({ open, onOpenChange, onSuccess }: StarshipC
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<StarshipFormData>({
     name: '',
-    class: 'scout'
+    class: 'scout',
+    maxActiveExpeditions: 3
   });
-  const [errors, setErrors] = useState<Partial<StarshipFormData>>({});
+  const [errors, setErrors] = useState<StarshipFormErrors>({});
 
   const totalSteps = 3;
 
   const validateStep = (stepNumber: number): boolean => {
-    const newErrors: Partial<StarshipFormData> = {};
+    const newErrors: StarshipFormErrors = {};
     
     if (stepNumber === 1) {
       if (!formData.name.trim()) {
@@ -99,6 +107,12 @@ export function StarshipCreateModal({ open, onOpenChange, onSuccess }: StarshipC
         newErrors.name = 'Name must be at least 3 characters';
       } else if (formData.name.length > 50) {
         newErrors.name = 'Name must be less than 50 characters';
+      }
+
+      if (formData.maxActiveExpeditions < 1) {
+        newErrors.maxActiveExpeditions = 'Must be at least 1';
+      } else if (formData.maxActiveExpeditions > 50) {
+        newErrors.maxActiveExpeditions = 'Must be 50 or less';
       }
     }
     
@@ -131,7 +145,7 @@ export function StarshipCreateModal({ open, onOpenChange, onSuccess }: StarshipC
 
   const handleReset = () => {
     setStep(1);
-    setFormData({ name: '', class: 'scout' });
+    setFormData({ name: '', class: 'scout', maxActiveExpeditions: 3 });
     setErrors({});
   };
 
@@ -200,6 +214,29 @@ export function StarshipCreateModal({ open, onOpenChange, onSuccess }: StarshipC
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="max-expeditions">Max Active Expeditions</Label>
+                    <Input
+                      id="max-expeditions"
+                      type="number"
+                      min="1"
+                      max="50"
+                      placeholder="3"
+                      value={formData.maxActiveExpeditions}
+                      onChange={(e) => setFormData({ ...formData, maxActiveExpeditions: parseInt(e.target.value) || 1 })}
+                      className={cn(
+                        "bg-background/50 backdrop-blur-sm border-border/50",
+                        errors.maxActiveExpeditions && "border-destructive"
+                      )}
+                    />
+                    {errors.maxActiveExpeditions && (
+                      <p className="text-sm text-destructive">{errors.maxActiveExpeditions}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Maximum number of active expeditions this starship can run simultaneously
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label>Preview</Label>
                     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                       <CardContent className="p-4">
@@ -210,7 +247,7 @@ export function StarshipCreateModal({ open, onOpenChange, onSuccess }: StarshipC
                               {formData.name || 'Unnamed Starship'}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              Scout Class • Ready for Configuration
+                              Scout Class • Max {formData.maxActiveExpeditions} Expeditions
                             </div>
                           </div>
                         </div>
@@ -333,10 +370,10 @@ export function StarshipCreateModal({ open, onOpenChange, onSuccess }: StarshipC
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
-                          <Zap className="w-4 h-4 text-yellow-500" />
-                          <span className="text-sm font-medium">Power Rating</span>
+                          <Navigation className="w-4 h-4 text-green-500" />
+                          <span className="text-sm font-medium">Max Expeditions</span>
                         </div>
-                        <div className="text-2xl font-bold">85%</div>
+                        <div className="text-2xl font-bold">{formData.maxActiveExpeditions}</div>
                       </div>
                     </div>
 

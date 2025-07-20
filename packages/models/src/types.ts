@@ -86,66 +86,23 @@ export interface Starship {
   ownerId: string; // Foreign key to User
   class: 'scout' | 'cruiser';
   name: string;
-  powerLevel: number;
-  activeExpeditions: number;
-  sibilInsights: number;
+  maxActiveExpeditions: number;
   maxAgents: number; // Based on class: Scout=3, Cruiser=6
-  status: 'active' | 'docked' | 'maintenance';
+  status: 'active' | 'inactive';
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Codex {
-  id: string;
-  starshipId: string; // Foreign key to Starship
-  version: string; // Semantic versioning (v1.0, v1.1, etc.)
-  timestamp: string;
-  author: string; // user_id or agent_id who made the change
-  changeSummary?: string;
-  isActive: boolean; // Only one active version per starship
-  createdAt: string;
 }
 
 export interface Vision {
   id: string;
-  codexId: string;
+  starshipId: string;    // Direct FK to Starship
   statement: string;
-  confidence: number; // 0-100
-  lastRefined: string;
+  confidence: number;
   refinementCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Constraint {
-  id: string;
-  codexId: string;
-  type: 'resource' | 'ethical' | 'technical' | 'business';
-  description: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  lastRefined: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface Concept {
-  id: string;
-  codexId: string;
-  name: string;
-  description: string;
-  category: 'person' | 'place' | 'object' | 'idea' | 'event';
-  importance: number; // 0-1 relevance score
-  metadata: Record<string, any>; // Flexible key-value storage
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface MetaAnchor {
-  id: string;
-  codexId: string;
-  type: 'telos_anchor' | 'ethos_anchor' | 'context_anchor';
-  description: string;
-  createdAt: string;
 }
 
 // Neo4j Relationship Types (keeping only essential ones)
@@ -173,26 +130,6 @@ export interface DeployedOnRelationship {
   };
 }
 
-export interface HasActiveCodexRelationship {
-  type: 'HAS_ACTIVE_CODEX';
-  properties?: {
-    activatedAt?: string;
-  };
-}
-
-export interface ContainsRelationship {
-  type: 'CONTAINS';
-  properties?: {
-    addedAt?: string;
-  };
-}
-
-export interface AnchoredByRelationship {
-  type: 'ANCHORED_BY';
-  properties?: {
-    anchorType?: string;
-  };
-}
 
 // NEW: Expedition Relationships
 export interface HasExpeditionRelationship {
@@ -251,6 +188,11 @@ export interface AgentRepository extends Repository<Agent> {
   findByChannel(channelId: string): Promise<Agent[]>;
   findByUser(userId: string): Promise<Agent[]>;
   findByStarship(starshipId: string): Promise<Agent[]>;
+
+  // NEW: starshipId FK-based query methods
+  findByStarshipId(starshipId: string): Promise<Agent[]>;
+  updateStarshipId(agentId: string, starshipId: string): Promise<void>;
+  findUndeployedAgents(): Promise<Agent[]>;
 
   // ADD: Enhanced query methods
   findByAuthor(authorId: string): Promise<Agent[]>;
@@ -357,38 +299,14 @@ export interface StarshipRepository {
   }>;
 }
 
-export interface CodexRepository extends Repository<Codex> {
-  findActiveByStarship(starshipId: string): Promise<Codex | null>;
-  getVersionHistory(starshipId: string): Promise<Codex[]>;
-  createVersion(starshipId: string, author: string, changeSummary: string): Promise<Codex>;
-  deactivateCurrentVersion(starshipId: string): Promise<void>;
-}
-
 export interface VisionRepository {
   findAll(): Promise<Vision[]>;
   findById(id: string): Promise<Vision | null>;
   create(entity: Omit<Vision, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vision>;
   update(id: string, updates: Partial<Vision>): Promise<Vision | null>;
   delete(id: string): Promise<boolean>;
-  findByCodex(codexId: string): Promise<Vision | null>;
-  updateStatement(codexId: string, statement: string): Promise<Vision | null>;
-}
-
-export interface ConstraintRepository extends Repository<Constraint> {
-  findByCodex(codexId: string): Promise<Constraint[]>;
-  findActive(codexId: string): Promise<Constraint[]>;
-  findByType(codexId: string, type: Constraint['type']): Promise<Constraint[]>;
-}
-
-export interface ConceptRepository extends Repository<Concept> {
-  findByCodex(codexId: string): Promise<Concept[]>;
-  findByCategory(codexId: string, category: Concept['category']): Promise<Concept[]>;
-  searchByName(codexId: string, nameQuery: string): Promise<Concept[]>;
-}
-
-export interface MetaAnchorRepository extends Repository<MetaAnchor> {
-  findByCodex(codexId: string): Promise<MetaAnchor[]>;
-  findByType(codexId: string, type: MetaAnchor['type']): Promise<MetaAnchor | null>;
+  findByStarship(starshipId: string): Promise<Vision | null>;
+  updateStatement(starshipId: string, statement: string): Promise<Vision | null>;
 }
 
 export interface AgentChannelRelationship {
@@ -443,7 +361,7 @@ export interface AgentTemplateRepository extends Repository<AgentTemplate> {
   updateRating(id: string, rating: number): Promise<void>;
 
   // Create agent from template
-  createAgentFromTemplate(templateId: string, agentName: string, authorId: string): Promise<Agent>;
+  createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<Agent>;
 
   // Create template from public agent
   createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null>;

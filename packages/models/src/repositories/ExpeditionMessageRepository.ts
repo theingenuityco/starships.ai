@@ -233,7 +233,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
        RETURN count(m) as count`,
       { expeditionId }
     );
-    return result[0]?.count || 0;
+    return Number(result[0]?.count || 0);
   }
 
   /**
@@ -313,31 +313,67 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
       { expeditionId }
     );
 
-    const stats = result[0] || {
-      total: 0, userMessages: 0, firstOfficerMessages: 0, agentMessages: 0, systemMessages: 0,
-      coordinationMessages: 0, taskWorkMessages: 0, userInputMessages: 0, statusUpdateMessages: 0,
-      resultMessages: 0, questionMessages: 0, notificationMessages: 0, threadedMessages: 0, replyMessages: 0
-    };
+    const rawStats = result[0];
+    
+    // Handle case where no results are returned
+    if (!rawStats) {
+      return {
+        total: 0,
+        byRole: {
+          user: 0,
+          'first-officer': 0,
+          agent: 0,
+          system: 0
+        },
+        byType: {
+          coordination: 0,
+          'task-work': 0,
+          'user-input': 0,
+          'status-update': 0,
+          result: 0,
+          question: 0,
+          notification: 0
+        },
+        threaded: 0,
+        replies: 0
+      };
+    }
+
+    // Convert BigInt values to numbers
+    const totalNum = Number(rawStats.total);
+    const userMessagesNum = Number(rawStats.userMessages);
+    const firstOfficerMessagesNum = Number(rawStats.firstOfficerMessages);
+    const agentMessagesNum = Number(rawStats.agentMessages);
+    const systemMessagesNum = Number(rawStats.systemMessages);
+    const coordinationMessagesNum = Number(rawStats.coordinationMessages);
+    const taskWorkMessagesNum = Number(rawStats.taskWorkMessages);
+    const userInputMessagesNum = Number(rawStats.userInputMessages);
+    const statusUpdateMessagesNum = Number(rawStats.statusUpdateMessages);
+    const resultMessagesNum = Number(rawStats.resultMessages);
+    const questionMessagesNum = Number(rawStats.questionMessages);
+    const notificationMessagesNum = Number(rawStats.notificationMessages);
+    const threadedMessagesNum = Number(rawStats.threadedMessages);
+    const replyMessagesNum = Number(rawStats.replyMessages);
 
     return {
-      total: stats.total,
+      total: totalNum,
       byRole: {
-        user: stats.userMessages,
-        'first-officer': stats.firstOfficerMessages,
-        agent: stats.agentMessages,
-        system: stats.systemMessages
+        user: userMessagesNum,
+        'first-officer': firstOfficerMessagesNum,
+        agent: agentMessagesNum,
+        system: systemMessagesNum
       },
       byType: {
-        coordination: stats.coordinationMessages,
-        'task-work': stats.taskWorkMessages,
-        'user-input': stats.userInputMessages,
-        'status-update': stats.statusUpdateMessages,
-        result: stats.resultMessages,
-        question: stats.questionMessages,
-        notification: stats.notificationMessages
+        coordination: coordinationMessagesNum,
+        'task-work': taskWorkMessagesNum,
+        'user-input': userInputMessagesNum,
+        'status-update': statusUpdateMessagesNum,
+        result: resultMessagesNum,
+        question: questionMessagesNum,
+        notification: notificationMessagesNum
       },
-      threaded: stats.threadedMessages,
-      replies: stats.replyMessages
+      threaded: threadedMessagesNum,
+      replies: replyMessagesNum
     };
   }
 

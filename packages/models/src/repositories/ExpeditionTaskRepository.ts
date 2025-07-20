@@ -318,17 +318,35 @@ export class ExpeditionTaskRepository implements ExpeditionTaskRepositoryInterfa
       { expeditionId }
     );
 
-    const stats = result[0] || { 
-      total: 0, pending: 0, assigned: 0, inProgress: 0, 
-      blocked: 0, review: 0, completed: 0, failed: 0 
-    };
+    const rawStats = result[0];
+    
+    // Handle case where no results are returned
+    if (!rawStats) {
+      return {
+        total: 0,
+        pending: 0,
+        inProgress: 0,
+        completed: 0,
+        failed: 0
+      };
+    }
+
+    // Convert BigInt values to numbers
+    const totalNum = Number(rawStats.total);
+    const pendingNum = Number(rawStats.pending);
+    const assignedNum = Number(rawStats.assigned);
+    const inProgressNum = Number(rawStats.inProgress);
+    const blockedNum = Number(rawStats.blocked);
+    const reviewNum = Number(rawStats.review);
+    const completedNum = Number(rawStats.completed);
+    const failedNum = Number(rawStats.failed);
 
     return {
-      total: stats.total,
-      pending: stats.pending + stats.assigned, // Combine pending and assigned
-      inProgress: stats.inProgress + stats.blocked + stats.review, // Combine active states
-      completed: stats.completed,
-      failed: stats.failed
+      total: totalNum,
+      pending: pendingNum + assignedNum, // Combine pending and assigned
+      inProgress: inProgressNum + blockedNum + reviewNum, // Combine active states
+      completed: completedNum,
+      failed: failedNum
     };
   }
 

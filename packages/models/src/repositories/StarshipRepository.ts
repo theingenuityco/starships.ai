@@ -483,33 +483,70 @@ export class StarshipRepository implements StarshipRepositoryInterface {
       { starshipId, cutoffDate: cutoffTimestamp }
     );
 
-    const expStats = expeditionStats[0] || { total: 0, completed: 0, failed: 0, cancelled: 0, avgDuration: 0 };
-    const tskStats = taskStats[0] || { total: 0, completed: 0, failed: 0, avgDuration: 0 };
+    const rawExpStats = expeditionStats[0];
+    const rawTskStats = taskStats[0];
 
-    const expeditionSuccessRate = expStats.total > 0 ? (expStats.completed / expStats.total) * 100 : 0;
-    const taskSuccessRate = tskStats.total > 0 ? (tskStats.completed / tskStats.total) * 100 : 0;
+    // Handle expedition stats
+    let expeditionSuccessRate = 0;
+    let expStatsConverted = { total: 0, completed: 0, failed: 0, cancelled: 0, avgDuration: 0 };
+    
+    if (rawExpStats) {
+      const expTotal = Number(rawExpStats.total);
+      const expCompleted = Number(rawExpStats.completed);
+      const expFailed = Number(rawExpStats.failed);
+      const expCancelled = Number(rawExpStats.cancelled);
+      const expAvgDuration = Number(rawExpStats.avgDuration || 0);
+      
+      expeditionSuccessRate = expTotal > 0 ? (expCompleted / expTotal) * 100 : 0;
+      expStatsConverted = {
+        total: expTotal,
+        completed: expCompleted,
+        failed: expFailed,
+        cancelled: expCancelled,
+        avgDuration: expAvgDuration
+      };
+    }
+
+    // Handle task stats
+    let taskSuccessRate = 0;
+    let tskStatsConverted = { total: 0, completed: 0, failed: 0, avgDuration: 0 };
+    
+    if (rawTskStats) {
+      const tskTotal = Number(rawTskStats.total);
+      const tskCompleted = Number(rawTskStats.completed);
+      const tskFailed = Number(rawTskStats.failed);
+      const tskAvgDuration = Number(rawTskStats.avgDuration || 0);
+      
+      taskSuccessRate = tskTotal > 0 ? (tskCompleted / tskTotal) * 100 : 0;
+      tskStatsConverted = {
+        total: tskTotal,
+        completed: tskCompleted,
+        failed: tskFailed,
+        avgDuration: tskAvgDuration
+      };
+    }
 
     return {
       expeditions: {
-        total: expStats.total,
-        completed: expStats.completed,
-        failed: expStats.failed,
-        cancelled: expStats.cancelled,
-        averageDuration: Math.round(expStats.avgDuration || 0),
+        total: expStatsConverted.total,
+        completed: expStatsConverted.completed,
+        failed: expStatsConverted.failed,
+        cancelled: expStatsConverted.cancelled,
+        averageDuration: Math.round(expStatsConverted.avgDuration),
         successRate: Math.round(expeditionSuccessRate * 100) / 100
       },
       tasks: {
-        total: tskStats.total,
-        completed: tskStats.completed,
-        failed: tskStats.failed,
-        averageDuration: Math.round(tskStats.avgDuration || 0),
+        total: tskStatsConverted.total,
+        completed: tskStatsConverted.completed,
+        failed: tskStatsConverted.failed,
+        averageDuration: Math.round(tskStatsConverted.avgDuration),
         successRate: Math.round(taskSuccessRate * 100) / 100
       },
       topPerformingAgents: agentStats.map(agent => ({
         agentId: agent.agentId,
         agentName: agent.agentName,
-        tasksCompleted: agent.tasksCompleted,
-        successRate: Math.round((agent.tasksCompleted / agent.totalTasks) * 10000) / 100
+        tasksCompleted: Number(agent.tasksCompleted),
+        successRate: Math.round((Number(agent.tasksCompleted) / Number(agent.totalTasks)) * 10000) / 100
       }))
     };
   }

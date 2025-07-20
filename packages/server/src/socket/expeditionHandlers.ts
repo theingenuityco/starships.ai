@@ -12,6 +12,48 @@ import { RepositoryFactory } from '@starships/models';
 import type { SocketIOEvents } from '@starships/protocol';
 
 /**
+ * Utility function to ensure error objects are never empty
+ */
+function safeEmitError(socket: any, errorData: any, expeditionId?: string, source?: string) {
+  console.log('[EXPEDITION-SOCKET] safeEmitError called with:', {
+    errorData,
+    errorDataType: typeof errorData,
+    expeditionId,
+    source
+  });
+  
+  // Ensure we never emit empty or invalid error objects
+  let errorMessage = 'An unknown error occurred';
+  
+  if (errorData) {
+    if (typeof errorData === 'string' && errorData.trim().length > 0) {
+      errorMessage = errorData.trim();
+    } else if (errorData instanceof Error) {
+      errorMessage = errorData.message || 'Error occurred';
+    } else if (typeof errorData === 'object' && errorData.message) {
+      errorMessage = errorData.message;
+    } else if (typeof errorData === 'object' && errorData.error) {
+      errorMessage = errorData.error;
+    }
+  }
+  
+  const errorObject = {
+    error: errorMessage,
+    expeditionId: expeditionId || 'unknown',
+    timestamp: new Date().toISOString(),
+    source: source || 'expedition-handler'
+  };
+  
+  console.log('[EXPEDITION-SOCKET] About to emit error object:', errorObject);
+  console.log('[EXPEDITION-SOCKET] Error object keys:', Object.keys(errorObject));
+  console.log('[EXPEDITION-SOCKET] Error object JSON:', JSON.stringify(errorObject));
+  
+  socket.emit('expedition:error', errorObject);
+  
+  console.log('[EXPEDITION-SOCKET] Error emission completed');
+}
+
+/**
  * Setup expedition-specific Socket.IO event handlers
  */
 export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
@@ -45,11 +87,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const expedition = await expeditionRepo.findById(expeditionId);
 
         if (!expedition) {
-          socket.emit('expedition:error', {
-            error: 'Expedition not found',
-            expeditionId,
-            timestamp: new Date().toISOString()
-          });
+          safeEmitError(socket, 'Expedition not found', expeditionId, 'expedition:join');
           return;
         }
 
@@ -58,11 +96,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const starship = await starshipRepo.findById(expedition.starshipId);
 
         if (!starship || starship.ownerId !== userId) {
-          socket.emit('expedition:error', {
-            error: 'Access denied to expedition',
-            expeditionId,
-            timestamp: new Date().toISOString()
-          });
+          safeEmitError(socket, 'Access denied to expedition', expeditionId, 'expedition:join');
           return;
         }
 
@@ -81,11 +115,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         console.log(`[EXPEDITION-SOCKET] User ${userId} joined expedition room: ${expeditionId}`);
       } catch (error) {
         console.error('[EXPEDITION-SOCKET] Failed to join expedition room:', error);
-        socket.emit('expedition:error', {
-          error: 'Failed to join expedition room',
-          expeditionId,
-          timestamp: new Date().toISOString()
-        });
+        safeEmitError(socket, error, expeditionId, 'expedition:join');
       }
     });
 
@@ -121,11 +151,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const expedition = await expeditionRepo.findById(expeditionId);
 
         if (!expedition) {
-          socket.emit('expedition:error', {
-            error: 'Expedition not found',
-            expeditionId,
-            timestamp: new Date().toISOString()
-          });
+          safeEmitError(socket, 'Expedition not found', expeditionId, 'expedition:start');
           return;
         }
 
@@ -134,11 +160,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const starship = await starshipRepo.findById(expedition.starshipId);
 
         if (!starship || starship.ownerId !== userId) {
-          socket.emit('expedition:error', {
-            error: 'Access denied to expedition',
-            expeditionId,
-            timestamp: new Date().toISOString()
-          });
+          safeEmitError(socket, 'Access denied to expedition', expeditionId, 'expedition:start');
           return;
         }
 
@@ -155,11 +177,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         console.log(`[EXPEDITION-SOCKET] Expedition started: ${expeditionId}`);
       } catch (error: any) {
         console.error('[EXPEDITION-SOCKET] Failed to start expedition:', error);
-        socket.emit('expedition:error', {
-          error: error.message || 'Failed to start expedition',
-          expeditionId,
-          timestamp: new Date().toISOString()
-        });
+        safeEmitError(socket, error, expeditionId, 'expedition:start');
       }
     });
 
@@ -175,11 +193,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const expedition = await expeditionRepo.findById(expeditionId);
 
         if (!expedition) {
-          socket.emit('expedition:error', {
-            error: 'Expedition not found',
-            expeditionId,
-            timestamp: new Date().toISOString()
-          });
+          safeEmitError(socket, 'Expedition not found', expeditionId, 'expedition:pause');
           return;
         }
 
@@ -196,11 +210,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         console.log(`[EXPEDITION-SOCKET] Expedition paused: ${expeditionId}`);
       } catch (error: any) {
         console.error('[EXPEDITION-SOCKET] Failed to pause expedition:', error);
-        socket.emit('expedition:error', {
-          error: error.message || 'Failed to pause expedition',
-          expeditionId,
-          timestamp: new Date().toISOString()
-        });
+        safeEmitError(socket, error, expeditionId, 'expedition:pause');
       }
     });
 
@@ -216,11 +226,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const expedition = await expeditionRepo.findById(expeditionId);
 
         if (!expedition) {
-          socket.emit('expedition:error', {
-            error: 'Expedition not found',
-            expeditionId,
-            timestamp: new Date().toISOString()
-          });
+          safeEmitError(socket, 'Expedition not found', expeditionId, 'expedition:cancel');
           return;
         }
 
@@ -237,11 +243,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         console.log(`[EXPEDITION-SOCKET] Expedition cancelled: ${expeditionId}`);
       } catch (error: any) {
         console.error('[EXPEDITION-SOCKET] Failed to cancel expedition:', error);
-        socket.emit('expedition:error', {
-          error: error.message || 'Failed to cancel expedition',
-          expeditionId,
-          timestamp: new Date().toISOString()
-        });
+        safeEmitError(socket, error, expeditionId, 'expedition:cancel');
       }
     });
 
@@ -281,11 +283,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         console.log(`[EXPEDITION-SOCKET] Message sent to expedition: ${expeditionId}`);
       } catch (error: any) {
         console.error('[EXPEDITION-SOCKET] Failed to send message:', error);
-        socket.emit('expedition:error', {
-          error: error.message || 'Failed to send message',
-          expeditionId: data.expeditionId,
-          timestamp: new Date().toISOString()
-        });
+        safeEmitError(socket, error, data.expeditionId, 'expedition:send-message');
       }
     });
 

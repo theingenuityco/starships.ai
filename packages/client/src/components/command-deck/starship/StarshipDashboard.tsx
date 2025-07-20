@@ -74,12 +74,11 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   const fleetStats = {
     total: starships.length,
     active: starships.filter(s => s.status === 'active').length,
-    docked: starships.filter(s => s.status === 'docked').length,
-    maintenance: starships.filter(s => s.status === 'maintenance').length,
+    inactive: starships.filter(s => s.status === 'inactive').length,
     scouts: starships.filter(s => s.class === 'scout').length,
     cruisers: starships.filter(s => s.class === 'cruiser').length,
     totalAgents: starships.reduce((sum, s) => sum + (s.maxAgents || 0), 0),
-    totalExpeditions: starships.reduce((sum, s) => sum + (s.activeExpeditions || 0), 0)
+    totalMaxExpeditions: starships.reduce((sum, s) => sum + (s.maxActiveExpeditions || 0), 0)
   };
 
   if (loadingStarships && starships.length === 0) {
@@ -158,7 +157,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary">{fleetStats.total}</div>
                 <div className="text-sm text-muted-foreground">Total Ships</div>
@@ -168,12 +167,8 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                 <div className="text-sm text-muted-foreground">Active</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-500">{fleetStats.docked}</div>
-                <div className="text-sm text-muted-foreground">Docked</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-500">{fleetStats.maintenance}</div>
-                <div className="text-sm text-muted-foreground">Maintenance</div>
+                <div className="text-2xl font-bold text-gray-500">{fleetStats.inactive}</div>
+                <div className="text-sm text-muted-foreground">Inactive</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-purple-500">{fleetStats.scouts}</div>
@@ -188,8 +183,8 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                 <div className="text-sm text-muted-foreground">Agent Slots</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-500">{fleetStats.totalExpeditions}</div>
-                <div className="text-sm text-muted-foreground">Expeditions</div>
+                <div className="text-2xl font-bold text-indigo-500">{fleetStats.totalMaxExpeditions}</div>
+                <div className="text-sm text-muted-foreground">Max Expeditions</div>
               </div>
             </div>
           </CardContent>

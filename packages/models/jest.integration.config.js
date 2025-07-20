@@ -10,5 +10,17 @@ module.exports = {
   globalTeardown: '<rootDir>/tests/helpers/neo4j-teardown.ts',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
+  },
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: '<rootDir>/tsconfig.test.json',
+      isolatedModules: true
+    }]
+  },
+  globals: {
+    'ts-jest': {
+      tsconfig: '<rootDir>/tsconfig.test.json',
+      isolatedModules: true
+    }
   }
 };

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { VisionFileService } from '@starships/models';
+import { VisionRepository } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import type { StarshipRepository } from '@starships/models';
 
@@ -8,11 +8,14 @@ const router: Router = Router();
 
 // Repository dependency injection (following starships.ts pattern)
 let starshipRepo: StarshipRepository;
+let visionRepo: VisionRepository;
 
 export function initializeVisionRoutes(deps: {
   starshipRepository: StarshipRepository;
+  visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
+  visionRepo = deps.visionRepository;
 }
 
 // GET /api/starships/:id/vision
@@ -27,11 +30,20 @@ router.get('/starships/:id/vision', authMiddleware, async (req, res) => {
       return;
     }
     
-    // Create empty file if doesn't exist
-    await VisionFileService.createEmptyVision(starshipId);
+    // Get vision from database, create empty if doesn't exist
+    let vision = await visionRepo.findByStarship(starshipId);
+    if (!vision) {
+      vision = await visionRepo.create({
+        starshipId,
+        statement: '',
+        confidence: 0.5,
+        refinementCount: 0,
+        lastRefined: new Date().toISOString(),
+        isActive: true
+      });
+    }
     
-    const vision = await VisionFileService.readVision(starshipId) || '';
-    res.json({ vision });
+    res.json({ vision: vision.statement });
   } catch (error) {
     res.status(500).json({ error: 'Failed to read vision' });
   }
@@ -50,7 +62,21 @@ router.post('/starships/:id/vision', authMiddleware, async (req, res) => {
       return;
     }
     
-    await VisionFileService.writeVision(starshipId, vision);
+    // Update existing vision or create new one
+    let existingVision = await visionRepo.findByStarship(starshipId);
+    if (existingVision) {
+      await visionRepo.updateStatement(starshipId, vision);
+    } else {
+      await visionRepo.create({
+        starshipId,
+        statement: vision,
+        confidence: 0.5,
+        refinementCount: 1,
+        lastRefined: new Date().toISOString(),
+        isActive: true
+      });
+    }
+    
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to save vision' });

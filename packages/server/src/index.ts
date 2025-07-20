@@ -14,11 +14,7 @@ import {
   ChannelRepository,
   LLMRepository,
   StarshipRepository,
-  CodexRepository,
   VisionRepository,
-  ConstraintRepository,
-  ConceptRepository,
-  MetaAnchorRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
@@ -58,11 +54,7 @@ const llmRepository = new LLMRepository();
 
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
-const codexRepository = new CodexRepository();
 const visionRepository = new VisionRepository();
-const constraintRepository = new ConstraintRepository();
-const conceptRepository = new ConceptRepository();
-const metaAnchorRepository = new MetaAnchorRepository();
 
 // Middleware
 app.use(cors());
@@ -103,11 +95,13 @@ app.get('/health/db', async (req, res) => {
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
+  visionRepository,
 });
 
 // Initialize vision routes with dependencies
 initializeVisionRoutes({
-  starshipRepository
+  starshipRepository,
+  visionRepository,
 });
 
 // API Routes

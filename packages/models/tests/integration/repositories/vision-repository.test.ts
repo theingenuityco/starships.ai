@@ -1,5 +1,4 @@
 import { VisionRepository } from '@/repositories/VisionRepository';
-import { CodexRepository } from '@/repositories/CodexRepository';
 import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { UserRepository } from '@/repositories/UserRepository';
 import { Vision } from '@/types';
@@ -7,7 +6,6 @@ import { getConnection } from '@/connection';
 
 describe('VisionRepository Integration Tests', () => {
   let visionRepository: VisionRepository;
-  let codexRepository: CodexRepository;
   let starshipRepository: StarshipRepository;
   let userRepository: UserRepository;
   let connection: any;
@@ -15,7 +13,6 @@ describe('VisionRepository Integration Tests', () => {
   beforeEach(async () => {
     connection = getConnection();
     visionRepository = new VisionRepository();
-    codexRepository = new CodexRepository();
     starshipRepository = new StarshipRepository();
     userRepository = new UserRepository();
     
@@ -42,17 +39,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const visionData = {
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Build amazing AI products that help humanity',
         confidence: 85,
         lastRefined: new Date().toISOString(),
@@ -63,7 +51,7 @@ describe('VisionRepository Integration Tests', () => {
 
       expect(result.id).toBeDefined();
       expect(result.id).toMatch(/^test-uuid-\d+$/);
-      expect(result.codexId).toBe(visionData.codexId);
+      expect(result.starshipId).toBe(visionData.starshipId);
       expect(result.statement).toBe(visionData.statement);
       expect(result.confidence).toBe(visionData.confidence);
       expect(result.refinementCount).toBe(visionData.refinementCount);
@@ -75,14 +63,14 @@ describe('VisionRepository Integration Tests', () => {
       expect(savedVision).not.toBeNull();
       expect(savedVision?.statement).toBe(visionData.statement);
 
-      // Verify relationship with codex was created
+      // Verify relationship with starship was created
       const relationship = await connection.executeQuery(
-        `MATCH (c:Codex {id: $codexId})-[r:CONTAINS]->(v:Vision {id: $visionId})
+        `MATCH (s:Starship {id: $starshipId})-[r:HAS_VISION]->(v:Vision {id: $visionId})
          RETURN r`,
-        { codexId: codex.id, visionId: result.id }
+        { starshipId: starship.id, visionId: result.id }
       );
       expect(relationship).toHaveLength(1);
-      expect(relationship[0].r.properties.addedAt).toBeDefined();
+      expect(relationship[0].r.properties.createdAt).toBeDefined();
     });
 
     it('should handle confidence values correctly', async () => {
@@ -102,18 +90,9 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       // Test various confidence values
       const visionData = {
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Test vision with specific confidence',
         confidence: 42,
         lastRefined: new Date().toISOString(),
@@ -127,17 +106,17 @@ describe('VisionRepository Integration Tests', () => {
     });
   });
 
-  describe('findByCodex()', () => {
-    it('should return vision for specific codex', async () => {
+  describe('findByStarship()', () => {
+    it('should return vision for specific starship', async () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
         displayName: 'Captain Test'
       });
 
-      const starship = await starshipRepository.create({
+      const starship1 = await starshipRepository.create({
         ownerId: user.id,
-        name: 'Test Ship',
+        name: 'Test Ship 1',
         class: 'scout',
         powerLevel: 85,
         activeExpeditions: 0,
@@ -145,55 +124,47 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex1 = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'First codex',
-        isActive: true
+      const starship2 = await starshipRepository.create({
+        ownerId: user.id,
+        name: 'Test Ship 2',
+        class: 'cruiser',
+        powerLevel: 95,
+        activeExpeditions: 1,
+        sibilInsights: 5,
+        status: 'active'
       });
 
-      const codex2 = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.1',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Second codex',
-        isActive: false
-      });
-
-      // Create visions for different codex
+      // Create visions for different starships
       const vision1 = await visionRepository.create({
-        codexId: codex1.id,
-        statement: 'Vision for codex 1',
+        starshipId: starship1.id,
+        statement: 'Vision for starship 1',
         confidence: 80,
         lastRefined: new Date().toISOString(),
         refinementCount: 1
       });
 
       const vision2 = await visionRepository.create({
-        codexId: codex2.id,
-        statement: 'Vision for codex 2',
+        starshipId: starship2.id,
+        statement: 'Vision for starship 2',
         confidence: 90,
         lastRefined: new Date().toISOString(),
         refinementCount: 2
       });
 
-      const foundVision1 = await visionRepository.findByCodex(codex1.id);
-      const foundVision2 = await visionRepository.findByCodex(codex2.id);
+      const foundVision1 = await visionRepository.findByStarship(starship1.id);
+      const foundVision2 = await visionRepository.findByStarship(starship2.id);
 
       expect(foundVision1).not.toBeNull();
       expect(foundVision1?.id).toBe(vision1.id);
-      expect(foundVision1?.statement).toBe('Vision for codex 1');
+      expect(foundVision1?.statement).toBe('Vision for starship 1');
 
       expect(foundVision2).not.toBeNull();
       expect(foundVision2?.id).toBe(vision2.id);
-      expect(foundVision2?.statement).toBe('Vision for codex 2');
+      expect(foundVision2?.statement).toBe('Vision for starship 2');
     });
 
-    it('should return null when no vision exists for codex', async () => {
-      const result = await visionRepository.findByCodex('nonexistent-codex');
+    it('should return null when no vision exists for starship', async () => {
+      const result = await visionRepository.findByStarship('nonexistent-starship');
       expect(result).toBeNull();
     });
   });
@@ -216,17 +187,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Original vision statement',
         confidence: 75,
         lastRefined: new Date(Date.now() - 1000).toISOString(),
@@ -234,7 +196,7 @@ describe('VisionRepository Integration Tests', () => {
       });
 
       const newStatement = 'Updated vision statement with more clarity';
-      const updatedVision = await visionRepository.updateStatement(codex.id, newStatement);
+      const updatedVision = await visionRepository.updateStatement(starship.id, newStatement);
 
       expect(updatedVision).not.toBeNull();
       expect(updatedVision?.statement).toBe(newStatement);
@@ -244,9 +206,9 @@ describe('VisionRepository Integration Tests', () => {
       expect(updatedVision?.confidence).toBe(vision.confidence); // Should remain unchanged
     });
 
-    it('should return null when updating vision for non-existent codex', async () => {
+    it('should return null when updating vision for non-existent starship', async () => {
       const result = await visionRepository.updateStatement(
-        'nonexistent-codex',
+        'nonexistent-starship',
         'Some statement'
       );
       expect(result).toBeNull();
@@ -269,17 +231,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Brand new vision',
         confidence: 60,
         lastRefined: new Date().toISOString(),
@@ -287,7 +240,7 @@ describe('VisionRepository Integration Tests', () => {
       });
 
       const updatedVision = await visionRepository.updateStatement(
-        codex.id,
+        starship.id,
         'First refinement of the vision'
       );
 
@@ -313,17 +266,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Original statement',
         confidence: 70,
         lastRefined: new Date().toISOString(),
@@ -347,7 +291,7 @@ describe('VisionRepository Integration Tests', () => {
       expect(updatedVision?.statement).toBe(updates.statement);
       expect(updatedVision?.confidence).toBe(updates.confidence);
       expect(updatedVision?.refinementCount).toBe(updates.refinementCount);
-      expect(updatedVision?.codexId).toBe(vision.codexId); // Should remain unchanged
+      expect(updatedVision?.starshipId).toBe(vision.starshipId); // Should remain unchanged
       expect(updatedVision?.updatedAt).not.toBe(originalUpdatedAt);
     });
 
@@ -378,17 +322,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const visionData = {
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Findable vision',
         confidence: 95,
         lastRefined: new Date().toISOString(),
@@ -417,9 +352,9 @@ describe('VisionRepository Integration Tests', () => {
         displayName: 'Captain Test'
       });
 
-      const starship = await starshipRepository.create({
+      const starship1 = await starshipRepository.create({
         ownerId: user.id,
-        name: 'Test Ship',
+        name: 'Ship One',
         class: 'scout',
         powerLevel: 85,
         activeExpeditions: 0,
@@ -427,26 +362,18 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex1 = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'First codex',
-        isActive: true
-      });
-
-      const codex2 = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.1',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Second codex',
-        isActive: false
+      const starship2 = await starshipRepository.create({
+        ownerId: user.id,
+        name: 'Ship Two',
+        class: 'cruiser',
+        powerLevel: 95,
+        activeExpeditions: 1,
+        sibilInsights: 5,
+        status: 'active'
       });
 
       const vision1 = await visionRepository.create({
-        codexId: codex1.id,
+        starshipId: starship1.id,
         statement: 'First vision',
         confidence: 80,
         lastRefined: new Date().toISOString(),
@@ -457,7 +384,7 @@ describe('VisionRepository Integration Tests', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const vision2 = await visionRepository.create({
-        codexId: codex2.id,
+        starshipId: starship2.id,
         statement: 'Second vision',
         confidence: 90,
         lastRefined: new Date().toISOString(),
@@ -496,17 +423,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Vision to be deleted',
         confidence: 50,
         lastRefined: new Date().toISOString(),
@@ -546,18 +464,9 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       // Test minimum confidence (0)
       const minVision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Very uncertain vision',
         confidence: 0,
         lastRefined: new Date().toISOString(),
@@ -568,7 +477,7 @@ describe('VisionRepository Integration Tests', () => {
 
       // Test maximum confidence (100)
       const maxVision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Absolutely certain vision',
         confidence: 100,
         lastRefined: new Date().toISOString(),
@@ -597,17 +506,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Unique vision',
         confidence: 75,
         lastRefined: new Date().toISOString(),
@@ -617,7 +517,7 @@ describe('VisionRepository Integration Tests', () => {
       // Try to create a vision with the same ID directly via connection
       await expect(
         connection.executeWrite(
-          'CREATE (v:Vision {id: $id, statement: "Duplicate", codexId: "other-codex"})',
+          'CREATE (v:Vision {id: $id, statement: "Duplicate", starshipId: "other-starship"})',
           { id: vision.id }
         )
       ).rejects.toThrow();
@@ -625,7 +525,7 @@ describe('VisionRepository Integration Tests', () => {
   });
 
   describe('complex scenarios', () => {
-    it('should maintain vision-codex relationship integrity', async () => {
+    it('should maintain vision-starship relationship integrity', async () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
@@ -642,36 +542,27 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Linked vision',
         confidence: 80,
         lastRefined: new Date().toISOString(),
         refinementCount: 0
       });
 
-      // Verify the vision can be found through codex relationship
-      const foundVision = await visionRepository.findByCodex(codex.id);
+      // Verify the vision can be found through starship relationship
+      const foundVision = await visionRepository.findByStarship(starship.id);
       expect(foundVision?.id).toBe(vision.id);
 
       // Verify relationship exists in graph
       const relationship = await connection.executeQuery(
-        `MATCH (c:Codex {id: $codexId})-[r:CONTAINS]->(v:Vision {id: $visionId})
-         RETURN r, c, v`,
-        { codexId: codex.id, visionId: vision.id }
+        `MATCH (s:Starship {id: $starshipId})-[r:HAS_VISION]->(v:Vision {id: $visionId})
+         RETURN r, s, v`,
+        { starshipId: starship.id, visionId: vision.id }
       );
 
       expect(relationship).toHaveLength(1);
-      expect(relationship[0].c.id).toBe(codex.id);
+      expect(relationship[0].s.id).toBe(starship.id);
       expect(relationship[0].v.id).toBe(vision.id);
     });
 
@@ -692,17 +583,8 @@ describe('VisionRepository Integration Tests', () => {
         status: 'active'
       });
 
-      const codex = await codexRepository.create({
-        starshipId: starship.id,
-        version: 'v1.0',
-        timestamp: new Date().toISOString(),
-        author: user.id,
-        changeSummary: 'Initial codex',
-        isActive: true
-      });
-
       const vision = await visionRepository.create({
-        codexId: codex.id,
+        starshipId: starship.id,
         statement: 'Initial rough vision',
         confidence: 40,
         lastRefined: new Date().toISOString(),
@@ -711,21 +593,21 @@ describe('VisionRepository Integration Tests', () => {
 
       // First refinement
       const refined1 = await visionRepository.updateStatement(
-        codex.id,
+        starship.id,
         'First refinement with more detail'
       );
       expect(refined1?.refinementCount).toBe(1);
 
       // Second refinement
       const refined2 = await visionRepository.updateStatement(
-        codex.id,
+        starship.id,
         'Second refinement with even more clarity'
       );
       expect(refined2?.refinementCount).toBe(2);
 
       // Third refinement
       const refined3 = await visionRepository.updateStatement(
-        codex.id,
+        starship.id,
         'Final polished vision statement'
       );
       expect(refined3?.refinementCount).toBe(3);

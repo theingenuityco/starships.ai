@@ -270,6 +270,7 @@ export class AgentService {
       customInstructions: agent.customInstructions,
       allowedStarshipClasses: agent.allowedStarshipClasses,
       requiredPermissions: agent.requiredPermissions,
+      starshipId: agent.starshipId,
     };
   }
 

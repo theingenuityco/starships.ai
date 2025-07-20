@@ -1,0 +1,676 @@
+/**
+ * Expedition Service - Business Logic Layer
+ * 
+ * Handles all business logic for expedition management including CRUD operations,
+ * validation, status transitions, and integration with First Officer Agent.
+ */
+
+import { 
+  Expedition, 
+  ExpeditionStatus, 
+  ExpeditionPriority,
+  CreateExpeditionRequest,
+  UpdateExpeditionRequest,
+  ExpeditionFilters,
+  ExpeditionSort,
+  PaginationOptions,
+  ExpeditionResponse,
+  ExpeditionListResponse,
+  ExpeditionStatsResponse,
+  ExpeditionError,
+  ExpeditionErrorCode
+} from '@starships/protocol';
+import { RepositoryFactory } from '@starships/models';
+import { FirstOfficerService } from './FirstOfficerService';
+import { SocketIOService } from './SocketIOService';
+
+export class ExpeditionService {
+  private static instance: ExpeditionService;
+  private firstOfficerService: FirstOfficerService;
+
+  private constructor() {
+    this.firstOfficerService = FirstOfficerService.getInstance();
+  }
+
+  /**
+   * Safely get SocketIOService instance with lazy initialization
+   * Returns null if SocketIOService is not yet initialized
+   */
+  private getSocketService(): SocketIOService | null {
+    try {
+      return SocketIOService.getInstance();
+    } catch (error) {
+      console.warn('[EXPEDITION-SERVICE] SocketIOService not yet initialized');
+      return null;
+    }
+  }
+
+  static getInstance(): ExpeditionService {
+    if (!ExpeditionService.instance) {
+      ExpeditionService.instance = new ExpeditionService();
+    }
+    return ExpeditionService.instance;
+  }
+
+  /**
+   * Create a new expedition
+   */
+  async createExpedition(
+    userId: string,
+    request: CreateExpeditionRequest
+  ): Promise<ExpeditionResponse> {
+    console.log(`[EXPEDITION-SERVICE] Creating expedition for starship: ${request.starshipId}`);
+
+    try {
+      // Validate starship ownership
+      await this.validateStarshipOwnership(request.starshipId, userId);
+
+      // Validate starship status
+      await this.validateStarshipStatus(request.starshipId);
+
+      // Create expedition
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.create({
+        starshipId: request.starshipId,
+        title: request.title,
+        description: request.description,
+        objective: request.objective,
+        status: 'draft',
+        priority: request.priority || 'medium',
+        assignedAgents: [],
+        createdBy: userId,
+        estimatedDuration: request.estimatedDuration,
+        tags: request.tags || [],
+        updatedAt: new Date().toISOString()
+      });
+
+      // Get assigned agents info
+      const assignedAgents = await this.getAssignedAgentsInfo(expedition.assignedAgents);
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:created', {
+          expedition,
+          assignedAgents
+        });
+      }
+
+      console.log(`[EXPEDITION-SERVICE] Expedition created: ${expedition.id}`);
+
+      return {
+        expedition,
+        assignedAgents,
+        tasks: [],
+        messages: [],
+        results: []
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to create expedition:', error);
+      throw this.handleError(error, 'CREATE_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Get expedition by ID
+   */
+  async getExpedition(
+    expeditionId: string,
+    userId: string
+  ): Promise<ExpeditionResponse> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access
+      await this.validateExpeditionAccess(expedition, userId);
+
+      // Get related data
+      const [tasks, messages, results, assignedAgents] = await Promise.all([
+        this.getExpeditionTasks(expeditionId),
+        this.getExpeditionMessages(expeditionId),
+        this.getExpeditionResults(expeditionId),
+        this.getAssignedAgentsInfo(expedition.assignedAgents)
+      ]);
+
+      return {
+        expedition,
+        tasks,
+        messages,
+        results,
+        assignedAgents
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to get expedition:', error);
+      throw this.handleError(error, 'GET_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Get expeditions for a starship
+   */
+  async getExpeditions(
+    starshipId: string,
+    userId: string,
+    filters?: ExpeditionFilters,
+    sort?: ExpeditionSort,
+    pagination?: PaginationOptions
+  ): Promise<ExpeditionListResponse> {
+    try {
+      // Validate starship ownership
+      await this.validateStarshipOwnership(starshipId, userId);
+
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const { expeditions, total } = await expeditionRepo.findWithFilters(
+        starshipId,
+        filters || {},
+        sort,
+        pagination
+      );
+
+      return {
+        expeditions,
+        total,
+        page: pagination?.page || 1,
+        limit: pagination?.limit || 20,
+        filters
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to get expeditions:', error);
+      throw this.handleError(error, 'GET_EXPEDITIONS_FAILED');
+    }
+  }
+
+  /**
+   * Update expedition
+   */
+  async updateExpedition(
+    expeditionId: string,
+    userId: string,
+    updates: UpdateExpeditionRequest
+  ): Promise<ExpeditionResponse> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access and modification rights
+      await this.validateExpeditionAccess(expedition, userId);
+      this.validateExpeditionModification(expedition);
+
+      // Update expedition
+      const updatedExpedition = await expeditionRepo.update(expeditionId, updates);
+      if (!updatedExpedition) {
+        throw this.createError('UPDATE_FAILED', 'Failed to update expedition');
+      }
+
+      // Get updated data
+      const [tasks, messages, results, assignedAgents] = await Promise.all([
+        this.getExpeditionTasks(expeditionId),
+        this.getExpeditionMessages(expeditionId),
+        this.getExpeditionResults(expeditionId),
+        this.getAssignedAgentsInfo(updatedExpedition.assignedAgents)
+      ]);
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:updated', {
+          expedition: updatedExpedition,
+          assignedAgents
+        });
+      }
+
+      return {
+        expedition: updatedExpedition,
+        tasks,
+        messages,
+        results,
+        assignedAgents
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to update expedition:', error);
+      throw this.handleError(error, 'UPDATE_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Delete expedition
+   */
+  async deleteExpedition(expeditionId: string, userId: string): Promise<void> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access and deletion rights
+      await this.validateExpeditionAccess(expedition, userId);
+      this.validateExpeditionDeletion(expedition);
+
+      // Delete expedition and related data
+      await this.deleteExpeditionData(expeditionId);
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:deleted', {
+          expeditionId
+        });
+      }
+
+      console.log(`[EXPEDITION-SERVICE] Expedition deleted: ${expeditionId}`);
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to delete expedition:', error);
+      throw this.handleError(error, 'DELETE_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Start expedition
+   */
+  async startExpedition(expeditionId: string, userId: string): Promise<ExpeditionResponse> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access and start conditions
+      await this.validateExpeditionAccess(expedition, userId);
+      this.validateExpeditionStart(expedition);
+
+      // Update status to planning
+      const updatedExpedition = await expeditionRepo.updateStatus(expeditionId, 'planning');
+      if (!updatedExpedition) {
+        throw this.createError('STATUS_UPDATE_FAILED', 'Failed to update expedition status');
+      }
+
+      // Start First Officer orchestration
+      await this.firstOfficerService.startExpedition(
+        expeditionId,
+        userId,
+        expedition.objective
+      );
+
+      // Get updated data
+      const [tasks, messages, results, assignedAgents] = await Promise.all([
+        this.getExpeditionTasks(expeditionId),
+        this.getExpeditionMessages(expeditionId),
+        this.getExpeditionResults(expeditionId),
+        this.getAssignedAgentsInfo(updatedExpedition.assignedAgents)
+      ]);
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:started', {
+          expedition: updatedExpedition,
+          assignedAgents
+        });
+      }
+
+      console.log(`[EXPEDITION-SERVICE] Expedition started: ${expeditionId}`);
+
+      return {
+        expedition: updatedExpedition,
+        tasks,
+        messages,
+        results,
+        assignedAgents
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to start expedition:', error);
+      throw this.handleError(error, 'START_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Pause expedition
+   */
+  async pauseExpedition(expeditionId: string, userId: string): Promise<ExpeditionResponse> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access and pause conditions
+      await this.validateExpeditionAccess(expedition, userId);
+      this.validateExpeditionPause(expedition);
+
+      // Pause First Officer orchestration
+      await this.firstOfficerService.pauseExpedition(expeditionId);
+
+      // Update status (First Officer will handle the actual status update)
+      const updatedExpedition = await expeditionRepo.findById(expeditionId);
+
+      // Get updated data
+      const [tasks, messages, results, assignedAgents] = await Promise.all([
+        this.getExpeditionTasks(expeditionId),
+        this.getExpeditionMessages(expeditionId),
+        this.getExpeditionResults(expeditionId),
+        this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents)
+      ]);
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:paused', {
+          expedition: updatedExpedition,
+          assignedAgents
+        });
+      }
+
+      return {
+        expedition: updatedExpedition!,
+        tasks,
+        messages,
+        results,
+        assignedAgents
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to pause expedition:', error);
+      throw this.handleError(error, 'PAUSE_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Resume expedition
+   */
+  async resumeExpedition(expeditionId: string, userId: string): Promise<ExpeditionResponse> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access and resume conditions
+      await this.validateExpeditionAccess(expedition, userId);
+      this.validateExpeditionResume(expedition);
+
+      // Resume First Officer orchestration
+      await this.firstOfficerService.resumeExpedition(expeditionId);
+
+      // Get updated expedition
+      const updatedExpedition = await expeditionRepo.findById(expeditionId);
+
+      // Get updated data
+      const [tasks, messages, results, assignedAgents] = await Promise.all([
+        this.getExpeditionTasks(expeditionId),
+        this.getExpeditionMessages(expeditionId),
+        this.getExpeditionResults(expeditionId),
+        this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents)
+      ]);
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:resumed', {
+          expedition: updatedExpedition,
+          assignedAgents
+        });
+      }
+
+      return {
+        expedition: updatedExpedition!,
+        tasks,
+        messages,
+        results,
+        assignedAgents
+      };
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to resume expedition:', error);
+      throw this.handleError(error, 'RESUME_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Cancel expedition
+   */
+  async cancelExpedition(expeditionId: string, userId: string): Promise<void> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+
+      if (!expedition) {
+        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+      }
+
+      // Validate access and cancel conditions
+      await this.validateExpeditionAccess(expedition, userId);
+      this.validateExpeditionCancel(expedition);
+
+      // Cancel First Officer orchestration
+      await this.firstOfficerService.cancelExpedition(expeditionId);
+
+      // Update status to cancelled
+      await expeditionRepo.updateStatus(expeditionId, 'cancelled');
+
+      // Emit real-time event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:cancelled', {
+          expeditionId
+        });
+      }
+
+      console.log(`[EXPEDITION-SERVICE] Expedition cancelled: ${expeditionId}`);
+    } catch (error) {
+      console.error('[EXPEDITION-SERVICE] Failed to cancel expedition:', error);
+      throw this.handleError(error, 'CANCEL_EXPEDITION_FAILED');
+    }
+  }
+
+  /**
+   * Get expedition statistics
+   */
+  async getExpeditionStats(starshipId: string, userId: string): Promise<ExpeditionStatsResponse> {
+    try {
+      // Validate starship ownership
+      await this.validateStarshipOwnership(starshipId, userId);
+
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const stats = await expeditionRepo.getExpeditionStats(starshipId);
+
+      // Get top performing agents (placeholder implementation)
+      const topPerformingAgents = await this.getTopPerformingAgents(starshipId);
+
+      return {
+        totalExpeditions: stats.total,
+        activeExpeditions: stats.active,
+        completedExpeditions: stats.completed,
+        failedExpeditions: stats.failed,
+        averageDuration: stats.averageDuration,
+        successRate: stats.successRate,
+        topPerformingAgents
+      };
+    } catch (error: any) {
+      console.error('[EXPEDITION-SERVICE] Failed to get expedition stats:', error);
+      
+      // If starship not found, return empty stats instead of throwing
+      if (error.code === 'STARSHIP_NOT_FOUND') {
+        console.warn(`[EXPEDITION-SERVICE] Returning empty stats for non-existent starship: ${starshipId}`);
+        return {
+          totalExpeditions: 0,
+          activeExpeditions: 0,
+          completedExpeditions: 0,
+          failedExpeditions: 0,
+          averageDuration: 0,
+          successRate: 0,
+          topPerformingAgents: []
+        };
+      }
+      
+      throw this.handleError(error, 'GET_STATS_FAILED');
+    }
+  }
+
+  // Private helper methods
+
+  private async validateStarshipOwnership(starshipId: string, userId: string): Promise<void> {
+    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    
+    try {
+      const starship = await starshipRepo.findById(starshipId);
+
+      if (!starship) {
+        console.warn(`[EXPEDITION-SERVICE] Starship not found: ${starshipId} for user: ${userId}`);
+        throw this.createError('STARSHIP_NOT_FOUND', `Starship not found: ${starshipId}`);
+      }
+
+      if (starship.ownerId !== userId) {
+        console.warn(`[EXPEDITION-SERVICE] Access denied to starship: ${starshipId} for user: ${userId}`);
+        throw this.createError('EXPEDITION_ACCESS_DENIED', 'Access denied to starship');
+      }
+    } catch (error: any) {
+      if (error.code) {
+        throw error; // Re-throw our custom errors
+      }
+      
+      console.error(`[EXPEDITION-SERVICE] Database error validating starship ownership:`, error);
+      throw this.createError('STARSHIP_VALIDATION_FAILED', 'Failed to validate starship ownership');
+    }
+  }
+
+  private async validateStarshipStatus(starshipId: string): Promise<void> {
+    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starship = await starshipRepo.findById(starshipId);
+
+    if (starship?.status === 'maintenance') {
+      throw this.createError('STARSHIP_MAINTENANCE', 'Starship is in maintenance mode');
+    }
+  }
+
+  private async validateExpeditionAccess(expedition: Expedition, userId: string): Promise<void> {
+    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starship = await starshipRepo.findById(expedition.starshipId);
+
+    if (!starship || starship.ownerId !== userId) {
+      throw this.createError('EXPEDITION_ACCESS_DENIED', 'Access denied to expedition');
+    }
+  }
+
+  private validateExpeditionModification(expedition: Expedition): void {
+    if (['in-progress', 'completed', 'failed'].includes(expedition.status)) {
+      throw this.createError('EXPEDITION_CANNOT_MODIFY', 'Cannot modify expedition in current status');
+    }
+  }
+
+  private validateExpeditionDeletion(expedition: Expedition): void {
+    if (['in-progress', 'planning'].includes(expedition.status)) {
+      throw this.createError('EXPEDITION_CANNOT_DELETE', 'Cannot delete active expedition');
+    }
+  }
+
+  private validateExpeditionStart(expedition: Expedition): void {
+    if (expedition.status !== 'draft') {
+      throw this.createError('INVALID_STATUS_TRANSITION', 'Expedition must be in draft status to start');
+    }
+  }
+
+  private validateExpeditionPause(expedition: Expedition): void {
+    if (!['planning', 'in-progress'].includes(expedition.status)) {
+      throw this.createError('INVALID_STATUS_TRANSITION', 'Can only pause active expeditions');
+    }
+  }
+
+  private validateExpeditionResume(expedition: Expedition): void {
+    // Resume logic would check for paused state when implemented
+    if (!['planning', 'in-progress'].includes(expedition.status)) {
+      throw this.createError('INVALID_STATUS_TRANSITION', 'Invalid expedition status for resume');
+    }
+  }
+
+  private validateExpeditionCancel(expedition: Expedition): void {
+    if (['completed', 'failed', 'cancelled'].includes(expedition.status)) {
+      throw this.createError('INVALID_STATUS_TRANSITION', 'Cannot cancel expedition in current status');
+    }
+  }
+
+  private async getExpeditionTasks(expeditionId: string) {
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    return await taskRepo.findByExpedition(expeditionId);
+  }
+
+  private async getExpeditionMessages(expeditionId: string) {
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+    return await messageRepo.findByExpedition(expeditionId);
+  }
+
+  private async getExpeditionResults(expeditionId: string) {
+    const resultRepo = RepositoryFactory.getExpeditionResultRepository();
+    return await resultRepo.findByExpedition(expeditionId);
+  }
+
+  private async getAssignedAgentsInfo(agentIds: string[]) {
+    if (agentIds.length === 0) return [];
+
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const agents = await Promise.all(
+      agentIds.map(id => agentRepo.findById(id))
+    );
+
+    return agents
+      .filter(agent => agent !== null)
+      .map(agent => ({
+        id: agent!.id,
+        name: agent!.name,
+        category: agent!.category,
+        tags: agent!.tags
+      }));
+  }
+
+  private async deleteExpeditionData(expeditionId: string): Promise<void> {
+    // Delete in order: results, messages, tasks, expedition
+    const resultRepo = RepositoryFactory.getExpeditionResultRepository();
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+
+    await resultRepo.deleteByExpedition(expeditionId);
+    await messageRepo.deleteByExpedition(expeditionId);
+    await taskRepo.deleteByExpedition(expeditionId);
+    await expeditionRepo.delete(expeditionId);
+  }
+
+  private async getTopPerformingAgents(starshipId: string) {
+    // Placeholder implementation - would analyze agent performance
+    return [];
+  }
+
+  private createError(code: ExpeditionErrorCode, message: string): ExpeditionError {
+    return {
+      code,
+      message,
+      details: undefined
+    };
+  }
+
+  private handleError(error: any, fallbackCode: string): ExpeditionError {
+    if (error.code) {
+      return error;
+    }
+
+    return {
+      code: fallbackCode as ExpeditionErrorCode,
+      message: error.message || 'Unknown error occurred',
+      details: error
+    };
+  }
+}

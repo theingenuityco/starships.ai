@@ -491,13 +491,14 @@ export class ExpeditionService {
       // Get top performing agents (placeholder implementation)
       const topPerformingAgents = await this.getTopPerformingAgents(starshipId);
 
+      // Ensure all values are properly converted to numbers (defensive programming)
       return {
-        totalExpeditions: stats.total,
-        activeExpeditions: stats.active,
-        completedExpeditions: stats.completed,
-        failedExpeditions: stats.failed,
-        averageDuration: stats.averageDuration,
-        successRate: stats.successRate,
+        totalExpeditions: Number(stats.total),
+        activeExpeditions: Number(stats.active),
+        completedExpeditions: Number(stats.completed),
+        failedExpeditions: Number(stats.failed),
+        averageDuration: Number(stats.averageDuration),
+        successRate: Number(stats.successRate),
         topPerformingAgents
       };
     } catch (error: any) {

@@ -29,6 +29,7 @@ import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
+import expeditionRoutes from './routes/expeditions';
 import { AgentService } from './services/AgentService';
 
 const app: express.Application = express();
@@ -112,6 +113,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
+app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 
 // Create HTTP server and initialize Socket.IO

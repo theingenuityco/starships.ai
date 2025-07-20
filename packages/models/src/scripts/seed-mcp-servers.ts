@@ -12,9 +12,22 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   {
     name: 'GitHub',
     command: 'docker',
-    args: ['run', '-i', '--rm', 'mcp/github'],
+    args: [
+      'run',
+      '-i',
+      '--rm',
+      '-e',
+      'GITHUB_PERSONAL_ACCESS_TOKEN',
+      '-e',
+      'GITHUB_TOOLSETS',
+      '-e',
+      'GITHUB_READ_ONLY',
+      'ghcr.io/github/github-mcp-server',
+    ],
     env: JSON.stringify({
-      GITHUB_PERSONAL_ACCESS_TOKEN: 'Your GitHub Personal Access Token',
+      GITHUB_PERSONAL_ACCESS_TOKEN: 'Github_API_key',
+      GITHUB_TOOLSETS: '',
+      GITHUB_READ_ONLY: '',
     }),
   },
   {
@@ -26,21 +39,25 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   {
     name: 'Filesystem',
     command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/allowed/directory'],
-    env: JSON.stringify({}),
+    args: ['-y', '@modelcontextprotocol/server-filesystem', 'FILESYSTEM_PATH'],
+    env: JSON.stringify({
+      FILESYSTEM_PATH: 'FILESYSTEM_PATH',
+    }),
   },
   {
-    name: 'SQLite',
+    name: 'Notion',
     command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-sqlite', '/path/to/database.db'],
-    env: JSON.stringify({}),
+    args: ['-y', '@notionhq/notion-mcp-server'],
+    env: JSON.stringify({
+      OPENAPI_MCP_HEADERS: '{"Authorization": "Notion_API_Key", "Notion-Version": "2022-06-28"}',
+    }),
   },
   {
     name: 'PostgreSQL',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-postgres'],
     env: JSON.stringify({
-      POSTGRES_CONNECTION_STRING: 'postgresql://user:password@localhost:5432/database',
+      POSTGRES_CONNECTION_STRING: 'POSTGRES_CONNECTION_STRING',
     }),
   },
   {
@@ -48,7 +65,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-brave-search'],
     env: JSON.stringify({
-      BRAVE_API_KEY: 'Your Brave Search API Key',
+      BRAVE_API_KEY: 'Brave_API_Key',
     }),
   },
   {
@@ -56,8 +73,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-gdrive'],
     env: JSON.stringify({
-      GOOGLE_CLIENT_ID: 'Your Google Client ID',
-      GOOGLE_CLIENT_SECRET: 'Your Google Client Secret',
+      GDRIVE_CREDENTIALS_PATH: 'Path_To_JSON',
     }),
   },
   {
@@ -65,7 +81,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-slack'],
     env: JSON.stringify({
-      SLACK_BOT_TOKEN: 'Your Slack Bot Token',
+      SLACK_BOT_TOKEN: 'Slack_API_key',
     }),
   },
   {
@@ -75,22 +91,18 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     env: JSON.stringify({}),
   },
   {
-    name: 'Everything',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-everything'],
-    env: JSON.stringify({}),
-  },
-  {
-    name: 'Fetch',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-fetch'],
-    env: JSON.stringify({}),
-  },
-  {
     name: 'Time',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-time'],
+    command: 'uvx',
+    args: ['mcp-server-time', '--local-timezone=America/New_York'],
     env: JSON.stringify({}),
+  },
+  {
+    name: 'Stripe',
+    command: 'npx',
+    args: ['-y', '@stripe/mcp', '--tools=all', '--api-key=Stripe_API_Key'],
+    env: JSON.stringify({
+      STRIPE_API_KEY: 'Stripe_API_Key',
+    }),
   },
 ];
 

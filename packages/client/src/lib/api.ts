@@ -1,7 +1,13 @@
 import axios, { AxiosResponse } from 'axios'
 
 import { getApiBaseUrl } from './env'
-import { apiCache, CACHE_KEYS, invalidateAgentCaches, invalidateMCPServerCaches } from './cache'
+import {
+  apiCache,
+  CACHE_KEYS,
+  invalidateAgentCaches,
+  invalidateMCPServerCaches,
+  invalidateConnectorInstanceCaches,
+} from './cache'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -118,6 +124,88 @@ export interface MCPServerOption {
   command: string // Execution command (e.g., "docker", "npx", "uvx")
   args: string[] // Command arguments array
   env?: string // Environment variables as JSON string (optional)
+}
+
+// Configuration history interface
+export interface ConnectorConfigHistory {
+  id: string
+  connectorId: string
+  config: ConnectorInstanceConfig
+  changedBy: string
+  changeSummary?: string
+  changeReason?: string
+  createdAt: string
+}
+
+// Configuration template interface
+export interface ConnectorConfigTemplate {
+  id: string
+  name: string
+  description?: string
+  category: 'development' | 'production' | 'testing' | 'monitoring' | 'custom'
+  tags: string[]
+  config: ConnectorInstanceConfig
+  isPublic: boolean
+  authorId: string
+  usageCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+// Configuration interface for connector instances
+export interface ConnectorInstanceConfig {
+  customName?: string
+  customDescription?: string
+  environmentVariables?: string
+  timeouts?: {
+    connection?: number
+    request?: number
+    idle?: number
+  }
+  retry?: {
+    maxAttempts?: number
+    baseDelay?: number
+    maxDelay?: number
+    exponentialBackoff?: boolean
+  }
+  logging?: {
+    level?: 'error' | 'warn' | 'info' | 'debug'
+    enableDebug?: boolean
+    logRequests?: boolean
+    logMetrics?: boolean
+  }
+  resources?: {
+    maxMemoryMB?: number
+    maxCpuPercent?: number
+    maxConnections?: number
+  }
+  healthCheck?: {
+    enabled?: boolean
+    interval?: number
+    timeout?: number
+    failureThreshold?: number
+  }
+  customConfig?: Record<string, any>
+}
+
+// NEW: MCP Server Connector Instance interface (matching backend model)
+export interface MCPServerConnector {
+  id: string
+  starshipId: string
+  templateId: string
+  status: 'active' | 'inactive' | 'error' | 'connecting'
+  isActive: boolean
+  connectedAt: string
+  lastUsed?: string
+  errorMessage?: string
+  // NEW: Configuration support
+  config?: ConnectorInstanceConfig
+  configTemplateId?: string
+  configVersion?: number
+  createdAt: string
+  updatedAt: string
+  // Include template information for UI display
+  template?: MCPServerOption
 }
 
 export interface Message {
@@ -665,6 +753,16 @@ interface StarshipConnectorsResponse {
   connectedConnectors: MCPServerOption[]
 }
 
+// NEW: Connector Instance API response types
+interface ConnectorInstancesResponse {
+  starshipId: string
+  connectorInstances: MCPServerConnector[]
+}
+
+interface CreateConnectorInstanceResponse {
+  connectorInstance: MCPServerConnector
+}
+
 // NEW: MCP Server API
 export const mcpServerAPI = {
   // Get all available MCP server options with 5-minute caching
@@ -784,6 +882,433 @@ export const mcpServerAPI = {
       }
 
       console.error('[API] Failed to disconnect MCP server from starship:', error)
+      throw error
+    }
+  },
+
+  // NEW: Connector Instance Methods
+  // Get connector instances for a starship with 1-minute caching
+  getConnectorInstances: async (starshipId: string): Promise<MCPServerConnector[]> => {
+    const cacheKey = CACHE_KEYS.CONNECTOR_INSTANCES_BY_STARSHIP(starshipId)
+    const cached = apiCache.get<MCPServerConnector[]>(cacheKey)
+    if (cached) {
+      console.log('[API] Using cached connector instances for starship:', starshipId, cached.length)
+      return cached
+    }
+
+    console.log('[API] Fetching connector instances for starship:', starshipId)
+    const data = await api
+      .get(`/api/starships/${starshipId}/connectors`)
+      .then((res: AxiosResponse<{ starshipId: string; connectedConnectors: any[] }>) => {
+        console.log(
+          '[API] Received connector instances for starship:',
+          starshipId,
+          res.data.connectedConnectors.length
+        )
+        // Transform the response to match MCPServerConnector interface
+        return res.data.connectedConnectors.map(connector => ({
+          id: connector.id,
+          starshipId: starshipId,
+          templateId: connector.templateId,
+          status: connector.status,
+          isActive: connector.isActive,
+          connectedAt: connector.connectedAt,
+          lastUsed: connector.lastUsed,
+          errorMessage: connector.errorMessage,
+          createdAt: connector.createdAt,
+          updatedAt: connector.updatedAt,
+          template: {
+            id: connector.templateId,
+            name: connector.name,
+            command: connector.command,
+            args: connector.args,
+            env: connector.env,
+          },
+        }))
+      })
+
+    // Cache for 1 minute (changes more frequently)
+    apiCache.set(cacheKey, data, 1 * 60 * 1000)
+    return data
+  },
+
+  // Create connector instance from template with cache invalidation
+  createConnectorInstance: async (
+    starshipId: string,
+    templateId: string
+  ): Promise<MCPServerConnector> => {
+    console.log('[API] Creating connector instance for starship:', { starshipId, templateId })
+
+    try {
+      const data = await api
+        .post(`/api/starships/${starshipId}/connectors/${templateId}`)
+        .then((res: AxiosResponse<any>) => {
+          console.log('[API] Successfully created connector instance:', res.data.connectorId)
+          // Transform response to match MCPServerConnector interface
+          return {
+            id: res.data.connectorId,
+            starshipId: res.data.starshipId,
+            templateId: res.data.templateId,
+            status: res.data.status,
+            isActive: true,
+            connectedAt: res.data.connectedAt,
+            createdAt: res.data.createdAt,
+            updatedAt: res.data.createdAt,
+          }
+        })
+
+      // Invalidate relevant caches
+      invalidateConnectorInstanceCaches(starshipId)
+
+      // Also invalidate starship cache since connector state changed
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+
+      return data
+    } catch (error: any) {
+      console.log('[API] Caught error in createConnectorInstance:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      })
+
+      // Handle 200 success for already connected - backend returns 200 for idempotent operation
+      if (error.response?.status === 200 || error.response?.data?.alreadyConnected) {
+        console.log('[API] Connector instance already exists - treating as success')
+
+        // Still invalidate caches to ensure UI is up to date
+        invalidateConnectorInstanceCaches(starshipId)
+        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+
+        // Return the existing instance info
+        return {
+          id: error.response.data.connectorId,
+          starshipId: error.response.data.starshipId,
+          templateId: error.response.data.templateId,
+          status: error.response.data.status,
+          isActive: true,
+          connectedAt: error.response.data.connectedAt,
+          createdAt: error.response.data.connectedAt,
+          updatedAt: error.response.data.connectedAt,
+        }
+      }
+
+      console.error('[API] Failed to create connector instance:', error)
+      throw error
+    }
+  },
+
+  // Remove connector instance with cache invalidation
+  removeConnectorInstance: async (starshipId: string, connectorId: string): Promise<void> => {
+    console.log('[API] Removing connector instance from starship:', { starshipId, connectorId })
+
+    try {
+      await api.delete(`/api/starships/${starshipId}/connectors/${connectorId}`)
+      console.log('[API] Successfully removed connector instance from starship')
+
+      // Invalidate relevant caches
+      invalidateConnectorInstanceCaches(starshipId)
+
+      // Also invalidate starship cache since connector state changed
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    } catch (error: any) {
+      // Handle 404 Not Found as success - connector instance is already removed
+      if (error.response?.status === 404) {
+        console.log(
+          '[API] Connector instance already removed from starship (404) - treating as success'
+        )
+
+        // Still invalidate caches to ensure UI is up to date
+        invalidateConnectorInstanceCaches(starshipId)
+        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+        return
+      }
+
+      console.error('[API] Failed to remove connector instance from starship:', error)
+      throw error
+    }
+  },
+
+  // NEW: Configuration Management Methods
+  // Update connector instance configuration
+  updateConnectorConfig: async (
+    starshipId: string,
+    connectorId: string,
+    config: ConnectorInstanceConfig
+  ): Promise<MCPServerConnector> => {
+    console.log('[API] Updating connector configuration:', { starshipId, connectorId })
+
+    try {
+      const data = await api
+        .put(`/api/starships/${starshipId}/connectors/${connectorId}/config`, { config })
+        .then((res: AxiosResponse<{ connectorInstance: MCPServerConnector }>) => {
+          console.log('[API] Successfully updated connector configuration')
+          return res.data.connectorInstance
+        })
+
+      // Invalidate relevant caches
+      invalidateConnectorInstanceCaches(starshipId)
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to update connector configuration:', error)
+      throw error
+    }
+  },
+
+  // Apply configuration template to connector instance
+  applyConfigTemplate: async (
+    starshipId: string,
+    connectorId: string,
+    templateId: string
+  ): Promise<MCPServerConnector> => {
+    console.log('[API] Applying configuration template:', { starshipId, connectorId, templateId })
+
+    try {
+      const data = await api
+        .post(`/api/starships/${starshipId}/connectors/${connectorId}/config/template`, {
+          templateId,
+        })
+        .then((res: AxiosResponse<{ connectorInstance: MCPServerConnector }>) => {
+          console.log('[API] Successfully applied configuration template')
+          return res.data.connectorInstance
+        })
+
+      // Invalidate relevant caches
+      invalidateConnectorInstanceCaches(starshipId)
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to apply configuration template:', error)
+      throw error
+    }
+  },
+
+  // Get connector instance configuration
+  getConnectorConfig: async (
+    starshipId: string,
+    connectorId: string
+  ): Promise<{
+    config: ConnectorInstanceConfig
+    templateId?: string
+    version: number
+    lastModified: string
+  }> => {
+    console.log('[API] Getting connector configuration:', { starshipId, connectorId })
+
+    try {
+      const data = await api
+        .get(`/api/starships/${starshipId}/connectors/${connectorId}/config`)
+        .then(
+          (
+            res: AxiosResponse<{
+              config: ConnectorInstanceConfig
+              templateId?: string
+              version: number
+              lastModified: string
+            }>
+          ) => {
+            console.log('[API] Successfully retrieved connector configuration')
+            return res.data
+          }
+        )
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to get connector configuration:', error)
+      throw error
+    }
+  },
+
+  // NEW: Configuration History Methods
+  // Get configuration history for a connector instance
+  getConnectorConfigHistory: async (
+    starshipId: string,
+    connectorId: string,
+    limit?: number
+  ): Promise<ConnectorConfigHistory[]> => {
+    console.log('[API] Getting connector configuration history:', {
+      starshipId,
+      connectorId,
+      limit,
+    })
+
+    try {
+      const params = new URLSearchParams()
+      if (limit) params.append('limit', limit.toString())
+
+      const data = await api
+        .get(
+          `/api/starships/${starshipId}/connectors/${connectorId}/config/history${params.toString() ? `?${params.toString()}` : ''}`
+        )
+        .then((res: AxiosResponse<{ history: ConnectorConfigHistory[] }>) => {
+          console.log('[API] Successfully retrieved connector configuration history')
+          return res.data.history
+        })
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to get connector configuration history:', error)
+      throw error
+    }
+  },
+
+  // Rollback connector configuration to a previous state
+  rollbackConnectorConfig: async (
+    starshipId: string,
+    connectorId: string,
+    historyId: string,
+    changeReason?: string
+  ): Promise<void> => {
+    console.log('[API] Rolling back connector configuration:', {
+      starshipId,
+      connectorId,
+      historyId,
+    })
+
+    try {
+      await api.post(`/api/starships/${starshipId}/connectors/${connectorId}/config/rollback`, {
+        historyId,
+        changeReason,
+      })
+      console.log('[API] Successfully rolled back connector configuration')
+
+      // Invalidate relevant caches
+      invalidateConnectorInstanceCaches(starshipId)
+      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
+    } catch (error) {
+      console.error('[API] Failed to rollback connector configuration:', error)
+      throw error
+    }
+  },
+}
+
+// NEW: Configuration Template API
+export const configTemplateAPI = {
+  // Get all configuration templates
+  getAll: async (options?: {
+    category?: string
+    public?: boolean
+  }): Promise<ConnectorConfigTemplate[]> => {
+    console.log('[API] Getting configuration templates:', options)
+
+    try {
+      const params = new URLSearchParams()
+      if (options?.category) params.append('category', options.category)
+      if (options?.public) params.append('public', 'true')
+
+      const data = await api
+        .get(`/api/config-templates${params.toString() ? `?${params.toString()}` : ''}`)
+        .then((res: AxiosResponse<{ templates: ConnectorConfigTemplate[] }>) => {
+          console.log('[API] Successfully retrieved configuration templates')
+          return res.data.templates
+        })
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to get configuration templates:', error)
+      throw error
+    }
+  },
+
+  // Create configuration template
+  create: async (
+    template: Omit<
+      ConnectorConfigTemplate,
+      'id' | 'usageCount' | 'createdAt' | 'updatedAt' | 'authorId'
+    >
+  ): Promise<ConnectorConfigTemplate> => {
+    console.log('[API] Creating configuration template:', template.name)
+
+    try {
+      const data = await api
+        .post('/api/config-templates', template)
+        .then((res: AxiosResponse<{ template: ConnectorConfigTemplate }>) => {
+          console.log('[API] Successfully created configuration template')
+          return res.data.template
+        })
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to create configuration template:', error)
+      throw error
+    }
+  },
+
+  // Get configuration template by ID
+  getById: async (id: string): Promise<ConnectorConfigTemplate> => {
+    console.log('[API] Getting configuration template:', id)
+
+    try {
+      const data = await api
+        .get(`/api/config-templates/${id}`)
+        .then((res: AxiosResponse<{ template: ConnectorConfigTemplate }>) => {
+          console.log('[API] Successfully retrieved configuration template')
+          return res.data.template
+        })
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to get configuration template:', error)
+      throw error
+    }
+  },
+
+  // Update configuration template
+  update: async (
+    id: string,
+    updates: Partial<Omit<ConnectorConfigTemplate, 'id' | 'createdAt' | 'updatedAt' | 'authorId'>>
+  ): Promise<ConnectorConfigTemplate> => {
+    console.log('[API] Updating configuration template:', id)
+
+    try {
+      const data = await api
+        .put(`/api/config-templates/${id}`, updates)
+        .then((res: AxiosResponse<{ template: ConnectorConfigTemplate }>) => {
+          console.log('[API] Successfully updated configuration template')
+          return res.data.template
+        })
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to update configuration template:', error)
+      throw error
+    }
+  },
+
+  // Delete configuration template
+  delete: async (id: string): Promise<void> => {
+    console.log('[API] Deleting configuration template:', id)
+
+    try {
+      await api.delete(`/api/config-templates/${id}`)
+      console.log('[API] Successfully deleted configuration template')
+    } catch (error) {
+      console.error('[API] Failed to delete configuration template:', error)
+      throw error
+    }
+  },
+
+  // Search configuration templates
+  search: async (query: string, category?: string): Promise<ConnectorConfigTemplate[]> => {
+    console.log('[API] Searching configuration templates:', { query, category })
+
+    try {
+      const params = new URLSearchParams({ q: query })
+      if (category) params.append('category', category)
+
+      const data = await api
+        .get(`/api/config-templates/search?${params.toString()}`)
+        .then((res: AxiosResponse<{ templates: ConnectorConfigTemplate[] }>) => {
+          console.log('[API] Successfully searched configuration templates')
+          return res.data.templates
+        })
+
+      return data
+    } catch (error) {
+      console.error('[API] Failed to search configuration templates:', error)
       throw error
     }
   },

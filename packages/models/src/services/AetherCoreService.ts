@@ -6,26 +6,30 @@ import type { Starship, Codex } from '../types';
  * Handles Starship and Codex management with proper versioning
  */
 export class AetherCoreService {
-  private static starshipRepo = RepositoryFactory.getStarshipRepository();
-  private static codexRepo = RepositoryFactory.getCodexRepository();
-  private static visionRepo = RepositoryFactory.getVisionRepository();
-  private static constraintRepo = RepositoryFactory.getConstraintRepository();
-  private static conceptRepo = RepositoryFactory.getConceptRepository();
-  private static metaAnchorRepo = RepositoryFactory.getMetaAnchorRepository();
+  private static starshipRepo: Promise<any> = RepositoryFactory.getStarshipRepository();
+  private static codexRepo: Promise<any> = RepositoryFactory.getCodexRepository();
+  private static visionRepo: Promise<any> = RepositoryFactory.getVisionRepository();
+  private static constraintRepo: Promise<any> = RepositoryFactory.getConstraintRepository();
+  private static conceptRepo: Promise<any> = RepositoryFactory.getConceptRepository();
+  private static metaAnchorRepo: Promise<any> = RepositoryFactory.getMetaAnchorRepository();
 
   /**
    * Initialize starship with default codex structure
    * PATTERN: Follows existing UserService.syncUser() pattern
    */
-  static async initializeStarship(ownerId: string, starshipData: {
-    name: string;
-    class: 'scout' | 'cruiser';
-  }): Promise<{ starship: Starship; codex: Codex }> {
+  static async initializeStarship(
+    ownerId: string,
+    starshipData: {
+      name: string;
+      class: 'scout' | 'cruiser';
+    }
+  ): Promise<{ starship: Starship; codex: Codex }> {
     // Generate unique slug for the starship
-    const slug = await this.starshipRepo.generateUniqueSlug(starshipData.name, ownerId);
-    
+    const starshipRepo = await this.starshipRepo;
+    const slug = await starshipRepo.generateUniqueSlug(starshipData.name, ownerId);
+
     // Create starship
-    const starship = await this.starshipRepo.create({
+    const starship = await starshipRepo.create({
       ownerId,
       name: starshipData.name,
       class: starshipData.class,
@@ -33,26 +37,28 @@ export class AetherCoreService {
       powerLevel: 85,
       activeExpeditions: 0,
       sibilInsights: 0,
-      status: 'active'
+      status: 'active',
     });
 
     // Create initial codex
-    const codex = await this.codexRepo.create({
+    const codexRepo = await this.codexRepo;
+    const codex = await codexRepo.create({
       starshipId: starship.id,
       version: 'v1.0',
       timestamp: new Date().toISOString(),
       author: ownerId,
       changeSummary: 'Initial starship creation',
-      isActive: true
+      isActive: true,
     });
 
     // Create default vision
-    await this.visionRepo.create({
+    const visionRepo = await this.visionRepo;
+    await visionRepo.create({
       codexId: codex.id,
       statement: '',
       confidence: 0,
       lastRefined: new Date().toISOString(),
-      refinementCount: 0
+      refinementCount: 0,
     });
 
     return { starship, codex };
@@ -63,24 +69,28 @@ export class AetherCoreService {
    * INTEGRATION POINT: Used by agent-engine for context
    */
   static async getProjection(starshipId: string, lens: 'telos' | 'ethos' | 'full' = 'telos') {
-    const codex = await this.codexRepo.findActiveByStarship(starshipId);
+    const codexRepo = await this.codexRepo;
+    const codex = await codexRepo.findActiveByStarship(starshipId);
     if (!codex) return null;
 
-    const vision = await this.visionRepo.findByCodex(codex.id);
-    const constraints = await this.constraintRepo.findByCodex(codex.id);
-    const concepts = await this.conceptRepo.findByCodex(codex.id);
+    const visionRepo = await this.visionRepo;
+    const constraintRepo = await this.constraintRepo;
+    const conceptRepo = await this.conceptRepo;
+    const vision = await visionRepo.findByCodex(codex.id);
+    const constraints = await constraintRepo.findByCodex(codex.id);
+    const concepts = await conceptRepo.findByCodex(codex.id);
 
     switch (lens) {
       case 'telos':
         return {
           vision: vision?.statement || '',
-          constraints: constraints.filter((c: any) => c.isActive && c.type === 'business')
+          constraints: constraints.filter((c: any) => c.isActive && c.type === 'business'),
         };
       case 'ethos':
         return {
           vision: vision?.statement || '',
           constraints: constraints.filter((c: any) => c.isActive && c.type === 'ethical'),
-          concepts: concepts.filter((c: any) => c.category === 'idea')
+          concepts: concepts.filter((c: any) => c.category === 'idea'),
         };
       case 'full':
         return { vision, constraints, concepts };
@@ -93,38 +103,43 @@ export class AetherCoreService {
    * Mutate codex entities with versioning
    * PATTERN: Similar to existing repository update patterns
    */
-  static async mutateCodex(starshipId: string, mutations: {
-    vision?: { statement: string };
-    constraints?: Array<{ description: string; type: 'resource' | 'ethical' | 'technical' | 'business' }>;
-  }, author: string) {
+  static async mutateCodex(
+    starshipId: string,
+    mutations: {
+      vision?: { statement: string };
+      constraints?: Array<{
+        description: string;
+        type: 'resource' | 'ethical' | 'technical' | 'business';
+      }>;
+    },
+    author: string
+  ) {
     // Create new codex version
-    const newCodex = await this.codexRepo.createVersion(
-      starshipId,
-      author,
-      'Codex updated via API'
-    );
+    const codexRepo = await this.codexRepo;
+    const newCodex = await codexRepo.createVersion(starshipId, author, 'Codex updated via API');
 
     // Apply mutations
     if (mutations.vision) {
-      await this.visionRepo.create({
+      const visionRepo = await this.visionRepo;
+      await visionRepo.create({
         codexId: newCodex.id,
         statement: mutations.vision.statement,
         confidence: Math.min(100, mutations.vision.statement.length * 2),
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
       });
     }
 
-
     if (mutations.constraints) {
+      const constraintRepo = await this.constraintRepo;
       for (const constraint of mutations.constraints) {
-        await this.constraintRepo.create({
+        await constraintRepo.create({
           codexId: newCodex.id,
           type: constraint.type,
           description: constraint.description,
           severity: 'medium',
           isActive: true,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
       }
     }
@@ -136,21 +151,25 @@ export class AetherCoreService {
    * Get active codex for a starship with all related entities
    */
   static async getActiveCodex(starshipId: string) {
-    const codex = await this.codexRepo.findActiveByStarship(starshipId);
+    const codexRepo = await this.codexRepo;
+    const codex = await codexRepo.findActiveByStarship(starshipId);
     if (!codex) return null;
 
     // Get all related entities
+    const visionRepo = await this.visionRepo;
+    const constraintRepo = await this.constraintRepo;
+    const conceptRepo = await this.conceptRepo;
     const [vision, constraints, concepts] = await Promise.all([
-      this.visionRepo.findByCodex(codex.id),
-      this.constraintRepo.findByCodex(codex.id),
-      this.conceptRepo.findByCodex(codex.id)
+      visionRepo.findByCodex(codex.id),
+      constraintRepo.findByCodex(codex.id),
+      conceptRepo.findByCodex(codex.id),
     ]);
 
     return {
       ...codex,
       vision,
       constraints,
-      concepts
+      concepts,
     };
   }
 
@@ -160,11 +179,12 @@ export class AetherCoreService {
    */
   static async isAgentDeployedOnStarship(starshipId: string, agentId: string): Promise<boolean> {
     try {
-      const deployedAgents = await this.starshipRepo.getDeployedAgents(starshipId);
+      const starshipRepo = await this.starshipRepo;
+      const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
       return deployedAgents.some((agent: any) => agent.id === agentId);
     } catch (error) {
       console.error('Error checking agent deployment:', error);
       return false;
     }
   }
-} 
+}

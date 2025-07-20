@@ -1,13 +1,13 @@
 /**
  * ConnectorSelector Component Tests
- * Comprehensive test suite covering all functionality with >90% coverage
+ * Updated for connector instance architecture
  */
 
 import React from 'react'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConnectorSelector } from '../ConnectorSelector'
-import { mcpServerAPI, MCPServerOption } from '@/lib/api'
+import { mcpServerAPI, MCPServerOption, MCPServerConnector } from '@/lib/api'
 
 // Mock the API
 jest.mock('@/lib/api', () => ({
@@ -16,6 +16,9 @@ jest.mock('@/lib/api', () => ({
     getConnectedToStarship: jest.fn(),
     connectToStarship: jest.fn(),
     disconnectFromStarship: jest.fn(),
+    getConnectorInstances: jest.fn(),
+    createConnectorInstance: jest.fn(),
+    removeConnectorInstance: jest.fn(),
   },
 }))
 

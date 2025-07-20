@@ -16,6 +16,10 @@ jest.mock('@/lib/api', () => ({
     getConnectedToStarship: jest.fn(),
     connectToStarship: jest.fn(),
     disconnectFromStarship: jest.fn(),
+    // NEW: Connector Instance methods
+    getConnectorInstances: jest.fn(),
+    createConnectorInstance: jest.fn(),
+    removeConnectorInstance: jest.fn(),
   },
   agentAPI: {
     getAll: jest.fn(),
@@ -139,6 +143,32 @@ describe('StarshipCrewContent Integration Tests', () => {
     ;(mcpServerAPI.getConnectedToStarship as jest.Mock).mockResolvedValue([mockConnectors[0]])
     ;(mcpServerAPI.connectToStarship as jest.Mock).mockResolvedValue(undefined)
     ;(mcpServerAPI.disconnectFromStarship as jest.Mock).mockResolvedValue(undefined)
+
+    // NEW: Setup connector instance API responses
+    ;(mcpServerAPI.getConnectorInstances as jest.Mock).mockResolvedValue([
+      {
+        id: 'connector-instance-1',
+        starshipId: 'test-starship-1',
+        templateId: 'github',
+        status: 'active',
+        isActive: true,
+        connectedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        template: mockConnectors[0],
+      },
+    ])
+    ;(mcpServerAPI.createConnectorInstance as jest.Mock).mockResolvedValue({
+      id: 'new-connector-instance',
+      starshipId: 'test-starship-1',
+      templateId: 'puppeteer',
+      status: 'active',
+      isActive: true,
+      connectedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    ;(mcpServerAPI.removeConnectorInstance as jest.Mock).mockResolvedValue(undefined)
     ;(agentAPI.getAll as jest.Mock).mockResolvedValue(mockAgents)
   })
 

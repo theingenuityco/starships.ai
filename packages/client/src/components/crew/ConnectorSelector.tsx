@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { MCPServerOption, mcpServerAPI } from '@/lib/api'
+import { MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { monitoringService, connectorMonitoring } from '@/lib/connector-monitoring'
+import { ConnectorInstanceConfig } from './ConnectorInstanceConfig'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -13,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Loader2,
   Search,
@@ -23,16 +26,26 @@ import {
   AlertCircle,
   Wifi,
   WifiOff,
+  Clock,
+  XCircle,
+  AlertTriangle,
+  CheckCircle,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Props interface as specified in the requirements
+// Updated props interface to work with connector instances
 interface ConnectorSelectorProps {
   starshipId: string
-  selectedConnectors: MCPServerOption[]
+  selectedConnectors: MCPServerOption[] // Templates derived from connector instances
   onConnectorsChange: (connectors: MCPServerOption[]) => void
   disabled?: boolean
   className?: string
+  // NEW: Optional connector instances for status display
+  connectorInstances?: MCPServerConnector[]
+  // NEW: Configuration management callbacks
+  onConfigUpdate?: (connectorId: string, config: any) => Promise<void>
+  onTemplateApply?: (connectorId: string, templateId: string) => Promise<void>
 }
 
 // Utility function for parsing environment variables
@@ -71,14 +84,27 @@ export function ConnectorSelector({
   onConnectorsChange,
   disabled = false,
   className,
+  connectorInstances = [],
+  onConfigUpdate,
+  onTemplateApply,
 }: ConnectorSelectorProps) {
   // State management
   const [availableConnectors, setAvailableConnectors] = useState<MCPServerOption[]>([])
-  const [connectedConnectors, setConnectedConnectors] = useState<MCPServerOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [connectingIds, setConnectingIds] = useState<Set<string>>(new Set())
+
+  // Create a map of template ID to connector instance for quick lookup
+  const connectorInstanceMap = useMemo(() => {
+    const map = new Map<string, MCPServerConnector>()
+    connectorInstances.forEach(instance => {
+      if (instance.templateId) {
+        map.set(instance.templateId, instance)
+      }
+    })
+    return map
+  }, [connectorInstances])
 
   // Fetch data on mount and when starshipId changes
   useEffect(() => {
@@ -93,30 +119,34 @@ export function ConnectorSelector({
     return selectedConnectors.some(selected => selected.id === connector.id)
   }
 
-  // Check if a connector is connected to the starship
-  const isConnectorConnected = (connector: MCPServerOption): boolean => {
-    return connectedConnectors.some(connected => connected.id === connector.id)
+  // Get connector instance for a template (if exists)
+  const getConnectorInstance = (connector: MCPServerOption): MCPServerConnector | undefined => {
+    return connectorInstanceMap.get(connector.id)
   }
 
-  // Fetch all connector data
+  // Check if a connector has an active instance
+  const isConnectorConnected = (connector: MCPServerOption): boolean => {
+    const instance = getConnectorInstance(connector)
+    return instance ? instance.isActive && instance.status === 'active' : false
+  }
+
+  // Get connector status for display
+  const getConnectorStatus = (
+    connector: MCPServerOption
+  ): MCPServerConnector['status'] | 'disconnected' => {
+    const instance = getConnectorInstance(connector)
+    return instance ? instance.status : 'disconnected'
+  }
+
+  // Fetch available connector templates
   const fetchConnectorData = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch both available and connected connectors in parallel
-      const [available, connected] = await Promise.all([
-        mcpServerAPI.getAll(),
-        mcpServerAPI.getConnectedToStarship(starshipId),
-      ])
-
+      // Only fetch available connector templates - instances are managed by parent
+      const available = await mcpServerAPI.getAll()
       setAvailableConnectors(available)
-      setConnectedConnectors(connected)
-
-      // Update selected connectors to match connected ones if not already set
-      if (selectedConnectors.length === 0) {
-        onConnectorsChange(connected)
-      }
     } catch (err) {
       console.error('Failed to fetch connector data:', err)
       setError('Failed to load connectors. Please try again.')
@@ -130,36 +160,22 @@ export function ConnectorSelector({
     if (disabled || connectingIds.has(connector.id)) return
 
     const isCurrentlySelected = isConnectorSelected(connector)
-    const isCurrentlyConnected = isConnectorConnected(connector)
 
     try {
       setConnectingIds(prev => new Set(prev).add(connector.id))
 
       if (isCurrentlySelected) {
-        // Deselect and disconnect if connected
+        // Deselect - let parent handle the connector instance removal
         const newSelected = selectedConnectors.filter(c => c.id !== connector.id)
         onConnectorsChange(newSelected)
-
-        if (isCurrentlyConnected) {
-          await mcpServerAPI.disconnectFromStarship(starshipId, connector.id)
-          setConnectedConnectors(prev => prev.filter(c => c.id !== connector.id))
-        }
       } else {
-        // Select and connect - let parent handle the API call
+        // Select - let parent handle the connector instance creation
         const newSelected = [...selectedConnectors, connector]
         onConnectorsChange(newSelected)
-
-        // Update local state optimistically
-        if (!isCurrentlyConnected) {
-          setConnectedConnectors(prev => [...prev, connector])
-        }
       }
     } catch (err) {
       console.error('Failed to toggle connector:', err)
       setError(`Failed to ${isCurrentlySelected ? 'disconnect' : 'connect'} ${connector.name}`)
-
-      // Revert the optimistic update
-      await fetchConnectorData()
     } finally {
       setConnectingIds(prev => {
         const newSet = new Set(prev)
@@ -173,11 +189,8 @@ export function ConnectorSelector({
   const handleClearAll = async () => {
     if (disabled) return
 
-    // Let parent handle the API calls
+    // Let parent handle the connector instance removal
     onConnectorsChange([])
-
-    // Update local state optimistically
-    setConnectedConnectors([])
   }
 
   // Render loading state
@@ -286,8 +299,69 @@ export function ConnectorSelector({
           ) : (
             filteredConnectors.map(connector => {
               const isSelected = isConnectorSelected(connector)
-              const isConnected = isConnectorConnected(connector)
               const isConnecting = connectingIds.has(connector.id)
+              const connectorInstance = getConnectorInstance(connector)
+              const status = getConnectorStatus(connector)
+
+              // Enhanced status display with health metrics
+              const healthMetrics = connectorInstance
+                ? monitoringService.createHealthMetrics(connectorInstance, connector)
+                : null
+
+              const getStatusIcon = () => {
+                if (isConnecting) {
+                  return <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                }
+
+                if (healthMetrics) {
+                  switch (healthMetrics.healthStatus) {
+                    case 'healthy':
+                      return <CheckCircle className="w-3 h-3 text-green-500" />
+                    case 'warning':
+                      return <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                    case 'critical':
+                      return <XCircle className="w-3 h-3 text-red-500" />
+                    default:
+                      return <AlertCircle className="w-3 h-3 text-gray-500" />
+                  }
+                }
+
+                switch (status) {
+                  case 'active':
+                    return <Wifi className="w-3 h-3 text-green-500" />
+                  case 'connecting':
+                    return <Clock className="w-3 h-3 text-blue-500" />
+                  case 'error':
+                    return <XCircle className="w-3 h-3 text-red-500" />
+                  case 'inactive':
+                    return <WifiOff className="w-3 h-3 text-gray-500" />
+                  default:
+                    return <WifiOff className="w-3 h-3 text-gray-400" />
+                }
+              }
+
+              const getStatusText = () => {
+                if (healthMetrics && status === 'active') {
+                  return `${status} (${healthMetrics.healthStatus})`
+                }
+                switch (status) {
+                  case 'active':
+                    return 'Active'
+                  case 'connecting':
+                    return 'Connecting...'
+                  case 'error':
+                    return 'Error'
+                  case 'inactive':
+                    return 'Inactive'
+                  default:
+                    return 'Not connected'
+                }
+              }
+
+              const getHealthTooltip = () => {
+                if (!healthMetrics) return getStatusText()
+                return `Status: ${status}\nHealth: ${healthMetrics.healthStatus}\nUptime: ${connectorMonitoring.formatUptime(healthMetrics.uptime)}\nSuccess Rate: ${connectorMonitoring.formatSuccessRate(healthMetrics.successRate)}`
+              }
 
               return (
                 <DropdownMenuItem
@@ -317,17 +391,31 @@ export function ConnectorSelector({
                       >
                         {connector.command.toUpperCase()}
                       </Badge>
-                      {isConnected && (
-                        <div title="Connected">
-                          <Wifi className="w-3 h-3 text-green-500" />
-                        </div>
-                      )}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 cursor-help">
+                              {getStatusIcon()}
+                              <span className="text-xs text-muted-foreground">
+                                {getStatusText()}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="text-xs whitespace-pre-line">{getHealthTooltip()}</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
 
                     {connector.env && (
                       <p className="text-xs text-muted-foreground">
                         {formatEnvForDisplay(connector.env)}
                       </p>
+                    )}
+
+                    {connectorInstance?.errorMessage && status === 'error' && (
+                      <p className="text-xs text-red-500 mt-1">{connectorInstance.errorMessage}</p>
                     )}
                   </div>
                 </DropdownMenuItem>
@@ -343,27 +431,142 @@ export function ConnectorSelector({
           <label className="text-sm font-medium">Selected Connectors:</label>
           <div className="space-y-2">
             {selectedConnectors.map(connector => {
-              const isConnected = isConnectorConnected(connector)
               const isConnecting = connectingIds.has(connector.id)
+              const connectorInstance = getConnectorInstance(connector)
+              const status = getConnectorStatus(connector)
+
+              // Enhanced status display with health metrics
+              const healthMetrics = connectorInstance
+                ? monitoringService.createHealthMetrics(connectorInstance, connector)
+                : null
+
+              const getStatusDisplay = () => {
+                if (isConnecting) {
+                  return {
+                    icon: <Loader2 className="w-4 h-4 animate-spin text-blue-500" />,
+                    badge: (
+                      <Badge variant="secondary" className="text-xs">
+                        Connecting...
+                      </Badge>
+                    ),
+                    borderColor: 'border-blue-200 dark:border-blue-800',
+                  }
+                }
+
+                if (healthMetrics) {
+                  const healthColor = connectorMonitoring.getHealthStatusColor(
+                    healthMetrics.healthStatus
+                  )
+                  const healthBg = connectorMonitoring.getHealthStatusBgColor(
+                    healthMetrics.healthStatus
+                  )
+
+                  return {
+                    icon:
+                      status === 'active' ? (
+                        healthMetrics.healthStatus === 'healthy' ? (
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                        ) : healthMetrics.healthStatus === 'warning' ? (
+                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-500" />
+                        )
+                      ) : (
+                        <WifiOff className="w-4 h-4 text-gray-500" />
+                      ),
+                    badge: (
+                      <Badge
+                        variant={
+                          healthMetrics.healthStatus === 'healthy'
+                            ? 'default'
+                            : healthMetrics.healthStatus === 'warning'
+                              ? 'secondary'
+                              : healthMetrics.healthStatus === 'critical'
+                                ? 'destructive'
+                                : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {status} ({healthMetrics.healthStatus})
+                      </Badge>
+                    ),
+                    borderColor:
+                      healthMetrics.healthStatus === 'healthy'
+                        ? 'border-green-200 dark:border-green-800'
+                        : healthMetrics.healthStatus === 'warning'
+                          ? 'border-yellow-200 dark:border-yellow-800'
+                          : healthMetrics.healthStatus === 'critical'
+                            ? 'border-red-200 dark:border-red-800'
+                            : 'border-gray-200 dark:border-gray-800',
+                  }
+                }
+
+                // Fallback to basic status display
+                switch (status) {
+                  case 'active':
+                    return {
+                      icon: <Wifi className="w-4 h-4 text-green-500" />,
+                      badge: (
+                        <Badge variant="default" className="text-xs">
+                          Active
+                        </Badge>
+                      ),
+                      borderColor: 'border-green-200 dark:border-green-800',
+                    }
+                  case 'connecting':
+                    return {
+                      icon: <Clock className="w-4 h-4 text-blue-500" />,
+                      badge: (
+                        <Badge variant="secondary" className="text-xs">
+                          Connecting...
+                        </Badge>
+                      ),
+                      borderColor: 'border-blue-200 dark:border-blue-800',
+                    }
+                  case 'error':
+                    return {
+                      icon: <XCircle className="w-4 h-4 text-red-500" />,
+                      badge: (
+                        <Badge variant="destructive" className="text-xs">
+                          Error
+                        </Badge>
+                      ),
+                      borderColor: 'border-red-200 dark:border-red-800',
+                    }
+                  case 'inactive':
+                    return {
+                      icon: <WifiOff className="w-4 h-4 text-gray-500" />,
+                      badge: (
+                        <Badge variant="outline" className="text-xs">
+                          Inactive
+                        </Badge>
+                      ),
+                      borderColor: 'border-gray-200 dark:border-gray-800',
+                    }
+                  default:
+                    return {
+                      icon: <WifiOff className="w-4 h-4 text-muted-foreground" />,
+                      badge: null,
+                      borderColor: 'border-border',
+                    }
+                }
+              }
+
+              const statusDisplay = getStatusDisplay()
 
               return (
                 <div
                   key={connector.id}
-                  className="flex items-center justify-between p-3 border border-border rounded-lg bg-card"
+                  className={cn(
+                    'flex items-center justify-between p-3 border rounded-lg bg-card transition-colors',
+                    statusDisplay.borderColor
+                  )}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex items-center gap-1">
-                      {isConnecting ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                      ) : isConnected ? (
-                        <Wifi className="w-4 h-4 text-green-500" />
-                      ) : (
-                        <WifiOff className="w-4 h-4 text-muted-foreground" />
-                      )}
-                    </div>
+                    <div className="flex items-center gap-1">{statusDisplay.icon}</div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="font-medium text-sm">{connector.name}</span>
                         <Badge
                           variant={getCommandBadgeVariant(connector.command)}
@@ -371,31 +574,55 @@ export function ConnectorSelector({
                         >
                           {connector.command.toUpperCase()}
                         </Badge>
-                        {isConnecting && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
-                            Connecting...
-                          </span>
-                        )}
+                        {statusDisplay.badge}
                       </div>
 
                       {connector.env && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground mb-1">
                           {formatEnvForDisplay(connector.env)}
+                        </p>
+                      )}
+
+                      {connectorInstance?.errorMessage && status === 'error' && (
+                        <p className="text-xs text-red-500">{connectorInstance.errorMessage}</p>
+                      )}
+
+                      {connectorInstance?.lastUsed && (
+                        <p className="text-xs text-muted-foreground">
+                          Last used: {new Date(connectorInstance.lastUsed).toLocaleString()}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <Button
-                    onClick={() => handleConnectorToggle(connector)}
-                    size="sm"
-                    variant="ghost"
-                    disabled={disabled || isConnecting}
-                    className="ml-2 h-8 w-8 p-0"
-                    aria-label={`Remove ${connector.name}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {/* Configuration button - only show if connector instance exists and callbacks are provided */}
+                    {connectorInstance && onConfigUpdate && onTemplateApply && (
+                      <ConnectorInstanceConfig
+                        connectorId={connectorInstance.id}
+                        starshipId={starshipId}
+                        connectorName={connector.name}
+                        currentConfig={connectorInstance.config}
+                        onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}
+                        onTemplateApply={templateId =>
+                          onTemplateApply(connectorInstance.id, templateId)
+                        }
+                        disabled={disabled}
+                        className="h-8 w-8 p-0"
+                      />
+                    )}
+
+                    <Button
+                      onClick={() => handleConnectorToggle(connector)}
+                      size="sm"
+                      variant="ghost"
+                      disabled={disabled || isConnecting}
+                      className="h-8 w-8 p-0"
+                      aria-label={`Remove ${connector.name}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               )
             })}

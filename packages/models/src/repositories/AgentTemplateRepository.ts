@@ -1,6 +1,7 @@
 import { AgentTemplate, AgentTemplateRepository, Agent } from '../types';
 import { Neo4jConnection } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
+import { int } from 'neo4j-driver';
 
 export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
   constructor(private connection: Neo4jConnection) {}
@@ -128,8 +129,8 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, {
-      limit,
-      offset,
+      limit: int(limit),
+      offset: int(offset),
     });
     return results.map((result) => result.t);
   }

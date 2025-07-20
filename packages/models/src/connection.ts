@@ -141,6 +141,12 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE',
         'CREATE CONSTRAINT starship_slug_owner_unique IF NOT EXISTS FOR (s:Starship) REQUIRE (s.slug, s.ownerId) IS UNIQUE',
         'CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE',
+        
+        // Expedition system constraints
+        'CREATE CONSTRAINT expedition_id_unique IF NOT EXISTS FOR (e:Expedition) REQUIRE e.id IS UNIQUE',
+        'CREATE CONSTRAINT expedition_task_id_unique IF NOT EXISTS FOR (t:ExpeditionTask) REQUIRE t.id IS UNIQUE',
+        'CREATE CONSTRAINT expedition_message_id_unique IF NOT EXISTS FOR (m:ExpeditionMessage) REQUIRE m.id IS UNIQUE',
+        'CREATE CONSTRAINT expedition_result_id_unique IF NOT EXISTS FOR (r:ExpeditionResult) REQUIRE r.id IS UNIQUE',
       ];
 
       for (const constraint of constraints) {
@@ -155,6 +161,32 @@ export class Neo4jConnection {
         'CREATE INDEX llm_provider_index IF NOT EXISTS FOR (l:LLM) ON (l.provider)',
         'CREATE INDEX starship_owner_index IF NOT EXISTS FOR (s:Starship) ON (s.ownerId)',
         'CREATE INDEX vision_starship_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId)',
+        
+        // Expedition system indexes
+        'CREATE INDEX expedition_starship_index IF NOT EXISTS FOR (e:Expedition) ON (e.starshipId)',
+        'CREATE INDEX expedition_status_index IF NOT EXISTS FOR (e:Expedition) ON (e.status)',
+        'CREATE INDEX expedition_priority_index IF NOT EXISTS FOR (e:Expedition) ON (e.priority)',
+        'CREATE INDEX expedition_created_by_index IF NOT EXISTS FOR (e:Expedition) ON (e.createdBy)',
+        'CREATE INDEX expedition_created_at_index IF NOT EXISTS FOR (e:Expedition) ON (e.createdAt)',
+        
+        'CREATE INDEX expedition_task_expedition_index IF NOT EXISTS FOR (t:ExpeditionTask) ON (t.expeditionId)',
+        'CREATE INDEX expedition_task_status_index IF NOT EXISTS FOR (t:ExpeditionTask) ON (t.status)',
+        'CREATE INDEX expedition_task_priority_index IF NOT EXISTS FOR (t:ExpeditionTask) ON (t.priority)',
+        'CREATE INDEX expedition_task_assigned_agent_index IF NOT EXISTS FOR (t:ExpeditionTask) ON (t.assignedAgentId)',
+        
+        'CREATE INDEX expedition_message_expedition_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.expeditionId)',
+        'CREATE INDEX expedition_message_role_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.role)',
+        'CREATE INDEX expedition_message_type_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.messageType)',
+        'CREATE INDEX expedition_message_timestamp_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.timestamp)',
+        'CREATE INDEX expedition_message_agent_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.agentId)',
+        'CREATE INDEX expedition_message_user_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.userId)',
+        'CREATE INDEX expedition_message_thread_index IF NOT EXISTS FOR (m:ExpeditionMessage) ON (m.threadId)',
+        
+        'CREATE INDEX expedition_result_expedition_index IF NOT EXISTS FOR (r:ExpeditionResult) ON (r.expeditionId)',
+        'CREATE INDEX expedition_result_type_index IF NOT EXISTS FOR (r:ExpeditionResult) ON (r.resultType)',
+        'CREATE INDEX expedition_result_format_index IF NOT EXISTS FOR (r:ExpeditionResult) ON (r.format)',
+        'CREATE INDEX expedition_result_created_by_index IF NOT EXISTS FOR (r:ExpeditionResult) ON (r.createdBy)',
+        'CREATE INDEX expedition_result_quality_index IF NOT EXISTS FOR (r:ExpeditionResult) ON (r.quality)',
       ];
 
       for (const index of indexes) {

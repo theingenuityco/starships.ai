@@ -422,15 +422,35 @@ export class ExpeditionRepository implements ExpeditionRepositoryInterface {
       { starshipId }
     );
 
-    const stats = result[0] || { total: 0, active: 0, completed: 0, failed: 0, avgDuration: 0 };
-    const successRate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
+    const rawStats = result[0];
+    
+    // Handle case where no results are returned
+    if (!rawStats) {
+      return {
+        total: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        averageDuration: 0,
+        successRate: 0
+      };
+    }
+    
+    // Convert BigInt values to numbers for calculations
+    const totalNum = Number(rawStats.total);
+    const activeNum = Number(rawStats.active);
+    const completedNum = Number(rawStats.completed);
+    const failedNum = Number(rawStats.failed);
+    const avgDurationNum = Number(rawStats.avgDuration || 0);
+    
+    const successRate = totalNum > 0 ? (completedNum / totalNum) * 100 : 0;
 
     return {
-      total: stats.total,
-      active: stats.active,
-      completed: stats.completed,
-      failed: stats.failed,
-      averageDuration: Math.round(stats.avgDuration || 0),
+      total: totalNum,
+      active: activeNum,
+      completed: completedNum,
+      failed: failedNum,
+      averageDuration: Math.round(avgDurationNum || 0),
       successRate: Math.round(successRate * 100) / 100
     };
   }

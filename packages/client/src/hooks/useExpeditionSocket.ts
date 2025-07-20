@@ -130,8 +130,64 @@ export function useExpeditionSocket({
 
     // Error events
     const handleExpeditionError = (data: any) => {
-      console.error('[EXPEDITION SOCKET] Expedition error:', data);
-      setError(data.message || 'An expedition error occurred');
+      // Add comprehensive debugging
+      console.log('[EXPEDITION SOCKET] Raw error data received:', data, 'Type:', typeof data, 'Keys:', data && typeof data === 'object' ? Object.keys(data) : 'N/A');
+      
+      // Check if data is empty or meaningless first
+      const isEmptyObject = data && typeof data === 'object' && Object.keys(data).length === 0;
+      const isUndefinedOrNull = data === undefined || data === null;
+      
+      if (isEmptyObject || isUndefinedOrNull) {
+        // Completely ignore empty error objects - don't log, don't set error, don't call onError
+        console.warn('[EXPEDITION SOCKET] Received empty/null error object, ignoring completely. Data:', data);
+        return;
+      }
+      
+      // Additional check for objects that might appear non-empty but have no meaningful content
+      if (data && typeof data === 'object') {
+        const keys = Object.keys(data);
+        const hasValidContent = keys.some(key => {
+          const value = data[key];
+          return value !== undefined && value !== null && value !== '';
+        });
+        
+        if (!hasValidContent) {
+          console.warn('[EXPEDITION SOCKET] Received object with no valid content, ignoring. Data:', data);
+          return;
+        }
+      }
+      
+      // Handle meaningful error objects
+      let errorMessage = 'An expedition error occurred';
+      
+      if (data && typeof data === 'object') {
+        if (data.message) {
+          errorMessage = data.message;
+        } else if (data.error) {
+          errorMessage = data.error;
+        } else {
+          // If object has properties but no standard error fields, stringify it
+          const keys = Object.keys(data);
+          if (keys.length > 0) {
+            errorMessage = `Error: ${JSON.stringify(data)}`;
+          } else {
+            // This should never happen due to checks above, but just in case
+            console.warn('[EXPEDITION SOCKET] Object passed validation but has no keys, ignoring. Data:', data);
+            return;
+          }
+        }
+      } else if (typeof data === 'string' && data.trim().length > 0) {
+        errorMessage = data;
+      } else {
+        // Any other falsy or empty string values should be ignored
+        console.warn('[EXPEDITION SOCKET] Received invalid error data, ignoring. Data:', data, 'Type:', typeof data);
+        return;
+      }
+      
+      // Only log and handle meaningful errors
+      console.error('[EXPEDITION SOCKET] Processing meaningful expedition error:', data);
+      console.log('[EXPEDITION SOCKET] Error message extracted:', errorMessage);
+      setError(errorMessage);
       onError?.(data);
     };
 

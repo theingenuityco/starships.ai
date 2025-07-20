@@ -83,7 +83,13 @@ export function useExpeditionChat({
 
     try {
       const fetchedMessages = await expeditionAPI.getMessages(starshipId, expeditionId);
-      setMessages(fetchedMessages.slice(-maxMessages));
+      // Ensure fetchedMessages is an array before calling slice
+      if (Array.isArray(fetchedMessages)) {
+        setMessages(fetchedMessages.slice(-maxMessages));
+      } else {
+        console.warn('[EXPEDITION CHAT] API returned non-array messages:', fetchedMessages);
+        setMessages([]);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load messages';
       setError(errorMessage);

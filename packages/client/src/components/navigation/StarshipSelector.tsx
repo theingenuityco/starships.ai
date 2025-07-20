@@ -150,7 +150,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                   <div className="flex flex-col flex-1">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-white">{starship.name}</span>
-                      <span className="text-xs text-white/60">{starship.powerLevel}%</span>
+                      <span className="text-xs text-white/60">100%</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge
@@ -161,7 +161,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                       </Badge>
                       <span className="text-xs text-white/60 capitalize">{starship.class}</span>
                       <span className="text-xs text-white/40">
-                        {starship.activeExpeditions} expeditions
+                        {starship.maxActiveExpeditions} max expeditions
                       </span>
                     </div>
                   </div>

@@ -33,9 +33,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Scout',
         class: 'scout' as const,
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active' as const
       };
 
@@ -71,9 +69,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Cruiser',
         class: 'cruiser' as const,
-        powerLevel: 95,
-        activeExpeditions: 2,
-        sibilInsights: 10,
+        maxActiveExpeditions: 4,
         status: 'active' as const
       };
 
@@ -96,9 +92,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Findable Ship',
         class: 'scout' as const,
-        powerLevel: 80,
-        activeExpeditions: 1,
-        sibilInsights: 5,
+        maxActiveExpeditions: 2,
         status: 'active' as const
       };
 
@@ -128,9 +122,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Ship One',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -138,10 +130,8 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Ship Two',
         class: 'cruiser',
-        powerLevel: 95,
-        activeExpeditions: 1,
-        sibilInsights: 5,
-        status: 'docked'
+        maxActiveExpeditions: 4,
+        status: 'inactive'
       });
 
       // Create another user's starship to ensure filtering works
@@ -155,9 +145,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: otherUser.id,
         name: 'Other Ship',
         class: 'scout',
-        powerLevel: 70,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -190,16 +178,20 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
       const agent = await agentRepository.create({
         name: 'Test Agent',
         model: 'gpt-4',
-        systemPrompt: 'You are a test agent'
+        systemPrompt: 'You are a test agent',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       const deployResult = await starshipRepository.deployAgent(starship.id, agent.id);
@@ -223,9 +215,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Full Ship',
         class: 'scout', // Max 3 agents
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -235,7 +225,13 @@ describe('StarshipRepository Integration Tests', () => {
         const agent = await agentRepository.create({
           name: `Agent ${i}`,
           model: 'gpt-4',
-          systemPrompt: `You are agent ${i}`
+          systemPrompt: `You are agent ${i}`,
+          starshipId: starship.id,
+          authorId: user.id,
+          category: 'general',
+          tags: ['test'],
+          isPublic: false,
+          version: '1.0.0'
         });
         agents.push(agent);
         await starshipRepository.deployAgent(starship.id, agent.id);
@@ -245,7 +241,13 @@ describe('StarshipRepository Integration Tests', () => {
       const extraAgent = await agentRepository.create({
         name: 'Extra Agent',
         model: 'gpt-4',
-        systemPrompt: 'You are the extra agent'
+        systemPrompt: 'You are the extra agent',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       await expect(
@@ -264,16 +266,20 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
       const agent = await agentRepository.create({
         name: 'Test Agent',
         model: 'gpt-4',
-        systemPrompt: 'You are a test agent'
+        systemPrompt: 'You are a test agent',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       // Deploy agent once
@@ -298,16 +304,20 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
       const agent = await agentRepository.create({
         name: 'Test Agent',
         model: 'gpt-4',
-        systemPrompt: 'You are a test agent'
+        systemPrompt: 'You are a test agent',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       // Deploy agent first
@@ -337,16 +347,20 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
       const agent = await agentRepository.create({
         name: 'Test Agent',
         model: 'gpt-4',
-        systemPrompt: 'You are a test agent'
+        systemPrompt: 'You are a test agent',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       // Try to remove agent that was never deployed
@@ -367,9 +381,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Scout Ship',
         class: 'scout', // Max 3 agents
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -381,7 +393,13 @@ describe('StarshipRepository Integration Tests', () => {
       const agent1 = await agentRepository.create({
         name: 'Agent 1',
         model: 'gpt-4',
-        systemPrompt: 'Agent 1'
+        systemPrompt: 'Agent 1',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
       await starshipRepository.deployAgent(starship.id, agent1.id);
 
@@ -393,7 +411,13 @@ describe('StarshipRepository Integration Tests', () => {
       const agent2 = await agentRepository.create({
         name: 'Agent 2',
         model: 'claude-3',
-        systemPrompt: 'Agent 2'
+        systemPrompt: 'Agent 2',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
       await starshipRepository.deployAgent(starship.id, agent2.id);
 
@@ -405,7 +429,13 @@ describe('StarshipRepository Integration Tests', () => {
       const agent3 = await agentRepository.create({
         name: 'Agent 3',
         model: 'gpt-4',
-        systemPrompt: 'Agent 3'
+        systemPrompt: 'Agent 3',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
       await starshipRepository.deployAgent(starship.id, agent3.id);
 
@@ -425,9 +455,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Cruiser Ship',
         class: 'cruiser', // Max 6 agents
-        powerLevel: 95,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 4,
         status: 'active'
       });
 
@@ -449,9 +477,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -459,19 +485,37 @@ describe('StarshipRepository Integration Tests', () => {
       const agentCharlie = await agentRepository.create({
         name: 'Charlie',
         model: 'gpt-4',
-        systemPrompt: 'Charlie'
+        systemPrompt: 'Charlie',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       const agentAlice = await agentRepository.create({
         name: 'Alice',
         model: 'claude-3',
-        systemPrompt: 'Alice'
+        systemPrompt: 'Alice',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       const agentBob = await agentRepository.create({
         name: 'Bob',
         model: 'gpt-4',
-        systemPrompt: 'Bob'
+        systemPrompt: 'Bob',
+        starshipId: starship.id,
+        authorId: user.id,
+        category: 'general',
+        tags: ['test'],
+        isPublic: false,
+        version: '1.0.0'
       });
 
       // Deploy agents in random order
@@ -499,9 +543,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Empty Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -522,9 +564,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Original Name',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -535,15 +575,15 @@ describe('StarshipRepository Integration Tests', () => {
 
       const updates = {
         name: 'Updated Name',
-        powerLevel: 90,
-        status: 'docked' as const
+        maxActiveExpeditions: 3,
+        status: 'inactive' as const
       };
 
       const updatedStarship = await starshipRepository.update(starship.id, updates);
 
       expect(updatedStarship).not.toBeNull();
       expect(updatedStarship?.name).toBe(updates.name);
-      expect(updatedStarship?.powerLevel).toBe(updates.powerLevel);
+      expect(updatedStarship?.maxActiveExpeditions).toBe(updates.maxActiveExpeditions);
       expect(updatedStarship?.status).toBe(updates.status);
       expect(updatedStarship?.class).toBe(starship.class); // Should remain unchanged
       expect(updatedStarship?.updatedAt).not.toBe(originalUpdatedAt);
@@ -570,9 +610,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Deletable Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 
@@ -603,9 +641,7 @@ describe('StarshipRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Unique Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 2,
         status: 'active'
       });
 

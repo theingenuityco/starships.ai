@@ -140,11 +140,7 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT channel_id_unique IF NOT EXISTS FOR (c:Channel) REQUIRE c.id IS UNIQUE',
         'CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE',
         'CREATE CONSTRAINT starship_slug_owner_unique IF NOT EXISTS FOR (s:Starship) REQUIRE (s.slug, s.ownerId) IS UNIQUE',
-        'CREATE CONSTRAINT codex_id_unique IF NOT EXISTS FOR (c:Codex) REQUIRE c.id IS UNIQUE',
         'CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE',
-        'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
-        'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
-        'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
       ];
 
       for (const constraint of constraints) {
@@ -158,14 +154,7 @@ export class Neo4jConnection {
         'CREATE INDEX channel_guild_index IF NOT EXISTS FOR (c:Channel) ON (c.guildId)',
         'CREATE INDEX llm_provider_index IF NOT EXISTS FOR (l:LLM) ON (l.provider)',
         'CREATE INDEX starship_owner_index IF NOT EXISTS FOR (s:Starship) ON (s.ownerId)',
-        'CREATE INDEX codex_starship_index IF NOT EXISTS FOR (c:Codex) ON (c.starshipId)',
-        'CREATE INDEX codex_active_index IF NOT EXISTS FOR (c:Codex) ON (c.isActive)',
-        'CREATE INDEX vision_codex_index IF NOT EXISTS FOR (v:Vision) ON (v.codexId)',
-        'CREATE INDEX constraint_codex_index IF NOT EXISTS FOR (con:Constraint) ON (con.codexId)',
-        'CREATE INDEX constraint_active_index IF NOT EXISTS FOR (con:Constraint) ON (con.isActive)',
-        'CREATE INDEX concept_codex_index IF NOT EXISTS FOR (concept:Concept) ON (concept.codexId)',
-        'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
-        'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
+        'CREATE INDEX vision_starship_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId)',
       ];
 
       for (const index of indexes) {

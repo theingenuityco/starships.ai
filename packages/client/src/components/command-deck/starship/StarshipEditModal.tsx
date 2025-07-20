@@ -42,8 +42,9 @@ interface StarshipEditModalProps {
 
 interface StarshipEditFormData {
   name: string;
-  status: 'active' | 'docked' | 'maintenance';
+  status: 'active' | 'inactive';
   class: 'scout' | 'cruiser';
+  maxActiveExpeditions: number;
 }
 
 const STARSHIP_CLASSES = {
@@ -67,15 +68,10 @@ const STARSHIP_STATUSES = {
     description: 'Currently operational and available for missions',
     color: 'bg-green-500/20 text-green-400 border-green-500/30'
   },
-  docked: {
-    name: 'Docked',
-    description: 'Stationed at port for maintenance and resupply',
-    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-  },
-  maintenance: {
-    name: 'Maintenance',
-    description: 'Undergoing repairs and system upgrades',
-    color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+  inactive: {
+    name: 'Inactive',
+    description: 'Currently not operational',
+    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
   }
 };
 
@@ -95,8 +91,9 @@ export function StarshipEditModal({
 
   const [formData, setFormData] = useState<StarshipEditFormData>({
     name: '',
-    status: 'docked',
-    class: 'scout'
+    status: 'inactive',
+    class: 'scout',
+    maxActiveExpeditions: 3
   });
   const [errors, setErrors] = useState<Partial<StarshipEditFormData>>({});
   const [hasChanges, setHasChanges] = useState(false);
@@ -109,7 +106,8 @@ export function StarshipEditModal({
       const initialData = {
         name: starship.name,
         status: starship.status,
-        class: starship.class
+        class: starship.class,
+        maxActiveExpeditions: starship.maxActiveExpeditions
       };
       setFormData(initialData);
       setHasChanges(false);
@@ -130,12 +128,13 @@ export function StarshipEditModal({
       const hasNameChange = formData.name !== starship.name;
       const hasStatusChange = formData.status !== starship.status;
       const hasClassChange = formData.class !== starship.class;
-      setHasChanges(hasNameChange || hasStatusChange || hasClassChange);
+      const hasExpeditionsChange = formData.maxActiveExpeditions !== starship.maxActiveExpeditions;
+      setHasChanges(hasNameChange || hasStatusChange || hasClassChange || hasExpeditionsChange);
     }
   }, [formData, starship]);
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<StarshipEditFormData> = {};
+    const newErrors: any = {};
 
     if (!formData.name.trim()) {
       newErrors.name = 'Starship name is required';
@@ -143,6 +142,12 @@ export function StarshipEditModal({
       newErrors.name = 'Name must be at least 3 characters';
     } else if (formData.name.length > 50) {
       newErrors.name = 'Name must be less than 50 characters';
+    }
+
+    if (formData.maxActiveExpeditions < 1) {
+      newErrors.maxActiveExpeditions = 'Must be at least 1';
+    } else if (formData.maxActiveExpeditions > 50) {
+      newErrors.maxActiveExpeditions = 'Must be 50 or less';
     }
 
     setErrors(newErrors);
@@ -153,7 +158,7 @@ export function StarshipEditModal({
     if (!validateForm() || !starship) return;
 
     try {
-      const updates: Partial<StarshipEditFormData> = {};
+      const updates: any = {};
       
       if (formData.name !== starship.name) {
         updates.name = formData.name;
@@ -163,6 +168,9 @@ export function StarshipEditModal({
       }
       if (formData.class !== starship.class) {
         updates.class = formData.class;
+      }
+      if (formData.maxActiveExpeditions !== starship.maxActiveExpeditions) {
+        updates.maxActiveExpeditions = formData.maxActiveExpeditions;
       }
 
       await updateStarship(starshipId, updates);
@@ -178,7 +186,8 @@ export function StarshipEditModal({
       setFormData({
         name: starship.name,
         status: starship.status,
-        class: starship.class
+        class: starship.class,
+        maxActiveExpeditions: starship.maxActiveExpeditions
       });
     }
     setErrors({});
@@ -264,7 +273,7 @@ export function StarshipEditModal({
               <Select
                 value={formData.status}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, status: value as 'active' | 'docked' | 'maintenance' })
+                  setFormData({ ...formData, status: value as 'active' | 'inactive' })
                 }
               >
                 <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50">
@@ -321,6 +330,25 @@ export function StarshipEditModal({
                 {STARSHIP_CLASSES[formData.class].description}
               </p>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="max-expeditions">Max Active Expeditions</Label>
+              <Input
+                id="max-expeditions"
+                type="number"
+                min="1"
+                max="50"
+                value={formData.maxActiveExpeditions}
+                onChange={(e) => setFormData({ ...formData, maxActiveExpeditions: parseInt(e.target.value) || 1 })}
+                className="bg-background/50 backdrop-blur-sm border-border/50"
+              />
+              {errors.maxActiveExpeditions && (
+                <p className="text-sm text-destructive">{errors.maxActiveExpeditions}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Maximum number of active expeditions this starship can run simultaneously
+              </p>
+            </div>
           </div>
 
           {/* Preview Changes */}
@@ -344,6 +372,9 @@ export function StarshipEditModal({
                         </Badge>
                         <Badge variant="outline" className="capitalize">
                           {formData.class}
+                        </Badge>
+                        <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                          Max {formData.maxActiveExpeditions} Expeditions
                         </Badge>
                       </div>
                     </div>

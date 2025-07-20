@@ -42,6 +42,7 @@ export interface Agent {
   customInstructions?: string;
 
   // Deployment settings
+  starshipId: string;
   allowedStarshipClasses?: ('scout' | 'cruiser')[];
   requiredPermissions?: string[];
 }
@@ -64,10 +65,12 @@ export interface CreateAgentRequest {
   customInstructions?: string;
   allowedStarshipClasses?: ('scout' | 'cruiser')[];
   authorId?: string;
+  starshipId: string; // REQUIRED for new agents
 }
 
 export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
   version?: string;
+  starshipId?: string; // Allow updating starship assignment
 }
 
 export interface MemoryEntry {

@@ -4,8 +4,7 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { StarshipRepository, AgentRepository, Starship } from '@starships/models';
-import { VisionFileService } from '@starships/models';
+import type { StarshipRepository, AgentRepository, VisionRepository, Starship } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 
 const router: Router = Router();
@@ -14,13 +13,16 @@ const router: Router = Router();
 // TODO: Replace with proper dependency injection pattern
 let starshipRepo: StarshipRepository;
 let agentRepo: AgentRepository;
+let visionRepo: VisionRepository;
 
 export function initializeStarshipRoutes(deps: {
   starshipRepository: StarshipRepository;
   agentRepository: AgentRepository;
+  visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
+  visionRepo = deps.visionRepository;
 }
 
 // GET /starships - Get user's starships
@@ -44,7 +46,23 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 
     if (!name || !starshipClass) {
-      res.status(400).json({ error: 'Name and class are required' });
+      res.status(400).json({
+        error: 'Missing required fields',
+        details: 'Both name and class are required to create a starship',
+        required_fields: ['name', 'class'],
+        provided: { name: !!name, class: !!starshipClass }
+      });
+      return;
+    }
+
+    // Validate starship class
+    if (!['scout', 'cruiser'].includes(starshipClass)) {
+      res.status(400).json({
+        error: 'Invalid starship class',
+        details: 'Starship class must be either scout or cruiser',
+        allowed_values: ['scout', 'cruiser'],
+        provided: starshipClass
+      });
       return;
     }
 
@@ -60,17 +78,22 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       name,
       class: starshipClass,
       slug,
-      powerLevel: 85,
-      activeExpeditions: 0,
-      sibilInsights: 0,
+      maxActiveExpeditions: starshipClass === 'scout' ? 2 : 5,
       status: 'active'
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
-    console.log('[STARSHIP-CREATE] Creating empty vision file...');
-    // Create empty vision file for the new starship
-    await VisionFileService.createEmptyVision(starship.id);
-    console.log('[STARSHIP-CREATE] Vision file created successfully');
+    console.log('[STARSHIP-CREATE] Creating empty vision in database...');
+    // Create empty vision in database for the new starship
+    await visionRepo.create({
+      starshipId: starship.id,
+      statement: '',
+      confidence: 0.5,
+      refinementCount: 0,
+      lastRefined: new Date().toISOString(),
+      isActive: true
+    });
+    console.log('[STARSHIP-CREATE] Vision created successfully in database');
 
     console.log('[STARSHIP-CREATE] Starship creation completed successfully');
     res.status(201).json({ starship });
@@ -215,8 +238,8 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
     }
 
     if (status !== undefined) {
-      if (!['active', 'docked', 'maintenance'].includes(status)) {
-        res.status(400).json({ error: 'Status must be one of: active, docked, maintenance' });
+      if (!['active', 'inactive'].includes(status)) {
+        res.status(400).json({ error: 'Status must be one of: active, inactive' });
         return;
       }
       allowedUpdates.status = status;
@@ -240,6 +263,16 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
       allowedUpdates.class = starshipClass;
       // Update maxAgents based on new class
       allowedUpdates.maxAgents = starshipClass === 'scout' ? 3 : 6;
+    }
+
+    // NEW: Handle maxActiveExpeditions updates
+    const { maxActiveExpeditions } = req.body;
+    if (maxActiveExpeditions !== undefined) {
+      if (typeof maxActiveExpeditions !== 'number' || maxActiveExpeditions < 0) {
+        res.status(400).json({ error: 'maxActiveExpeditions must be a non-negative number' });
+        return;
+      }
+      allowedUpdates.maxActiveExpeditions = maxActiveExpeditions;
     }
 
     if (Object.keys(allowedUpdates).length === 0) {
@@ -278,13 +311,8 @@ router.delete('/starships/:id', authMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    // Check if starship has active expeditions (business rule)
-    if (starship.activeExpeditions > 0) {
-      res.status(400).json({
-        error: 'Cannot delete starship with active expeditions. Complete or cancel expeditions first.'
-      });
-      return;
-    }
+    // Note: activeExpeditions field removed - business logic can be implemented later
+    // if expedition tracking is needed in the future
 
     const deleted = await starshipRepo.delete(starshipId);
     if (!deleted) {
@@ -306,8 +334,8 @@ router.put('/starships/:id/status', authMiddleware, async (req: Request, res: Re
     const userId = req.user!.id;
     const { status } = req.body;
 
-    if (!status || !['active', 'docked', 'maintenance'].includes(status)) {
-      res.status(400).json({ error: 'Status must be one of: active, docked, maintenance' });
+    if (!status || !['active', 'inactive'].includes(status)) {
+      res.status(400).json({ error: 'Status must be one of: active, inactive' });
       return;
     }
 
@@ -323,13 +351,7 @@ router.put('/starships/:id/status', authMiddleware, async (req: Request, res: Re
       return;
     }
 
-    // Business rule: Can't set to maintenance if there are active expeditions
-    if (status === 'maintenance' && starship.activeExpeditions > 0) {
-      res.status(400).json({
-        error: 'Cannot set starship to maintenance with active expeditions'
-      });
-      return;
-    }
+    // Business rule simplified - status can be set to active or inactive freely
 
     const updatedStarship = await starshipRepo.update(starshipId, { status });
     if (!updatedStarship) {

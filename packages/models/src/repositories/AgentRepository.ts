@@ -51,10 +51,91 @@ export class AgentRepository implements AgentRepositoryInterface {
     return result.map((record) => record.a);
   }
 
+  // NEW: FK-based query methods for starshipId relationship
+  async findByStarshipId(starshipId: string): Promise<Agent[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ a: Agent }>(
+      'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',
+      { starshipId }
+    );
+    return result.map((record) => record.a);
+  }
+
+  async updateStarshipId(agentId: string, starshipId: string): Promise<void> {
+    const connection = getConnection();
+    
+    // Validate starshipId exists
+    const starshipCheck = await connection.executeQuery(
+      'MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count',
+      { starshipId }
+    );
+    
+    if (!starshipCheck[0] || starshipCheck[0].count === 0) {
+      throw new Error(`Starship with id ${starshipId} not found`);
+    }
+    
+    // Update agent's starshipId
+    const result = await connection.executeWrite<{ count: number }>(
+      `MATCH (a:Agent) WHERE a.id = $agentId
+       SET a.starshipId = $starshipId, a.updatedAt = $timestamp
+       RETURN count(a) as count`,
+      {
+        agentId,
+        starshipId,
+        timestamp: new Date().toISOString()
+      }
+    );
+    
+    if (!result[0] || result[0].count === 0) {
+      throw new Error(`Agent with id ${agentId} not found`);
+    }
+
+    // For backward compatibility, update Neo4j relationship during transition
+    try {
+      // Remove existing DEPLOYED_ON relationships
+      await connection.executeWrite(
+        'MATCH (a:Agent {id: $agentId})-[r:DEPLOYED_ON]->() DELETE r',
+        { agentId }
+      );
+      
+      // Create new DEPLOYED_ON relationship
+      await connection.executeWrite(
+        `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
+         CREATE (a)-[:DEPLOYED_ON {
+           deployedAt: $timestamp,
+           isActive: true
+         }]->(s)`,
+        {
+          starshipId,
+          agentId,
+          timestamp: new Date().toISOString()
+        }
+      );
+    } catch (error) {
+      // Log but don't fail - Neo4j relationship is optional during transition
+      console.warn('Failed to update Neo4j relationship for agent deployment:', error);
+    }
+  }
+
+  async findUndeployedAgents(): Promise<Agent[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ a: Agent }>(
+      'MATCH (a:Agent) WHERE a.starshipId IS NULL OR a.starshipId = "" RETURN a ORDER BY a.createdAt DESC',
+      {}
+    );
+    return result.map((record) => record.a);
+  }
+
   async create(
     entity: Omit<Agent, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
   ): Promise<Agent> {
     const connection = getConnection();
+    
+    // Validate required starshipId field
+    if (!entity.starshipId) {
+      throw new Error('starshipId is required when creating an agent');
+    }
+    
     const now = new Date().toISOString();
     const agent: Agent = {
       ...entity,
@@ -66,9 +147,29 @@ export class AgentRepository implements AgentRepositoryInterface {
       category: entity.category || 'general',
       isPublic: entity.isPublic || false,
       version: entity.version || '1.0.0',
+      starshipId: entity.starshipId, // Ensure starshipId is included
     };
 
     await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agent });
+
+    // For backward compatibility, also create Neo4j relationship during transition
+    try {
+      await connection.executeWrite(
+        `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
+         CREATE (a)-[:DEPLOYED_ON {
+           deployedAt: $timestamp,
+           isActive: true
+         }]->(s)`,
+        {
+          starshipId: agent.starshipId,
+          agentId: agent.id,
+          timestamp: now
+        }
+      );
+    } catch (error) {
+      // Log but don't fail - Neo4j relationship is optional during transition
+      console.warn('Failed to create Neo4j relationship for agent deployment:', error);
+    }
 
     return agent;
   }

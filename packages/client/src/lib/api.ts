@@ -108,55 +108,22 @@ export interface Starship {
   slug: string
   name: string
   class: 'scout' | 'cruiser'
-  powerLevel: number
   ownerId: string
-  status: 'active' | 'docked' | 'maintenance'
+  status: 'active' | 'inactive'
   maxAgents: number
-  activeExpeditions: number
-  sibilInsights: number
+  maxActiveExpeditions: number
   createdAt: string
   updatedAt: string
 }
 
-export interface Codex {
-  id: string
-  starshipId: string
-  version: string
-  timestamp: string
-  author: string
-  changeSummary: string
-  isActive: boolean
-}
-
 export interface Vision {
   id: string
-  codexId: string
+  starshipId: string
   statement: string
   confidence: number
   lastRefined: string
   refinementCount: number
   updatedAt: string
-}
-
-export interface CodexProjection {
-  vision?: string
-  goals?: Array<{
-    id: string
-    description: string
-    type: 'short_term' | 'long_term' | 'milestone'
-    status: string
-  }>
-  constraints?: Array<{
-    id: string
-    description: string
-    type: 'resource' | 'ethical' | 'technical' | 'business'
-    isActive: boolean
-  }>
-  concepts?: Array<{
-    id: string
-    description: string
-    category: string
-  }>
 }
 
 // Backend request/response types (snake_case)
@@ -207,6 +174,21 @@ export const agentAPI = {
       console.log('[API] Received agents from server:', res.data.length)
       return res.data
     })
+    apiCache.set(cacheKey, data)
+    return data
+  },
+
+  // Get agents by starship ID
+  getByStarshipId: async (starshipId: string): Promise<Agent[]> => {
+    const cacheKey = CACHE_KEYS.AGENTS_BY_STARSHIP(starshipId)
+    const cached = apiCache.get<Agent[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api
+      .get(`/api/agents/starship/${starshipId}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
   },
@@ -433,12 +415,13 @@ export const chatAPI = {
 // Define starship API types locally since they're not exported from protocol
 interface UpdateStarshipRequest {
   name?: string;
-  status?: 'active' | 'docked' | 'maintenance';
+  status?: 'active' | 'inactive';
   class?: 'scout' | 'cruiser';
+  maxActiveExpeditions?: number;
 }
 
 interface UpdateStarshipStatusRequest {
-  status: 'active' | 'docked' | 'maintenance';
+  status: 'active' | 'inactive';
 }
 
 interface StarshipResponse {
@@ -485,12 +468,26 @@ export const starshipAPI = {
   // Get user's starships
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
     api.get('/api/starships').then(res => res.data),
+  
+  // Get user's starships list (simple list for dropdowns)
+  getUserStarshipsList: async (): Promise<Starship[]> => {
+    const cacheKey = 'starships:list'
+    const cached = apiCache.get<Starship[]>(cacheKey)
+    if (cached) {
+      return cached
+    }
+
+    const data = await api.get('/api/starships').then(res => res.data.starships)
+    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes
+    return data
+  },
 
   // Create new starship
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser'
-  }): Promise<{ starship: Starship; codex: Codex }> =>
+    maxActiveExpeditions?: number
+  }): Promise<{ starship: Starship }> =>
     api.post('/api/starships', data).then(res => res.data),
 
   // Get starship details with caching (supports both ID and slug)
@@ -585,30 +582,6 @@ export const starshipAPI = {
     return data
   },
 
-  // Get active codex for starship
-  getCodex: (starshipId: string): Promise<{ codex: any }> =>
-    api.get(`/api/starships/${starshipId}/codex`).then(res => res.data),
-
-  // Update codex with mutations
-  updateCodex: (
-    starshipId: string,
-    mutations: {
-      vision?: { statement: string }
-      goals?: Array<{ description: string; type: 'short_term' | 'long_term' | 'milestone' }>
-      constraints?: Array<{
-        description: string
-        type: 'resource' | 'ethical' | 'technical' | 'business'
-      }>
-    }
-  ): Promise<{ codex: Codex }> =>
-    api.post(`/api/starships/${starshipId}/codex/mutate`, { mutations }).then(res => res.data),
-
-  // Get projection for specific lens
-  getProjection: (
-    starshipId: string,
-    lens: 'telos' | 'ethos' | 'full'
-  ): Promise<{ projection: CodexProjection }> =>
-    api.get(`/api/starships/${starshipId}/projection/${lens}`).then(res => res.data),
 }
 
 // NEW: Vision API

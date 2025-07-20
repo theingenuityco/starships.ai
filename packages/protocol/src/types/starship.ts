@@ -3,12 +3,13 @@
 export interface UpdateStarshipRequest {
   name?: string;
   slug?: string; // Optional - will be auto-generated from name if not provided
-  status?: 'active' | 'docked' | 'maintenance';
+  status?: 'active' | 'inactive';
   class?: 'scout' | 'cruiser';
+  maxActiveExpeditions?: number;
 }
 
 export interface UpdateStarshipStatusRequest {
-  status: 'active' | 'docked' | 'maintenance';
+  status: 'active' | 'inactive';
 }
 
 export interface StarshipResponse {
@@ -18,11 +19,9 @@ export interface StarshipResponse {
     ownerId: string;
     class: 'scout' | 'cruiser';
     name: string;
-    powerLevel: number;
-    activeExpeditions: number;
-    sibilInsights: number;
+    maxActiveExpeditions: number;
     maxAgents: number;
-    status: 'active' | 'docked' | 'maintenance';
+    status: 'active' | 'inactive';
     createdAt: string;
     updatedAt: string;
   };

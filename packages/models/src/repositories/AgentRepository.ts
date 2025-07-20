@@ -1,6 +1,7 @@
 import { getConnection } from '../connection';
 import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { int } from 'neo4j-driver';
 
 /**
  * Neo4j-based agent repository
@@ -231,8 +232,8 @@ export class AgentRepository implements AgentRepositoryInterface {
     const result = await connection.executeQuery<{ a: Agent }>(
       'MATCH (a:Agent) WHERE a.isPublic = true RETURN a ORDER BY a.usageCount DESC, a.rating DESC SKIP $offset LIMIT $limit',
       {
-        limit: Math.floor(Number(limit)),
-        offset: Math.floor(Number(offset)),
+        limit: int(limit),
+        offset: int(offset),
       }
     );
     return result.map((record) => record.a);

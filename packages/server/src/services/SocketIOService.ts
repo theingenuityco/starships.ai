@@ -2,6 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import type { SocketIOEvents, SocketConnectionState } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
+import { UserService } from './UserService';
 
 // Kinde JWKS endpoint for token verification
 const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
@@ -61,10 +62,40 @@ export class SocketIOService {
         }
 
         const payload = await verifySocketJWT(token);
-        socket.data.userId = payload.sub;
+        
+        // Look up user in database by Kinde ID (same as HTTP middleware)
+        let user;
+        try {
+          user = await UserService.getUserByKindeId(payload.sub as string);
+        } catch (dbError) {
+          console.error(`[SOCKET.IO] Database error when looking up user: ${payload.sub}`, dbError);
+          return next(new Error('Database error during authentication'));
+        }
+
+        if (!user) {
+          console.log(`[SOCKET.IO] User not found in database for Kinde ID: ${payload.sub}, attempting auto-sync`);
+          
+          // Auto-sync user if they don't exist (same as HTTP middleware)
+          try {
+            user = await UserService.syncUser({
+              kindeId: payload.sub as string,
+              email: (payload.email as string) || `user-${payload.sub}@unknown.com`,
+              name: (payload.given_name as string) || (payload.name as string),
+              avatar: payload.picture as string,
+            });
+            console.log(`[SOCKET.IO] User auto-synced: ${user.id} (${user.displayName || user.username})`);
+          } catch (syncError: any) {
+            console.error(`[SOCKET.IO] Failed to auto-sync user for Kinde ID: ${payload.sub}`, syncError);
+            return next(new Error('Failed to sync user'));
+          }
+        }
+
+        // Use internal user ID (not Kinde ID) for consistency with HTTP routes
+        socket.data.userId = user.id;
+        socket.data.kindeId = payload.sub;
         socket.data.authenticated = true;
         
-        console.log(`[SOCKET.IO] User ${payload.sub} authenticated`);
+        console.log(`[SOCKET.IO] User ${user.id} (${user.displayName || user.username}) authenticated`);
         next();
       } catch (error) {
         console.error('[SOCKET.IO] Authentication failed:', error);

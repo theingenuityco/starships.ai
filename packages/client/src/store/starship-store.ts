@@ -6,12 +6,12 @@ import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
 // Define types locally based on protocol package
 interface UpdateStarshipRequest {
   name?: string;
-  status?: 'active' | 'docked' | 'maintenance';
+  status?: 'active' | 'inactive';
   class?: 'scout' | 'cruiser';
 }
 
 interface UpdateStarshipStatusRequest {
-  status: 'active' | 'docked' | 'maintenance';
+  status: 'active' | 'inactive';
 }
 
 interface StarshipAgentsResponse {
@@ -188,7 +188,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             const state = get();
             if (!state || !state.starships) return 85;
             const activeStarship = state.starships.find(s => s.id === state.activeStarshipId);
-            return activeStarship?.powerLevel || 85;
+            return 85; // Default power level since powerLevel doesn't exist on Starship
           } catch {
             return 85;
           }
@@ -199,7 +199,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             const state = get();
             if (!state || !state.starships) return 0;
             const activeStarship = state.starships.find(s => s.id === state.activeStarshipId);
-            return activeStarship?.activeExpeditions || 0;
+            return 0; // Default active expeditions since activeExpeditions doesn't exist on Starship
           } catch {
             return 0;
           }
@@ -210,7 +210,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             const state = get();
             if (!state || !state.starships) return 0;
             const activeStarship = state.starships.find(s => s.id === state.activeStarshipId);
-            return activeStarship?.sibilInsights || 0;
+            return 0; // Default sibil insights since sibilInsights doesn't exist on Starship
           } catch {
             return 0;
           }

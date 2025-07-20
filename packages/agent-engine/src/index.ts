@@ -606,3 +606,6 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
 
 
 export { LangChainMemoryStore, chatStream };
+
+// Export First Officer Agent functionality
+export * from './first-officer';

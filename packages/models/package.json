@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "clean": "rm -rf dist && find tests -name '*.js' -o -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.js.map' | xargs rm -f",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "jest",
     "test:integration": "jest --config jest.integration.config.js",
@@ -15,7 +16,10 @@
     "test:coverage": "jest --coverage",
     "test:service": "jest --testPathIgnorePatterns=integration",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
-    "migrate": "tsx src/scripts/run-migration.ts"
+    "migrate": "tsx src/scripts/run-migration.ts",
+    "migrate:starship-schema": "tsx src/scripts/migrate-starship-schema.ts",
+    "migrate:starship-schema:dry-run": "tsx src/scripts/migrate-starship-schema.ts --dry-run",
+    "migrate:starship-schema:rollback": "tsx src/scripts/migrate-starship-schema.ts --rollback"
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",

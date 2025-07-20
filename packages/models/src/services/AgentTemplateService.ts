@@ -70,13 +70,14 @@ export class AgentTemplateService {
   async createAgentFromTemplate(
     templateId: string,
     agentName: string,
-    authorId: string
+    authorId: string,
+    starshipId: string
   ): Promise<Agent> {
     if (!agentName.trim()) {
       throw new Error('Agent name is required');
     }
 
-    return this.templateRepository.createAgentFromTemplate(templateId, agentName.trim(), authorId);
+    return this.templateRepository.createAgentFromTemplate(templateId, agentName.trim(), authorId, starshipId);
   }
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {

@@ -41,20 +41,30 @@ export class StarshipRepository implements StarshipRepositoryInterface {
     return result.map(record => record.s);
   }
 
-  async create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt'>): Promise<Starship> {
+  async create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }): Promise<Starship> {
     const connection = getConnection();
     
     // Set maxAgents based on class
     const maxAgents = entity.class === 'scout' ? 3 : 6;
     
+    // Set default maxActiveExpeditions based on class if not provided
+    const maxActiveExpeditions = entity.maxActiveExpeditions ?? (entity.class === 'scout' ? 2 : 4);
+    
     // Generate unique slug if not provided
     const slug = entity.slug || await this.generateUniqueSlug(entity.name, entity.ownerId);
+    
+    // Validate status - only allow 'active' | 'inactive'
+    if (entity.status && !['active', 'inactive'].includes(entity.status)) {
+      throw new Error(`Invalid status: ${entity.status}. Must be 'active' or 'inactive'`);
+    }
     
     const starship: Starship = {
       ...entity,
       id: uuidv4(),
       slug,
       maxAgents,
+      maxActiveExpeditions,
+      status: entity.status || 'active', // Default to active
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -89,9 +99,14 @@ export class StarshipRepository implements StarshipRepositoryInterface {
       }
     }
     
-    const updateProps = { 
-      ...updates, 
-      updatedAt: new Date().toISOString() 
+    // Validate status - only allow 'active' | 'inactive'
+    if (updates.status && !['active', 'inactive'].includes(updates.status)) {
+      throw new Error(`Invalid status: ${updates.status}. Must be 'active' or 'inactive'`);
+    }
+    
+    const updateProps = {
+      ...updates,
+      updatedAt: new Date().toISOString()
     };
     
     const result = await connection.executeWrite<{ s: Starship }>(
@@ -185,6 +200,60 @@ export class StarshipRepository implements StarshipRepositoryInterface {
 
     const { maxAgents, deployedCount } = result[0] || { maxAgents: 0, deployedCount: 0 };
     return maxAgents - Number(deployedCount);
+  }
+
+  async updateMaxActiveExpeditions(starshipId: string, maxActiveExpeditions: number): Promise<boolean> {
+    const connection = getConnection();
+    
+    // Validate maxActiveExpeditions is a positive number
+    if (maxActiveExpeditions < 0) {
+      throw new Error('maxActiveExpeditions must be a positive number');
+    }
+    
+    const result = await connection.executeWrite<{ count: number }>(
+      `MATCH (s:Starship) WHERE s.id = $starshipId
+       SET s.maxActiveExpeditions = $maxActiveExpeditions, s.updatedAt = $timestamp
+       RETURN count(s) as count`,
+      {
+        starshipId,
+        maxActiveExpeditions,
+        timestamp: new Date().toISOString()
+      }
+    );
+    
+    return result[0]?.count > 0;
+  }
+
+  async getMaxActiveExpeditions(starshipId: string): Promise<number | null> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ maxActiveExpeditions: number }>(
+      'MATCH (s:Starship) WHERE s.id = $starshipId RETURN s.maxActiveExpeditions as maxActiveExpeditions',
+      { starshipId }
+    );
+    
+    return result[0]?.maxActiveExpeditions ?? null;
+  }
+
+  async updateStatus(starshipId: string, status: 'active' | 'inactive'): Promise<boolean> {
+    const connection = getConnection();
+    
+    // Validate status
+    if (!['active', 'inactive'].includes(status)) {
+      throw new Error(`Invalid status: ${status}. Must be 'active' or 'inactive'`);
+    }
+    
+    const result = await connection.executeWrite<{ count: number }>(
+      `MATCH (s:Starship) WHERE s.id = $starshipId
+       SET s.status = $status, s.updatedAt = $timestamp
+       RETURN count(s) as count`,
+      {
+        starshipId,
+        status,
+        timestamp: new Date().toISOString()
+      }
+    );
+    
+    return result[0]?.count > 0;
   }
 
   async generateUniqueSlug(name: string, ownerId: string): Promise<string> {

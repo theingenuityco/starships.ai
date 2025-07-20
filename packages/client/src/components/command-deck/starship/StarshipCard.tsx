@@ -69,8 +69,7 @@ export function StarshipCard({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'docked': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'maintenance': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'inactive': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -78,8 +77,7 @@ export function StarshipCard({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active': return <CheckCircle className="w-3 h-3" />;
-      case 'docked': return <Circle className="w-3 h-3" />;
-      case 'maintenance': return <AlertCircle className="w-3 h-3" />;
+      case 'inactive': return <XCircle className="w-3 h-3" />;
       default: return <XCircle className="w-3 h-3" />;
     }
   };
@@ -146,20 +144,12 @@ export function StarshipCard({
 
               <div className="flex items-center space-x-6">
                 <div className="text-center">
-                  <div className="text-sm font-medium">{starship.powerLevel}%</div>
-                  <div className="text-xs text-muted-foreground">Power</div>
-                </div>
-                <div className="text-center">
                   <div className="text-sm font-medium">{deployedAgents.length}/{starship.maxAgents}</div>
                   <div className="text-xs text-muted-foreground">Agents</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm font-medium">{starship.activeExpeditions}</div>
-                  <div className="text-xs text-muted-foreground">Expeditions</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-sm font-medium">{starship.sibilInsights}</div>
-                  <div className="text-xs text-muted-foreground">Insights</div>
+                  <div className="text-sm font-medium">{starship.maxActiveExpeditions}</div>
+                  <div className="text-xs text-muted-foreground">Max Expeditions</div>
                 </div>
 
                 <DropdownMenu>
@@ -272,18 +262,6 @@ export function StarshipCard({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Power Level */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Zap className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">Power Level</span>
-              </div>
-              <span className="text-sm font-mono">{starship.powerLevel}%</span>
-            </div>
-            <Progress value={starship.powerLevel} className="h-2" />
-          </div>
-
           {/* Agent Deployment */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -295,9 +273,9 @@ export function StarshipCard({
                 {deployedAgents.length}/{starship.maxAgents}
               </span>
             </div>
-            <Progress 
-              value={(deployedAgents.length / (starship.maxAgents || 1)) * 100} 
-              className="h-2" 
+            <Progress
+              value={(deployedAgents.length / (starship.maxAgents || 1)) * 100}
+              className="h-2"
             />
             <div className="flex space-x-1">
               {Array.from({ length: starship.maxAgents || 0 }).map((_, i) => (
@@ -305,8 +283,8 @@ export function StarshipCard({
                   key={i}
                   className={cn(
                     "w-2 h-2 rounded-full",
-                    i < deployedAgents.length 
-                      ? "bg-blue-500" 
+                    i < deployedAgents.length
+                      ? "bg-blue-500"
                       : "bg-muted border border-border"
                   )}
                 />
@@ -315,20 +293,13 @@ export function StarshipCard({
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="grid grid-cols-1 gap-4 pt-2">
             <div className="text-center">
               <div className="flex items-center justify-center space-x-1 text-muted-foreground">
                 <Navigation className="w-3 h-3" />
-                <span className="text-xs">Expeditions</span>
+                <span className="text-xs">Max Expeditions</span>
               </div>
-              <div className="text-lg font-semibold">{starship.activeExpeditions}</div>
-            </div>
-            <div className="text-center">
-              <div className="flex items-center justify-center space-x-1 text-muted-foreground">
-                <Activity className="w-3 h-3" />
-                <span className="text-xs">Insights</span>
-              </div>
-              <div className="text-lg font-semibold">{starship.sibilInsights}</div>
+              <div className="text-lg font-semibold">{starship.maxActiveExpeditions}</div>
             </div>
           </div>
 

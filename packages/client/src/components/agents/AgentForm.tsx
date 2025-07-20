@@ -16,6 +16,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { StarshipSelector } from './StarshipSelector'
 import {
   X,
   Plus,
@@ -31,6 +32,7 @@ import {
   Globe,
   Lock,
   MessageSquare,
+  Rocket,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -53,14 +55,41 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     maxTokens: agent?.maxTokens,
     customInstructions: agent?.customInstructions || '',
     allowedStarshipClasses: agent?.allowedStarshipClasses || ['scout', 'cruiser'],
-  })
+    starshipId: (agent as any)?.starshipId || '',
+  } as CreateAgentRequest)
 
   const [newTag, setNewTag] = useState('')
   const [loading, setLoading] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({})
+
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {}
+
+    if (!formData.name.trim()) {
+      errors.name = 'Agent name is required'
+    }
+
+    if (!formData.category) {
+      errors.category = 'Category is required'
+    }
+
+    if (!(formData as any).starshipId) {
+      errors.starshipId = 'Starship assignment is required'
+    }
+
+    setFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -183,6 +212,31 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   Select the category that best describes your agent's purpose
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Rocket className="h-4 w-4 text-muted-foreground" />
+                  Starship Assignment
+                </label>
+                <StarshipSelector
+                  value={(formData as any).starshipId}
+                  onValueChange={(starshipId) =>
+                    setFormData(prev => ({ ...prev, starshipId } as any))
+                  }
+                  placeholder="Select a starship to deploy this agent"
+                  className={`border-muted-foreground/20 focus:border-primary ${
+                    formErrors.starshipId ? 'border-destructive' : ''
+                  }`}
+                />
+                {formErrors.starshipId && (
+                  <p className="text-sm text-destructive">{formErrors.starshipId}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Choose the starship where this agent will be deployed
                 </p>
               </div>
             </div>

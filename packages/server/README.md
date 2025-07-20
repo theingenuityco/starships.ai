@@ -39,8 +39,10 @@ src/
 │   └── environment.ts      # Environment configuration
 ├── routes/
 │   ├── agents.ts          # Agent management endpoints
+│   ├── starships.ts       # Starship management endpoints
 │   ├── chat.ts            # Chat processing endpoints
 │   ├── memory.ts          # Memory management endpoints
+│   ├── vision.ts          # Vision chamber endpoints
 │   └── redeploy.ts        # Deployment webhook
 └── services/
     └── AgentService.ts    # Business logic services
@@ -75,11 +77,96 @@ Content-Type: application/json
 }
 ```
 
+### Starship Endpoints
+
+#### List User's Starships
+```http
+GET /starships
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "starships": [
+    {
+      "id": "starship-123",
+      "slug": "enterprise",
+      "ownerId": "user-456",
+      "class": "cruiser",
+      "name": "Enterprise",
+      "maxActiveExpeditions": 5,
+      "maxAgents": 6,
+      "status": "active",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+#### Create Starship
+```http
+POST /starships
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Enterprise",
+  "class": "cruiser"
+}
+```
+
+**Response:**
+```json
+{
+  "starship": {
+    "id": "starship-123",
+    "slug": "enterprise",
+    "ownerId": "user-456",
+    "class": "cruiser",
+    "name": "Enterprise",
+    "maxActiveExpeditions": 5,
+    "maxAgents": 6,
+    "status": "active",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### Update Starship
+```http
+PUT /starships/:id
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Enterprise NX-01",
+  "status": "inactive",
+  "maxActiveExpeditions": 3
+}
+```
+
+**Response:**
+```json
+{
+  "starship": {
+    "id": "starship-123",
+    "name": "Enterprise NX-01",
+    "status": "inactive",
+    "maxActiveExpeditions": 3,
+    "updatedAt": "2024-01-15T11:00:00Z"
+  }
+}
+```
+
 ### Agent Endpoints
 
 #### List Agents
 ```http
-GET /v1/agents
+GET /agents
+Authorization: Bearer <token>
 ```
 
 **Response:**
@@ -89,26 +176,89 @@ GET /v1/agents
     "id": "agent-123",
     "name": "Assistant",
     "model": "gpt-4",
-    "provider": "openai",
-    "systemPrompt": "You are a helpful assistant"
+    "systemPrompt": "You are a helpful assistant",
+    "starshipId": "starship-123",
+    "category": "general",
+    "tags": ["assistant", "general"],
+    "isPublic": false,
+    "authorId": "user-456"
   }
 ]
 ```
 
-#### Get Agent
+#### Create Agent
 ```http
-GET /v1/agents/:id
+POST /agents
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Code Assistant",
+  "model": "gpt-4",
+  "systemPrompt": "You are a helpful coding assistant",
+  "starshipId": "starship-123",
+  "category": "coding",
+  "tags": ["coding", "development"],
+  "isPublic": false
+}
 ```
 
 **Response:**
 ```json
 {
-  "id": "agent-123",
-  "name": "Assistant", 
+  "id": "agent-456",
+  "name": "Code Assistant",
   "model": "gpt-4",
-  "provider": "openai",
-  "systemPrompt": "You are a helpful assistant"
+  "systemPrompt": "You are a helpful coding assistant",
+  "starshipId": "starship-123",
+  "category": "coding",
+  "tags": ["coding", "development"],
+  "isPublic": false,
+  "authorId": "user-456",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
 }
+```
+
+#### Update Agent Starship Assignment
+```http
+PUT /agents/:id/starship
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "starshipId": "starship-789"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Agent starship assignment updated successfully",
+  "agent": {
+    "id": "agent-456",
+    "starshipId": "starship-789",
+    "updatedAt": "2024-01-15T11:00:00Z"
+  }
+}
+```
+
+#### Get Agents by Starship
+```http
+GET /agents/by-starship/:starshipId
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "agent-123",
+    "name": "Assistant",
+    "starshipId": "starship-123",
+    "category": "general"
+  }
+]
 ```
 
 ### Memory Endpoints

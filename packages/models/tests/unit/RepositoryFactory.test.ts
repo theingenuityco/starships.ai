@@ -1,0 +1,423 @@
+/// <reference types="jest" />
+import { RepositoryFactory } from '../../src/repositories';
+import { getConnection } from '../../src/connection';
+import {
+  AgentRepository,
+  UserRepository,
+  ChannelRepository,
+  LLMRepository,
+  StarshipRepository,
+  CodexRepository,
+  VisionRepository,
+  ConstraintRepository,
+  ConceptRepository,
+  MetaAnchorRepository,
+  MCPServerOptionRepository,
+  MCPServerConnectorRepository,
+} from '../../src/repositories';
+import { AgentTemplateService } from '../../src/services/AgentTemplateService';
+
+// Mock all repository classes
+jest.mock('../../src/repositories/AgentRepository');
+jest.mock('../../src/repositories/UserRepository');
+jest.mock('../../src/repositories/ChannelRepository');
+jest.mock('../../src/repositories/LLMRepository');
+jest.mock('../../src/repositories/StarshipRepository');
+jest.mock('../../src/repositories/CodexRepository');
+jest.mock('../../src/repositories/VisionRepository');
+jest.mock('../../src/repositories/ConstraintRepository');
+jest.mock('../../src/repositories/ConceptRepository');
+jest.mock('../../src/repositories/MetaAnchorRepository');
+jest.mock('../../src/repositories/MCPServerOptionRepository');
+jest.mock('../../src/repositories/MCPServerConnectorRepository');
+jest.mock('../../src/services/AgentTemplateService');
+jest.mock('../../src/connection');
+
+describe('RepositoryFactory', () => {
+  let mockConnection: any;
+  let consoleLogSpy: jest.SpyInstance;
+  let consoleErrorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    // Reset factory state
+    RepositoryFactory.resetAll();
+
+    // Mock connection
+    mockConnection = {
+      executeQuery: jest.fn(),
+      executeWrite: jest.fn(),
+    };
+    (getConnection as jest.Mock).mockReturnValue(mockConnection);
+
+    // Spy on console methods
+    consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    RepositoryFactory.resetAll();
+  });
+
+  describe('Singleton Pattern', () => {
+    it('should return the same instance for multiple calls to getAgentRepository', async () => {
+      const repo1 = await RepositoryFactory.getAgentRepository();
+      const repo2 = await RepositoryFactory.getAgentRepository();
+
+      expect(repo1).toBe(repo2);
+      expect(AgentRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return the same instance for multiple calls to getMCPServerConnectorRepository', async () => {
+      const repo1 = await RepositoryFactory.getMCPServerConnectorRepository();
+      const repo2 = await RepositoryFactory.getMCPServerConnectorRepository();
+
+      expect(repo1).toBe(repo2);
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return the same instance for multiple calls to getStarshipRepository', async () => {
+      const repo1 = await RepositoryFactory.getStarshipRepository();
+      const repo2 = await RepositoryFactory.getStarshipRepository();
+
+      expect(repo1).toBe(repo2);
+      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Dependency Injection', () => {
+    it('should inject MCPServerConnectorRepository into StarshipRepository', async () => {
+      const starshipRepo = await RepositoryFactory.getStarshipRepository();
+
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+      expect(StarshipRepository).toHaveBeenCalledWith(expect.any(Object));
+    });
+
+    it('should initialize MCPServerConnectorRepository before StarshipRepository', async () => {
+      const starshipRepo = await RepositoryFactory.getStarshipRepository();
+
+      // Verify that MCPServerConnectorRepository was created first
+      const mcpConnectorCall = (MCPServerConnectorRepository as jest.Mock).mock
+        .invocationCallOrder[0];
+      const starshipCall = (StarshipRepository as jest.Mock).mock.invocationCallOrder[0];
+
+      expect(mcpConnectorCall).toBeLessThan(starshipCall);
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle repository creation errors gracefully', async () => {
+      // Reset and setup error mock
+      RepositoryFactory.resetAll();
+      (AgentRepository as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('Repository creation failed');
+      });
+
+      await expect(RepositoryFactory.getAgentRepository()).rejects.toThrow(
+        'Failed to initialize agentRepo: Repository creation failed'
+      );
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to initialize agentRepo: Repository creation failed')
+      );
+    });
+
+    it('should handle connection errors in AgentTemplateService', async () => {
+      RepositoryFactory.resetAll();
+      (getConnection as jest.Mock).mockImplementationOnce(() => {
+        throw new Error('Database connection failed');
+      });
+
+      await expect(RepositoryFactory.getAgentTemplateService()).rejects.toThrow(
+        'Failed to initialize agentTemplateService: Database connection failed'
+      );
+    });
+  });
+
+  describe('Logging', () => {
+    it('should log repository creation', async () => {
+      await RepositoryFactory.getAgentRepository();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Creating AgentRepository instance')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Successfully initialized agentRepo')
+      );
+    });
+
+    it('should log dependency injection', async () => {
+      await RepositoryFactory.getStarshipRepository();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Creating StarshipRepository instance with MCPServerConnectorRepository dependency'
+        )
+      );
+    });
+
+    it('should log reset operations', () => {
+      RepositoryFactory.resetAll();
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Resetting all repository instances')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('All repository instances reset successfully')
+      );
+    });
+  });
+
+  describe('Thread Safety', () => {
+    it('should handle concurrent initialization requests', async () => {
+      // Start multiple concurrent requests
+      const promises = [
+        RepositoryFactory.getAgentRepository(),
+        RepositoryFactory.getAgentRepository(),
+        RepositoryFactory.getAgentRepository(),
+      ];
+
+      const results = await Promise.all(promises);
+
+      // All should return the same instance
+      expect(results[0]).toBe(results[1]);
+      expect(results[1]).toBe(results[2]);
+
+      // Repository should only be created once
+      expect(AgentRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle concurrent initialization with dependencies', async () => {
+      const promises = [
+        RepositoryFactory.getStarshipRepository(),
+        RepositoryFactory.getStarshipRepository(),
+        RepositoryFactory.getMCPServerConnectorRepository(),
+      ];
+
+      const results = await Promise.all(promises);
+
+      // StarshipRepository instances should be the same
+      expect(results[0]).toBe(results[1]);
+
+      // Should only create one instance of each
+      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Utility Methods', () => {
+    describe('getInitializationStatus', () => {
+      it('should return correct initialization status', async () => {
+        let status = RepositoryFactory.getInitializationStatus();
+        expect(status.agentRepo).toBe(false);
+        expect(status.mcpServerConnectorRepo).toBe(false);
+
+        await RepositoryFactory.getAgentRepository();
+        await RepositoryFactory.getMCPServerConnectorRepository();
+
+        status = RepositoryFactory.getInitializationStatus();
+        expect(status.agentRepo).toBe(true);
+        expect(status.mcpServerConnectorRepo).toBe(true);
+      });
+    });
+
+    describe('hasActiveInitializations', () => {
+      it('should return false when no initializations are active', () => {
+        expect(RepositoryFactory.hasActiveInitializations()).toBe(false);
+      });
+    });
+
+    describe('getActiveInitializations', () => {
+      it('should return empty array when no initializations are active', () => {
+        expect(RepositoryFactory.getActiveInitializations()).toEqual([]);
+      });
+    });
+
+    describe('initializeAll', () => {
+      it('should initialize all repositories in correct order', async () => {
+        await RepositoryFactory.initializeAll();
+
+        // Verify all repositories were created
+        expect(AgentRepository).toHaveBeenCalledTimes(1);
+        expect(UserRepository).toHaveBeenCalledTimes(1);
+        expect(ChannelRepository).toHaveBeenCalledTimes(1);
+        expect(LLMRepository).toHaveBeenCalledTimes(1);
+        expect(StarshipRepository).toHaveBeenCalledTimes(1);
+        expect(CodexRepository).toHaveBeenCalledTimes(1);
+        expect(VisionRepository).toHaveBeenCalledTimes(1);
+        expect(ConstraintRepository).toHaveBeenCalledTimes(1);
+        expect(ConceptRepository).toHaveBeenCalledTimes(1);
+        expect(MetaAnchorRepository).toHaveBeenCalledTimes(1);
+        expect(MCPServerOptionRepository).toHaveBeenCalledTimes(1);
+        expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+        expect(AgentTemplateService).toHaveBeenCalledTimes(1);
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Starting initialization of all repositories')
+        );
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining('All repositories initialized successfully')
+        );
+      });
+    });
+
+    describe('validateCriticalRepositories', () => {
+      it('should pass validation when critical repositories are initialized', async () => {
+        await RepositoryFactory.getMCPServerConnectorRepository();
+        await RepositoryFactory.getStarshipRepository();
+
+        expect(() => RepositoryFactory.validateCriticalRepositories()).not.toThrow();
+
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining('All critical repositories validated successfully')
+        );
+      });
+
+      it('should throw error when critical repositories are not initialized', () => {
+        expect(() => RepositoryFactory.validateCriticalRepositories()).toThrow(
+          'Critical repository mcpServerConnectorRepo is not initialized'
+        );
+      });
+    });
+
+    describe('resetAll', () => {
+      it('should reset all repository instances and locks', async () => {
+        // Initialize some repositories
+        await RepositoryFactory.getAgentRepository();
+        await RepositoryFactory.getMCPServerConnectorRepository();
+
+        let status = RepositoryFactory.getInitializationStatus();
+        expect(status.agentRepo).toBe(true);
+        expect(status.mcpServerConnectorRepo).toBe(true);
+
+        // Reset all
+        RepositoryFactory.resetAll();
+
+        status = RepositoryFactory.getInitializationStatus();
+        expect(status.agentRepo).toBe(false);
+        expect(status.mcpServerConnectorRepo).toBe(false);
+        expect(RepositoryFactory.hasActiveInitializations()).toBe(false);
+      });
+    });
+  });
+
+  describe('All Repository Getters', () => {
+    it('should create AgentRepository', async () => {
+      const repo = await RepositoryFactory.getAgentRepository();
+      expect(repo).toBeDefined();
+      expect(AgentRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create UserRepository', async () => {
+      const repo = await RepositoryFactory.getUserRepository();
+      expect(repo).toBeDefined();
+      expect(UserRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create ChannelRepository', async () => {
+      const repo = await RepositoryFactory.getChannelRepository();
+      expect(repo).toBeDefined();
+      expect(ChannelRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create LLMRepository', async () => {
+      const repo = await RepositoryFactory.getLLMRepository();
+      expect(repo).toBeDefined();
+      expect(LLMRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create CodexRepository', async () => {
+      const repo = await RepositoryFactory.getCodexRepository();
+      expect(repo).toBeDefined();
+      expect(CodexRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create VisionRepository', async () => {
+      const repo = await RepositoryFactory.getVisionRepository();
+      expect(repo).toBeDefined();
+      expect(VisionRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create ConstraintRepository', async () => {
+      const repo = await RepositoryFactory.getConstraintRepository();
+      expect(repo).toBeDefined();
+      expect(ConstraintRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create ConceptRepository', async () => {
+      const repo = await RepositoryFactory.getConceptRepository();
+      expect(repo).toBeDefined();
+      expect(ConceptRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create MetaAnchorRepository', async () => {
+      const repo = await RepositoryFactory.getMetaAnchorRepository();
+      expect(repo).toBeDefined();
+      expect(MetaAnchorRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create MCPServerOptionRepository', async () => {
+      const repo = await RepositoryFactory.getMCPServerOptionRepository();
+      expect(repo).toBeDefined();
+      expect(MCPServerOptionRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create MCPServerConnectorRepository', async () => {
+      const repo = await RepositoryFactory.getMCPServerConnectorRepository();
+      expect(repo).toBeDefined();
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create StarshipRepository with dependency', async () => {
+      const repo = await RepositoryFactory.getStarshipRepository();
+      expect(repo).toBeDefined();
+      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+    });
+
+    it('should create AgentTemplateService with connection', async () => {
+      const service = await RepositoryFactory.getAgentTemplateService();
+      expect(service).toBeDefined();
+      expect(AgentTemplateService).toHaveBeenCalledTimes(1);
+      expect(AgentTemplateService).toHaveBeenCalledWith(mockConnection);
+    });
+  });
+
+  describe('Integration Scenarios', () => {
+    it('should handle complete factory lifecycle', async () => {
+      // Initialize all repositories
+      await RepositoryFactory.initializeAll();
+
+      // Validate critical repositories
+      RepositoryFactory.validateCriticalRepositories();
+
+      // Check status
+      const status = RepositoryFactory.getInitializationStatus();
+      expect(Object.values(status).every(Boolean)).toBe(true);
+
+      // Reset everything
+      RepositoryFactory.resetAll();
+
+      // Verify reset
+      const resetStatus = RepositoryFactory.getInitializationStatus();
+      expect(Object.values(resetStatus).every((val) => !val)).toBe(true);
+    });
+
+    it('should handle mixed initialization patterns', async () => {
+      // Initialize some repositories individually
+      await RepositoryFactory.getAgentRepository();
+      await RepositoryFactory.getMCPServerConnectorRepository();
+
+      // Then initialize all (should not recreate existing ones)
+      await RepositoryFactory.initializeAll();
+
+      // Verify singleton behavior maintained
+      expect(AgentRepository).toHaveBeenCalledTimes(1);
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+    });
+  });
+});

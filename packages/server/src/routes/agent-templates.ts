@@ -9,7 +9,7 @@ const router: Router = Router();
 // Get all templates
 router.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = await RepositoryFactory.getAgentTemplateService();
     const templates = await templateService.getAllTemplates();
     res.json(templates);
   } catch (error) {
@@ -21,7 +21,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // Get template by ID
 router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = await RepositoryFactory.getAgentTemplateService();
     const template = await templateService.getTemplateById(req.params.id);
 
     if (!template) {
@@ -47,7 +47,7 @@ router.post('/:templateId/create-agent', authMiddleware, async (req: Request, re
       return;
     }
 
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = await RepositoryFactory.getAgentTemplateService();
 
     // Check if template exists first
     const template = await templateService.getTemplateById(templateId);
@@ -90,11 +90,11 @@ router.post('/convert-from-agent/:agentId', authMiddleware, async (req: Request,
     }
 
     console.log('[TEMPLATE] Getting template service...');
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = await RepositoryFactory.getAgentTemplateService();
 
     // Check if agent exists and is public
     console.log('[TEMPLATE] Getting agent repository...');
-    const agentRepository = RepositoryFactory.getAgentRepository();
+    const agentRepository = await RepositoryFactory.getAgentRepository();
     console.log('[TEMPLATE] Finding agent by ID:', agentId);
     const agent = await agentRepository.findById(agentId);
 

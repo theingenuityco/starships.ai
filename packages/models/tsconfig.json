@@ -5,7 +5,7 @@
     "lib": ["ES2020"],
     "allowJs": true,
     "outDir": "./dist",
-    "rootDir": "src",
+    "rootDir": "./src",
     "strict": true,
     "moduleResolution": "node",
     "baseUrl": ".",
@@ -18,24 +18,15 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "composite": true,
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "tests",
-    "**/*.test.ts",
-    "**/*.spec.ts",
-    "**/__tests__/**"
-  ],
-  "references": [
-    { "path": "../protocol" }
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"],
+  "references": [{ "path": "../protocol" }]
 }

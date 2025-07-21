@@ -100,8 +100,6 @@ initializeStarshipRoutes({
   agentRepository,
   mcpServerOptionRepository,
   mcpServerConnectorRepository,
-  connectorConfigHistoryRepository,
-  connectorConfigTemplateRepository,
 });
 
 // Initialize vision routes with dependencies

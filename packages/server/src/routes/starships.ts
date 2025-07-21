@@ -117,7 +117,7 @@ export function initializeStarshipRoutes(deps: {
   mcpServerConnectorRepository: MCPServerConnectorRepository;
   connectorConfigTemplateRepository: ConnectorConfigTemplateRepository;
   connectorConfigHistoryRepository: ConnectorConfigHistoryRepository;
-  visionRepository: VisionRepository;
+  // visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
@@ -127,7 +127,7 @@ export function initializeStarshipRoutes(deps: {
   configHistoryRepo = deps.connectorConfigHistoryRepository;
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
-  visionRepo = deps.visionRepository;
+  // visionRepo = deps.visionRepository;
 }
 
 // GET /starships - Get user's starships

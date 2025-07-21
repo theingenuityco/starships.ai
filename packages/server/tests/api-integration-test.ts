@@ -145,9 +145,7 @@ class APIIntegrationTester {
         ownerId: 'test-user-1',
         class: 'scout',
         slug: 'api-test-starship',
-        powerLevel: 100,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 3,
         status: 'active',
       });
       this.testStarshipId = testStarship.id;

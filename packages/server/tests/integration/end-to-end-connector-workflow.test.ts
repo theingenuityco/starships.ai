@@ -172,9 +172,7 @@ class EndToEndConnectorWorkflowTester {
         ownerId: this.testUserId,
         class: 'cruiser',
         slug: 'e2e-test-starship',
-        powerLevel: 100,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 5,
         status: 'active',
       });
       this.testStarshipId = testStarship.id;

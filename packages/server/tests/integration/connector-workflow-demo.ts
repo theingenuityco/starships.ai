@@ -156,9 +156,7 @@ class ConnectorWorkflowDemo {
       ownerId: this.demoUserId,
       class: 'cruiser',
       slug: 'demo-starship-workflow',
-      powerLevel: 100,
-      activeExpeditions: 0,
-      sibilInsights: 0,
+      maxActiveExpeditions: 5,
       status: 'active',
     });
     this.demoStarshipId = demoStarship.id;

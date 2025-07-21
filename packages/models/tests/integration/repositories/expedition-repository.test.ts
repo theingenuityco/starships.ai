@@ -16,7 +16,7 @@ describe('ExpeditionRepository Integration Tests', () => {
     expeditionRepository = new ExpeditionRepository();
     starshipRepository = new StarshipRepository();
     userRepository = new UserRepository();
-    
+
     // Clean up any existing test data
     await connection.executeWrite('MATCH (n) DETACH DELETE n');
     console.log('✅ Test database cleaned');
@@ -35,12 +35,12 @@ describe('ExpeditionRepository Integration Tests', () => {
   describe('create()', () => {
     it('should create expedition with proper relationships', async () => {
       console.log('🚀 Testing expedition creation...');
-      
+
       // Create test user and starship
       const user = await userRepository.create({
         username: 'expedition-captain',
         email: 'captain@expedition.test',
-        displayName: 'Expedition Captain'
+        displayName: 'Expedition Captain',
       });
       console.log(`✅ Created test user: ${user.id}`);
 
@@ -48,10 +48,8 @@ describe('ExpeditionRepository Integration Tests', () => {
         ownerId: user.id,
         name: 'Test Expedition Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
       console.log(`✅ Created test starship: ${starship.id}`);
 
@@ -61,7 +59,11 @@ describe('ExpeditionRepository Integration Tests', () => {
         description: 'A test expedition for integration testing',
         objective: 'Validate expedition creation workflow',
         status: 'planning' as ExpeditionStatus,
-        participants: [user.id]
+        priority: 'medium' as const,
+        assignedAgents: [],
+        tags: [],
+        createdBy: user.id,
+        updatedAt: new Date().toISOString(),
       };
 
       console.log('🔄 Creating expedition...');
@@ -96,20 +98,22 @@ describe('ExpeditionRepository Integration Tests', () => {
 
     it('should handle expedition creation errors gracefully', async () => {
       console.log('🔍 Testing expedition creation error handling...');
-      
+
       const invalidExpeditionData = {
         starshipId: 'nonexistent-starship',
         title: 'Invalid Expedition',
         description: 'This should fail',
         objective: 'Test error handling',
         status: 'planning' as ExpeditionStatus,
-        participants: ['nonexistent-user']
+        priority: 'medium' as const,
+        assignedAgents: [],
+        tags: [],
+        createdBy: 'nonexistent-user',
+        updatedAt: new Date().toISOString(),
       };
 
       console.log('🔄 Attempting to create expedition with invalid data...');
-      await expect(
-        expeditionRepository.create(invalidExpeditionData)
-      ).rejects.toThrow();
+      await expect(expeditionRepository.create(invalidExpeditionData)).rejects.toThrow();
       console.log('✅ Error handling validated - invalid expedition creation properly rejected');
     });
   });
@@ -117,22 +121,20 @@ describe('ExpeditionRepository Integration Tests', () => {
   describe('findById()', () => {
     it('should retrieve expedition with all relationships', async () => {
       console.log('🔍 Testing expedition retrieval...');
-      
+
       // Setup test data
       const user = await userRepository.create({
         username: 'retrieval-test',
         email: 'retrieval@test.com',
-        displayName: 'Retrieval Test'
+        displayName: 'Retrieval Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Retrieval Test Ship',
         class: 'cruiser',
-        powerLevel: 95,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 6,
+        status: 'active',
       });
 
       const expedition = await expeditionRepository.create({
@@ -141,7 +143,11 @@ describe('ExpeditionRepository Integration Tests', () => {
         description: 'Testing expedition retrieval',
         objective: 'Validate data retrieval',
         status: 'planning',
-        participants: [user.id]
+        priority: 'medium' as const,
+        assignedAgents: [],
+        tags: [],
+        createdBy: user.id,
+        updatedAt: new Date().toISOString(),
       });
       console.log(`✅ Test expedition created: ${expedition.id}`);
 
@@ -159,22 +165,20 @@ describe('ExpeditionRepository Integration Tests', () => {
   describe('updateStatus()', () => {
     it('should update expedition status and track transitions', async () => {
       console.log('🔄 Testing expedition status updates...');
-      
+
       // Setup test data
       const user = await userRepository.create({
         username: 'status-test',
         email: 'status@test.com',
-        displayName: 'Status Test'
+        displayName: 'Status Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Status Test Ship',
         class: 'scout',
-        powerLevel: 80,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const expedition = await expeditionRepository.create({
@@ -183,14 +187,21 @@ describe('ExpeditionRepository Integration Tests', () => {
         description: 'Testing status transitions',
         objective: 'Validate status updates',
         status: 'planning',
-        participants: [user.id]
+        priority: 'medium' as const,
+        assignedAgents: [],
+        tags: [],
+        createdBy: user.id,
+        updatedAt: new Date().toISOString(),
       });
 
-      console.log(`🔄 Updating expedition status from planning to active...`);
-      const updatedExpedition = await expeditionRepository.updateStatus(expedition.id, 'active');
+      console.log(`🔄 Updating expedition status from planning to in-progress...`);
+      const updatedExpedition = await expeditionRepository.updateStatus(
+        expedition.id,
+        'in-progress'
+      );
 
       expect(updatedExpedition).not.toBeNull();
-      expect(updatedExpedition?.status).toBe('active');
+      expect(updatedExpedition?.status).toBe('in-progress');
       expect(updatedExpedition?.updatedAt).not.toBe(expedition.updatedAt);
       console.log('✅ Status update validated');
 
@@ -206,21 +217,19 @@ describe('ExpeditionRepository Integration Tests', () => {
   describe('Performance and Scalability', () => {
     it('should handle multiple expeditions efficiently', async () => {
       console.log('⚡ Testing expedition repository performance...');
-      
+
       const user = await userRepository.create({
         username: 'perf-test',
         email: 'perf@test.com',
-        displayName: 'Performance Test'
+        displayName: 'Performance Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Performance Test Ship',
         class: 'cruiser',
-        powerLevel: 90,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 6,
+        status: 'active',
       });
 
       const startTime = Date.now();
@@ -234,7 +243,11 @@ describe('ExpeditionRepository Integration Tests', () => {
           description: `Performance test expedition number ${i}`,
           objective: `Test objective ${i}`,
           status: 'planning',
-          participants: [user.id]
+          priority: 'medium' as const,
+          assignedAgents: [],
+          tags: [],
+          createdBy: user.id,
+          updatedAt: new Date().toISOString(),
         });
         expeditions.push(expedition);
       }

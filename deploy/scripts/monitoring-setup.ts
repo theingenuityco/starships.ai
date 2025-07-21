@@ -392,7 +392,7 @@ node deploy/monitoring/metrics-collector.js
           subject: 'Starships.ai Alert: {{ .GroupLabels.alertname }}',
           body: 'Alert: {{ .GroupLabels.alertname }}\nDescription: {{ range .Alerts }}{{ .Annotations.description }}{{ end }}',
         })),
-      });
+      } as any);
     }
 
     const alertmanagerPath = path.join(process.cwd(), 'deploy', 'monitoring', 'alertmanager.yml');

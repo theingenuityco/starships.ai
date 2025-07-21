@@ -8,7 +8,8 @@ import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashb
 import { ConnectorTroubleshootingPanel } from '@/components/crew/ConnectorTroubleshootingPanel'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, Users } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArrowLeft, Users, Plug, Bot } from 'lucide-react'
 import Link from 'next/link'
 
 interface StarshipCrewContentProps {
@@ -131,56 +132,75 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-[350px_1fr] flex-1 overflow-hidden">
-        {/* Left sidebar - fixed width */}
-        <div className="border-r bg-card shadow-sm overflow-hidden">
-          <div className="p-6 h-full flex flex-col">
-            <div className="flex-1 overflow-auto pr-1 -mr-1 space-y-6">
-              {/* ConnectorSelector above AgentSelector */}
-              <div className="pb-4 border-b border-border/50">
-                <ConnectorSelector
-                  starshipId={slug}
-                  selectedConnectors={connectorInstances
-                    .filter(instance => instance.template)
-                    .map(instance => instance.template!)}
-                  onConnectorsChange={handleConnectorsChange}
-                  disabled={connectorsLoading}
-                  className="mb-0"
-                  connectorInstances={connectorInstances}
-                />
-                {connectorsError && (
-                  <div className="mt-2 text-sm text-destructive">{connectorsError}</div>
-                )}
+      <div className="grid grid-cols-[400px_1fr] flex-1 overflow-hidden">
+        {/* Left sidebar - fixed width with tabs */}
+        <div className="border-r bg-card shadow-sm flex flex-col">
+          <div className="p-6 pb-0">
+            <Tabs defaultValue="agents" className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="agents" className="flex items-center gap-2">
+                  <Bot className="h-4 w-4" />
+                  Agents
+                </TabsTrigger>
+                <TabsTrigger value="connectors" className="flex items-center gap-2">
+                  <Plug className="h-4 w-4" />
+                  Connectors
+                </TabsTrigger>
+              </TabsList>
 
-                {/* Status Dashboard - compact view */}
-                {connectorInstances.length > 0 && (
-                  <div className="mt-3">
-                    <ConnectorStatusDashboard
-                      starshipId={slug}
-                      connectorInstances={connectorInstances}
-                      compact={true}
-                    />
-                  </div>
-                )}
+              <TabsContent
+                value="agents"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col"
+              >
+                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6">
+                  <AgentSelector
+                    selectedAgent={selectedAgent}
+                    onAgentSelect={handleAgentSelect}
+                    showCreateButton={true}
+                    showFilters={true}
+                  />
+                </div>
+              </TabsContent>
 
-                {/* Troubleshooting Panel - only show if there are issues */}
-                {connectorInstances.some(c => c.status === 'error' || c.errorMessage) && (
-                  <div className="mt-3">
-                    <ConnectorTroubleshootingPanel connectorInstances={connectorInstances} />
-                  </div>
-                )}
-              </div>
+              <TabsContent
+                value="connectors"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col"
+              >
+                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-6">
+                  <ConnectorSelector
+                    starshipId={slug}
+                    selectedConnectors={connectorInstances
+                      .filter(instance => instance.template)
+                      .map(instance => instance.template!)}
+                    onConnectorsChange={handleConnectorsChange}
+                    disabled={connectorsLoading}
+                    className="mb-0"
+                    connectorInstances={connectorInstances}
+                  />
+                  {connectorsError && (
+                    <div className="mt-2 text-sm text-destructive">{connectorsError}</div>
+                  )}
 
-              {/* AgentSelector */}
-              <div>
-                <AgentSelector
-                  selectedAgent={selectedAgent}
-                  onAgentSelect={handleAgentSelect}
-                  showCreateButton={true}
-                  showFilters={true}
-                />
-              </div>
-            </div>
+                  {/* Status Dashboard - compact view */}
+                  {connectorInstances.length > 0 && (
+                    <div className="mt-3">
+                      <ConnectorStatusDashboard
+                        starshipId={slug}
+                        connectorInstances={connectorInstances}
+                        compact={true}
+                      />
+                    </div>
+                  )}
+
+                  {/* Troubleshooting Panel - only show if there are issues */}
+                  {connectorInstances.some(c => c.status === 'error' || c.errorMessage) && (
+                    <div className="mt-3">
+                      <ConnectorTroubleshootingPanel connectorInstances={connectorInstances} />
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
 

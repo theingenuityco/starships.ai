@@ -185,14 +185,6 @@ export function ConnectorSelector({
     }
   }
 
-  // Clear all selections
-  const handleClearAll = async () => {
-    if (disabled) return
-
-    // Let parent handle the connector instance removal
-    onConnectorsChange([])
-  }
-
   // Render loading state
   if (loading && availableConnectors.length === 0) {
     return (
@@ -237,199 +229,219 @@ export function ConnectorSelector({
   }
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center">
-            <span className="bg-primary/10 p-2 rounded-md mr-3">
-              <Plug className="h-5 w-5 text-primary" />
-            </span>
-            <h3 className="text-lg font-semibold">Connectors</h3>
+    <div className={cn('space-y-6', className)}>
+      {/* Enhanced Header with better visual hierarchy */}
+      <div className="flex items-center p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
+            <Plug className="h-6 w-6 text-primary" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-foreground">Connectors</h3>
+            <p className="text-sm text-muted-foreground">
+              Manage your starship's external connections
+            </p>
           </div>
           {selectedConnectors.length > 0 && (
-            <Badge variant="outline" className="text-xs">
-              {selectedConnectors.length}
+            <Badge
+              variant="default"
+              className="text-sm px-3 py-1 bg-primary text-primary-foreground flex-shrink-0"
+            >
+              {selectedConnectors.length} Active
             </Badge>
           )}
         </div>
-        {selectedConnectors.length > 0 && (
-          <Button
-            onClick={handleClearAll}
-            size="sm"
-            variant="ghost"
-            disabled={disabled || loading}
-            className="text-muted-foreground hover:text-foreground text-xs"
-          >
-            Clear All
-          </Button>
-        )}
       </div>
 
-      {/* Multi-select Dropdown */}
-      <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="w-full justify-between h-auto min-h-[2.5rem] p-3 bg-card hover:bg-muted/50 transition-colors"
-            disabled={disabled}
-            aria-label="Select connectors"
-            aria-expanded={isDropdownOpen}
-            aria-haspopup="listbox"
+      {/* Browse Connectors Section */}
+      <div className="space-y-3">
+        {/* Multi-select Dropdown with enhanced styling */}
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-full justify-between h-auto min-h-[3rem] p-4 bg-gradient-to-r from-card to-muted/30 hover:from-muted/50 hover:to-muted/70 transition-all duration-200 border-2 border-dashed border-primary/30 hover:border-primary/50 shadow-sm hover:shadow-md"
+              disabled={disabled}
+              aria-label="Select connectors"
+              aria-expanded={isDropdownOpen}
+              aria-haspopup="listbox"
+            >
+              <div className="flex flex-1 mr-2 items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"></div>
+                {selectedConnectors.length === 0 ? (
+                  <span className="text-muted-foreground font-medium">
+                    Browse & Select Connectors...
+                  </span>
+                ) : (
+                  <span className="text-foreground font-medium">Browse More Connectors</span>
+                )}
+              </div>
+              <ChevronDown className="w-5 h-5 flex-shrink-0 text-primary/70" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[350px] overflow-y-auto bg-card/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl"
+            align="start"
           >
-            <div className="flex flex-1 mr-2">
-              {selectedConnectors.length === 0 ? (
-                <span className="text-muted-foreground">Select connectors...</span>
-              ) : (
-                <span className="text-foreground">Browse Connectors</span>
-              )}
-            </div>
-            <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[300px] overflow-y-auto bg-card border-border shadow-lg"
-          align="start"
-        >
-          <DropdownMenuLabel>Available Connectors</DropdownMenuLabel>
-          <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-primary font-semibold">
+              Available Connectors
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-primary/20" />
 
-          {filteredConnectors.length === 0 ? (
-            <DropdownMenuItem disabled>No connectors available</DropdownMenuItem>
-          ) : (
-            filteredConnectors.map(connector => {
-              const isSelected = isConnectorSelected(connector)
-              const isConnecting = connectingIds.has(connector.id)
-              const connectorInstance = getConnectorInstance(connector)
-              const status = getConnectorStatus(connector)
+            {filteredConnectors.length === 0 ? (
+              <DropdownMenuItem disabled>No connectors available</DropdownMenuItem>
+            ) : (
+              filteredConnectors.map(connector => {
+                const isSelected = isConnectorSelected(connector)
+                const isConnecting = connectingIds.has(connector.id)
+                const connectorInstance = getConnectorInstance(connector)
+                const status = getConnectorStatus(connector)
 
-              // Enhanced status display with health metrics
-              const healthMetrics = connectorInstance
-                ? monitoringService.createHealthMetrics(connectorInstance, connector)
-                : null
+                // Enhanced status display with health metrics
+                const healthMetrics = connectorInstance
+                  ? monitoringService.createHealthMetrics(connectorInstance, connector)
+                  : null
 
-              const getStatusIcon = () => {
-                if (isConnecting) {
-                  return <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                }
+                const getStatusIcon = () => {
+                  if (isConnecting) {
+                    return <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                  }
 
-                if (healthMetrics) {
-                  switch (healthMetrics.healthStatus) {
-                    case 'healthy':
-                      return <CheckCircle className="w-3 h-3 text-green-500" />
-                    case 'warning':
-                      return <AlertTriangle className="w-3 h-3 text-yellow-500" />
-                    case 'critical':
+                  if (healthMetrics) {
+                    switch (healthMetrics.healthStatus) {
+                      case 'healthy':
+                        return <CheckCircle className="w-3 h-3 text-green-500" />
+                      case 'warning':
+                        return <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                      case 'critical':
+                        return <XCircle className="w-3 h-3 text-red-500" />
+                      default:
+                        return <AlertCircle className="w-3 h-3 text-gray-500" />
+                    }
+                  }
+
+                  switch (status) {
+                    case 'active':
+                      return <Wifi className="w-3 h-3 text-green-500" />
+                    case 'connecting':
+                      return <Clock className="w-3 h-3 text-blue-500" />
+                    case 'error':
                       return <XCircle className="w-3 h-3 text-red-500" />
+                    case 'inactive':
+                      return <WifiOff className="w-3 h-3 text-gray-500" />
                     default:
-                      return <AlertCircle className="w-3 h-3 text-gray-500" />
+                      return <WifiOff className="w-3 h-3 text-gray-400" />
                   }
                 }
 
-                switch (status) {
-                  case 'active':
-                    return <Wifi className="w-3 h-3 text-green-500" />
-                  case 'connecting':
-                    return <Clock className="w-3 h-3 text-blue-500" />
-                  case 'error':
-                    return <XCircle className="w-3 h-3 text-red-500" />
-                  case 'inactive':
-                    return <WifiOff className="w-3 h-3 text-gray-500" />
-                  default:
-                    return <WifiOff className="w-3 h-3 text-gray-400" />
+                const getStatusText = () => {
+                  if (healthMetrics && status === 'active') {
+                    return `${status} (${healthMetrics.healthStatus})`
+                  }
+                  switch (status) {
+                    case 'active':
+                      return 'Active'
+                    case 'connecting':
+                      return 'Connecting...'
+                    case 'error':
+                      return 'Error'
+                    case 'inactive':
+                      return 'Inactive'
+                    default:
+                      return 'Not connected'
+                  }
                 }
-              }
 
-              const getStatusText = () => {
-                if (healthMetrics && status === 'active') {
-                  return `${status} (${healthMetrics.healthStatus})`
+                const getHealthTooltip = () => {
+                  if (!healthMetrics) return getStatusText()
+                  return `Status: ${status}\nHealth: ${healthMetrics.healthStatus}\nUptime: ${connectorMonitoring.formatUptime(healthMetrics.uptime)}\nSuccess Rate: ${connectorMonitoring.formatSuccessRate(healthMetrics.successRate)}`
                 }
-                switch (status) {
-                  case 'active':
-                    return 'Active'
-                  case 'connecting':
-                    return 'Connecting...'
-                  case 'error':
-                    return 'Error'
-                  case 'inactive':
-                    return 'Inactive'
-                  default:
-                    return 'Not connected'
-                }
-              }
 
-              const getHealthTooltip = () => {
-                if (!healthMetrics) return getStatusText()
-                return `Status: ${status}\nHealth: ${healthMetrics.healthStatus}\nUptime: ${connectorMonitoring.formatUptime(healthMetrics.uptime)}\nSuccess Rate: ${connectorMonitoring.formatSuccessRate(healthMetrics.successRate)}`
-              }
-
-              return (
-                <DropdownMenuItem
-                  key={connector.id}
-                  onClick={() => handleConnectorToggle(connector)}
-                  disabled={disabled || isConnecting}
-                  className="flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                  role="option"
-                  aria-selected={isSelected}
-                >
-                  <div className="flex items-center justify-center w-4 h-4 mt-0.5">
-                    {isConnecting ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : isSelected ? (
-                      <Check className="w-3 h-3 text-primary" />
-                    ) : (
-                      <div className="w-3 h-3 border border-muted-foreground/30 rounded-sm" />
+                return (
+                  <DropdownMenuItem
+                    key={connector.id}
+                    onClick={() => handleConnectorToggle(connector)}
+                    disabled={disabled || isConnecting}
+                    className={cn(
+                      'flex items-start gap-3 p-4 cursor-pointer transition-all duration-200 border-l-4 border-transparent hover:border-primary/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent',
+                      isSelected && 'border-primary bg-gradient-to-r from-primary/10 to-primary/5'
                     )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm">{connector.name}</span>
-                      <Badge
-                        variant={getCommandBadgeVariant(connector.command)}
-                        className="text-xs"
-                      >
-                        {connector.command.toUpperCase()}
-                      </Badge>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="flex items-center gap-1 cursor-help">
-                              {getStatusIcon()}
-                              <span className="text-xs text-muted-foreground">
-                                {getStatusText()}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <div className="text-xs whitespace-pre-line">{getHealthTooltip()}</div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <div className="flex items-center justify-center w-5 h-5 mt-0.5">
+                      {isConnecting ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      ) : isSelected ? (
+                        <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        </div>
+                      ) : (
+                        <div className="w-4 h-4 border-2 border-muted-foreground/40 rounded-full hover:border-primary/60 transition-colors" />
+                      )}
                     </div>
 
-                    {connector.env && (
-                      <p className="text-xs text-muted-foreground">
-                        {formatEnvForDisplay(connector.env)}
-                      </p>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-semibold text-sm text-foreground">
+                          {connector.name}
+                        </span>
+                        <Badge
+                          variant={getCommandBadgeVariant(connector.command)}
+                          className="text-xs font-medium"
+                        >
+                          {connector.command.toUpperCase()}
+                        </Badge>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5 cursor-help px-2 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors">
+                                {getStatusIcon()}
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  {getStatusText()}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs whitespace-pre-line">
+                                {getHealthTooltip()}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
 
-                    {connectorInstance?.errorMessage && status === 'error' && (
-                      <p className="text-xs text-red-500 mt-1">{connectorInstance.errorMessage}</p>
-                    )}
-                  </div>
-                </DropdownMenuItem>
-              )
-            })
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+                      {connector.env && (
+                        <p className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                          {formatEnvForDisplay(connector.env)}
+                        </p>
+                      )}
 
-      {/* Selected Connectors Display */}
+                      {connectorInstance?.errorMessage && status === 'error' && (
+                        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded mt-1 border border-red-200 dark:border-red-800">
+                          {connectorInstance.errorMessage}
+                        </p>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                )
+              })
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Enhanced Selected Connectors Display */}
       {selectedConnectors.length > 0 && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Selected Connectors:</label>
-          <div className="space-y-2">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <div className="h-px bg-gradient-to-r from-green-500/50 to-transparent flex-1"></div>
+            <h4 className="text-sm font-semibold text-green-600 uppercase tracking-wide">
+              Active Connectors
+            </h4>
+            <div className="h-px bg-gradient-to-l from-green-500/50 to-transparent flex-1"></div>
+          </div>
+          <div className="space-y-3">
             {selectedConnectors.map(connector => {
               const isConnecting = connectingIds.has(connector.id)
               const connectorInstance = getConnectorInstance(connector)
@@ -558,19 +570,23 @@ export function ConnectorSelector({
                 <div
                   key={connector.id}
                   className={cn(
-                    'flex items-center justify-between p-3 border rounded-lg bg-card transition-colors',
+                    'flex items-center justify-between p-4 border-2 rounded-xl bg-gradient-to-r from-card to-muted/20 transition-all duration-200 shadow-sm hover:shadow-md',
                     statusDisplay.borderColor
                   )}
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex items-center gap-1">{statusDisplay.icon}</div>
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 border-2 border-primary/20">
+                      {statusDisplay.icon}
+                    </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-medium text-sm">{connector.name}</span>
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
+                        <span className="font-bold text-base text-foreground">
+                          {connector.name}
+                        </span>
                         <Badge
                           variant={getCommandBadgeVariant(connector.command)}
-                          className="text-xs"
+                          className="text-xs font-semibold px-2 py-1"
                         >
                           {connector.command.toUpperCase()}
                         </Badge>
@@ -578,13 +594,15 @@ export function ConnectorSelector({
                       </div>
 
                       {connector.env && (
-                        <p className="text-xs text-muted-foreground mb-1">
+                        <p className="text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full mb-2 inline-block">
                           {formatEnvForDisplay(connector.env)}
                         </p>
                       )}
 
                       {connectorInstance?.errorMessage && status === 'error' && (
-                        <p className="text-xs text-red-500">{connectorInstance.errorMessage}</p>
+                        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full border border-red-200 dark:border-red-800 mb-2 inline-block">
+                          {connectorInstance.errorMessage}
+                        </p>
                       )}
 
                       {connectorInstance?.lastUsed && (
@@ -595,7 +613,7 @@ export function ConnectorSelector({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     {/* Configuration button - only show if connector instance exists and callbacks are provided */}
                     {connectorInstance && onConfigUpdate && onTemplateApply && (
                       <ConnectorInstanceConfig
@@ -615,9 +633,9 @@ export function ConnectorSelector({
                     <Button
                       onClick={() => handleConnectorToggle(connector)}
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       disabled={disabled || isConnecting}
-                      className="h-8 w-8 p-0"
+                      className="h-9 w-9 p-0 border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive hover:text-destructive"
                       aria-label={`Remove ${connector.name}`}
                     >
                       <X className="w-4 h-4" />

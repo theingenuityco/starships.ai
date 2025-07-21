@@ -17,11 +17,19 @@ import {
   Headphones,
   Database,
   PenTool,
+  MoreVertical,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 
 interface AgentCardProps {
   agent: Agent
@@ -241,68 +249,83 @@ export function AgentCard({
             </div>
           </div>
 
-          {/* Action buttons positioned on the right side */}
+          {/* Action dropdown menu positioned on the right side */}
           {showActions && (onEdit || onDelete || onTest || onAnalytics) && (
-            <div className="flex flex-col items-center gap-1.5 absolute top-4 right-4 z-10">
-              {onAnalytics && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onAnalytics(agent)
-                  }}
-                  title="View Analytics"
-                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/20"
+            <div className="absolute top-4 right-4 z-10">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={e => e.stopPropagation()}
+                    className="h-8 w-8 p-0 rounded-full bg-background/90 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/30 hover:border-primary/50 transition-all duration-200"
+                    title="Agent Actions"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                    <span className="sr-only">Open agent actions menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48 bg-background/95 backdrop-blur-sm border border-border/50 shadow-lg"
+                  onClick={e => e.stopPropagation()}
                 >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                </Button>
-              )}
+                  {onAnalytics && (
+                    <DropdownMenuItem
+                      onClick={e => {
+                        e.stopPropagation()
+                        onAnalytics(agent)
+                      }}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                    >
+                      <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                      <span>View Analytics</span>
+                    </DropdownMenuItem>
+                  )}
 
-              {onTest && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onTest(agent)
-                  }}
-                  title="Test Agent"
-                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/20"
-                >
-                  <TestTube className="w-3.5 h-3.5" />
-                </Button>
-              )}
+                  {onTest && (
+                    <DropdownMenuItem
+                      onClick={e => {
+                        e.stopPropagation()
+                        onTest(agent)
+                      }}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                    >
+                      <TestTube className="w-4 h-4 text-muted-foreground" />
+                      <span>Test Agent</span>
+                    </DropdownMenuItem>
+                  )}
 
-              {onEdit && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onEdit(agent)
-                  }}
-                  title="Edit Agent"
-                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-primary/10 hover:text-primary shadow-sm border border-border/20"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                </Button>
-              )}
+                  {onEdit && (
+                    <DropdownMenuItem
+                      onClick={e => {
+                        e.stopPropagation()
+                        onEdit(agent)
+                      }}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                    >
+                      <Edit className="w-4 h-4 text-muted-foreground" />
+                      <span>Edit Agent</span>
+                    </DropdownMenuItem>
+                  )}
 
-              {onDelete && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={e => {
-                    e.stopPropagation()
-                    onDelete(agent)
-                  }}
-                  className="h-7 w-7 p-0 rounded-full bg-background/80 hover:bg-destructive/10 hover:text-destructive shadow-sm border border-border/20"
-                  title="Delete Agent"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              )}
+                  {onDelete && (
+                    <>
+                      {(onAnalytics || onTest || onEdit) && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        onClick={e => {
+                          e.stopPropagation()
+                          onDelete(agent)
+                        }}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Delete Agent</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>

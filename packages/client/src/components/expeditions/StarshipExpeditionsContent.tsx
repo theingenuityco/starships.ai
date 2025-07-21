@@ -14,6 +14,7 @@ import { CreateExpeditionModal } from './CreateExpeditionModal';
 import { ExpeditionCard } from './ExpeditionCard';
 import { useExpeditionData } from '@/hooks/useExpeditionData';
 import { useExpeditionSocket } from '@/hooks/useExpeditionSocket';
+import { expeditionAPI } from '@/lib/expeditionApi';
 
 // Local type definitions
 interface Expedition {
@@ -63,10 +64,13 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
   // Socket integration for real-time updates
   useExpeditionSocket({
-    onExpeditionUpdate: () => {
+    onExpeditionUpdated: () => {
       refreshExpeditions();
     },
-    onStatusChange: () => {
+    onExpeditionStarted: () => {
+      refreshExpeditions();
+    },
+    onExpeditionCompleted: () => {
       refreshExpeditions();
     }
   });
@@ -261,7 +265,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
           <div className="flex items-center justify-center h-64">
             <Card className="p-6 text-center">
               <p className="text-red-500 mb-4">Error loading expeditions</p>
-              <p className="text-sm text-muted-foreground mb-4">{expeditionsError}</p>
+              <p className="text-sm text-muted-foreground mb-4">{expeditionsError?.message || 'Unknown error occurred'}</p>
               <Button onClick={refreshExpeditions} variant="outline">
                 Try Again
               </Button>
@@ -298,6 +302,79 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 <ExpeditionCard
                   expedition={expedition}
                   onClick={() => handleExpeditionClick(expedition.id)}
+                  showActions={true}
+                  enableRealTimeUpdates={true}
+                  enableContextMenu={true}
+                  showAgentAvatars={true}
+                  showQualityScore={true}
+                  showTaskProgress={true}
+                  onStart={async (expeditionId) => {
+                    try {
+                      await expeditionAPI.startExpedition(starshipId, expeditionId);
+                      refreshExpeditions();
+                      return true;
+                    } catch (error) {
+                      console.error('Failed to start expedition:', error);
+                      return false;
+                    }
+                  }}
+                  onPause={async (expeditionId) => {
+                    try {
+                      await expeditionAPI.pauseExpedition(starshipId, expeditionId);
+                      refreshExpeditions();
+                      return true;
+                    } catch (error) {
+                      console.error('Failed to pause expedition:', error);
+                      return false;
+                    }
+                  }}
+                  onResume={async (expeditionId) => {
+                    try {
+                      await expeditionAPI.resumeExpedition(starshipId, expeditionId);
+                      refreshExpeditions();
+                      return true;
+                    } catch (error) {
+                      console.error('Failed to resume expedition:', error);
+                      return false;
+                    }
+                  }}
+                  onCancel={async (expeditionId) => {
+                    try {
+                      await expeditionAPI.cancelExpedition(starshipId, expeditionId);
+                      refreshExpeditions();
+                      return true;
+                    } catch (error) {
+                      console.error('Failed to cancel expedition:', error);
+                      return false;
+                    }
+                  }}
+                  onViewDetails={(expeditionId) => {
+                    router.push(`/ship/${slug}/expeditions/${expeditionId}`);
+                  }}
+                  onViewChat={(expeditionId) => {
+                    router.push(`/ship/${slug}/expeditions/${expeditionId}?tab=chat`);
+                  }}
+                  onViewAnalytics={(expeditionId) => {
+                    router.push(`/ship/${slug}/expeditions/${expeditionId}?tab=analytics`);
+                  }}
+                  onEdit={(expeditionId) => {
+                    // TODO: Implement edit functionality
+                    console.log('Edit expedition:', expeditionId);
+                  }}
+                  onDuplicate={(expeditionId) => {
+                    // TODO: Implement duplicate functionality
+                    console.log('Duplicate expedition:', expeditionId);
+                  }}
+                  onDelete={async (expeditionId) => {
+                    if (confirm('Are you sure you want to delete this expedition?')) {
+                      try {
+                        await expeditionAPI.deleteExpedition(starshipId, expeditionId);
+                        refreshExpeditions();
+                      } catch (error) {
+                        console.error('Failed to delete expedition:', error);
+                      }
+                    }
+                  }}
                 />
               </motion.div>
             ))}

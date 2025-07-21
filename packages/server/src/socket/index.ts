@@ -10,6 +10,9 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   const socketService = SocketIOService.initialize(httpServer);
   const io = socketService.getIO();
 
+  // Start health monitoring for connection stability
+  socketService.startHealthMonitoring();
+
   // Setup Sibil-specific handlers
   setupSibilHandlers(io);
 
@@ -22,7 +25,18 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   // Initialize expedition socket utilities
   ExpeditionSocketUtils.initialize(io);
 
-  console.log('[SOCKET.IO] Socket.IO server initialized successfully');
+  // Log connection statistics periodically
+  setInterval(() => {
+    const stats = socketService.getConnectionStats();
+    console.log('[SOCKET.IO] Connection Stats:', {
+      totalConnections: stats.totalConnections,
+      connectedUsers: stats.connectedUsers,
+      averagePingTime: Math.round(stats.averagePingTime),
+      healthyConnections: stats.healthyConnections
+    });
+  }, 60000); // Log every minute
+
+  console.log('[SOCKET.IO] Socket.IO server initialized successfully with enhanced features');
   return socketService;
 }
 

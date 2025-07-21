@@ -4,6 +4,26 @@ import type { SocketIOEvents, SocketConnectionState } from '@starships/protocol'
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from './UserService';
 
+// Enhanced event emission options
+interface EventEmissionOptions {
+  expeditionId?: string;
+  excludeUser?: string;
+  includeUsers?: string[];
+  retryCount?: number;
+  timeout?: number;
+}
+
+interface EventEmissionResult {
+  success: boolean;
+  eventType: string;
+  recipientCount: number;
+  errors?: Array<{
+    userId: string;
+    error: string;
+  }>;
+  timestamp: string;
+}
+
 // Kinde JWKS endpoint for token verification
 const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
 const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
@@ -194,7 +214,150 @@ export class SocketIOService {
     this.io.to(userRoom).emit(event, data);
   }
 
+  // Enhanced event emission with error handling and retry logic
+  async emitToUserWithRetry(
+    userId: string,
+    event: keyof SocketIOEvents,
+    data: any,
+    options: EventEmissionOptions = {}
+  ): Promise<EventEmissionResult> {
+    const userRoom = this.getUserRoom(userId);
+    return this.emitToRoomWithRetry(userRoom, event, data, options);
+  }
+
+  async emitToExpeditionRoomWithRetry(
+    expeditionId: string,
+    event: keyof SocketIOEvents,
+    data: any,
+    options: EventEmissionOptions = {}
+  ): Promise<EventEmissionResult> {
+    const expeditionRoom = `expedition:${expeditionId}`;
+    return this.emitToRoomWithRetry(expeditionRoom, event, data, { ...options, expeditionId });
+  }
+
+  private async emitToRoomWithRetry(
+    room: string,
+    event: keyof SocketIOEvents,
+    data: any,
+    options: EventEmissionOptions
+  ): Promise<EventEmissionResult> {
+    const startTime = Date.now();
+    const errors: Array<{ userId: string; error: string }> = [];
+    let recipientCount = 0;
+
+    try {
+      // Get sockets in the room
+      const sockets = await this.io.in(room).fetchSockets();
+      recipientCount = sockets.length;
+
+      if (recipientCount === 0) {
+        console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}`);
+        return {
+          success: true,
+          eventType: String(event),
+          recipientCount: 0,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Emit with timeout protection
+      const emissionPromise = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Emission timeout'));
+        }, options.timeout || 5000);
+
+        try {
+          this.io.to(room).emit(event, data);
+          clearTimeout(timeout);
+          resolve();
+        } catch (error) {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+
+      await emissionPromise;
+
+      console.log(`[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`);
+
+      return {
+        success: true,
+        eventType: String(event),
+        recipientCount,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error(`[SOCKET.IO] Failed to emit ${String(event)} to room ${room}:`, error);
+      
+      // Retry logic
+      const retryCount = options.retryCount || 0;
+      if (retryCount < 3) {
+        console.log(`[SOCKET.IO] Retrying emission (attempt ${retryCount + 1})`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return this.emitToRoomWithRetry(room, event, data, { ...options, retryCount: retryCount + 1 });
+      }
+
+      return {
+        success: false,
+        eventType: String(event),
+        recipientCount,
+        errors: [{ userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' }],
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  // Connection health monitoring
+  private connectionHealthCheck() {
+    const now = Date.now();
+    const staleThreshold = 120000; // 2 minutes
+
+    for (const [socketId, state] of this.connections.entries()) {
+      if (now - (state.last_ping || 0) > staleThreshold) {
+        console.warn(`[SOCKET.IO] Stale connection detected: ${socketId}`);
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.disconnect(true);
+        }
+      }
+    }
+  }
+
+  // Start health monitoring
+  startHealthMonitoring() {
+    setInterval(() => {
+      this.connectionHealthCheck();
+    }, 30000); // Check every 30 seconds
+  }
+
   getConnectedUsersCount(): number {
     return this.connections.size;
+  }
+
+  // Get connection statistics
+  getConnectionStats() {
+    return {
+      totalConnections: this.connections.size,
+      connectedUsers: Array.from(this.connections.values()).map(conn => conn.user_id).filter((id, index, arr) => arr.indexOf(id) === index).length,
+      averagePingTime: this.getAveragePingTime(),
+      healthyConnections: this.getHealthyConnectionsCount()
+    };
+  }
+
+  private getAveragePingTime(): number {
+    const now = Date.now();
+    const pingTimes = Array.from(this.connections.values())
+      .map(conn => now - (conn.last_ping || now))
+      .filter(time => time < 60000); // Only consider pings within last minute
+    
+    return pingTimes.length > 0 ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length : 0;
+  }
+
+  private getHealthyConnectionsCount(): number {
+    const now = Date.now();
+    return Array.from(this.connections.values())
+      .filter(conn => conn.connected && (now - (conn.last_ping || 0)) < 60000)
+      .length;
   }
 }

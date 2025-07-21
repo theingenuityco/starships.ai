@@ -7,7 +7,8 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "downlevelIteration": true
   },
   "exclude": ["node_modules"],
   "references": [
@@ -15,7 +16,6 @@
     { "path": "./packages/env-config" },
     { "path": "./packages/models" },
     { "path": "./packages/agent-engine" },
-    { "path": "./packages/server" },
-    { "path": "./packages/client" }
+    { "path": "./packages/server" }
   ]
-} 
+}

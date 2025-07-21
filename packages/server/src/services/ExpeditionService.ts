@@ -1,6 +1,6 @@
 /**
  * Expedition Service - Business Logic Layer
- * 
+ *
  * Handles all business logic for expedition management including CRUD operations,
  * validation, status transitions, and integration with First Officer Agent.
  */
@@ -16,7 +16,7 @@ import {
   PaginationOptions,
   ExpeditionResponse,
   ExpeditionListResponse,
-  ExpeditionStatsResponse
+  ExpeditionStatsResponse,
 } from '@starships/protocol';
 
 import {
@@ -26,7 +26,7 @@ import {
   NotFoundError,
   AuthorizationError,
   BusinessLogicError,
-  ErrorFactory
+  ErrorFactory,
 } from '@starships/protocol/src/types/error-classes';
 
 import { getLogger } from '../utils/logger';
@@ -38,7 +38,7 @@ export class ExpeditionService {
   private static instance: ExpeditionService;
   private firstOfficerService: FirstOfficerService;
   private logger = getLogger({
-    service: 'expedition-service'
+    service: 'expedition-service',
   });
 
   private constructor() {
@@ -72,54 +72,88 @@ export class ExpeditionService {
     userId: string,
     request: CreateExpeditionRequest
   ): Promise<ExpeditionResponse> {
-    console.log(`[EXPEDITION-SERVICE] Creating expedition for starship: ${request.starshipId}`);
+    console.log(`[EXPEDITION-SERVICE] Creating expedition for starship: ${request.starshipId}`, {
+      userId,
+      request,
+      timestamp: new Date().toISOString(),
+    });
 
     try {
+      console.log(`[EXPEDITION-SERVICE] Step 1: Validating starship ownership`);
       // Validate starship ownership
       await this.validateStarshipOwnership(request.starshipId, userId);
+      console.log(`[EXPEDITION-SERVICE] Step 1: Starship ownership validated successfully`);
 
+      console.log(`[EXPEDITION-SERVICE] Step 2: Validating starship status`);
       // Validate starship status
       await this.validateStarshipStatus(request.starshipId);
+      console.log(`[EXPEDITION-SERVICE] Step 2: Starship status validated successfully`);
 
+      console.log(`[EXPEDITION-SERVICE] Step 3: Getting expedition repository`);
       // Create expedition
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      const expedition = await expeditionRepo.create({
+      console.log(`[EXPEDITION-SERVICE] Step 3: Expedition repository obtained successfully`);
+
+      console.log(`[EXPEDITION-SERVICE] Step 4: Creating expedition in database`);
+      const expeditionData = {
         starshipId: request.starshipId,
         title: request.title,
         description: request.description,
         objective: request.objective,
-        status: 'draft',
+        status: 'draft' as const,
         priority: request.priority || 'medium',
         assignedAgents: [],
         createdBy: userId,
         estimatedDuration: request.estimatedDuration,
         tags: request.tags || [],
-        updatedAt: new Date().toISOString()
-      });
+        updatedAt: new Date().toISOString(),
+      };
+      console.log(`[EXPEDITION-SERVICE] Step 4: Expedition data prepared:`, expeditionData);
 
+      const expedition = await expeditionRepo.create(expeditionData);
+      console.log(`[EXPEDITION-SERVICE] Step 4: Expedition created in database:`, expedition);
+
+      console.log(`[EXPEDITION-SERVICE] Step 5: Getting assigned agents info`);
       // Get assigned agents info
       const assignedAgents = await this.getAssignedAgentsInfo(expedition.assignedAgents);
+      console.log(`[EXPEDITION-SERVICE] Step 5: Assigned agents info retrieved:`, assignedAgents);
 
+      console.log(`[EXPEDITION-SERVICE] Step 6: Emitting real-time event`);
       // Emit real-time event
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:created', {
           expedition,
-          assignedAgents
+          assignedAgents,
         });
+        console.log(`[EXPEDITION-SERVICE] Step 6: Real-time event emitted successfully`);
+      } else {
+        console.log(
+          `[EXPEDITION-SERVICE] Step 6: SocketService not available, skipping real-time event`
+        );
       }
 
-      console.log(`[EXPEDITION-SERVICE] Expedition created: ${expedition.id}`);
+      console.log(`[EXPEDITION-SERVICE] Expedition created successfully: ${expedition.id}`);
 
       return {
         expedition,
         assignedAgents,
         tasks: [],
         messages: [],
-        results: []
+        results: [],
       };
     } catch (error) {
-      console.error('[EXPEDITION-SERVICE] Failed to create expedition:', error);
+      console.error('[EXPEDITION-SERVICE] Failed to create expedition - Enhanced Debug:', {
+        error,
+        errorMessage: (error as any)?.message,
+        errorCode: (error as any)?.code,
+        errorStack: (error as any)?.stack,
+        errorType: typeof error,
+        errorConstructor: error?.constructor?.name,
+        userId,
+        request,
+        timestamp: new Date().toISOString(),
+      });
       throw this.handleError(error, 'CREATE_EXPEDITION_FAILED');
     }
   }
@@ -127,10 +161,7 @@ export class ExpeditionService {
   /**
    * Get expedition by ID
    */
-  async getExpedition(
-    expeditionId: string,
-    userId: string
-  ): Promise<ExpeditionResponse> {
+  async getExpedition(expeditionId: string, userId: string): Promise<ExpeditionResponse> {
     try {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       const expedition = await expeditionRepo.findById(expeditionId);
@@ -138,7 +169,7 @@ export class ExpeditionService {
       if (!expedition) {
         throw ErrorFactory.notFound('Expedition', expeditionId, {
           service: 'expedition-service',
-          operation: 'get_expedition'
+          operation: 'get_expedition',
         });
       }
 
@@ -150,7 +181,7 @@ export class ExpeditionService {
         this.getExpeditionTasks(expeditionId),
         this.getExpeditionMessages(expeditionId),
         this.getExpeditionResults(expeditionId),
-        this.getAssignedAgentsInfo(expedition.assignedAgents)
+        this.getAssignedAgentsInfo(expedition.assignedAgents),
       ]);
 
       return {
@@ -158,7 +189,7 @@ export class ExpeditionService {
         tasks,
         messages,
         results,
-        assignedAgents
+        assignedAgents,
       };
     } catch (error) {
       console.error('[EXPEDITION-SERVICE] Failed to get expedition:', error);
@@ -193,7 +224,7 @@ export class ExpeditionService {
         total,
         page: pagination?.page || 1,
         limit: pagination?.limit || 20,
-        filters
+        filters,
       };
     } catch (error) {
       console.error('[EXPEDITION-SERVICE] Failed to get expeditions:', error);
@@ -216,7 +247,7 @@ export class ExpeditionService {
       if (!expedition) {
         throw ErrorFactory.notFound('Expedition', expeditionId, {
           service: 'expedition-service',
-          operation: 'update_expedition'
+          operation: 'update_expedition',
         });
       }
 
@@ -235,7 +266,7 @@ export class ExpeditionService {
         this.getExpeditionTasks(expeditionId),
         this.getExpeditionMessages(expeditionId),
         this.getExpeditionResults(expeditionId),
-        this.getAssignedAgentsInfo(updatedExpedition.assignedAgents)
+        this.getAssignedAgentsInfo(updatedExpedition.assignedAgents),
       ]);
 
       // Emit real-time event
@@ -243,7 +274,7 @@ export class ExpeditionService {
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:updated', {
           expedition: updatedExpedition,
-          assignedAgents
+          assignedAgents,
         });
       }
 
@@ -252,7 +283,7 @@ export class ExpeditionService {
         tasks,
         messages,
         results,
-        assignedAgents
+        assignedAgents,
       };
     } catch (error) {
       console.error('[EXPEDITION-SERVICE] Failed to update expedition:', error);
@@ -283,7 +314,7 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:deleted', {
-          expeditionId
+          expeditionId,
         });
       }
 
@@ -317,18 +348,14 @@ export class ExpeditionService {
       }
 
       // Start First Officer orchestration
-      await this.firstOfficerService.startExpedition(
-        expeditionId,
-        userId,
-        expedition.objective
-      );
+      await this.firstOfficerService.startExpedition(expeditionId, userId, expedition.objective);
 
       // Get updated data
       const [tasks, messages, results, assignedAgents] = await Promise.all([
         this.getExpeditionTasks(expeditionId),
         this.getExpeditionMessages(expeditionId),
         this.getExpeditionResults(expeditionId),
-        this.getAssignedAgentsInfo(updatedExpedition.assignedAgents)
+        this.getAssignedAgentsInfo(updatedExpedition.assignedAgents),
       ]);
 
       // Emit real-time event
@@ -336,7 +363,7 @@ export class ExpeditionService {
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:started', {
           expedition: updatedExpedition,
-          assignedAgents
+          assignedAgents,
         });
       }
 
@@ -347,7 +374,7 @@ export class ExpeditionService {
         tasks,
         messages,
         results,
-        assignedAgents
+        assignedAgents,
       };
     } catch (error) {
       console.error('[EXPEDITION-SERVICE] Failed to start expedition:', error);
@@ -382,7 +409,7 @@ export class ExpeditionService {
         this.getExpeditionTasks(expeditionId),
         this.getExpeditionMessages(expeditionId),
         this.getExpeditionResults(expeditionId),
-        this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents)
+        this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents),
       ]);
 
       // Emit real-time event
@@ -390,7 +417,7 @@ export class ExpeditionService {
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:paused', {
           expedition: updatedExpedition,
-          assignedAgents
+          assignedAgents,
         });
       }
 
@@ -399,7 +426,7 @@ export class ExpeditionService {
         tasks,
         messages,
         results,
-        assignedAgents
+        assignedAgents,
       };
     } catch (error) {
       console.error('[EXPEDITION-SERVICE] Failed to pause expedition:', error);
@@ -434,7 +461,7 @@ export class ExpeditionService {
         this.getExpeditionTasks(expeditionId),
         this.getExpeditionMessages(expeditionId),
         this.getExpeditionResults(expeditionId),
-        this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents)
+        this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents),
       ]);
 
       // Emit real-time event
@@ -442,7 +469,7 @@ export class ExpeditionService {
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:resumed', {
           expedition: updatedExpedition,
-          assignedAgents
+          assignedAgents,
         });
       }
 
@@ -451,7 +478,7 @@ export class ExpeditionService {
         tasks,
         messages,
         results,
-        assignedAgents
+        assignedAgents,
       };
     } catch (error) {
       console.error('[EXPEDITION-SERVICE] Failed to resume expedition:', error);
@@ -485,7 +512,7 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:cancelled', {
-          expeditionId
+          expeditionId,
         });
       }
 
@@ -518,14 +545,16 @@ export class ExpeditionService {
         failedExpeditions: Number(stats.failed),
         averageDuration: Number(stats.averageDuration),
         successRate: Number(stats.successRate),
-        topPerformingAgents
+        topPerformingAgents,
       };
     } catch (error: any) {
       console.error('[EXPEDITION-SERVICE] Failed to get expedition stats:', error);
-      
+
       // If starship not found, return empty stats instead of throwing
       if (error.code === 'STARSHIP_NOT_FOUND') {
-        console.warn(`[EXPEDITION-SERVICE] Returning empty stats for non-existent starship: ${starshipId}`);
+        console.warn(
+          `[EXPEDITION-SERVICE] Returning empty stats for non-existent starship: ${starshipId}`
+        );
         return {
           totalExpeditions: 0,
           activeExpeditions: 0,
@@ -533,10 +562,10 @@ export class ExpeditionService {
           failedExpeditions: 0,
           averageDuration: 0,
           successRate: 0,
-          topPerformingAgents: []
+          topPerformingAgents: [],
         };
       }
-      
+
       throw this.handleError(error, 'GET_STATS_FAILED');
     }
   }
@@ -545,38 +574,38 @@ export class ExpeditionService {
 
   private async validateStarshipOwnership(starshipId: string, userId: string): Promise<void> {
     const starshipRepo = RepositoryFactory.getStarshipRepository();
-    
+
     try {
       const starship = await starshipRepo.findById(starshipId);
 
       if (!starship) {
         this.logger.warn(`Starship not found: ${starshipId} for user: ${userId}`, {
           service: 'expedition-service',
-          operation: 'validate_starship_ownership'
+          operation: 'validate_starship_ownership',
         });
         throw ErrorFactory.notFound('Starship', starshipId, {
           service: 'expedition-service',
-          operation: 'validate_starship_ownership'
+          operation: 'validate_starship_ownership',
         });
       }
 
       if (starship.ownerId !== userId) {
         this.logger.warn(`Access denied to starship: ${starshipId} for user: ${userId}`, {
           service: 'expedition-service',
-          operation: 'validate_starship_ownership'
+          operation: 'validate_starship_ownership',
         });
         throw ErrorFactory.authorization('Access denied to starship', {
           service: 'expedition-service',
           operation: 'validate_starship_ownership',
           resource: 'starship',
-          resourceId: starshipId
+          resourceId: starshipId,
         });
       }
     } catch (error: any) {
       if (error.code) {
         throw error; // Re-throw our custom errors
       }
-      
+
       console.error(`[EXPEDITION-SERVICE] Database error validating starship ownership:`, error);
       throw this.createError('STARSHIP_VALIDATION_FAILED', 'Failed to validate starship ownership');
     }
@@ -602,7 +631,10 @@ export class ExpeditionService {
 
   private validateExpeditionModification(expedition: Expedition): void {
     if (['in-progress', 'completed', 'failed'].includes(expedition.status)) {
-      throw this.createError('EXPEDITION_CANNOT_MODIFY', 'Cannot modify expedition in current status');
+      throw this.createError(
+        'EXPEDITION_CANNOT_MODIFY',
+        'Cannot modify expedition in current status'
+      );
     }
   }
 
@@ -614,7 +646,10 @@ export class ExpeditionService {
 
   private validateExpeditionStart(expedition: Expedition): void {
     if (expedition.status !== 'draft') {
-      throw this.createError('INVALID_STATUS_TRANSITION', 'Expedition must be in draft status to start');
+      throw this.createError(
+        'INVALID_STATUS_TRANSITION',
+        'Expedition must be in draft status to start'
+      );
     }
   }
 
@@ -633,7 +668,10 @@ export class ExpeditionService {
 
   private validateExpeditionCancel(expedition: Expedition): void {
     if (['completed', 'failed', 'cancelled'].includes(expedition.status)) {
-      throw this.createError('INVALID_STATUS_TRANSITION', 'Cannot cancel expedition in current status');
+      throw this.createError(
+        'INVALID_STATUS_TRANSITION',
+        'Cannot cancel expedition in current status'
+      );
     }
   }
 
@@ -656,17 +694,15 @@ export class ExpeditionService {
     if (agentIds.length === 0) return [];
 
     const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await Promise.all(
-      agentIds.map(id => agentRepo.findById(id))
-    );
+    const agents = await Promise.all(agentIds.map((id) => agentRepo.findById(id)));
 
     return agents
-      .filter(agent => agent !== null)
-      .map(agent => ({
+      .filter((agent) => agent !== null)
+      .map((agent) => ({
         id: agent!.id,
         name: agent!.name,
         category: agent!.category,
-        tags: agent!.tags
+        tags: agent!.tags,
       }));
   }
 
@@ -689,15 +725,10 @@ export class ExpeditionService {
   }
 
   private createError(code: string, message: string, expeditionId?: string): ExpeditionError {
-    return ErrorFactory.expedition(
-      code as any,
-      message,
-      expeditionId,
-      {
-        service: 'expedition-service',
-        operation: 'error_creation'
-      }
-    );
+    return ErrorFactory.expedition(code as any, message, expeditionId, {
+      service: 'expedition-service',
+      operation: 'error_creation',
+    });
   }
 
   private handleError(error: any, fallbackCode: string, expeditionId?: string): ExpeditionError {
@@ -719,7 +750,7 @@ export class ExpeditionService {
       {
         service: 'expedition-service',
         operation: 'error_handling',
-        metadata: { originalError: error.toString() }
+        metadata: { originalError: error.toString() },
       }
     );
   }

@@ -17,6 +17,8 @@ import {
   VisionRepository,
   MCPServerOptionRepository,
   MCPServerConnectorRepository,
+  ConnectorConfigTemplateRepository,
+  ConnectorConfigHistoryRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
@@ -37,13 +39,7 @@ import expeditionRoutes from './routes/expeditions';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
-import {
-  requestIdMiddleware,
-  requestLoggingMiddleware,
-  responseLoggingMiddleware,
-  errorHandler,
-  notFoundHandler,
-} from './middleware/errorHandler';
+import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRoutes from './routes/health';
 import { logger } from '@starships/models/src/logging';
 
@@ -69,29 +65,26 @@ const llmRepository = new LLMRepository();
 
 // Aether Core repositories - use proper dependency injection
 const mcpServerConnectorRepository = new MCPServerConnectorRepository();
+const connectorConfigTemplateRepository = new ConnectorConfigTemplateRepository();
+const connectorConfigHistoryRepository = new ConnectorConfigHistoryRepository();
 // const codexRepository = new CodexRepository();
 // const constraintRepository = new ConstraintRepository();
 // const conceptRepository = new ConceptRepository();
 // const metaAnchorRepository = new MetaAnchorRepository();
 const mcpServerOptionRepository = new MCPServerOptionRepository();
 
-
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
 const visionRepository = new VisionRepository();
-
 // Middleware - Order is important!
 app.use(cors());
 app.use(express.json());
 
 // Add error handling middleware
 app.use(requestIdMiddleware);
-app.use(requestLoggingMiddleware);
-app.use(responseLoggingMiddleware);
 
 // Health check routes (comprehensive)
 app.use('/health', healthRoutes);
-
 
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
@@ -100,6 +93,9 @@ initializeStarshipRoutes({
   agentRepository,
   mcpServerOptionRepository,
   mcpServerConnectorRepository,
+  connectorConfigTemplateRepository,
+  connectorConfigHistoryRepository,
+  visionRepository,
 });
 
 // Initialize vision routes with dependencies
@@ -122,6 +118,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
+app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 
@@ -129,7 +126,7 @@ app.use('/api', redeployRoutes);
 app.use(notFoundHandler);
 
 // Add centralized error handling middleware (must be last)
-app.use(errorHandler);
+app.use(errorHandler());
 
 // Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);

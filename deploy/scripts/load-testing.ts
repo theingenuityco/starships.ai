@@ -385,7 +385,7 @@ export class LoadTester {
       this.testData.createdInstances.push(instance.id);
     } catch (error) {
       // Instance might already exist - this is expected in load testing
-      if (!error.message.includes('already exists')) {
+      if (!(error instanceof Error) || !error.message.includes('already exists')) {
         throw error;
       }
     }

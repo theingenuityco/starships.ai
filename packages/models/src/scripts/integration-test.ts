@@ -149,9 +149,7 @@ class DatabaseIntegrationTester {
         ownerId: 'test-owner-id',
         class: 'scout',
         slug: 'integration-test-ship',
-        powerLevel: 100,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 3,
         status: 'active',
       });
       this.testStarshipId = testStarship.id;

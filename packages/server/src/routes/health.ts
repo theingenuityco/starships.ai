@@ -36,11 +36,11 @@ router.get('/health', (req: Request, res: Response) => {
       version: process.env.npm_package_version || '1.0.0',
       environment: process.env.NODE_ENV || 'development',
       uptime: process.uptime(),
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
     };
 
     logger.info('Basic health check requested', {
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
       component: 'health',
       path: req.path,
     });
@@ -50,7 +50,7 @@ router.get('/health', (req: Request, res: Response) => {
     logger.error(
       'Basic health check failed',
       {
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
         component: 'health',
         path: req.path,
       },
@@ -62,7 +62,7 @@ router.get('/health', (req: Request, res: Response) => {
         code: 'HEALTH_CHECK_FAILED',
         message: 'Health check failed',
         timestamp: new Date().toISOString(),
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
       },
     });
   }
@@ -101,7 +101,7 @@ router.get('/health/database', async (req: Request, res: Response) => {
         service: 'database',
         details: dbHealthStatus,
         timestamp: new Date().toISOString(),
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
       });
     } else {
       res.status(503).json({
@@ -111,7 +111,7 @@ router.get('/health/database', async (req: Request, res: Response) => {
           service: 'database',
           details: dbHealthStatus,
           timestamp: new Date().toISOString(),
-          requestId: req.requestId,
+          requestId: req.get('X-Request-ID'),
         },
       });
     }
@@ -119,7 +119,7 @@ router.get('/health/database', async (req: Request, res: Response) => {
     logger.error(
       'Database health check failed',
       {
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
         component: 'health',
         path: req.path,
       },
@@ -129,7 +129,7 @@ router.get('/health/database', async (req: Request, res: Response) => {
     const dbError = ErrorHandlerUtils.database('Database health check failed', 'health-check', req);
 
     res.status(503).json({
-      error: dbError.toResponse(),
+      error: dbError.toErrorResponse(),
     });
   }
 });
@@ -211,7 +211,7 @@ router.get('/health/repositories', async (req: Request, res: Response) => {
       service: 'repositories',
       repositories: repositoryStatuses,
       timestamp: new Date().toISOString(),
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
     };
 
     if (allHealthy) {
@@ -229,7 +229,7 @@ router.get('/health/repositories', async (req: Request, res: Response) => {
     logger.error(
       'Repository health check failed',
       {
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
         component: 'health',
         path: req.path,
       },
@@ -241,7 +241,7 @@ router.get('/health/repositories', async (req: Request, res: Response) => {
       'repositories',
       30,
       undefined,
-      req.requestId,
+      req.get('X-Request-ID'),
       req.path
     );
 
@@ -309,7 +309,7 @@ router.get('/health/system', async (req: Request, res: Response) => {
     const response = {
       ...systemHealth,
       timestamp: new Date().toISOString(),
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
     };
 
     if (systemHealth.status === 'healthy') {
@@ -327,7 +327,7 @@ router.get('/health/system', async (req: Request, res: Response) => {
     logger.error(
       'System health check failed',
       {
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
         component: 'health',
         path: req.path,
       },
@@ -339,7 +339,7 @@ router.get('/health/system', async (req: Request, res: Response) => {
       'system',
       30,
       undefined,
-      req.requestId,
+      req.get('X-Request-ID'),
       req.path
     );
 
@@ -423,12 +423,12 @@ router.get('/health/comprehensive', async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
       duration: totalDuration,
       checks: healthResults,
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
     };
 
     // Log comprehensive health check
     logger.info(`Comprehensive health check completed: ${overallStatus}`, {
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
       component: 'health',
       path: req.path,
       duration: totalDuration,
@@ -450,7 +450,7 @@ router.get('/health/comprehensive', async (req: Request, res: Response) => {
     logger.error(
       'Comprehensive health check failed',
       {
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
         component: 'health',
         path: req.path,
       },
@@ -462,7 +462,7 @@ router.get('/health/comprehensive', async (req: Request, res: Response) => {
       'system',
       60,
       undefined,
-      req.requestId,
+      req.get('X-Request-ID'),
       req.path
     );
 
@@ -485,13 +485,13 @@ router.get('/health/ready', async (req: Request, res: Response) => {
     res.json({
       status: 'ready',
       timestamp: new Date().toISOString(),
-      requestId: req.requestId,
+      requestId: req.get('X-Request-ID'),
     });
   } catch (error) {
     logger.warn(
       'Readiness check failed',
       {
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
         component: 'health',
         path: req.path,
       },
@@ -503,7 +503,7 @@ router.get('/health/ready', async (req: Request, res: Response) => {
         code: 'NOT_READY',
         message: 'Service is not ready',
         timestamp: new Date().toISOString(),
-        requestId: req.requestId,
+        requestId: req.get('X-Request-ID'),
       },
     });
   }
@@ -519,7 +519,7 @@ router.get('/health/live', (req: Request, res: Response) => {
     status: 'alive',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    requestId: req.requestId,
+    requestId: req.get('X-Request-ID'),
   });
 });
 

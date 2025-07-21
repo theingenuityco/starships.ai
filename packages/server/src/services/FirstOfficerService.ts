@@ -15,15 +15,24 @@ import {
   ChatResponse
 } from '@starships/protocol';
 import { ExpeditionProgress } from '@starships/agent-engine';
+import {
+  ErrorFactory,
+  NotFoundError,
+  ValidationError,
+  StandardError
+} from '@starships/protocol/src/types/error-classes';
+import { Logger } from '../utils/logger';
 
 export class FirstOfficerService {
   private static instance: FirstOfficerService;
   private activeAgents: Map<string, FirstOfficerAgent> = new Map();
   private memoryStores: Map<string, LangChainMemoryStore> = new Map();
   private socketService?: SocketIOService;
+  private logger: Logger;
 
   private constructor() {
     // SocketIOService will be initialized lazily to avoid initialization order issues
+    this.logger = Logger.getInstance({ service: 'FirstOfficerService' });
   }
 
   static getInstance(): FirstOfficerService {
@@ -48,15 +57,48 @@ export class FirstOfficerService {
     userId: string,
     objective: string
   ): Promise<string> {
-    console.log(`[FIRST-OFFICER-SERVICE] Starting expedition: ${expeditionId}`);
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'startExpedition',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId, objective }
+    };
+
+    this.logger.info('Starting expedition orchestration', context);
 
     try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation([
+          { field: 'expeditionId', message: 'Expedition ID is required' }
+        ], context);
+      }
+
+      if (!userId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
+          context
+        );
+      }
+
+      if (!objective?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'objective', message: 'Expedition objective is required' }],
+          context
+        );
+      }
+
       // Get expedition details
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       const expedition = await expeditionRepo.findById(expeditionId);
       
       if (!expedition) {
-        throw new Error(`Expedition not found: ${expeditionId}`);
+        throw ErrorFactory.notFound(
+          'Expedition',
+          expeditionId,
+          context
+        );
       }
 
       // Initialize memory store for this expedition
@@ -83,17 +125,32 @@ export class FirstOfficerService {
       // Start orchestration
       const result = await firstOfficer.startExpedition(expeditionId, userId, objective);
 
-      console.log(`[FIRST-OFFICER-SERVICE] Expedition orchestration completed: ${expeditionId}`);
+      this.logger.info('Expedition orchestration completed successfully', {
+        ...context,
+        metadata: { ...context.metadata, result: result.substring(0, 100) + '...' }
+      });
+
       return result;
 
     } catch (error) {
-      console.error(`[FIRST-OFFICER-SERVICE] Failed to start expedition:`, error);
-      
       // Clean up on failure
       this.activeAgents.delete(expeditionId);
       this.memoryStores.delete(expeditionId);
-      
-      throw error;
+
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to start expedition', error as StandardError, context);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'EXPEDITION_WORKFLOW_FAILED',
+        'Failed to start expedition orchestration',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to start expedition', error instanceof Error ? error : undefined, context);
+      throw standardError;
     }
   }
 
@@ -101,54 +158,124 @@ export class FirstOfficerService {
    * Pause expedition orchestration
    */
   async pauseExpedition(expeditionId: string): Promise<void> {
-    console.log(`[FIRST-OFFICER-SERVICE] Pausing expedition: ${expeditionId}`);
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'pauseExpedition',
+      resource: 'expedition',
+      resourceId: expeditionId
+    };
 
-    const firstOfficer = this.activeAgents.get(expeditionId);
-    if (!firstOfficer) {
-      throw new Error(`No active First Officer found for expedition: ${expeditionId}`);
+    this.logger.info('Pausing expedition orchestration', context);
+
+    try {
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
+          context
+        );
+      }
+
+      const firstOfficer = this.activeAgents.get(expeditionId);
+      if (!firstOfficer) {
+        throw ErrorFactory.notFound(
+          'First Officer',
+          expeditionId,
+          context
+        );
+      }
+
+      // Update expedition status
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      await expeditionRepo.updateStatus(expeditionId, 'review');
+
+      // Emit pause event
+      const expedition = await expeditionRepo.findById(expeditionId);
+      if (expedition) {
+        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:paused', {
+          expeditionId,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      this.logger.info('Expedition orchestration paused successfully', context);
+    } catch (error) {
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to pause expedition', error as StandardError, context);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'STATUS_UPDATE_FAILED',
+        'Failed to pause expedition orchestration',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to pause expedition', error instanceof Error ? error : undefined, context);
+      throw standardError;
     }
-
-    // Update expedition status
-    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-    await expeditionRepo.updateStatus(expeditionId, 'review');
-
-    // Emit pause event
-    const expedition = await expeditionRepo.findById(expeditionId);
-    if (expedition) {
-      this.getSocketService().emitToUser(expedition.createdBy, 'expedition:paused', {
-        expeditionId,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    console.log(`[FIRST-OFFICER-SERVICE] Expedition paused: ${expeditionId}`);
   }
 
   /**
    * Resume expedition orchestration
    */
   async resumeExpedition(expeditionId: string): Promise<void> {
-    console.log(`[FIRST-OFFICER-SERVICE] Resuming expedition: ${expeditionId}`);
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'resumeExpedition',
+      resource: 'expedition',
+      resourceId: expeditionId
+    };
 
-    const firstOfficer = this.activeAgents.get(expeditionId);
-    if (!firstOfficer) {
-      throw new Error(`No active First Officer found for expedition: ${expeditionId}`);
+    this.logger.info('Resuming expedition orchestration', context);
+
+    try {
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
+          context
+        );
+      }
+
+      const firstOfficer = this.activeAgents.get(expeditionId);
+      if (!firstOfficer) {
+        throw ErrorFactory.notFound(
+          'First Officer',
+          expeditionId,
+          context
+        );
+      }
+
+      // Update expedition status
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      await expeditionRepo.updateStatus(expeditionId, 'in-progress');
+
+      // Emit resume event
+      const expedition = await expeditionRepo.findById(expeditionId);
+      if (expedition) {
+        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:resumed', {
+          expeditionId,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      this.logger.info('Expedition orchestration resumed successfully', context);
+    } catch (error) {
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to resume expedition', error as StandardError, context);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'STATUS_UPDATE_FAILED',
+        'Failed to resume expedition orchestration',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to resume expedition', error instanceof Error ? error : undefined, context);
+      throw standardError;
     }
-
-    // Update expedition status
-    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-    await expeditionRepo.updateStatus(expeditionId, 'in-progress');
-
-    // Emit resume event
-    const expedition = await expeditionRepo.findById(expeditionId);
-    if (expedition) {
-      this.getSocketService().emitToUser(expedition.createdBy, 'expedition:resumed', {
-        expeditionId,
-        timestamp: new Date().toISOString()
-      });
-    }
-
-    console.log(`[FIRST-OFFICER-SERVICE] Expedition resumed: ${expeditionId}`);
   }
 
   /**
@@ -188,17 +315,49 @@ export class FirstOfficerService {
     userId: string,
     message: string
   ): Promise<ChatResponse> {
-    console.log(`[FIRST-OFFICER-SERVICE] Handling user message for expedition: ${expeditionId}`);
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'handleUserMessage',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId, messageLength: message?.length }
+    };
 
-    const firstOfficer = this.activeAgents.get(expeditionId);
-    if (!firstOfficer) {
-      return {
-        reply: "No active expedition found. Please start an expedition first.",
-        usage: undefined
-      };
-    }
+    this.logger.info('Handling user message for expedition', context);
 
     try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
+          context
+        );
+      }
+
+      if (!userId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
+          context
+        );
+      }
+
+      if (!message?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'message', message: 'Message content is required' }],
+          context
+        );
+      }
+
+      const firstOfficer = this.activeAgents.get(expeditionId);
+      if (!firstOfficer) {
+        // Return a graceful response instead of throwing an error
+        this.logger.warn('No active expedition found for user message', context);
+        return {
+          reply: "No active expedition found. Please start an expedition first.",
+          usage: undefined
+        };
+      }
+
       // Store user message
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
       await messageRepo.create({
@@ -230,9 +389,29 @@ export class FirstOfficerService {
         timestamp: new Date().toISOString()
       });
 
+      this.logger.info('User message handled successfully', {
+        ...context,
+        metadata: { ...context.metadata, responseLength: response.reply?.length }
+      });
+
       return response;
     } catch (error) {
-      console.error(`[FIRST-OFFICER-SERVICE] Failed to handle user message:`, error);
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to handle user message', error as StandardError, context);
+        return {
+          reply: "I encountered an error processing your message. Please try again.",
+          usage: undefined
+        };
+      }
+
+      const standardError = new StandardError(
+        'MESSAGE_SEND_FAILED',
+        'Failed to handle user message',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to handle user message', error instanceof Error ? error : undefined, context);
       return {
         reply: "I encountered an error processing your message. Please try again.",
         usage: undefined

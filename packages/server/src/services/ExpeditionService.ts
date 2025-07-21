@@ -5,9 +5,9 @@
  * validation, status transitions, and integration with First Officer Agent.
  */
 
-import { 
-  Expedition, 
-  ExpeditionStatus, 
+import {
+  Expedition,
+  ExpeditionStatus,
   ExpeditionPriority,
   CreateExpeditionRequest,
   UpdateExpeditionRequest,
@@ -16,10 +16,20 @@ import {
   PaginationOptions,
   ExpeditionResponse,
   ExpeditionListResponse,
-  ExpeditionStatsResponse,
-  ExpeditionError,
-  ExpeditionErrorCode
+  ExpeditionStatsResponse
 } from '@starships/protocol';
+
+import {
+  StandardError,
+  ExpeditionError,
+  StarshipError,
+  NotFoundError,
+  AuthorizationError,
+  BusinessLogicError,
+  ErrorFactory
+} from '@starships/protocol/src/types/error-classes';
+
+import { getLogger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
 import { SocketIOService } from './SocketIOService';
@@ -27,6 +37,9 @@ import { SocketIOService } from './SocketIOService';
 export class ExpeditionService {
   private static instance: ExpeditionService;
   private firstOfficerService: FirstOfficerService;
+  private logger = getLogger({
+    service: 'expedition-service'
+  });
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
@@ -123,7 +136,10 @@ export class ExpeditionService {
       const expedition = await expeditionRepo.findById(expeditionId);
 
       if (!expedition) {
-        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+        throw ErrorFactory.notFound('Expedition', expeditionId, {
+          service: 'expedition-service',
+          operation: 'get_expedition'
+        });
       }
 
       // Validate access
@@ -198,7 +214,10 @@ export class ExpeditionService {
       const expedition = await expeditionRepo.findById(expeditionId);
 
       if (!expedition) {
-        throw this.createError('EXPEDITION_NOT_FOUND', `Expedition not found: ${expeditionId}`);
+        throw ErrorFactory.notFound('Expedition', expeditionId, {
+          service: 'expedition-service',
+          operation: 'update_expedition'
+        });
       }
 
       // Validate access and modification rights
@@ -531,13 +550,27 @@ export class ExpeditionService {
       const starship = await starshipRepo.findById(starshipId);
 
       if (!starship) {
-        console.warn(`[EXPEDITION-SERVICE] Starship not found: ${starshipId} for user: ${userId}`);
-        throw this.createError('STARSHIP_NOT_FOUND', `Starship not found: ${starshipId}`);
+        this.logger.warn(`Starship not found: ${starshipId} for user: ${userId}`, {
+          service: 'expedition-service',
+          operation: 'validate_starship_ownership'
+        });
+        throw ErrorFactory.notFound('Starship', starshipId, {
+          service: 'expedition-service',
+          operation: 'validate_starship_ownership'
+        });
       }
 
       if (starship.ownerId !== userId) {
-        console.warn(`[EXPEDITION-SERVICE] Access denied to starship: ${starshipId} for user: ${userId}`);
-        throw this.createError('EXPEDITION_ACCESS_DENIED', 'Access denied to starship');
+        this.logger.warn(`Access denied to starship: ${starshipId} for user: ${userId}`, {
+          service: 'expedition-service',
+          operation: 'validate_starship_ownership'
+        });
+        throw ErrorFactory.authorization('Access denied to starship', {
+          service: 'expedition-service',
+          operation: 'validate_starship_ownership',
+          resource: 'starship',
+          resourceId: starshipId
+        });
       }
     } catch (error: any) {
       if (error.code) {
@@ -655,23 +688,39 @@ export class ExpeditionService {
     return [];
   }
 
-  private createError(code: ExpeditionErrorCode, message: string): ExpeditionError {
-    return {
-      code,
+  private createError(code: string, message: string, expeditionId?: string): ExpeditionError {
+    return ErrorFactory.expedition(
+      code as any,
       message,
-      details: undefined
-    };
+      expeditionId,
+      {
+        service: 'expedition-service',
+        operation: 'error_creation'
+      }
+    );
   }
 
-  private handleError(error: any, fallbackCode: string): ExpeditionError {
-    if (error.code) {
+  private handleError(error: any, fallbackCode: string, expeditionId?: string): ExpeditionError {
+    // If it's already a StandardError, return as-is
+    if (error instanceof StandardError) {
       return error;
     }
 
-    return {
-      code: fallbackCode as ExpeditionErrorCode,
-      message: error.message || 'Unknown error occurred',
-      details: error
-    };
+    // If it has a code property, try to create appropriate error
+    if (error.code) {
+      return this.createError(error.code, error.message || 'Unknown error occurred', expeditionId);
+    }
+
+    // Create fallback error
+    return ErrorFactory.expedition(
+      fallbackCode as any,
+      error.message || 'Unknown error occurred',
+      expeditionId,
+      {
+        service: 'expedition-service',
+        operation: 'error_handling',
+        metadata: { originalError: error.toString() }
+      }
+    );
   }
 }

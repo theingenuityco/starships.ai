@@ -1,0 +1,54 @@
+{
+  "name": "@starships/deployment",
+  "version": "1.0.0",
+  "description": "Connector Instance Deployment Package",
+  "main": "connector-instance-deployment.ts",
+  "scripts": {
+    "deploy:staging": "tsx connector-instance-deployment.ts staging",
+    "deploy:production": "tsx connector-instance-deployment.ts production",
+    "deploy:staging:dry-run": "tsx connector-instance-deployment.ts staging --dry-run",
+    "deploy:production:dry-run": "tsx connector-instance-deployment.ts production --dry-run",
+    "deploy:staging:skip-tests": "tsx connector-instance-deployment.ts staging --skip-tests",
+    "deploy:production:skip-tests": "tsx connector-instance-deployment.ts production --skip-tests",
+    "validate:pre": "tsx scripts/deployment-validator.ts pre",
+    "validate:post": "tsx scripts/deployment-validator.ts post",
+    "health:check": "tsx scripts/production-health-checker.ts",
+    "health:quick": "tsx scripts/production-health-checker.ts --quick",
+    "load:test": "tsx scripts/load-testing.ts",
+    "load:test:light": "LOAD_TEST_USERS=5 LOAD_TEST_DURATION=30 tsx scripts/load-testing.ts",
+    "load:test:heavy": "LOAD_TEST_USERS=50 LOAD_TEST_DURATION=300 tsx scripts/load-testing.ts",
+    "monitoring:setup": "tsx scripts/monitoring-setup.ts",
+    "monitoring:start": "cd monitoring && docker-compose up -d",
+    "monitoring:stop": "cd monitoring && docker-compose down",
+    "monitoring:status": "cd monitoring && docker-compose ps",
+    "report:generate": "tsx scripts/deployment-reporter.ts",
+    "backup:create": "tsx ../packages/models/src/migrations/backup-restore.ts backup",
+    "backup:restore": "tsx ../packages/models/src/migrations/backup-restore.ts restore",
+    "backup:list": "ls -la ../packages/models/src/migrations/backups/",
+    "migration:run": "tsx ../packages/models/src/migrations/001-connector-instances.ts migrate",
+    "migration:rollback": "tsx ../packages/models/src/migrations/001-connector-instances.ts rollback",
+    "migration:validate": "tsx ../packages/models/src/migrations/validate-migration.ts",
+    "migration:test": "tsx ../packages/models/src/migrations/test-migration-scenarios.ts",
+    "schema:create": "tsx ../packages/models/src/scripts/create-connector-schema.ts",
+    "schema:validate": "tsx ../packages/models/src/scripts/test-connector-constraints.ts",
+    "cleanup:backups": "find ../packages/models/src/migrations/backups/ -name '*.json*' -mtime +30 -delete",
+    "cleanup:logs": "find ../logs/ -name '*.log' -mtime +7 -delete",
+    "cleanup:reports": "find reports/ -name '*.md' -mtime +30 -delete"
+  },
+  "dependencies": {
+    "tsx": "^4.0.0",
+    "neo4j-driver": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "deployment",
+    "migration",
+    "connector-instances",
+    "starships"
+  ],
+  "author": "Starships.ai Development Team",
+  "license": "MIT"
+}

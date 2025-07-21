@@ -236,15 +236,19 @@ export function AgentSelector({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold flex items-center">
-          <span className="bg-primary/10 p-1.5 rounded-md mr-2">
-            <Bot className="h-5 w-5 text-primary" />
+      {/* Enhanced Header with better visual hierarchy */}
+      <div className="p-4 bg-gradient-to-r from-blue-500/5 to-blue-500/10 border border-blue-500/20 rounded-lg space-y-4">
+        <div className="flex items-center gap-4">
+          <span className="bg-blue-500/20 p-3 rounded-lg shadow-sm flex-shrink-0">
+            <Bot className="h-6 w-6 text-blue-500" />
           </span>
-          {AGENT_TEXT.SECTION_TITLE}
-        </h2>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
+            <p className="text-sm text-muted-foreground">Manage your starship's AI crew members</p>
+          </div>
+        </div>
         {showCreateButton && (
-          <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 justify-end">
             <AgentTemplateSelector
               onSelectTemplate={template => {
                 // Handle template selection if needed
@@ -252,13 +256,21 @@ export function AgentSelector({
               }}
               onCreateFromTemplate={handleCreateFromTemplate}
               trigger={
-                <Button variant="outline" size="sm" className="h-10 whitespace-nowrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 whitespace-nowrap border-blue-500/30 hover:border-blue-500/50"
+                >
                   <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
                   <span>From Template</span>
                 </Button>
               }
             />
-            <Button onClick={handleCreateAgent} size="sm" className="h-10 whitespace-nowrap">
+            <Button
+              onClick={handleCreateAgent}
+              size="sm"
+              className="h-9 whitespace-nowrap bg-blue-500 hover:bg-blue-600"
+            >
               <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>Create Agent</span>
             </Button>
@@ -268,25 +280,35 @@ export function AgentSelector({
 
       {showFilters && (
         <div className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-              <Search className="w-4 h-4" />
+          {/* Enhanced Search Section */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <div className="h-px bg-gradient-to-r from-blue-500/50 to-transparent flex-1"></div>
+              <h4 className="text-sm font-semibold text-blue-500 uppercase tracking-wide">
+                Search & Filter
+              </h4>
+              <div className="h-px bg-gradient-to-l from-blue-500/50 to-transparent flex-1"></div>
             </div>
-            <Input
-              placeholder="Search agents..."
-              value={filters.searchQuery}
-              onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-              className="pl-10 h-10 bg-background/50 border-muted"
+
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
+                <Search className="w-4 h-4" />
+              </div>
+              <Input
+                placeholder="Search agents..."
+                value={filters.searchQuery}
+                onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+                className="pl-12 pr-4 h-12 bg-gradient-to-r from-card to-muted/30 border-2 border-dashed border-blue-500/30 hover:border-blue-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+              />
+            </div>
+
+            {/* Filters */}
+            <AgentFilters
+              filters={filters}
+              onFiltersChange={setFilters}
+              availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
             />
           </div>
-
-          {/* Filters */}
-          <AgentFilters
-            filters={filters}
-            onFiltersChange={setFilters}
-            availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
-          />
         </div>
       )}
 

@@ -14,6 +14,13 @@ export { LLMRepository } from './repositories/LLMRepository';
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
+// export { ConstraintRepository } from './repositories/ConstraintRepository';
+// export { ConceptRepository } from './repositories/ConceptRepository';
+// export { MetaAnchorRepository } from './repositories/MetaAnchorRepository';
+export { MCPServerOptionRepository } from './repositories/MCPServerOptionRepository';
+export { MCPServerConnectorRepository } from './repositories/MCPServerConnectorRepository';
+export { ConnectorConfigTemplateRepository } from './repositories/ConnectorConfigTemplateRepository';
+export { ConnectorConfigHistoryRepository } from './repositories/ConnectorConfigHistoryRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';
@@ -25,3 +32,37 @@ export { RepositoryFactory } from './repositories';
 export { AgentTemplateService } from './services/AgentTemplateService';
 // NEW: Export VisionFileService
 export { VisionFileService } from './services/VisionFileService';
+
+// NEW: Export comprehensive error handling system
+export {
+  BaseError,
+  ErrorCategory,
+  ErrorDetails,
+  ErrorFactory,
+  ErrorUtils,
+  AuthenticationError,
+  AuthorizationError,
+  ConflictError,
+  DatabaseError,
+  NetworkError,
+  RateLimitError,
+  ServiceUnavailableError,
+  InternalServerError,
+  // Re-export enhanced versions with new names to avoid conflicts
+  ValidationError as EnhancedValidationError,
+  ConstraintViolationError as EnhancedConstraintViolationError,
+  NotFoundError as EnhancedNotFoundError,
+} from './errors';
+
+// NEW: Export structured logging and monitoring system
+export {
+  Logger,
+  LogLevel,
+  LogContext,
+  PerformanceMetrics,
+  HealthStatus,
+  PerformanceMonitor,
+  HealthMonitor,
+  RequestContext,
+  logger,
+} from './logging';

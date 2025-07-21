@@ -8,7 +8,7 @@
 import express from 'express';
 import { getConnection } from '@starships/models';
 import { RepositoryFactory } from '@starships/models';
-import { logger } from '@starships/models/src/logging';
+import { logger, LogContext } from '@starships/models/src/logging';
 import { ErrorUtils } from '@starships/models/src/errors';
 
 const router: express.Router = express.Router();
@@ -88,7 +88,7 @@ router.get('/', async (req, res) => {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       
       // Test basic repository functionality
-      await expeditionRepo.findAll({ limit: 1 });
+      await expeditionRepo.findAll();
       
       healthCheck.services.repositories = {
         status: 'healthy',
@@ -126,12 +126,14 @@ router.get('/', async (req, res) => {
     // Log health check
     logger.info('Health check completed', {
       requestId,
-      status: healthCheck.status,
-      responseTime,
-      services: Object.keys(healthCheck.services).map(service => ({
-        name: service,
-        status: healthCheck.services[service].status,
-      })),
+      metadata: {
+        status: healthCheck.status,
+        responseTime,
+        services: Object.keys(healthCheck.services).map(service => ({
+          name: service,
+          status: healthCheck.services[service].status,
+        })),
+      },
     });
 
     // Set appropriate HTTP status code
@@ -157,8 +159,10 @@ router.get('/', async (req, res) => {
 
     logger.error('Health check failed', {
       requestId,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
     });
 
     res.status(503).json(errorResponse);
@@ -236,7 +240,7 @@ router.get('/detailed', async (req, res) => {
         const repo = (RepositoryFactory as any)[`get${repoType}`]();
         
         // Test basic functionality
-        await repo.findAll({ limit: 1 });
+        await repo.findAll();
         
         healthCheck.services[repoType.toLowerCase()] = {
           status: 'healthy',
@@ -300,9 +304,11 @@ router.get('/detailed', async (req, res) => {
     
     logger.info('Detailed health check completed', {
       requestId,
-      status: healthCheck.status,
-      responseTime,
-      serviceCount: Object.keys(healthCheck.services).length,
+      metadata: {
+        status: healthCheck.status,
+        responseTime,
+        serviceCount: Object.keys(healthCheck.services).length,
+      },
     });
 
     const statusCode = healthCheck.status === 'healthy' ? 200 : 
@@ -313,8 +319,10 @@ router.get('/detailed', async (req, res) => {
   } catch (error) {
     logger.error('Detailed health check failed', {
       requestId,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
     });
 
     res.status(503).json({
@@ -337,7 +345,7 @@ router.get('/ready', async (req, res) => {
     
     // Check if essential repositories are available
     const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-    await expeditionRepo.findAll({ limit: 1 });
+    await expeditionRepo.findAll();
 
     res.status(200).json({
       status: 'ready',
@@ -346,7 +354,7 @@ router.get('/ready', async (req, res) => {
 
   } catch (error) {
     logger.warn('Readiness check failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
     res.status(503).json({
@@ -413,7 +421,7 @@ router.get('/metrics', (req, res) => {
 
   } catch (error) {
     logger.error('Metrics collection failed', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
     res.status(500).json({

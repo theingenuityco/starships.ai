@@ -53,6 +53,12 @@ export interface LogContext {
   ruleName?: string;
   actionType?: string;
   alertData?: Record<string, any>;
+  // Additional properties for health check logging
+  status?: string;
+  responseTime?: number;
+  serviceCount?: number;
+  services?: any[];
+  stack?: string;
 }
 
 /**

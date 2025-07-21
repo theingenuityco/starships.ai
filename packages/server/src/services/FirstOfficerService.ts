@@ -76,17 +76,15 @@ export class FirstOfficerService {
       }
 
       if (!userId?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_USER_ID',
-          'User ID is required',
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
           context
         );
       }
 
       if (!objective?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_OBJECTIVE',
-          'Expedition objective is required',
+        throw ErrorFactory.validation(
+          [{ field: 'objective', message: 'Expedition objective is required' }],
           context
         );
       }
@@ -96,9 +94,9 @@ export class FirstOfficerService {
       const expedition = await expeditionRepo.findById(expeditionId);
       
       if (!expedition) {
-        throw ErrorFactory.createNotFoundError(
-          'EXPEDITION_NOT_FOUND',
-          `Expedition not found: ${expeditionId}`,
+        throw ErrorFactory.notFound(
+          'Expedition',
+          expeditionId,
           context
         );
       }
@@ -144,11 +142,11 @@ export class FirstOfficerService {
         throw error;
       }
 
-      const standardError = ErrorFactory.createInternalServerError(
-        'EXPEDITION_START_FAILED',
+      const standardError = new StandardError(
+        'EXPEDITION_WORKFLOW_FAILED',
         'Failed to start expedition orchestration',
-        context,
-        { originalError: error instanceof Error ? error.message : String(error) }
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
       );
 
       this.logger.error('Failed to start expedition', error instanceof Error ? error : undefined, context);
@@ -171,18 +169,17 @@ export class FirstOfficerService {
 
     try {
       if (!expeditionId?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_EXPEDITION_ID',
-          'Expedition ID is required',
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
           context
         );
       }
 
       const firstOfficer = this.activeAgents.get(expeditionId);
       if (!firstOfficer) {
-        throw ErrorFactory.createNotFoundError(
-          'EXPEDITION_NOT_FOUND',
-          `No active First Officer found for expedition: ${expeditionId}`,
+        throw ErrorFactory.notFound(
+          'First Officer',
+          expeditionId,
           context
         );
       }
@@ -207,11 +204,11 @@ export class FirstOfficerService {
         throw error;
       }
 
-      const standardError = ErrorFactory.createInternalServerError(
-        'EXPEDITION_PAUSE_FAILED',
+      const standardError = new StandardError(
+        'STATUS_UPDATE_FAILED',
         'Failed to pause expedition orchestration',
-        context,
-        { originalError: error instanceof Error ? error.message : String(error) }
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
       );
 
       this.logger.error('Failed to pause expedition', error instanceof Error ? error : undefined, context);
@@ -234,18 +231,17 @@ export class FirstOfficerService {
 
     try {
       if (!expeditionId?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_EXPEDITION_ID',
-          'Expedition ID is required',
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
           context
         );
       }
 
       const firstOfficer = this.activeAgents.get(expeditionId);
       if (!firstOfficer) {
-        throw ErrorFactory.createNotFoundError(
-          'EXPEDITION_NOT_FOUND',
-          `No active First Officer found for expedition: ${expeditionId}`,
+        throw ErrorFactory.notFound(
+          'First Officer',
+          expeditionId,
           context
         );
       }
@@ -270,11 +266,11 @@ export class FirstOfficerService {
         throw error;
       }
 
-      const standardError = ErrorFactory.createInternalServerError(
-        'EXPEDITION_RESUME_FAILED',
+      const standardError = new StandardError(
+        'STATUS_UPDATE_FAILED',
         'Failed to resume expedition orchestration',
-        context,
-        { originalError: error instanceof Error ? error.message : String(error) }
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
       );
 
       this.logger.error('Failed to resume expedition', error instanceof Error ? error : undefined, context);
@@ -332,25 +328,22 @@ export class FirstOfficerService {
     try {
       // Validate inputs
       if (!expeditionId?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_EXPEDITION_ID',
-          'Expedition ID is required',
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
           context
         );
       }
 
       if (!userId?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_USER_ID',
-          'User ID is required',
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
           context
         );
       }
 
       if (!message?.trim()) {
-        throw ErrorFactory.createValidationError(
-          'INVALID_MESSAGE',
-          'Message content is required',
+        throw ErrorFactory.validation(
+          [{ field: 'message', message: 'Message content is required' }],
           context
         );
       }
@@ -411,11 +404,11 @@ export class FirstOfficerService {
         };
       }
 
-      const standardError = ErrorFactory.createInternalServerError(
-        'MESSAGE_HANDLING_FAILED',
+      const standardError = new StandardError(
+        'MESSAGE_SEND_FAILED',
         'Failed to handle user message',
-        context,
-        { originalError: error instanceof Error ? error.message : String(error) }
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
       );
 
       this.logger.error('Failed to handle user message', error instanceof Error ? error : undefined, context);

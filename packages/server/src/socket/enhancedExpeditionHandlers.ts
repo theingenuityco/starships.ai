@@ -520,7 +520,7 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
             role: 'user',
             content: message,
             userId,
-            threadId: response.threadId
+            // Remove threadId as it's not needed and not part of ChatResponse
           },
           timestamp: new Date().toISOString()
         };
@@ -535,7 +535,7 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
             id: `msg_${Date.now()}_fo`,
             role: 'first-officer',
             content: response.reply,
-            threadId: response.threadId
+            // Remove threadId as it's not needed and not part of ChatResponse
           },
           timestamp: new Date().toISOString()
         };

@@ -55,41 +55,22 @@ const STARSHIP_STATUSES = {
       'Crew readiness confirmed'
     ]
   },
-  docked: {
-    name: 'Docked',
-    icon: Anchor,
-    description: 'Stationed at port for maintenance and resupply',
-    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    iconColor: 'text-blue-500',
+  inactive: {
+    name: 'Inactive',
+    icon: Circle,
+    description: 'Currently offline and not available for missions',
+    color: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    iconColor: 'text-gray-500',
     benefits: [
-      'Safe harbor protection',
-      'Resupply opportunities',
-      'Crew rest and rotation',
-      'System diagnostics available'
+      'Power conservation',
+      'System rest period',
+      'Maintenance opportunity',
+      'Crew downtime'
     ],
     requirements: [
-      'Available docking bay',
-      'Port clearance obtained',
-      'Mission completion confirmed'
-    ]
-  },
-  maintenance: {
-    name: 'Maintenance',
-    icon: Settings,
-    description: 'Undergoing repairs and system upgrades',
-    color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    iconColor: 'text-yellow-500',
-    benefits: [
-      'System optimization',
-      'Performance upgrades',
-      'Preventive maintenance',
-      'Extended operational life'
-    ],
-    requirements: [
-      'Maintenance crew available',
-      'Spare parts in stock',
-      'Service bay allocation',
-      'Scheduled downtime window'
+      'Safe shutdown procedures',
+      'Mission completion',
+      'System diagnostics clear'
     ]
   }
 };
@@ -108,11 +89,11 @@ export function StarshipStatusManager({
     clearError 
   } = useStarshipStore();
 
-  const [selectedStatus, setSelectedStatus] = useState<'active' | 'docked' | 'maintenance'>('active');
+  const [selectedStatus, setSelectedStatus] = useState<'active' | 'inactive'>('active');
   const [step, setStep] = useState(1);
 
   const starship = starships.find(s => s.id === starshipId);
-  const currentStatus = starship?.status || 'docked';
+  const currentStatus = starship?.status || 'inactive';
   const statusData = STARSHIP_STATUSES[selectedStatus];
 
   // Initialize with current status
@@ -244,7 +225,7 @@ export function StarshipStatusManager({
                           isSelected && "ring-2 ring-primary/50 bg-primary/5",
                           isCurrent && "border-primary/30"
                         )}
-                        onClick={() => setSelectedStatus(key as 'active' | 'docked' | 'maintenance')}
+                        onClick={() => setSelectedStatus(key as 'active' | 'inactive')}
                       >
                         <CardHeader className="pb-3">
                           <CardTitle className="text-base flex items-center space-x-2">

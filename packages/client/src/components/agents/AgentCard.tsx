@@ -1,6 +1,7 @@
 'use client'
 
-import { Agent } from '@/lib/api'
+import { Agent, starshipAPI, Starship } from '@/lib/api'
+import { useState, useEffect } from 'react'
 import {
   Bot,
   Edit,
@@ -18,6 +19,8 @@ import {
   Database,
   PenTool,
   MoreVertical,
+  Rocket,
+  Loader2,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -52,6 +55,38 @@ export function AgentCard({
   onAnalytics,
   showActions = false,
 }: AgentCardProps) {
+  const [starship, setStarship] = useState<Starship | null>(null)
+  const [loadingStarship, setLoadingStarship] = useState(false)
+
+  // Fetch starship information if agent has starshipId
+  useEffect(() => {
+    const fetchStarship = async () => {
+      if (!(agent as any)?.starshipId) return
+
+      try {
+        setLoadingStarship(true)
+        const starshipData = await starshipAPI.getStarship((agent as any).starshipId)
+        setStarship(starshipData.starship)
+      } catch (error) {
+        console.error('Failed to fetch starship:', error)
+      } finally {
+        setLoadingStarship(false)
+      }
+    }
+
+    fetchStarship()
+  }, [(agent as any)?.starshipId])
+
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
+    return starshipClass === 'scout' ? '🚀' : '🛸'
+  }
+
+  const getStarshipStatusColor = (status: 'active' | 'inactive') => {
+    return status === 'active'
+      ? 'bg-green-500/20 text-green-400 border-green-500/30'
+      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+  }
+
   const getCategoryColor = (category: Agent['category']) => {
     const colors = {
       general: 'bg-gray-100 text-gray-800',
@@ -206,6 +241,38 @@ export function AgentCard({
                   )}
                 </div>
               )}
+              
+              {/* Starship Information */}
+              {(agent as any)?.starshipId && (
+                <div className="mb-3">
+                  {loadingStarship ? (
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Loading starship...</span>
+                    </div>
+                  ) : starship ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm">{getStarshipIcon(starship.class)}</span>
+                      <span className="text-xs font-medium">{starship.name}</span>
+                      <Badge
+                        variant="outline"
+                        className={`${getStarshipStatusColor(starship.status)} text-xs`}
+                      >
+                        {starship.status}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {starship.class}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      <Rocket className="w-3 h-3" />
+                      <span>Starship unavailable</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="bg-secondary/50 px-2.5 py-1 rounded-md font-mono">
                   {agent.model}
@@ -239,7 +306,7 @@ export function AgentCard({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 002 2z"
                       />
                     </svg>
                     v{agent.version || '1.0.0'}

@@ -61,7 +61,8 @@ router.post('/:templateId/create-agent', authMiddleware, async (req: Request, re
     const agent = await templateService.createAgentFromTemplate(
       templateId,
       agentName.trim(),
-      req.user!.id
+      req.user!.id,
+      'default-starship-id' // TODO: Get actual starship ID from request or user context
     );
 
     // Log the creation for audit purposes

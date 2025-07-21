@@ -14,11 +14,7 @@ import {
   ChannelRepository,
   LLMRepository,
   StarshipRepository,
-  CodexRepository,
   VisionRepository,
-  ConstraintRepository,
-  ConceptRepository,
-  MetaAnchorRepository,
   MCPServerOptionRepository,
   MCPServerConnectorRepository,
   RepositoryFactory,
@@ -37,6 +33,7 @@ import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
+import expeditionRoutes from './routes/expeditions';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
@@ -72,13 +69,16 @@ const llmRepository = new LLMRepository();
 
 // Aether Core repositories - use proper dependency injection
 const mcpServerConnectorRepository = new MCPServerConnectorRepository();
-const starshipRepository = new StarshipRepository(mcpServerConnectorRepository);
-const codexRepository = new CodexRepository();
-const visionRepository = new VisionRepository();
-const constraintRepository = new ConstraintRepository();
-const conceptRepository = new ConceptRepository();
-const metaAnchorRepository = new MetaAnchorRepository();
+// const codexRepository = new CodexRepository();
+// const constraintRepository = new ConstraintRepository();
+// const conceptRepository = new ConceptRepository();
+// const metaAnchorRepository = new MetaAnchorRepository();
 const mcpServerOptionRepository = new MCPServerOptionRepository();
+
+
+// Aether Core repositories
+const starshipRepository = new StarshipRepository();
+const visionRepository = new VisionRepository();
 
 // Middleware - Order is important!
 app.use(cors());
@@ -92,17 +92,22 @@ app.use(responseLoggingMiddleware);
 // Health check routes (comprehensive)
 app.use('/health', healthRoutes);
 
+
+// ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
   mcpServerOptionRepository,
   mcpServerConnectorRepository,
+  connectorConfigHistoryRepository,
+  connectorConfigTemplateRepository,
 });
 
 // Initialize vision routes with dependencies
 initializeVisionRoutes({
   starshipRepository,
+  visionRepository,
 });
 
 // Initialize MCP server routes with dependencies
@@ -119,7 +124,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
-app.use('/api', mcpServerRoutes);
+app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 
 // Add 404 handler for unmatched routes

@@ -1,417 +1,543 @@
 /**
- * Centralized Error Handling Middleware for Starships.ai Server
- *
- * This middleware provides comprehensive error handling with standardized
- * error responses, logging, monitoring, and request correlation.
+ * Standardized Error Handler Middleware
+ * 
+ * Provides centralized error handling for Express routes with consistent
+ * error responses, logging, and monitoring integration.
  */
 
 import { Request, Response, NextFunction } from 'express';
 import {
-  BaseError,
-  ErrorUtils,
+  StandardError,
   ValidationError,
   AuthenticationError,
   AuthorizationError,
   NotFoundError,
   ConflictError,
-  ConstraintViolationError,
   DatabaseError,
   NetworkError,
-  RateLimitError,
-  ServiceUnavailableError,
-  InternalServerError,
-  ErrorDetails,
-} from '@starships/models/src/errors';
+  BusinessLogicError,
+  ExpeditionError,
+  StarshipError,
+  TaskError,
+  AgentError,
+  ErrorFactory,
+  isStandardError,
+  isValidationError,
+  isAuthenticationError,
+  isAuthorizationError,
+  isNotFoundError,
+  isConflictError,
+  isDatabaseError,
+  isNetworkError,
+  isBusinessLogicError
+} from '@starships/protocol/src/types/error-classes';
+
 import {
-  logger,
-  LogContext,
-  RequestContext,
-  PerformanceMonitor,
-} from '@starships/models/src/logging';
+  StandardErrorCode,
+  ErrorSeverity,
+  ErrorResponse,
+  generateCorrelationId,
+  shouldLogError
+} from '@starships/protocol/src/types/errors';
+
+// ============================================================================
+// CONFIGURATION AND TYPES
+// ============================================================================
 
 /**
- * Extended Express Request interface with error handling context
+ * Error handler configuration
  */
-declare global {
-  namespace Express {
-    interface Request {
-      requestId?: string;
-      startTime?: number;
-      context?: LogContext;
-    }
-  }
+export interface ErrorHandlerConfig {
+  includeStackTrace: boolean;
+  logErrors: boolean;
+  enableMetrics: boolean;
+  environment: 'development' | 'production' | 'test';
+  service: string;
+  version: string;
 }
 
 /**
- * Request ID middleware - adds correlation ID to all requests
+ * Default configuration
  */
-export const requestIdMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  // Generate or extract request ID
-  req.requestId = (req.headers['x-request-id'] as string) || ErrorUtils.generateRequestId();
-
-  // Set response header for client tracking
-  res.setHeader('X-Request-ID', req.requestId);
-
-  // Create request context
-  req.context = RequestContext.create(req.requestId, {
-    method: req.method,
-    path: req.path,
-    userId: req.user?.id,
-    metadata: {
-      userAgent: req.headers['user-agent'],
-      ip: req.ip,
-      createdAt: Date.now(),
-    },
-  });
-
-  // Start performance monitoring
-  req.startTime = Date.now();
-  PerformanceMonitor.start(req.requestId);
-
-  next();
+const DEFAULT_CONFIG: ErrorHandlerConfig = {
+  includeStackTrace: process.env.NODE_ENV === 'development',
+  logErrors: true,
+  enableMetrics: true,
+  environment: (process.env.NODE_ENV as any) || 'development',
+  service: 'starships-api',
+  version: process.env.npm_package_version || '1.0.0'
 };
 
 /**
- * Request logging middleware - logs incoming requests
+ * Error metrics for monitoring
  */
-export const requestLoggingMiddleware = (req: Request, res: Response, next: NextFunction): void => {
-  logger.info(`Incoming request: ${req.method} ${req.path}`, {
-    requestId: req.requestId,
-    method: req.method,
-    path: req.path,
-    userId: req.user?.id,
-    component: 'http',
-    metadata: {
-      userAgent: req.headers['user-agent'],
-      ip: req.ip,
-      query: req.query,
-      // Don't log sensitive data
-      bodySize: req.body ? JSON.stringify(req.body).length : 0,
-    },
-  });
+interface ErrorMetrics {
+  totalErrors: number;
+  errorsByCode: Record<string, number>;
+  errorsByCategory: Record<string, number>;
+  errorsBySeverity: Record<string, number>;
+  errorsByEndpoint: Record<string, number>;
+}
 
-  next();
+// Global error metrics (in production, this would be replaced with proper metrics service)
+const errorMetrics: ErrorMetrics = {
+  totalErrors: 0,
+  errorsByCode: {},
+  errorsByCategory: {},
+  errorsBySeverity: {},
+  errorsByEndpoint: {}
 };
 
-/**
- * Response logging middleware - logs outgoing responses
- */
-export const responseLoggingMiddleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  // Capture original end method
-  const originalEnd = res.end;
-
-  res.end = function (chunk?: any, encoding?: any, cb?: () => void): Response {
-    // Calculate request duration
-    const duration = req.startTime ? Date.now() - req.startTime : 0;
-
-    // End performance monitoring
-    if (req.requestId) {
-      PerformanceMonitor.end(
-        req.requestId,
-        `${req.method} ${req.path}`,
-        res.statusCode < 400,
-        res.statusCode >= 400 ? `HTTP_${res.statusCode}` : undefined,
-        {
-          statusCode: res.statusCode,
-          method: req.method,
-          path: req.path,
-          userId: req.user?.id,
-        }
-      );
-    }
-
-    // Log response
-    const logLevel = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
-    logger[logLevel](`Response: ${req.method} ${req.path} - ${res.statusCode}`, {
-      requestId: req.requestId,
-      method: req.method,
-      path: req.path,
-      statusCode: res.statusCode,
-      duration,
-      userId: req.user?.id,
-      component: 'http',
-    });
-
-    // Cleanup request context
-    if (req.requestId) {
-      RequestContext.remove(req.requestId);
-    }
-
-    // Call original end method with proper return
-    return originalEnd.call(res, chunk, encoding, cb);
-  } as any;
-
-  next();
-};
+// ============================================================================
+// LOGGING UTILITIES
+// ============================================================================
 
 /**
- * Main error handling middleware
+ * Enhanced error logger
  */
-export const errorHandler = (error: any, req: Request, res: Response, next: NextFunction): void => {
-  // Skip if response already sent
-  if (res.headersSent) {
-    return next(error);
+class ErrorLogger {
+  private static instance: ErrorLogger;
+  private config: ErrorHandlerConfig;
+
+  private constructor(config: ErrorHandlerConfig) {
+    this.config = config;
   }
 
-  // Normalize error to application error
-  const normalizedError = ErrorUtils.normalize(error, req.requestId, req.path);
+  static getInstance(config: ErrorHandlerConfig = DEFAULT_CONFIG): ErrorLogger {
+    if (!ErrorLogger.instance) {
+      ErrorLogger.instance = new ErrorLogger(config);
+    }
+    return ErrorLogger.instance;
+  }
 
-  // Update request context with error details
-  if (req.requestId && req.context) {
-    RequestContext.update(req.requestId, {
-      ...req.context,
-      metadata: {
-        ...req.context.metadata,
-        error: {
-          code: normalizedError.code,
-          category: normalizedError.category,
-          statusCode: normalizedError.statusCode,
-        },
+  /**
+   * Log error with structured format
+   */
+  logError(error: StandardError, req: Request, additionalContext?: Record<string, any>): void {
+    if (!this.config.logErrors) return;
+
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: this.getSeverityLogLevel(error.severity),
+      service: this.config.service,
+      version: this.config.version,
+      environment: this.config.environment,
+      error: {
+        name: error.name,
+        code: error.code,
+        message: error.message,
+        category: error.category,
+        severity: error.severity,
+        correlationId: error.correlationId,
+        httpStatusCode: error.httpStatusCode,
+        isRetryable: error.isRetryable
       },
-    });
+      request: {
+        method: req.method,
+        url: req.url,
+        path: req.path,
+        query: req.query,
+        headers: this.sanitizeHeaders(req.headers),
+        userAgent: req.get('User-Agent'),
+        ip: req.ip || req.connection.remoteAddress,
+        userId: error.userId || (req as any).user?.id,
+        requestId: error.requestId || req.get('X-Request-ID')
+      },
+      context: {
+        ...error.context,
+        ...additionalContext
+      },
+      details: error.details,
+      stack: this.config.includeStackTrace ? error.stack : undefined
+    };
+
+    // Use appropriate log level based on severity
+    switch (error.severity) {
+      case 'critical':
+        console.error('[CRITICAL ERROR]', JSON.stringify(logEntry, null, 2));
+        break;
+      case 'high':
+        console.error('[HIGH ERROR]', JSON.stringify(logEntry, null, 2));
+        break;
+      case 'medium':
+        console.warn('[MEDIUM ERROR]', JSON.stringify(logEntry, null, 2));
+        break;
+      case 'low':
+        console.info('[LOW ERROR]', JSON.stringify(logEntry, null, 2));
+        break;
+      default:
+        console.error('[ERROR]', JSON.stringify(logEntry, null, 2));
+    }
   }
 
-  // Log error with context
-  const logContext: LogContext = {
-    requestId: req.requestId,
+  /**
+   * Log unhandled errors
+   */
+  logUnhandledError(error: Error, req: Request): void {
+    const standardError = StandardError.fromError(
+      error,
+      'INTERNAL_SERVER_ERROR',
+      {
+        service: this.config.service,
+        method: req.method,
+        resource: req.path,
+        operation: 'unhandled_error'
+      },
+      (req as any).user?.id,
+      req.get('X-Request-ID')
+    );
+
+    this.logError(standardError, req, { unhandled: true });
+  }
+
+  private getSeverityLogLevel(severity: ErrorSeverity): string {
+    switch (severity) {
+      case 'critical': return 'error';
+      case 'high': return 'error';
+      case 'medium': return 'warn';
+      case 'low': return 'info';
+      default: return 'error';
+    }
+  }
+
+  private sanitizeHeaders(headers: any): Record<string, any> {
+    const sanitized = { ...headers };
+    
+    // Remove sensitive headers
+    const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-auth-token'];
+    sensitiveHeaders.forEach(header => {
+      if (sanitized[header]) {
+        sanitized[header] = '[REDACTED]';
+      }
+    });
+
+    return sanitized;
+  }
+}
+
+// ============================================================================
+// METRICS UTILITIES
+// ============================================================================
+
+/**
+ * Update error metrics
+ */
+function updateErrorMetrics(error: StandardError, req: Request): void {
+  if (!DEFAULT_CONFIG.enableMetrics) return;
+
+  errorMetrics.totalErrors++;
+  
+  // Count by error code
+  errorMetrics.errorsByCode[error.code] = (errorMetrics.errorsByCode[error.code] || 0) + 1;
+  
+  // Count by category
+  errorMetrics.errorsByCategory[error.category] = (errorMetrics.errorsByCategory[error.category] || 0) + 1;
+  
+  // Count by severity
+  errorMetrics.errorsBySeverity[error.severity] = (errorMetrics.errorsBySeverity[error.severity] || 0) + 1;
+  
+  // Count by endpoint
+  const endpoint = `${req.method} ${req.path}`;
+  errorMetrics.errorsByEndpoint[endpoint] = (errorMetrics.errorsByEndpoint[endpoint] || 0) + 1;
+}
+
+/**
+ * Get current error metrics
+ */
+export function getErrorMetrics(): ErrorMetrics {
+  return { ...errorMetrics };
+}
+
+/**
+ * Reset error metrics (useful for testing)
+ */
+export function resetErrorMetrics(): void {
+  errorMetrics.totalErrors = 0;
+  errorMetrics.errorsByCode = {};
+  errorMetrics.errorsByCategory = {};
+  errorMetrics.errorsBySeverity = {};
+  errorMetrics.errorsByEndpoint = {};
+}
+
+// ============================================================================
+// ERROR CONVERSION UTILITIES
+// ============================================================================
+
+/**
+ * Convert various error types to StandardError
+ */
+function convertToStandardError(error: any, req: Request): StandardError {
+  // If already a StandardError, return as-is
+  if (isStandardError(error)) {
+    return error;
+  }
+
+  const userId = (req as any).user?.id;
+  const requestId = req.get('X-Request-ID');
+  const context = {
+    service: DEFAULT_CONFIG.service,
     method: req.method,
-    path: req.path,
-    userId: req.user?.id,
-    component: 'error-handler',
-    statusCode: normalizedError.statusCode,
-    operation: `${req.method} ${req.path}`,
+    resource: req.path,
+    operation: 'error_conversion'
   };
 
-  if (normalizedError.statusCode >= 500) {
-    logger.error(`Server error: ${normalizedError.message}`, logContext, normalizedError);
-  } else if (normalizedError.statusCode >= 400) {
-    logger.warn(`Client error: ${normalizedError.message}`, logContext, normalizedError);
+  // Handle specific error types
+  if (error.name === 'ValidationError' || error.type === 'validation') {
+    return ErrorFactory.validation(
+      error.errors || [{ field: 'unknown', message: error.message }],
+      context,
+      userId,
+      requestId
+    );
   }
 
-  // Create error response
-  const errorResponse = createErrorResponse(normalizedError, req);
-
-  // Set appropriate headers
-  res.status(normalizedError.statusCode);
-  res.setHeader('Content-Type', 'application/json');
-
-  // Add rate limit headers if applicable
-  if (normalizedError instanceof RateLimitError) {
-    if (normalizedError.resetTime) {
-      res.setHeader(
-        'Retry-After',
-        Math.ceil((normalizedError.resetTime.getTime() - Date.now()) / 1000)
-      );
-    }
-    res.setHeader('X-RateLimit-Limit', normalizedError.limit);
+  if (error.name === 'UnauthorizedError' || error.status === 401) {
+    return ErrorFactory.authentication(error.message, context, userId, requestId);
   }
 
-  // Send error response
-  res.json({ error: errorResponse });
-};
-
-/**
- * Create standardized error response
- */
-function createErrorResponse(error: BaseError, req: Request): ErrorDetails {
-  const response = error.toResponse();
-
-  // Add request context
-  response.requestId = req.requestId;
-  response.path = req.path;
-
-  // Sanitize error details for production
-  if (process.env.NODE_ENV === 'production') {
-    // Remove sensitive information in production
-    if (error instanceof DatabaseError) {
-      delete response.details?.query;
-    }
-
-    if (error instanceof InternalServerError) {
-      response.message = 'An internal server error occurred';
-      response.details = undefined;
-    }
+  if (error.name === 'ForbiddenError' || error.status === 403) {
+    return ErrorFactory.authorization(error.message, context, userId, requestId);
   }
 
-  return response;
+  if (error.name === 'NotFoundError' || error.status === 404) {
+    return ErrorFactory.notFound('Resource', undefined, context, userId, requestId);
+  }
+
+  if (error.name === 'ConflictError' || error.status === 409) {
+    return ErrorFactory.conflict('Resource', error.message || 'Conflict occurred', context, userId, requestId);
+  }
+
+  // Handle database errors
+  if (error.name === 'DatabaseError' || error.code?.startsWith('ER_') || error.code?.startsWith('SQLITE_')) {
+    return ErrorFactory.businessLogic(
+      'DATABASE_ERROR',
+      'Database operation failed',
+      error.message,
+      context,
+      userId,
+      requestId
+    );
+  }
+
+  // Handle network/HTTP errors
+  if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+    return ErrorFactory.businessLogic(
+      'NETWORK_ERROR',
+      'Network operation failed',
+      error.message,
+      context,
+      userId,
+      requestId
+    );
+  }
+
+  // Default to internal server error
+  return StandardError.fromError(error, 'INTERNAL_SERVER_ERROR', context, userId, requestId);
 }
 
-/**
- * 404 Not Found handler for unmatched routes
- */
-export const notFoundHandler = (req: Request, res: Response, next: NextFunction): void => {
-  const error = new NotFoundError(
-    `Route not found: ${req.method} ${req.path}`,
-    'Route',
-    req.path,
-    undefined,
-    req.requestId,
-    req.path
-  );
+// ============================================================================
+// MIDDLEWARE FUNCTIONS
+// ============================================================================
 
-  next(error);
-};
+/**
+ * Main error handler middleware
+ */
+export function errorHandler(config: Partial<ErrorHandlerConfig> = {}) {
+  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const logger = ErrorLogger.getInstance(finalConfig);
+
+  return (error: any, req: Request, res: Response, next: NextFunction): void => {
+    // Convert to StandardError if needed
+    const standardError = convertToStandardError(error, req);
+
+    // Add request ID if not present
+    if (!standardError.requestId && req.get('X-Request-ID')) {
+      (standardError as any).requestId = req.get('X-Request-ID');
+    }
+
+    // Add user ID if not present
+    if (!standardError.userId && (req as any).user?.id) {
+      (standardError as any).userId = (req as any).user.id;
+    }
+
+    // Log error if it should be logged
+    if (shouldLogError(standardError.severity)) {
+      logger.logError(standardError, req);
+    }
+
+    // Update metrics
+    updateErrorMetrics(standardError, req);
+
+    // Create error response
+    const errorResponse: ErrorResponse = standardError.toErrorResponse({
+      version: finalConfig.version,
+      environment: finalConfig.environment,
+      service: finalConfig.service
+    });
+
+    // Add stack trace in development
+    if (finalConfig.includeStackTrace && standardError.stack) {
+      (errorResponse.error as any).stack = standardError.stack;
+    }
+
+    // Send error response
+    res.status(standardError.httpStatusCode).json(errorResponse);
+  };
+}
 
 /**
  * Async error wrapper for route handlers
  */
-export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
-) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
+export function asyncHandler<T extends Request, U extends Response>(
+  fn: (req: T, res: U, next: NextFunction) => Promise<any>
+) {
+  return (req: T, res: U, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
-};
+}
 
 /**
- * Validation error helper
+ * Not found handler middleware
  */
-export const createValidationError = (
-  message: string,
-  field?: string,
-  req?: Request
-): ValidationError => {
-  return new ValidationError(message, field, undefined, req?.requestId, req?.path);
-};
-
-/**
- * Authorization error helper
- */
-export const createAuthorizationError = (
-  message: string = 'Access denied',
-  requiredPermission?: string,
-  req?: Request
-): AuthorizationError => {
-  return new AuthorizationError(
-    message,
-    requiredPermission,
-    req?.user?.id,
-    undefined,
-    req?.requestId,
-    req?.path
+export function notFoundHandler(req: Request, res: Response, next: NextFunction): void {
+  const error = ErrorFactory.notFound(
+    'Endpoint',
+    `${req.method} ${req.path}`,
+    {
+      service: DEFAULT_CONFIG.service,
+      method: req.method,
+      resource: req.path,
+      operation: 'not_found'
+    },
+    (req as any).user?.id,
+    req.get('X-Request-ID')
   );
-};
+
+  next(error);
+}
 
 /**
- * Not found error helper
+ * Request timeout handler
  */
-export const createNotFoundError = (
-  entityType: string,
-  entityId: string,
-  req?: Request
-): NotFoundError => {
-  return new NotFoundError(
-    `${entityType} with ID ${entityId} not found`,
-    entityType,
-    entityId,
-    undefined,
-    req?.requestId,
-    req?.path
-  );
-};
+export function timeoutHandler(timeout: number = 30000) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const timer = setTimeout(() => {
+      if (!res.headersSent) {
+        const error = ErrorFactory.businessLogic(
+          'REQUEST_TIMEOUT',
+          'Request timeout',
+          `Request timed out after ${timeout}ms`,
+          {
+            service: DEFAULT_CONFIG.service,
+            method: req.method,
+            resource: req.path,
+            operation: 'timeout',
+            metadata: { timeout }
+          },
+          (req as any).user?.id,
+          req.get('X-Request-ID')
+        );
+        next(error);
+      }
+    }, timeout);
+
+    // Clear timeout when response is sent
+    res.on('finish', () => clearTimeout(timer));
+    res.on('close', () => clearTimeout(timer));
+
+    next();
+  };
+}
 
 /**
- * Conflict error helper
+ * Rate limit error handler
  */
-export const createConflictError = (
-  message: string,
-  conflictType?: string,
-  req?: Request
-): ConflictError => {
-  return new ConflictError(message, conflictType, undefined, req?.requestId, req?.path);
-};
-
-/**
- * Database error helper
- */
-export const createDatabaseError = (
-  message: string,
-  operation?: string,
-  req?: Request
-): DatabaseError => {
-  return new DatabaseError(message, operation, undefined, undefined, req?.requestId, req?.path);
-};
-
-/**
- * Rate limit error helper
- */
-export const createRateLimitError = (
-  limit: number,
-  resetTime?: Date,
-  req?: Request
-): RateLimitError => {
-  return new RateLimitError(
+export function rateLimitErrorHandler(req: Request, res: Response, next: NextFunction): void {
+  const error = ErrorFactory.businessLogic(
+    'RATE_LIMIT_EXCEEDED',
     'Rate limit exceeded',
-    limit,
-    resetTime,
-    undefined,
-    req?.requestId,
-    req?.path
+    'Too many requests, please try again later',
+    {
+      service: DEFAULT_CONFIG.service,
+      method: req.method,
+      resource: req.path,
+      operation: 'rate_limit'
+    },
+    (req as any).user?.id,
+    req.get('X-Request-ID')
   );
-};
+
+  next(error);
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 /**
- * Service unavailable error helper
+ * Create a standardized error response manually
  */
-export const createServiceUnavailableError = (
-  service: string,
-  retryAfter?: number,
+export function createErrorResponse(
+  code: StandardErrorCode,
+  message?: string,
+  details?: Record<string, any>,
   req?: Request
-): ServiceUnavailableError => {
-  return new ServiceUnavailableError(
-    `Service ${service} is temporarily unavailable`,
-    service,
-    retryAfter,
+): ErrorResponse {
+  const error = new StandardError(
+    code,
+    message,
+    details,
+    req ? {
+      service: DEFAULT_CONFIG.service,
+      method: req.method,
+      resource: req.path
+    } : undefined,
     undefined,
-    req?.requestId,
-    req?.path
+    req ? (req as any).user?.id : undefined,
+    req ? req.get('X-Request-ID') : undefined
   );
-};
+
+  return error.toErrorResponse({
+    version: DEFAULT_CONFIG.version,
+    environment: DEFAULT_CONFIG.environment,
+    service: DEFAULT_CONFIG.service
+  });
+}
 
 /**
- * Error handling utilities for route handlers
+ * Middleware to add request ID to all requests
  */
-export const ErrorHandlerUtils = {
-  validation: createValidationError,
-  authorization: createAuthorizationError,
-  notFound: createNotFoundError,
-  conflict: createConflictError,
-  database: createDatabaseError,
-  rateLimit: createRateLimitError,
-  serviceUnavailable: createServiceUnavailableError,
+export function requestIdMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!req.get('X-Request-ID')) {
+    const requestId = generateCorrelationId();
+    req.headers['x-request-id'] = requestId;
+    res.setHeader('X-Request-ID', requestId);
+  }
+  next();
+}
 
-  /**
-   * Handle repository errors with proper conversion
-   */
-  handleRepositoryError: (error: any, req?: Request): never => {
-    if (ErrorUtils.isApplicationError(error)) {
-      throw error;
-    }
+/**
+ * Health check endpoint for error handler
+ */
+export function healthCheck(req: Request, res: Response): void {
+  res.json({
+    success: true,
+    service: DEFAULT_CONFIG.service,
+    version: DEFAULT_CONFIG.version,
+    environment: DEFAULT_CONFIG.environment,
+    timestamp: new Date().toISOString(),
+    metrics: getErrorMetrics()
+  });
+}
 
-    // Convert common repository errors
-    if (error?.message?.includes('not found')) {
-      throw createNotFoundError('Resource', 'unknown', req);
-    }
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
-    if (error?.message?.includes('already exists')) {
-      throw createConflictError('Resource already exists', 'duplicate', req);
-    }
-
-    if (error?.message?.includes('constraint')) {
-      throw new ConstraintViolationError(
-        error.message,
-        'check',
-        undefined,
-        req?.requestId,
-        req?.path
-      );
-    }
-
-    // Default to database error
-    throw createDatabaseError(error?.message || 'Database operation failed', 'unknown', req);
-  },
+export {
+  ErrorLogger,
+  DEFAULT_CONFIG as defaultErrorHandlerConfig
 };
+
+// Export error factory for convenience
+export { ErrorFactory } from '@starships/protocol/src/types/error-classes';

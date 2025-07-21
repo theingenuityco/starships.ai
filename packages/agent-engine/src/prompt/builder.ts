@@ -8,7 +8,7 @@ export function buildPrompt(
   memory: MemoryEntry[], 
   currentMessage: string,
   relevantContext?: string,
-  codexContext?: string
+  visionContext?: string
 ): LLMChatPrompt {
   const messages: LLMChatPrompt['messages'] = [];
 
@@ -16,8 +16,8 @@ export function buildPrompt(
     messages.push({ role: "system", content: systemPrompt });
   }
 
-  if (codexContext) {
-    messages.push({ role: "system", content: codexContext });
+  if (visionContext) {
+    messages.push({ role: "system", content: visionContext });
   }
 
   if (relevantContext) {

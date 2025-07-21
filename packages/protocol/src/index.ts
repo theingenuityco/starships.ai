@@ -42,6 +42,7 @@ export interface Agent {
   customInstructions?: string;
 
   // Deployment settings
+  starshipId: string;
   allowedStarshipClasses?: ('scout' | 'cruiser')[];
   requiredPermissions?: string[];
 }
@@ -64,10 +65,12 @@ export interface CreateAgentRequest {
   customInstructions?: string;
   allowedStarshipClasses?: ('scout' | 'cruiser')[];
   authorId?: string;
+  starshipId: string; // REQUIRED for new agents
 }
 
 export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
   version?: string;
+  starshipId?: string; // Allow updating starship assignment
 }
 
 export interface MemoryEntry {
@@ -194,7 +197,7 @@ export interface SibilStreamResponse {
   status: 'started' | 'streaming' | 'completed' | 'error';
 }
 
-// Socket.IO Event Definitions
+// Legacy Socket.IO Event Definitions (kept for backward compatibility)
 export interface SocketIOEvents {
   // Sibil Client to Server events
   'sibil:start-stream': (request: SibilSocketRequest) => void;
@@ -223,6 +226,31 @@ export interface SocketIOEvents {
   'agent:stream-error': (error: AgentStreamError) => void;
   'agent:typing-start': (agentId: string) => void;
   'agent:typing-stop': (agentId: string) => void;
+
+  // Expedition Client to Server events
+  'expedition:join': (expeditionId: string) => void;
+  'expedition:leave': (expeditionId: string) => void;
+  'expedition:send-message': (data: { expeditionId: string; message: string }) => void;
+  'expedition:start': (expeditionId: string) => void;
+  'expedition:pause': (expeditionId: string) => void;
+  'expedition:cancel': (expeditionId: string) => void;
+
+  // Expedition Server to Client events
+  'expedition:created': (data: any) => void;
+  'expedition:updated': (data: any) => void;
+  'expedition:deleted': (data: any) => void;
+  'expedition:started': (data: any) => void;
+  'expedition:paused': (data: any) => void;
+  'expedition:resumed': (data: any) => void;
+  'expedition:cancelled': (data: any) => void;
+  'expedition:completed': (data: any) => void;
+  'expedition:status-update': (data: any) => void;
+  'expedition:task-assigned': (data: any) => void;
+  'expedition:task-completed': (data: any) => void;
+  'expedition:message': (data: any) => void;
+  'expedition:error': (data: any) => void;
+  'expedition:phase-change': (data: any) => void;
+  'expedition:result-available': (data: any) => void;
 
   // Common events
   'connection-status': (status: ConnectionStatus) => void;
@@ -314,3 +342,40 @@ export interface AgentStreamError {
 
 // Export starship-related types
 export * from './types/starship';
+
+// Export expedition-related types
+export * from './types/expedition';
+
+// Export enhanced Socket.IO event types
+export * from './types/socket-events';
+
+// Export standardized error handling types and classes
+export * from './types/errors';
+
+// Export error classes with explicit naming to avoid conflicts
+export {
+  StandardError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  NetworkError,
+  BusinessLogicError,
+  ErrorFactory
+} from './types/error-classes';
+
+// Re-export specific types to resolve naming conflicts
+export type {
+  ExpeditionError as LegacyExpeditionError,
+  ExpeditionErrorCode as LegacyExpeditionErrorCode
+} from './types/expedition';
+
+// Re-export specific types to avoid conflicts
+export type {
+  EnhancedSocketIOEvents,
+  EventEmissionOptions,
+  EventEmissionResult,
+  SocketExpeditionEventType
+} from './types/socket-events';

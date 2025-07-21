@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
+    "clean": "rm -rf dist && find tests -name '*.js' -o -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.js.map' | xargs rm -f",
     "test": "pnpm run test:unit && pnpm run test:integration",
     "test:unit": "jest",
     "test:integration": "jest --config jest.integration.config.js",
@@ -33,7 +34,10 @@
     "backup:validate": "tsx src/scripts/backup-cli.ts validate",
     "backup:help": "tsx src/scripts/backup-cli.ts help",
     "disaster:recovery": "tsx src/migrations/disaster-recovery.ts",
-    "test:backup": "tsx src/scripts/test-backup-restore.ts"
+    "test:backup": "tsx src/scripts/test-backup-restore.ts",
+    "migrate:starship-schema": "tsx src/scripts/migrate-starship-schema.ts",
+    "migrate:starship-schema:dry-run": "tsx src/scripts/migrate-starship-schema.ts --dry-run",
+    "migrate:starship-schema:rollback": "tsx src/scripts/migrate-starship-schema.ts --rollback"
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",

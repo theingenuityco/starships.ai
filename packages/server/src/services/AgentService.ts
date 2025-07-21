@@ -60,6 +60,7 @@ export class AgentService {
       maxTokens: createRequest.maxTokens,
       customInstructions: createRequest.customInstructions,
       allowedStarshipClasses: createRequest.allowedStarshipClasses,
+      starshipId: createRequest.starshipId, // Required starshipId from request
 
       // Auto-generated fields
       authorId: createRequest.authorId || 'system', // Use provided authorId or default to system
@@ -270,6 +271,7 @@ export class AgentService {
       customInstructions: agent.customInstructions,
       allowedStarshipClasses: agent.allowedStarshipClasses,
       requiredPermissions: agent.requiredPermissions,
+      starshipId: agent.starshipId,
     };
   }
 
@@ -292,6 +294,7 @@ export class AgentService {
         authorId: 'system',
         isPublic: true,
         version: '1.0.0',
+        starshipId: 'system-starship', // Default starship for system agents
       },
       {
         name: 'Code Helper',
@@ -304,6 +307,7 @@ export class AgentService {
         authorId: 'system',
         isPublic: true,
         version: '1.0.0',
+        starshipId: 'system-starship', // Default starship for system agents
       },
       {
         name: 'Creative Writer',
@@ -316,6 +320,7 @@ export class AgentService {
         authorId: 'system',
         isPublic: true,
         version: '1.0.0',
+        starshipId: 'system-starship', // Default starship for system agents
       },
     ];
 

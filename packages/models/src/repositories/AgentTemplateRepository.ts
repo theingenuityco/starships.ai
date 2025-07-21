@@ -1,6 +1,7 @@
 import { AgentTemplate, AgentTemplateRepository, Agent } from '../types';
 import { Neo4jConnection } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
+import { int } from 'neo4j-driver';
 
 export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
   constructor(private connection: Neo4jConnection) {}
@@ -128,8 +129,8 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, {
-      limit,
-      offset,
+      limit: int(limit),
+      offset: int(offset),
     });
     return results.map((result) => result.t);
   }
@@ -178,7 +179,8 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
   async createAgentFromTemplate(
     templateId: string,
     agentName: string,
-    authorId: string
+    authorId: string,
+    starshipId: string
   ): Promise<Agent> {
     // First get the template
     const template = await this.findById(templateId);
@@ -204,6 +206,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
       version: '1.0.0',
       isPublic: false, // New agents from templates are private by default
       authorId,
+      starshipId,
       rating: undefined,
       usageCount: 0,
       temperature: template.temperature,

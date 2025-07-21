@@ -69,6 +69,7 @@ export const CACHE_KEYS = {
   AGENTS_ALL: 'agents:all',
   AGENTS_BY_CATEGORY: (category: string) => `agents:category:${category}`,
   AGENTS_BY_AUTHOR: (authorId: string) => `agents:author:${authorId}`,
+  AGENTS_BY_STARSHIP: (starshipId: string) => `agents:starship:${starshipId}`,
   AGENTS_PUBLIC: (limit: number, offset: number) => `agents:public:${limit}:${offset}`,
   AGENTS_SEARCH: (query: string) => `agents:search:${query}`,
   AGENT_BY_ID: (id: string) => `agent:${id}`,
@@ -107,6 +108,10 @@ export const invalidateAgentCaches = (agentId?: string) => {
 
   apiCache.invalidatePattern('^starship:.*:agents$')
   console.log('[CACHE] Invalidated all starship agent caches with pattern: ^starship:.*:agents$')
+
+  // Invalidate starships list cache since agent assignments may have changed
+  apiCache.invalidate('starships:list')
+  console.log('[CACHE] Invalidated starships list cache')
 
   // Log remaining cache keys for debugging
   const stats = apiCache.getStats()

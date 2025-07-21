@@ -13,23 +13,33 @@ export { LLMRepository } from './LLMRepository';
 
 // NEW: Aether Core Repositories
 export { StarshipRepository } from './StarshipRepository';
-export { CodexRepository } from './CodexRepository';
 export { VisionRepository } from './VisionRepository';
-export { ConstraintRepository } from './ConstraintRepository';
-export { ConceptRepository } from './ConceptRepository';
-export { MetaAnchorRepository } from './MetaAnchorRepository';
+// export { ConstraintRepository } from './ConstraintRepository';
+// export { ConceptRepository } from './ConceptRepository';
+// export { MetaAnchorRepository } from './MetaAnchorRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
+// Export expedition repositories
+export { ExpeditionRepository } from './ExpeditionRepository';
+export { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
+export { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
+export { ExpeditionResultRepository } from './ExpeditionResultRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
-import { CodexRepository } from './CodexRepository';
 import { VisionRepository } from './VisionRepository';
-import { ConstraintRepository } from './ConstraintRepository';
-import { ConceptRepository } from './ConceptRepository';
-import { MetaAnchorRepository } from './MetaAnchorRepository';
+// import { ConstraintRepository } from './ConstraintRepository';
+// import { ConceptRepository } from './ConceptRepository';
+// import { MetaAnchorRepository } from './MetaAnchorRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
+
+// Import expedition repositories
+import { ExpeditionRepository } from './ExpeditionRepository';
+import { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
+import { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
+import { ExpeditionResultRepository } from './ExpeditionResultRepository';
 
 /**
  * Factory for creating singleton repository instances with proper dependency injection,
@@ -50,17 +60,69 @@ export class RepositoryFactory {
 
   // NEW: Aether Core repository instances
   private static starshipRepo: StarshipRepository | null = null;
-  private static codexRepo: CodexRepository | null = null;
+  // private static codexRepo: CodexRepository | null = null;
   private static visionRepo: VisionRepository | null = null;
-  private static constraintRepo: ConstraintRepository | null = null;
-  private static conceptRepo: ConceptRepository | null = null;
-  private static metaAnchorRepo: MetaAnchorRepository | null = null;
+  // private static constraintRepo: ConstraintRepository | null = null;
+  // private static conceptRepo: ConceptRepository | null = null;
+  // private static metaAnchorRepo: MetaAnchorRepository | null = null;
   private static mcpServerOptionRepo: MCPServerOptionRepository | null = null;
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
   // Initialization locks for thread safety
   private static readonly initializationLocks = new Map<string, Promise<any>>();
+  // private static starshipRepo: StarshipRepository;
+  // private static visionRepo: VisionRepository;
+  // private static agentTemplateService: AgentTemplateService;
+
+  // Expedition repository instances
+  private static expeditionRepo: ExpeditionRepository;
+  private static expeditionTaskRepo: ExpeditionTaskRepository;
+  private static expeditionMessageRepo: ExpeditionMessageRepository;
+  private static expeditionResultRepo: ExpeditionResultRepository;
+
+  static getAgentRepository(): AgentRepository {
+    if (!this.agentRepo) {
+      this.agentRepo = new AgentRepository();
+    }
+    return this.agentRepo;
+  }
+
+  static getUserRepository(): UserRepository {
+    if (!this.userRepo) {
+      this.userRepo = new UserRepository();
+    }
+    return this.userRepo;
+  }
+
+  static getChannelRepository(): ChannelRepository {
+    if (!this.channelRepo) {
+      this.channelRepo = new ChannelRepository();
+    }
+    return this.channelRepo;
+  }
+
+  static getLLMRepository(): LLMRepository {
+    if (!this.llmRepo) {
+      this.llmRepo = new LLMRepository();
+    }
+    return this.llmRepo;
+  }
+
+  // NEW: Aether Core repository getters
+  static getStarshipRepository(): StarshipRepository {
+    if (!this.starshipRepo) {
+      this.starshipRepo = new StarshipRepository();
+    }
+    return this.starshipRepo;
+  }
+
+  static getVisionRepository(): VisionRepository {
+    if (!this.visionRepo) {
+      this.visionRepo = new VisionRepository();
+    }
+    return this.visionRepo;
+  }
 
   /**
    * Logger for factory operations
@@ -143,117 +205,117 @@ export class RepositoryFactory {
     }
   }
 
-  /**
-   * Get AgentRepository singleton instance
-   */
-  static async getAgentRepository(): Promise<AgentRepository> {
-    return this.createRepository('agentRepo', () => {
-      this.log('Creating AgentRepository instance');
-      return new AgentRepository();
-    });
-  }
+  // /**
+  //  * Get AgentRepository singleton instance
+  //  */
+  // static async getAgentRepository(): Promise<AgentRepository> {
+  //   return this.createRepository('agentRepo', () => {
+  //     this.log('Creating AgentRepository instance');
+  //     return new AgentRepository();
+  //   });
+  // }
 
-  /**
-   * Get UserRepository singleton instance
-   */
-  static async getUserRepository(): Promise<UserRepository> {
-    return this.createRepository('userRepo', () => {
-      this.log('Creating UserRepository instance');
-      return new UserRepository();
-    });
-  }
+  // /**
+  //  * Get UserRepository singleton instance
+  //  */
+  // static async getUserRepository(): Promise<UserRepository> {
+  //   return this.createRepository('userRepo', () => {
+  //     this.log('Creating UserRepository instance');
+  //     return new UserRepository();
+  //   });
+  // }
 
-  /**
-   * Get ChannelRepository singleton instance
-   */
-  static async getChannelRepository(): Promise<ChannelRepository> {
-    return this.createRepository('channelRepo', () => {
-      this.log('Creating ChannelRepository instance');
-      return new ChannelRepository();
-    });
-  }
+  // /**
+  //  * Get ChannelRepository singleton instance
+  //  */
+  // static async getChannelRepository(): Promise<ChannelRepository> {
+  //   return this.createRepository('channelRepo', () => {
+  //     this.log('Creating ChannelRepository instance');
+  //     return new ChannelRepository();
+  //   });
+  // }
 
-  /**
-   * Get LLMRepository singleton instance
-   */
-  static async getLLMRepository(): Promise<LLMRepository> {
-    return this.createRepository('llmRepo', () => {
-      this.log('Creating LLMRepository instance');
-      return new LLMRepository();
-    });
-  }
+  // /**
+  //  * Get LLMRepository singleton instance
+  //  */
+  // static async getLLMRepository(): Promise<LLMRepository> {
+  //   return this.createRepository('llmRepo', () => {
+  //     this.log('Creating LLMRepository instance');
+  //     return new LLMRepository();
+  //   });
+  // }
 
-  // NEW: Aether Core repository getters with proper dependency injection
+  // // NEW: Aether Core repository getters with proper dependency injection
 
-  /**
-   * Get StarshipRepository singleton instance with MCPServerConnectorRepository dependency
-   */
-  static async getStarshipRepository(): Promise<StarshipRepository> {
-    return this.createRepository(
-      'starshipRepo',
-      async () => {
-        this.log(
-          'Creating StarshipRepository instance with MCPServerConnectorRepository dependency'
-        );
+  // /**
+  //  * Get StarshipRepository singleton instance with MCPServerConnectorRepository dependency
+  //  */
+  // static async getStarshipRepository(): Promise<StarshipRepository> {
+  //   return this.createRepository(
+  //     'starshipRepo',
+  //     async () => {
+  //       this.log(
+  //         'Creating StarshipRepository instance with MCPServerConnectorRepository dependency'
+  //       );
 
-        // Ensure MCPServerConnectorRepository is initialized first
-        const mcpConnectorRepo = await this.getMCPServerConnectorRepository();
+  //       // Ensure MCPServerConnectorRepository is initialized first
+  //       const mcpConnectorRepo = await this.getMCPServerConnectorRepository();
 
-        return new StarshipRepository(mcpConnectorRepo);
-      },
-      ['mcpServerConnectorRepo']
-    );
-  }
+  //       return new StarshipRepository(mcpConnectorRepo);
+  //     },
+  //     ['mcpServerConnectorRepo']
+  //   );
+  // }
 
-  /**
-   * Get CodexRepository singleton instance
-   */
-  static async getCodexRepository(): Promise<CodexRepository> {
-    return this.createRepository('codexRepo', () => {
-      this.log('Creating CodexRepository instance');
-      return new CodexRepository();
-    });
-  }
+  // /**
+  //  * Get CodexRepository singleton instance
+  //  */
+  // static async getCodexRepository(): Promise<CodexRepository> {
+  //   return this.createRepository('codexRepo', () => {
+  //     this.log('Creating CodexRepository instance');
+  //     return new CodexRepository();
+  //   });
+  // }
 
-  /**
-   * Get VisionRepository singleton instance
-   */
-  static async getVisionRepository(): Promise<VisionRepository> {
-    return this.createRepository('visionRepo', () => {
-      this.log('Creating VisionRepository instance');
-      return new VisionRepository();
-    });
-  }
+  // /**
+  //  * Get VisionRepository singleton instance
+  //  */
+  // static async getVisionRepository(): Promise<VisionRepository> {
+  //   return this.createRepository('visionRepo', () => {
+  //     this.log('Creating VisionRepository instance');
+  //     return new VisionRepository();
+  //   });
+  // }
 
-  /**
-   * Get ConstraintRepository singleton instance
-   */
-  static async getConstraintRepository(): Promise<ConstraintRepository> {
-    return this.createRepository('constraintRepo', () => {
-      this.log('Creating ConstraintRepository instance');
-      return new ConstraintRepository();
-    });
-  }
+  // /**
+  //  * Get ConstraintRepository singleton instance
+  //  */
+  // static async getConstraintRepository(): Promise<ConstraintRepository> {
+  //   return this.createRepository('constraintRepo', () => {
+  //     this.log('Creating ConstraintRepository instance');
+  //     return new ConstraintRepository();
+  //   });
+  // }
 
-  /**
-   * Get ConceptRepository singleton instance
-   */
-  static async getConceptRepository(): Promise<ConceptRepository> {
-    return this.createRepository('conceptRepo', () => {
-      this.log('Creating ConceptRepository instance');
-      return new ConceptRepository();
-    });
-  }
+  // /**
+  //  * Get ConceptRepository singleton instance
+  //  */
+  // static async getConceptRepository(): Promise<ConceptRepository> {
+  //   return this.createRepository('conceptRepo', () => {
+  //     this.log('Creating ConceptRepository instance');
+  //     return new ConceptRepository();
+  //   });
+  // }
 
-  /**
-   * Get MetaAnchorRepository singleton instance
-   */
-  static async getMetaAnchorRepository(): Promise<MetaAnchorRepository> {
-    return this.createRepository('metaAnchorRepo', () => {
-      this.log('Creating MetaAnchorRepository instance');
-      return new MetaAnchorRepository();
-    });
-  }
+  // /**
+  //  * Get MetaAnchorRepository singleton instance
+  //  */
+  // static async getMetaAnchorRepository(): Promise<MetaAnchorRepository> {
+  //   return this.createRepository('metaAnchorRepo', () => {
+  //     this.log('Creating MetaAnchorRepository instance');
+  //     return new MetaAnchorRepository();
+  //   });
+  // }
 
   /**
    * Get MCPServerOptionRepository singleton instance
@@ -307,11 +369,11 @@ export class RepositoryFactory {
     this.channelRepo = null;
     this.llmRepo = null;
     this.starshipRepo = null;
-    this.codexRepo = null;
+    // this.codexRepo = null;
     this.visionRepo = null;
-    this.constraintRepo = null;
-    this.conceptRepo = null;
-    this.metaAnchorRepo = null;
+    // this.constraintRepo = null;
+    // this.conceptRepo = null;
+    // this.metaAnchorRepo = null;
     this.mcpServerOptionRepo = null;
     this.mcpServerConnectorRepo = null;
     this.agentTemplateService = null;
@@ -333,11 +395,11 @@ export class RepositoryFactory {
       channelRepo: this.channelRepo !== null,
       llmRepo: this.llmRepo !== null,
       starshipRepo: this.starshipRepo !== null,
-      codexRepo: this.codexRepo !== null,
+      // codexRepo: this.codexRepo !== null,
       visionRepo: this.visionRepo !== null,
-      constraintRepo: this.constraintRepo !== null,
-      conceptRepo: this.conceptRepo !== null,
-      metaAnchorRepo: this.metaAnchorRepo !== null,
+      // constraintRepo: this.constraintRepo !== null,
+      // conceptRepo: this.conceptRepo !== null,
+      // metaAnchorRepo: this.metaAnchorRepo !== null,
       mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
       mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
       agentTemplateService: this.agentTemplateService !== null,
@@ -372,11 +434,11 @@ export class RepositoryFactory {
         this.getUserRepository(),
         this.getChannelRepository(),
         this.getLLMRepository(),
-        this.getCodexRepository(),
+        // this.getCodexRepository(),
         this.getVisionRepository(),
-        this.getConstraintRepository(),
-        this.getConceptRepository(),
-        this.getMetaAnchorRepository(),
+        // this.getConstraintRepository(),
+        // this.getConceptRepository(),
+        // this.getMetaAnchorRepository(),
         this.getMCPServerOptionRepository(),
         this.getMCPServerConnectorRepository(),
         this.getAgentTemplateService(),
@@ -411,4 +473,60 @@ export class RepositoryFactory {
 
     this.log('All critical repositories validated successfully');
   }
+  /*
+   * Get the ExpeditionRepository instance
+   */
+  static getExpeditionRepository(): ExpeditionRepository {
+    if (!this.expeditionRepo) {
+      this.expeditionRepo = new ExpeditionRepository();
+    }
+    return this.expeditionRepo;
+  }
+
+  /**
+   * Get the ExpeditionTaskRepository instance
+   */
+  static getExpeditionTaskRepository(): ExpeditionTaskRepository {
+    if (!this.expeditionTaskRepo) {
+      this.expeditionTaskRepo = new ExpeditionTaskRepository();
+    }
+    return this.expeditionTaskRepo;
+  }
+
+  /**
+   * Get the ExpeditionMessageRepository instance
+   */
+  static getExpeditionMessageRepository(): ExpeditionMessageRepository {
+    if (!this.expeditionMessageRepo) {
+      this.expeditionMessageRepo = new ExpeditionMessageRepository();
+    }
+    return this.expeditionMessageRepo;
+  }
+
+  /**
+   * Get the ExpeditionResultRepository instance
+   */
+  static getExpeditionResultRepository(): ExpeditionResultRepository {
+    if (!this.expeditionResultRepo) {
+      this.expeditionResultRepo = new ExpeditionResultRepository();
+    }
+    return this.expeditionResultRepo;
+  }
+
+  // /**
+  //  * Reset all repository instances - useful for testing
+  //  */
+  // static resetAll(): void {
+  //   this.agentRepo = null as any;
+  //   this.userRepo = null as any;
+  //   this.channelRepo = null as any;
+  //   this.llmRepo = null as any;
+  //   this.starshipRepo = null as any;
+  //   this.visionRepo = null as any;
+  //   this.agentTemplateService = null as any;
+  //   this.expeditionRepo = null as any;
+  //   this.expeditionTaskRepo = null as any;
+  //   this.expeditionMessageRepo = null as any;
+  //   this.expeditionResultRepo = null as any;
 }
+

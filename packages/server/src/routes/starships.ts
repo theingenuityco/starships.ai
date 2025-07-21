@@ -117,7 +117,7 @@ export function initializeStarshipRoutes(deps: {
   mcpServerConnectorRepository: MCPServerConnectorRepository;
   connectorConfigTemplateRepository: ConnectorConfigTemplateRepository;
   connectorConfigHistoryRepository: ConnectorConfigHistoryRepository;
-  // visionRepository: VisionRepository;
+  visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
@@ -125,9 +125,7 @@ export function initializeStarshipRoutes(deps: {
   mcpConnectorRepo = deps.mcpServerConnectorRepository;
   configTemplateRepo = deps.connectorConfigTemplateRepository;
   configHistoryRepo = deps.connectorConfigHistoryRepository;
-  starshipRepo = deps.starshipRepository;
-  agentRepo = deps.agentRepository;
-  // visionRepo = deps.visionRepository;
+  visionRepo = deps.visionRepository;
 }
 
 // GET /starships - Get user's starships
@@ -155,7 +153,7 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
         error: 'Missing required fields',
         details: 'Both name and class are required to create a starship',
         required_fields: ['name', 'class'],
-        provided: { name: !!name, class: !!starshipClass }
+        provided: { name: !!name, class: !!starshipClass },
       });
       return;
     }
@@ -166,7 +164,7 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
         error: 'Invalid starship class',
         details: 'Starship class must be either scout or cruiser',
         allowed_values: ['scout', 'cruiser'],
-        provided: starshipClass
+        provided: starshipClass,
       });
       return;
     }
@@ -184,7 +182,7 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       class: starshipClass,
       slug,
       maxActiveExpeditions: starshipClass === 'scout' ? 2 : 5,
-      status: 'active'
+      status: 'active',
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
@@ -196,7 +194,7 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       confidence: 0.5,
       refinementCount: 0,
       lastRefined: new Date().toISOString(),
-      isActive: true
+      isActive: true,
     });
     console.log('[STARSHIP-CREATE] Vision created successfully in database');
 

@@ -118,14 +118,14 @@ The connector instance deployment to **${data.environment}** environment has **$
 
     if (result.errors.length > 0) {
       summary += `### Critical Issues
-${result.errors.map((error, index) => `${index + 1}. ${error}`).join('\n')}
+${result.errors.map((error: string, index: number) => `${index + 1}. ${error}`).join('\n')}
 
 `;
     }
 
     if (result.warnings.length > 0) {
       summary += `### Warnings
-${result.warnings.map((warning, index) => `${index + 1}. ${warning}`).join('\n')}
+${result.warnings.map((warning: string, index: number) => `${index + 1}. ${warning}`).join('\n')}
 
 `;
     }

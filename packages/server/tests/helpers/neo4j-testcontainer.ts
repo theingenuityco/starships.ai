@@ -14,15 +14,15 @@ export class Neo4jTestContainer {
     }
 
     console.log('[NEO4J-TESTCONTAINER] Starting Neo4j test container...');
-    
+
     this.container = await new Neo4jContainer('neo4j:5.28')
-      .withAdminPassword('test[DEFAULT-PASSWORD]')
+      .withPassword('test[DEFAULT-PASSWORD]')
       .withApoc()
       .withStartupTimeout(120000)
       .start();
 
     console.log('[NEO4J-TESTCONTAINER] Neo4j test container started successfully');
-    
+
     return this.getConfig();
   }
 
@@ -44,7 +44,7 @@ export class Neo4jTestContainer {
       uri: this.container.getBoltUri(),
       username: 'neo4j',
       [DEFAULT-PASSWORD]: 'test[DEFAULT-PASSWORD]',
-      database: 'neo4j'
+      database: 'neo4j',
     };
   }
 

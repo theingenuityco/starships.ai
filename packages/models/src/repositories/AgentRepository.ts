@@ -2,6 +2,7 @@ import { getConnection } from '../connection';
 import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4j-helpers';
 
 /**
  * Neo4j-based agent repository
@@ -12,7 +13,7 @@ export class AgentRepository implements AgentRepositoryInterface {
     const result = await connection.executeQuery<{ a: Agent }>(
       'MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC'
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async findById(id: string): Promise<Agent | null> {
@@ -21,7 +22,8 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent) WHERE a.id = $id RETURN a',
       { id }
     );
-    return result[0]?.a || null;
+    const agent = result[0]?.a || null;
+    return agent ? convertNeo4jIntsInObject(agent) : null;
   }
 
   async findByChannel(channelId: string): Promise<Agent[]> {
@@ -30,7 +32,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent)-[:ACTIVE_IN]->(c:Channel) WHERE c.id = $channelId RETURN a',
       { channelId }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async findByUser(userId: string): Promise<Agent[]> {
@@ -39,7 +41,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent)<-[:INTERACTS_WITH]-(u:User) WHERE u.id = $userId RETURN a',
       { userId }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async findByStarship(starshipId: string): Promise<Agent[]> {
@@ -48,7 +50,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a ORDER BY a.name',
       { starshipId }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   // NEW: FK-based query methods for starshipId relationship
@@ -58,7 +60,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',
       { starshipId }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async updateStarshipId(agentId: string, starshipId: string): Promise<void> {
@@ -123,7 +125,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent) WHERE a.starshipId IS NULL OR a.starshipId = "" RETURN a ORDER BY a.createdAt DESC',
       {}
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async create(
@@ -171,7 +173,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       console.warn('Failed to create Neo4j relationship for agent deployment:', error);
     }
 
-    return agent;
+    return convertNeo4jIntsInObject(agent);
   }
 
   async update(id: string, updates: Partial<Agent>): Promise<Agent | null> {
@@ -186,7 +188,8 @@ export class AgentRepository implements AgentRepositoryInterface {
       { id, updates: updateProps }
     );
 
-    return result[0]?.a || null;
+    const agent = result[0]?.a || null;
+    return agent ? convertNeo4jIntsInObject(agent) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -206,7 +209,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent) WHERE a.authorId = $authorId RETURN a ORDER BY a.updatedAt DESC',
       { authorId }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async findByCategory(category: string): Promise<Agent[]> {
@@ -215,7 +218,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent) WHERE a.category = $category RETURN a ORDER BY a.name',
       { category }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async findByTags(tags: string[]): Promise<Agent[]> {
@@ -224,7 +227,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'MATCH (a:Agent) WHERE ANY(tag IN $tags WHERE tag IN a.tags) RETURN a ORDER BY a.name',
       { tags }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async findPublic(limit: number = 50, offset: number = 0): Promise<Agent[]> {
@@ -236,7 +239,7 @@ export class AgentRepository implements AgentRepositoryInterface {
         offset: int(offset),
       }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async searchAgents(query: string): Promise<Agent[]> {
@@ -245,7 +248,7 @@ export class AgentRepository implements AgentRepositoryInterface {
       'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
       { query }
     );
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
   async incrementUsageCount(id: string): Promise<void> {
@@ -303,6 +306,6 @@ export class AgentRepository implements AgentRepositoryInterface {
     query += ' RETURN a ORDER BY a.updatedAt DESC';
 
     const result = await connection.executeQuery<{ a: Agent }>(query, params);
-    return result.map((record) => record.a);
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 }

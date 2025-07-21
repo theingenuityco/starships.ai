@@ -34,6 +34,25 @@ export interface LogContext {
   duration?: number;
   metadata?: Record<string, any>;
   error?: Record<string, any>;
+  // Additional properties for error monitoring
+  occurrenceId?: string;
+  ruleId?: string;
+  target?: string;
+  cleanedCount?: number;
+  expeditionId?: string;
+  taskId?: string;
+  sessionId?: string;
+  correlationId?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  category?: string;
+  severity?: string;
+  tags?: string[];
+  resolvedBy?: string;
+  resolutionTime?: number;
+  ruleName?: string;
+  actionType?: string;
+  alertData?: Record<string, any>;
 }
 
 /**

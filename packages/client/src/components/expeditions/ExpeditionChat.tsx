@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   ArrowLeft,
   Play,
@@ -20,7 +21,13 @@ import {
   BarChart3,
   FileText,
   AlertCircle,
-  Search
+  Search,
+  Download,
+  RefreshCw,
+  Maximize2,
+  Minimize2,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import Link from 'next/link';
 import { MessageBubble } from './MessageBubble';
@@ -32,7 +39,7 @@ import { TaskTimeline } from './TaskTimeline';
 import { ParticipantsList } from './ParticipantsList';
 import { useExpeditionData } from '@/hooks/useExpeditionData';
 import { useExpeditionChat } from '@/hooks/useExpeditionChat';
-import { useExpeditionSocket } from '@/hooks/useExpeditionSocket';
+import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
 import { expeditionAPI } from '@/lib/expeditionApi';
 
 // Local type definitions
@@ -66,6 +73,18 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<any[]>([]);
+  
+  // Enhanced state for new features
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [replyingTo, setReplyingTo] = useState<any | null>(null);
+  const [messageThreads, setMessageThreads] = useState<Record<string, any[]>>({});
+  const [retryAttempts, setRetryAttempts] = useState<Record<string, number>>({});
+  
+  // Refs for accessibility and performance
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const lastMessageRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get starship ID from the slug first
   const [starshipId, setStarshipId] = useState<string>('');
@@ -118,19 +137,23 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     autoScroll: true
   });
 
-  // Socket integration
+  // Enhanced socket integration
   const {
     startExpedition,
     pauseExpedition,
     cancelExpedition,
     error: socketError,
-    realtimeData
-  } = useExpeditionSocket({
+    realtimeData,
+    startTyping,
+    stopTyping
+  } = useEnhancedExpeditionSocket({
     expeditionId,
-    onExpeditionUpdated: () => {
+    enableTypingIndicators: true,
+    debugMode: false,
+    onExpeditionStarted: () => {
       refreshExpedition();
     },
-    onExpeditionStarted: () => {
+    onExpeditionCompleted: () => {
       refreshExpedition();
     },
     onExpeditionPaused: () => {
@@ -139,29 +162,126 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     onExpeditionCancelled: () => {
       refreshExpedition();
     },
-    onExpeditionCompleted: () => {
+    onStatusUpdate: () => {
       refreshExpedition();
     },
-    onTypingStart: (event) => {
-      setTypingUsers(prev => [...prev.filter(u => u.id !== event.userId), {
+    onTypingStart: (event: { expeditionId: string; userId?: string; agentId?: string; role: string; timestamp: string }) => {
+      setTypingUsers(prev => [...prev.filter(u => u.id !== (event.userId || event.agentId)), {
         id: event.userId || event.agentId || 'unknown',
         name: event.userId ? 'User' : event.agentId ? `Agent ${event.agentId.slice(0, 8)}` : 'Unknown',
-        role: event.role
+        role: event.role as any
       }]);
     },
-    onTypingStop: (event) => {
+    onTypingStop: (event: { expeditionId: string; userId?: string; agentId?: string; role: string; timestamp: string }) => {
       setTypingUsers(prev => prev.filter(u => u.id !== (event.userId || event.agentId)));
+    },
+    onMessage: (event) => {
+      // Real-time message handling is already done by useExpeditionChat
+      // This is just for additional processing if needed
+      console.log('[EXPEDITION CHAT] Real-time message received:', event);
     }
   });
 
-  // Handle expedition actions
+  // Enhanced utility functions
+  const playNotificationSound = useCallback(() => {
+    if (soundEnabled && audioRef.current) {
+      audioRef.current.play().catch(() => {
+        // Ignore audio play errors (user interaction required)
+      });
+    }
+  }, [soundEnabled]);
+
+  const exportMessages = useCallback(() => {
+    const exportData = {
+      expedition: {
+        id: expeditionId,
+        title: expedition?.title,
+        starship: starshipSlug,
+        exportedAt: new Date().toISOString()
+      },
+      messages: messages.map(msg => ({
+        timestamp: msg.timestamp,
+        role: msg.role,
+        content: msg.content,
+        messageType: msg.messageType,
+        agentId: msg.agentId
+      }))
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expedition-${expeditionId}-messages.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [expeditionId, expedition?.title, starshipSlug, messages]);
+
+  const handleRetry = useCallback(async (action: string, params: any) => {
+    const retryKey = `${action}-${JSON.stringify(params)}`;
+    const currentAttempts = retryAttempts[retryKey] || 0;
+    
+    if (currentAttempts >= 3) {
+      console.error(`Max retry attempts reached for ${action}`);
+      return false;
+    }
+    
+    setRetryAttempts(prev => ({ ...prev, [retryKey]: currentAttempts + 1 }));
+    
+    try {
+      switch (action) {
+        case 'start':
+          await expeditionAPI.startExpedition(params.starshipId, params.expeditionId);
+          break;
+        case 'pause':
+          await expeditionAPI.pauseExpedition(params.starshipId, params.expeditionId);
+          break;
+        case 'cancel':
+          await expeditionAPI.cancelExpedition(params.starshipId, params.expeditionId);
+          break;
+        default:
+          return false;
+      }
+      
+      // Reset retry count on success
+      setRetryAttempts(prev => {
+        const newAttempts = { ...prev };
+        delete newAttempts[retryKey];
+        return newAttempts;
+      });
+      
+      return true;
+    } catch (error) {
+      console.error(`Retry attempt ${currentAttempts + 1} failed for ${action}:`, error);
+      return false;
+    }
+  }, [retryAttempts]);
+
+  const handleReplyToMessage = useCallback((message: any) => {
+    setReplyingTo(message);
+    // Focus the message input
+    const messageInput = document.querySelector('[data-testid="message-input"]') as HTMLElement;
+    if (messageInput) {
+      messageInput.focus();
+    }
+  }, []);
+
+  const clearReply = useCallback(() => {
+    setReplyingTo(null);
+  }, []);
+
+  // Handle expedition actions with retry logic
   const handleStartExpedition = async () => {
     if (!expedition || !starshipId) return;
     
     setActionLoading('start');
     try {
-      await expeditionAPI.startExpedition(starshipId, expeditionId);
-      startExpedition(expeditionId);
+      const success = await handleRetry('start', { starshipId, expeditionId });
+      if (success) {
+        startExpedition(expeditionId);
+      }
     } catch (error) {
       console.error('Failed to start expedition:', error);
     } finally {
@@ -174,8 +294,10 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     
     setActionLoading('pause');
     try {
-      await expeditionAPI.pauseExpedition(starshipId, expeditionId);
-      pauseExpedition(expeditionId);
+      const success = await handleRetry('pause', { starshipId, expeditionId });
+      if (success) {
+        pauseExpedition(expeditionId);
+      }
     } catch (error) {
       console.error('Failed to pause expedition:', error);
     } finally {
@@ -188,14 +310,112 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     
     setActionLoading('cancel');
     try {
-      await expeditionAPI.cancelExpedition(starshipId, expeditionId);
-      cancelExpedition(expeditionId);
+      const success = await handleRetry('cancel', { starshipId, expeditionId });
+      if (success) {
+        cancelExpedition(expeditionId);
+      }
     } catch (error) {
       console.error('Failed to cancel expedition:', error);
     } finally {
       setActionLoading(null);
     }
   };
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      switch (event.key) {
+        case 'f':
+          event.preventDefault();
+          setShowSearch(true);
+          break;
+        case 'e':
+          event.preventDefault();
+          exportMessages();
+          break;
+        case 'Enter':
+          if (activeTab === 'chat') {
+            event.preventDefault();
+            const messageInput = document.querySelector('[data-testid="message-input"]') as HTMLElement;
+            if (messageInput) {
+              messageInput.focus();
+            }
+          }
+          break;
+      }
+    }
+    
+    if (event.key === 'Escape') {
+      if (showSearch) {
+        setShowSearch(false);
+      } else if (replyingTo) {
+        clearReply();
+      } else if (isFullscreen) {
+        setIsFullscreen(false);
+      }
+    }
+  }, [activeTab, showSearch, replyingTo, isFullscreen, exportMessages, clearReply]);
+
+  // Add keyboard event listeners
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Play notification sound for new messages
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role !== 'user' && lastMessage.timestamp) {
+        const messageTime = new Date(lastMessage.timestamp).getTime();
+        const now = Date.now();
+        // Only play sound for messages received in the last 5 seconds
+        if (now - messageTime < 5000) {
+          playNotificationSound();
+        }
+      }
+    }
+  }, [messages, playNotificationSound]);
+
+  // Performance optimizations - memoize expensive computations
+  const memoizedMessages = useMemo(() => {
+    const messagesToShow = searchResults.length > 0 ? searchResults : messages;
+    // Limit messages for performance (show last 100 messages)
+    return messagesToShow.slice(-100);
+  }, [messages, searchResults]);
+
+  const memoizedAgentList = useMemo(() => {
+    return expedition?.assignedAgents.map(agentId => ({
+      id: agentId,
+      name: `Agent ${agentId.slice(0, 8)}`
+    })) || [];
+  }, [expedition?.assignedAgents]);
+
+  const memoizedAvailableAgents = useMemo(() => {
+    return expedition?.assignedAgents.map(agentId => ({
+      id: agentId,
+      name: `Agent ${agentId.slice(0, 8)}`,
+      status: 'online' as const
+    })) || [];
+  }, [expedition?.assignedAgents]);
+
+  // Virtual scrolling for large message lists
+  const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
+  const containerHeight = 600; // Approximate height
+  const itemHeight = 80; // Approximate message height
+
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    const start = Math.floor(scrollTop / itemHeight);
+    const end = Math.min(start + Math.ceil(containerHeight / itemHeight) + 5, memoizedMessages.length);
+    
+    setVisibleRange({ start, end });
+  }, [memoizedMessages.length, itemHeight, containerHeight]);
+
+  const visibleMessages = useMemo(() => {
+    if (memoizedMessages.length <= 50) return memoizedMessages;
+    return memoizedMessages.slice(visibleRange.start, visibleRange.end);
+  }, [memoizedMessages, visibleRange]);
 
   // Get status styling
   const getStatusConfig = (status: Expedition['status']) => {
@@ -249,28 +469,106 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   const statusConfig = getStatusConfig(expedition.status);
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 border-b">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={`/ship/${starshipSlug}/expeditions`}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Expeditions
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold">{expedition.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              Starship: {starshipSlug} • Expedition ID: {expeditionId.slice(0, 8)}
-            </p>
+    <TooltipProvider>
+      <div className={`h-full flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
+        {/* Hidden audio element for notifications */}
+        <audio
+          ref={audioRef}
+          preload="auto"
+          aria-hidden="true"
+        >
+          <source src="/sounds/notification.mp3" type="audio/mpeg" />
+          <source src="/sounds/notification.ogg" type="audio/ogg" />
+        </audio>
+
+        {/* Header */}
+        <header
+          className="flex items-center justify-between p-6 border-b"
+          role="banner"
+          aria-label="Expedition chat header"
+        >
+          <div className="flex items-center space-x-4">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link
+                    href={`/ship/${starshipSlug}/expeditions`}
+                    aria-label="Back to expeditions list"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Expeditions
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Return to expeditions list (Alt+B)</TooltipContent>
+            </Tooltip>
+            <div>
+              <h1 className="text-xl font-semibold" id="expedition-title">
+                {expedition.title}
+              </h1>
+              <p className="text-sm text-muted-foreground" id="expedition-details">
+                Starship: {starshipSlug} • Expedition ID: {expeditionId.slice(0, 8)}
+              </p>
+            </div>
           </div>
-        </div>
-        
-        <div className="flex items-center space-x-3">
-          <Badge variant={statusConfig.variant}>
-            {statusConfig.label}
-          </Badge>
+          
+          <div className="flex items-center space-x-2">
+            {/* Enhanced Controls */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  aria-label={soundEnabled ? 'Disable sound notifications' : 'Enable sound notifications'}
+                >
+                  {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {soundEnabled ? 'Disable' : 'Enable'} sound notifications
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={exportMessages}
+                  aria-label="Export chat messages"
+                  disabled={messages.length === 0}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export messages (Ctrl+E)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                >
+                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isFullscreen ? 'Exit' : 'Enter'} fullscreen (F11)
+              </TooltipContent>
+            </Tooltip>
+
+            <Separator orientation="vertical" className="h-6" />
+
+            <Badge
+              variant={statusConfig.variant}
+              aria-label={`Expedition status: ${statusConfig.label}`}
+            >
+              {statusConfig.label}
+            </Badge>
           
           {/* Action Buttons */}
           {expedition.status === 'draft' && (
@@ -319,10 +617,10 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
               Cancel
             </Button>
           )}
-        </div>
-      </div>
+          </div>
+        </header>
 
-      {/* Main Content */}
+        {/* Main Content */}
       <div className="flex-1 flex">
         {/* Left Panel - Chat */}
         <div className="flex-1 flex flex-col">
@@ -395,56 +693,78 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                         messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       }
                     }}
-                    availableAgents={expedition.assignedAgents.map(agentId => ({
-                      id: agentId,
-                      name: `Agent ${agentId.slice(0, 8)}`
-                    }))}
+                    availableAgents={memoizedAgentList}
                   />
                 )}
 
                 {/* Messages */}
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-4">
+                <ScrollArea
+                  className="flex-1 p-4"
+                  onScrollCapture={handleScroll}
+                  role="log"
+                  aria-label="Expedition chat messages"
+                  aria-live="polite"
+                  aria-atomic="false"
+                >
+                  <div
+                    className="space-y-4"
+                    style={{
+                      minHeight: memoizedMessages.length > 50 ? `${memoizedMessages.length * itemHeight}px` : 'auto'
+                    }}
+                  >
                     {messagesLoading && messages.length === 0 ? (
-                      <div className="text-center text-muted-foreground">
+                      <div className="text-center text-muted-foreground" role="status" aria-label="Loading messages">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                         Loading messages...
                       </div>
                     ) : messagesError ? (
-                      <div className="text-center text-red-500">
+                      <div className="text-center text-red-500" role="alert" aria-label="Error loading messages">
                         <AlertCircle className="h-8 w-8 mx-auto mb-2" />
                         Error loading messages: {messagesError}
                       </div>
                     ) : messages.length === 0 ? (
-                      <div className="text-center text-muted-foreground">
+                      <div className="text-center text-muted-foreground" role="status">
                         <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p className="text-lg font-medium mb-2">No messages yet</p>
                         <p className="text-sm">Start the conversation to coordinate with your team!</p>
                       </div>
                     ) : (
-                      (searchResults.length > 0 ? searchResults : messages).map((message) => (
-                        <div
-                          key={message.id}
-                          id={`message-${message.id}`}
-                          className={highlightedMessageId === message.id ? 'ring-2 ring-blue-500 rounded-lg' : ''}
-                        >
-                          <MessageBubble
-                            message={message}
-                            showReactions={true}
-                            showStatus={true}
-                            enableActions={true}
-                            onReply={(msg) => {
-                              console.log('Reply to message:', msg.id);
-                            }}
-                            onReact={(messageId, emoji) => {
-                              console.log('React to message:', messageId, emoji);
-                            }}
-                            onCopy={(content) => {
-                              navigator.clipboard.writeText(content);
-                            }}
-                          />
-                        </div>
-                      ))
+                      <>
+                        {/* Virtual scrolling spacer for items above visible range */}
+                        {visibleRange.start > 0 && (
+                          <div style={{ height: `${visibleRange.start * itemHeight}px` }} />
+                        )}
+                        
+                        {visibleMessages.map((message, index) => (
+                          <div
+                            key={message.id}
+                            id={`message-${message.id}`}
+                            className={highlightedMessageId === message.id ? 'ring-2 ring-blue-500 rounded-lg' : ''}
+                            role="article"
+                            aria-label={`Message from ${message.role} at ${new Date(message.timestamp).toLocaleTimeString()}`}
+                            tabIndex={0}
+                          >
+                            <MessageBubble
+                              message={message}
+                              showReactions={true}
+                              showStatus={true}
+                              enableActions={true}
+                              onReply={handleReplyToMessage}
+                              onReact={(messageId, emoji) => {
+                                console.log('React to message:', messageId, emoji);
+                              }}
+                              onCopy={(content) => {
+                                navigator.clipboard.writeText(content);
+                              }}
+                            />
+                          </div>
+                        ))}
+                        
+                        {/* Virtual scrolling spacer for items below visible range */}
+                        {visibleRange.end < memoizedMessages.length && (
+                          <div style={{ height: `${(memoizedMessages.length - visibleRange.end) * itemHeight}px` }} />
+                        )}
+                      </>
                     )}
                     
                     {/* Typing Indicator */}
@@ -474,12 +794,12 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                     showAgentSelector={expedition.assignedAgents.length > 0}
                     showFormatting={true}
                     showAttachments={true}
-                    availableAgents={expedition.assignedAgents.map(agentId => ({
-                      id: agentId,
-                      name: `Agent ${agentId.slice(0, 8)}`,
-                      status: 'online' as const
-                    }))}
+                    availableAgents={memoizedAvailableAgents}
+                    replyingTo={replyingTo}
+                    data-testid="message-input"
                     className="p-4"
+                    onTypingStart={() => startTyping(expeditionId)}
+                    onTypingStop={() => stopTyping(expeditionId)}
                   />
                 </div>
 
@@ -566,6 +886,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

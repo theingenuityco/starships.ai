@@ -13,27 +13,9 @@ import { useRouter } from 'next/navigation';
 import { CreateExpeditionModal } from './CreateExpeditionModal';
 import { ExpeditionCard } from './ExpeditionCard';
 import { useExpeditionData } from '@/hooks/useExpeditionData';
-import { useExpeditionSocket } from '@/hooks/useExpeditionSocket';
+import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
 import { expeditionAPI } from '@/lib/expeditionApi';
-
-// Local type definitions
-interface Expedition {
-  id: string;
-  starshipId: string;
-  title: string;
-  description: string;
-  objective: string;
-  status: 'draft' | 'planning' | 'in-progress' | 'review' | 'completed' | 'failed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  assignedAgents: string[];
-  result?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  estimatedDuration?: number;
-  actualDuration?: number;
-  tags: string[];
-}
+import type { Expedition, ExpeditionStatus, ExpeditionPriority } from '@starships/protocol';
 
 interface StarshipExpeditionsContentProps {
   slug: string;
@@ -43,8 +25,8 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   const router = useRouter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<ExpeditionStatus | 'all'>('all');
+  const [priorityFilter, setPriorityFilter] = useState<ExpeditionPriority | 'all'>('all');
 
   // Get starship data (we'll need to fetch this)
   const [starshipId, setStarshipId] = useState<string>('');
@@ -62,15 +44,30 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
     refreshInterval: 30000
   });
 
-  // Socket integration for real-time updates
-  useExpeditionSocket({
-    onExpeditionUpdated: () => {
-      refreshExpeditions();
-    },
+  // Enhanced socket integration for real-time updates
+  const { realtimeData } = useEnhancedExpeditionSocket({
+    autoJoin: false, // Don't auto-join specific expeditions in list view
+    enableReconnection: true,
+    debugMode: false,
     onExpeditionStarted: () => {
       refreshExpeditions();
     },
     onExpeditionCompleted: () => {
+      refreshExpeditions();
+    },
+    onExpeditionPaused: () => {
+      refreshExpeditions();
+    },
+    onExpeditionCancelled: () => {
+      refreshExpeditions();
+    },
+    onStatusUpdate: () => {
+      refreshExpeditions();
+    },
+    onTaskCompleted: () => {
+      refreshExpeditions();
+    },
+    onResultAvailable: () => {
       refreshExpeditions();
     }
   });
@@ -213,7 +210,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               className="pl-10"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ExpeditionStatus | 'all')}>
             <SelectTrigger className="w-full md:w-48">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -228,7 +225,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+          <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as ExpeditionPriority | 'all')}>
             <SelectTrigger className="w-full md:w-48">
               <SelectValue placeholder="Filter by priority" />
             </SelectTrigger>

@@ -1,6 +1,6 @@
 /**
  * Standardized Error Handler Middleware
- * 
+ *
  * Provides centralized error handling for Express routes with consistent
  * error responses, logging, and monitoring integration.
  */
@@ -29,7 +29,7 @@ import {
   isConflictError,
   isDatabaseError,
   isNetworkError,
-  isBusinessLogicError
+  isBusinessLogicError,
 } from '@starships/protocol/src/types/error-classes';
 
 import {
@@ -37,7 +37,7 @@ import {
   ErrorSeverity,
   ErrorResponse,
   generateCorrelationId,
-  shouldLogError
+  shouldLogError,
 } from '@starships/protocol/src/types/errors';
 
 // ============================================================================
@@ -65,7 +65,7 @@ const DEFAULT_CONFIG: ErrorHandlerConfig = {
   enableMetrics: true,
   environment: (process.env.NODE_ENV as any) || 'development',
   service: 'starships-api',
-  version: process.env.npm_package_version || '1.0.0'
+  version: process.env.npm_package_version || '1.0.0',
 };
 
 /**
@@ -85,7 +85,7 @@ const errorMetrics: ErrorMetrics = {
   errorsByCode: {},
   errorsByCategory: {},
   errorsBySeverity: {},
-  errorsByEndpoint: {}
+  errorsByEndpoint: {},
 };
 
 // ============================================================================
@@ -130,7 +130,7 @@ class ErrorLogger {
         severity: error.severity,
         correlationId: error.correlationId,
         httpStatusCode: error.httpStatusCode,
-        isRetryable: error.isRetryable
+        isRetryable: error.isRetryable,
       },
       request: {
         method: req.method,
@@ -141,14 +141,14 @@ class ErrorLogger {
         userAgent: req.get('User-Agent'),
         ip: req.ip || req.connection.remoteAddress,
         userId: error.userId || (req as any).user?.id,
-        requestId: error.requestId || req.get('X-Request-ID')
+        requestId: error.requestId || req.get('X-Request-ID'),
       },
       context: {
         ...error.context,
-        ...additionalContext
+        ...additionalContext,
       },
       details: error.details,
-      stack: this.config.includeStackTrace ? error.stack : undefined
+      stack: this.config.includeStackTrace ? error.stack : undefined,
     };
 
     // Use appropriate log level based on severity
@@ -181,7 +181,7 @@ class ErrorLogger {
         service: this.config.service,
         method: req.method,
         resource: req.path,
-        operation: 'unhandled_error'
+        operation: 'unhandled_error',
       },
       (req as any).user?.id,
       req.get('X-Request-ID')
@@ -192,20 +192,25 @@ class ErrorLogger {
 
   private getSeverityLogLevel(severity: ErrorSeverity): string {
     switch (severity) {
-      case 'critical': return 'error';
-      case 'high': return 'error';
-      case 'medium': return 'warn';
-      case 'low': return 'info';
-      default: return 'error';
+      case 'critical':
+        return 'error';
+      case 'high':
+        return 'error';
+      case 'medium':
+        return 'warn';
+      case 'low':
+        return 'info';
+      default:
+        return 'error';
     }
   }
 
   private sanitizeHeaders(headers: any): Record<string, any> {
     const sanitized = { ...headers };
-    
+
     // Remove sensitive headers
     const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key', 'x-auth-token'];
-    sensitiveHeaders.forEach(header => {
+    sensitiveHeaders.forEach((header) => {
       if (sanitized[header]) {
         sanitized[header] = '[REDACTED]';
       }
@@ -226,16 +231,18 @@ function updateErrorMetrics(error: StandardError, req: Request): void {
   if (!DEFAULT_CONFIG.enableMetrics) return;
 
   errorMetrics.totalErrors++;
-  
+
   // Count by error code
   errorMetrics.errorsByCode[error.code] = (errorMetrics.errorsByCode[error.code] || 0) + 1;
-  
+
   // Count by category
-  errorMetrics.errorsByCategory[error.category] = (errorMetrics.errorsByCategory[error.category] || 0) + 1;
-  
+  errorMetrics.errorsByCategory[error.category] =
+    (errorMetrics.errorsByCategory[error.category] || 0) + 1;
+
   // Count by severity
-  errorMetrics.errorsBySeverity[error.severity] = (errorMetrics.errorsBySeverity[error.severity] || 0) + 1;
-  
+  errorMetrics.errorsBySeverity[error.severity] =
+    (errorMetrics.errorsBySeverity[error.severity] || 0) + 1;
+
   // Count by endpoint
   const endpoint = `${req.method} ${req.path}`;
   errorMetrics.errorsByEndpoint[endpoint] = (errorMetrics.errorsByEndpoint[endpoint] || 0) + 1;
@@ -278,7 +285,7 @@ function convertToStandardError(error: any, req: Request): StandardError {
     service: DEFAULT_CONFIG.service,
     method: req.method,
     resource: req.path,
-    operation: 'error_conversion'
+    operation: 'error_conversion',
   };
 
   // Handle specific error types
@@ -304,11 +311,21 @@ function convertToStandardError(error: any, req: Request): StandardError {
   }
 
   if (error.name === 'ConflictError' || error.status === 409) {
-    return ErrorFactory.conflict('Resource', error.message || 'Conflict occurred', context, userId, requestId);
+    return ErrorFactory.conflict(
+      'Resource',
+      error.message || 'Conflict occurred',
+      context,
+      userId,
+      requestId
+    );
   }
 
   // Handle database errors
-  if (error.name === 'DatabaseError' || error.code?.startsWith('ER_') || error.code?.startsWith('SQLITE_')) {
+  if (
+    error.name === 'DatabaseError' ||
+    error.code?.startsWith('ER_') ||
+    error.code?.startsWith('SQLITE_')
+  ) {
     return ErrorFactory.businessLogic(
       'DATABASE_ERROR',
       'Database operation failed',
@@ -372,7 +389,7 @@ export function errorHandler(config: Partial<ErrorHandlerConfig> = {}) {
     const errorResponse: ErrorResponse = standardError.toErrorResponse({
       version: finalConfig.version,
       environment: finalConfig.environment,
-      service: finalConfig.service
+      service: finalConfig.service,
     });
 
     // Add stack trace in development
@@ -407,7 +424,7 @@ export function notFoundHandler(req: Request, res: Response, next: NextFunction)
       service: DEFAULT_CONFIG.service,
       method: req.method,
       resource: req.path,
-      operation: 'not_found'
+      operation: 'not_found',
     },
     (req as any).user?.id,
     req.get('X-Request-ID')
@@ -432,7 +449,7 @@ export function timeoutHandler(timeout: number = 30000) {
             method: req.method,
             resource: req.path,
             operation: 'timeout',
-            metadata: { timeout }
+            metadata: { timeout },
           },
           (req as any).user?.id,
           req.get('X-Request-ID')
@@ -461,7 +478,7 @@ export function rateLimitErrorHandler(req: Request, res: Response, next: NextFun
       service: DEFAULT_CONFIG.service,
       method: req.method,
       resource: req.path,
-      operation: 'rate_limit'
+      operation: 'rate_limit',
     },
     (req as any).user?.id,
     req.get('X-Request-ID')
@@ -487,11 +504,13 @@ export function createErrorResponse(
     code,
     message,
     details,
-    req ? {
-      service: DEFAULT_CONFIG.service,
-      method: req.method,
-      resource: req.path
-    } : undefined,
+    req
+      ? {
+          service: DEFAULT_CONFIG.service,
+          method: req.method,
+          resource: req.path,
+        }
+      : undefined,
     undefined,
     req ? (req as any).user?.id : undefined,
     req ? req.get('X-Request-ID') : undefined
@@ -500,7 +519,7 @@ export function createErrorResponse(
   return error.toErrorResponse({
     version: DEFAULT_CONFIG.version,
     environment: DEFAULT_CONFIG.environment,
-    service: DEFAULT_CONFIG.service
+    service: DEFAULT_CONFIG.service,
   });
 }
 
@@ -526,7 +545,7 @@ export function healthCheck(req: Request, res: Response): void {
     version: DEFAULT_CONFIG.version,
     environment: DEFAULT_CONFIG.environment,
     timestamp: new Date().toISOString(),
-    metrics: getErrorMetrics()
+    metrics: getErrorMetrics(),
   });
 }
 
@@ -534,10 +553,70 @@ export function healthCheck(req: Request, res: Response): void {
 // EXPORTS
 // ============================================================================
 
-export {
-  ErrorLogger,
-  DEFAULT_CONFIG as defaultErrorHandlerConfig
-};
+export { ErrorLogger, DEFAULT_CONFIG as defaultErrorHandlerConfig };
 
-// Export error factory for convenience
-export { ErrorFactory } from '@starships/protocol/src/types/error-classes';
+// Export error classes for convenience
+export {
+  ErrorFactory,
+  DatabaseError,
+  StandardError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  NetworkError,
+  BusinessLogicError,
+  ExpeditionError,
+  StarshipError,
+  TaskError,
+  AgentError,
+} from '@starships/protocol/src/types/error-classes';
+
+// Create ServiceUnavailableError as an alias for BusinessLogicError
+export class ServiceUnavailableError extends BusinessLogicError {
+  constructor(
+    message: string,
+    service: string,
+    retryAfter?: number,
+    context?: Record<string, any>,
+    requestId?: string,
+    resource?: string
+  ) {
+    super(
+      'SERVICE_UNAVAILABLE',
+      'Service unavailable',
+      message,
+      {
+        service,
+        retryAfter,
+        ...context,
+      },
+      undefined,
+      requestId
+    );
+  }
+
+  toResponse() {
+    return this.toErrorResponse();
+  }
+}
+
+// Create ErrorHandlerUtils as a utility class
+export class ErrorHandlerUtils {
+  static database(message: string, operation: string, req: any) {
+    return ErrorFactory.businessLogic(
+      'DATABASE_ERROR',
+      'Database operation failed',
+      message,
+      {
+        service: 'starships-api',
+        method: req.method,
+        resource: req.path,
+        operation,
+      },
+      req.user?.id,
+      req.get?.('X-Request-ID')
+    );
+  }
+}

@@ -35,6 +35,7 @@ describe('StarshipRepository', () => {
     isPublic: true,
     version: '1.0.0',
     usageCount: 0,
+    starshipId: 'starship-123',
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
   };
@@ -213,9 +214,7 @@ describe('StarshipRepository', () => {
         name: 'New Starship',
         ownerId: 'user-123',
         class: 'scout' as const,
-        powerLevel: 100,
-        activeExpeditions: 0,
-        sibilInsights: 0,
+        maxActiveExpeditions: 3,
         status: 'active' as const,
       };
 

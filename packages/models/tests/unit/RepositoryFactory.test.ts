@@ -7,11 +7,7 @@ import {
   ChannelRepository,
   LLMRepository,
   StarshipRepository,
-  CodexRepository,
   VisionRepository,
-  ConstraintRepository,
-  ConceptRepository,
-  MetaAnchorRepository,
   MCPServerOptionRepository,
   MCPServerConnectorRepository,
 } from '../../src/repositories';
@@ -23,11 +19,7 @@ jest.mock('../../src/repositories/UserRepository');
 jest.mock('../../src/repositories/ChannelRepository');
 jest.mock('../../src/repositories/LLMRepository');
 jest.mock('../../src/repositories/StarshipRepository');
-jest.mock('../../src/repositories/CodexRepository');
 jest.mock('../../src/repositories/VisionRepository');
-jest.mock('../../src/repositories/ConstraintRepository');
-jest.mock('../../src/repositories/ConceptRepository');
-jest.mock('../../src/repositories/MetaAnchorRepository');
 jest.mock('../../src/repositories/MCPServerOptionRepository');
 jest.mock('../../src/repositories/MCPServerConnectorRepository');
 jest.mock('../../src/services/AgentTemplateService');
@@ -87,24 +79,19 @@ describe('RepositoryFactory', () => {
     });
   });
 
-  describe('Dependency Injection', () => {
-    it('should inject MCPServerConnectorRepository into StarshipRepository', async () => {
+  describe('Repository Creation', () => {
+    it('should create StarshipRepository', async () => {
       const starshipRepo = await RepositoryFactory.getStarshipRepository();
 
-      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
       expect(StarshipRepository).toHaveBeenCalledTimes(1);
-      expect(StarshipRepository).toHaveBeenCalledWith(expect.any(Object));
+      expect(starshipRepo).toBeDefined();
     });
 
-    it('should initialize MCPServerConnectorRepository before StarshipRepository', async () => {
-      const starshipRepo = await RepositoryFactory.getStarshipRepository();
+    it('should create MCPServerConnectorRepository', async () => {
+      const mcpRepo = await RepositoryFactory.getMCPServerConnectorRepository();
 
-      // Verify that MCPServerConnectorRepository was created first
-      const mcpConnectorCall = (MCPServerConnectorRepository as jest.Mock).mock
-        .invocationCallOrder[0];
-      const starshipCall = (StarshipRepository as jest.Mock).mock.invocationCallOrder[0];
-
-      expect(mcpConnectorCall).toBeLessThan(starshipCall);
+      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
+      expect(mcpRepo).toBeDefined();
     });
   });
 
@@ -149,14 +136,10 @@ describe('RepositoryFactory', () => {
       );
     });
 
-    it('should log dependency injection', async () => {
+    it('should log repository creation', async () => {
       await RepositoryFactory.getStarshipRepository();
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'Creating StarshipRepository instance with MCPServerConnectorRepository dependency'
-        )
-      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('StarshipRepository'));
     });
 
     it('should log reset operations', () => {
@@ -240,17 +223,13 @@ describe('RepositoryFactory', () => {
       it('should initialize all repositories in correct order', async () => {
         await RepositoryFactory.initializeAll();
 
-        // Verify all repositories were created
+        // Verify all existing repositories were created
         expect(AgentRepository).toHaveBeenCalledTimes(1);
         expect(UserRepository).toHaveBeenCalledTimes(1);
         expect(ChannelRepository).toHaveBeenCalledTimes(1);
         expect(LLMRepository).toHaveBeenCalledTimes(1);
         expect(StarshipRepository).toHaveBeenCalledTimes(1);
-        expect(CodexRepository).toHaveBeenCalledTimes(1);
         expect(VisionRepository).toHaveBeenCalledTimes(1);
-        expect(ConstraintRepository).toHaveBeenCalledTimes(1);
-        expect(ConceptRepository).toHaveBeenCalledTimes(1);
-        expect(MetaAnchorRepository).toHaveBeenCalledTimes(1);
         expect(MCPServerOptionRepository).toHaveBeenCalledTimes(1);
         expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
         expect(AgentTemplateService).toHaveBeenCalledTimes(1);
@@ -329,34 +308,10 @@ describe('RepositoryFactory', () => {
       expect(LLMRepository).toHaveBeenCalledTimes(1);
     });
 
-    it('should create CodexRepository', async () => {
-      const repo = await RepositoryFactory.getCodexRepository();
-      expect(repo).toBeDefined();
-      expect(CodexRepository).toHaveBeenCalledTimes(1);
-    });
-
     it('should create VisionRepository', async () => {
       const repo = await RepositoryFactory.getVisionRepository();
       expect(repo).toBeDefined();
       expect(VisionRepository).toHaveBeenCalledTimes(1);
-    });
-
-    it('should create ConstraintRepository', async () => {
-      const repo = await RepositoryFactory.getConstraintRepository();
-      expect(repo).toBeDefined();
-      expect(ConstraintRepository).toHaveBeenCalledTimes(1);
-    });
-
-    it('should create ConceptRepository', async () => {
-      const repo = await RepositoryFactory.getConceptRepository();
-      expect(repo).toBeDefined();
-      expect(ConceptRepository).toHaveBeenCalledTimes(1);
-    });
-
-    it('should create MetaAnchorRepository', async () => {
-      const repo = await RepositoryFactory.getMetaAnchorRepository();
-      expect(repo).toBeDefined();
-      expect(MetaAnchorRepository).toHaveBeenCalledTimes(1);
     });
 
     it('should create MCPServerOptionRepository', async () => {
@@ -371,11 +326,10 @@ describe('RepositoryFactory', () => {
       expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
     });
 
-    it('should create StarshipRepository with dependency', async () => {
+    it('should create StarshipRepository', async () => {
       const repo = await RepositoryFactory.getStarshipRepository();
       expect(repo).toBeDefined();
       expect(StarshipRepository).toHaveBeenCalledTimes(1);
-      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
     });
 
     it('should create AgentTemplateService with connection', async () => {

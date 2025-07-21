@@ -12,14 +12,19 @@ import {
 } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
+import { BaseRepository } from './BaseRepository';
 
 /**
  * Neo4j-based expedition repository
- * 
+ *
  * Handles all database operations for expeditions including CRUD operations,
  * agent assignments, workflow state management, and advanced querying.
  */
-export class ExpeditionRepository implements ExpeditionRepositoryInterface {
+export class ExpeditionRepository extends BaseRepository implements ExpeditionRepositoryInterface {
+  
+  constructor() {
+    super('ExpeditionRepository');
+  }
   
   /**
    * Find all expeditions (admin use only)
@@ -36,12 +41,24 @@ export class ExpeditionRepository implements ExpeditionRepositoryInterface {
    * Find expedition by ID
    */
   async findById(id: string): Promise<Expedition | null> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ e: Expedition }>(
-      'MATCH (e:Expedition) WHERE e.id = $id RETURN e',
-      { id }
-    );
-    return result[0]?.e || null;
+    try {
+      this.validateRequired({ id }, ['id'], 'findById');
+      
+      const connection = getConnection();
+      const result = await this.executeWithErrorHandling(
+        () => connection.executeQuery<{ e: Expedition }>(
+          'MATCH (e:Expedition) WHERE e.id = $id RETURN e',
+          { id }
+        ),
+        'findById',
+        'expedition',
+        id
+      );
+      
+      return result[0]?.e || null;
+    } catch (error) {
+      throw this.handleDatabaseError(error, 'findById', 'expedition', id);
+    }
   }
 
   /**
@@ -207,37 +224,69 @@ export class ExpeditionRepository implements ExpeditionRepositoryInterface {
    * Create a new expedition
    */
   async create(entity: Omit<Expedition, 'id' | 'createdAt'>): Promise<Expedition> {
-    const connection = getConnection();
-    const now = new Date().toISOString();
-    
-    const expedition: Expedition = {
-      ...entity,
-      id: uuidv4(),
-      createdAt: now,
-      updatedAt: entity.updatedAt || now,
-      assignedAgents: entity.assignedAgents || [],
-      tags: entity.tags || [],
-      status: entity.status || 'draft'
-    };
+    try {
+      // Validate required fields
+      this.validateRequired(entity, ['title', 'starshipId', 'createdBy'], 'create');
+      
+      // Validate field types
+      this.validateTypes(entity, {
+        title: 'string',
+        starshipId: 'string',
+        createdBy: 'string'
+      }, 'create');
 
-    // Create expedition node
-    await connection.executeWrite(
-      'CREATE (e:Expedition $props) RETURN e',
-      { props: expedition }
-    );
+      // Validate string lengths
+      this.validateStringLengths(entity, {
+        title: { min: 1, max: 200 },
+        description: { max: 2000 }
+      }, 'create');
 
-    // Create relationship with starship
-    await connection.executeWrite(
-      `MATCH (s:Starship {id: $starshipId}), (e:Expedition {id: $expeditionId})
-       CREATE (s)-[:HAS_EXPEDITION {createdAt: $timestamp}]->(e)`,
-      {
-        starshipId: expedition.starshipId,
-        expeditionId: expedition.id,
-        timestamp: expedition.createdAt
-      }
-    );
+      const connection = getConnection();
+      const now = new Date().toISOString();
+      
+      const expedition: Expedition = {
+        ...entity,
+        id: uuidv4(),
+        createdAt: now,
+        updatedAt: entity.updatedAt || now,
+        assignedAgents: entity.assignedAgents || [],
+        tags: entity.tags || [],
+        status: entity.status || 'draft'
+      };
 
-    return expedition;
+      // Create expedition node with error handling
+      await this.executeWithErrorHandling(
+        () => connection.executeWrite(
+          'CREATE (e:Expedition $props) RETURN e',
+          { props: expedition }
+        ),
+        'create',
+        'expedition',
+        expedition.id
+      );
+
+      // Create relationship with starship with error handling
+      await this.executeWithErrorHandling(
+        () => connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (e:Expedition {id: $expeditionId})
+           CREATE (s)-[:HAS_EXPEDITION {createdAt: $timestamp}]->(e)`,
+          {
+            starshipId: expedition.starshipId,
+            expeditionId: expedition.id,
+            timestamp: expedition.createdAt
+          }
+        ),
+        'create',
+        'expedition',
+        expedition.id
+      );
+
+      this.log('info', `Expedition created successfully: ${expedition.id}`);
+      return expedition;
+    } catch (error) {
+      this.log('error', 'Failed to create expedition', { error: error instanceof Error ? error.message : String(error) });
+      throw this.handleDatabaseError(error, 'create', 'expedition');
+    }
   }
 
   /**

@@ -7,22 +7,26 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  ArrowLeft, 
-  Play, 
-  Pause, 
-  Square, 
-  Users, 
-  Clock, 
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  Square,
+  Users,
+  Clock,
   Target,
   MessageSquare,
   Settings,
   BarChart3,
-  FileText
+  FileText,
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import Link from 'next/link';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
+import { TypingIndicator } from './TypingIndicator';
+import { MessageSearch } from './MessageSearch';
 import { ExpeditionProgress } from './ExpeditionProgress';
 import { TaskTimeline } from './TaskTimeline';
 import { ParticipantsList } from './ParticipantsList';
@@ -58,6 +62,10 @@ interface ExpeditionChatProps {
 export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'progress' | 'tasks' | 'participants'>('chat');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [typingUsers, setTypingUsers] = useState<any[]>([]);
 
   // Get starship ID from the slug first
   const [starshipId, setStarshipId] = useState<string>('');
@@ -111,18 +119,38 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   });
 
   // Socket integration
-  const { 
-    startExpedition, 
-    pauseExpedition, 
+  const {
+    startExpedition,
+    pauseExpedition,
     cancelExpedition,
-    error: socketError 
+    error: socketError,
+    realtimeData
   } = useExpeditionSocket({
     expeditionId,
-    onExpeditionUpdate: () => {
+    onExpeditionUpdated: () => {
       refreshExpedition();
     },
-    onStatusChange: () => {
+    onExpeditionStarted: () => {
       refreshExpedition();
+    },
+    onExpeditionPaused: () => {
+      refreshExpedition();
+    },
+    onExpeditionCancelled: () => {
+      refreshExpedition();
+    },
+    onExpeditionCompleted: () => {
+      refreshExpedition();
+    },
+    onTypingStart: (event) => {
+      setTypingUsers(prev => [...prev.filter(u => u.id !== event.userId), {
+        id: event.userId || event.agentId || 'unknown',
+        name: event.userId ? 'User' : event.agentId ? `Agent ${event.agentId.slice(0, 8)}` : 'Unknown',
+        role: event.role
+      }]);
+    },
+    onTypingStop: (event) => {
+      setTypingUsers(prev => prev.filter(u => u.id !== (event.userId || event.agentId)));
     }
   });
 
@@ -208,7 +236,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
         <Card className="p-6 text-center">
           <p className="text-red-500 mb-4">Error loading expedition</p>
           <p className="text-sm text-muted-foreground mb-4">
-            {expeditionError || 'Expedition not found'}
+            {typeof expeditionError === 'string' ? expeditionError : expeditionError?.message || 'Expedition not found'}
           </p>
           <Button onClick={refreshExpedition} variant="outline">
             Try Again
@@ -310,6 +338,9 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
             >
               <MessageSquare className="h-4 w-4 inline mr-2" />
               Chat
+              {typingUsers.length > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              )}
             </button>
             <button
               onClick={() => setActiveTab('progress')}
@@ -349,45 +380,118 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           {/* Tab Content */}
           <div className="flex-1 overflow-hidden">
             {activeTab === 'chat' && (
-              <div className="h-full flex flex-col">
+              <div className="h-full flex flex-col relative">
+                {/* Search */}
+                {showSearch && (
+                  <MessageSearch
+                    messages={messages}
+                    onSearchResults={(results, query) => {
+                      setSearchResults(results);
+                    }}
+                    onHighlightMessage={(messageId) => {
+                      setHighlightedMessageId(messageId);
+                      const messageElement = document.getElementById(`message-${messageId}`);
+                      if (messageElement) {
+                        messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                    availableAgents={expedition.assignedAgents.map(agentId => ({
+                      id: agentId,
+                      name: `Agent ${agentId.slice(0, 8)}`
+                    }))}
+                  />
+                )}
+
                 {/* Messages */}
                 <ScrollArea className="flex-1 p-4">
                   <div className="space-y-4">
                     {messagesLoading && messages.length === 0 ? (
                       <div className="text-center text-muted-foreground">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                         Loading messages...
                       </div>
                     ) : messagesError ? (
                       <div className="text-center text-red-500">
+                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
                         Error loading messages: {messagesError}
                       </div>
                     ) : messages.length === 0 ? (
                       <div className="text-center text-muted-foreground">
-                        No messages yet. Start the conversation!
+                        <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg font-medium mb-2">No messages yet</p>
+                        <p className="text-sm">Start the conversation to coordinate with your team!</p>
                       </div>
                     ) : (
-                      messages.map((message) => (
-                        <MessageBubble key={message.id} message={message} />
+                      (searchResults.length > 0 ? searchResults : messages).map((message) => (
+                        <div
+                          key={message.id}
+                          id={`message-${message.id}`}
+                          className={highlightedMessageId === message.id ? 'ring-2 ring-blue-500 rounded-lg' : ''}
+                        >
+                          <MessageBubble
+                            message={message}
+                            showReactions={true}
+                            showStatus={true}
+                            enableActions={true}
+                            onReply={(msg) => {
+                              console.log('Reply to message:', msg.id);
+                            }}
+                            onReact={(messageId, emoji) => {
+                              console.log('React to message:', messageId, emoji);
+                            }}
+                            onCopy={(content) => {
+                              navigator.clipboard.writeText(content);
+                            }}
+                          />
+                        </div>
                       ))
                     )}
+                    
+                    {/* Typing Indicator */}
+                    {typingUsers.length > 0 && (
+                      <TypingIndicator typingUsers={typingUsers} />
+                    )}
+                    
                     <div ref={messagesEndRef} />
                   </div>
                 </ScrollArea>
 
                 {/* Message Input */}
-                <div className="border-t p-4">
+                <div className="border-t">
                   <MessageInput
-                    onSendMessage={sendMessage}
+                    onSendMessage={async (content, messageType, agentId) => {
+                      await sendMessage(content, messageType, agentId);
+                    }}
                     disabled={sending || expedition.status === 'completed' || expedition.status === 'cancelled'}
                     placeholder={
-                      expedition.status === 'completed' 
+                      expedition.status === 'completed'
                         ? 'Expedition completed'
                         : expedition.status === 'cancelled'
                         ? 'Expedition cancelled'
                         : 'Type your message...'
                     }
+                    showMessageType={true}
+                    showAgentSelector={expedition.assignedAgents.length > 0}
+                    showFormatting={true}
+                    showAttachments={true}
+                    availableAgents={expedition.assignedAgents.map(agentId => ({
+                      id: agentId,
+                      name: `Agent ${agentId.slice(0, 8)}`,
+                      status: 'online' as const
+                    }))}
+                    className="p-4"
                   />
                 </div>
+
+                {/* Search toggle button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-2 right-2 z-10"
+                  onClick={() => setShowSearch(!showSearch)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
               </div>
             )}
 

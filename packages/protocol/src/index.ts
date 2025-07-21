@@ -197,7 +197,7 @@ export interface SibilStreamResponse {
   status: 'started' | 'streaming' | 'completed' | 'error';
 }
 
-// Socket.IO Event Definitions
+// Legacy Socket.IO Event Definitions (kept for backward compatibility)
 export interface SocketIOEvents {
   // Sibil Client to Server events
   'sibil:start-stream': (request: SibilSocketRequest) => void;
@@ -345,3 +345,37 @@ export * from './types/starship';
 
 // Export expedition-related types
 export * from './types/expedition';
+
+// Export enhanced Socket.IO event types
+export * from './types/socket-events';
+
+// Export standardized error handling types and classes
+export * from './types/errors';
+
+// Export error classes with explicit naming to avoid conflicts
+export {
+  StandardError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  DatabaseError,
+  NetworkError,
+  BusinessLogicError,
+  ErrorFactory
+} from './types/error-classes';
+
+// Re-export specific types to resolve naming conflicts
+export type {
+  ExpeditionError as LegacyExpeditionError,
+  ExpeditionErrorCode as LegacyExpeditionErrorCode
+} from './types/expedition';
+
+// Re-export specific types to avoid conflicts
+export type {
+  EnhancedSocketIOEvents,
+  EventEmissionOptions,
+  EventEmissionResult,
+  SocketExpeditionEventType
+} from './types/socket-events';

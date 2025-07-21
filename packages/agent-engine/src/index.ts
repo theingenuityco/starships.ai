@@ -14,7 +14,7 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     channel_id: req.channel_id,
     message: req.message,
     stream: req.stream,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   const agentRepo = RepositoryFactory.getAgentRepository();
@@ -24,9 +24,9 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   const userRepo = RepositoryFactory.getUserRepository();
   
   ProviderFactory.initialize(agentRepo, llmRepo);
-  
+
   const agent = await agentRepo.findById(req.agent_id);
-  
+
   if (!agent) {
     console.error('❌ [AGENT-ENGINE] Agent not found:', req.agent_id);
     throw new Error(`Agent ${req.agent_id} not found`);
@@ -36,7 +36,7 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     id: agent.id,
     name: agent.name,
     model: agent.model,
-    systemPrompt: agent.systemPrompt?.substring(0, 100) + '...'
+    systemPrompt: agent.systemPrompt?.substring(0, 100) + '...',
   });
 
   // ENHANCED USER ID RESOLUTION WITH COMPREHENSIVE FALLBACK STRATEGIES
@@ -210,20 +210,20 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   console.log('🧠 [AGENT-ENGINE] Memory loaded:', {
     sessionKey,
     memoryEntries: memory.length,
-    recentEntries: memory.slice(-3).map(m => `${m.role}: ${m.content.substring(0, 50)}...`)
+    recentEntries: memory.slice(-3).map((m) => `${m.role}: ${m.content.substring(0, 50)}...`),
   });
 
-  let relevantContext = "";
+  let relevantContext = '';
   if (memory.length > 10) {
     const searchResult = await store.semanticSearch(sessionKey, req.message, 5);
     console.log('🔍 [AGENT-ENGINE] Semantic search results:', {
       entriesFound: searchResult.entries.length,
-      entries: searchResult.entries.map(e => `${e.role}: ${e.content.substring(0, 50)}...`)
+      entries: searchResult.entries.map((e) => `${e.role}: ${e.content.substring(0, 50)}...`),
     });
-    
+
     if (searchResult.entries.length > 0) {
       relevantContext = searchResult.entries
-        .map(entry => `${entry.role}: ${entry.content}`)
+        .map((entry) => `${entry.role}: ${entry.content}`)
         .join('\n');
     }
   }
@@ -244,32 +244,32 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     relevantContext,
     visionContext
   );
-  
+
   console.log('✅ [AGENT-ENGINE] Prompt built:', {
     totalMessages: prompt.messages.length,
-    systemMessages: prompt.messages.filter(m => m.role === 'system').length,
-    userMessages: prompt.messages.filter(m => m.role === 'user').length,
-    assistantMessages: prompt.messages.filter(m => m.role === 'assistant').length
+    systemMessages: prompt.messages.filter((m) => m.role === 'system').length,
+    userMessages: prompt.messages.filter((m) => m.role === 'user').length,
+    assistantMessages: prompt.messages.filter((m) => m.role === 'assistant').length,
   });
-  
+
   const provider = await ProviderFactory.getProvider(req.agent_id);
   console.log('🤖 [AGENT-ENGINE] Provider loaded for agent:', req.agent_id);
-  
+
   const llm = await llmRepo.findById(agent.model);
   const opts = {
     stream: req.stream,
     temperature: llm?.temperature,
     maxTokens: llm?.maxTokens,
   };
-  
+
   console.log('⚙️ [AGENT-ENGINE] LLM configuration:', {
     modelId: agent.model,
     modelName: llm?.name,
     temperature: llm?.temperature,
     maxTokens: llm?.maxTokens,
-    stream: req.stream
+    stream: req.stream,
   });
-  
+
   if (req.stream) {
     throw new Error('Use chatStream for streaming responses');
   }
@@ -278,24 +278,32 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   const startTime = Date.now();
   const result = await provider.complete(prompt, opts);
   const endTime = Date.now();
-  
+
   console.log('✅ [AGENT-ENGINE] LLM response received:', {
     responseTime: `${endTime - startTime}ms`,
     replyLength: result.reply.length,
     replyPreview: result.reply.substring(0, 200) + '...',
-    usage: result.usage
+    usage: result.usage,
   });
 
   console.log('💾 [AGENT-ENGINE] Storing messages in memory...');
   const userTimestamp = Date.now();
-  await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
-  
+  await store.append(sessionKey, {
+    role: 'user',
+    content: req.message,
+    timestamp: userTimestamp,
+  } as MemoryEntry);
+
   const assistantTimestamp = Date.now();
-  await store.append(sessionKey, { role: "assistant", content: result.reply, timestamp: assistantTimestamp } as MemoryEntry);
+  await store.append(sessionKey, {
+    role: 'assistant',
+    content: result.reply,
+    timestamp: assistantTimestamp,
+  } as MemoryEntry);
 
   console.log('🎉 [AGENT-ENGINE] Chat completed successfully:', {
     finalReplyLength: result.reply.length,
-    totalProcessingTime: `${Date.now() - startTime}ms`
+    totalProcessingTime: `${Date.now() - startTime}ms`,
   });
 
   return { reply: result.reply, usage: result.usage };
@@ -304,13 +312,16 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
 /**
  * Process chat request through agent with streaming support
  */
-async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): AsyncGenerator<string, void, unknown> {
+async function* chatStream(
+  req: ChatRequest,
+  store: LangChainMemoryStore
+): AsyncGenerator<string, void, unknown> {
   console.log('🌊 [AGENT-ENGINE-STREAM] Starting streaming chat request:', {
     agent_id: req.agent_id,
     user_id: req.user_id,
     channel_id: req.channel_id,
     message: req.message,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 
   const agentRepo = RepositoryFactory.getAgentRepository();
@@ -320,9 +331,9 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   const userRepo = RepositoryFactory.getUserRepository();
   
   ProviderFactory.initialize(agentRepo, llmRepo);
-  
+
   const agent = await agentRepo.findById(req.agent_id);
-  
+
   if (!agent) {
     console.error('❌ [AGENT-ENGINE-STREAM] Agent not found:', req.agent_id);
     throw new Error(`Agent ${req.agent_id} not found`);
@@ -331,7 +342,7 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   console.log('✅ [AGENT-ENGINE-STREAM] Agent found:', {
     id: agent.id,
     name: agent.name,
-    model: agent.model
+    model: agent.model,
   });
 
   // ENHANCED USER ID RESOLUTION WITH COMPREHENSIVE FALLBACK STRATEGIES (STREAMING)
@@ -503,20 +514,20 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
   console.log('🧠 [AGENT-ENGINE-STREAM] Memory loaded:', {
     sessionKey,
     memoryEntries: memory.length,
-    recentEntries: memory.slice(-3).map(m => `${m.role}: ${m.content.substring(0, 50)}...`)
+    recentEntries: memory.slice(-3).map((m) => `${m.role}: ${m.content.substring(0, 50)}...`),
   });
 
-  let relevantContext = "";
+  let relevantContext = '';
   if (memory.length > 10) {
     const searchResult = await store.semanticSearch(sessionKey, req.message, 5);
     console.log('🔍 [AGENT-ENGINE-STREAM] Semantic search results:', {
       entriesFound: searchResult.entries.length,
-      entries: searchResult.entries.map(e => `${e.role}: ${e.content.substring(0, 50)}...`)
+      entries: searchResult.entries.map((e) => `${e.role}: ${e.content.substring(0, 50)}...`),
     });
-    
+
     if (searchResult.entries.length > 0) {
       relevantContext = searchResult.entries
-        .map(entry => `${entry.role}: ${entry.content}`)
+        .map((entry) => `${entry.role}: ${entry.content}`)
         .join('\n');
     }
   }
@@ -536,71 +547,79 @@ async function* chatStream(req: ChatRequest, store: LangChainMemoryStore): Async
     relevantContext,
     visionContext
   );
-  
+
   console.log('✅ [AGENT-ENGINE-STREAM] Prompt built:', {
     totalMessages: prompt.messages.length,
-    systemMessages: prompt.messages.filter(m => m.role === 'system').length,
-    userMessages: prompt.messages.filter(m => m.role === 'user').length,
-    assistantMessages: prompt.messages.filter(m => m.role === 'assistant').length
+    systemMessages: prompt.messages.filter((m) => m.role === 'system').length,
+    userMessages: prompt.messages.filter((m) => m.role === 'user').length,
+    assistantMessages: prompt.messages.filter((m) => m.role === 'assistant').length,
   });
-  
+
   const provider = await ProviderFactory.getProvider(req.agent_id);
   console.log('🤖 [AGENT-ENGINE-STREAM] Provider loaded for agent:', req.agent_id);
-  
+
   const llm = await llmRepo.findById(agent.model);
   const opts = {
     temperature: llm?.temperature,
     maxTokens: llm?.maxTokens,
   };
-  
+
   console.log('⚙️ [AGENT-ENGINE-STREAM] LLM configuration:', {
     modelId: agent.model,
     modelName: llm?.name,
     temperature: llm?.temperature,
-    maxTokens: llm?.maxTokens
+    maxTokens: llm?.maxTokens,
   });
-  
+
   // Store user message before streaming
   console.log('💾 [AGENT-ENGINE-STREAM] Storing user message in memory...');
   const userTimestamp = Date.now();
-  await store.append(sessionKey, { role: "user", content: req.message, timestamp: userTimestamp } as MemoryEntry);
-  
-  let fullResponse = "";
+  await store.append(sessionKey, {
+    role: 'user',
+    content: req.message,
+    timestamp: userTimestamp,
+  } as MemoryEntry);
+
+  let fullResponse = '';
   let chunkCount = 0;
-  
+
   console.log('🌊 [AGENT-ENGINE-STREAM] Starting streaming response...');
   const streamStartTime = Date.now();
-  
+
   // Stream the response
   for await (const chunk of provider.completeStream(prompt, opts)) {
     fullResponse += chunk;
     chunkCount++;
-    
+
     // Log every 10th chunk to avoid spam
     if (chunkCount % 10 === 0) {
       console.log(`🔄 [AGENT-ENGINE-STREAM] Chunk ${chunkCount}:`, {
         chunkLength: chunk.length,
         totalLength: fullResponse.length,
-        elapsedTime: `${Date.now() - streamStartTime}ms`
+        elapsedTime: `${Date.now() - streamStartTime}ms`,
       });
     }
-    
+
     yield chunk;
   }
-  
+
   const streamEndTime = Date.now();
   console.log('✅ [AGENT-ENGINE-STREAM] Streaming completed:', {
     totalChunks: chunkCount,
     totalResponseLength: fullResponse.length,
     streamingTime: `${streamEndTime - streamStartTime}ms`,
-    responsePreview: fullResponse.substring(0, 200) + '...'
+    responsePreview: fullResponse.substring(0, 200) + '...',
   });
-  
+
   // Store assistant message after streaming completes
   console.log('💾 [AGENT-ENGINE-STREAM] Storing assistant message in memory...');
   const assistantTimestamp = Date.now();
-  await store.append(sessionKey, { role: "assistant", content: fullResponse, timestamp: assistantTimestamp } as MemoryEntry);
-  
+  await store.append(sessionKey, {
+    role: 'assistant',
+    content: fullResponse,
+    timestamp: assistantTimestamp,
+  } as MemoryEntry);
+
   console.log('🎉 [AGENT-ENGINE-STREAM] Streaming chat completed successfully');
 }
 

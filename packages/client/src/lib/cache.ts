@@ -82,6 +82,12 @@ export const CACHE_KEYS = {
   TEMPLATES_PUBLIC: (limit: number, offset: number) => `templates:public:${limit}:${offset}`,
   TEMPLATES_SEARCH: (query: string) => `templates:search:${query}`,
   TEMPLATE_BY_ID: (id: string) => `template:${id}`,
+  // MCP Server cache keys
+  MCP_SERVERS_ALL: 'mcp-servers:all',
+  MCP_SERVERS_BY_STARSHIP: (starshipId: string) => `mcp-servers:starship:${starshipId}`,
+  // NEW: Connector Instance cache keys
+  CONNECTOR_INSTANCES_BY_STARSHIP: (starshipId: string) =>
+    `connector-instances:starship:${starshipId}`,
 }
 
 // Helper function to invalidate related caches when agents are modified
@@ -120,4 +126,54 @@ export const invalidateTemplateCaches = (templateId?: string) => {
 
   // Invalidate all template list caches
   apiCache.invalidatePattern('^templates:')
+}
+
+// Helper function to invalidate MCP server caches
+export const invalidateMCPServerCaches = (starshipId?: string) => {
+  console.log(
+    '[CACHE] Invalidating MCP server caches',
+    starshipId ? `for starship ${starshipId}` : 'for all servers'
+  )
+
+  // Invalidate all MCP server list cache
+  apiCache.invalidate(CACHE_KEYS.MCP_SERVERS_ALL)
+  console.log('[CACHE] Invalidated MCP servers all cache')
+
+  if (starshipId) {
+    apiCache.invalidate(CACHE_KEYS.MCP_SERVERS_BY_STARSHIP(starshipId))
+    console.log('[CACHE] Invalidated MCP servers cache for starship:', starshipId)
+  } else {
+    // Invalidate all starship-specific MCP server caches
+    apiCache.invalidatePattern('^mcp-servers:starship:')
+    console.log(
+      '[CACHE] Invalidated all starship MCP server caches with pattern: ^mcp-servers:starship:'
+    )
+  }
+
+  // Log remaining cache keys for debugging
+  const stats = apiCache.getStats()
+  console.log('[CACHE] Remaining cache keys after MCP server invalidation:', stats.keys)
+}
+
+// NEW: Helper function to invalidate connector instance caches
+export const invalidateConnectorInstanceCaches = (starshipId?: string) => {
+  console.log(
+    '[CACHE] Invalidating connector instance caches',
+    starshipId ? `for starship ${starshipId}` : 'for all instances'
+  )
+
+  if (starshipId) {
+    apiCache.invalidate(CACHE_KEYS.CONNECTOR_INSTANCES_BY_STARSHIP(starshipId))
+    console.log('[CACHE] Invalidated connector instances cache for starship:', starshipId)
+  } else {
+    // Invalidate all starship-specific connector instance caches
+    apiCache.invalidatePattern('^connector-instances:starship:')
+    console.log(
+      '[CACHE] Invalidated all starship connector instance caches with pattern: ^connector-instances:starship:'
+    )
+  }
+
+  // Log remaining cache keys for debugging
+  const stats = apiCache.getStats()
+  console.log('[CACHE] Remaining cache keys after connector instance invalidation:', stats.keys)
 }

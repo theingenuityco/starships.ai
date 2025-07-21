@@ -15,9 +15,12 @@ import {
   LLMRepository,
   StarshipRepository,
   VisionRepository,
+  MCPServerOptionRepository,
+  MCPServerConnectorRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
+import { seedMCPServers } from '@starships/models/src/scripts/seed-mcp-servers';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -27,10 +30,22 @@ import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
+import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import expeditionRoutes from './routes/expeditions';
 import { AgentService } from './services/AgentService';
+
+// Import new error handling and health check routes
+import {
+  requestIdMiddleware,
+  requestLoggingMiddleware,
+  responseLoggingMiddleware,
+  errorHandler,
+  notFoundHandler,
+} from './middleware/errorHandler';
+import healthRoutes from './routes/health';
+import { logger } from '@starships/models/src/logging';
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
@@ -52,56 +67,50 @@ const userRepository = new UserRepository();
 const channelRepository = new ChannelRepository();
 const llmRepository = new LLMRepository();
 
+// Aether Core repositories - use proper dependency injection
+const mcpServerConnectorRepository = new MCPServerConnectorRepository();
+// const codexRepository = new CodexRepository();
+// const constraintRepository = new ConstraintRepository();
+// const conceptRepository = new ConceptRepository();
+// const metaAnchorRepository = new MetaAnchorRepository();
+const mcpServerOptionRepository = new MCPServerOptionRepository();
+
+
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
 const visionRepository = new VisionRepository();
 
-// Middleware
+// Middleware - Order is important!
 app.use(cors());
 app.use(express.json());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    version: 'aether-core-v1.0',
-  });
-});
+// Add error handling middleware
+app.use(requestIdMiddleware);
+app.use(requestLoggingMiddleware);
+app.use(responseLoggingMiddleware);
 
-// Database health check
-app.get('/health/db', async (req, res) => {
-  try {
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agentCount = await agentRepo.findAll().then((agents) => agents.length);
-    res.json({
-      status: 'healthy',
-      database: 'connected',
-      agentCount,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    console.error('Database health check failed:', error);
-    res.status(500).json({
-      status: 'unhealthy',
-      database: 'disconnected',
-      error: error?.message || 'Unknown database error',
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+// Health check routes (comprehensive)
+app.use('/health', healthRoutes);
 
+
+// ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
-  visionRepository,
+  mcpServerOptionRepository,
+  mcpServerConnectorRepository,
 });
 
 // Initialize vision routes with dependencies
 initializeVisionRoutes({
   starshipRepository,
   visionRepository,
+});
+
+// Initialize MCP server routes with dependencies
+initializeMCPServerRoutes({
+  mcpServerOptionRepository,
 });
 
 // API Routes
@@ -115,6 +124,12 @@ app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
 app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
+
+// Add 404 handler for unmatched routes
+app.use(notFoundHandler);
+
+// Add centralized error handling middleware (must be last)
+app.use(errorHandler);
 
 // Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);
@@ -134,9 +149,26 @@ httpServer.listen(PORT, async () => {
     console.log('✅ AgentService initialized with default agents');
 
     // Initialize AgentTemplateService (seeds default templates)
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = await RepositoryFactory.getAgentTemplateService();
     await templateService.seedDefaultTemplates();
     console.log('✅ AgentTemplateService initialized with default templates');
+
+    // Initialize MCP Server Options (seeds default connectors)
+    await seedMCPServers();
+    console.log('✅ MCP Server Options initialized with default connectors');
+
+    // Initialize MCPServerConnectorRepository (validate schema and constraints)
+    try {
+      const connectorCount = await mcpServerConnectorRepository
+        .findAll()
+        .then((connectors) => connectors.length);
+      console.log(
+        `✅ MCPServerConnectorRepository initialized with ${connectorCount} existing connector instances`
+      );
+    } catch (error) {
+      console.error('❌ Failed to initialize MCPServerConnectorRepository:', error);
+      // Don't exit - this is not critical for server startup
+    }
 
     // Log Socket.IO status
     console.log('✅ Socket.IO server initialized');

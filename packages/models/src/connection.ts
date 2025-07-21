@@ -31,7 +31,7 @@ export class Neo4jConnection {
           connectionTimeout: 5000, // 5 second timeout
           maxConnectionLifetime: 30000, // 30 second max lifetime
           maxConnectionPoolSize: 100,
-          connectionAcquisitionTimeout: 10000 // 10 second acquisition timeout
+          connectionAcquisitionTimeout: 10000, // 10 second acquisition timeout
         }
       );
 
@@ -40,10 +40,7 @@ export class Neo4jConnection {
         setTimeout(() => reject(new Error('Neo4j connection timeout')), 5000);
       });
 
-      await Promise.race([
-        this.driver.verifyConnectivity(),
-        timeoutPromise
-      ]);
+      await Promise.race([this.driver.verifyConnectivity(), timeoutPromise]);
     } catch (error) {
       console.error('Failed to connect to Neo4j:', error);
       throw error;
@@ -61,24 +58,21 @@ export class Neo4jConnection {
     if (!this.driver) {
       throw new Error('Neo4j driver is not connected. Call connect() first.');
     }
-    
+
     return this.driver.session({
-      database: this.config.database || 'neo4j'
+      database: this.config.database || 'neo4j',
     });
   }
 
-  async executeQuery<T = any>(
-    cypher: string, 
-    parameters: any = {}
-  ): Promise<T[]> {
+  async executeQuery<T = any>(cypher: string, parameters: any = {}): Promise<T[]> {
     const session = this.getSession();
-    
+
     try {
-      const result = await session.executeRead((tx: ManagedTransaction) => 
+      const result = await session.executeRead((tx: ManagedTransaction) =>
         tx.run(cypher, parameters)
       );
-      
-      return result.records.map(record => {
+
+      return result.records.map((record) => {
         const obj = record.toObject();
         // Extract properties from Neo4j nodes
         const processedObj: any = {};
@@ -98,18 +92,15 @@ export class Neo4jConnection {
     }
   }
 
-  async executeWrite<T = any>(
-    cypher: string, 
-    parameters: any = {}
-  ): Promise<T[]> {
+  async executeWrite<T = any>(cypher: string, parameters: any = {}): Promise<T[]> {
     const session = this.getSession();
-    
+
     try {
-      const result = await session.executeWrite((tx: ManagedTransaction) => 
+      const result = await session.executeWrite((tx: ManagedTransaction) =>
         tx.run(cypher, parameters)
       );
-      
-      return result.records.map(record => {
+
+      return result.records.map((record) => {
         const obj = record.toObject();
         // Extract properties from Neo4j nodes
         const processedObj: any = {};
@@ -131,7 +122,7 @@ export class Neo4jConnection {
 
   async initializeSchema(): Promise<void> {
     const session = this.getSession();
-    
+
     try {
       const constraints = [
         'CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE',
@@ -141,7 +132,10 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE',
         'CREATE CONSTRAINT starship_slug_owner_unique IF NOT EXISTS FOR (s:Starship) REQUIRE (s.slug, s.ownerId) IS UNIQUE',
         'CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE',
-        
+        // 'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
+        // 'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
+        // 'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
+        'CREATE CONSTRAINT mcp_server_option_id_unique IF NOT EXISTS FOR (m:MCPServerOption) REQUIRE m.id IS UNIQUE',
         // Expedition system constraints
         'CREATE CONSTRAINT expedition_id_unique IF NOT EXISTS FOR (e:Expedition) REQUIRE e.id IS UNIQUE',
         'CREATE CONSTRAINT expedition_task_id_unique IF NOT EXISTS FOR (t:ExpeditionTask) REQUIRE t.id IS UNIQUE',
@@ -160,6 +154,16 @@ export class Neo4jConnection {
         'CREATE INDEX channel_guild_index IF NOT EXISTS FOR (c:Channel) ON (c.guildId)',
         'CREATE INDEX llm_provider_index IF NOT EXISTS FOR (l:LLM) ON (l.provider)',
         'CREATE INDEX starship_owner_index IF NOT EXISTS FOR (s:Starship) ON (s.ownerId)',
+        // 'CREATE INDEX codex_starship_index IF NOT EXISTS FOR (c:Codex) ON (c.starshipId)',
+        // 'CREATE INDEX codex_active_index IF NOT EXISTS FOR (c:Codex) ON (c.isActive)',
+        // 'CREATE INDEX vision_codex_index IF NOT EXISTS FOR (v:Vision) ON (v.codexId)',
+        // 'CREATE INDEX constraint_codex_index IF NOT EXISTS FOR (con:Constraint) ON (con.codexId)',
+        // 'CREATE INDEX constraint_active_index IF NOT EXISTS FOR (con:Constraint) ON (con.isActive)',
+        // 'CREATE INDEX concept_codex_index IF NOT EXISTS FOR (concept:Concept) ON (concept.codexId)',
+        // 'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
+        // 'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
+        'CREATE INDEX mcp_server_option_name_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.name)',
+        'CREATE INDEX mcp_server_option_command_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.command)',
         'CREATE INDEX vision_starship_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId)',
         
         // Expedition system indexes
@@ -192,7 +196,6 @@ export class Neo4jConnection {
       for (const index of indexes) {
         await session.run(index);
       }
-
     } catch (error) {
       console.error('Failed to initialize Neo4j schema:', error);
       throw error;
@@ -216,4 +219,4 @@ export function getConnection(): Neo4jConnection {
     throw new Error('Neo4j connection not initialized. Call createConnection() first.');
   }
   return connectionInstance;
-} 
+}

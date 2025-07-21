@@ -1,20 +1,30 @@
 'use client'
 
-import { useState } from 'react'
-import { Agent } from '@/lib/api'
+import { useState, useEffect } from 'react'
+import { Agent, MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
+import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
+import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
+import { ConnectorTroubleshootingPanel } from '@/components/crew/ConnectorTroubleshootingPanel'
 import { ChatInterface } from '@/components/chat/ChatInterface'
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Users } from 'lucide-react';
-import Link from 'next/link';
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ArrowLeft, Users, Plug, Bot } from 'lucide-react'
+import Link from 'next/link'
 
 interface StarshipCrewContentProps {
-  slug: string;
+  slug: string
 }
 
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+
+  // Connector instance state management
+  const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
+  const [connectorsLoading, setConnectorsLoading] = useState(false)
+  const [connectorsError, setConnectorsError] = useState<string | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
 
   const handleAgentSelect = (agent: Agent) => {
     setSelectedAgent(agent)
@@ -23,6 +33,77 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   const handleSessionCreated = (newSessionId: string) => {
     setSessionId(newSessionId)
+  }
+
+  // Fetch connector instances on component mount and when starship changes
+  useEffect(() => {
+    fetchConnectorInstances()
+  }, [slug])
+
+  // Auto-refresh connector instances every 30 seconds
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      fetchConnectorInstances()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, slug])
+
+  const fetchConnectorInstances = async () => {
+    try {
+      setConnectorsLoading(true)
+      setConnectorsError(null)
+      const instances = await mcpServerAPI.getConnectorInstances(slug)
+      setConnectorInstances(instances)
+    } catch (error) {
+      console.error('Failed to fetch connector instances:', error)
+      setConnectorsError('Failed to load connectors. Please try again.')
+    } finally {
+      setConnectorsLoading(false)
+    }
+  }
+
+  // Handle connector changes with proper error handling and loading states
+  const handleConnectorsChange = async (newConnectors: MCPServerOption[]) => {
+    try {
+      setConnectorsLoading(true)
+      setConnectorsError(null)
+
+      // Compare with current connector instances to determine what changed
+      const currentTemplateIds = new Set(connectorInstances.map(instance => instance.templateId))
+      const newTemplateIds = new Set(newConnectors.map(template => template.id))
+
+      // Find templates to create instances for (in new but not in current)
+      const toCreate = newConnectors.filter(template => !currentTemplateIds.has(template.id))
+
+      // Find instances to remove (in current but not in new)
+      const toRemove = connectorInstances.filter(
+        instance => !newTemplateIds.has(instance.templateId)
+      )
+
+      // Execute connector instance operations
+      const operations = [
+        ...toCreate.map(template => mcpServerAPI.createConnectorInstance(slug, template.id)),
+        ...toRemove.map(instance => mcpServerAPI.removeConnectorInstance(slug, instance.id)),
+      ]
+
+      if (operations.length > 0) {
+        await Promise.all(operations)
+      }
+
+      // Refresh connector instances to get current state
+      await fetchConnectorInstances()
+    } catch (error) {
+      console.error('Failed to update connector instances:', error)
+      setConnectorsError('Failed to update connectors. Please try again.')
+
+      // Refresh connector instances to get current state
+      await fetchConnectorInstances()
+    } finally {
+      setConnectorsLoading(false)
+    }
   }
 
   return (
@@ -36,34 +117,93 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               Back to Fleet
             </Link>
           </Button>
-          <div className="text-sm text-muted-foreground">
-            Starship: <span className="font-medium">{slug}</span>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <span className="bg-primary/10 p-1.5 rounded-md">
+                <Users className="h-4 w-4 text-primary" />
+              </span>
+              <span className="text-lg font-semibold">Crew Console</span>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Starship: <span className="font-medium">{slug}</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-[350px_1fr] flex-1 overflow-hidden">
-        {/* Left sidebar - fixed width */}
-        <div className="border-r bg-card shadow-sm overflow-hidden">
-          <div className="p-6 h-full flex flex-col">
-            <h2 className="text-xl font-semibold mb-6 flex items-center">
-              <span className="bg-primary/10 p-2 rounded-md mr-3 shadow-sm">
-                <Users className="h-5 w-5 text-primary" />
-              </span>
-              Crew Console
-            </h2>
-            <div className="flex-1 overflow-auto pr-1 -mr-1">
-              <AgentSelector
-                selectedAgent={selectedAgent}
-                onAgentSelect={handleAgentSelect}
-                showCreateButton={true}
-                showFilters={true}
-              />
-            </div>
+      <div className="grid grid-cols-[400px_1fr] flex-1 overflow-hidden">
+        {/* Left sidebar - fixed width with tabs */}
+        <div className="border-r bg-card shadow-sm flex flex-col">
+          <div className="p-6 pb-0">
+            <Tabs defaultValue="agents" className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="agents" className="flex items-center gap-2">
+                  <Bot className="h-4 w-4" />
+                  Agents
+                </TabsTrigger>
+                <TabsTrigger value="connectors" className="flex items-center gap-2">
+                  <Plug className="h-4 w-4" />
+                  Connectors
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent
+                value="agents"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col"
+              >
+                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6">
+                  <AgentSelector
+                    selectedAgent={selectedAgent}
+                    onAgentSelect={handleAgentSelect}
+                    showCreateButton={true}
+                    showFilters={true}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="connectors"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col"
+              >
+                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-6">
+                  <ConnectorSelector
+                    starshipId={slug}
+                    selectedConnectors={connectorInstances
+                      .filter(instance => instance.template)
+                      .map(instance => instance.template!)}
+                    onConnectorsChange={handleConnectorsChange}
+                    disabled={connectorsLoading}
+                    className="mb-0"
+                    connectorInstances={connectorInstances}
+                  />
+                  {connectorsError && (
+                    <div className="mt-2 text-sm text-destructive">{connectorsError}</div>
+                  )}
+
+                  {/* Status Dashboard - compact view */}
+                  {connectorInstances.length > 0 && (
+                    <div className="mt-3">
+                      <ConnectorStatusDashboard
+                        starshipId={slug}
+                        connectorInstances={connectorInstances}
+                        compact={true}
+                      />
+                    </div>
+                  )}
+
+                  {/* Troubleshooting Panel - only show if there are issues */}
+                  {connectorInstances.some(c => c.status === 'error' || c.errorMessage) && (
+                    <div className="mt-3">
+                      <ConnectorTroubleshootingPanel connectorInstances={connectorInstances} />
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
-        
+
         {/* Right content area */}
         <div className="bg-background overflow-hidden">
           {selectedAgent ? (

@@ -7,5 +7,5 @@
     "types": ["node", "jest"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
-  "include": ["src", "src/types/**/*"]
+  "include": ["src", "src/types/**/*", "tests"]
 }

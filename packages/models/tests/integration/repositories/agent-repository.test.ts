@@ -25,6 +25,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const result = await agentRepository.create(agentData);
@@ -52,6 +53,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const agent2Data = {
@@ -63,6 +65,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const agent1 = await agentRepository.create(agent1Data);
@@ -85,6 +88,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const createdAgent = await agentRepository.create(agentData);
@@ -112,6 +116,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const agent2Data = {
@@ -123,6 +128,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const agent1 = await agentRepository.create(agent1Data);
@@ -155,6 +161,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const createdAgent = await agentRepository.create(agentData);
@@ -193,6 +200,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const createdAgent = await agentRepository.create(agentData);
@@ -223,6 +231,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       const agent2 = await agentRepository.create({
@@ -234,6 +243,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       const agent3 = await agentRepository.create({
@@ -245,6 +255,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       // Create starship and deploy agents
@@ -297,6 +308,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       const agent2 = await agentRepository.create({
@@ -308,6 +320,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       const agent3 = await agentRepository.create({
@@ -319,6 +332,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       // Create channel and relationships
@@ -367,6 +381,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       const agent2 = await agentRepository.create({
@@ -378,6 +393,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       const agent3 = await agentRepository.create({
@@ -389,6 +405,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       });
 
       // Create user and relationships
@@ -436,6 +453,7 @@ describe('AgentRepository Integration Tests', () => {
         authorId: 'test-user',
         isPublic: false,
         version: '1.0.0',
+        starshipId: 'test-starship-1',
       };
 
       const agent1 = await agentRepository.create(agentData);

@@ -1,5 +1,7 @@
 import { getConnection } from '../../packages/models/src/connection';
-import { Session } from 'neo4j-driver';
+
+// Use a more generic type instead of importing from neo4j-driver
+type Session = any;
 
 export interface ValidationResult {
   valid: boolean;

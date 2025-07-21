@@ -15,7 +15,7 @@ describe('VisionRepository Integration Tests', () => {
     visionRepository = new VisionRepository();
     starshipRepository = new StarshipRepository();
     userRepository = new UserRepository();
-    
+
     // Clean up any existing test data
     await connection.executeWrite('MATCH (n) DETACH DELETE n');
   });
@@ -26,17 +26,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const visionData = {
@@ -44,7 +42,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Build amazing AI products that help humanity',
         confidence: 85,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       };
 
       const result = await visionRepository.create(visionData);
@@ -77,17 +76,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       // Test various confidence values
@@ -96,7 +93,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Test vision with specific confidence',
         confidence: 42,
         lastRefined: new Date().toISOString(),
-        refinementCount: 5
+        refinementCount: 5,
+        isActive: true,
       };
 
       const result = await visionRepository.create(visionData);
@@ -111,27 +109,23 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship1 = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship 1',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const starship2 = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship 2',
         class: 'cruiser',
-        powerLevel: 95,
-        activeExpeditions: 1,
-        sibilInsights: 5,
-        status: 'active'
+        maxActiveExpeditions: 5,
+        status: 'active',
       });
 
       // Create visions for different starships
@@ -140,7 +134,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Vision for starship 1',
         confidence: 80,
         lastRefined: new Date().toISOString(),
-        refinementCount: 1
+        refinementCount: 1,
+        isActive: true,
       });
 
       const vision2 = await visionRepository.create({
@@ -148,7 +143,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Vision for starship 2',
         confidence: 90,
         lastRefined: new Date().toISOString(),
-        refinementCount: 2
+        refinementCount: 2,
+        isActive: true,
       });
 
       const foundVision1 = await visionRepository.findByStarship(starship1.id);
@@ -174,17 +170,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -192,7 +186,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Original vision statement',
         confidence: 75,
         lastRefined: new Date(Date.now() - 1000).toISOString(),
-        refinementCount: 2
+        refinementCount: 2,
+        isActive: true,
       });
 
       const newStatement = 'Updated vision statement with more clarity';
@@ -218,17 +213,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -236,7 +229,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Brand new vision',
         confidence: 60,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       const updatedVision = await visionRepository.updateStatement(
@@ -253,17 +247,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -271,18 +263,19 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Original statement',
         confidence: 70,
         lastRefined: new Date().toISOString(),
-        refinementCount: 1
+        refinementCount: 1,
+        isActive: true,
       });
 
       const originalUpdatedAt = vision.updatedAt;
 
       // Small delay to ensure different timestamp
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const updates = {
         statement: 'Updated statement',
         confidence: 85,
-        refinementCount: 3
+        refinementCount: 3,
       };
 
       const updatedVision = await visionRepository.update(vision.id, updates);
@@ -297,9 +290,9 @@ describe('VisionRepository Integration Tests', () => {
 
     it('should return null when updating non-existent vision', async () => {
       const result = await visionRepository.update('nonexistent-id', {
-        statement: 'Updated statement'
+        statement: 'Updated statement',
       });
-      
+
       expect(result).toBeNull();
     });
   });
@@ -309,17 +302,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const visionData = {
@@ -327,7 +318,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Findable vision',
         confidence: 95,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       };
 
       const createdVision = await visionRepository.create(visionData);
@@ -349,27 +341,23 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship1 = await starshipRepository.create({
         ownerId: user.id,
         name: 'Ship One',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const starship2 = await starshipRepository.create({
         ownerId: user.id,
         name: 'Ship Two',
         class: 'cruiser',
-        powerLevel: 95,
-        activeExpeditions: 1,
-        sibilInsights: 5,
-        status: 'active'
+        maxActiveExpeditions: 5,
+        status: 'active',
       });
 
       const vision1 = await visionRepository.create({
@@ -377,18 +365,20 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'First vision',
         confidence: 80,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       // Small delay to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
       const vision2 = await visionRepository.create({
         starshipId: starship2.id,
         statement: 'Second vision',
         confidence: 90,
         lastRefined: new Date().toISOString(),
-        refinementCount: 1
+        refinementCount: 1,
+        isActive: true,
       });
 
       const allVisions = await visionRepository.findAll();
@@ -410,17 +400,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -428,7 +416,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Vision to be deleted',
         confidence: 50,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       const deleteResult = await visionRepository.delete(vision.id);
@@ -451,17 +440,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       // Test minimum confidence (0)
@@ -470,7 +457,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Very uncertain vision',
         confidence: 0,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       expect(minVision.confidence).toBe(0);
@@ -481,7 +469,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Absolutely certain vision',
         confidence: 100,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       expect(maxVision.confidence).toBe(100);
@@ -493,17 +482,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -511,7 +498,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Unique vision',
         confidence: 75,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       // Try to create a vision with the same ID directly via connection
@@ -529,17 +517,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -547,7 +533,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Linked vision',
         confidence: 80,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       // Verify the vision can be found through starship relationship
@@ -570,17 +557,15 @@ describe('VisionRepository Integration Tests', () => {
       const user = await userRepository.create({
         username: 'captain',
         email: 'captain@starships.ai',
-        displayName: 'Captain Test'
+        displayName: 'Captain Test',
       });
 
       const starship = await starshipRepository.create({
         ownerId: user.id,
         name: 'Test Ship',
         class: 'scout',
-        powerLevel: 85,
-        activeExpeditions: 0,
-        sibilInsights: 0,
-        status: 'active'
+        maxActiveExpeditions: 3,
+        status: 'active',
       });
 
       const vision = await visionRepository.create({
@@ -588,7 +573,8 @@ describe('VisionRepository Integration Tests', () => {
         statement: 'Initial rough vision',
         confidence: 40,
         lastRefined: new Date().toISOString(),
-        refinementCount: 0
+        refinementCount: 0,
+        isActive: true,
       });
 
       // First refinement

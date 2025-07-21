@@ -5,6 +5,9 @@ import type {
   AgentRepository,
   MCPServerOptionRepository,
   MCPServerConnectorRepository,
+  ConnectorConfigTemplateRepository,
+  ConnectorConfigHistoryRepository,
+  VisionRepository,
 } from '@starships/models/src/types';
 
 // Mock repositories
@@ -44,7 +47,7 @@ const mockMCPServerRepo: jest.Mocked<MCPServerOptionRepository> = {
   searchByName: jest.fn(),
 };
 
-const mockMCPConnectorRepo: jest.Mocked<MCPServerConnectorRepository> = {
+const mockMCPConnectorRepo: any = {
   findAll: jest.fn(),
   findById: jest.fn(),
   create: jest.fn(),
@@ -57,6 +60,43 @@ const mockMCPConnectorRepo: jest.Mocked<MCPServerConnectorRepository> = {
   deactivate: jest.fn(),
   activate: jest.fn(),
   findByStarshipAndTemplate: jest.fn(),
+  updateConfig: jest.fn(),
+  applyConfigTemplate: jest.fn(),
+};
+
+const mockConfigTemplateRepo: any = {
+  findAll: jest.fn(),
+  findById: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  findByCategory: jest.fn(),
+  findByTags: jest.fn(),
+  findPublic: jest.fn(),
+  findByAuthor: jest.fn(),
+  search: jest.fn(),
+  incrementUsageCount: jest.fn(),
+};
+
+const mockConfigHistoryRepo: any = {
+  findAll: jest.fn(),
+  findById: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  findByConnector: jest.fn(),
+  findByUser: jest.fn(),
+  createEntry: jest.fn(),
+};
+
+const mockVisionRepo: any = {
+  findAll: jest.fn(),
+  findById: jest.fn(),
+  create: jest.fn(),
+  update: jest.fn(),
+  delete: jest.fn(),
+  findByStarship: jest.fn(),
+  updateStatement: jest.fn(),
 };
 
 // Mock auth middleware to provide test user
@@ -75,6 +115,9 @@ describe('Starship Routes', () => {
       agentRepository: mockAgentRepo,
       mcpServerOptionRepository: mockMCPServerRepo,
       mcpServerConnectorRepository: mockMCPConnectorRepo,
+      connectorConfigTemplateRepository: mockConfigTemplateRepo,
+      connectorConfigHistoryRepository: mockConfigHistoryRepo,
+      visionRepository: mockVisionRepo,
     });
 
     // Reset all mocks

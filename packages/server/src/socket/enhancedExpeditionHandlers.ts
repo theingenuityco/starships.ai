@@ -6,7 +6,7 @@
  */
 
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { EnhancedSocketIOService } from '../services/EnhancedSocketIOService';
+import { SocketIOService } from '../services/SocketIOService';
 import { FirstOfficerService } from '../services/FirstOfficerService';
 import { RepositoryFactory } from '@starships/models';
 import type { 
@@ -28,9 +28,9 @@ import type {
  * Enhanced utility class for broadcasting expedition events with proper error handling
  */
 export class EnhancedExpeditionSocketUtils {
-  private static socketService: EnhancedSocketIOService;
+  private static socketService: SocketIOService;
 
-  static initialize(socketService: EnhancedSocketIOService) {
+  static initialize(socketService: SocketIOService) {
     this.socketService = socketService;
   }
 
@@ -330,7 +330,7 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
   console.log('[ENHANCED-SOCKET.IO] Setting up enhanced expedition handlers...');
 
   const firstOfficerService = FirstOfficerService.getInstance();
-  const socketService = EnhancedSocketIOService.getInstance();
+  const socketService = SocketIOService.getInstance();
 
   // Initialize the utility class
   EnhancedExpeditionSocketUtils.initialize(socketService);
@@ -356,36 +356,137 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
       try {
         console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} starting expedition: ${expeditionId}`);
 
-        // Validate expedition access
+        // Enhanced validation with structured error responses
+        if (!expeditionId || typeof expeditionId !== 'string') {
+          socket.emit('expedition:error', {
+            expeditionId: expeditionId || 'unknown',
+            error: {
+              code: 'INVALID_EXPEDITION_ID',
+              message: 'Invalid expedition ID provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate expedition access with graceful error handling
         const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-        const expedition = await expeditionRepo.findById(expeditionId);
+        let expedition;
+        
+        try {
+          expedition = await expeditionRepo.findById(expeditionId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during expedition lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
         if (!expedition) {
-          await EnhancedExpeditionSocketUtils.broadcastError(expeditionId, {
-            code: 'EXPEDITION_NOT_FOUND',
-            message: 'Expedition not found',
-            severity: 'high',
-            recoverable: false
-          }, 'user');
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_NOT_FOUND',
+              message: 'Expedition not found',
+              severity: 'high',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
           return;
         }
 
-        // Validate starship ownership
+        // Validate starship ownership with enhanced error handling
         const starshipRepo = RepositoryFactory.getStarshipRepository();
-        const starship = await starshipRepo.findById(expedition.starshipId);
+        let starship;
+        
+        try {
+          starship = await starshipRepo.findById(expedition.starshipId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during starship lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
         if (!starship || starship.ownerId !== userId) {
-          await EnhancedExpeditionSocketUtils.broadcastError(expeditionId, {
-            code: 'EXPEDITION_ACCESS_DENIED',
-            message: 'Access denied to expedition',
-            severity: 'high',
-            recoverable: false
-          }, 'user');
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_ACCESS_DENIED',
+              message: 'Access denied to expedition',
+              severity: 'high',
+              source: 'authorization',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
           return;
         }
 
-        // Start expedition through First Officer
-        await firstOfficerService.startExpedition(expeditionId, userId, expedition.objective);
+        // Check expedition state
+        if (expedition.status === 'in-progress') {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_ALREADY_RUNNING',
+              message: 'Expedition is already in progress',
+              severity: 'low',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Start expedition through First Officer with error handling
+        try {
+          await firstOfficerService.startExpedition(expeditionId, userId, expedition.objective);
+        } catch (serviceError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] First Officer service error:', serviceError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'SERVICE_ERROR',
+              message: 'Failed to start expedition - service temporarily unavailable',
+              severity: 'high',
+              source: 'service',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
         // Broadcast expedition started event
         const statusEvent: ExpeditionStatusEvent = {
@@ -400,32 +501,138 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
 
         // Broadcast phase change
         await EnhancedExpeditionSocketUtils.broadcastPhaseChange(
-          expeditionId, 
-          'initializing', 
+          expeditionId,
+          'initializing',
           'draft',
           { description: 'Expedition initialization started' }
         );
 
+        // Send success confirmation to the requesting client
+        socket.emit('expedition:operation-success', {
+          expeditionId,
+          operation: 'start',
+          timestamp: new Date().toISOString()
+        });
+
         console.log(`[ENHANCED-EXPEDITION-SOCKET] Expedition started successfully: ${expeditionId}`);
       } catch (error: any) {
-        console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to start expedition:', error);
-        await EnhancedExpeditionSocketUtils.broadcastError(expeditionId, {
-          code: 'START_EXPEDITION_FAILED',
-          message: error.message || 'Failed to start expedition',
-          severity: 'high',
-          recoverable: true
-        }, 'system');
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Unexpected error starting expedition:', error);
+        
+        // Send structured error response instead of disconnecting
+        socket.emit('expedition:error', {
+          expeditionId: expeditionId || 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'An unexpected error occurred - please try again',
+            severity: 'high',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
+          },
+          timestamp: new Date().toISOString()
+        });
       }
     });
 
     /**
-     * Pause expedition with state preservation
+     * Pause expedition with enhanced error handling
      */
     socket.on('expedition:pause', async (expeditionId: string) => {
       try {
         console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} pausing expedition: ${expeditionId}`);
 
-        await firstOfficerService.pauseExpedition(expeditionId);
+        // Validate input
+        if (!expeditionId || typeof expeditionId !== 'string') {
+          socket.emit('expedition:error', {
+            expeditionId: expeditionId || 'unknown',
+            error: {
+              code: 'INVALID_EXPEDITION_ID',
+              message: 'Invalid expedition ID provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate expedition exists and user has access
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        let expedition;
+        
+        try {
+          expedition = await expeditionRepo.findById(expeditionId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during expedition lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        if (!expedition) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_NOT_FOUND',
+              message: 'Expedition not found',
+              severity: 'high',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Check if expedition can be paused
+        if (expedition.status !== 'in-progress') {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'INVALID_EXPEDITION_STATE',
+              message: `Cannot pause expedition in ${expedition.status} state`,
+              severity: 'medium',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Pause expedition with service error handling
+        try {
+          await firstOfficerService.pauseExpedition(expeditionId);
+        } catch (serviceError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Service error pausing expedition:', serviceError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'SERVICE_ERROR',
+              message: 'Failed to pause expedition - service temporarily unavailable',
+              severity: 'high',
+              source: 'service',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
         const statusEvent: ExpeditionStatusEvent = {
           expeditionId,
@@ -437,21 +644,129 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
 
         await socketService.emitToExpeditionRoom(expeditionId, 'expedition:paused', statusEvent);
 
+        socket.emit('expedition:operation-success', {
+          expeditionId,
+          operation: 'pause',
+          timestamp: new Date().toISOString()
+        });
+
         console.log(`[ENHANCED-EXPEDITION-SOCKET] Expedition paused: ${expeditionId}`);
       } catch (error: any) {
-        console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to pause expedition:', error);
-        await EnhancedExpeditionSocketUtils.broadcastError(expeditionId, error, 'system');
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Unexpected error pausing expedition:', error);
+        socket.emit('expedition:error', {
+          expeditionId: expeditionId || 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'An unexpected error occurred - please try again',
+            severity: 'high',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
+          },
+          timestamp: new Date().toISOString()
+        });
       }
     });
 
     /**
-     * Resume expedition with state restoration
+     * Resume expedition with enhanced error handling
      */
     socket.on('expedition:resume', async (expeditionId: string) => {
       try {
         console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} resuming expedition: ${expeditionId}`);
 
-        await firstOfficerService.resumeExpedition(expeditionId);
+        // Validate input
+        if (!expeditionId || typeof expeditionId !== 'string') {
+          socket.emit('expedition:error', {
+            expeditionId: expeditionId || 'unknown',
+            error: {
+              code: 'INVALID_EXPEDITION_ID',
+              message: 'Invalid expedition ID provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate expedition exists and user has access
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        let expedition;
+        
+        try {
+          expedition = await expeditionRepo.findById(expeditionId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during expedition lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        if (!expedition) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_NOT_FOUND',
+              message: 'Expedition not found',
+              severity: 'high',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Check if expedition can be resumed
+        if (!['paused', 'failed'].includes(expedition.status)) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'INVALID_EXPEDITION_STATE',
+              message: `Cannot resume expedition in ${expedition.status} state`,
+              severity: 'medium',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Resume expedition with service error handling
+        try {
+          await firstOfficerService.resumeExpedition(expeditionId);
+        } catch (serviceError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Service error resuming expedition:', serviceError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'SERVICE_ERROR',
+              message: 'Failed to resume expedition - service temporarily unavailable',
+              severity: 'high',
+              source: 'service',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
         const statusEvent: ExpeditionStatusEvent = {
           expeditionId,
@@ -463,36 +778,161 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
 
         await socketService.emitToExpeditionRoom(expeditionId, 'expedition:resumed', statusEvent);
 
+        socket.emit('expedition:operation-success', {
+          expeditionId,
+          operation: 'resume',
+          timestamp: new Date().toISOString()
+        });
+
         console.log(`[ENHANCED-EXPEDITION-SOCKET] Expedition resumed: ${expeditionId}`);
       } catch (error: any) {
-        console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to resume expedition:', error);
-        await EnhancedExpeditionSocketUtils.broadcastError(expeditionId, error, 'system');
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Unexpected error resuming expedition:', error);
+        socket.emit('expedition:error', {
+          expeditionId: expeditionId || 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'An unexpected error occurred - please try again',
+            severity: 'high',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
+          },
+          timestamp: new Date().toISOString()
+        });
       }
     });
 
     /**
-     * Cancel expedition with cleanup
+     * Cancel expedition with enhanced error handling
      */
     socket.on('expedition:cancel', async (expeditionId: string) => {
       try {
         console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} cancelling expedition: ${expeditionId}`);
 
-        await firstOfficerService.cancelExpedition(expeditionId);
+        // Validate input
+        if (!expeditionId || typeof expeditionId !== 'string') {
+          socket.emit('expedition:error', {
+            expeditionId: expeditionId || 'unknown',
+            error: {
+              code: 'INVALID_EXPEDITION_ID',
+              message: 'Invalid expedition ID provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate expedition exists and user has access
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        let expedition;
+        
+        try {
+          expedition = await expeditionRepo.findById(expeditionId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during expedition lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        if (!expedition) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_NOT_FOUND',
+              message: 'Expedition not found',
+              severity: 'high',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Check if expedition can be cancelled
+        if (['completed', 'cancelled'].includes(expedition.status)) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'INVALID_EXPEDITION_STATE',
+              message: `Cannot cancel expedition in ${expedition.status} state`,
+              severity: 'medium',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Cancel expedition with service error handling
+        try {
+          await firstOfficerService.cancelExpedition(expeditionId);
+        } catch (serviceError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Service error cancelling expedition:', serviceError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'SERVICE_ERROR',
+              message: 'Failed to cancel expedition - service temporarily unavailable',
+              severity: 'high',
+              source: 'service',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
         const statusEvent: ExpeditionStatusEvent = {
           expeditionId,
           status: 'cancelled',
-          previousStatus: 'in-progress',
+          previousStatus: expedition.status,
           changedBy: userId,
           timestamp: new Date().toISOString()
         };
 
         await socketService.emitToExpeditionRoom(expeditionId, 'expedition:cancelled', statusEvent);
 
+        socket.emit('expedition:operation-success', {
+          expeditionId,
+          operation: 'cancel',
+          timestamp: new Date().toISOString()
+        });
+
         console.log(`[ENHANCED-EXPEDITION-SOCKET] Expedition cancelled: ${expeditionId}`);
       } catch (error: any) {
-        console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to cancel expedition:', error);
-        await EnhancedExpeditionSocketUtils.broadcastError(expeditionId, error, 'system');
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Unexpected error cancelling expedition:', error);
+        socket.emit('expedition:error', {
+          expeditionId: expeditionId || 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'An unexpected error occurred - please try again',
+            severity: 'high',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
+          },
+          timestamp: new Date().toISOString()
+        });
       }
     });
 
@@ -501,17 +941,157 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
     // ========================================================================
 
     /**
-     * Send message with enhanced features and broadcasting
+     * Send message with enhanced features and comprehensive error handling
      */
     socket.on('expedition:send-message', async (data: { expeditionId: string; message: string }) => {
       try {
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} sending message to expedition: ${data?.expeditionId}`);
+
+        // Enhanced input validation
+        if (!data || typeof data !== 'object') {
+          socket.emit('expedition:error', {
+            expeditionId: 'unknown',
+            error: {
+              code: 'INVALID_MESSAGE_DATA',
+              message: 'Invalid message data provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
         const { expeditionId, message } = data;
-        console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} sending message to expedition: ${expeditionId}`);
 
-        // Handle message through First Officer Service
-        const response = await firstOfficerService.handleUserMessage(expeditionId, userId, message);
+        if (!expeditionId || typeof expeditionId !== 'string') {
+          socket.emit('expedition:error', {
+            expeditionId: expeditionId || 'unknown',
+            error: {
+              code: 'INVALID_EXPEDITION_ID',
+              message: 'Invalid expedition ID provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
-        // Create and broadcast user message
+        if (!message || typeof message !== 'string' || message.trim().length === 0) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'INVALID_MESSAGE_CONTENT',
+              message: 'Message content cannot be empty',
+              severity: 'low',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate message length
+        if (message.length > 10000) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'MESSAGE_TOO_LONG',
+              message: 'Message exceeds maximum length of 10,000 characters',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate expedition exists and user has access
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        let expedition;
+        
+        try {
+          expedition = await expeditionRepo.findById(expeditionId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during expedition lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        if (!expedition) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_NOT_FOUND',
+              message: 'Expedition not found',
+              severity: 'high',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Handle message through First Officer Service with enhanced error handling
+        let response;
+        try {
+          response = await firstOfficerService.handleUserMessage(expeditionId, userId, message);
+        } catch (serviceError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] First Officer service error:', serviceError);
+          
+          // Categorize service errors
+          let errorCode = 'SERVICE_ERROR';
+          let errorMessage = 'Failed to process message - service temporarily unavailable';
+          let severity: 'low' | 'medium' | 'high' = 'high';
+          
+          if (serviceError.message?.includes('rate limit')) {
+            errorCode = 'RATE_LIMIT_EXCEEDED';
+            errorMessage = 'Too many messages sent - please wait a moment';
+            severity = 'medium';
+          } else if (serviceError.message?.includes('timeout')) {
+            errorCode = 'SERVICE_TIMEOUT';
+            errorMessage = 'Message processing timed out - please try again';
+            severity = 'medium';
+          }
+
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: errorCode,
+              message: errorMessage,
+              severity,
+              source: 'service',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Create and broadcast user message with error handling
         const userMessageEvent: ExpeditionMessageEvent = {
           expeditionId,
           messageId: `msg_${Date.now()}_user`,
@@ -520,41 +1100,282 @@ export function setupEnhancedExpeditionHandlers(io: SocketIOServer<EnhancedSocke
             role: 'user',
             content: message,
             userId,
-            // Remove threadId as it's not needed and not part of ChatResponse
           },
           timestamp: new Date().toISOString()
         };
 
-        await socketService.emitToExpeditionRoom(expeditionId, 'expedition:message', userMessageEvent);
+        try {
+          await socketService.emitToExpeditionRoom(expeditionId, 'expedition:message', userMessageEvent);
+        } catch (broadcastError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to broadcast user message:', broadcastError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'BROADCAST_ERROR',
+              message: 'Failed to broadcast message to expedition participants',
+              severity: 'medium',
+              source: 'system',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
 
-        // Create and broadcast First Officer response
-        const responseMessageEvent: ExpeditionMessageEvent = {
+        // Create and broadcast First Officer response with error handling
+        if (response?.reply) {
+          const responseMessageEvent: ExpeditionMessageEvent = {
+            expeditionId,
+            messageId: `msg_${Date.now()}_fo`,
+            message: {
+              id: `msg_${Date.now()}_fo`,
+              role: 'first-officer',
+              content: response.reply,
+            },
+            timestamp: new Date().toISOString()
+          };
+
+          try {
+            await socketService.emitToExpeditionRoom(expeditionId, 'expedition:message', responseMessageEvent);
+          } catch (broadcastError: any) {
+            console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to broadcast First Officer response:', broadcastError);
+            socket.emit('expedition:error', {
+              expeditionId,
+              error: {
+                code: 'BROADCAST_ERROR',
+                message: 'Failed to broadcast First Officer response',
+                severity: 'medium',
+                source: 'system',
+                recoverable: true,
+                retryCount: 0
+              },
+              timestamp: new Date().toISOString()
+            });
+            return;
+          }
+        }
+
+        // Send success confirmation
+        socket.emit('expedition:operation-success', {
           expeditionId,
-          messageId: `msg_${Date.now()}_fo`,
-          message: {
-            id: `msg_${Date.now()}_fo`,
-            role: 'first-officer',
-            content: response.reply,
-            // Remove threadId as it's not needed and not part of ChatResponse
+          operation: 'send-message',
+          timestamp: new Date().toISOString()
+        });
+
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] Messages broadcasted successfully for expedition: ${expeditionId}`);
+      } catch (error: any) {
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Unexpected error sending message:', error);
+        socket.emit('expedition:error', {
+          expeditionId: data?.expeditionId || 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'An unexpected error occurred while sending message',
+            severity: 'high',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
           },
           timestamp: new Date().toISOString()
-        };
-
-        await socketService.emitToExpeditionRoom(expeditionId, 'expedition:message', responseMessageEvent);
-
-        console.log(`[ENHANCED-EXPEDITION-SOCKET] Messages broadcasted for expedition: ${expeditionId}`);
-      } catch (error: any) {
-        console.error('[ENHANCED-EXPEDITION-SOCKET] Failed to send message:', error);
-        await EnhancedExpeditionSocketUtils.broadcastError(data.expeditionId, error, 'messaging');
+        });
       }
+    });
+
+    // ========================================================================
+    // ROOM MANAGEMENT WITH ERROR HANDLING
+    // ========================================================================
+
+    /**
+     * Join expedition room with validation
+     */
+    socket.on('expedition:join-room', async (expeditionId: string) => {
+      try {
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} joining expedition room: ${expeditionId}`);
+
+        // Validate input
+        if (!expeditionId || typeof expeditionId !== 'string') {
+          socket.emit('expedition:error', {
+            expeditionId: expeditionId || 'unknown',
+            error: {
+              code: 'INVALID_EXPEDITION_ID',
+              message: 'Invalid expedition ID provided',
+              severity: 'medium',
+              source: 'validation',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Validate expedition exists and user has access
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        let expedition;
+        
+        try {
+          expedition = await expeditionRepo.findById(expeditionId);
+        } catch (dbError: any) {
+          console.error('[ENHANCED-EXPEDITION-SOCKET] Database error during expedition lookup:', dbError);
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'DATABASE_ERROR',
+              message: 'Temporary database issue - please try again',
+              severity: 'medium',
+              source: 'database',
+              recoverable: true,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        if (!expedition) {
+          socket.emit('expedition:error', {
+            expeditionId,
+            error: {
+              code: 'EXPEDITION_NOT_FOUND',
+              message: 'Expedition not found',
+              severity: 'high',
+              source: 'validation',
+              recoverable: false,
+              retryCount: 0
+            },
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Join the expedition room
+        await socket.join(`expedition:${expeditionId}`);
+        
+        // Send confirmation
+        socket.emit('expedition:room-joined', {
+          expeditionId,
+          timestamp: new Date().toISOString()
+        });
+
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} joined expedition room: ${expeditionId}`);
+      } catch (error: any) {
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Unexpected error joining expedition room:', error);
+        socket.emit('expedition:error', {
+          expeditionId: expeditionId || 'unknown',
+          error: {
+            code: 'UNEXPECTED_ERROR',
+            message: 'Failed to join expedition room',
+            severity: 'medium',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+
+    /**
+     * Leave expedition room
+     */
+    socket.on('expedition:leave-room', async (expeditionId: string) => {
+      try {
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} leaving expedition room: ${expeditionId}`);
+
+        if (expeditionId && typeof expeditionId === 'string') {
+          await socket.leave(`expedition:${expeditionId}`);
+          
+          socket.emit('expedition:room-left', {
+            expeditionId,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} left expedition room: ${expeditionId}`);
+      } catch (error: any) {
+        console.error('[ENHANCED-EXPEDITION-SOCKET] Error leaving expedition room:', error);
+        // Don't emit error for leave operations as they're not critical
+      }
+    });
+
+    // ========================================================================
+    // GLOBAL ERROR HANDLING
+    // ========================================================================
+
+    /**
+     * Global error handler for socket connection
+     */
+    socket.on('error', (error: any) => {
+      console.error(`[ENHANCED-EXPEDITION-SOCKET] Socket error for user ${userId}:`, error);
+      
+      // Send structured error response
+      socket.emit('expedition:error', {
+        expeditionId: 'system',
+        error: {
+          code: 'SOCKET_ERROR',
+          message: 'Connection error occurred',
+          severity: 'high',
+          source: 'connection',
+          recoverable: true,
+          retryCount: 0
+        },
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    /**
+     * Handle connection errors gracefully
+     */
+    socket.on('connect_error', (error: any) => {
+      console.error(`[ENHANCED-EXPEDITION-SOCKET] Connection error for user ${userId}:`, error);
+    });
+
+    /**
+     * Handle reconnection attempts
+     */
+    socket.on('reconnect', (attemptNumber: number) => {
+      console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} reconnected after ${attemptNumber} attempts`);
+      
+      // Send reconnection success event
+      socket.emit('expedition:reconnected', {
+        attemptNumber,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    /**
+     * Handle reconnection errors
+     */
+    socket.on('reconnect_error', (error: any) => {
+      console.error(`[ENHANCED-EXPEDITION-SOCKET] Reconnection error for user ${userId}:`, error);
+    });
+
+    /**
+     * Handle reconnection failures
+     */
+    socket.on('reconnect_failed', () => {
+      console.error(`[ENHANCED-EXPEDITION-SOCKET] Reconnection failed for user ${userId}`);
     });
 
     // ========================================================================
     // DISCONNECTION HANDLING
     // ========================================================================
 
-    socket.on('disconnect', () => {
-      console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} disconnected from enhanced expeditions`);
+    socket.on('disconnect', (reason: string) => {
+      console.log(`[ENHANCED-EXPEDITION-SOCKET] User ${userId} disconnected from enhanced expeditions. Reason: ${reason}`);
+      
+      // Log disconnection reason for monitoring
+      if (reason === 'io server disconnect') {
+        console.warn(`[ENHANCED-EXPEDITION-SOCKET] Server initiated disconnect for user ${userId}`);
+      } else if (reason === 'io client disconnect') {
+        console.log(`[ENHANCED-EXPEDITION-SOCKET] Client initiated disconnect for user ${userId}`);
+      } else if (reason === 'ping timeout') {
+        console.warn(`[ENHANCED-EXPEDITION-SOCKET] Ping timeout disconnect for user ${userId}`);
+      } else if (reason === 'transport close') {
+        console.warn(`[ENHANCED-EXPEDITION-SOCKET] Transport close disconnect for user ${userId}`);
+      } else if (reason === 'transport error') {
+        console.error(`[ENHANCED-EXPEDITION-SOCKET] Transport error disconnect for user ${userId}`);
+      }
     });
   });
 

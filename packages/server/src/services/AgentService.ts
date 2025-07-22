@@ -23,7 +23,7 @@ export class AgentService {
     try {
       await this.initialize();
 
-      const agentRepo = await RepositoryFactory.getAgentRepository();
+      const agentRepo = RepositoryFactory.getAgentRepository();
       const agents = await agentRepo.findAll();
 
       return agents.map(this.convertToAgentConfig);
@@ -36,7 +36,7 @@ export class AgentService {
   static async getAgent(id: string): Promise<AgentConfig | undefined> {
     await this.initialize();
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const agent = await agentRepo.findById(id);
 
     return agent ? this.convertToAgentConfig(agent) : undefined;
@@ -72,7 +72,7 @@ export class AgentService {
       requiredPermissions: [],
     };
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const agent = await agentRepo.create(agentData);
 
     return this.convertToAgentConfig(agent);
@@ -90,7 +90,7 @@ export class AgentService {
       updatedAt: new Date().toISOString(),
     };
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const updated = await agentRepo.update(id, updates);
 
     return updated ? this.convertToAgentConfig(updated) : null;
@@ -99,14 +99,14 @@ export class AgentService {
   static async deleteAgent(id: string): Promise<boolean> {
     await this.initialize();
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     return await agentRepo.delete(id);
   }
 
   // ADD: Enhanced query methods
   static async getAgentsByCategory(category: string): Promise<AgentConfig[]> {
     await this.initialize();
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const agents = await agentRepo.findByCategory(category);
     return agents.map(this.convertToAgentConfig);
   }
@@ -115,7 +115,7 @@ export class AgentService {
     try {
       await this.initialize();
       console.log(`[AGENT-SERVICE] Finding agents for author: ${authorId}`);
-      const agentRepo = await RepositoryFactory.getAgentRepository();
+      const agentRepo = RepositoryFactory.getAgentRepository();
       const agents = await agentRepo.findByAuthor(authorId);
       console.log(`[AGENT-SERVICE] Found ${agents.length} agents for author: ${authorId}`);
 
@@ -133,7 +133,7 @@ export class AgentService {
 
   static async getAgentsByTags(tags: string[]): Promise<AgentConfig[]> {
     await this.initialize();
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const agents = await agentRepo.findByTags(tags);
     return agents.map(this.convertToAgentConfig);
   }
@@ -141,7 +141,7 @@ export class AgentService {
   static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentConfig[]> {
     try {
       await this.initialize();
-      const agentRepo = await RepositoryFactory.getAgentRepository();
+      const agentRepo = RepositoryFactory.getAgentRepository();
       const agents = await agentRepo.findPublic(limit, offset);
       return agents.map(this.convertToAgentConfig);
     } catch (error: any) {
@@ -152,7 +152,7 @@ export class AgentService {
 
   static async searchAgents(query: string): Promise<AgentConfig[]> {
     await this.initialize();
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const agents = await agentRepo.searchAgents(query);
     return agents.map(this.convertToAgentConfig);
   }
@@ -168,7 +168,7 @@ export class AgentService {
   } | null> {
     await this.initialize();
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const agent = await agentRepo.findById(agentId);
 
     if (!agent) {
@@ -200,7 +200,7 @@ export class AgentService {
       throw new Error('Rating must be between 1 and 5');
     }
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
 
     // Check if agent exists
     const agent = await agentRepo.findById(agentId);
@@ -233,7 +233,7 @@ export class AgentService {
   }> {
     await this.initialize();
 
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
 
     // Check if agent exists
     const agent = await agentRepo.findById(agentId);
@@ -276,7 +276,7 @@ export class AgentService {
   }
 
   private static async seedDefaultAgents(): Promise<void> {
-    const agentRepo = await RepositoryFactory.getAgentRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
     const existingAgents = await agentRepo.findAll();
 
     if (existingAgents.length > 0) {

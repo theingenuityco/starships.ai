@@ -16,7 +16,7 @@ export class UserService {
    * Creates new user or updates existing user
    */
   static async syncUser(kindeData: KindeUserData): Promise<User> {
-    const userRepo = await RepositoryFactory.getUserRepository();
+    const userRepo = RepositoryFactory.getUserRepository();
 
     try {
       // First, try to find existing user by Kinde ID
@@ -73,7 +73,7 @@ export class UserService {
    * Get user by internal ID
    */
   static async getUserById(id: string): Promise<User | null> {
-    const userRepo = await RepositoryFactory.getUserRepository();
+    const userRepo = RepositoryFactory.getUserRepository();
     return await userRepo.findById(id);
   }
 
@@ -81,7 +81,7 @@ export class UserService {
    * Get user by Kinde ID
    */
   static async getUserByKindeId(kindeId: string): Promise<User | null> {
-    const userRepo = await RepositoryFactory.getUserRepository();
+    const userRepo = RepositoryFactory.getUserRepository();
     return await userRepo.findByKindeId(kindeId);
   }
 
@@ -89,7 +89,7 @@ export class UserService {
    * Get user by email
    */
   static async getUserByEmail(email: string): Promise<User | null> {
-    const userRepo = await RepositoryFactory.getUserRepository();
+    const userRepo = RepositoryFactory.getUserRepository();
     return await userRepo.findByEmail(email);
   }
 }

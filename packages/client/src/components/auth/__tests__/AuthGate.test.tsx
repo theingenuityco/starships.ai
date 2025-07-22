@@ -12,10 +12,13 @@ jest.mock('@kinde-oss/kinde-auth-nextjs', () => ({
   useKindeBrowserClient: jest.fn(),
 }))
 
+// Import the mock
+import { useKindeBrowserClient } from '@kinde-oss/kinde-auth-nextjs'
+
 // Mock child component
 const MockChildComponent = () => <div data-testid="protected-content">Protected Content</div>
 
-const mockUseKindeBrowserClient = require('@kinde-oss/kinde-auth-nextjs').useKindeBrowserClient
+const mockUseKindeBrowserClient = useKindeBrowserClient as jest.MockedFunction<typeof useKindeBrowserClient>
 
 describe('AuthGate', () => {
   beforeEach(() => {

@@ -51,7 +51,8 @@ export class FirstOfficerAgent {
   constructor(
     starshipId: string,
     memoryStore: LangChainMemoryStore,
-    config: Partial<FirstOfficerConfig> = {}
+    config: Partial<FirstOfficerConfig> = {},
+    selectedAgentIds?: string[]
   ) {
     // Initialize configuration with defaults
     this.config = {
@@ -67,7 +68,7 @@ export class FirstOfficerAgent {
     this.memoryStore = memoryStore;
     
     // Initialize components
-    this.agentSelector = new AgentSelector(starshipId);
+    this.agentSelector = new AgentSelector(starshipId, selectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
     this.taskExecutor = new TaskExecutor(this.config, memoryStore);
     
@@ -117,7 +118,11 @@ export class FirstOfficerAgent {
         starshipId: expedition.starshipId,
         errors: [],
         retryCount: 0,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
+        // Set selectedAgents if provided (from expedition.assignedAgents)
+        selectedAgents: expedition.assignedAgents && expedition.assignedAgents.length > 0
+          ? await this.convertAgentIdsToAssignments(expedition.assignedAgents)
+          : undefined
       };
 
       // Update expedition status
@@ -415,18 +420,49 @@ export class FirstOfficerAgent {
     console.log(`⚡ [FIRST-OFFICER] Assigning tasks to agents`);
     
     try {
-      // Assign tasks in database
-      const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
-      
-      for (const assignment of state.selectedAgents || []) {
-        for (const taskId of assignment.assignedTasks) {
-          await taskRepo.assignToAgent(taskId, assignment.agentId);
+      // If we have pre-selected agents but no task assignments yet, assign tasks to them
+      if (state.selectedAgents && state.selectedAgents.some(a => a.assignedTasks.length === 0)) {
+        console.log(`🎯 [FIRST-OFFICER] Assigning tasks to pre-selected agents`);
+        
+        // Use AgentSelector to assign tasks to pre-selected agents
+        const updatedAssignments = await this.assignTasksToSelectedAgents(state.taskBreakdown, state.selectedAgents);
+        
+        // Update database with task assignments
+        const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+        for (const assignment of updatedAssignments) {
+          for (const taskId of assignment.assignedTasks) {
+            await taskRepo.assignToAgent(taskId, assignment.agentId);
+          }
         }
-      }
 
-      return {
-        lastUpdated: new Date().toISOString()
-      };
+        await this.chatCoordinator.sendCoordinationMessage(
+          'phase-update',
+          'assigning',
+          `🎯 **Pre-selected Agents Assigned**\n\n` +
+          `Successfully assigned tasks to ${updatedAssignments.length} pre-selected agents:\n` +
+          updatedAssignments.map((a: AgentAssignment) => `• ${a.agentName}: ${a.assignedTasks.length} tasks`).join('\n')
+        );
+
+        return {
+          currentPhase: 'coordinating',
+          selectedAgents: updatedAssignments,
+          lastUpdated: new Date().toISOString()
+        };
+      } else {
+        // Standard task assignment for automatically selected agents
+        const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+        
+        for (const assignment of state.selectedAgents || []) {
+          for (const taskId of assignment.assignedTasks) {
+            await taskRepo.assignToAgent(taskId, assignment.agentId);
+          }
+        }
+
+        return {
+          currentPhase: 'coordinating',
+          lastUpdated: new Date().toISOString()
+        };
+      }
     } catch (error) {
       console.error('❌ [FIRST-OFFICER] Task assignment failed:', error);
       return {
@@ -1217,6 +1253,100 @@ Create a well-structured final report that:
     } catch (error) {
       console.error(`❌ [FIRST-OFFICER] Failed to persist workflow state:`, error);
       // Don't throw - this shouldn't stop the workflow
+    }
+  }
+
+  /**
+   * Convert agent IDs to AgentAssignment objects for pre-selected agents
+   */
+  private async convertAgentIdsToAssignments(agentIds: string[]): Promise<AgentAssignment[]> {
+    try {
+      // Initialize agent selector to get available agents
+      await this.agentSelector.initialize();
+      
+      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const availableAgents = await starshipRepo.getDeployedAgents(this.agentSelector['starshipId']);
+      
+      const assignments: AgentAssignment[] = [];
+      
+      for (const agentId of agentIds) {
+        const agent = availableAgents.find(a => a.id === agentId);
+        if (agent) {
+          assignments.push({
+            agentId: agent.id,
+            agentName: agent.name,
+            assignedTasks: [], // Tasks will be assigned later during task planning
+            skillMatch: 1.0, // Pre-selected agents are assumed to be suitable
+            workload: 0, // Will be calculated during task assignment
+            reasoning: 'Pre-selected by user during expedition creation'
+          });
+        } else {
+          console.warn(`⚠️ [FIRST-OFFICER] Pre-selected agent not found or not available: ${agentId}`);
+        }
+      }
+      
+      console.log(`🎯 [FIRST-OFFICER] Converted ${assignments.length}/${agentIds.length} pre-selected agents to assignments`);
+      return assignments;
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Failed to convert agent IDs to assignments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Assign tasks to pre-selected agents using the AgentSelector
+   */
+  private async assignTasksToSelectedAgents(
+    tasks: TaskBreakdown[],
+    selectedAgents: AgentAssignment[]
+  ): Promise<AgentAssignment[]> {
+    try {
+      console.log(`🎯 [FIRST-OFFICER] Assigning ${tasks.length} tasks to ${selectedAgents.length} pre-selected agents`);
+      
+      // Create a simple assignment strategy for pre-selected agents
+      const updatedAssignments = [...selectedAgents];
+      const unassignedTasks = [...tasks];
+      
+      // Distribute tasks among pre-selected agents based on skill match
+      for (const task of tasks) {
+        let bestAgent: AgentAssignment | null = null;
+        let bestScore = -1;
+        
+        for (const agent of updatedAssignments) {
+          // Calculate a simple skill match score
+          const agentSkillMatch = agent.skillMatch || 0.5;
+          const currentWorkload = agent.assignedTasks.length;
+          const workloadPenalty = currentWorkload * 0.1;
+          const score = agentSkillMatch - workloadPenalty;
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestAgent = agent;
+          }
+        }
+        
+        if (bestAgent) {
+          bestAgent.assignedTasks.push(task.id);
+          bestAgent.workload += task.estimatedEffort || 30;
+          
+          // Remove from unassigned tasks
+          const taskIndex = unassignedTasks.findIndex(t => t.id === task.id);
+          if (taskIndex > -1) {
+            unassignedTasks.splice(taskIndex, 1);
+          }
+        }
+      }
+      
+      // If there are still unassigned tasks, log a warning
+      if (unassignedTasks.length > 0) {
+        console.warn(`⚠️ [FIRST-OFFICER] ${unassignedTasks.length} tasks could not be assigned to pre-selected agents`);
+      }
+      
+      console.log(`✅ [FIRST-OFFICER] Task assignment complete. Assigned ${tasks.length - unassignedTasks.length}/${tasks.length} tasks`);
+      return updatedAssignments;
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Failed to assign tasks to selected agents:', error);
+      return selectedAgents;
     }
   }
 }

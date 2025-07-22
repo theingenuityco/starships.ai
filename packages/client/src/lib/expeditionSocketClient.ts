@@ -5,8 +5,7 @@
  * with automatic reconnection, event debouncing, and performance optimizations.
  */
 
-import { io, Socket } from 'socket.io-client';
-import type { SocketIOEvents } from '@starships/protocol';
+import { Socket } from 'socket.io-client';
 
 // Event types for expedition socket events
 export interface ExpeditionSocketEvents {
@@ -69,7 +68,7 @@ class ExpeditionSocketClient {
   private static instance: ExpeditionSocketClient;
   private socket: Socket | null = null;
   private config: Required<ExpeditionSocketConfig>;
-  private eventListeners: Map<string, Set<Function>> = new Map();
+  private eventListeners: Map<string, Set<(...args: any[]) => void>> = new Map();
   private joinedRooms: Set<string> = new Set();
   private eventHistory: Array<{ event: string; data: any; timestamp: number }> = [];
   private connectionMetrics: ConnectionMetrics;

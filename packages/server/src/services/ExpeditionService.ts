@@ -113,30 +113,56 @@ export class ExpeditionService {
       const expedition = await expeditionRepo.create(expeditionData);
       console.log(`[EXPEDITION-SERVICE] Step 4: Expedition created in database:`, expedition);
 
-      console.log(`[EXPEDITION-SERVICE] Step 5: Getting assigned agents info`);
-      // Get assigned agents info
-      const assignedAgents = await this.getAssignedAgentsInfo(expedition.assignedAgents);
-      console.log(`[EXPEDITION-SERVICE] Step 5: Assigned agents info retrieved:`, assignedAgents);
+      console.log(`[EXPEDITION-SERVICE] Step 5: Processing selected agents`);
+      // Process selected agents if provided
+      let finalExpedition = expedition;
+      if (request.selectedAgents && request.selectedAgents.length > 0) {
+        console.log(`[EXPEDITION-SERVICE] Step 5a: Validating and assigning selected agents:`, request.selectedAgents);
+        
+        // Validate selected agents belong to the starship and are deployed
+        await this.validateSelectedAgents(request.starshipId, request.selectedAgents);
+        
+        // Assign each selected agent to the expedition
+        for (const agentId of request.selectedAgents) {
+          console.log(`[EXPEDITION-SERVICE] Step 5b: Assigning agent ${agentId} to expedition ${expedition.id}`);
+          await expeditionRepo.assignAgent(expedition.id, agentId);
+        }
+        
+        // Get updated expedition with assigned agents
+        const updatedExpedition = await expeditionRepo.findById(expedition.id);
+        if (!updatedExpedition) {
+          throw this.createError('UPDATE_FAILED', 'Failed to retrieve updated expedition after agent assignment');
+        }
+        finalExpedition = updatedExpedition;
+        console.log(`[EXPEDITION-SERVICE] Step 5c: Agents assigned successfully. Updated expedition:`, finalExpedition);
+      } else {
+        console.log(`[EXPEDITION-SERVICE] Step 5: No agents selected, proceeding without agent assignment`);
+      }
 
-      console.log(`[EXPEDITION-SERVICE] Step 6: Emitting real-time event`);
+      console.log(`[EXPEDITION-SERVICE] Step 6: Getting assigned agents info`);
+      // Get assigned agents info
+      const assignedAgents = await this.getAssignedAgentsInfo(finalExpedition.assignedAgents);
+      console.log(`[EXPEDITION-SERVICE] Step 6: Assigned agents info retrieved:`, assignedAgents);
+
+      console.log(`[EXPEDITION-SERVICE] Step 7: Emitting real-time event`);
       // Emit real-time event
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:created', {
-          expedition,
+          expedition: finalExpedition,
           assignedAgents,
         });
-        console.log(`[EXPEDITION-SERVICE] Step 6: Real-time event emitted successfully`);
+        console.log(`[EXPEDITION-SERVICE] Step 7: Real-time event emitted successfully`);
       } else {
         console.log(
-          `[EXPEDITION-SERVICE] Step 6: SocketService not available, skipping real-time event`
+          `[EXPEDITION-SERVICE] Step 7: SocketService not available, skipping real-time event`
         );
       }
 
-      console.log(`[EXPEDITION-SERVICE] Expedition created successfully: ${expedition.id}`);
+      console.log(`[EXPEDITION-SERVICE] Expedition created successfully: ${finalExpedition.id}`);
 
       return {
-        expedition,
+        expedition: finalExpedition,
         assignedAgents,
         tasks: [],
         messages: [],
@@ -618,6 +644,36 @@ export class ExpeditionService {
     if (starship?.status === 'inactive') {
       throw this.createError('STARSHIP_MAINTENANCE', 'Starship is in maintenance mode');
     }
+  }
+
+  /**
+   * Validate that selected agents belong to the starship and are deployed
+   */
+  private async validateSelectedAgents(starshipId: string, selectedAgents: string[]): Promise<void> {
+    if (!selectedAgents || selectedAgents.length === 0) {
+      return; // No agents to validate
+    }
+
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    
+    // Validate each selected agent
+    for (const agentId of selectedAgents) {
+      const agent = await agentRepo.findById(agentId);
+      
+      if (!agent) {
+        throw this.createError('AGENT_NOT_AVAILABLE', `Agent not found: ${agentId}`);
+      }
+      
+      // Check if agent belongs to the starship
+      if (agent.starshipId !== starshipId) {
+        throw this.createError('AGENT_NOT_AVAILABLE', `Agent ${agentId} does not belong to starship ${starshipId}`);
+      }
+      
+      // Agent is available if it exists and belongs to the starship
+      // No additional status check needed since agents are either deployed on a starship or not
+    }
+    
+    console.log(`[EXPEDITION-SERVICE] All selected agents validated successfully for starship: ${starshipId}`);
   }
 
   private async validateExpeditionAccess(expedition: Expedition, userId: string): Promise<void> {

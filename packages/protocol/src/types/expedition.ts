@@ -214,6 +214,7 @@ export interface CreateExpeditionRequest {
   estimatedDuration?: number;
   tags?: string[];
   dueDate?: string;
+  selectedAgents?: string[];
 }
 
 /**

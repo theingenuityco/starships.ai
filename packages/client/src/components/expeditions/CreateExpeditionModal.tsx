@@ -374,8 +374,8 @@ export function CreateExpeditionModal({
       const { default: api } = await import('@/lib/api');
       const response = await api.get(`/api/starships/${starshipId}/agents`);
       
-      if (response.data?.agents) {
-        setAvailableAgents(response.data.agents);
+      if (response.data?.deployedAgents) {
+        setAvailableAgents(response.data.deployedAgents);
       }
     } catch (error) {
       console.error('Failed to load available agents:', error);
@@ -444,7 +444,10 @@ export function CreateExpeditionModal({
         priority: formData.priority,
         estimatedDuration: formData.estimatedDuration || undefined,
         tags: formData.tags,
-        dueDate: formData.dueDate || undefined
+        dueDate: formData.dueDate || undefined,
+        selectedAgents: formData.enableAgentSelection && formData.selectedAgents.length > 0
+          ? formData.selectedAgents
+          : undefined
       };
 
       // Create the expedition

@@ -10,40 +10,55 @@ import { useSocketConnection } from './useSocketConnection';
 import SocketClient from '@/lib/socket-client';
 import ExpeditionSocketClient, { type ExpeditionSocketEvents, type ConnectionMetrics } from '@/lib/expeditionSocketClient';
 
-// Enhanced event callback types
+// Import the actual socket event types
+import type {
+  ExpeditionStatusEvent,
+  ExpeditionProgressEvent,
+  TaskAssignedEvent,
+  TaskCompletedEvent,
+  TaskProgressEvent,
+  AgentStatusEvent,
+  ExpeditionMessageEvent,
+  ChatTypingEvent,
+  PhaseChangeEvent,
+  ResultAvailableEvent,
+  ExpeditionErrorEvent
+} from '@starships/protocol';
+
+// Enhanced event callback types that match the actual socket events
 export interface EnhancedExpeditionSocketCallbacks {
   // Expedition lifecycle events
-  onExpeditionStarted?: (data: { expeditionId: string; timestamp: string }) => void;
-  onExpeditionCompleted?: (data: { expeditionId: string; result: string; timestamp: string }) => void;
-  onExpeditionFailed?: (data: { expeditionId: string; error: string; timestamp: string }) => void;
-  onExpeditionCancelled?: (data: { expeditionId: string; timestamp: string }) => void;
-  onExpeditionPaused?: (data: { expeditionId: string; timestamp: string }) => void;
-  onExpeditionResumed?: (data: { expeditionId: string; timestamp: string }) => void;
+  onExpeditionStarted?: (data: ExpeditionStatusEvent) => void;
+  onExpeditionCompleted?: (data: ExpeditionStatusEvent) => void;
+  onExpeditionFailed?: (data: ExpeditionStatusEvent) => void;
+  onExpeditionCancelled?: (data: ExpeditionStatusEvent) => void;
+  onExpeditionPaused?: (data: ExpeditionStatusEvent) => void;
+  onExpeditionResumed?: (data: ExpeditionStatusEvent) => void;
   
   // Progress and status updates
-  onStatusUpdate?: (data: { expeditionId: string; progress: any; timestamp: string }) => void;
-  onWorkflowProgress?: (data: { expeditionId: string; phase: string; progress: number; timestamp: string }) => void;
+  onStatusUpdate?: (data: ExpeditionProgressEvent) => void;
+  onWorkflowProgress?: (data: any) => void; // Custom event not in unified types
   
   // Task management
-  onTaskAssigned?: (data: { expeditionId: string; taskId: string; agentId: string; timestamp: string }) => void;
-  onTaskCompleted?: (data: { expeditionId: string; taskId: string; result: string; timestamp: string }) => void;
-  onTaskProgress?: (data: { expeditionId: string; taskId: string; progress: number; timestamp: string }) => void;
+  onTaskAssigned?: (data: TaskAssignedEvent) => void;
+  onTaskCompleted?: (data: TaskCompletedEvent) => void;
+  onTaskProgress?: (data: TaskProgressEvent) => void;
   
   // Agent management
-  onAgentAssigned?: (data: { expeditionId: string; agentId: string; timestamp: string }) => void;
-  onAgentStatus?: (data: { expeditionId: string; agentId: string; status: string; timestamp: string }) => void;
+  onAgentAssigned?: (data: any) => void; // Custom event not in unified types
+  onAgentStatus?: (data: AgentStatusEvent) => void;
   
   // Real-time messaging
-  onMessage?: (data: { expeditionId: string; role: string; content: string; userId?: string; agentId?: string; timestamp: string }) => void;
-  onTypingStart?: (data: { expeditionId: string; userId?: string; agentId?: string; role: string; timestamp: string }) => void;
-  onTypingStop?: (data: { expeditionId: string; userId?: string; agentId?: string; role: string; timestamp: string }) => void;
+  onMessage?: (data: ExpeditionMessageEvent) => void;
+  onTypingStart?: (data: ChatTypingEvent) => void;
+  onTypingStop?: (data: ChatTypingEvent) => void;
   
   // Phase and workflow
-  onPhaseChange?: (data: { expeditionId: string; phase: string; data?: any; timestamp: string }) => void;
-  onResultAvailable?: (data: { expeditionId: string; resultId: string; timestamp: string }) => void;
+  onPhaseChange?: (data: PhaseChangeEvent) => void;
+  onResultAvailable?: (data: ResultAvailableEvent) => void;
   
   // Error handling
-  onError?: (data: { expeditionId: string; error: string; timestamp: string; source?: string }) => void;
+  onError?: (data: ExpeditionErrorEvent) => void;
   
   // Connection events
   onConnectionChange?: (connected: boolean) => void;
@@ -96,6 +111,7 @@ export interface UseEnhancedExpeditionSocketReturn {
   // Connection state
   isConnected: boolean;
   connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
+  connectionState: ConnectionMetrics;
   
   // Real-time data
   realtimeData: RealtimeExpeditionData;
@@ -118,8 +134,16 @@ export interface UseEnhancedExpeditionSocketReturn {
   // Event subscription management
   subscribeToEvents: (callbacks: Partial<EnhancedExpeditionSocketCallbacks>) => () => void;
   
-  // Utility functions
+  // Enhanced connection management
   getConnectionMetrics: () => ConnectionMetrics;
+  getCircuitBreakerStatus: () => { state: 'closed' | 'open' | 'half-open'; failureCount: number; nextRetryTime?: number; timeUntilRetry?: number; };
+  getOfflineQueueStatus: () => { queueSize: number; maxQueueSize: number; oldestOperationAge?: number; };
+  getHealthStatus: () => { isHealthy: boolean; connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected'; issues: string[]; recommendations: string[]; };
+  forceReconnect: () => void;
+  resetCircuitBreaker: () => void;
+  clearOfflineQueue: () => void;
+  
+  // Utility functions
   getEventHistory: () => Array<{ event: string; data: any; timestamp: number }>;
   clearRealtimeData: () => void;
   
@@ -174,6 +198,15 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
   const [isJoining, setIsJoining] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionMetrics>({
+    isConnected: false,
+    connectionQuality: 'disconnected',
+    eventCount: 0,
+    uptime: 0,
+    reconnectAttempts: 0,
+    circuitBreakerState: 'closed',
+    failureCount: 0
+  });
   const [realtimeData, setRealtimeData] = useState<RealtimeExpeditionData>({
     typingUsers: [],
     activeAgents: [],
@@ -185,7 +218,9 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
       connectionQuality: 'disconnected',
       eventCount: 0,
       uptime: 0,
-      reconnectAttempts: 0
+      reconnectAttempts: 0,
+      circuitBreakerState: 'closed',
+      failureCount: 0
     }
   });
 
@@ -195,7 +230,7 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
   const additionalCallbacksRef = useRef<Partial<EnhancedExpeditionSocketCallbacks>>({});
 
   // Base socket connection
-  const { isConnected: socketConnected } = useSocketConnection();
+  const { isConnected: socketConnected, connectionStatus } = useSocketConnection();
   const baseSocketClient = SocketClient.getInstance();
 
   // Debug logging
@@ -204,13 +239,35 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
       console.log(`[ENHANCED EXPEDITION SOCKET] ${message}`, data || '');
     }
   }, [debugMode]);
+  
+  // Debug the base socket connection state
+  useEffect(() => {
+    debugLog('Base socket connection changed:', {
+      socketConnected,
+      connectionStatus,
+      actualSocketConnected: baseSocketClient.isConnected()
+    });
+  }, [socketConnected, connectionStatus, debugLog]);
 
   // Initialize expedition socket client
   useEffect(() => {
-    if (!socketConnected) return;
+    debugLog('Socket connection state changed:', { socketConnected });
+    
+    if (!socketConnected) {
+      debugLog('Base socket not connected, skipping expedition socket initialization');
+      return;
+    }
 
     const baseSocket = baseSocketClient.getSocket();
-    if (!baseSocket) return;
+    if (!baseSocket) {
+      debugLog('Base socket instance not available');
+      return;
+    }
+
+    debugLog('Base socket state:', {
+      connected: baseSocket.connected,
+      id: baseSocket.id
+    });
 
     const initializeExpeditionSocket = async () => {
       try {
@@ -226,12 +283,16 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
         });
 
         await expeditionSocketRef.current.initialize(baseSocket);
-        debugLog('Expedition socket initialized');
+        debugLog('Expedition socket initialized successfully');
 
-        // Update connection metrics
+        // Update connection metrics immediately
+        const metrics = expeditionSocketRef.current.getConnectionMetrics();
+        debugLog('Initial connection metrics:', metrics);
+        
+        setConnectionState(metrics);
         setRealtimeData(prev => ({
           ...prev,
-          connectionMetrics: expeditionSocketRef.current!.getConnectionMetrics()
+          connectionMetrics: metrics
         }));
 
       } catch (err) {
@@ -245,11 +306,58 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
 
     return () => {
       if (expeditionSocketRef.current) {
+        debugLog('Cleaning up expedition socket');
         expeditionSocketRef.current.cleanup();
         expeditionSocketRef.current = null;
       }
     };
   }, [socketConnected, enableReconnection, maxReconnectAttempts, reconnectDelay, enableEventDebouncing, debounceDelay, enablePerformanceMonitoring, enableTypingIndicators, typingTimeout, debugLog]);
+
+  // Enhanced connection state monitoring
+  useEffect(() => {
+    if (!expeditionSocketRef.current) return;
+
+    const unsubscribeConnectionState = expeditionSocketRef.current.onConnectionStateChange((newState) => {
+      debugLog('Connection state changed:', newState);
+      
+      setConnectionState(newState);
+      setRealtimeData(prev => ({
+        ...prev,
+        connectionMetrics: newState
+      }));
+
+      // Handle connection state changes
+      if (onConnectionChange) {
+        onConnectionChange(newState.isConnected);
+      }
+
+      // Handle reconnection attempts
+      if (onReconnectAttempt && newState.reconnectAttempts > 0) {
+        onReconnectAttempt(newState.reconnectAttempts, maxReconnectAttempts);
+      }
+
+      // Clear errors on successful connection
+      if (newState.isConnected && newState.circuitBreakerState === 'closed') {
+        setError(null);
+      }
+
+      // Set error for circuit breaker open state
+      if (newState.circuitBreakerState === 'open') {
+        setError('Connection temporarily suspended due to repeated failures. Retrying automatically...');
+      }
+    });
+
+    // Also get the initial connection state
+    const initialState = expeditionSocketRef.current.getConnectionMetrics();
+    debugLog('Initial connection state:', initialState);
+    setConnectionState(initialState);
+    setRealtimeData(prev => ({
+      ...prev,
+      connectionMetrics: initialState
+    }));
+
+    return unsubscribeConnectionState;
+  }, [maxReconnectAttempts, debugLog]); // Added debugLog back since it's stable
 
   // Setup event listeners
   useEffect(() => {
@@ -384,7 +492,7 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
     // Phase and workflow events
     if (onPhaseChange) {
       unsubscribers.push(expeditionSocket.on('expedition:phase-change', (data) => {
-        setRealtimeData(prev => ({ ...prev, currentPhase: data.phase }));
+        setRealtimeData(prev => ({ ...prev, currentPhase: data.phase.current }));
         onPhaseChange(data);
       }));
     }
@@ -402,7 +510,7 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
     if (onError) {
       unsubscribers.push(expeditionSocket.on('expedition:error', (data) => {
         setRealtimeData(prev => ({ ...prev, lastError: data }));
-        setError(data.error);
+        setError(data.error.message);
         onError(data);
       }));
     }
@@ -598,15 +706,61 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
         connectionQuality: 'disconnected',
         eventCount: 0,
         uptime: 0,
-        reconnectAttempts: 0
+        reconnectAttempts: 0,
+        circuitBreakerState: 'closed',
+        failureCount: 0
       }
     });
   }, []);
 
+  // Enhanced connection management methods
+  const getCircuitBreakerStatus = useCallback(() => {
+    return expeditionSocketRef.current?.getCircuitBreakerStatus() || {
+      state: 'closed' as const,
+      failureCount: 0
+    };
+  }, []);
+
+  const getOfflineQueueStatus = useCallback(() => {
+    return expeditionSocketRef.current?.getOfflineQueueStatus() || {
+      queueSize: 0,
+      maxQueueSize: 100,
+      oldestOperationAge: undefined
+    };
+  }, []);
+
+  const getHealthStatus = useCallback(() => {
+    return expeditionSocketRef.current?.getHealthStatus() || {
+      isHealthy: false,
+      connectionQuality: 'disconnected' as const,
+      issues: ['Socket not initialized'],
+      recommendations: ['Initialize socket connection']
+    };
+  }, []);
+
+  const forceReconnect = useCallback(() => {
+    if (expeditionSocketRef.current) {
+      expeditionSocketRef.current.forceReconnect();
+    }
+  }, []);
+
+  const resetCircuitBreaker = useCallback(() => {
+    if (expeditionSocketRef.current) {
+      expeditionSocketRef.current.resetCircuitBreaker();
+    }
+  }, []);
+
+  const clearOfflineQueue = useCallback(() => {
+    if (expeditionSocketRef.current) {
+      expeditionSocketRef.current.clearOfflineQueue();
+    }
+  }, []);
+
   return {
     // Connection state
-    isConnected: realtimeData.connectionMetrics.isConnected,
-    connectionQuality: realtimeData.connectionMetrics.connectionQuality,
+    isConnected: connectionState.isConnected,
+    connectionQuality: connectionState.connectionQuality,
+    connectionState,
     
     // Real-time data
     realtimeData,
@@ -629,8 +783,16 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
     // Event subscription management
     subscribeToEvents,
     
-    // Utility functions
+    // Enhanced connection management
     getConnectionMetrics,
+    getCircuitBreakerStatus,
+    getOfflineQueueStatus,
+    getHealthStatus,
+    forceReconnect,
+    resetCircuitBreaker,
+    clearOfflineQueue,
+    
+    // Utility functions
     getEventHistory,
     clearRealtimeData,
     

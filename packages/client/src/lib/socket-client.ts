@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { SocketIOEvents, ConnectionStatus, SocketConnectionState } from '@starships/protocol';
+import type { SocketIOEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
 
 class SocketClient {
   private static instance: SocketClient;
@@ -69,9 +69,9 @@ class SocketClient {
         }
       });
 
-      this.socket.on('connection-status', (status: ConnectionStatus) => {
-        console.log('[SOCKET CLIENT] Status update:', status);
-        this.connectionState.connected = status === 'connected';
+      this.socket.on('connection-status', (event: ConnectionStatusEvent) => {
+        console.log('[SOCKET CLIENT] Status update:', event.status);
+        this.connectionState.connected = event.status === 'connected';
       });
 
       setInterval(() => {

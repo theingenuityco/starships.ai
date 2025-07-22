@@ -1,10 +1,11 @@
 /**
  * Comprehensive Socket.IO Event Type Definitions
- * 
+ *
  * This file defines all Socket.IO event types for real-time communication
  * across the expedition system, replacing generic 'any' types with proper
  * TypeScript interfaces for better type safety and development experience.
  */
+
 
 // ============================================================================
 // EXPEDITION EVENT TYPES
@@ -16,7 +17,7 @@ export interface ExpeditionCreatedEvent {
     id: string;
     title: string;
     objective: string;
-    status: 'draft' | 'planning' | 'in-progress' | 'paused' | 'completed' | 'cancelled' | 'failed';
+    status: 'draft' | 'planning' | 'in-progress' | 'paused' | 'review' | 'completed' | 'cancelled' | 'failed';
     priority: 'low' | 'medium' | 'high' | 'critical';
     starshipId: string;
     createdBy: string;
@@ -208,8 +209,8 @@ export interface ResultAvailableEvent {
     id: string;
     title: string;
     description?: string;
-    resultType: 'analysis' | 'report' | 'data' | 'code' | 'document' | 'artifact';
-    format: 'text' | 'markdown' | 'json' | 'csv' | 'pdf' | 'image' | 'other';
+    resultType: 'final-report' | 'task-output' | 'analysis' | 'code' | 'document' | 'design' | 'data' | 'recommendation';
+    format: 'text' | 'markdown' | 'json' | 'code' | 'html' | 'pdf' | 'image' | 'video' | 'audio' | 'archive';
     createdBy: string;
     createdAt: string;
     quality: {
@@ -316,11 +317,19 @@ export interface ConnectionStatusEvent {
   timestamp: string;
 }
 
+// Additional type for Socket.io v4.x compatibility
+export type ConnectionStatus = ConnectionStatusEvent;
+
 // ============================================================================
-// ENHANCED SOCKET.IO EVENTS INTERFACE
+// UNIFIED SOCKET.IO EVENTS INTERFACE
 // ============================================================================
 
-export interface EnhancedSocketIOEvents {
+/**
+ * Unified Socket.IO Events Interface
+ * This replaces both EnhancedSocketIOEvents and client-side ExpeditionSocketEvents
+ * to ensure type consistency across client and server
+ */
+export interface SocketIOEvents {
   // Connection events
   'connection-status': (event: ConnectionStatusEvent) => void;
   'ping': () => void;
@@ -335,7 +344,9 @@ export interface EnhancedSocketIOEvents {
   'expedition:resumed': (event: ExpeditionStatusEvent) => void;
   'expedition:cancelled': (event: ExpeditionStatusEvent) => void;
   'expedition:completed': (event: ExpeditionStatusEvent) => void;
+  'expedition:failed': (event: ExpeditionStatusEvent) => void;
   'expedition:status-update': (event: ExpeditionProgressEvent) => void;
+  'expedition:workflow-progress': (event: any) => void;
 
   // Task events
   'expedition:task-assigned': (event: TaskAssignedEvent) => void;
@@ -349,6 +360,7 @@ export interface EnhancedSocketIOEvents {
 
   // Agent activity events
   'expedition:agent-activity': (event: AgentActivityEvent) => void;
+  'expedition:agent-assigned': (event: any) => void;
   'expedition:agent-status': (event: AgentStatusEvent) => void;
 
   // Quality and results events
@@ -366,6 +378,7 @@ export interface EnhancedSocketIOEvents {
   // Room management events
   'expedition:room-joined': (event: RoomJoinedEvent) => void;
   'expedition:room-left': (event: RoomLeftEvent) => void;
+  
 
   // Client to server events
   'expedition:join': (expeditionId: string) => void;
@@ -375,13 +388,54 @@ export interface EnhancedSocketIOEvents {
   'expedition:pause': (expeditionId: string) => void;
   'expedition:resume': (expeditionId: string) => void;
   'expedition:cancel': (expeditionId: string) => void;
+
+  // Non-expedition events for backward compatibility
+  // Sibil Client to Server events
+  'sibil:start-stream': (request: any) => void;
+  'sibil:stop-stream': (streamId: string) => void;
+  'sibil:join-room': (userId: string) => void;
+  'sibil:leave-room': (userId: string) => void;
+
+  // Sibil Server to Client events
+  'sibil:stream-start': (streamId: string) => void;
+  'sibil:stream-chunk': (chunk: any) => void;
+  'sibil:stream-complete': (response: any) => void;
+  'sibil:stream-error': (error: any) => void;
+  'sibil:typing-start': () => void;
+  'sibil:typing-stop': () => void;
+
+  // Agent Chat Client to Server events
+  'agent:start-stream': (request: any) => void;
+  'agent:stop-stream': (streamId: string) => void;
+  'agent:join-room': (userId: string, agentId: string) => void;
+  'agent:leave-room': (userId: string, agentId: string) => void;
+
+  // Agent Chat Server to Client events
+  'agent:stream-start': (streamId: string, agentId: string) => void;
+  'agent:stream-chunk': (chunk: any) => void;
+  'agent:stream-complete': (response: any) => void;
+  'agent:stream-error': (error: any) => void;
+  'agent:typing-start': (agentId: string) => void;
+  'agent:typing-stop': (agentId: string) => void;
 }
+
+/**
+ * Legacy alias for backward compatibility
+ * @deprecated Use SocketIOEvents instead
+ */
+export interface EnhancedSocketIOEvents extends SocketIOEvents {}
+
+/**
+ * Client-compatible expedition socket events
+ * This ensures the client can use the same types as the server
+ */
+export interface ExpeditionSocketEvents extends SocketIOEvents {}
 
 // ============================================================================
 // UTILITY TYPES
 // ============================================================================
 
-export type SocketExpeditionEventType = keyof EnhancedSocketIOEvents;
+export type SocketExpeditionEventType = keyof SocketIOEvents;
 
 export interface EventEmissionOptions {
   expeditionId: string;

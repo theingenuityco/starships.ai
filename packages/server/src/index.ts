@@ -43,8 +43,54 @@ import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware
 import healthRoutes from './routes/health';
 import { logger } from '@starships/models/src/logging';
 
+/**
+ * Validate required environment variables
+ */
+function validateEnvironmentVariables() {
+  const requiredVars = [
+    'CLIENT_URL',
+    'NEXT_PUBLIC_API_URL'
+  ];
+  
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    console.error('❌ Missing required environment variables:');
+    missingVars.forEach(varName => {
+      console.error(`   - ${varName}`);
+    });
+    console.error('');
+    console.error('Please ensure these variables are set in your .env file.');
+    console.error('You can copy .env.example to .env and fill in the values.');
+    process.exit(1);
+  }
+  
+  // Validate CLIENT_URL format
+  const clientUrl = process.env.CLIENT_URL;
+  if (clientUrl && !clientUrl.match(/^https?:\/\/.+/)) {
+    console.error('❌ CLIENT_URL must be a valid HTTP/HTTPS URL');
+    console.error(`   Current value: ${clientUrl}`);
+    process.exit(1);
+  }
+  
+  // Validate NEXT_PUBLIC_API_URL format
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (apiUrl && !apiUrl.match(/^https?:\/\/.+/)) {
+    console.error('❌ NEXT_PUBLIC_API_URL must be a valid HTTP/HTTPS URL');
+    console.error(`   Current value: ${apiUrl}`);
+    process.exit(1);
+  }
+  
+  console.log('✅ Environment variables validated successfully');
+  console.log(`   CLIENT_URL: ${clientUrl}`);
+  console.log(`   NEXT_PUBLIC_API_URL: ${apiUrl}`);
+}
+
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
+
+// Validate environment variables before starting server
+validateEnvironmentVariables();
 
 // Initialize Neo4j database connection
 const dbConnection = createConnection({
@@ -141,14 +187,24 @@ httpServer.listen(PORT, async () => {
     await dbConnection.connect();
     await dbConnection.initializeSchema();
     console.log('✅ Neo4j database connected and schema initialized');
+    
+    // Initialize RepositoryFactory BEFORE any socket connections
+    console.log('🔧 Initializing RepositoryFactory...');
+    await RepositoryFactory.initialize();
+    console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
+    
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();
     console.log('✅ AgentService initialized with default agents');
 
     // Initialize AgentTemplateService (seeds default templates)
-    const templateService = await RepositoryFactory.getAgentTemplateService();
-    await templateService.seedDefaultTemplates();
-    console.log('✅ AgentTemplateService initialized with default templates');
+    const templateService = RepositoryFactory.getAgentTemplateService();
+    if (templateService) {
+      await templateService.seedDefaultTemplates();
+      console.log('✅ AgentTemplateService initialized with default templates');
+    } else {
+      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable');
+    }
 
     // Initialize MCP Server Options (seeds default connectors)
     await seedMCPServers();

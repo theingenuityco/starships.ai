@@ -1,28 +1,14 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
-import type { SocketIOEvents, SocketConnectionState } from '@starships/protocol';
+import type {
+  SocketConnectionState,
+  SocketIOEvents,
+  EventEmissionOptions,
+  EventEmissionResult,
+  SocketExpeditionEventType
+} from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from './UserService';
-
-// Enhanced event emission options
-interface EventEmissionOptions {
-  expeditionId?: string;
-  excludeUser?: string;
-  includeUsers?: string[];
-  retryCount?: number;
-  timeout?: number;
-}
-
-interface EventEmissionResult {
-  success: boolean;
-  eventType: string;
-  recipientCount: number;
-  errors?: Array<{
-    userId: string;
-    error: string;
-  }>;
-  timestamp: string;
-}
 
 // Kinde JWKS endpoint for token verification
 const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
@@ -36,10 +22,20 @@ async function verifySocketJWT(token: string) {
   return payload;
 }
 
+/**
+ * Consolidated Socket.IO Service with enhanced features
+ * Combines functionality from both SocketIOService and EnhancedSocketIOService
+ */
 export class SocketIOService {
   private static instance: SocketIOService;
   private io: SocketIOServer<SocketIOEvents>;
   private connections: Map<string, SocketConnectionState> = new Map();
+  private expeditionRooms: Map<string, Set<string>> = new Map(); // expeditionId -> Set<socketId>
+  private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
+  private reconnectionAttempts: Map<string, number> = new Map();
+  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> = new Map();
+  private healthCheckInterval?: NodeJS.Timeout;
+  private isShuttingDown = false;
 
   private constructor(httpServer: HTTPServer) {
     this.io = new SocketIOServer(httpServer, {
@@ -50,11 +46,19 @@ export class SocketIOService {
       },
       transports: ['websocket', 'polling'],
       pingTimeout: 60000,
-      pingInterval: 25000
+      pingInterval: 25000,
+      connectTimeout: 45000,
+      // Enhanced configuration for better reliability
+      allowEIO3: true,
+      maxHttpBufferSize: 1e6, // 1MB
+      httpCompression: true,
+      perMessageDeflate: true
     });
 
     this.setupMiddleware();
     this.setupEventHandlers();
+    this.startHealthCheck();
+    this.setupGracefulShutdown();
   }
 
   static initialize(httpServer: HTTPServer): SocketIOService {
@@ -72,7 +76,22 @@ export class SocketIOService {
   }
 
   private setupMiddleware() {
-    // Authentication middleware
+    // Rate limiting middleware
+    this.io.use((socket, next) => {
+      const userId = socket.handshake.auth.userId;
+      const maxConnections = 5;
+
+      if (userId) {
+        const userConnections = this.userSockets.get(userId) || new Set();
+        if (userConnections.size >= maxConnections) {
+          return next(new Error('Too many connections for this user'));
+        }
+      }
+
+      next();
+    });
+
+    // Non-blocking authentication middleware
     this.io.use(async (socket, next) => {
       try {
         const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
@@ -81,84 +100,451 @@ export class SocketIOService {
           return next(new Error('Authentication token required'));
         }
 
+        // Verify JWT token - this is the only blocking operation
         const payload = await verifySocketJWT(token);
         
-        // Look up user in database by Kinde ID (same as HTTP middleware)
-        let user;
-        try {
-          user = await UserService.getUserByKindeId(payload.sub as string);
-        } catch (dbError) {
-          console.error(`[SOCKET.IO] Database error when looking up user: ${payload.sub}`, dbError);
-          return next(new Error('Database error during authentication'));
-        }
-
-        if (!user) {
-          console.log(`[SOCKET.IO] User not found in database for Kinde ID: ${payload.sub}, attempting auto-sync`);
-          
-          // Auto-sync user if they don't exist (same as HTTP middleware)
-          try {
-            user = await UserService.syncUser({
-              kindeId: payload.sub as string,
-              email: (payload.email as string) || `user-${payload.sub}@unknown.com`,
-              name: (payload.given_name as string) || (payload.name as string),
-              avatar: payload.picture as string,
-            });
-            console.log(`[SOCKET.IO] User auto-synced: ${user.id} (${user.displayName || user.username})`);
-          } catch (syncError: any) {
-            console.error(`[SOCKET.IO] Failed to auto-sync user for Kinde ID: ${payload.sub}`, syncError);
-            return next(new Error('Failed to sync user'));
-          }
-        }
-
-        // Use internal user ID (not Kinde ID) for consistency with HTTP routes
-        socket.data.userId = user.id;
-        socket.data.kindeId = payload.sub;
+        // Store Kinde ID immediately for connection
+        socket.data.kindeId = payload.sub as string;
+        socket.data.email = payload.email as string;
+        socket.data.name = (payload.given_name as string) || (payload.name as string);
+        socket.data.avatar = payload.picture as string;
         socket.data.authenticated = true;
+        socket.data.connectedAt = Date.now();
         
-        console.log(`[SOCKET.IO] User ${user.id} (${user.displayName || user.username}) authenticated`);
+        // Set temporary user ID using Kinde ID until database resolution
+        socket.data.userId = `temp:${payload.sub}`;
+        socket.data.userResolved = false;
+        socket.data.userResolutionAttempts = 0;
+        
+        console.log(`[SOCKET.IO] JWT verified for Kinde ID: ${payload.sub}, allowing connection with temporary ID`);
+        
+        // Allow connection immediately - user resolution happens in background
         next();
       } catch (error) {
-        console.error('[SOCKET.IO] Authentication failed:', error);
-        next(new Error('Authentication failed'));
+        console.error('[SOCKET.IO] JWT verification failed:', error);
+        next(new Error('Invalid authentication token'));
       }
     });
   }
 
   private setupEventHandlers() {
     this.io.on('connection', (socket) => {
-      const userId = socket.data.userId;
-      console.log(`[SOCKET.IO] User ${userId} connected: ${socket.id}`);
+      const tempUserId = socket.data.userId;
+      const kindeId = socket.data.kindeId;
+      const socketId = socket.id;
+      
+      console.log(`[SOCKET.IO] Connection established for Kinde ID: ${kindeId}, socket: ${socketId}`);
 
-      // Initialize connection state
-      this.connections.set(socket.id, {
+      // Initialize connection state with temporary user ID
+      this.connections.set(socketId, {
         connected: true,
         authenticated: true,
         room_joined: false,
-        user_id: userId,
-        connection_id: socket.id,
+        user_id: tempUserId,
+        connection_id: socketId,
         last_ping: Date.now()
       });
 
-      // Auto-join user to their personal room
-      const userRoom = `user:${userId}`;
+      // Track user sockets using temporary ID initially
+      if (!this.userSockets.has(tempUserId)) {
+        this.userSockets.set(tempUserId, new Set());
+      }
+      this.userSockets.get(tempUserId)!.add(socketId);
+
+      // Auto-join user to their personal room (using temp ID initially)
+      const userRoom = this.getUserRoom(tempUserId);
       socket.join(userRoom);
-      this.updateConnectionState(socket.id, { room_joined: true });
+      this.updateConnectionState(socketId, { room_joined: true });
 
-      // Send connection confirmation
-      socket.emit('connection-status', 'connected');
-
-      // Handle disconnection
-      socket.on('disconnect', (reason) => {
-        console.log(`[SOCKET.IO] User ${userId} disconnected: ${reason}`);
-        this.connections.delete(socket.id);
+      // Send initial connection confirmation with degraded status
+      socket.emit('connection-status', {
+        status: 'connected',
+        userId: tempUserId,
+        connectionId: socketId,
+        timestamp: new Date().toISOString()
       });
+
+      // Start background user resolution
+      this.resolveUserInBackground(socket);
 
       // Handle ping/pong for connection health
-      socket.on('ping' as any, () => {
-        this.updateConnectionState(socket.id, { last_ping: Date.now() });
-        socket.emit('pong' as any);
+      socket.on('ping', () => {
+        this.updateConnectionState(socketId, { last_ping: Date.now() });
+        socket.emit('pong');
+      });
+
+      // Handle expedition room management
+      this.setupExpeditionHandlers(socket);
+
+      // Handle disconnection with cleanup
+      socket.on('disconnect', (reason) => {
+        const currentUserId = socket.data.userId;
+        console.log(`[SOCKET.IO] User ${currentUserId} disconnected: ${reason}`);
+        this.handleDisconnection(socketId, currentUserId, reason);
+      });
+
+      // Handle connection errors
+      socket.on('error', (error) => {
+        const currentUserId = socket.data.userId;
+        console.error(`[SOCKET.IO] Socket error for user ${currentUserId}:`, error);
+        this.handleSocketError(socketId, currentUserId, error);
       });
     });
+  }
+
+  private setupExpeditionHandlers(socket: any) {
+    // Join expedition room
+    socket.on('expedition:join', (expeditionId: string) => {
+      try {
+        const currentUserId = socket.data.userId; // This will be updated when user is resolved
+        const expeditionRoom = this.getExpeditionRoom(expeditionId);
+        socket.join(expeditionRoom);
+        
+        // Track expedition room membership
+        if (!this.expeditionRooms.has(expeditionId)) {
+          this.expeditionRooms.set(expeditionId, new Set());
+        }
+        this.expeditionRooms.get(expeditionId)!.add(socket.id);
+
+        console.log(`[SOCKET.IO] User ${currentUserId} joined expedition room: ${expeditionId}`);
+        
+        // Emit room joined event (works with both temp and resolved IDs)
+        this.emitToExpeditionRoom(expeditionId, 'expedition:room-joined', {
+          expeditionId,
+          userId: currentUserId,
+          userInfo: {
+            id: currentUserId,
+            name: socket.data.name || 'User',
+            role: 'viewer' // Default role for safety
+          },
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error(`[SOCKET.IO] Failed to join expedition room ${expeditionId}:`, error);
+        socket.emit('expedition:error', {
+          expeditionId,
+          error: {
+            code: 'ROOM_JOIN_FAILED',
+            message: 'Failed to join expedition room',
+            severity: 'medium',
+            source: 'system',
+            recoverable: true,
+            retryCount: 0
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+    });
+
+    // Leave expedition room
+    socket.on('expedition:leave', (expeditionId: string) => {
+      try {
+        const currentUserId = socket.data.userId;
+        const expeditionRoom = this.getExpeditionRoom(expeditionId);
+        socket.leave(expeditionRoom);
+        
+        // Remove from expedition room tracking
+        const roomMembers = this.expeditionRooms.get(expeditionId);
+        if (roomMembers) {
+          roomMembers.delete(socket.id);
+          if (roomMembers.size === 0) {
+            this.expeditionRooms.delete(expeditionId);
+          }
+        }
+
+        console.log(`[SOCKET.IO] User ${currentUserId} left expedition room: ${expeditionId}`);
+        
+        // Emit room left event
+        this.emitToExpeditionRoom(expeditionId, 'expedition:room-left', {
+          expeditionId,
+          userId: currentUserId,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error(`[SOCKET.IO] Failed to leave expedition room ${expeditionId}:`, error);
+      }
+    });
+  }
+
+  private handleDisconnection(socketId: string, userId: string, reason: string) {
+    console.log(`[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`);
+    
+    // Clean up connection state
+    this.connections.delete(socketId);
+    
+    // Remove from user sockets tracking (works for both temp and resolved IDs)
+    const userSockets = this.userSockets.get(userId);
+    if (userSockets) {
+      userSockets.delete(socketId);
+      if (userSockets.size === 0) {
+        this.userSockets.delete(userId);
+      }
+    }
+
+    // Clean up expedition room memberships
+    this.expeditionRooms.forEach((members, expeditionId) => {
+      if (members.has(socketId)) {
+        members.delete(socketId);
+        if (members.size === 0) {
+          this.expeditionRooms.delete(expeditionId);
+        }
+      }
+    });
+
+    // Reset reconnection attempts if clean disconnect
+    if (reason === 'client namespace disconnect' || reason === 'server namespace disconnect') {
+      this.reconnectionAttempts.delete(userId);
+      // Also clean up for temporary user IDs
+      if (userId.startsWith('temp:')) {
+        const kindeId = userId.replace('temp:', '');
+        this.reconnectionAttempts.delete(kindeId);
+      }
+    }
+  }
+
+  private handleSocketError(socketId: string, userId: string, error: any) {
+    console.warn(`[SOCKET.IO] Socket error for user ${userId}:`, error);
+    
+    const attempts = this.reconnectionAttempts.get(userId) || 0;
+    this.reconnectionAttempts.set(userId, attempts + 1);
+
+    // More lenient error handling - only disconnect for severe errors
+    if (attempts > 10) { // Increased threshold
+      console.warn(`[SOCKET.IO] Too many errors for user ${userId}, temporarily blocking`);
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        // Send warning before disconnecting
+        socket.emit('connection-status', {
+          status: 'error',
+          userId: userId,
+          connectionId: socketId,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Delay disconnection to allow user to see the warning
+        setTimeout(() => {
+          if (socket.connected) {
+            socket.disconnect(true);
+          }
+        }, 3000);
+      }
+    } else if (attempts > 5) {
+      // Send warning but don't disconnect
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        socket.emit('connection-status', {
+          status: 'reconnecting',
+          userId: userId,
+          connectionId: socketId,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  private processQueuedEvents(userId: string, socketId: string) {
+    const queuedEvents = this.eventQueue.get(userId);
+    if (queuedEvents && queuedEvents.length > 0) {
+      const socket = this.io.sockets.sockets.get(socketId);
+      if (socket) {
+        console.log(`[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`);
+        
+        queuedEvents.forEach(({ event, data }) => {
+          socket.emit(event as any, data);
+        });
+        
+        this.eventQueue.delete(userId);
+      }
+    }
+  }
+
+  /**
+   * Resolve user in background without blocking the connection
+   */
+  private async resolveUserInBackground(socket: any) {
+    const kindeId = socket.data.kindeId;
+    const socketId = socket.id;
+    const tempUserId = socket.data.userId;
+    
+    // Prevent multiple resolution attempts for the same socket
+    if (socket.data.userResolutionInProgress) {
+      return;
+    }
+    
+    socket.data.userResolutionInProgress = true;
+    
+    try {
+      console.log(`[SOCKET.IO] Starting background user resolution for Kinde ID: ${kindeId}`);
+      
+      // Attempt to find existing user
+      let user = null;
+      try {
+        user = await UserService.getUserByKindeId(kindeId);
+      } catch (dbError) {
+        console.warn(`[SOCKET.IO] Database error during user lookup for ${kindeId}, will retry later:`, dbError);
+        // Schedule retry
+        setTimeout(() => {
+          if (socket.connected && !socket.data.userResolved) {
+            socket.data.userResolutionInProgress = false;
+            this.resolveUserInBackground(socket);
+          }
+        }, 5000); // Retry in 5 seconds
+        return;
+      }
+
+      // If user not found, attempt to sync
+      if (!user) {
+        console.log(`[SOCKET.IO] User not found for Kinde ID: ${kindeId}, attempting background sync`);
+        
+        try {
+          user = await UserService.syncUser({
+            kindeId: kindeId,
+            email: socket.data.email || `user-${kindeId}@unknown.com`,
+            name: socket.data.name,
+            avatar: socket.data.avatar,
+          });
+          console.log(`[SOCKET.IO] User successfully synced in background: ${user.id} (${user.displayName || user.username})`);
+        } catch (syncError) {
+          console.warn(`[SOCKET.IO] Background user sync failed for ${kindeId}, providing degraded service:`, syncError);
+          // Continue with degraded service - don't disconnect
+          socket.data.userResolutionInProgress = false;
+          socket.data.userResolutionAttempts = (socket.data.userResolutionAttempts || 0) + 1;
+          
+          // Retry with exponential backoff if not too many attempts
+          if (socket.data.userResolutionAttempts < 5) {
+            const retryDelay = Math.min(30000, 1000 * Math.pow(2, socket.data.userResolutionAttempts));
+            setTimeout(() => {
+              if (socket.connected && !socket.data.userResolved) {
+                socket.data.userResolutionInProgress = false;
+                this.resolveUserInBackground(socket);
+              }
+            }, retryDelay);
+          }
+          return;
+        }
+      }
+
+      // User resolution successful - update socket data and tracking
+      const oldUserId = socket.data.userId;
+      const newUserId = user.id;
+      
+      socket.data.userId = newUserId;
+      socket.data.userResolved = true;
+      socket.data.userResolutionInProgress = false;
+      
+      // Update connection state
+      this.updateConnectionState(socketId, { user_id: newUserId });
+      
+      // Update user socket tracking
+      // Remove from old tracking
+      const oldUserSockets = this.userSockets.get(oldUserId);
+      if (oldUserSockets) {
+        oldUserSockets.delete(socketId);
+        if (oldUserSockets.size === 0) {
+          this.userSockets.delete(oldUserId);
+        }
+      }
+      
+      // Add to new tracking
+      if (!this.userSockets.has(newUserId)) {
+        this.userSockets.set(newUserId, new Set());
+      }
+      this.userSockets.get(newUserId)!.add(socketId);
+      
+      // Update room membership
+      const oldRoom = this.getUserRoom(oldUserId);
+      const newRoom = this.getUserRoom(newUserId);
+      
+      if (oldRoom !== newRoom) {
+        socket.leave(oldRoom);
+        socket.join(newRoom);
+      }
+      
+      // Process any queued events for the resolved user
+      this.processQueuedEvents(newUserId, socketId);
+      
+      // Notify client of successful user resolution using connection-status
+      socket.emit('connection-status', {
+        status: 'connected',
+        userId: newUserId,
+        connectionId: socketId,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`[SOCKET.IO] User resolution completed: ${kindeId} -> ${newUserId} (${user.displayName || user.username})`);
+      
+    } catch (error) {
+      console.error(`[SOCKET.IO] Unexpected error during background user resolution for ${kindeId}:`, error);
+      socket.data.userResolutionInProgress = false;
+      
+      // Continue with degraded service - don't disconnect the user
+      socket.emit('connection-status', {
+        status: 'error',
+        userId: tempUserId,
+        connectionId: socketId,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  private startHealthCheck() {
+    this.healthCheckInterval = setInterval(() => {
+      if (this.isShuttingDown) return;
+
+      const now = Date.now();
+      const staleThreshold = 120000; // 2 minutes
+
+      // Check for stale connections
+      this.connections.forEach((state, socketId) => {
+        if (now - (state.last_ping || 0) > staleThreshold) {
+          console.warn(`[SOCKET.IO] Stale connection detected: ${socketId}`);
+          const socket = this.io.sockets.sockets.get(socketId);
+          if (socket) {
+            socket.disconnect(true);
+          }
+        }
+      });
+
+      // Clean up old queued events (older than 5 minutes)
+      const eventThreshold = 300000; // 5 minutes
+      this.eventQueue.forEach((events, userId) => {
+        const filteredEvents = events.filter(event => now - event.timestamp < eventThreshold);
+        if (filteredEvents.length !== events.length) {
+          if (filteredEvents.length === 0) {
+            this.eventQueue.delete(userId);
+          } else {
+            this.eventQueue.set(userId, filteredEvents);
+          }
+        }
+      });
+    }, 30000); // Run every 30 seconds
+  }
+
+  private setupGracefulShutdown() {
+    const shutdown = () => {
+      console.log('[SOCKET.IO] Graceful shutdown initiated...');
+      this.isShuttingDown = true;
+      
+      if (this.healthCheckInterval) {
+        clearInterval(this.healthCheckInterval);
+      }
+
+      // Notify all connected clients
+      this.io.emit('connection-status', {
+        status: 'disconnected',
+        userId: 'system',
+        connectionId: 'system',
+        timestamp: new Date().toISOString()
+      });
+
+      // Close all connections
+      this.io.close(() => {
+        console.log('[SOCKET.IO] All connections closed');
+      });
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
   }
 
   private updateConnectionState(socketId: string, updates: Partial<SocketConnectionState>) {
@@ -177,7 +563,11 @@ export class SocketIOService {
     return `user:${userId}`;
   }
 
-  // Agent-specific room management
+  getExpeditionRoom(expeditionId: string): string {
+    return `expedition:${expeditionId}`;
+  }
+
+  // Agent-specific room management (backward compatibility)
   getAgentRoom(agentId: string, userId: string): string {
     return `agent:${agentId}:${userId}`;
   }
@@ -204,41 +594,63 @@ export class SocketIOService {
   }
 
   isUserConnected(userId: string): boolean {
-    return Array.from(this.connections.values()).some(
-      conn => conn.user_id === userId && conn.connected
-    );
+    const userSockets = this.userSockets.get(userId);
+    return userSockets ? userSockets.size > 0 : false;
   }
 
-  emitToUser(userId: string, event: keyof SocketIOEvents, data: any) {
-    const userRoom = this.getUserRoom(userId);
-    this.io.to(userRoom).emit(event, data);
+  getConnectedUsersCount(): number {
+    return this.userSockets.size;
+  }
+
+  getExpeditionMembersCount(expeditionId: string): number {
+    const members = this.expeditionRooms.get(expeditionId);
+    return members ? members.size : 0;
   }
 
   // Enhanced event emission with error handling and retry logic
+  async emitToUser<K extends keyof SocketIOEvents>(
+    userId: string,
+    event: K,
+    data: Parameters<SocketIOEvents[K]>[0],
+    options?: Partial<EventEmissionOptions>
+  ): Promise<EventEmissionResult> {
+    const userRoom = this.getUserRoom(userId);
+    return this.emitToRoom(userRoom, event, data, { ...options, expeditionId: options?.expeditionId || 'user-room' });
+  }
+
+  async emitToExpeditionRoom<K extends keyof SocketIOEvents>(
+    expeditionId: string,
+    event: K,
+    data: Parameters<SocketIOEvents[K]>[0],
+    options?: Partial<EventEmissionOptions>
+  ): Promise<EventEmissionResult> {
+    const expeditionRoom = this.getExpeditionRoom(expeditionId);
+    return this.emitToRoom(expeditionRoom, event, data, { ...options, expeditionId });
+  }
+
+  // Legacy method for backward compatibility
   async emitToUserWithRetry(
     userId: string,
     event: keyof SocketIOEvents,
     data: any,
-    options: EventEmissionOptions = {}
+    options: EventEmissionOptions = { expeditionId: 'legacy' }
   ): Promise<EventEmissionResult> {
-    const userRoom = this.getUserRoom(userId);
-    return this.emitToRoomWithRetry(userRoom, event, data, options);
+    return this.emitToUser(userId, event, data, options);
   }
 
   async emitToExpeditionRoomWithRetry(
     expeditionId: string,
     event: keyof SocketIOEvents,
     data: any,
-    options: EventEmissionOptions = {}
+    options: EventEmissionOptions = { expeditionId }
   ): Promise<EventEmissionResult> {
-    const expeditionRoom = `expedition:${expeditionId}`;
-    return this.emitToRoomWithRetry(expeditionRoom, event, data, { ...options, expeditionId });
+    return this.emitToExpeditionRoom(expeditionId, event, data, options);
   }
 
-  private async emitToRoomWithRetry(
+  private async emitToRoom<K extends keyof SocketIOEvents>(
     room: string,
-    event: keyof SocketIOEvents,
-    data: any,
+    event: K,
+    data: Parameters<SocketIOEvents[K]>[0],
     options: EventEmissionOptions
   ): Promise<EventEmissionResult> {
     const startTime = Date.now();
@@ -251,29 +663,22 @@ export class SocketIOService {
       recipientCount = sockets.length;
 
       if (recipientCount === 0) {
-        console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}`);
-        return {
-          success: true,
-          eventType: String(event),
-          recipientCount: 0,
-          timestamp: new Date().toISOString()
-        };
+        // Queue the event if no recipients are currently connected
+        const expeditionId = options.expeditionId;
+        if (expeditionId && expeditionId !== 'user-room' && expeditionId !== 'legacy') {
+          console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`);
+        }
       }
 
-      // Emit with timeout protection
+      // Emit to room with timeout
       const emissionPromise = new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Emission timeout'));
         }, options.timeout || 5000);
 
-        try {
-          this.io.to(room).emit(event, data);
-          clearTimeout(timeout);
-          resolve();
-        } catch (error) {
-          clearTimeout(timeout);
-          reject(error);
-        }
+        this.io.to(room).emit(event as any, data);
+        clearTimeout(timeout);
+        resolve();
       });
 
       await emissionPromise;
@@ -282,7 +687,7 @@ export class SocketIOService {
 
       return {
         success: true,
-        eventType: String(event),
+        eventType: event as string,
         recipientCount,
         timestamp: new Date().toISOString()
       };
@@ -295,12 +700,12 @@ export class SocketIOService {
       if (retryCount < 3) {
         console.log(`[SOCKET.IO] Retrying emission (attempt ${retryCount + 1})`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        return this.emitToRoomWithRetry(room, event, data, { ...options, retryCount: retryCount + 1 });
+        return this.emitToRoom(room, event, data, { ...options, retryCount: retryCount + 1 });
       }
 
       return {
         success: false,
-        eventType: String(event),
+        eventType: event as string,
         recipientCount,
         errors: [{ userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' }],
         timestamp: new Date().toISOString()
@@ -308,40 +713,42 @@ export class SocketIOService {
     }
   }
 
-  // Connection health monitoring
-  private connectionHealthCheck() {
-    const now = Date.now();
-    const staleThreshold = 120000; // 2 minutes
+  // Queue events for offline users
+  queueEventForUser(userId: string, event: string, data: any) {
+    if (!this.eventQueue.has(userId)) {
+      this.eventQueue.set(userId, []);
+    }
+    
+    const queue = this.eventQueue.get(userId)!;
+    queue.push({
+      event,
+      data,
+      timestamp: Date.now()
+    });
 
-    for (const [socketId, state] of this.connections.entries()) {
-      if (now - (state.last_ping || 0) > staleThreshold) {
-        console.warn(`[SOCKET.IO] Stale connection detected: ${socketId}`);
-        const socket = this.io.sockets.sockets.get(socketId);
-        if (socket) {
-          socket.disconnect(true);
-        }
-      }
+    // Limit queue size to prevent memory issues
+    if (queue.length > 50) {
+      queue.shift(); // Remove oldest event
     }
   }
 
-  // Start health monitoring
+  // Start health monitoring (backward compatibility)
   startHealthMonitoring() {
-    setInterval(() => {
-      this.connectionHealthCheck();
-    }, 30000); // Check every 30 seconds
-  }
-
-  getConnectedUsersCount(): number {
-    return this.connections.size;
+    // Health monitoring is already started in constructor
+    console.log('[SOCKET.IO] Health monitoring already active');
   }
 
   // Get connection statistics
   getConnectionStats() {
     return {
       totalConnections: this.connections.size,
-      connectedUsers: Array.from(this.connections.values()).map(conn => conn.user_id).filter((id, index, arr) => arr.indexOf(id) === index).length,
+      totalUsers: this.userSockets.size,
+      connectedUsers: this.userSockets.size, // For backward compatibility
+      expeditionRooms: this.expeditionRooms.size,
+      queuedEvents: Array.from(this.eventQueue.values()).reduce((sum, queue) => sum + queue.length, 0),
       averagePingTime: this.getAveragePingTime(),
-      healthyConnections: this.getHealthyConnectionsCount()
+      healthyConnections: this.getHealthyConnectionsCount(),
+      isHealthy: !this.isShuttingDown
     };
   }
 

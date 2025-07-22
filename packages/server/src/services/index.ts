@@ -85,18 +85,28 @@ export class ServiceFactory {
 
   /**
    * Initialize all services - useful for startup
+   * Services are initialized in dependency order to ensure proper integration
    */
   static initializeServices(): void {
     console.log('[SERVICE-FACTORY] Initializing specialized services...');
     
-    // Initialize services in dependency order
+    // Initialize services in dependency order:
+    // 1. Core services first (no dependencies)
+    // 2. Services that depend on core services
+    // 3. Orchestration services last (depend on all others)
+    
+    // Core services (no socket dependencies initially)
     this.getTaskService();
     this.getMessageService();
     this.getResultService();
+    
+    // Business logic services (may use socket service)
     this.getExpeditionService();
+    
+    // Orchestration services (depend on all others)
     this.getFirstOfficerService();
     
-    console.log('[SERVICE-FACTORY] All specialized services initialized');
+    console.log('[SERVICE-FACTORY] All specialized services initialized in correct dependency order');
   }
 
   /**
@@ -108,13 +118,25 @@ export class ServiceFactory {
     resultService: boolean;
     expeditionService: boolean;
     firstOfficerService: boolean;
+    socketIntegration: boolean;
   }> {
+    // Check if SocketIOService is available for integration
+    let socketIntegration = false;
+    try {
+      const { SocketIOService } = await import('./SocketIOService');
+      SocketIOService.getInstance();
+      socketIntegration = true;
+    } catch (error) {
+      console.warn('[SERVICE-FACTORY] SocketIOService not available for health check');
+    }
+
     return {
       taskService: !!this.taskService,
       messageService: !!this.messageService,
       resultService: !!this.resultService,
       expeditionService: !!this.expeditionService,
-      firstOfficerService: !!this.firstOfficerService
+      firstOfficerService: !!this.firstOfficerService,
+      socketIntegration
     };
   }
 }

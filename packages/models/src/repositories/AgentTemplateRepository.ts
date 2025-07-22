@@ -2,6 +2,7 @@ import { AgentTemplate, AgentTemplateRepository, Agent } from '../types';
 import { Neo4jConnection } from '../connection';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4j-helpers';
 
 export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
   constructor(private connection: Neo4jConnection) {}
@@ -14,7 +15,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query);
-    return results.map((result) => result.t);
+    return convertNeo4jIntsInArray(results.map((result) => result.t));
   }
 
   async findById(id: string): Promise<AgentTemplate | null> {
@@ -24,7 +25,8 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { id });
-    return results.length > 0 ? results[0].t : null;
+    const template = results.length > 0 ? results[0].t : null;
+    return template ? convertNeo4jIntsInObject(template) : null;
   }
 
   async create(entity: Omit<AgentTemplate, 'id' | 'createdAt'>): Promise<AgentTemplate> {
@@ -45,7 +47,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeWrite<{ t: AgentTemplate }>(query, { template });
-    return results[0].t;
+    return convertNeo4jIntsInObject(results[0].t);
   }
 
   async update(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | null> {
@@ -70,7 +72,8 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
       now: new Date().toISOString(),
     });
 
-    return results.length > 0 ? results[0].t : null;
+    const template = results.length > 0 ? results[0].t : null;
+    return template ? convertNeo4jIntsInObject(template) : null;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -92,7 +95,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { authorId });
-    return results.map((result) => result.t);
+    return convertNeo4jIntsInArray(results.map((result) => result.t));
   }
 
   async findByCategory(category: string): Promise<AgentTemplate[]> {
@@ -104,7 +107,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { category });
-    return results.map((result) => result.t);
+    return convertNeo4jIntsInArray(results.map((result) => result.t));
   }
 
   async findByTags(tags: string[]): Promise<AgentTemplate[]> {
@@ -116,7 +119,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { tags });
-    return results.map((result) => result.t);
+    return convertNeo4jIntsInArray(results.map((result) => result.t));
   }
 
   async findPublic(limit: number = 50, offset: number = 0): Promise<AgentTemplate[]> {
@@ -132,7 +135,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
       limit: int(limit),
       offset: int(offset),
     });
-    return results.map((result) => result.t);
+    return convertNeo4jIntsInArray(results.map((result) => result.t));
   }
 
   async searchTemplates(query: string): Promise<AgentTemplate[]> {
@@ -155,7 +158,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     const results = await this.connection.executeQuery<{ t: AgentTemplate }>(searchQuery, {
       query,
     });
-    return results.map((result) => result.t);
+    return convertNeo4jIntsInArray(results.map((result) => result.t));
   }
 
   async incrementUsageCount(id: string): Promise<void> {
@@ -221,7 +224,7 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     `;
 
     const results = await this.connection.executeWrite<{ a: Agent }>(query, { agent });
-    return results[0].a;
+    return convertNeo4jIntsInObject(results[0].a);
   }
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {
@@ -272,6 +275,6 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     const results = await this.connection.executeWrite<{ t: AgentTemplate }>(createQuery, {
       template,
     });
-    return results[0].t;
+    return convertNeo4jIntsInObject(results[0].t);
   }
 }

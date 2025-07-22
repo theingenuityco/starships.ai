@@ -201,7 +201,7 @@ export function validateCreateExpedition(req: Request, res: Response, next: Next
   let errors: ValidationError[] = [];
   
   // Required fields
-  errors = errors.concat(validateRequired(body, ['title', 'description', 'objective']));
+  errors = errors.concat(validateRequired(body, ['title', 'description', 'objective', 'selectedAgents']));
   
   // String length validations
   errors = errors.concat(validateStringLength(body, 'title', 1, 200));
@@ -213,6 +213,7 @@ export function validateCreateExpedition(req: Request, res: Response, next: Next
   
   // Array validations
   errors = errors.concat(validateArray(body, 'tags', false, 10));
+  errors = errors.concat(validateArray(body, 'selectedAgents', true, 10)); // Required array with max 10 agents
   
   // Number validations
   errors = errors.concat(validateNumberRange(body, 'estimatedDuration', 1, 10080)); // Max 1 week in minutes

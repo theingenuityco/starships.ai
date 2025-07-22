@@ -198,8 +198,8 @@ export interface MCPServerConnector {
   connectedAt: string
   lastUsed?: string
   errorMessage?: string
-  // NEW: Configuration support
-  config?: ConnectorInstanceConfig
+  // NEW: Simplified environment variables support
+  env?: string
   configTemplateId?: string
   configVersion?: number
   createdAt: string
@@ -540,14 +540,14 @@ export const chatAPI = {
 
 // Define starship API types locally since they're not exported from protocol
 interface UpdateStarshipRequest {
-  name?: string;
-  status?: 'active' | 'inactive';
-  class?: 'scout' | 'cruiser';
-  maxActiveExpeditions?: number;
+  name?: string
+  status?: 'active' | 'inactive'
+  class?: 'scout' | 'cruiser'
+  maxActiveExpeditions?: number
 }
 
 interface UpdateStarshipStatusRequest {
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive'
 }
 
 interface StarshipResponse {
@@ -594,7 +594,7 @@ export const starshipAPI = {
   // Get user's starships
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
     api.get('/api/starships').then(res => res.data),
-  
+
   // Get user's starships list (simple list for dropdowns)
   getUserStarshipsList: async (): Promise<Starship[]> => {
     const cacheKey = 'starships:list'
@@ -613,8 +613,7 @@ export const starshipAPI = {
     name: string
     class: 'scout' | 'cruiser'
     maxActiveExpeditions?: number
-  }): Promise<{ starship: Starship }> =>
-    api.post('/api/starships', data).then(res => res.data),
+  }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
 
   // Get starship details with caching (supports both ID and slug)
   getStarship: async (
@@ -704,7 +703,6 @@ export const starshipAPI = {
     apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
     return data
   },
-
 }
 
 // NEW: Vision API
@@ -908,13 +906,20 @@ export const mcpServerAPI = {
   // Create connector instance from template with cache invalidation
   createConnectorInstance: async (
     starshipId: string,
-    templateId: string
+    templateId: string,
+    env?: string
   ): Promise<MCPServerConnector> => {
-    console.log('[API] Creating connector instance for starship:', { starshipId, templateId })
+    console.log('[API] Creating connector instance for starship:', {
+      starshipId,
+      templateId,
+      hasEnv: !!env,
+    })
 
     try {
+      const requestBody = env ? { env } : {}
+
       const data = await api
-        .post(`/api/starships/${starshipId}/connectors/${templateId}`)
+        .post(`/api/starships/${starshipId}/connectors/${templateId}`, requestBody)
         .then((res: AxiosResponse<any>) => {
           console.log('[API] Successfully created connector instance:', res.data.connectorId)
           // Transform response to match MCPServerConnector interface
@@ -927,6 +932,7 @@ export const mcpServerAPI = {
             connectedAt: res.data.connectedAt,
             createdAt: res.data.createdAt,
             updatedAt: res.data.createdAt,
+            env: res.data.env,
           }
         })
 
@@ -963,6 +969,7 @@ export const mcpServerAPI = {
           connectedAt: error.response.data.connectedAt,
           createdAt: error.response.data.connectedAt,
           updatedAt: error.response.data.connectedAt,
+          env: error.response.data.env,
         }
       }
 

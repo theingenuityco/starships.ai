@@ -71,6 +71,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       setConnectorsLoading(true)
       setConnectorsError(null)
 
+      console.log('[StarshipCrewContent] Handling connector changes:', newConnectors.length)
+
       // Compare with current connector instances to determine what changed
       const currentTemplateIds = new Set(connectorInstances.map(instance => instance.templateId))
       const newTemplateIds = new Set(newConnectors.map(template => template.id))
@@ -83,10 +85,36 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         instance => !newTemplateIds.has(instance.templateId)
       )
 
+      console.log(
+        '[StarshipCrewContent] To create:',
+        toCreate.length,
+        'To remove:',
+        toRemove.length
+      )
+
       // Execute connector instance operations
       const operations = [
-        ...toCreate.map(template => mcpServerAPI.createConnectorInstance(slug, template.id)),
-        ...toRemove.map(instance => mcpServerAPI.removeConnectorInstance(slug, instance.id)),
+        ...toCreate.map(template => {
+          console.log(
+            '[StarshipCrewContent] Creating connector instance for template:',
+            template.name
+          )
+
+          // Check if template has API keys configured
+          let env: string | undefined = undefined
+          if (template.env) {
+            console.log('[StarshipCrewContent] Template has environment variables:', template.env)
+            // Store the API keys directly in the env field
+            env = template.env
+            console.log('[StarshipCrewContent] Creating connector with env:', env)
+          }
+
+          return mcpServerAPI.createConnectorInstance(slug, template.id, env)
+        }),
+        ...toRemove.map(instance => {
+          console.log('[StarshipCrewContent] Removing connector instance:', instance.id)
+          return mcpServerAPI.removeConnectorInstance(slug, instance.id)
+        }),
       ]
 
       if (operations.length > 0) {
@@ -107,9 +135,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Header with Back Navigation */}
-      <div className="flex items-center justify-between p-6 border-b">
+      <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" asChild>
             <Link href="/ships">
@@ -132,12 +160,12 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-[400px_1fr] flex-1 overflow-hidden">
+      <div className="grid grid-cols-[400px_1fr] flex-1 min-h-0">
         {/* Left sidebar - fixed width with tabs */}
-        <div className="border-r bg-card shadow-sm flex flex-col">
-          <div className="p-6 pb-0">
-            <Tabs defaultValue="agents" className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+        <div className="border-r bg-card shadow-sm flex flex-col min-h-0">
+          <div className="p-6 pb-0 flex flex-col h-full min-h-0">
+            <Tabs defaultValue="agents" className="flex flex-col h-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0">
                 <TabsTrigger value="agents" className="flex items-center gap-2">
                   <Bot className="h-4 w-4" />
                   Agents
@@ -150,9 +178,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
               <TabsContent
                 value="agents"
-                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
               >
-                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6">
+                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0">
                   <AgentSelector
                     selectedAgent={selectedAgent}
                     onAgentSelect={handleAgentSelect}
@@ -164,9 +192,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
               <TabsContent
                 value="connectors"
-                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
               >
-                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-6">
+                <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-6 min-h-0">
                   <ConnectorSelector
                     starshipId={slug}
                     selectedConnectors={connectorInstances
@@ -205,7 +233,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         </div>
 
         {/* Right content area */}
-        <div className="bg-background overflow-hidden">
+        <div className="bg-background overflow-hidden h-full">
           {selectedAgent ? (
             <ChatInterface
               agent={selectedAgent}

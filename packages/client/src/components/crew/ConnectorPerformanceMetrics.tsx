@@ -7,9 +7,20 @@ import {
   monitoringService,
   connectorMonitoring,
 } from '@/lib/connector-monitoring'
+import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
-import { Activity, Clock, TrendingUp, Zap, Target } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  Activity,
+  Clock,
+  TrendingUp,
+  Zap,
+  Target,
+  Key,
+  AlertTriangle,
+  CheckCircle,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConnectorPerformanceMetricsProps {
@@ -24,15 +35,23 @@ export function ConnectorPerformanceMetrics({
   showDetails = false,
 }: ConnectorPerformanceMetricsProps) {
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
+  const [apiKeyStatus, setApiKeyStatus] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
 
-  // Update health metrics when connector instances change
+  // Update health metrics and API key status when connector instances change
   useEffect(() => {
     const metrics = new Map<string, ConnectorHealthMetrics>()
+    const keyStatus = new Map<string, ApiKeyStatusInfo>()
+
     connectorInstances.forEach(connector => {
       const healthMetric = monitoringService.createHealthMetrics(connector, connector.template)
       metrics.set(connector.id, healthMetric)
+
+      const apiStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
+      keyStatus.set(connector.id, apiStatus)
     })
+
     setHealthMetrics(metrics)
+    setApiKeyStatus(keyStatus)
   }, [connectorInstances])
 
   // Calculate overall performance metrics
@@ -61,6 +80,17 @@ export function ConnectorPerformanceMetrics({
 
   const activeConnectors = connectorInstances.filter(c => c.status === 'active')
 
+  // Calculate API key status summary
+  const apiKeysSummary = {
+    total: connectorInstances.length,
+    configured: Array.from(apiKeyStatus.values()).filter(status => status.status === 'configured')
+      .length,
+    missing: Array.from(apiKeyStatus.values()).filter(status => status.status === 'missing').length,
+    notRequired: Array.from(apiKeyStatus.values()).filter(
+      status => status.status === 'not_required'
+    ).length,
+  }
+
   if (connectorInstances.length === 0) {
     return (
       <Card className={className}>
@@ -76,12 +106,12 @@ export function ConnectorPerformanceMetrics({
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Activity className="w-4 h-4" />
-          Performance Metrics
+          Performance & Configuration
         </CardTitle>
       </CardHeader>
       <CardContent>
         {/* Overall Performance Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-3 h-3 text-green-500" />
@@ -104,6 +134,38 @@ export function ConnectorPerformanceMetrics({
               {connectorMonitoring.formatResponseTime(overallMetrics.averageResponseTime)}
             </div>
           </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Key className="w-3 h-3 text-amber-500" />
+              <span className="text-xs text-muted-foreground">API Keys</span>
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1 cursor-help">
+                    <span className="text-sm font-mono text-green-600">
+                      {apiKeysSummary.configured}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/</span>
+                    <span className="text-sm font-mono">
+                      {apiKeysSummary.total - apiKeysSummary.notRequired}
+                    </span>
+                    {apiKeysSummary.missing > 0 && (
+                      <AlertTriangle className="w-3 h-3 text-amber-500 ml-1" />
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-xs">
+                    <div>Configured: {apiKeysSummary.configured}</div>
+                    <div>Missing: {apiKeysSummary.missing}</div>
+                    <div>Not Required: {apiKeysSummary.notRequired}</div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
         {/* Individual Connector Performance */}
@@ -113,7 +175,25 @@ export function ConnectorPerformanceMetrics({
             <div className="space-y-2">
               {activeConnectors.slice(0, 3).map(connector => {
                 const metrics = healthMetrics.get(connector.id)
+                const keyStatusInfo = apiKeyStatus.get(connector.id)
                 if (!metrics) return null
+
+                const getApiKeyIcon = () => {
+                  if (!keyStatusInfo || keyStatusInfo.status === 'not_required') {
+                    return null
+                  }
+
+                  switch (keyStatusInfo.status) {
+                    case 'configured':
+                      return <CheckCircle className="w-3 h-3 text-green-500" />
+                    case 'missing':
+                      return <AlertTriangle className="w-3 h-3 text-amber-500" />
+                    case 'invalid':
+                      return <AlertTriangle className="w-3 h-3 text-red-500" />
+                    default:
+                      return <Key className="w-3 h-3 text-gray-400" />
+                  }
+                }
 
                 return (
                   <div
@@ -133,6 +213,21 @@ export function ConnectorPerformanceMetrics({
                       <span className="text-sm font-medium">
                         {connector.template?.name || connector.templateId}
                       </span>
+                      {getApiKeyIcon() && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center">{getApiKeyIcon()}</div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs">
+                                {keyStatusInfo &&
+                                  ConnectorApiKeyStatus.getStatusMessage(keyStatusInfo)}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs">
                       <div className="flex items-center gap-1">
@@ -156,7 +251,7 @@ export function ConnectorPerformanceMetrics({
         )}
 
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
+        <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t">
           <div className="text-center">
             <p className="text-lg font-semibold text-green-600">{activeConnectors.length}</p>
             <p className="text-xs text-muted-foreground">Active</p>
@@ -170,6 +265,16 @@ export function ConnectorPerformanceMetrics({
           <div className="text-center">
             <p className="text-lg font-semibold text-red-600">{overallMetrics.totalErrors}</p>
             <p className="text-xs text-muted-foreground">Total Errors</p>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1">
+              <p className="text-lg font-semibold text-green-600">{apiKeysSummary.configured}</p>
+              <span className="text-sm text-muted-foreground">/</span>
+              <p className="text-lg font-semibold text-muted-foreground">
+                {apiKeysSummary.total - apiKeysSummary.notRequired}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">API Keys</p>
           </div>
         </div>
       </CardContent>

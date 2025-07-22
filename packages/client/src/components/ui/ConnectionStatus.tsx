@@ -143,16 +143,6 @@ export function ConnectionStatus({
   const statusConfig = useMemo(() => {
     const { isConnected, connectionQuality, circuitBreakerState } = connectionState;
     
-    // Debug logging to understand connection state
-    console.log('[CONNECTION STATUS] Current state:', {
-      isConnected,
-      connectionQuality,
-      circuitBreakerState,
-      eventCount: connectionState.eventCount,
-      uptime: connectionState.uptime,
-      reconnectAttempts: connectionState.reconnectAttempts
-    });
-    
     if (circuitBreakerState === 'open') {
       return {
         icon: Shield,
@@ -234,10 +224,7 @@ export function ConnectionStatus({
   }, [
     connectionState.isConnected,
     connectionState.connectionQuality,
-    connectionState.circuitBreakerState,
-    connectionState.eventCount,
-    connectionState.uptime,
-    connectionState.reconnectAttempts
+    connectionState.circuitBreakerState
   ]);
 
   const StatusIcon = statusConfig.icon;

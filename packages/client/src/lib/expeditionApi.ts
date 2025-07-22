@@ -152,35 +152,37 @@ async function withRetry<T>(
       let operationCompleted = false;
       
       // Wrap the operation with enhanced error handling
-      const operationPromise = new Promise<T>(async (resolve, reject) => {
-        try {
-          console.log(`[EXPEDITION-API] [${attemptId}] Executing operation...`);
-          const result = await operation();
-          
-          if (!operationCompleted) {
-            operationCompleted = true;
-            if (timeoutId) {
-              clearTimeout(timeoutId);
+      const operationPromise = new Promise<T>((resolve, reject) => {
+        (async () => {
+          try {
+            console.log(`[EXPEDITION-API] [${attemptId}] Executing operation...`);
+            const result = await operation();
+            
+            if (!operationCompleted) {
+              operationCompleted = true;
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              console.log(`[EXPEDITION-API] [${attemptId}] Operation completed successfully`);
+              resolve(result);
             }
-            console.log(`[EXPEDITION-API] [${attemptId}] Operation completed successfully`);
-            resolve(result);
-          }
-        } catch (error) {
-          if (!operationCompleted) {
-            operationCompleted = true;
-            if (timeoutId) {
-              clearTimeout(timeoutId);
+          } catch (error) {
+            if (!operationCompleted) {
+              operationCompleted = true;
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              console.error(`[EXPEDITION-API] [${attemptId}] Operation failed:`, {
+                error,
+                errorType: typeof error,
+                errorMessage: (error as any)?.message,
+                errorCode: (error as any)?.code,
+                errorStatus: (error as any)?.response?.status
+              });
+              reject(error);
             }
-            console.error(`[EXPEDITION-API] [${attemptId}] Operation failed:`, {
-              error,
-              errorType: typeof error,
-              errorMessage: (error as any)?.message,
-              errorCode: (error as any)?.code,
-              errorStatus: (error as any)?.response?.status
-            });
-            reject(error);
           }
-        }
+        })();
       });
       
       // Create timeout promise with proper error details

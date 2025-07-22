@@ -251,7 +251,7 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
 
   // Initialize expedition socket client
   useEffect(() => {
-    debugLog('Socket connection state changed:', { socketConnected });
+    debugLog('Socket connection state changed:', { socketConnected, connectionStatus });
     
     if (!socketConnected) {
       debugLog('Base socket not connected, skipping expedition socket initialization');
@@ -266,11 +266,28 @@ export function useEnhancedExpeditionSocket(props: UseEnhancedExpeditionSocketPr
 
     debugLog('Base socket state:', {
       connected: baseSocket.connected,
-      id: baseSocket.id
+      id: baseSocket.id,
+      connectionStatus
     });
 
     const initializeExpeditionSocket = async () => {
       try {
+        // Wait for base socket to be connected if it's not already
+        if (!baseSocket.connected) {
+          debugLog('Waiting for base socket to connect...');
+          await new Promise<void>((resolve) => {
+            const checkConnection = () => {
+              if (baseSocket.connected) {
+                debugLog('Base socket connected, proceeding with initialization');
+                resolve();
+              } else {
+                setTimeout(checkConnection, 100);
+              }
+            };
+            checkConnection();
+          });
+        }
+        
         expeditionSocketRef.current = ExpeditionSocketClient.getInstance({
           enableReconnection,
           maxReconnectAttempts,

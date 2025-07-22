@@ -190,22 +190,22 @@ export function ExpeditionCard({
         setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
       }
     },
-    onExpeditionPaused: (event) => {
+    onExpeditionResumed: (event: { expeditionId: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
         setLocalExpedition(prev => ({ ...prev, status: 'paused' as ExpeditionStatus }));
       }
     },
-    onExpeditionResumed: (event) => {
+    onExpeditionCompleted: (event: { expeditionId: string; result: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
         setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
       }
     },
-    onExpeditionCompleted: (event) => {
+    onExpeditionCancelled: (event: { expeditionId: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
         setLocalExpedition(prev => ({ ...prev, status: 'completed' as ExpeditionStatus }));
       }
     },
-    onExpeditionCancelled: (event) => {
+    onExpeditionFailed: (event: { expeditionId: string; error: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
         setLocalExpedition(prev => ({ ...prev, status: 'cancelled' as ExpeditionStatus }));
       }
@@ -223,7 +223,13 @@ export function ExpeditionCard({
     },
     onError: (event) => {
       if (event.expeditionId === expedition.id) {
-        setError(event.error.message);
+        // Update progress or other status information
+        console.log('Status update for expedition:', event);
+      }
+    },
+    onError: (event: { expeditionId: string; error: string; timestamp: string; source?: string }) => {
+      if (event.expeditionId === expedition.id) {
+        setError(event.error);
         setTimeout(() => setError(null), 5000);
       }
     },

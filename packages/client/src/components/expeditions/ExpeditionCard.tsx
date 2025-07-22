@@ -43,7 +43,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useExpeditionSocket } from '@/hooks/useExpeditionSocket';
+import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
 import { expeditionAPI } from '@/lib/expeditionApi';
 import type {
   Expedition,
@@ -166,47 +166,51 @@ export function ExpeditionCard({
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Real-time updates via socket
-  const { isConnected, realtimeData } = useExpeditionSocket({
+  // Real-time updates via enhanced socket
+  const { isConnected, realtimeData } = useEnhancedExpeditionSocket({
     expeditionId: enableRealTimeUpdates ? expedition.id : undefined,
-    onExpeditionUpdated: (event) => {
+    autoJoin: enableRealTimeUpdates,
+    enableReconnection: true,
+    debugMode: false,
+    onExpeditionStarted: (event: { expeditionId: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({
-          ...prev,
-          ...event.changes,
-          status: (event.changes.status as ExpeditionStatus) || prev.status,
-          priority: (event.changes.priority as ExpeditionPriority) || prev.priority
-        }));
+        setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
       }
     },
-    onExpeditionStarted: (event) => {
+    onExpeditionPaused: (event: { expeditionId: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'paused' as ExpeditionStatus }));
       }
     },
-    onExpeditionPaused: (event) => {
+    onExpeditionResumed: (event: { expeditionId: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
       }
     },
-    onExpeditionResumed: (event) => {
+    onExpeditionCompleted: (event: { expeditionId: string; result: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'completed' as ExpeditionStatus, result: event.result }));
       }
     },
-    onExpeditionCompleted: (event) => {
+    onExpeditionCancelled: (event: { expeditionId: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'cancelled' as ExpeditionStatus }));
       }
     },
-    onExpeditionCancelled: (event) => {
+    onExpeditionFailed: (event: { expeditionId: string; error: string; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'failed' as ExpeditionStatus }));
       }
     },
-    onExpeditionError: (event) => {
+    onStatusUpdate: (event: { expeditionId: string; progress: any; timestamp: string }) => {
       if (event.expeditionId === expedition.id) {
-        setError(event.error.message);
+        // Update progress or other status information
+        console.log('Status update for expedition:', event);
+      }
+    },
+    onError: (event: { expeditionId: string; error: string; timestamp: string; source?: string }) => {
+      if (event.expeditionId === expedition.id) {
+        setError(event.error);
         setTimeout(() => setError(null), 5000);
       }
     }

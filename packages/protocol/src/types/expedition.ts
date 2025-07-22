@@ -214,6 +214,7 @@ export interface CreateExpeditionRequest {
   estimatedDuration?: number;
   tags?: string[];
   dueDate?: string;
+  selectedAgents: string[]; // REQUIRED: At least one agent must be selected
 }
 
 /**
@@ -386,13 +387,15 @@ export interface ExpeditionWorkflowState {
 /**
  * Workflow phases for First Officer coordination
  */
-export type WorkflowPhase = 
+export type WorkflowPhase =
   | 'initializing'
   | 'analyzing'
   | 'decomposing'
+  | 'plan_tasks'
   | 'assigning'
   | 'coordinating'
   | 'synthesizing'
+  | 'waiting_for_approval'
   | 'completed'
   | 'failed';
 

@@ -32,6 +32,8 @@ export class Neo4jConnection {
           maxConnectionLifetime: 30000, // 30 second max lifetime
           maxConnectionPoolSize: 100,
           connectionAcquisitionTimeout: 10000, // 10 second acquisition timeout
+          encrypted: false, // Disable encryption for local development
+          trust: 'TRUST_ALL_CERTIFICATES' // Trust all certificates for local development
         }
       );
 

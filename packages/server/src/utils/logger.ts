@@ -60,6 +60,13 @@ export interface LogContext {
   file?: string;
   stackTrace?: string;
   metadata?: Record<string, any>;
+  status?: string;
+  requestId?: string;
+  responseTime?: number;
+  serviceCount?: number;
+  stack?: string;
+  error?: Record<string, any>;
+  services?: any[];
 }
 
 /**

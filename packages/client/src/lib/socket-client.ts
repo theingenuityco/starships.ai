@@ -85,7 +85,11 @@ class SocketClient {
 
   private handleReconnection() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[SOCKET CLIENT] Max reconnection attempts reached');
+      console.warn('[SOCKET CLIENT] Max reconnection attempts reached, stopping reconnection attempts');
+      // Reset connection state but don't throw error
+      this.connectionState.connected = false;
+      this.connectionState.authenticated = false;
+      this.connectionState.room_joined = false;
       return;
     }
 
@@ -96,7 +100,15 @@ class SocketClient {
     
     setTimeout(() => {
       if (this.socket && !this.socket.connected) {
-        this.socket.connect();
+        try {
+          this.socket.connect();
+        } catch (error) {
+          console.warn('[SOCKET CLIENT] Reconnection attempt failed:', error);
+          // Continue trying if we haven't reached max attempts
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.handleReconnection();
+          }
+        }
       }
     }, delay);
   }

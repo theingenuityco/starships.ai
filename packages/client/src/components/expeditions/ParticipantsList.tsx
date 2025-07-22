@@ -269,7 +269,9 @@ export function ParticipantsList({
                 <div key={agent.id} className="flex items-start space-x-4 p-4 border rounded-lg">
                   {/* Avatar */}
                   <Avatar className="h-12 w-12 bg-primary/10">
-                    <Bot className="h-6 w-6 text-primary" />
+                    <div className="flex items-center justify-center w-full h-full">
+                      <Bot className="h-6 w-6 text-primary" />
+                    </div>
                   </Avatar>
 
                   {/* Agent Info */}
@@ -358,9 +360,11 @@ export function ParticipantsList({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-            <Avatar className="h-12 w-12 bg-purple-100">
-              <Crown className="h-6 w-6 text-purple-600" />
+          <div className="flex items-center space-x-4 p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+            <Avatar className="h-12 w-12 bg-purple-100 dark:bg-purple-900/30">
+              <div className="flex items-center justify-center w-full h-full">
+                <Crown className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
             </Avatar>
             <div className="flex-1">
               <h4 className="text-sm font-medium">First Officer AI</h4>
@@ -368,7 +372,7 @@ export function ParticipantsList({
                 Analyzing requirements, coordinating agents, and ensuring quality delivery
               </p>
               <div className="flex items-center space-x-2 mt-2">
-                <Badge variant="outline" className="text-purple-600 bg-purple-100">
+                <Badge variant="outline" className="text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 border-purple-200 dark:border-purple-700">
                   <Activity className="h-3 w-3 mr-1" />
                   Coordinating
                 </Badge>

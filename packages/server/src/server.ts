@@ -34,14 +34,23 @@ httpServer.listen(PORT, async () => {
     await dbConnection.initializeSchema();
     console.log('✅ Neo4j database connected and schema initialized');
     
+    // Initialize RepositoryFactory BEFORE any socket connections
+    console.log('🔧 Initializing RepositoryFactory...');
+    await RepositoryFactory.initialize();
+    console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
+    
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();
     console.log('✅ AgentService initialized with default agents');
 
     // Initialize AgentTemplateService (seeds default templates)
-    const templateService = await RepositoryFactory.getAgentTemplateService();
-    await templateService.seedDefaultTemplates();
-    console.log('✅ AgentTemplateService initialized with default templates');
+    const templateService = RepositoryFactory.getAgentTemplateService();
+    if (templateService) {
+      await templateService.seedDefaultTemplates();
+      console.log('✅ AgentTemplateService initialized with default templates');
+    } else {
+      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable');
+    }
 
     // Initialize MCP Server Options (seeds default connectors)
     await seedMCPServers();
@@ -49,9 +58,12 @@ httpServer.listen(PORT, async () => {
 
     // Initialize MCPServerConnectorRepository (validate schema and constraints)
     try {
-      // Note: This would need the actual repository instance, 
-      // but for now we'll skip this initialization in the separated server file
-      console.log('✅ MCPServerConnectorRepository validation skipped in server startup');
+      const connectorCount = await mcpServerConnectorRepository
+        .findAll()
+        .then((connectors) => connectors.length);
+      console.log(
+        `✅ MCPServerConnectorRepository initialized with ${connectorCount} existing connector instances`
+      );
     } catch (error) {
       console.error('❌ Failed to initialize MCPServerConnectorRepository:', error);
       // Don't exit - this is not critical for server startup

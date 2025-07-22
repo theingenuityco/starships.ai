@@ -14,9 +14,6 @@ export { LLMRepository } from './LLMRepository';
 // NEW: Aether Core Repositories
 export { StarshipRepository } from './StarshipRepository';
 export { VisionRepository } from './VisionRepository';
-// export { ConstraintRepository } from './ConstraintRepository';
-// export { ConceptRepository } from './ConceptRepository';
-// export { MetaAnchorRepository } from './MetaAnchorRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
@@ -29,9 +26,6 @@ export { ExpeditionResultRepository } from './ExpeditionResultRepository';
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
-// import { ConstraintRepository } from './ConstraintRepository';
-// import { ConceptRepository } from './ConceptRepository';
-// import { MetaAnchorRepository } from './MetaAnchorRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
@@ -42,326 +36,328 @@ import { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
 import { ExpeditionResultRepository } from './ExpeditionResultRepository';
 
 /**
- * Factory for creating singleton repository instances with proper dependency injection,
- * error handling, and resource management.
- *
+ * Synchronized Repository Factory for Socket.IO Compatibility
+ * 
  * This factory ensures:
- * - Singleton pattern for all repositories
- * - Proper dependency injection (e.g., StarshipRepository gets MCPServerConnectorRepository)
- * - Error handling during repository creation
- * - Resource cleanup and connection management
- * - Thread-safe initialization
+ * - All repository getters are synchronous for socket middleware compatibility
+ * - Proper initialization without blocking socket operations
+ * - Thread-safe singleton pattern
+ * - Graceful error handling and recovery
+ * - Consistent repository access patterns
  */
 export class RepositoryFactory {
+  // Repository instances - all initialized synchronously
   private static agentRepo: AgentRepository | null = null;
   private static userRepo: UserRepository | null = null;
   private static channelRepo: ChannelRepository | null = null;
   private static llmRepo: LLMRepository | null = null;
 
-  // NEW: Aether Core repository instances
+  // Aether Core repository instances
   private static starshipRepo: StarshipRepository | null = null;
-  // private static codexRepo: CodexRepository | null = null;
   private static visionRepo: VisionRepository | null = null;
-  // private static constraintRepo: ConstraintRepository | null = null;
-  // private static conceptRepo: ConceptRepository | null = null;
-  // private static metaAnchorRepo: MetaAnchorRepository | null = null;
   private static mcpServerOptionRepo: MCPServerOptionRepository | null = null;
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
-  // Initialization locks for thread safety
-  private static readonly initializationLocks = new Map<string, Promise<any>>();
-  // private static starshipRepo: StarshipRepository;
-  // private static visionRepo: VisionRepository;
-  // private static agentTemplateService: AgentTemplateService;
-
   // Expedition repository instances
-  private static expeditionRepo: ExpeditionRepository;
-  private static expeditionTaskRepo: ExpeditionTaskRepository;
-  private static expeditionMessageRepo: ExpeditionMessageRepository;
-  private static expeditionResultRepo: ExpeditionResultRepository;
+  private static expeditionRepo: ExpeditionRepository | null = null;
+  private static expeditionTaskRepo: ExpeditionTaskRepository | null = null;
+  private static expeditionMessageRepo: ExpeditionMessageRepository | null = null;
+  private static expeditionResultRepo: ExpeditionResultRepository | null = null;
 
-  static getAgentRepository(): AgentRepository {
-    if (!this.agentRepo) {
-      this.agentRepo = new AgentRepository();
-    }
-    return this.agentRepo;
-  }
-
-  static getUserRepository(): UserRepository {
-    if (!this.userRepo) {
-      this.userRepo = new UserRepository();
-    }
-    return this.userRepo;
-  }
-
-  static getChannelRepository(): ChannelRepository {
-    if (!this.channelRepo) {
-      this.channelRepo = new ChannelRepository();
-    }
-    return this.channelRepo;
-  }
-
-  static getLLMRepository(): LLMRepository {
-    if (!this.llmRepo) {
-      this.llmRepo = new LLMRepository();
-    }
-    return this.llmRepo;
-  }
-
-  // NEW: Aether Core repository getters
-  static getStarshipRepository(): StarshipRepository {
-    if (!this.starshipRepo) {
-      this.starshipRepo = new StarshipRepository();
-    }
-    return this.starshipRepo;
-  }
-
-  static getVisionRepository(): VisionRepository {
-    if (!this.visionRepo) {
-      this.visionRepo = new VisionRepository();
-    }
-    return this.visionRepo;
-  }
+  // Initialization state tracking
+  private static isInitialized = false;
+  private static isInitializing = false;
+  private static initializationError: Error | null = null;
+  private static initializationPromise: Promise<void> | null = null;
 
   /**
-   * Logger for factory operations
+   * Initialize all repositories asynchronously during application startup
+   * This should be called once during server initialization, before socket connections
    */
-  private static log(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
-    const timestamp = new Date().toISOString();
-    const logMessage = `[RepositoryFactory] ${timestamp} - ${message}`;
-
-    switch (level) {
-      case 'error':
-        console.error(logMessage);
-        break;
-      case 'warn':
-        console.warn(logMessage);
-        break;
-      default:
-        console.log(logMessage);
-    }
-  }
-
-  /**
-   * Thread-safe repository creation with error handling
-   */
-  private static async createRepository<T>(
-    key: string,
-    factory: () => T | Promise<T>,
-    dependencies?: string[]
-  ): Promise<T> {
-    // Check if already initialized
-    const existingRepo = (this as any)[key];
-    if (existingRepo) {
-      return existingRepo;
+  static async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      return;
     }
 
-    // Check if initialization is in progress
-    if (this.initializationLocks.has(key)) {
-      this.log(`Waiting for ${key} initialization to complete`);
-      return await this.initializationLocks.get(key)!;
+    if (this.isInitializing) {
+      if (this.initializationPromise) {
+        return this.initializationPromise;
+      }
+      throw new Error('Repository initialization already in progress');
     }
 
-    // Start initialization
-    const initPromise = this.performInitialization(key, factory, dependencies);
-    this.initializationLocks.set(key, initPromise);
+    this.isInitializing = true;
+    this.initializationError = null;
 
+    this.initializationPromise = this.performInitialization();
+    
     try {
-      const result = await initPromise;
-      this.initializationLocks.delete(key);
-      return result;
+      await this.initializationPromise;
+      this.isInitialized = true;
+      this.isInitializing = false;
+      console.log('[RepositoryFactory] All repositories initialized successfully');
     } catch (error) {
-      this.initializationLocks.delete(key);
-      throw error;
+      this.isInitializing = false;
+      this.initializationError = error instanceof Error ? error : new Error('Unknown initialization error');
+      console.error('[RepositoryFactory] Initialization failed:', this.initializationError);
+      throw this.initializationError;
     }
   }
 
   /**
    * Perform the actual repository initialization
    */
-  private static async performInitialization<T>(
-    key: string,
-    factory: () => T | Promise<T>,
-    dependencies?: string[]
-  ): Promise<T> {
+  private static async performInitialization(): Promise<void> {
+    console.log('[RepositoryFactory] Starting repository initialization...');
+
     try {
-      this.log(
-        `Initializing ${key}${dependencies ? ` with dependencies: ${dependencies.join(', ')}` : ''}`
-      );
+      // Initialize basic repositories first (no dependencies)
+      this.agentRepo = new AgentRepository();
+      this.userRepo = new UserRepository();
+      this.channelRepo = new ChannelRepository();
+      this.llmRepo = new LLMRepository();
+      this.visionRepo = new VisionRepository();
+      this.mcpServerOptionRepo = new MCPServerOptionRepository();
 
-      // Dependencies are handled by the factory function itself
-      // No need to validate here as the factory will ensure dependencies are created
+      // Initialize expedition repositories (no dependencies)
+      this.expeditionRepo = new ExpeditionRepository();
+      this.expeditionTaskRepo = new ExpeditionTaskRepository();
+      this.expeditionMessageRepo = new ExpeditionMessageRepository();
+      this.expeditionResultRepo = new ExpeditionResultRepository();
 
-      const repository = await factory();
-      (this as any)[key] = repository;
+      // Initialize repositories with dependencies
+      this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
+      this.starshipRepo = new StarshipRepository();
 
-      this.log(`Successfully initialized ${key}`);
-      return repository;
+      // Initialize services that require database connections
+      try {
+        const connection = getConnection();
+        this.agentTemplateService = new AgentTemplateService(connection);
+      } catch (connectionError) {
+        console.warn('[RepositoryFactory] Database connection not available for AgentTemplateService, will retry later');
+        // Don't fail initialization for this - it can be retried later
+      }
+
+      console.log('[RepositoryFactory] Repository initialization completed successfully');
     } catch (error) {
-      const errorMessage = `Failed to initialize ${key}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      this.log(errorMessage, 'error');
-      throw new Error(errorMessage);
+      console.error('[RepositoryFactory] Repository initialization failed:', error);
+      // Clean up any partially initialized repositories
+      this.resetAll();
+      throw error;
     }
   }
 
-  // /**
-  //  * Get AgentRepository singleton instance
-  //  */
-  // static async getAgentRepository(): Promise<AgentRepository> {
-  //   return this.createRepository('agentRepo', () => {
-  //     this.log('Creating AgentRepository instance');
-  //     return new AgentRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get UserRepository singleton instance
-  //  */
-  // static async getUserRepository(): Promise<UserRepository> {
-  //   return this.createRepository('userRepo', () => {
-  //     this.log('Creating UserRepository instance');
-  //     return new UserRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get ChannelRepository singleton instance
-  //  */
-  // static async getChannelRepository(): Promise<ChannelRepository> {
-  //   return this.createRepository('channelRepo', () => {
-  //     this.log('Creating ChannelRepository instance');
-  //     return new ChannelRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get LLMRepository singleton instance
-  //  */
-  // static async getLLMRepository(): Promise<LLMRepository> {
-  //   return this.createRepository('llmRepo', () => {
-  //     this.log('Creating LLMRepository instance');
-  //     return new LLMRepository();
-  //   });
-  // }
-
-  // // NEW: Aether Core repository getters with proper dependency injection
-
-  // /**
-  //  * Get StarshipRepository singleton instance with MCPServerConnectorRepository dependency
-  //  */
-  // static async getStarshipRepository(): Promise<StarshipRepository> {
-  //   return this.createRepository(
-  //     'starshipRepo',
-  //     async () => {
-  //       this.log(
-  //         'Creating StarshipRepository instance with MCPServerConnectorRepository dependency'
-  //       );
-
-  //       // Ensure MCPServerConnectorRepository is initialized first
-  //       const mcpConnectorRepo = await this.getMCPServerConnectorRepository();
-
-  //       return new StarshipRepository(mcpConnectorRepo);
-  //     },
-  //     ['mcpServerConnectorRepo']
-  //   );
-  // }
-
-  // /**
-  //  * Get CodexRepository singleton instance
-  //  */
-  // static async getCodexRepository(): Promise<CodexRepository> {
-  //   return this.createRepository('codexRepo', () => {
-  //     this.log('Creating CodexRepository instance');
-  //     return new CodexRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get VisionRepository singleton instance
-  //  */
-  // static async getVisionRepository(): Promise<VisionRepository> {
-  //   return this.createRepository('visionRepo', () => {
-  //     this.log('Creating VisionRepository instance');
-  //     return new VisionRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get ConstraintRepository singleton instance
-  //  */
-  // static async getConstraintRepository(): Promise<ConstraintRepository> {
-  //   return this.createRepository('constraintRepo', () => {
-  //     this.log('Creating ConstraintRepository instance');
-  //     return new ConstraintRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get ConceptRepository singleton instance
-  //  */
-  // static async getConceptRepository(): Promise<ConceptRepository> {
-  //   return this.createRepository('conceptRepo', () => {
-  //     this.log('Creating ConceptRepository instance');
-  //     return new ConceptRepository();
-  //   });
-  // }
-
-  // /**
-  //  * Get MetaAnchorRepository singleton instance
-  //  */
-  // static async getMetaAnchorRepository(): Promise<MetaAnchorRepository> {
-  //   return this.createRepository('metaAnchorRepo', () => {
-  //     this.log('Creating MetaAnchorRepository instance');
-  //     return new MetaAnchorRepository();
-  //   });
-  // }
-
   /**
-   * Get MCPServerOptionRepository singleton instance
+   * Check if repositories are initialized and throw error if not
    */
-  static async getMCPServerOptionRepository(): Promise<MCPServerOptionRepository> {
-    return this.createRepository('mcpServerOptionRepo', () => {
-      this.log('Creating MCPServerOptionRepository instance');
-      return new MCPServerOptionRepository();
-    });
+  private static ensureInitialized(): void {
+    if (!this.isInitialized) {
+      if (this.initializationError) {
+        throw new Error(`Repository factory not initialized due to previous error: ${this.initializationError.message}`);
+      }
+      throw new Error('Repository factory not initialized. Call RepositoryFactory.initialize() during application startup.');
+    }
   }
 
   /**
-   * Get MCPServerConnectorRepository singleton instance
+   * Get initialization status for monitoring
    */
-  static async getMCPServerConnectorRepository(): Promise<MCPServerConnectorRepository> {
-    return this.createRepository('mcpServerConnectorRepo', () => {
-      this.log('Creating MCPServerConnectorRepository instance');
-      return new MCPServerConnectorRepository();
-    });
+  static getInitializationStatus(): {
+    isInitialized: boolean;
+    isInitializing: boolean;
+    error: string | null;
+    repositoryStatus: Record<string, boolean>;
+  } {
+    return {
+      isInitialized: this.isInitialized,
+      isInitializing: this.isInitializing,
+      error: this.initializationError?.message || null,
+      repositoryStatus: {
+        agentRepo: this.agentRepo !== null,
+        userRepo: this.userRepo !== null,
+        channelRepo: this.channelRepo !== null,
+        llmRepo: this.llmRepo !== null,
+        starshipRepo: this.starshipRepo !== null,
+        visionRepo: this.visionRepo !== null,
+        mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
+        mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
+        agentTemplateService: this.agentTemplateService !== null,
+        expeditionRepo: this.expeditionRepo !== null,
+        expeditionTaskRepo: this.expeditionTaskRepo !== null,
+        expeditionMessageRepo: this.expeditionMessageRepo !== null,
+        expeditionResultRepo: this.expeditionResultRepo !== null,
+      }
+    };
+  }
+
+  // ========================================================================
+  // SYNCHRONOUS REPOSITORY GETTERS - SOCKET COMPATIBLE
+  // ========================================================================
+
+  /**
+   * Get AgentRepository instance (synchronous)
+   */
+  static getAgentRepository(): AgentRepository {
+    this.ensureInitialized();
+    if (!this.agentRepo) {
+      throw new Error('AgentRepository not initialized');
+    }
+    return this.agentRepo;
   }
 
   /**
-   * Get the AgentTemplateService instance with proper connection management
+   * Get UserRepository instance (synchronous)
    */
-  static async getAgentTemplateService(): Promise<AgentTemplateService> {
-    return this.createRepository('agentTemplateService', () => {
-      this.log('Creating AgentTemplateService instance with connection dependency');
+  static getUserRepository(): UserRepository {
+    this.ensureInitialized();
+    if (!this.userRepo) {
+      throw new Error('UserRepository not initialized');
+    }
+    return this.userRepo;
+  }
+
+  /**
+   * Get ChannelRepository instance (synchronous)
+   */
+  static getChannelRepository(): ChannelRepository {
+    this.ensureInitialized();
+    if (!this.channelRepo) {
+      throw new Error('ChannelRepository not initialized');
+    }
+    return this.channelRepo;
+  }
+
+  /**
+   * Get LLMRepository instance (synchronous)
+   */
+  static getLLMRepository(): LLMRepository {
+    this.ensureInitialized();
+    if (!this.llmRepo) {
+      throw new Error('LLMRepository not initialized');
+    }
+    return this.llmRepo;
+  }
+
+  /**
+   * Get StarshipRepository instance (synchronous)
+   */
+  static getStarshipRepository(): StarshipRepository {
+    this.ensureInitialized();
+    if (!this.starshipRepo) {
+      throw new Error('StarshipRepository not initialized');
+    }
+    return this.starshipRepo;
+  }
+
+  /**
+   * Get VisionRepository instance (synchronous)
+   */
+  static getVisionRepository(): VisionRepository {
+    this.ensureInitialized();
+    if (!this.visionRepo) {
+      throw new Error('VisionRepository not initialized');
+    }
+    return this.visionRepo;
+  }
+
+  /**
+   * Get MCPServerOptionRepository instance (synchronous)
+   */
+  static getMCPServerOptionRepository(): MCPServerOptionRepository {
+    this.ensureInitialized();
+    if (!this.mcpServerOptionRepo) {
+      throw new Error('MCPServerOptionRepository not initialized');
+    }
+    return this.mcpServerOptionRepo;
+  }
+
+  /**
+   * Get MCPServerConnectorRepository instance (synchronous)
+   */
+  static getMCPServerConnectorRepository(): MCPServerConnectorRepository {
+    this.ensureInitialized();
+    if (!this.mcpServerConnectorRepo) {
+      throw new Error('MCPServerConnectorRepository not initialized');
+    }
+    return this.mcpServerConnectorRepo;
+  }
+
+  /**
+   * Get AgentTemplateService instance (synchronous)
+   * Note: May return null if database connection was not available during initialization
+   */
+  static getAgentTemplateService(): AgentTemplateService | null {
+    this.ensureInitialized();
+    
+    // Try to initialize if not available and connection is now available
+    if (!this.agentTemplateService) {
       try {
         const connection = getConnection();
-        return new AgentTemplateService(connection);
+        this.agentTemplateService = new AgentTemplateService(connection);
+        console.log('[RepositoryFactory] AgentTemplateService initialized on demand');
       } catch (error) {
-        this.log(
-          `Failed to get database connection for AgentTemplateService: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          'error'
-        );
-        throw error;
+        console.warn('[RepositoryFactory] AgentTemplateService still not available:', error);
+        return null;
       }
-    });
+    }
+    
+    return this.agentTemplateService;
   }
+
+  /**
+   * Get ExpeditionRepository instance (synchronous)
+   */
+  static getExpeditionRepository(): ExpeditionRepository {
+    this.ensureInitialized();
+    if (!this.expeditionRepo) {
+      throw new Error('ExpeditionRepository not initialized');
+    }
+    return this.expeditionRepo;
+  }
+
+  /**
+   * Get ExpeditionTaskRepository instance (synchronous)
+   */
+  static getExpeditionTaskRepository(): ExpeditionTaskRepository {
+    this.ensureInitialized();
+    if (!this.expeditionTaskRepo) {
+      throw new Error('ExpeditionTaskRepository not initialized');
+    }
+    return this.expeditionTaskRepo;
+  }
+
+  /**
+   * Get ExpeditionMessageRepository instance (synchronous)
+   */
+  static getExpeditionMessageRepository(): ExpeditionMessageRepository {
+    this.ensureInitialized();
+    if (!this.expeditionMessageRepo) {
+      throw new Error('ExpeditionMessageRepository not initialized');
+    }
+    return this.expeditionMessageRepo;
+  }
+
+  /**
+   * Get ExpeditionResultRepository instance (synchronous)
+   */
+  static getExpeditionResultRepository(): ExpeditionResultRepository {
+    this.ensureInitialized();
+    if (!this.expeditionResultRepo) {
+      throw new Error('ExpeditionResultRepository not initialized');
+    }
+    return this.expeditionResultRepo;
+  }
+
+  // ========================================================================
+  // UTILITY METHODS
+  // ========================================================================
 
   /**
    * Reset all repository instances - useful for testing and cleanup
-   * This method clears all singleton instances and initialization locks
    */
   static resetAll(): void {
-    this.log('Resetting all repository instances');
+    console.log('[RepositoryFactory] Resetting all repository instances');
 
     // Clear all repository instances
     this.agentRepo = null;
@@ -369,92 +365,22 @@ export class RepositoryFactory {
     this.channelRepo = null;
     this.llmRepo = null;
     this.starshipRepo = null;
-    // this.codexRepo = null;
     this.visionRepo = null;
-    // this.constraintRepo = null;
-    // this.conceptRepo = null;
-    // this.metaAnchorRepo = null;
     this.mcpServerOptionRepo = null;
     this.mcpServerConnectorRepo = null;
     this.agentTemplateService = null;
+    this.expeditionRepo = null;
+    this.expeditionTaskRepo = null;
+    this.expeditionMessageRepo = null;
+    this.expeditionResultRepo = null;
 
-    // Clear initialization locks
-    this.initializationLocks.clear();
+    // Reset initialization state
+    this.isInitialized = false;
+    this.isInitializing = false;
+    this.initializationError = null;
+    this.initializationPromise = null;
 
-    this.log('All repository instances reset successfully');
-  }
-
-  /**
-   * Get initialization status of all repositories
-   * Useful for debugging and monitoring
-   */
-  static getInitializationStatus(): Record<string, boolean> {
-    return {
-      agentRepo: this.agentRepo !== null,
-      userRepo: this.userRepo !== null,
-      channelRepo: this.channelRepo !== null,
-      llmRepo: this.llmRepo !== null,
-      starshipRepo: this.starshipRepo !== null,
-      // codexRepo: this.codexRepo !== null,
-      visionRepo: this.visionRepo !== null,
-      // constraintRepo: this.constraintRepo !== null,
-      // conceptRepo: this.conceptRepo !== null,
-      // metaAnchorRepo: this.metaAnchorRepo !== null,
-      mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
-      mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
-      agentTemplateService: this.agentTemplateService !== null,
-    };
-  }
-
-  /**
-   * Check if any repositories are currently being initialized
-   */
-  static hasActiveInitializations(): boolean {
-    return this.initializationLocks.size > 0;
-  }
-
-  /**
-   * Get list of repositories currently being initialized
-   */
-  static getActiveInitializations(): string[] {
-    return Array.from(this.initializationLocks.keys());
-  }
-
-  /**
-   * Initialize all repositories in the correct dependency order
-   * This ensures all dependencies are properly resolved
-   */
-  static async initializeAll(): Promise<void> {
-    this.log('Starting initialization of all repositories');
-
-    try {
-      // Initialize repositories without dependencies first
-      await Promise.all([
-        this.getAgentRepository(),
-        this.getUserRepository(),
-        this.getChannelRepository(),
-        this.getLLMRepository(),
-        // this.getCodexRepository(),
-        this.getVisionRepository(),
-        // this.getConstraintRepository(),
-        // this.getConceptRepository(),
-        // this.getMetaAnchorRepository(),
-        this.getMCPServerOptionRepository(),
-        this.getMCPServerConnectorRepository(),
-        this.getAgentTemplateService(),
-      ]);
-
-      // Initialize repositories with dependencies
-      await this.getStarshipRepository();
-
-      this.log('All repositories initialized successfully');
-    } catch (error) {
-      this.log(
-        `Failed to initialize all repositories: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'error'
-      );
-      throw error;
-    }
+    console.log('[RepositoryFactory] All repository instances reset successfully');
   }
 
   /**
@@ -462,71 +388,70 @@ export class RepositoryFactory {
    * Throws an error if any critical repository is missing
    */
   static validateCriticalRepositories(): void {
-    const critical = ['mcpServerConnectorRepo', 'starshipRepo'];
-    const status = this.getInitializationStatus();
+    this.ensureInitialized();
+    
+    const critical = [
+      { name: 'starshipRepo', instance: this.starshipRepo },
+      { name: 'expeditionRepo', instance: this.expeditionRepo },
+      { name: 'expeditionTaskRepo', instance: this.expeditionTaskRepo },
+      { name: 'expeditionMessageRepo', instance: this.expeditionMessageRepo },
+      { name: 'mcpServerConnectorRepo', instance: this.mcpServerConnectorRepo }
+    ];
 
     for (const repo of critical) {
-      if (!status[repo]) {
-        throw new Error(`Critical repository ${repo} is not initialized`);
+      if (!repo.instance) {
+        throw new Error(`Critical repository ${repo.name} is not initialized`);
       }
     }
 
-    this.log('All critical repositories validated successfully');
-  }
-  /*
-   * Get the ExpeditionRepository instance
-   */
-  static getExpeditionRepository(): ExpeditionRepository {
-    if (!this.expeditionRepo) {
-      this.expeditionRepo = new ExpeditionRepository();
-    }
-    return this.expeditionRepo;
+    console.log('[RepositoryFactory] All critical repositories validated successfully');
   }
 
   /**
-   * Get the ExpeditionTaskRepository instance
+   * Check if the factory is ready for socket operations
    */
-  static getExpeditionTaskRepository(): ExpeditionTaskRepository {
-    if (!this.expeditionTaskRepo) {
-      this.expeditionTaskRepo = new ExpeditionTaskRepository();
+  static isReadyForSocketOperations(): boolean {
+    try {
+      this.validateCriticalRepositories();
+      return true;
+    } catch (error) {
+      console.warn('[RepositoryFactory] Not ready for socket operations:', error);
+      return false;
     }
-    return this.expeditionTaskRepo;
   }
 
   /**
-   * Get the ExpeditionMessageRepository instance
+   * Get a health check summary
    */
-  static getExpeditionMessageRepository(): ExpeditionMessageRepository {
-    if (!this.expeditionMessageRepo) {
-      this.expeditionMessageRepo = new ExpeditionMessageRepository();
-    }
-    return this.expeditionMessageRepo;
-  }
+  static getHealthCheck(): {
+    status: 'healthy' | 'degraded' | 'unhealthy';
+    details: {
+      initialized: boolean;
+      criticalRepositoriesReady: boolean;
+      agentTemplateServiceAvailable: boolean;
+      error?: string;
+    };
+  } {
+    const details = {
+      initialized: this.isInitialized,
+      criticalRepositoriesReady: false,
+      agentTemplateServiceAvailable: this.agentTemplateService !== null,
+      error: this.initializationError?.message
+    };
 
-  /**
-   * Get the ExpeditionResultRepository instance
-   */
-  static getExpeditionResultRepository(): ExpeditionResultRepository {
-    if (!this.expeditionResultRepo) {
-      this.expeditionResultRepo = new ExpeditionResultRepository();
+    try {
+      details.criticalRepositoriesReady = this.isReadyForSocketOperations();
+    } catch (error) {
+      details.error = error instanceof Error ? error.message : 'Unknown error';
     }
-    return this.expeditionResultRepo;
-  }
 
-  // /**
-  //  * Reset all repository instances - useful for testing
-  //  */
-  // static resetAll(): void {
-  //   this.agentRepo = null as any;
-  //   this.userRepo = null as any;
-  //   this.channelRepo = null as any;
-  //   this.llmRepo = null as any;
-  //   this.starshipRepo = null as any;
-  //   this.visionRepo = null as any;
-  //   this.agentTemplateService = null as any;
-  //   this.expeditionRepo = null as any;
-  //   this.expeditionTaskRepo = null as any;
-  //   this.expeditionMessageRepo = null as any;
-  //   this.expeditionResultRepo = null as any;
+    let status: 'healthy' | 'degraded' | 'unhealthy';
+    if (details.initialized && details.criticalRepositoriesReady) {
+      status = details.agentTemplateServiceAvailable ? 'healthy' : 'degraded';
+    } else {
+      status = 'unhealthy';
+    }
+
+    return { status, details };
+  }
 }
-

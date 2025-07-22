@@ -197,8 +197,8 @@ export interface SibilStreamResponse {
   status: 'started' | 'streaming' | 'completed' | 'error';
 }
 
-// Legacy Socket.IO Event Definitions (kept for backward compatibility)
-export interface SocketIOEvents {
+// Legacy Socket.IO Event Definitions for non-expedition events
+export interface LegacySocketIOEvents {
   // Sibil Client to Server events
   'sibil:start-stream': (request: SibilSocketRequest) => void;
   'sibil:stop-stream': (streamId: string) => void;
@@ -226,31 +226,6 @@ export interface SocketIOEvents {
   'agent:stream-error': (error: AgentStreamError) => void;
   'agent:typing-start': (agentId: string) => void;
   'agent:typing-stop': (agentId: string) => void;
-
-  // Expedition Client to Server events
-  'expedition:join': (expeditionId: string) => void;
-  'expedition:leave': (expeditionId: string) => void;
-  'expedition:send-message': (data: { expeditionId: string; message: string }) => void;
-  'expedition:start': (expeditionId: string) => void;
-  'expedition:pause': (expeditionId: string) => void;
-  'expedition:cancel': (expeditionId: string) => void;
-
-  // Expedition Server to Client events
-  'expedition:created': (data: any) => void;
-  'expedition:updated': (data: any) => void;
-  'expedition:deleted': (data: any) => void;
-  'expedition:started': (data: any) => void;
-  'expedition:paused': (data: any) => void;
-  'expedition:resumed': (data: any) => void;
-  'expedition:cancelled': (data: any) => void;
-  'expedition:completed': (data: any) => void;
-  'expedition:status-update': (data: any) => void;
-  'expedition:task-assigned': (data: any) => void;
-  'expedition:task-completed': (data: any) => void;
-  'expedition:message': (data: any) => void;
-  'expedition:error': (data: any) => void;
-  'expedition:phase-change': (data: any) => void;
-  'expedition:result-available': (data: any) => void;
 
   // Common events
   'connection-status': (status: ConnectionStatus) => void;

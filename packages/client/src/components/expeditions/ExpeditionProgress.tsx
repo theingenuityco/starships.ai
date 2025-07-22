@@ -1,19 +1,23 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Clock, 
-  Target, 
-  CheckCircle, 
-  AlertCircle, 
-  Users, 
+import {
+  Clock,
+  Target,
+  CheckCircle,
+  AlertCircle,
+  Users,
   TrendingUp,
   Calendar,
-  Activity
+  Activity,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
+import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
 
 // Local type definitions
 interface Expedition {
@@ -37,9 +41,45 @@ interface Expedition {
 interface ExpeditionProgressProps {
   expedition: Expedition;
   showDetails?: boolean;
+  enableRealTimeUpdates?: boolean;
 }
 
-export function ExpeditionProgress({ expedition, showDetails = true }: ExpeditionProgressProps) {
+export function ExpeditionProgress({ expedition, showDetails = true, enableRealTimeUpdates = true }: ExpeditionProgressProps) {
+  // Real-time progress state
+  const [realtimeProgress, setRealtimeProgress] = useState<any>(null);
+  const [currentPhase, setCurrentPhase] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<string>(expedition.updatedAt);
+
+  // Enhanced socket integration for real-time progress
+  const { isConnected, realtimeData } = useEnhancedExpeditionSocket({
+    expeditionId: enableRealTimeUpdates ? expedition.id : undefined,
+    autoJoin: enableRealTimeUpdates,
+    enableReconnection: true,
+    debugMode: false,
+    onStatusUpdate: (event) => {
+      if (event.expeditionId === expedition.id) {
+        setRealtimeProgress(event.progress);
+        setLastUpdate(event.timestamp);
+      }
+    },
+    onWorkflowProgress: (event) => {
+      if (event.expeditionId === expedition.id) {
+        setCurrentPhase(event.phase);
+        setLastUpdate(event.timestamp);
+      }
+    },
+    onPhaseChange: (event) => {
+      if (event.expeditionId === expedition.id) {
+        setCurrentPhase(event.phase.current);
+        setLastUpdate(event.timestamp);
+      }
+    },
+    onTaskCompleted: (event) => {
+      if (event.expeditionId === expedition.id) {
+        setLastUpdate(event.timestamp);
+      }
+    }
+  });
   
   // Calculate progress based on status
   const getProgress = () => {
@@ -157,20 +197,72 @@ export function ExpeditionProgress({ expedition, showDetails = true }: Expeditio
       {/* Overall Progress */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
-            <span>Expedition Progress</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
+              <span>Expedition Progress</span>
+              {currentPhase && (
+                <Badge variant="outline" className="text-xs">
+                  {currentPhase}
+                </Badge>
+              )}
+            </div>
+            {enableRealTimeUpdates && (
+              <div className="flex items-center space-x-2">
+                {isConnected ? (
+                  <div className="flex items-center space-x-1 text-green-600">
+                    <Wifi className="h-4 w-4" />
+                    <span className="text-xs">Live</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-1 text-gray-400">
+                    <WifiOff className="h-4 w-4" />
+                    <span className="text-xs">Offline</span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardTitle>
-          <CardDescription>{statusConfig.description}</CardDescription>
+          <CardDescription>
+            {statusConfig.description}
+            {realtimeProgress && (
+              <span className="ml-2 text-blue-600">
+                • Real-time progress: {realtimeProgress.overall || 0}%
+              </span>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Overall Progress</span>
-              <span className="text-sm text-muted-foreground">{progress}%</span>
+              <div className="flex items-center space-x-2">
+                {realtimeProgress && realtimeProgress.overall !== progress && (
+                  <span className="text-xs text-blue-600">
+                    Real-time: {realtimeProgress.overall}%
+                  </span>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {realtimeProgress?.overall || progress}%
+                </span>
+              </div>
             </div>
-            <Progress value={progress} className="h-3" />
+            <Progress
+              value={realtimeProgress?.overall || progress}
+              className={`h-3 transition-all duration-500 ${
+                realtimeProgress ? 'ring-1 ring-blue-200' : ''
+              }`}
+            />
+            {realtimeProgress && (
+              <div className="text-xs text-muted-foreground">
+                Phase: {realtimeProgress.currentPhase || 'Unknown'} •
+                Tasks: {realtimeProgress.completedTasks || 0}/{realtimeProgress.totalTasks || 0}
+                {realtimeProgress.estimatedTimeRemaining && (
+                  <span> • ETA: {Math.round(realtimeProgress.estimatedTimeRemaining / 60)}m</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Status Badge */}

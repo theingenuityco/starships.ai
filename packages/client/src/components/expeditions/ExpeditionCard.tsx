@@ -43,8 +43,9 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useExpeditionSocket } from '@/hooks/useExpeditionSocket';
+import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
 import { expeditionAPI } from '@/lib/expeditionApi';
+import { ConnectionStatus } from '@/components/ui/ConnectionStatus';
 import type {
   Expedition,
   ExpeditionTask,
@@ -166,58 +167,77 @@ export function ExpeditionCard({
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Real-time updates via socket
-  const { isConnected, realtimeData } = useExpeditionSocket({
+  // Real-time updates via enhanced socket with connection management
+  const {
+    isConnected,
+    connectionState,
+    connectionQuality,
+    realtimeData,
+    getHealthStatus,
+    getOfflineQueueStatus,
+    getCircuitBreakerStatus,
+    forceReconnect,
+    resetCircuitBreaker,
+    clearOfflineQueue,
+    error: socketError
+  } = useEnhancedExpeditionSocket({
     expeditionId: enableRealTimeUpdates ? expedition.id : undefined,
-    onExpeditionUpdated: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({
-          ...prev,
-          ...event.changes,
-          status: (event.changes.status as ExpeditionStatus) || prev.status,
-          priority: (event.changes.priority as ExpeditionPriority) || prev.priority
-        }));
-      }
-    },
+    autoJoin: enableRealTimeUpdates,
+    enableReconnection: true,
+    debugMode: false,
     onExpeditionStarted: (event) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
-      }
-    },
-    onExpeditionPaused: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
       }
     },
     onExpeditionResumed: (event) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
       }
     },
     onExpeditionCompleted: (event) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'completed' as ExpeditionStatus }));
       }
     },
     onExpeditionCancelled: (event) => {
       if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: event.status as ExpeditionStatus }));
+        setLocalExpedition(prev => ({ ...prev, status: 'cancelled' as ExpeditionStatus }));
       }
     },
-    onExpeditionError: (event) => {
+    onExpeditionFailed: (event) => {
+      if (event.expeditionId === expedition.id) {
+        setLocalExpedition(prev => ({ ...prev, status: 'failed' as ExpeditionStatus }));
+      }
+    },
+    onStatusUpdate: (event) => {
+      if (event.expeditionId === expedition.id) {
+        // Update progress or other status information
+        console.log('Status update for expedition:', event);
+      }
+    },
+    onError: (event) => {
       if (event.expeditionId === expedition.id) {
         setError(event.error.message);
         setTimeout(() => setError(null), 5000);
       }
+    },
+    onConnectionChange: (connected: boolean) => {
+      if (!connected) {
+        setError('Connection lost - operations will be queued until reconnected');
+      }
     }
   });
+
+  // Combine socket error with local error
+  const displayError = error || socketError;
 
   // Update local state when expedition prop changes
   useEffect(() => {
     setLocalExpedition(expedition);
   }, [expedition]);
 
-  // Enhanced action handlers with API integration
+  // Enhanced action handlers with offline support and better error handling
   const handleAction = useCallback(async (
     action: string,
     handler?: (expeditionId: string) => Promise<boolean>
@@ -228,16 +248,40 @@ export function ExpeditionCard({
     setError(null);
 
     try {
+      // Show different messages based on connection state
+      if (!isConnected) {
+        setError(`${action} queued - will execute when connection is restored`);
+      }
+
       const success = await handler(localExpedition.id);
       if (!success) {
-        setError(`Failed to ${action} expedition`);
+        // Provide more specific error messages based on connection state
+        if (connectionState.circuitBreakerState === 'open') {
+          setError(`Cannot ${action} expedition - connection temporarily suspended. Try again later.`);
+        } else if (!isConnected) {
+          setError(`${action} queued for when connection is restored`);
+        } else {
+          setError(`Failed to ${action} expedition`);
+        }
+      } else if (!isConnected) {
+        // Success but offline - operation was queued
+        setError(`${action} queued successfully - will execute when connected`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to ${action} expedition`);
+      const errorMessage = err instanceof Error ? err.message : `Failed to ${action} expedition`;
+      
+      // Enhance error message with connection context
+      if (!isConnected) {
+        setError(`${errorMessage} - operation queued for retry`);
+      } else if (connectionState.circuitBreakerState === 'open') {
+        setError(`${errorMessage} - connection issues detected`);
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setActionLoading(null);
     }
-  }, [localExpedition.id]);
+  }, [localExpedition.id, isConnected, connectionState.circuitBreakerState]);
 
   // Get status styling
   const getStatusConfig = (status: ExpeditionStatus) => {
@@ -411,24 +455,52 @@ export function ExpeditionCard({
           }
         }}
       >
-        {/* Real-time connection indicator */}
+        {/* Enhanced connection status indicator */}
         {enableRealTimeUpdates && (
-          <div className={`absolute top-2 right-2 w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-gray-400'
-            }`} />
+          <div className="absolute top-2 right-2">
+            <ConnectionStatus
+              connectionState={connectionState}
+              onForceReconnect={forceReconnect}
+              onResetCircuitBreaker={resetCircuitBreaker}
+              onClearQueue={clearOfflineQueue}
+              getHealthStatus={getHealthStatus}
+              getOfflineQueueStatus={getOfflineQueueStatus}
+              getCircuitBreakerStatus={getCircuitBreakerStatus}
+              compact={true}
+            />
+          </div>
         )}
 
-        {/* Error banner */}
+        {/* Enhanced error banner */}
         <AnimatePresence>
-          {error && (
+          {displayError && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-red-100 border-b border-red-200 px-4 py-2"
+              className={`border-b px-4 py-2 ${
+                !isConnected || connectionState.circuitBreakerState === 'open'
+                  ? 'bg-yellow-100 border-yellow-200'
+                  : 'bg-red-100 border-red-200'
+              }`}
             >
-              <div className="flex items-center space-x-2 text-red-700 text-sm">
+              <div className={`flex items-center space-x-2 text-sm ${
+                !isConnected || connectionState.circuitBreakerState === 'open'
+                  ? 'text-yellow-700'
+                  : 'text-red-700'
+              }`}>
                 <AlertCircle className="h-4 w-4" />
-                <span>{error}</span>
+                <span>{displayError}</span>
+                {!isConnected && (
+                  <Badge variant="outline" className="text-xs ml-2">
+                    Offline Mode
+                  </Badge>
+                )}
+                {connectionState.circuitBreakerState === 'open' && (
+                  <Badge variant="outline" className="text-xs ml-2">
+                    Connection Suspended
+                  </Badge>
+                )}
               </div>
             </motion.div>
           )}
@@ -649,7 +721,7 @@ export function ExpeditionCard({
             </div>
           )}
 
-          {/* Action Buttons */}
+          {/* Enhanced Action Buttons with offline support */}
           <AnimatePresence>
             {showActions && (isHovered || ['in-progress', 'planning'].includes(localExpedition.status)) && (
               <motion.div
@@ -660,54 +732,78 @@ export function ExpeditionCard({
               >
                 <div className="flex space-x-2">
                   {localExpedition.status === 'draft' && onStart && (
-                    <ActionButton
-                      icon={Play}
-                      label="Start Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('start', onStart);
-                      }}
-                      loading={actionLoading === 'start'}
-                      variant="default"
-                    />
+                    <div className="relative">
+                      <ActionButton
+                        icon={Play}
+                        label={!isConnected ? "Start Expedition (will queue)" : "Start Expedition"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction('start', onStart);
+                        }}
+                        loading={actionLoading === 'start'}
+                        variant="default"
+                        disabled={connectionState.circuitBreakerState === 'open'}
+                      />
+                      {!isConnected && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
+                      )}
+                    </div>
                   )}
 
                   {localExpedition.status === 'in-progress' && onPause && (
-                    <ActionButton
-                      icon={Pause}
-                      label="Pause Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('pause', onPause);
-                      }}
-                      loading={actionLoading === 'pause'}
-                    />
+                    <div className="relative">
+                      <ActionButton
+                        icon={Pause}
+                        label={!isConnected ? "Pause Expedition (will queue)" : "Pause Expedition"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction('pause', onPause);
+                        }}
+                        loading={actionLoading === 'pause'}
+                        disabled={connectionState.circuitBreakerState === 'open'}
+                      />
+                      {!isConnected && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
+                      )}
+                    </div>
                   )}
 
                   {['paused', 'failed'].includes(localExpedition.status) && onResume && (
-                    <ActionButton
-                      icon={RotateCcw}
-                      label="Resume Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('resume', onResume);
-                      }}
-                      loading={actionLoading === 'resume'}
-                      variant="default"
-                    />
+                    <div className="relative">
+                      <ActionButton
+                        icon={RotateCcw}
+                        label={!isConnected ? "Resume Expedition (will queue)" : "Resume Expedition"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction('resume', onResume);
+                        }}
+                        loading={actionLoading === 'resume'}
+                        variant="default"
+                        disabled={connectionState.circuitBreakerState === 'open'}
+                      />
+                      {!isConnected && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
+                      )}
+                    </div>
                   )}
 
                   {['draft', 'planning', 'in-progress'].includes(localExpedition.status) && onCancel && (
-                    <ActionButton
-                      icon={XCircle}
-                      label="Cancel Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('cancel', onCancel);
-                      }}
-                      loading={actionLoading === 'cancel'}
-                      variant="destructive"
-                    />
+                    <div className="relative">
+                      <ActionButton
+                        icon={XCircle}
+                        label={!isConnected ? "Cancel Expedition (will queue)" : "Cancel Expedition"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction('cancel', onCancel);
+                        }}
+                        loading={actionLoading === 'cancel'}
+                        variant="destructive"
+                        disabled={connectionState.circuitBreakerState === 'open'}
+                      />
+                      {!isConnected && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
+                      )}
+                    </div>
                   )}
                 </div>
 

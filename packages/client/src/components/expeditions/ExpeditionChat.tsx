@@ -41,6 +41,7 @@ import { useExpeditionData } from '@/hooks/useExpeditionData';
 import { useExpeditionChat } from '@/hooks/useExpeditionChat';
 import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
 import { expeditionAPI } from '@/lib/expeditionApi';
+import { agentAPI } from '@/lib/api';
 
 // Local type definitions
 interface Expedition {
@@ -88,6 +89,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
 
   // Get starship ID from the slug first
   const [starshipId, setStarshipId] = useState<string>('');
+  const [agentDetails, setAgentDetails] = useState<Record<string, any>>({});
 
   // Fetch starship by slug to get the real ID
   useEffect(() => {
@@ -109,6 +111,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
       fetchStarshipBySlug();
     }
   }, [starshipSlug]);
+
 
   // Data hooks
   const {
@@ -165,10 +168,12 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     onStatusUpdate: () => {
       refreshExpedition();
     },
-    onTypingStart: (event: { expeditionId: string; userId?: string; agentId?: string; role: string; timestamp: string }) => {
+    onTypingStart: (event: { expeditionId: string; userId?: string; agentId?: string; agentName?: string; role: string; timestamp: string }) => {
       setTypingUsers(prev => [...prev.filter(u => u.id !== (event.userId || event.agentId)), {
         id: event.userId || event.agentId || 'unknown',
-        name: event.userId ? 'User' : event.agentId ? `Agent ${event.agentId.slice(0, 8)}` : 'Unknown',
+        name: event.userId ? 'User' :
+              event.agentId ? (agentDetails[event.agentId]?.name || event.agentName || event.agentId) :
+              'Unknown',
         role: event.role as any
       }]);
     },
@@ -181,6 +186,36 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
       console.log('[EXPEDITION CHAT] Real-time message received:', event);
     }
   });
+
+  // Fetch agent details when expedition loads
+  useEffect(() => {
+    const fetchAgentDetails = async () => {
+      if (!expedition?.assignedAgents || expedition.assignedAgents.length === 0) {
+        return;
+      }
+
+      const details: Record<string, any> = {};
+      
+      for (const agentId of expedition.assignedAgents) {
+        try {
+          const agent = await agentAPI.getById(agentId);
+          details[agentId] = agent;
+        } catch (error) {
+          console.error(`Failed to fetch agent ${agentId}:`, error);
+          // Fallback for failed agent fetch
+          details[agentId] = {
+            id: agentId,
+            name: agentId.slice(0, 8), // Use truncated ID as fallback
+            category: 'general'
+          };
+        }
+      }
+      
+      setAgentDetails(details);
+    };
+
+    fetchAgentDetails();
+  }, [expedition?.assignedAgents]);
 
   // Enhanced utility functions
   const playNotificationSound = useCallback(() => {
@@ -385,19 +420,25 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   }, [messages, searchResults]);
 
   const memoizedAgentList = useMemo(() => {
-    return expedition?.assignedAgents.map(agentId => ({
-      id: agentId,
-      name: `Agent ${agentId.slice(0, 8)}`
-    })) || [];
-  }, [expedition?.assignedAgents]);
+    return expedition?.assignedAgents.map(agentId => {
+      const agentDetail = agentDetails[agentId];
+      return {
+        id: agentId,
+        name: agentDetail?.name || agentId
+      };
+    }) || [];
+  }, [expedition?.assignedAgents, agentDetails]);
 
   const memoizedAvailableAgents = useMemo(() => {
-    return expedition?.assignedAgents.map(agentId => ({
-      id: agentId,
-      name: `Agent ${agentId.slice(0, 8)}`,
-      status: 'online' as const
-    })) || [];
-  }, [expedition?.assignedAgents]);
+    return expedition?.assignedAgents.map(agentId => {
+      const agentDetail = agentDetails[agentId];
+      return {
+        id: agentId,
+        name: agentDetail?.name || agentId,
+        status: 'online' as const
+      };
+    }) || [];
+  }, [expedition?.assignedAgents, agentDetails]);
 
   // Virtual scrolling for large message lists
   const [visibleRange, setVisibleRange] = useState({ start: 0, end: 50 });
@@ -676,7 +717,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-auto">
             {activeTab === 'chat' && (
               <div className="h-full flex flex-col relative">
                 {/* Search */}
@@ -699,7 +740,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
 
                 {/* Messages */}
                 <ScrollArea
-                  className="flex-1 p-4"
+                  className="flex-1 p-4 max-h-full"
                   onScrollCapture={handleScroll}
                   role="log"
                   aria-label="Expedition chat messages"

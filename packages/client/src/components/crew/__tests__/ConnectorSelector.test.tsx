@@ -127,7 +127,7 @@ describe('ConnectorSelector', () => {
 
       expect(screen.getByTestId('plug-icon')).toBeInTheDocument()
       expect(screen.getByPlaceholderText('Search connectors...')).toBeInTheDocument()
-      expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+      expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
     })
 
     it('should display selected connectors count badge', async () => {
@@ -215,7 +215,7 @@ describe('ConnectorSelector', () => {
       const searchInput = screen.getByPlaceholderText('Search connectors...')
 
       // Open dropdown to see connectors
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       await waitFor(() => {
@@ -249,7 +249,7 @@ describe('ConnectorSelector', () => {
       })
 
       const searchInput = screen.getByPlaceholderText('Search connectors...')
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
 
       await user.click(dropdownTrigger)
       await user.type(searchInput, 'nonexistent')
@@ -305,10 +305,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} onConnectorsChange={onConnectorsChange} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       await waitFor(() => {
@@ -337,10 +337,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...propsWithSelected} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       const githubOption = screen.getByText('Github').closest('[role="option"]')
@@ -404,10 +404,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       await waitFor(() => {
@@ -450,10 +450,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       await waitFor(() => {
@@ -491,10 +491,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       await waitFor(() => {
@@ -513,10 +513,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       const githubOption = screen.getByText('Github').closest('[role="option"]')
@@ -538,10 +538,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...propsWithSelected} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       const puppeteerOption = screen.getByText('Puppeteer').closest('[role="option"]')
@@ -562,10 +562,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       const githubOption = screen.getByText('Github').closest('[role="option"]')
@@ -585,10 +585,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       const githubOption = screen.getByText('Github').closest('[role="option"]')
@@ -702,7 +702,7 @@ describe('ConnectorSelector', () => {
 
       await waitFor(() => {
         const searchInput = screen.getByPlaceholderText('Search connectors...')
-        const dropdownTrigger = screen.getByText('Select connectors...')
+        const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
 
         expect(searchInput).toBeDisabled()
         expect(dropdownTrigger).toBeDisabled()
@@ -748,10 +748,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       await waitFor(() => {
@@ -776,10 +776,10 @@ describe('ConnectorSelector', () => {
       render(<ConnectorSelector {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Select connectors...')).toBeInTheDocument()
+        expect(screen.getByText('Browse & Select Connectors...')).toBeInTheDocument()
       })
 
-      const dropdownTrigger = screen.getByText('Select connectors...')
+      const dropdownTrigger = screen.getByText('Browse & Select Connectors...')
       await user.click(dropdownTrigger)
 
       const githubOption = screen.getByText('Github').closest('[role="option"]')

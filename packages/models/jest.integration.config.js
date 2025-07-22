@@ -13,14 +13,7 @@ module.exports = {
   },
   transform: {
     '^.+\\.ts$': ['ts-jest', {
-      tsconfig: '<rootDir>/tsconfig.test.json',
-      isolatedModules: true
+      tsconfig: '<rootDir>/tsconfig.test.json'
     }]
-  },
-  globals: {
-    'ts-jest': {
-      tsconfig: '<rootDir>/tsconfig.test.json',
-      isolatedModules: true
-    }
   }
 };

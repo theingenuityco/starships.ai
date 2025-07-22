@@ -3,25 +3,24 @@
  * Tests all the new CRUD operations and state management features
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useStarshipStore } from '../starship-store';
 import { starshipAPI } from '../../lib/api';
 
 // Mock the API
-vi.mock('../../lib/api', () => ({
+jest.mock('../../lib/api', () => ({
   starshipAPI: {
-    getUserStarships: vi.fn(),
-    createStarship: vi.fn(),
-    updateStarship: vi.fn(),
-    deleteStarship: vi.fn(),
-    updateStarshipStatus: vi.fn(),
-    getStarshipAgents: vi.fn(),
-    deployAgent: vi.fn(),
-    removeAgent: vi.fn(),
+    getUserStarships: jest.fn(),
+    createStarship: jest.fn(),
+    updateStarship: jest.fn(),
+    deleteStarship: jest.fn(),
+    updateStarshipStatus: jest.fn(),
+    getStarshipAgents: jest.fn(),
+    deployAgent: jest.fn(),
+    removeAgent: jest.fn(),
   },
   visionAPI: {
-    get: vi.fn(),
-    save: vi.fn(),
+    get: jest.fn(),
+    save: jest.fn(),
   },
 }));
 
@@ -95,13 +94,13 @@ describe('Enhanced Starship Store', () => {
         isHovered: false,
       },
     });
-    vi.clearAllMocks();
+    jest.clearAllMocks();
   });
 
   describe('Enhanced CRUD Operations', () => {
     it('should update starship details', async () => {
       const mockResponse = { starship: { ...mockStarship, name: 'Updated Starship' } };
-      vi.mocked(starshipAPI.updateStarship).mockResolvedValue(mockResponse);
+      (starshipAPI.updateStarship as jest.Mock).mockResolvedValue(mockResponse);
 
       const store = useStarshipStore.getState();
       store.starships = [mockStarship];
@@ -118,7 +117,7 @@ describe('Enhanced Starship Store', () => {
 
     it('should handle update errors', async () => {
       const error = new Error('Update failed');
-      vi.mocked(starshipAPI.updateStarship).mockRejectedValue(error);
+      (starshipAPI.updateStarship as jest.Mock).mockRejectedValue(error);
 
       const store = useStarshipStore.getState();
       await store.updateStarship('starship-1', { name: 'Updated Starship' });
@@ -128,7 +127,7 @@ describe('Enhanced Starship Store', () => {
     });
 
     it('should delete starship', async () => {
-      vi.mocked(starshipAPI.deleteStarship).mockResolvedValue({ message: 'Deleted' });
+      (starshipAPI.deleteStarship as jest.Mock).mockResolvedValue({ message: 'Deleted' });
 
       const store = useStarshipStore.getState();
       store.starships = [mockStarship];
@@ -144,7 +143,7 @@ describe('Enhanced Starship Store', () => {
 
     it('should update starship status', async () => {
       const mockResponse = { starship: { ...mockStarship, status: 'docked' as const } };
-      vi.mocked(starshipAPI.updateStarshipStatus).mockResolvedValue(mockResponse);
+      (starshipAPI.updateStarshipStatus as jest.Mock).mockResolvedValue(mockResponse);
 
       const store = useStarshipStore.getState();
       store.starships = [mockStarship];
@@ -157,7 +156,7 @@ describe('Enhanced Starship Store', () => {
     });
 
     it('should get starship agents', async () => {
-      vi.mocked(starshipAPI.getStarshipAgents).mockResolvedValue(mockAgentsResponse);
+      (starshipAPI.getStarshipAgents as jest.Mock).mockResolvedValue(mockAgentsResponse);
 
       const store = useStarshipStore.getState();
       await store.getStarshipAgents('starship-1');
@@ -170,8 +169,8 @@ describe('Enhanced Starship Store', () => {
 
   describe('Enhanced Agent Management', () => {
     it('should deploy agent and refresh agents data', async () => {
-      vi.mocked(starshipAPI.deployAgent).mockResolvedValue({ message: 'Agent deployed' });
-      vi.mocked(starshipAPI.getStarshipAgents).mockResolvedValue(mockAgentsResponse);
+      (starshipAPI.deployAgent as jest.Mock).mockResolvedValue({ message: 'Agent deployed' });
+      (starshipAPI.getStarshipAgents as jest.Mock).mockResolvedValue(mockAgentsResponse);
 
       const store = useStarshipStore.getState();
       store.activeStarshipId = 'starship-1';
@@ -184,8 +183,8 @@ describe('Enhanced Starship Store', () => {
     });
 
     it('should remove agent and refresh agents data', async () => {
-      vi.mocked(starshipAPI.removeAgent).mockResolvedValue({ message: 'Agent removed' });
-      vi.mocked(starshipAPI.getStarshipAgents).mockResolvedValue(mockAgentsResponse);
+      (starshipAPI.removeAgent as jest.Mock).mockResolvedValue({ message: 'Agent removed' });
+      (starshipAPI.getStarshipAgents as jest.Mock).mockResolvedValue(mockAgentsResponse);
 
       const store = useStarshipStore.getState();
       store.activeStarshipId = 'starship-1';
@@ -245,7 +244,7 @@ describe('Enhanced Starship Store', () => {
       const store = useStarshipStore.getState();
       
       // Mock a slow API call
-      vi.mocked(starshipAPI.updateStarship).mockImplementation(
+      (starshipAPI.updateStarship as jest.Mock).mockImplementation(
         () => new Promise(resolve => setTimeout(resolve, 100))
       );
 

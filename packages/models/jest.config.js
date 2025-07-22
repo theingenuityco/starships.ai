@@ -9,7 +9,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   coverageThreshold: {
     global: {
-      branches: 80,
+      branches: 85,
       functions: 85,
       lines: 85,
       statements: 85,
@@ -21,13 +21,7 @@ module.exports = {
   },
   transform: {
     '^.+\\.ts$': ['ts-jest', {
-      tsconfig: '<rootDir>/tsconfig.test.json',
-      isolatedModules: true
+      tsconfig: '<rootDir>/tsconfig.test.json'
     }]
-  },
-  globals: {
-    'ts-jest': {
-      isolatedModules: true
-    }
   }
 };

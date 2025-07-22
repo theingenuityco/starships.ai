@@ -41,7 +41,13 @@ describe('Neo4jConnection', () => {
 
       expect(neo4j.driver).toHaveBeenCalledWith(
         mockConfig.uri,
-        expect.anything()
+        expect.anything(),
+        expect.objectContaining({
+          connectionTimeout: 5000,
+          maxConnectionLifetime: 30000,
+          maxConnectionPoolSize: 100,
+          connectionAcquisitionTimeout: 10000,
+        })
       );
       expect(mockDriver.verifyConnectivity).toHaveBeenCalled();
     });

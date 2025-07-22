@@ -134,7 +134,7 @@ async function withRetry<T>(
 
   let lastError: any = null
   let operationSucceeded = false
-  let attemptResults: any[] = [];
+  const attemptResults: any[] = [];
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const attemptId = `${operationId}-${attempt + 1}`;

@@ -214,7 +214,7 @@ export interface CreateExpeditionRequest {
   estimatedDuration?: number;
   tags?: string[];
   dueDate?: string;
-  selectedAgents?: string[];
+  selectedAgents: string[]; // REQUIRED: At least one agent must be selected
 }
 
 /**

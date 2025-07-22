@@ -120,80 +120,261 @@ async function withRetry<T>(
   allowNullResult: boolean = false
 ): Promise<T> {
   const { maxRetries, baseDelay, maxDelay, retryCondition } = { ...DEFAULT_RETRY_CONFIG, ...config }
+  const operationId = Math.random().toString(36).substring(7);
+
+  console.log(`[EXPEDITION-API] [${operationId}] ===== WITHRETRY START =====`);
+  console.log(`[EXPEDITION-API] [${operationId}] Starting withRetry operation:`, {
+    maxRetries,
+    baseDelay,
+    maxDelay,
+    allowNullResult,
+    operationId,
+    timestamp: new Date().toISOString()
+  });
 
   let lastError: any = null
+  let operationSucceeded = false
+  let attemptResults: any[] = [];
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const attemptId = `${operationId}-${attempt + 1}`;
+    console.log(`[EXPEDITION-API] [${attemptId}] ===== ATTEMPT ${attempt + 1}/${maxRetries + 1} START =====`);
+    
     try {
-      const result = await operation()
+      console.log(`[EXPEDITION-API] [${attemptId}] About to call operation function...`);
+      console.log(`[EXPEDITION-API] [${attemptId}] Operation type:`, typeof operation);
+      console.log(`[EXPEDITION-API] [${attemptId}] Operation name:`, operation.name || 'anonymous');
+      
+      // Add timeout wrapper to detect hanging operations
+      console.log(`[EXPEDITION-API] [${attemptId}] Creating operation promise...`);
+      const operationPromise = operation();
+      console.log(`[EXPEDITION-API] [${attemptId}] Operation promise created, setting up timeout...`);
+      
+      const timeoutPromise = new Promise<T>((_, reject) => {
+        setTimeout(() => {
+          console.error(`[EXPEDITION-API] [${attemptId}] TIMEOUT: Operation exceeded 30 seconds`);
+          reject(new Error('Operation timeout after 30 seconds'));
+        }, 30000);
+      });
+      
+      console.log(`[EXPEDITION-API] [${attemptId}] Starting Promise.race between operation and timeout...`);
+      const result = await Promise.race([operationPromise, timeoutPromise]);
+      
+      console.log(`[EXPEDITION-API] [${attemptId}] ===== OPERATION SUCCESS =====`);
+      console.log(`[EXPEDITION-API] [${attemptId}] Operation completed successfully:`, {
+        resultType: typeof result,
+        resultConstructor: result?.constructor?.name,
+        hasResult: result !== null && result !== undefined,
+        resultKeys: result && typeof result === 'object' ? Object.keys(result) : 'N/A',
+        resultStringified: JSON.stringify(result, null, 2).substring(0, 500) + '...',
+        timestamp: new Date().toISOString()
+      });
 
       // Allow null/undefined results if explicitly permitted
       if (!allowNullResult && (result === null || result === undefined)) {
+        console.warn(`[EXPEDITION-API] [${attemptId}] Operation returned null/undefined but allowNullResult is false`);
         throw new Error('Operation returned null or undefined')
       }
 
+      operationSucceeded = true
+      console.log(`[EXPEDITION-API] [${attemptId}] withRetry operation succeeded, returning result`);
+      console.log(`[EXPEDITION-API] [${operationId}] ===== WITHRETRY SUCCESS =====`);
       return result
     } catch (error) {
       lastError = error
+      operationSucceeded = false
+      
+      console.error(`[EXPEDITION-API] [${attemptId}] ===== ATTEMPT FAILED =====`);
+      
+      // Comprehensive error analysis
+      const errorAnalysis = {
+        error: error,
+        errorType: typeof error,
+        errorConstructor: error?.constructor?.name,
+        errorMessage: (error as any)?.message,
+        errorStack: (error as any)?.stack?.substring(0, 1000) + '...',
+        isAxiosError: error && typeof error === 'object' && 'response' in error,
+        isNetworkError: error && typeof error === 'object' && 'code' in error,
+        status: (error as any)?.response?.status,
+        statusText: (error as any)?.response?.statusText,
+        responseData: (error as any)?.response?.data,
+        responseHeaders: (error as any)?.response?.headers,
+        requestConfig: (error as any)?.config ? {
+          url: (error as any)?.config?.url,
+          method: (error as any)?.config?.method,
+          timeout: (error as any)?.config?.timeout,
+          headers: (error as any)?.config?.headers
+        } : undefined,
+        code: (error as any)?.code,
+        name: (error as any)?.name,
+        errno: (error as any)?.errno,
+        syscall: (error as any)?.syscall,
+        hostname: (error as any)?.hostname,
+        port: (error as any)?.port,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.error(`[EXPEDITION-API] [${attemptId}] Detailed error analysis:`, errorAnalysis);
+      attemptResults.push({ attempt: attempt + 1, error: errorAnalysis });
 
       // If this is the last attempt, break and throw
       if (attempt === maxRetries) {
+        console.warn(`[EXPEDITION-API] [${attemptId}] Last attempt failed, will throw error`);
+        console.error(`[EXPEDITION-API] [${operationId}] All attempts exhausted. Attempt history:`, attemptResults);
         break
+      }
+
+      // Check for request cancellation or network errors
+      if (error && typeof error === 'object') {
+        const errorCode = (error as any)?.code;
+        const errorName = (error as any)?.name;
+        
+        console.log(`[EXPEDITION-API] [${attemptId}] Checking for non-retryable errors:`, { errorCode, errorName });
+        
+        // Don't retry on request cancellation or certain network errors
+        if (errorCode === 'ECONNABORTED' || errorName === 'CanceledError' || errorCode === 'ERR_CANCELED') {
+          console.warn(`[EXPEDITION-API] [${attemptId}] Request was cancelled, not retrying`);
+          break;
+        }
+        
+        // Check for connection refused
+        if (errorCode === 'ECONNREFUSED') {
+          console.error(`[EXPEDITION-API] [${attemptId}] Connection refused - server may be down`);
+          // Still retry in case server comes back up
+        }
       }
 
       // Check if it's an AxiosError and if we should retry
       const isAxiosError = error && typeof error === 'object' && 'response' in error
+      console.log(`[EXPEDITION-API] [${attemptId}] Is Axios error:`, isAxiosError);
 
       // Don't retry on 4xx errors (client errors) except 429 (rate limit)
       if (isAxiosError) {
         const status = (error as AxiosError).response?.status
+        console.log(`[EXPEDITION-API] [${attemptId}] HTTP status:`, status);
+        
         if (status && status >= 400 && status < 500 && status !== 429) {
+          console.warn(`[EXPEDITION-API] [${attemptId}] Not retrying client error ${status}`);
           break // Don't retry client errors
         }
       }
 
-      if (!isAxiosError || !retryCondition(error as AxiosError)) {
+      // Check retry condition
+      const shouldRetry = !isAxiosError || retryCondition(error as AxiosError);
+      console.log(`[EXPEDITION-API] [${attemptId}] Should retry:`, shouldRetry);
+      
+      if (!shouldRetry) {
+        console.warn(`[EXPEDITION-API] [${attemptId}] Error does not meet retry conditions`);
         break
       }
 
       // Wait before retrying
       const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay)
+      console.log(`[EXPEDITION-API] [${attemptId}] Retrying in ${delay}ms...`);
       await new Promise(resolve => setTimeout(resolve, delay))
+      console.log(`[EXPEDITION-API] [${attemptId}] Retry delay completed, starting next attempt`);
     }
   }
 
+  // Log final state before throwing with defensive logging
+  console.error(`[EXPEDITION-API] [${operationId}] ===== WITHRETRY FAILED =====`);
+  console.error(`[EXPEDITION-API] [${operationId}] withRetry operation failed after all attempts`);
+  console.error(`[EXPEDITION-API] [${operationId}] Final state:`, {
+    operationSucceeded,
+    lastErrorExists: !!lastError,
+    lastErrorType: typeof lastError,
+    lastErrorConstructor: lastError?.constructor?.name,
+    lastErrorMessage: (lastError as any)?.message,
+    totalAttempts: attemptResults.length,
+    timestamp: new Date().toISOString()
+  });
+  console.error(`[EXPEDITION-API] [${operationId}] Complete attempt history:`, attemptResults);
+  console.error(`[EXPEDITION-API] [${operationId}] Last error object:`, lastError);
+
   // Convert and throw the final error
   if (lastError instanceof ExpeditionAPIError) {
+    console.warn(`[EXPEDITION-API] [${operationId}] Throwing ExpeditionAPIError`);
     throw lastError
   }
 
   const isAxiosError = lastError && typeof lastError === 'object' && 'response' in lastError
   if (isAxiosError) {
+    console.warn(`[EXPEDITION-API] [${operationId}] Converting AxiosError to ExpeditionAPIError`);
     throw ExpeditionAPIError.fromAxiosError(lastError as AxiosError)
   }
 
-  // Enhanced error logging for debugging
-  console.error('[EXPEDITION-API] Non-Axios error in withRetry:', {
-    error: lastError,
-    errorType: typeof lastError,
-    errorConstructor: lastError?.constructor?.name,
-    errorMessage: (lastError as any)?.message,
-    errorStack: (lastError as any)?.stack,
-    errorCode: (lastError as any)?.code,
-    errorDetails: (lastError as any)?.details,
-  })
+  // Handle empty or null error objects - provide more informative logging
+  if (!lastError) {
+    console.error(`[EXPEDITION-API] [${operationId}] CRITICAL: No error object available - this indicates the operation failed but no error was caught`);
+    console.error(`[EXPEDITION-API] [${operationId}] This usually means:`);
+    console.error(`[EXPEDITION-API] [${operationId}] 1. The request was cancelled before completion`);
+    console.error(`[EXPEDITION-API] [${operationId}] 2. A network interruption occurred`);
+    console.error(`[EXPEDITION-API] [${operationId}] 3. The operation timed out without throwing an error`);
+    console.error(`[EXPEDITION-API] [${operationId}] 4. There is a bug in the error handling logic`);
+    
+    throw new ExpeditionAPIError(
+      'Request failed unexpectedly - no error information available. This may indicate a network issue or request cancellation.',
+      'WORKFLOW_FAILED',
+      500,
+      {
+        note: 'No error object available',
+        operationSucceeded,
+        operationId,
+        attemptHistory: attemptResults,
+        debugInfo: 'withRetry completed all attempts but no error was captured'
+      }
+    );
+  }
 
-  const errorMessage = (lastError as any)?.message || 'Unknown error occurred'
-  const errorCode = (lastError as any)?.code || 'UNKNOWN_ERROR'
+  if (typeof lastError === 'object' && Object.keys(lastError).length === 0) {
+    console.warn(`[EXPEDITION-API] [${operationId}] Empty error object detected - this may indicate a network timeout`);
+    throw new ExpeditionAPIError(
+      'Request failed - please try again',
+      'WORKFLOW_FAILED',
+      500,
+      {
+        originalError: lastError,
+        errorType: typeof lastError,
+        operationId,
+        attemptHistory: attemptResults,
+        note: 'Empty error object detected'
+      }
+    );
+  }
+
+  // Handle standard Error objects
+  if (lastError instanceof Error) {
+    console.warn(`[EXPEDITION-API] [${operationId}] Converting Error to ExpeditionAPIError`);
+    throw new ExpeditionAPIError(
+      lastError.message || 'Unknown error occurred',
+      'WORKFLOW_FAILED',
+      500,
+      {
+        originalError: lastError,
+        errorType: typeof lastError,
+        errorConstructor: lastError.constructor.name,
+        stack: lastError.stack,
+        operationId,
+        attemptHistory: attemptResults
+      }
+    );
+  }
+
+  // Handle any other error types
+  console.warn(`[EXPEDITION-API] [${operationId}] Converting unknown error type to ExpeditionAPIError`);
+  const errorMessage = (lastError as any)?.message || String(lastError) || 'Unknown error occurred'
+  const errorCode = (lastError as any)?.code || 'WORKFLOW_FAILED'
 
   throw new ExpeditionAPIError(
-    `${errorMessage} (Debug: ${lastError?.constructor?.name || 'Unknown'})`,
-    errorCode as any,
+    errorMessage,
+    errorCode as ExpeditionErrorCode,
     500,
     {
       originalError: lastError,
       errorType: typeof lastError,
       errorConstructor: lastError?.constructor?.name,
+      operationId,
+      attemptHistory: attemptResults
     }
   )
 }
@@ -202,11 +383,27 @@ async function withRetry<T>(
  * Request validation utility
  */
 function validateRequest(data: any, requiredFields: string[]): void {
+  console.log('[EXPEDITION-API] Validating request:', { data, requiredFields })
+  
   for (const field of requiredFields) {
-    if (data[field] === undefined || data[field] === null || data[field] === '') {
-      throw new ExpeditionAPIError(`Missing required field: ${field}`, 'VALIDATION_ERROR', 400)
+    const value = data[field]
+    console.log(`[EXPEDITION-API] Checking field '${field}':`, value)
+    
+    if (value === undefined || value === null || value === '') {
+      const error = new ExpeditionAPIError(`Missing required field: ${field}`, 'VALIDATION_ERROR', 400)
+      console.error('[EXPEDITION-API] Validation failed:', error)
+      throw error
+    }
+    
+    // Special validation for arrays (like selectedAgents)
+    if (field === 'selectedAgents' && Array.isArray(value) && value.length === 0) {
+      const error = new ExpeditionAPIError(`Field '${field}' cannot be empty`, 'VALIDATION_ERROR', 400)
+      console.error('[EXPEDITION-API] Array validation failed:', error)
+      throw error
     }
   }
+  
+  console.log('[EXPEDITION-API] Request validation passed')
 }
 
 /**
@@ -375,14 +572,72 @@ export const expeditionAPI = {
     request: CreateExpeditionRequest,
     options?: APIOptions
   ): Promise<ExpeditionResponse> => {
-    validateRequest(request, ['starshipId', 'title', 'description', 'objective'])
+    // Enhanced validation to include selectedAgents
+    validateRequest(request, ['starshipId', 'title', 'description', 'objective', 'selectedAgents'])
+
+    // Additional validation for selectedAgents array
+    if (!Array.isArray(request.selectedAgents) || request.selectedAgents.length === 0) {
+      throw new ExpeditionAPIError(
+        'At least one agent must be selected for the expedition',
+        'VALIDATION_ERROR',
+        400,
+        { field: 'selectedAgents', value: request.selectedAgents }
+      )
+    }
 
     return withRetry(
       async () => {
-        const response = await api.post(`/api/starships/${request.starshipId}/expeditions`, request)
-        const data = validateResponse<ExpeditionResponse>(response.data.data, ['expedition'])
-        invalidateExpeditionCaches(undefined, request.starshipId)
-        return data
+        console.log('[EXPEDITION-API] ===== CREATE EXPEDITION OPERATION START =====');
+        console.log('[EXPEDITION-API] Making POST request to create expedition:', {
+          url: `/api/starships/${request.starshipId}/expeditions`,
+          request: request,
+          timestamp: new Date().toISOString()
+        });
+        
+        try {
+          console.log('[EXPEDITION-API] About to call api.post...');
+          console.log('[EXPEDITION-API] API instance details:', {
+            baseURL: api.defaults.baseURL,
+            timeout: api.defaults.timeout,
+            hasInterceptors: {
+              request: !!api.interceptors.request,
+              response: !!api.interceptors.response
+            }
+          });
+          
+          const response = await api.post(`/api/starships/${request.starshipId}/expeditions`, request)
+          console.log('[EXPEDITION-API] api.post completed successfully');
+          
+          console.log('[EXPEDITION-API] Received response from create expedition:', {
+            status: response.status,
+            statusText: response.statusText,
+            hasData: !!response.data,
+            dataKeys: response.data ? Object.keys(response.data) : [],
+            responseData: response.data,
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log('[EXPEDITION-API] About to validate response...');
+          const data = validateResponse<ExpeditionResponse>(response.data.data, ['expedition'])
+          console.log('[EXPEDITION-API] Response validation completed:', data);
+          
+          console.log('[EXPEDITION-API] Invalidating caches...');
+          invalidateExpeditionCaches(undefined, request.starshipId)
+          
+          console.log('[EXPEDITION-API] ===== CREATE EXPEDITION OPERATION SUCCESS =====');
+          return data
+        } catch (error) {
+          console.error('[EXPEDITION-API] ===== CREATE EXPEDITION OPERATION ERROR =====');
+          console.error('[EXPEDITION-API] Error in createExpedition operation:', {
+            error,
+            errorType: typeof error,
+            errorConstructor: error?.constructor?.name,
+            errorMessage: (error as any)?.message,
+            errorStack: (error as any)?.stack,
+            timestamp: new Date().toISOString()
+          });
+          throw error; // Re-throw to let withRetry handle it
+        }
       },
       { maxRetries: options?.retries }
     )

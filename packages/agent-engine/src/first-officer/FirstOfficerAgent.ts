@@ -52,8 +52,18 @@ export class FirstOfficerAgent {
     starshipId: string,
     memoryStore: LangChainMemoryStore,
     config: Partial<FirstOfficerConfig> = {},
-    selectedAgentIds?: string[]
+    selectedAgentIds: string[] // REQUIRED: No longer optional
   ) {
+    // MANDATORY: Validate that agents are provided
+    if (!selectedAgentIds || selectedAgentIds.length === 0) {
+      throw new Error(
+        'FirstOfficerAgent requires at least one agent to be selected. ' +
+        'Auto-assignment has been removed - agents must be explicitly provided during expedition creation.'
+      );
+    }
+
+    console.log(`🎯 [FIRST-OFFICER] Initializing with ${selectedAgentIds.length} pre-selected agents:`, selectedAgentIds);
+
     // Initialize configuration with defaults
     this.config = {
       maxRetries: 3,
@@ -67,7 +77,7 @@ export class FirstOfficerAgent {
 
     this.memoryStore = memoryStore;
     
-    // Initialize components
+    // Initialize components with REQUIRED agents
     this.agentSelector = new AgentSelector(starshipId, selectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
     this.taskExecutor = new TaskExecutor(this.config, memoryStore);
@@ -219,11 +229,8 @@ export class FirstOfficerAgent {
                 currentState = { ...currentState, ...(await this.planTasksNode(currentState)) };
                 break;
               case 'assigning':
-                if (!currentState.selectedAgents) {
-                  currentState = { ...currentState, ...(await this.selectAgentsNode(currentState)) };
-                } else {
-                  currentState = { ...currentState, ...(await this.assignTasksNode(currentState)) };
-                }
+                // Always use pre-selected agents - no auto-selection
+                currentState = { ...currentState, ...(await this.assignTasksNode(currentState)) };
                 break;
               case 'coordinating':
                 if (!currentState.activeExecutions && !currentState.completedTasks) {

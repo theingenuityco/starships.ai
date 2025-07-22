@@ -97,26 +97,47 @@ router.post(
   authMiddleware,
   validateCreateExpedition,
   async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== CREATE EXPEDITION REQUEST START =====`);
+    
     try {
       const { starshipId } = req.params;
       const userId = req.user!.id;
+      
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Request received`, {
+        starshipId,
+        userId,
+        requestBody: req.body,
+        headers: {
+          'content-type': req.headers['content-type'],
+          'authorization': req.headers.authorization ? 'Bearer [REDACTED]' : 'None'
+        },
+        timestamp: new Date().toISOString()
+      });
+      
       const createRequest: CreateExpeditionRequest = {
         starshipId,
         ...req.body,
       };
 
-      console.log(`[EXPEDITION-API] Creating expedition for starship: ${starshipId}`, {
-        userId,
-        requestBody: req.body,
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Request object prepared`, {
         createRequest,
+        hasSelectedAgents: !!createRequest.selectedAgents,
+        selectedAgentsCount: createRequest.selectedAgents?.length || 0,
+        timestamp: new Date().toISOString()
       });
 
+      console.log(`[EXPEDITION-API] [${requestId}] Step 3: Calling expeditionService.createExpedition`);
       const expeditionResponse = await expeditionService.createExpedition(userId, createRequest);
 
-      console.log(
-        `[EXPEDITION-API] Expedition created successfully: ${expeditionResponse.expedition.id}`
-      );
+      console.log(`[EXPEDITION-API] [${requestId}] Step 4: Expedition created successfully`, {
+        expeditionId: expeditionResponse.expedition.id,
+        expeditionTitle: expeditionResponse.expedition.title,
+        assignedAgentsCount: expeditionResponse.assignedAgents?.length || 0,
+        timestamp: new Date().toISOString()
+      });
 
+      console.log(`[EXPEDITION-API] [${requestId}] Step 5: Emitting real-time event`);
       // Emit real-time event for expedition creation
       await emitSocketEvent(
         'expedition:created',
@@ -138,12 +159,16 @@ router.post(
         userId
       );
 
+      console.log(`[EXPEDITION-API] [${requestId}] Step 6: Sending response`);
       res.status(201).json({
         success: true,
         data: expeditionResponse,
       });
+      
+      console.log(`[EXPEDITION-API] [${requestId}] ===== CREATE EXPEDITION REQUEST SUCCESS =====`);
     } catch (error: any) {
-      console.error('[EXPEDITION-API] Failed to create expedition - Enhanced Debug:', {
+      console.error(`[EXPEDITION-API] [${requestId}] ===== CREATE EXPEDITION REQUEST ERROR =====`);
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to create expedition - Enhanced Debug:`, {
         error,
         errorMessage: error.message,
         errorCode: error.code,
@@ -153,17 +178,26 @@ router.post(
         starshipId: req.params.starshipId,
         userId: req.user?.id,
         requestBody: req.body,
+        timestamp: new Date().toISOString()
       });
 
-      res.status(error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500).json({
+      const statusCode = error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 :
+                        error.code === 'VALIDATION_ERROR' ? 400 :
+                        error.code === 'STARSHIP_NOT_FOUND' ? 404 :
+                        error.code === 'AGENT_NOT_AVAILABLE' ? 400 : 500;
+
+      res.status(statusCode).json({
         success: false,
         error: error.message || 'Failed to create expedition',
         code: error.code || 'UNKNOWN_ERROR',
         debug: {
           errorType: error.constructor?.name,
+          requestId,
           timestamp: new Date().toISOString(),
         },
       });
+      
+      console.error(`[EXPEDITION-API] [${requestId}] ===== CREATE EXPEDITION REQUEST FAILED =====`);
     }
   }
 );

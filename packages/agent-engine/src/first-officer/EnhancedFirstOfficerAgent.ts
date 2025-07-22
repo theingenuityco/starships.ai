@@ -71,7 +71,8 @@ export class EnhancedFirstOfficerAgent {
   constructor(
     starshipId: string,
     memoryStore: LangChainMemoryStore,
-    config: Partial<FirstOfficerConfig> = {}
+    config: Partial<FirstOfficerConfig> = {},
+    preSelectedAgentIds: string[] = []
   ) {
     // Initialize configuration with enhanced defaults
     this.config = {
@@ -87,7 +88,7 @@ export class EnhancedFirstOfficerAgent {
     this.memoryStore = memoryStore;
     
     // Initialize core components
-    this.agentSelector = new AgentSelector(starshipId);
+    this.agentSelector = new AgentSelector(starshipId, preSelectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
     this.taskExecutor = new TaskExecutor(this.config, memoryStore);
     

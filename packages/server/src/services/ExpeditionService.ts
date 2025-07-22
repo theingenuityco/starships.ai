@@ -79,22 +79,37 @@ export class ExpeditionService {
     });
 
     try {
-      console.log(`[EXPEDITION-SERVICE] Step 1: Validating starship ownership`);
+      console.log(`[EXPEDITION-SERVICE] Step 1: Validating agent selection requirement`);
+      // MANDATORY: Validate that agents are selected
+      if (!request.selectedAgents || request.selectedAgents.length === 0) {
+        throw this.createError(
+          'VALIDATION_ERROR',
+          'Agent selection is required. At least one agent must be selected for the expedition.'
+        );
+      }
+      console.log(`[EXPEDITION-SERVICE] Step 1: Agent selection validated - ${request.selectedAgents.length} agents selected`);
+
+      console.log(`[EXPEDITION-SERVICE] Step 2: Validating starship ownership`);
       // Validate starship ownership
       await this.validateStarshipOwnership(request.starshipId, userId);
-      console.log(`[EXPEDITION-SERVICE] Step 1: Starship ownership validated successfully`);
+      console.log(`[EXPEDITION-SERVICE] Step 2: Starship ownership validated successfully`);
 
-      console.log(`[EXPEDITION-SERVICE] Step 2: Validating starship status`);
+      console.log(`[EXPEDITION-SERVICE] Step 3: Validating starship status`);
       // Validate starship status
       await this.validateStarshipStatus(request.starshipId);
-      console.log(`[EXPEDITION-SERVICE] Step 2: Starship status validated successfully`);
+      console.log(`[EXPEDITION-SERVICE] Step 3: Starship status validated successfully`);
 
-      console.log(`[EXPEDITION-SERVICE] Step 3: Getting expedition repository`);
+      console.log(`[EXPEDITION-SERVICE] Step 4: Validating selected agents`);
+      // Validate selected agents belong to the starship and are deployed
+      await this.validateSelectedAgents(request.starshipId, request.selectedAgents);
+      console.log(`[EXPEDITION-SERVICE] Step 4: Selected agents validated successfully`);
+
+      console.log(`[EXPEDITION-SERVICE] Step 5: Getting expedition repository`);
       // Create expedition
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      console.log(`[EXPEDITION-SERVICE] Step 3: Expedition repository obtained successfully`);
+      console.log(`[EXPEDITION-SERVICE] Step 5: Expedition repository obtained successfully`);
 
-      console.log(`[EXPEDITION-SERVICE] Step 4: Creating expedition in database`);
+      console.log(`[EXPEDITION-SERVICE] Step 6: Creating expedition in database`);
       const expeditionData = {
         starshipId: request.starshipId,
         title: request.title,
@@ -102,49 +117,37 @@ export class ExpeditionService {
         objective: request.objective,
         status: 'draft' as const,
         priority: request.priority || 'medium',
-        assignedAgents: [],
+        assignedAgents: [], // Will be populated in next step
         createdBy: userId,
         estimatedDuration: request.estimatedDuration,
         tags: request.tags || [],
         updatedAt: new Date().toISOString(),
       };
-      console.log(`[EXPEDITION-SERVICE] Step 4: Expedition data prepared:`, expeditionData);
+      console.log(`[EXPEDITION-SERVICE] Step 6: Expedition data prepared:`, expeditionData);
 
       const expedition = await expeditionRepo.create(expeditionData);
-      console.log(`[EXPEDITION-SERVICE] Step 4: Expedition created in database:`, expedition);
+      console.log(`[EXPEDITION-SERVICE] Step 6: Expedition created in database:`, expedition);
 
-      console.log(`[EXPEDITION-SERVICE] Step 5: Processing selected agents`);
-      // Process selected agents if provided
-      let finalExpedition = expedition;
-      if (request.selectedAgents && request.selectedAgents.length > 0) {
-        console.log(`[EXPEDITION-SERVICE] Step 5a: Validating and assigning selected agents:`, request.selectedAgents);
-        
-        // Validate selected agents belong to the starship and are deployed
-        await this.validateSelectedAgents(request.starshipId, request.selectedAgents);
-        
-        // Assign each selected agent to the expedition
-        for (const agentId of request.selectedAgents) {
-          console.log(`[EXPEDITION-SERVICE] Step 5b: Assigning agent ${agentId} to expedition ${expedition.id}`);
-          await expeditionRepo.assignAgent(expedition.id, agentId);
-        }
-        
-        // Get updated expedition with assigned agents
-        const updatedExpedition = await expeditionRepo.findById(expedition.id);
-        if (!updatedExpedition) {
-          throw this.createError('UPDATE_FAILED', 'Failed to retrieve updated expedition after agent assignment');
-        }
-        finalExpedition = updatedExpedition;
-        console.log(`[EXPEDITION-SERVICE] Step 5c: Agents assigned successfully. Updated expedition:`, finalExpedition);
-      } else {
-        console.log(`[EXPEDITION-SERVICE] Step 5: No agents selected, proceeding without agent assignment`);
+      console.log(`[EXPEDITION-SERVICE] Step 7: Assigning selected agents to expedition`);
+      // Assign each selected agent to the expedition (required step)
+      for (const agentId of request.selectedAgents) {
+        console.log(`[EXPEDITION-SERVICE] Step 7a: Assigning agent ${agentId} to expedition ${expedition.id}`);
+        await expeditionRepo.assignAgent(expedition.id, agentId);
       }
+      
+      // Get updated expedition with assigned agents
+      const finalExpedition = await expeditionRepo.findById(expedition.id);
+      if (!finalExpedition) {
+        throw this.createError('UPDATE_FAILED', 'Failed to retrieve updated expedition after agent assignment');
+      }
+      console.log(`[EXPEDITION-SERVICE] Step 7: All agents assigned successfully. Updated expedition:`, finalExpedition);
 
-      console.log(`[EXPEDITION-SERVICE] Step 6: Getting assigned agents info`);
+      console.log(`[EXPEDITION-SERVICE] Step 8: Getting assigned agents info`);
       // Get assigned agents info
       const assignedAgents = await this.getAssignedAgentsInfo(finalExpedition.assignedAgents);
-      console.log(`[EXPEDITION-SERVICE] Step 6: Assigned agents info retrieved:`, assignedAgents);
+      console.log(`[EXPEDITION-SERVICE] Step 8: Assigned agents info retrieved:`, assignedAgents);
 
-      console.log(`[EXPEDITION-SERVICE] Step 7: Emitting real-time event`);
+      console.log(`[EXPEDITION-SERVICE] Step 9: Emitting real-time event`);
       // Emit real-time event
       const socketService = this.getSocketService();
       if (socketService) {
@@ -152,10 +155,10 @@ export class ExpeditionService {
           expedition: finalExpedition,
           assignedAgents,
         });
-        console.log(`[EXPEDITION-SERVICE] Step 7: Real-time event emitted successfully`);
+        console.log(`[EXPEDITION-SERVICE] Step 9: Real-time event emitted successfully`);
       } else {
         console.log(
-          `[EXPEDITION-SERVICE] Step 7: SocketService not available, skipping real-time event`
+          `[EXPEDITION-SERVICE] Step 9: SocketService not available, skipping real-time event`
         );
       }
 

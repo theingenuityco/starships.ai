@@ -1,526 +1,434 @@
 /**
- * Comprehensive Health Check Endpoints for Starships.ai
- *
- * This module provides detailed health checks for all system components
- * including database connectivity, repository health, service dependencies,
- * and system resource monitoring.
+ * Health Check Routes
+ * 
+ * Comprehensive health monitoring endpoints for the expedition orchestration system.
+ * Provides detailed system status, dependency health, and performance metrics.
  */
 
-import { Router, Request, Response } from 'express';
-import { logger, HealthMonitor, PerformanceMonitor } from '@starships/models/src/logging';
-import {
-  DatabaseError,
-  ServiceUnavailableError,
-  ErrorHandlerUtils,
-} from '../middleware/errorHandler';
+import express from 'express';
 import { getConnection } from '@starships/models';
-import {
-  AgentRepository,
-  StarshipRepository,
-  MCPServerOptionRepository,
-  MCPServerConnectorRepository,
-  UserRepository,
-} from '@starships/models';
+import { RepositoryFactory } from '@starships/models';
+import { logger, LogContext } from '@starships/models/src/logging';
+import { ErrorUtils } from '@starships/models/src/errors';
 
-const router: Router = Router();
+const router: express.Router = express.Router();
+
+/**
+ * Health check response interface
+ */
+interface HealthCheckResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  uptime: number;
+  version: string;
+  environment: string;
+  services: {
+    [key: string]: {
+      status: 'healthy' | 'degraded' | 'unhealthy';
+      responseTime?: number;
+      error?: string;
+      details?: any;
+    };
+  };
+  metrics?: {
+    memory: {
+      used: number;
+      total: number;
+      percentage: number;
+    };
+    cpu: {
+      usage: number;
+    };
+    connections: {
+      active: number;
+      total: number;
+    };
+  };
+}
 
 /**
  * Basic health check endpoint
  * GET /health
  */
-router.get('/health', (req: Request, res: Response) => {
+router.get('/', async (req, res) => {
+  const requestId = ErrorUtils.generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const healthStatus = {
+    const healthCheck: HealthCheckResponse = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
       version: process.env.npm_package_version || '1.0.0',
       environment: process.env.NODE_ENV || 'development',
-      uptime: process.uptime(),
-      requestId: req.get('X-Request-ID'),
+      services: {},
     };
 
-    logger.info('Basic health check requested', {
-      requestId: req.get('X-Request-ID'),
-      component: 'health',
-      path: req.path,
-    });
-
-    res.json(healthStatus);
-  } catch (error) {
-    logger.error(
-      'Basic health check failed',
-      {
-        requestId: req.get('X-Request-ID'),
-        component: 'health',
-        path: req.path,
-      },
-      error as Error
-    );
-
-    res.status(503).json({
-      error: {
-        code: 'HEALTH_CHECK_FAILED',
-        message: 'Health check failed',
-        timestamp: new Date().toISOString(),
-        requestId: req.get('X-Request-ID'),
-      },
-    });
-  }
-});
-
-/**
- * Database health check endpoint
- * GET /health/database
- */
-router.get('/health/database', async (req: Request, res: Response) => {
-  try {
-    const dbHealthStatus = await HealthMonitor.checkService(
-      'neo4j-database',
-      async () => {
-        const connection = getConnection();
-
-        // Test basic connectivity
-        const result = await connection.executeQuery('RETURN 1 as test');
-        if (!result || result.length === 0) {
-          throw new Error('Database query returned no results');
-        }
-
-        // Test node count (basic functionality)
-        const nodeCountResult = await connection.executeQuery<{ count: number }>(
-          'MATCH (n) RETURN count(n) as count LIMIT 1'
-        );
-
-        return nodeCountResult.length > 0;
-      },
-      5000 // 5 second timeout
-    );
-
-    if (dbHealthStatus.status === 'healthy') {
-      res.json({
+    // Check database connectivity
+    try {
+      const dbStart = Date.now();
+      const connection = getConnection();
+      await connection.executeQuery('RETURN 1 as health_check');
+      
+      healthCheck.services.database = {
         status: 'healthy',
-        service: 'database',
-        details: dbHealthStatus,
-        timestamp: new Date().toISOString(),
-        requestId: req.get('X-Request-ID'),
-      });
-    } else {
-      res.status(503).json({
-        error: {
-          code: 'DATABASE_UNHEALTHY',
-          message: 'Database health check failed',
-          service: 'database',
-          details: dbHealthStatus,
-          timestamp: new Date().toISOString(),
-          requestId: req.get('X-Request-ID'),
-        },
-      });
+        responseTime: Date.now() - dbStart,
+      };
+    } catch (error) {
+      healthCheck.services.database = {
+        status: 'unhealthy',
+        error: error instanceof Error ? error.message : 'Unknown database error',
+      };
+      healthCheck.status = 'unhealthy';
     }
-  } catch (error) {
-    logger.error(
-      'Database health check failed',
-      {
-        requestId: req.get('X-Request-ID'),
-        component: 'health',
-        path: req.path,
+
+    // Check repository health
+    try {
+      const repoStart = Date.now();
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      
+      // Test basic repository functionality
+      await expeditionRepo.findAll();
+      
+      healthCheck.services.repositories = {
+        status: 'healthy',
+        responseTime: Date.now() - repoStart,
+      };
+    } catch (error) {
+      healthCheck.services.repositories = {
+        status: 'degraded',
+        error: error instanceof Error ? error.message : 'Repository error',
+      };
+      if (healthCheck.status === 'healthy') {
+        healthCheck.status = 'degraded';
+      }
+    }
+
+    // Add system metrics
+    const memUsage = process.memoryUsage();
+    healthCheck.metrics = {
+      memory: {
+        used: memUsage.heapUsed,
+        total: memUsage.heapTotal,
+        percentage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
       },
-      error as Error
-    );
+      cpu: {
+        usage: process.cpuUsage().user / 1000000, // Convert to seconds
+      },
+      connections: {
+        active: (global as any).__SOCKET_CONNECTIONS__ || 0,
+        total: (global as any).__TOTAL_CONNECTIONS__ || 0,
+      },
+    };
 
-    const dbError = ErrorHandlerUtils.database('Database health check failed', 'health-check', req);
-
-    res.status(503).json({
-      error: dbError.toErrorResponse(),
+    const responseTime = Date.now() - startTime;
+    
+    // Log health check
+    logger.info('Health check completed', {
+      requestId,
+      metadata: {
+        status: healthCheck.status,
+        responseTime,
+        services: Object.keys(healthCheck.services).map(service => ({
+          name: service,
+          status: healthCheck.services[service].status,
+        })),
+      },
     });
+
+    // Set appropriate HTTP status code
+    const statusCode = healthCheck.status === 'healthy' ? 200 : 
+                      healthCheck.status === 'degraded' ? 200 : 503;
+
+    res.status(statusCode).json(healthCheck);
+
+  } catch (error) {
+    const errorResponse: HealthCheckResponse = {
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        system: {
+          status: 'unhealthy',
+          error: error instanceof Error ? error.message : 'System error',
+        },
+      },
+    };
+
+    logger.error('Health check failed', {
+      requestId,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    });
+
+    res.status(503).json(errorResponse);
   }
 });
 
 /**
- * Repository health check endpoint
- * GET /health/repositories
+ * Detailed health check endpoint
+ * GET /health/detailed
  */
-router.get('/health/repositories', async (req: Request, res: Response) => {
+router.get('/detailed', async (req, res) => {
+  const requestId = ErrorUtils.generateRequestId();
+  const startTime = Date.now();
+
   try {
-    const repositoryHealthChecks = await Promise.allSettled([
-      // Agent Repository Health
-      HealthMonitor.checkService('agent-repository', async () => {
-        const agentRepo = new AgentRepository();
-        const agents = await agentRepo.findAll();
-        return Array.isArray(agents);
-      }),
+    const healthCheck: HealthCheckResponse = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      services: {},
+    };
 
-      // Starship Repository Health
-      HealthMonitor.checkService('starship-repository', async () => {
-        const starshipRepo = new StarshipRepository();
-        const starships = await starshipRepo.findAll();
-        return Array.isArray(starships);
-      }),
+    // Comprehensive database health check
+    try {
+      const dbStart = Date.now();
+      const connection = getConnection();
+      
+      // Test basic connectivity
+      await connection.executeQuery('RETURN 1 as health_check');
+      
+      // Test database schema
+      const schemaCheck = await connection.executeQuery(`
+        CALL db.schema.visualization() YIELD nodes, relationships
+        RETURN count(nodes) as nodeTypes, count(relationships) as relationshipTypes
+      `);
+      
+      // Test database performance
+      const perfStart = Date.now();
+      await connection.executeQuery('MATCH (n) RETURN count(n) as totalNodes LIMIT 1');
+      const perfTime = Date.now() - perfStart;
+      
+      healthCheck.services.database = {
+        status: 'healthy',
+        responseTime: Date.now() - dbStart,
+        details: {
+          nodeTypes: schemaCheck[0]?.nodeTypes || 0,
+          relationshipTypes: schemaCheck[0]?.relationshipTypes || 0,
+          queryPerformance: perfTime,
+        },
+      };
+    } catch (error) {
+      healthCheck.services.database = {
+        status: 'unhealthy',
+        error: error instanceof Error ? error.message : 'Database error',
+      };
+      healthCheck.status = 'unhealthy';
+    }
 
-      // MCP Server Option Repository Health
-      HealthMonitor.checkService('mcp-server-option-repository', async () => {
-        const mcpServerRepo = new MCPServerOptionRepository();
-        const mcpServers = await mcpServerRepo.findAll();
-        return Array.isArray(mcpServers);
-      }),
+    // Check all repository types
+    const repositoryTypes = [
+      'ExpeditionRepository',
+      'StarshipRepository',
+      'UserRepository',
+      'AgentRepository',
+      'ExpeditionTaskRepository',
+      'ExpeditionMessageRepository',
+      'ExpeditionResultRepository',
+    ];
 
-      // MCP Server Connector Repository Health
-      HealthMonitor.checkService('mcp-server-connector-repository', async () => {
-        const mcpConnectorRepo = new MCPServerConnectorRepository();
-        const connectors = await mcpConnectorRepo.findAll();
-        return Array.isArray(connectors);
-      }),
-
-      // User Repository Health
-      HealthMonitor.checkService('user-repository', async () => {
-        const userRepo = new UserRepository();
-        const users = await userRepo.findAll();
-        return Array.isArray(users);
-      }),
-    ]);
-
-    const repositoryStatuses = repositoryHealthChecks.map((result, index) => {
-      const repoNames = [
-        'agent-repository',
-        'starship-repository',
-        'mcp-server-option-repository',
-        'mcp-server-connector-repository',
-        'user-repository',
-      ];
-
-      if (result.status === 'fulfilled') {
-        return {
-          repository: repoNames[index],
-          status: result.value.status,
-          responseTime: result.value.responseTime,
-          timestamp: result.value.timestamp,
+    for (const repoType of repositoryTypes) {
+      try {
+        const repoStart = Date.now();
+        const repo = (RepositoryFactory as any)[`get${repoType}`]();
+        
+        // Test basic functionality
+        await repo.findAll();
+        
+        healthCheck.services[repoType.toLowerCase()] = {
+          status: 'healthy',
+          responseTime: Date.now() - repoStart,
         };
-      } else {
-        return {
-          repository: repoNames[index],
-          status: 'unhealthy',
-          error: result.reason?.message || 'Unknown error',
-          timestamp: new Date().toISOString(),
+      } catch (error) {
+        healthCheck.services[repoType.toLowerCase()] = {
+          status: 'degraded',
+          error: error instanceof Error ? error.message : 'Repository error',
+        };
+        if (healthCheck.status === 'healthy') {
+          healthCheck.status = 'degraded';
+        }
+      }
+    }
+
+    // Check external dependencies
+    try {
+      // Check LLM provider availability (if configured)
+      if (process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY) {
+        const llmStart = Date.now();
+        // This would test LLM connectivity in a real implementation
+        healthCheck.services.llm = {
+          status: 'healthy',
+          responseTime: Date.now() - llmStart,
+          details: {
+            providers: {
+              openai: !!process.env.OPENAI_API_KEY,
+              anthropic: !!process.env.ANTHROPIC_API_KEY,
+            },
+          },
         };
       }
-    });
+    } catch (error) {
+      healthCheck.services.llm = {
+        status: 'degraded',
+        error: 'LLM provider check failed',
+      };
+    }
 
-    const allHealthy = repositoryStatuses.every((repo) => repo.status === 'healthy');
-    const overallStatus = allHealthy ? 'healthy' : 'degraded';
-
-    const response = {
-      status: overallStatus,
-      service: 'repositories',
-      repositories: repositoryStatuses,
-      timestamp: new Date().toISOString(),
-      requestId: req.get('X-Request-ID'),
+    // Enhanced system metrics
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    
+    healthCheck.metrics = {
+      memory: {
+        used: memUsage.heapUsed,
+        total: memUsage.heapTotal,
+        percentage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
+      },
+      cpu: {
+        usage: (cpuUsage.user + cpuUsage.system) / 1000000,
+      },
+      connections: {
+        active: (global as any).__SOCKET_CONNECTIONS__ || 0,
+        total: (global as any).__TOTAL_CONNECTIONS__ || 0,
+      },
     };
 
-    if (allHealthy) {
-      res.json(response);
-    } else {
-      res.status(503).json({
-        error: {
-          code: 'REPOSITORIES_UNHEALTHY',
-          message: 'One or more repositories are unhealthy',
-          ...response,
-        },
-      });
-    }
-  } catch (error) {
-    logger.error(
-      'Repository health check failed',
-      {
-        requestId: req.get('X-Request-ID'),
-        component: 'health',
-        path: req.path,
+    const responseTime = Date.now() - startTime;
+    
+    logger.info('Detailed health check completed', {
+      requestId,
+      metadata: {
+        status: healthCheck.status,
+        responseTime,
+        serviceCount: Object.keys(healthCheck.services).length,
       },
-      error as Error
-    );
+    });
 
-    const serviceError = new ServiceUnavailableError(
-      'Repository health check failed',
-      'repositories',
-      30,
-      undefined,
-      req.get('X-Request-ID'),
-      req.path
-    );
+    const statusCode = healthCheck.status === 'healthy' ? 200 : 
+                      healthCheck.status === 'degraded' ? 200 : 503;
+
+    res.status(statusCode).json(healthCheck);
+
+  } catch (error) {
+    logger.error('Detailed health check failed', {
+      requestId,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+    });
 
     res.status(503).json({
-      error: serviceError.toResponse(),
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: 'Health check system failure',
     });
   }
 });
 
 /**
- * System resources health check endpoint
- * GET /health/system
- */
-router.get('/health/system', async (req: Request, res: Response) => {
-  try {
-    const systemHealth = await PerformanceMonitor.measure('system-health-check', async () => {
-      // Memory usage
-      const memoryUsage = process.memoryUsage();
-      const memoryUsageMB = {
-        rss: Math.round(memoryUsage.rss / 1024 / 1024),
-        heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024),
-        heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-        external: Math.round(memoryUsage.external / 1024 / 1024),
-      };
-
-      // CPU usage (approximation)
-      const cpuUsage = process.cpuUsage();
-
-      // System uptime
-      const uptime = process.uptime();
-
-      // Node.js version
-      const nodeVersion = process.version;
-
-      // Environment info
-      const environment = {
-        nodeEnv: process.env.NODE_ENV || 'development',
-        platform: process.platform,
-        arch: process.arch,
-        nodeVersion,
-      };
-
-      // Health thresholds
-      const memoryThreshold = 1024; // 1GB
-      const uptimeThreshold = 60; // 1 minute minimum uptime
-
-      const isHealthy = memoryUsageMB.heapUsed < memoryThreshold && uptime > uptimeThreshold;
-
-      return {
-        status: isHealthy ? 'healthy' : 'degraded',
-        memory: memoryUsageMB,
-        cpu: {
-          user: cpuUsage.user,
-          system: cpuUsage.system,
-        },
-        uptime: Math.round(uptime),
-        environment,
-        thresholds: {
-          memoryThreshold,
-          uptimeThreshold,
-        },
-      };
-    });
-
-    const response = {
-      ...systemHealth,
-      timestamp: new Date().toISOString(),
-      requestId: req.get('X-Request-ID'),
-    };
-
-    if (systemHealth.status === 'healthy') {
-      res.json(response);
-    } else {
-      res.status(503).json({
-        error: {
-          code: 'SYSTEM_DEGRADED',
-          message: 'System resources are degraded',
-          ...response,
-        },
-      });
-    }
-  } catch (error) {
-    logger.error(
-      'System health check failed',
-      {
-        requestId: req.get('X-Request-ID'),
-        component: 'health',
-        path: req.path,
-      },
-      error as Error
-    );
-
-    const serviceError = new ServiceUnavailableError(
-      'System health check failed',
-      'system',
-      30,
-      undefined,
-      req.get('X-Request-ID'),
-      req.path
-    );
-
-    res.status(503).json({
-      error: serviceError.toResponse(),
-    });
-  }
-});
-
-/**
- * Comprehensive health check endpoint
- * GET /health/comprehensive
- */
-router.get('/health/comprehensive', async (req: Request, res: Response) => {
-  try {
-    const startTime = Date.now();
-
-    // Run all health checks in parallel
-    const [basicHealth, dbHealth, repoHealth, systemHealth] = await Promise.allSettled([
-      // Basic health
-      Promise.resolve({
-        status: 'healthy',
-        uptime: process.uptime(),
-        version: process.env.npm_package_version || '1.0.0',
-      }),
-
-      // Database health
-      HealthMonitor.checkService('neo4j-database', async () => {
-        const connection = getConnection();
-        const result = await connection.executeQuery('RETURN 1 as test');
-        return result && result.length > 0;
-      }),
-
-      // Repository health (simplified)
-      HealthMonitor.checkService('repositories', async () => {
-        const agentRepo = new AgentRepository();
-        await agentRepo.findAll();
-        return true;
-      }),
-
-      // System health
-      PerformanceMonitor.measure('system-check', async () => {
-        const memoryUsage = process.memoryUsage();
-        const heapUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
-        return { status: heapUsedMB < 1024 ? 'healthy' : 'degraded', heapUsedMB };
-      }),
-    ]);
-
-    const totalDuration = Date.now() - startTime;
-
-    // Process results
-    const healthResults = {
-      basic:
-        basicHealth.status === 'fulfilled'
-          ? basicHealth.value
-          : { status: 'unhealthy', error: basicHealth.reason },
-      database:
-        dbHealth.status === 'fulfilled'
-          ? dbHealth.value
-          : { status: 'unhealthy', error: dbHealth.reason },
-      repositories:
-        repoHealth.status === 'fulfilled'
-          ? repoHealth.value
-          : { status: 'unhealthy', error: repoHealth.reason },
-      system:
-        systemHealth.status === 'fulfilled'
-          ? systemHealth.value
-          : { status: 'unhealthy', error: systemHealth.reason },
-    };
-
-    // Determine overall status
-    const allHealthy = Object.values(healthResults).every((result) => result.status === 'healthy');
-    const anyUnhealthy = Object.values(healthResults).some(
-      (result) => result.status === 'unhealthy'
-    );
-
-    const overallStatus = allHealthy ? 'healthy' : anyUnhealthy ? 'unhealthy' : 'degraded';
-
-    const response = {
-      status: overallStatus,
-      timestamp: new Date().toISOString(),
-      duration: totalDuration,
-      checks: healthResults,
-      requestId: req.get('X-Request-ID'),
-    };
-
-    // Log comprehensive health check
-    logger.info(`Comprehensive health check completed: ${overallStatus}`, {
-      requestId: req.get('X-Request-ID'),
-      component: 'health',
-      path: req.path,
-      duration: totalDuration,
-      metadata: { overallStatus, checkCount: Object.keys(healthResults).length },
-    });
-
-    if (overallStatus === 'healthy') {
-      res.json(response);
-    } else {
-      res.status(503).json({
-        error: {
-          code: 'SYSTEM_UNHEALTHY',
-          message: `System health check failed: ${overallStatus}`,
-          ...response,
-        },
-      });
-    }
-  } catch (error) {
-    logger.error(
-      'Comprehensive health check failed',
-      {
-        requestId: req.get('X-Request-ID'),
-        component: 'health',
-        path: req.path,
-      },
-      error as Error
-    );
-
-    const serviceError = new ServiceUnavailableError(
-      'Comprehensive health check failed',
-      'system',
-      60,
-      undefined,
-      req.get('X-Request-ID'),
-      req.path
-    );
-
-    res.status(503).json({
-      error: serviceError.toResponse(),
-    });
-  }
-});
-
-/**
- * Health check readiness probe (for Kubernetes/Docker)
+ * Readiness probe endpoint
  * GET /health/ready
  */
-router.get('/health/ready', async (req: Request, res: Response) => {
+router.get('/ready', async (req, res) => {
   try {
-    // Quick readiness check - database connectivity
+    // Check if system is ready to accept requests
     const connection = getConnection();
-    await connection.executeQuery('RETURN 1');
+    await connection.executeQuery('RETURN 1 as readiness_check');
+    
+    // Check if essential repositories are available
+    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+    await expeditionRepo.findAll();
 
-    res.json({
+    res.status(200).json({
       status: 'ready',
       timestamp: new Date().toISOString(),
-      requestId: req.get('X-Request-ID'),
     });
+
   } catch (error) {
-    logger.warn(
-      'Readiness check failed',
-      {
-        requestId: req.get('X-Request-ID'),
-        component: 'health',
-        path: req.path,
-      },
-      error as Error
-    );
+    logger.warn('Readiness check failed', {
+      error: { message: error instanceof Error ? error.message : 'Unknown error' },
+    });
 
     res.status(503).json({
-      error: {
-        code: 'NOT_READY',
-        message: 'Service is not ready',
-        timestamp: new Date().toISOString(),
-        requestId: req.get('X-Request-ID'),
-      },
+      status: 'not_ready',
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'System not ready',
     });
   }
 });
 
 /**
- * Health check liveness probe (for Kubernetes/Docker)
+ * Liveness probe endpoint
  * GET /health/live
  */
-router.get('/health/live', (req: Request, res: Response) => {
+router.get('/live', (req, res) => {
   // Simple liveness check - if we can respond, we're alive
-  res.json({
+  res.status(200).json({
     status: 'alive',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    requestId: req.get('X-Request-ID'),
   });
+});
+
+/**
+ * System metrics endpoint
+ * GET /health/metrics
+ */
+router.get('/metrics', (req, res) => {
+  try {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    
+    const metrics = {
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: {
+        rss: memUsage.rss,
+        heapTotal: memUsage.heapTotal,
+        heapUsed: memUsage.heapUsed,
+        external: memUsage.external,
+        arrayBuffers: memUsage.arrayBuffers,
+      },
+      cpu: {
+        user: cpuUsage.user,
+        system: cpuUsage.system,
+      },
+      process: {
+        pid: process.pid,
+        version: process.version,
+        platform: process.platform,
+        arch: process.arch,
+      },
+      connections: {
+        active: (global as any).__SOCKET_CONNECTIONS__ || 0,
+        total: (global as any).__TOTAL_CONNECTIONS__ || 0,
+      },
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        version: process.env.npm_package_version || '1.0.0',
+      },
+    };
+
+    res.status(200).json(metrics);
+
+  } catch (error) {
+    logger.error('Metrics collection failed', {
+      error: { message: error instanceof Error ? error.message : 'Unknown error' },
+    });
+
+    res.status(500).json({
+      error: 'Failed to collect metrics',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 export default router;

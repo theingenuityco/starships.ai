@@ -29,8 +29,15 @@ export interface MigrationResult {
 }
 
 export class MigrationRunner {
-  private connection = getConnection();
+  private connection: any = null;
   private migrationsPath = join(__dirname, '../migrations');
+
+  private getConnection() {
+    if (!this.connection) {
+      this.connection = getConnection();
+    }
+    return this.connection;
+  }
 
   /**
    * Execute a migration with full error handling
@@ -166,12 +173,12 @@ export class MigrationRunner {
    */
   async getAppliedMigrations(): Promise<MigrationInfo[]> {
     try {
-      const result = await this.connection.executeQuery<{ m: MigrationInfo }>(
+      const result = await this.getConnection().executeQuery(
         `MATCH (m:Migration) 
          RETURN m 
          ORDER BY m.appliedAt ASC`
       );
-      return result.map(record => record.m);
+      return result.map((record: any) => record.m);
     } catch (error) {
       console.error('Failed to get applied migrations:', error);
       return [];
@@ -225,7 +232,7 @@ export class MigrationRunner {
    */
   private async isMigrationApplied(migrationId: string): Promise<boolean> {
     try {
-      const result = await this.connection.executeQuery<{ count: number }>(
+      const result = await this.getConnection().executeQuery(
         'MATCH (m:Migration {id: $migrationId}) RETURN count(m) as count',
         { migrationId }
       );
@@ -250,7 +257,7 @@ export class MigrationRunner {
     for (const statement of statements) {
       if (statement.trim()) {
         try {
-          await this.connection.executeWrite(statement);
+          await this.getConnection().executeWrite(statement);
         } catch (error) {
           throw new Error(`Failed to execute statement in ${migrationId}: ${statement.substring(0, 100)}... Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -263,7 +270,7 @@ export class MigrationRunner {
    */
   private async createBackupPoint(migrationId: string): Promise<void> {
     try {
-      await this.connection.executeWrite(
+      await this.getConnection().executeWrite(
         `CREATE (bp:BackupPoint {
           id: $backupId,
           migrationId: $migrationId,
@@ -321,7 +328,7 @@ export class MigrationRunner {
   private async verifyConstraintsAndIndexes(errors: string[]): Promise<void> {
     try {
       // Check constraints
-      const constraints = await this.connection.executeQuery(
+      const constraints = await this.getConnection().executeQuery(
         'SHOW CONSTRAINTS YIELD name WHERE name CONTAINS "expedition" RETURN count(*) as count'
       );
       
@@ -330,7 +337,7 @@ export class MigrationRunner {
       }
 
       // Check indexes
-      const indexes = await this.connection.executeQuery(
+      const indexes = await this.getConnection().executeQuery(
         'SHOW INDEXES YIELD name WHERE name CONTAINS "expedition" RETURN count(*) as count'
       );
       
@@ -349,7 +356,7 @@ export class MigrationRunner {
   private async verifyExpeditionOptimizations(errors: string[]): Promise<void> {
     try {
       // Check full-text indexes
-      const fullTextIndexes = await this.connection.executeQuery(
+      const fullTextIndexes = await this.getConnection().executeQuery(
         'CALL db.index.fulltext.listAvailableAnalyzers() YIELD analyzer RETURN count(*) as count'
       );
       
@@ -358,7 +365,7 @@ export class MigrationRunner {
       }
 
       // Check cache nodes
-      const cacheNodes = await this.connection.executeQuery(
+      const cacheNodes = await this.getConnection().executeQuery(
         'MATCH (c:QueryCache) RETURN count(c) as count'
       );
       

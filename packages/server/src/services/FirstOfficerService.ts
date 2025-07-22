@@ -116,7 +116,8 @@ export class FirstOfficerService {
           requireUserApproval: false,
           enableParallelExecution: true,
           autoEscalation: true
-        }
+        },
+        expedition.assignedAgents // Pass selected agents from expedition
       );
 
       // Store active agent

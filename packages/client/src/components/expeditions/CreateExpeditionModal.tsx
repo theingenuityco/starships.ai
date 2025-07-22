@@ -68,8 +68,7 @@ interface FormData {
   // Task configuration
   enableTaskBreakdown: boolean;
   initialTasks: TaskFormData[];
-  // Agent configuration
-  enableAgentSelection: boolean;
+  // Agent configuration - MANDATORY (no toggle)
   selectedAgents: string[];
   maxAgents: number;
   // Advanced settings
@@ -173,8 +172,7 @@ export function CreateExpeditionModal({
     autoStart: false,
     enableTaskBreakdown: false,
     initialTasks: [],
-    enableAgentSelection: false,
-    selectedAgents: [],
+    selectedAgents: [], // MANDATORY: Always enabled, no toggle
     maxAgents: 5,
     enableAdvancedSettings: false,
     resourceRequirements: '',
@@ -272,6 +270,20 @@ export function CreateExpeditionModal({
 
       if (Object.keys(taskErrors).length > 0) {
         errors.tasks = taskErrors;
+      }
+    }
+
+    if (step === 3) {
+      // Agent selection validation - MANDATORY
+      console.log('[VALIDATION] Step 3 - Agent selection validation');
+      console.log('[VALIDATION] selectedAgents:', formData.selectedAgents);
+      console.log('[VALIDATION] selectedAgents length:', formData.selectedAgents?.length);
+      
+      if (!formData.selectedAgents || formData.selectedAgents.length === 0) {
+        console.log('[VALIDATION] Agent selection validation failed');
+        errors.general = 'At least one agent must be selected for the expedition';
+      } else {
+        console.log('[VALIDATION] Agent selection validation passed');
       }
     }
 
@@ -374,8 +386,8 @@ export function CreateExpeditionModal({
       const { default: api } = await import('@/lib/api');
       const response = await api.get(`/api/starships/${starshipId}/agents`);
       
-      if (response.data?.agents) {
-        setAvailableAgents(response.data.agents);
+      if (response.data?.deployedAgents) {
+        setAvailableAgents(response.data.deployedAgents);
       }
     } catch (error) {
       console.error('Failed to load available agents:', error);
@@ -426,7 +438,11 @@ export function CreateExpeditionModal({
   // ============================================================================
 
   const handleSubmit = useCallback(async () => {
+    console.log('[CREATE-EXPEDITION] Starting form submission...');
+    console.log('[CREATE-EXPEDITION] Form data:', formData);
+    
     if (!validateForm()) {
+      console.log('[CREATE-EXPEDITION] Form validation failed');
       setSubmitError('Please fix the validation errors before submitting');
       return;
     }
@@ -444,8 +460,11 @@ export function CreateExpeditionModal({
         priority: formData.priority,
         estimatedDuration: formData.estimatedDuration || undefined,
         tags: formData.tags,
-        dueDate: formData.dueDate || undefined
+        dueDate: formData.dueDate || undefined,
+        selectedAgents: formData.selectedAgents // MANDATORY: Always include selected agents
       };
+
+      console.log('[CREATE-EXPEDITION] Expedition request:', expeditionRequest);
 
       // Create the expedition
       const response = await expeditionAPI.createExpedition(expeditionRequest);
@@ -483,10 +502,25 @@ export function CreateExpeditionModal({
 
     } catch (error: any) {
       console.error('Failed to create expedition:', error);
-      setSubmitError(
-        error.message || 
-        'Failed to create expedition. Please check your input and try again.'
-      );
+      
+      // Provide more specific error messages based on error type
+      let errorMessage = 'Failed to create expedition. Please check your input and try again.';
+      
+      if (error?.code === 'VALIDATION_ERROR') {
+        errorMessage = error.message || 'Please check that all required fields are filled correctly.';
+      } else if (error?.statusCode === 400) {
+        errorMessage = 'Invalid request. Please check your input and try again.';
+      } else if (error?.statusCode === 401) {
+        errorMessage = 'Authentication failed. Please refresh the page and try again.';
+      } else if (error?.statusCode === 403) {
+        errorMessage = 'You do not have permission to create expeditions for this starship.';
+      } else if (error?.statusCode >= 500) {
+        errorMessage = 'Server error. Please try again in a moment.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -514,8 +548,7 @@ export function CreateExpeditionModal({
       autoStart: false,
       enableTaskBreakdown: false,
       initialTasks: [],
-      enableAgentSelection: false,
-      selectedAgents: [],
+      selectedAgents: [], // MANDATORY: Always enabled, no toggle
       maxAgents: 5,
       enableAdvancedSettings: false,
       resourceRequirements: '',
@@ -532,12 +565,12 @@ export function CreateExpeditionModal({
   // EFFECTS
   // ============================================================================
 
-  // Load agents when modal opens and agent selection is enabled
+  // Load agents when modal opens (always enabled now)
   useEffect(() => {
-    if (open && formData.enableAgentSelection && availableAgents.length === 0) {
+    if (open && availableAgents.length === 0) {
       loadAvailableAgents();
     }
-  }, [open, formData.enableAgentSelection, availableAgents.length, loadAvailableAgents]);
+  }, [open, availableAgents.length, loadAvailableAgents]);
 
   // Reset form when modal closes
   useEffect(() => {
@@ -1005,29 +1038,24 @@ export function CreateExpeditionModal({
         </p>
       </div>
 
-      {/* Enable Agent Selection */}
+      {/* Agent Selection - MANDATORY */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-base">Agent Assignment</CardTitle>
+              <CardTitle className="text-base">Agent Assignment *</CardTitle>
               <CardDescription>
-                Select specific agents for this expedition
+                Select agents for this expedition (required)
               </CardDescription>
             </div>
-            <Switch
-              checked={formData.enableAgentSelection}
-              onCheckedChange={(checked) => {
-                updateFormData({ enableAgentSelection: checked });
-                if (checked && availableAgents.length === 0) {
-                  loadAvailableAgents();
-                }
-              }}
-            />
+            <Badge variant="secondary" className="text-xs">
+              Required
+            </Badge>
           </div>
         </CardHeader>
         
-        {formData.enableAgentSelection && (
+        {/* Always show agent selection - no toggle */}
+        <CardContent className="space-y-4">
           <CardContent className="space-y-4">
             {/* Max Agents Setting */}
             <div className="flex items-center justify-between">
@@ -1151,7 +1179,7 @@ export function CreateExpeditionModal({
               </div>
             )}
           </CardContent>
-        )}
+        </CardContent>
       </Card>
     </div>
   );

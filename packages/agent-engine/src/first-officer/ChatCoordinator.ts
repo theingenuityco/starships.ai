@@ -281,9 +281,11 @@ export class ChatCoordinator {
       'initializing': 'Initialization',
       'analyzing': 'Objective Analysis',
       'decomposing': 'Task Planning',
+      'plan_tasks': 'Task Planning',
       'assigning': 'Agent Selection',
       'coordinating': 'Task Execution',
       'synthesizing': 'Result Synthesis',
+      'waiting_for_approval': 'Waiting for Approval',
       'completed': 'Expedition Complete',
       'failed': 'Expedition Failed'
     };
@@ -355,9 +357,11 @@ export class ChatCoordinator {
       'initializing': '🚀',
       'analyzing': '🔍',
       'decomposing': '📋',
+      'plan_tasks': '📋',
       'assigning': '👥',
       'coordinating': '⚡',
       'synthesizing': '🔧',
+      'waiting_for_approval': '⏳',
       'completed': '✅',
       'failed': '❌'
     };

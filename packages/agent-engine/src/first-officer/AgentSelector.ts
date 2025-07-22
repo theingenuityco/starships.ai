@@ -19,9 +19,21 @@ export class AgentSelector {
   private starshipId: string;
   private availableAgents: Agent[] = [];
   private agentWorkloads: Map<string, AgentWorkload> = new Map();
+  private preSelectedAgentIds?: string[];
 
-  constructor(starshipId: string) {
+  constructor(starshipId: string, preSelectedAgentIds: string[]) {
     this.starshipId = starshipId;
+    
+    // MANDATORY: Validate that agents are provided
+    if (!preSelectedAgentIds || preSelectedAgentIds.length === 0) {
+      throw new Error(
+        'AgentSelector requires pre-selected agents. ' +
+        'Auto-assignment has been removed - agents must be explicitly provided.'
+      );
+    }
+    
+    this.preSelectedAgentIds = preSelectedAgentIds;
+    console.log(`🎯 [AGENT-SELECTOR] Initialized with ${preSelectedAgentIds.length} pre-selected agents:`, preSelectedAgentIds);
   }
 
   /**
@@ -43,7 +55,7 @@ export class AgentSelector {
   }
 
   /**
-   * Select optimal agents for expedition tasks
+   * Select optimal agents for expedition tasks - ONLY WORKS WITH PRE-SELECTED AGENTS
    */
   async selectAgents(
     tasks: TaskBreakdown[],
@@ -53,19 +65,16 @@ export class AgentSelector {
       await this.initialize();
     }
 
-    // Phase 1: Rule-based filtering
-    const candidateAgents = this.filterAgentsByRules(tasks, criteria);
-    
-    // Phase 2: LLM-enhanced selection and assignment
-    const assignments = await this.optimizeAssignments(tasks, candidateAgents, criteria);
-    
-    // Phase 3: Workload balancing
-    const balancedAssignments = this.balanceWorkload(assignments);
-    
-    // Update workload tracking
-    this.updateWorkloadTracking(balancedAssignments);
-    
-    return balancedAssignments;
+    // MANDATORY: Only work with pre-selected agents - no auto-assignment
+    if (!this.preSelectedAgentIds || this.preSelectedAgentIds.length === 0) {
+      throw new Error(
+        'AgentSelector.selectAgents() requires pre-selected agents. ' +
+        'Auto-assignment has been removed - agents must be explicitly provided during expedition creation.'
+      );
+    }
+
+    console.log(`🎯 [AGENT-SELECTOR] Using ONLY pre-selected agents - no auto-assignment fallback`);
+    return await this.usePreSelectedAgents(tasks, criteria);
   }
 
   /**
@@ -351,6 +360,155 @@ Please provide optimal agent assignments with reasoning.`;
    */
   getAgentWorkloads(): AgentWorkload[] {
     return Array.from(this.agentWorkloads.values());
+  }
+
+  /**
+   * Use pre-selected agents ONLY - no fallback to automatic selection
+   */
+  private async usePreSelectedAgents(
+    tasks: TaskBreakdown[],
+    criteria: AgentSelectionCriteria
+  ): Promise<AgentAssignment[]> {
+    console.log(`🎯 [AGENT-SELECTOR] Using ONLY pre-selected agents: ${this.preSelectedAgentIds?.join(', ')}`);
+    
+    // Get pre-selected agents that are available
+    const preSelectedAgents = this.availableAgents.filter(agent =>
+      this.preSelectedAgentIds?.includes(agent.id)
+    );
+    
+    if (preSelectedAgents.length === 0) {
+      throw new Error(
+        `No pre-selected agents are available on this starship. ` +
+        `Selected agent IDs: ${this.preSelectedAgentIds?.join(', ')}. ` +
+        `Auto-assignment has been removed - please select different agents.`
+      );
+    }
+    
+    // Check if pre-selected agents have required skills
+    const skillCheckResults = this.validatePreSelectedAgentSkills(preSelectedAgents, tasks);
+    
+    if (!skillCheckResults.hasRequiredSkills) {
+      console.warn(`⚠️ [AGENT-SELECTOR] Pre-selected agents lack some required skills: ${skillCheckResults.missingSkills.join(', ')}`);
+      console.warn(`⚠️ [AGENT-SELECTOR] Proceeding with available agents - expedition may have reduced capability`);
+    }
+    
+    // Use pre-selected agents for task assignment (no fallback)
+    const assignments = await this.assignTasksToPreSelectedAgents(tasks, preSelectedAgents, criteria);
+    this.updateWorkloadTracking(assignments);
+    
+    console.log(`✅ [AGENT-SELECTOR] Successfully assigned tasks to ${assignments.length} pre-selected agents (NO AUTO-ASSIGNMENT)`);
+    return assignments;
+  }
+
+  /**
+   * Validate that pre-selected agents have the required skills
+   */
+  private validatePreSelectedAgentSkills(
+    preSelectedAgents: Agent[],
+    tasks: TaskBreakdown[]
+  ): { hasRequiredSkills: boolean; missingSkills: string[] } {
+    const allRequiredSkills = new Set<string>();
+    tasks.forEach(task => {
+      task.requiredSkills.forEach(skill => allRequiredSkills.add(skill.toLowerCase()));
+    });
+    
+    const availableSkills = new Set<string>();
+    preSelectedAgents.forEach(agent => {
+      agent.tags.forEach(tag => availableSkills.add(tag.toLowerCase()));
+      availableSkills.add(agent.category.toLowerCase());
+    });
+    
+    const missingSkills: string[] = [];
+    for (const requiredSkill of allRequiredSkills) {
+      const hasSkill = Array.from(availableSkills).some(availableSkill =>
+        availableSkill.includes(requiredSkill) || requiredSkill.includes(availableSkill)
+      );
+      if (!hasSkill) {
+        missingSkills.push(requiredSkill);
+      }
+    }
+    
+    return {
+      hasRequiredSkills: missingSkills.length === 0,
+      missingSkills
+    };
+  }
+
+  /**
+   * Assign tasks to pre-selected agents using optimization
+   */
+  private async assignTasksToPreSelectedAgents(
+    tasks: TaskBreakdown[],
+    preSelectedAgents: Agent[],
+    criteria: AgentSelectionCriteria
+  ): Promise<AgentAssignment[]> {
+    // Use the same optimization logic but with pre-selected agents only
+    const assignments = await this.optimizeAssignments(tasks, preSelectedAgents, criteria);
+    return this.balanceWorkload(assignments);
+  }
+
+  /**
+   * Hybrid approach: use pre-selected agents where possible, supplement with automatic selection
+   */
+  private async hybridAgentSelection(
+    tasks: TaskBreakdown[],
+    preSelectedAgents: Agent[],
+    criteria: AgentSelectionCriteria
+  ): Promise<AgentAssignment[]> {
+    // First, assign tasks that pre-selected agents can handle
+    const preSelectedAssignments: AgentAssignment[] = [];
+    const remainingTasks: TaskBreakdown[] = [];
+    
+    for (const task of tasks) {
+      let assigned = false;
+      for (const agent of preSelectedAgents) {
+        const skillMatch = this.calculateSkillMatch(agent, task.requiredSkills);
+        if (skillMatch > 0.3) { // Minimum skill match threshold
+          let assignment = preSelectedAssignments.find(a => a.agentId === agent.id);
+          if (!assignment) {
+            assignment = {
+              agentId: agent.id,
+              agentName: agent.name,
+              assignedTasks: [],
+              skillMatch,
+              workload: 0,
+              reasoning: `Pre-selected agent with skill match: ${Math.round(skillMatch * 100)}%`
+            };
+            preSelectedAssignments.push(assignment);
+          }
+          
+          assignment.assignedTasks.push(task.id);
+          assignment.workload += task.estimatedEffort || 30;
+          assigned = true;
+          break;
+        }
+      }
+      
+      if (!assigned) {
+        remainingTasks.push(task);
+      }
+    }
+    
+    // For remaining tasks, use automatic selection from all available agents
+    let automaticAssignments: AgentAssignment[] = [];
+    if (remainingTasks.length > 0) {
+      const candidateAgents = this.filterAgentsByRules(remainingTasks, criteria);
+      // Exclude pre-selected agents to avoid double assignment
+      const nonPreSelectedCandidates = candidateAgents.filter(agent =>
+        !this.preSelectedAgentIds?.includes(agent.id)
+      );
+      
+      if (nonPreSelectedCandidates.length > 0) {
+        automaticAssignments = await this.optimizeAssignments(remainingTasks, nonPreSelectedCandidates, criteria);
+      }
+    }
+    
+    // Combine assignments
+    const allAssignments = [...preSelectedAssignments, ...automaticAssignments];
+    const balancedAssignments = this.balanceWorkload(allAssignments);
+    
+    console.log(`🔄 [AGENT-SELECTOR] Hybrid selection: ${preSelectedAssignments.length} pre-selected, ${automaticAssignments.length} automatic`);
+    return balancedAssignments;
   }
 
   /**

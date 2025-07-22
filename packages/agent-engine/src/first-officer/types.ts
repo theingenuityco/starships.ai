@@ -38,6 +38,16 @@ export interface FirstOfficerState extends ExpeditionWorkflowState {
   // Error handling
   retryAttempts?: Record<string, number>;
   escalationRequired?: boolean;
+  
+  // Enhanced workflow features
+  userApprovalRequired?: boolean;
+  userApprovalResponse?: UserApprovalResponse;
+  parallelExecutionEnabled?: boolean;
+  dependencyGraph?: Record<string, string[]>;
+  criticalPath?: string[];
+  
+  // Final results
+  finalResult?: string;
 }
 
 /**
@@ -208,4 +218,61 @@ export interface ExpeditionProgress {
   estimatedTimeRemaining: number;
   qualityScore: number;
   issues: string[];
+}
+
+/**
+ * User approval response
+ */
+export interface UserApprovalResponse {
+  action: 'approve' | 'reject' | 'modify' | 'resolve';
+  targetPhase?: WorkflowPhase;
+  comments?: string;
+  modifications?: Record<string, any>;
+  timestamp: string;
+}
+
+/**
+ * Enhanced workflow execution options
+ */
+export interface EnhancedWorkflowOptions extends TaskExecutionOptions {
+  enableDependencyResolution?: boolean;
+  enableParallelExecution?: boolean;
+  enableUserApprovalGates?: boolean;
+  enableStatePersistence?: boolean;
+  maxConcurrentTasks?: number;
+  dependencyResolutionStrategy?: 'strict' | 'flexible' | 'adaptive';
+}
+
+/**
+ * Workflow checkpoint for state persistence
+ */
+export interface WorkflowCheckpoint {
+  checkpointId: string;
+  expeditionId: string;
+  state: FirstOfficerState;
+  timestamp: string;
+  phase: WorkflowPhase;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Task dependency information
+ */
+export interface TaskDependency {
+  taskId: string;
+  dependsOn: string[];
+  dependencyType: 'blocking' | 'soft' | 'resource';
+  resolved: boolean;
+  resolutionStrategy?: string;
+}
+
+/**
+ * Parallel execution group
+ */
+export interface ParallelExecutionGroup {
+  groupId: string;
+  tasks: string[];
+  maxConcurrency: number;
+  executionStrategy: 'all' | 'any' | 'majority';
+  timeout?: number;
 }

@@ -140,6 +140,7 @@ export class MessageService {
             role: message.role,
             content: message.content,
             userId: message.userId,
+            agentId: message.agentId,
             threadId: message.threadId
           },
           timestamp: message.timestamp
@@ -257,6 +258,7 @@ export class MessageService {
             role: updatedMessage.role,
             content: updatedMessage.content,
             userId: updatedMessage.userId,
+            agentId: updatedMessage.agentId,
             threadId: updatedMessage.threadId
           },
           timestamp: updatedMessage.timestamp
@@ -544,15 +546,11 @@ export class MessageService {
 
       const socketService = this.getSocketService();
       if (socketService) {
-        socketService.emitToUser(userId, 'expedition:message', {
+        socketService.emitToUser(userId, 'expedition:typing-start', {
           expeditionId,
-          messageId: 'typing-start',
-          message: {
-            id: 'typing-start',
-            role: 'system',
-            content: 'User is typing...',
-            userId
-          },
+          userId,
+          role: 'user',
+          isTyping: true,
           timestamp: new Date().toISOString()
         });
       }
@@ -571,15 +569,11 @@ export class MessageService {
 
       const socketService = this.getSocketService();
       if (socketService) {
-        socketService.emitToUser(userId, 'expedition:message', {
+        socketService.emitToUser(userId, 'expedition:typing-stop', {
           expeditionId,
-          messageId: 'typing-stop',
-          message: {
-            id: 'typing-stop',
-            role: 'system',
-            content: 'User stopped typing',
-            userId
-          },
+          userId,
+          role: 'user',
+          isTyping: false,
           timestamp: new Date().toISOString()
         });
       }

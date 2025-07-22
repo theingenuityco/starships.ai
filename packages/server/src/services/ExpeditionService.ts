@@ -152,8 +152,18 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:created', {
-          expedition: finalExpedition,
-          assignedAgents,
+          expeditionId: finalExpedition.id,
+          expedition: {
+            id: finalExpedition.id,
+            title: finalExpedition.title,
+            objective: finalExpedition.objective,
+            status: finalExpedition.status as 'draft' | 'planning' | 'in-progress' | 'paused' | 'completed' | 'cancelled' | 'failed',
+            priority: finalExpedition.priority as 'low' | 'medium' | 'high' | 'critical',
+            starshipId: finalExpedition.starshipId,
+            createdBy: finalExpedition.createdBy,
+            createdAt: finalExpedition.createdAt
+          },
+          timestamp: new Date().toISOString()
         });
         console.log(`[EXPEDITION-SERVICE] Step 9: Real-time event emitted successfully`);
       } else {
@@ -302,8 +312,15 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:updated', {
-          expedition: updatedExpedition,
-          assignedAgents,
+          expeditionId: updatedExpedition.id,
+          changes: {
+            title: updatedExpedition.title,
+            objective: updatedExpedition.objective,
+            status: updatedExpedition.status,
+            priority: updatedExpedition.priority as 'low' | 'medium' | 'high' | 'critical'
+          },
+          updatedBy: userId,
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -344,6 +361,8 @@ export class ExpeditionService {
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:deleted', {
           expeditionId,
+          deletedBy: userId,
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -391,8 +410,11 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:started', {
-          expedition: updatedExpedition,
-          assignedAgents,
+          expeditionId: updatedExpedition.id,
+          status: 'planning',
+          previousStatus: 'draft',
+          changedBy: userId,
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -445,8 +467,11 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:paused', {
-          expedition: updatedExpedition,
-          assignedAgents,
+          expeditionId: expeditionId,
+          status: 'paused',
+          previousStatus: expedition.status,
+          changedBy: userId,
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -497,8 +522,11 @@ export class ExpeditionService {
       const socketService = this.getSocketService();
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:resumed', {
-          expedition: updatedExpedition,
-          assignedAgents,
+          expeditionId: expeditionId,
+          status: 'in-progress',
+          previousStatus: expedition.status,
+          changedBy: userId,
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -542,6 +570,10 @@ export class ExpeditionService {
       if (socketService) {
         socketService.emitToUser(userId, 'expedition:cancelled', {
           expeditionId,
+          status: 'cancelled',
+          previousStatus: expedition.status,
+          changedBy: userId,
+          timestamp: new Date().toISOString()
         });
       }
 

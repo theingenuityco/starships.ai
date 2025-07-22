@@ -162,8 +162,10 @@ export class TaskService {
             id: task.id,
             title: task.title,
             description: task.description,
-            status: task.status,
-            priority: task.priority,
+            status: task.status as 'pending' | 'assigned' | 'in-progress' | 'completed' | 'failed',
+            priority: task.priority as 'low' | 'medium' | 'high' | 'critical',
+            assignedTo: undefined,
+            agentId: undefined,
             estimatedEffort: task.estimatedEffort
           },
           assignedBy: userId,
@@ -287,8 +289,10 @@ export class TaskService {
             id: updatedTask.id,
             title: updatedTask.title,
             description: updatedTask.description,
-            status: updatedTask.status,
-            priority: updatedTask.priority,
+            status: updatedTask.status as 'pending' | 'assigned' | 'in-progress' | 'completed' | 'failed',
+            priority: updatedTask.priority as 'low' | 'medium' | 'high' | 'critical',
+            assignedTo: updatedTask.assignedAgentId,
+            agentId: updatedTask.assignedAgentId,
             estimatedEffort: updatedTask.estimatedEffort
           },
           assignedBy: userId,
@@ -352,8 +356,8 @@ export class TaskService {
             id: updatedTask.id,
             title: updatedTask.title,
             description: updatedTask.description,
-            status: updatedTask.status,
-            priority: updatedTask.priority,
+            status: updatedTask.status as 'pending' | 'assigned' | 'in-progress' | 'completed' | 'failed',
+            priority: updatedTask.priority as 'low' | 'medium' | 'high' | 'critical',
             assignedTo: assignment.agentId,
             agentId: assignment.agentId,
             estimatedEffort: updatedTask.estimatedEffort
@@ -405,18 +409,15 @@ export class TaskService {
       // Emit real-time event
       const socketService = this.getSocketService();
       if (socketService) {
-        socketService.emitToUser(userId, 'expedition:task-assigned', {
+        socketService.emitToUser(userId, 'expedition:task-progress', {
           expeditionId: task.expeditionId,
           taskId: updatedTask.id,
-          task: {
-            id: updatedTask.id,
-            title: updatedTask.title,
-            description: updatedTask.description,
-            status: updatedTask.status,
-            priority: updatedTask.priority,
-            estimatedEffort: updatedTask.estimatedEffort
+          progress: {
+            percentage: 50, // Task started, assume 50% progress
+            currentStep: 'Task execution started',
+            estimatedTimeRemaining: updatedTask.estimatedEffort,
+            lastUpdate: new Date().toISOString()
           },
-          assignedBy: userId,
           timestamp: new Date().toISOString()
         });
       }
@@ -476,7 +477,7 @@ export class TaskService {
           task: {
             id: updatedTask.id,
             title: updatedTask.title,
-            status: updatedTask.status,
+            status: updatedTask.status as 'completed' | 'failed',
             result: updatedTask.result,
             completedAt: updatedTask.updatedAt,
             completedBy: userId,

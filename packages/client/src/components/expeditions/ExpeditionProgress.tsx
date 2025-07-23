@@ -70,7 +70,7 @@ export function ExpeditionProgress({ expedition, showDetails = true, enableRealT
     },
     onPhaseChange: (event) => {
       if (event.expeditionId === expedition.id) {
-        setCurrentPhase(event.phase);
+        setCurrentPhase(event.phase.current);
         setLastUpdate(event.timestamp);
       }
     },

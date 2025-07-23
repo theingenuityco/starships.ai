@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import SocketClient from '@/lib/socket-client';
-import type { ConnectionStatus, SocketConnectionState } from '@starships/protocol';
+import type { ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
 
 interface UseSocketConnectionReturn {
   isConnected: boolean;
@@ -86,9 +86,9 @@ export function useSocketConnection(): UseSocketConnectionReturn {
     const socket = socketClient.getSocket();
     if (!socket) return;
 
-    const handleConnectionStatus = (status: ConnectionStatus) => {
-      setConnectionStatus(status);
-      setIsConnected(status === 'connected');
+    const handleConnectionStatus = (event: ConnectionStatusEvent) => {
+      setConnectionStatus(event.status);
+      setIsConnected(event.status === 'connected');
     };
 
     const handleDisconnect = () => {

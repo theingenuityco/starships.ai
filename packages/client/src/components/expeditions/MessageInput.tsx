@@ -114,7 +114,7 @@ export function MessageInput({
   // State management
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<MessageType>('user-input');
-  const [selectedAgent, setSelectedAgent] = useState<string>('');
+  const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [sending, setSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -273,7 +273,7 @@ export function MessageInput({
       const draft: MessageDraft = {
         content: message,
         messageType,
-        agentId: selectedAgent || undefined,
+        agentId: selectedAgent === 'all' ? undefined : selectedAgent,
         attachments,
         threadId,
         parentMessageId: replyingTo?.id
@@ -321,7 +321,7 @@ export function MessageInput({
       if (draft) {
         setMessage(draft.content);
         setMessageType(draft.messageType);
-        setSelectedAgent(draft.agentId || '');
+        setSelectedAgent(draft.agentId || 'all');
         setAttachments(draft.attachments);
       }
     }
@@ -350,7 +350,7 @@ export function MessageInput({
       await onSendMessage(
         message.trim(),
         messageType,
-        selectedAgent || undefined,
+        selectedAgent === 'all' ? undefined : selectedAgent,
         attachments.length > 0 ? attachments : undefined,
         threadId,
         replyingTo?.id
@@ -358,7 +358,7 @@ export function MessageInput({
       
       // Reset form
       setMessage('');
-      setSelectedAgent('');
+      setSelectedAgent('all');
       setAttachments([]);
       
       // Reset textarea height
@@ -595,13 +595,14 @@ export function MessageInput({
                       <SelectValue placeholder="Direct to agent..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">
-                        <span className="text-muted-foreground">All participants</span>
-                      </SelectItem>
+                      <SelectItem value="all">All participants</SelectItem>
                       {availableAgents.map((agent) => (
                         <SelectItem key={agent.id} value={agent.id}>
-                          <div className="flex items-center space-x-2">
-                            <span>{agent.name}</span>
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                              <span>{agent.name || agent.id}</span>
+                              <span className="text-xs text-muted-foreground">({agent.id.slice(0, 8)})</span>
+                            </div>
                             {agent.status && (
                               <div className={cn(
                                 "w-2 h-2 rounded-full",
@@ -762,7 +763,7 @@ export function MessageInput({
           {/* Character count and hints */}
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-4">
-              {selectedAgent && (
+              {selectedAgent && selectedAgent !== 'all' && (
                 <span>Directing to: {availableAgents.find(a => a.id === selectedAgent)?.name}</span>
               )}
               {currentTypeConfig.description && (

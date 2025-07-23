@@ -42,11 +42,13 @@ export class FirstOfficerService {
     return FirstOfficerService.instance;
   }
 
-  private getSocketService(): SocketIOService {
-    if (!this.socketService) {
-      this.socketService = SocketIOService.getInstance();
+  private getSocketService(): SocketIOService | null {
+    try {
+      return SocketIOService.getInstance();
+    } catch (error) {
+      console.warn('[FIRST-OFFICER-SERVICE] SocketIOService not yet initialized');
+      return null;
     }
-    return this.socketService;
   }
 
   /**
@@ -192,10 +194,16 @@ export class FirstOfficerService {
       // Emit pause event
       const expedition = await expeditionRepo.findById(expeditionId);
       if (expedition) {
-        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:paused', {
+        const socketService = this.getSocketService();
+        if (socketService) {
+          socketService.emitToUser(expedition.createdBy, 'expedition:paused', {
           expeditionId,
+          status: 'paused',
+          previousStatus: 'in-progress',
+          changedBy: expedition.createdBy,
           timestamp: new Date().toISOString()
-        });
+          });
+        }
       }
 
       this.logger.info('Expedition orchestration paused successfully', context);
@@ -254,10 +262,16 @@ export class FirstOfficerService {
       // Emit resume event
       const expedition = await expeditionRepo.findById(expeditionId);
       if (expedition) {
-        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:resumed', {
+        const socketService = this.getSocketService();
+        if (socketService) {
+          socketService.emitToUser(expedition.createdBy, 'expedition:resumed', {
           expeditionId,
+          status: 'in-progress',
+          previousStatus: 'paused',
+          changedBy: expedition.createdBy,
           timestamp: new Date().toISOString()
-        });
+          });
+        }
       }
 
       this.logger.info('Expedition orchestration resumed successfully', context);
@@ -299,10 +313,16 @@ export class FirstOfficerService {
     // Emit cancel event
     const expedition = await expeditionRepo.findById(expeditionId);
     if (expedition) {
-      this.getSocketService().emitToUser(expedition.createdBy, 'expedition:cancelled', {
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(expedition.createdBy, 'expedition:cancelled', {
         expeditionId,
+        status: 'cancelled',
+        previousStatus: expedition.status,
+        changedBy: expedition.createdBy,
         timestamp: new Date().toISOString()
-      });
+        });
+      }
     }
 
     console.log(`[FIRST-OFFICER-SERVICE] Expedition cancelled: ${expeditionId}`);
@@ -383,12 +403,21 @@ export class FirstOfficerService {
       });
 
       // Emit message events
-      this.getSocketService().emitToUser(userId, 'expedition:message', {
+      const socketService = this.getSocketService();
+      if (socketService) {
+        socketService.emitToUser(userId, 'expedition:message', {
         expeditionId,
-        role: 'first-officer',
-        content: response.reply,
+        messageId: `fo_${Date.now()}`,
+        message: {
+          id: `fo_${Date.now()}`,
+          role: 'first-officer',
+          content: response.reply,
+          userId: undefined,
+          agentId: 'first-officer'
+        },
         timestamp: new Date().toISOString()
-      });
+        });
+      }
 
       this.logger.info('User message handled successfully', {
         ...context,
@@ -505,12 +534,21 @@ export class FirstOfficerService {
         await expeditionRepo.updateWorkflowState(expeditionId, workflowState);
 
         // Emit real-time status update
-        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:status-update', {
+        const socketService = this.getSocketService();
+        if (socketService) {
+          socketService.emitToUser(expedition.createdBy, 'expedition:status-update', {
           expeditionId,
-          phase,
-          progress,
+          progress: {
+            overall: progress.overallProgress || 0,
+            currentPhase: phase,
+            completedTasks: progress.tasksCompleted || 0,
+            totalTasks: progress.tasksTotal || 0,
+            estimatedTimeRemaining: progress.estimatedTimeRemaining,
+            lastActivity: new Date().toISOString()
+          },
           timestamp: new Date().toISOString()
-        });
+          });
+        }
       }
     } catch (error) {
       console.error(`[FIRST-OFFICER-SERVICE] Failed to handle status update:`, error);
@@ -543,13 +581,23 @@ export class FirstOfficerService {
 
       if (expedition) {
         // Emit task completion event
-        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:task-completed', {
+        const socketService = this.getSocketService();
+        if (socketService) {
+          socketService.emitToUser(expedition.createdBy, 'expedition:task-completed', {
           expeditionId,
           taskId,
-          result,
-          agentId,
+          task: {
+            id: taskId,
+            title: 'Task',
+            status: 'completed',
+            result,
+            completedAt: new Date().toISOString(),
+            completedBy: agentId,
+            agentId
+          },
           timestamp: new Date().toISOString()
-        });
+          });
+        }
       }
     } catch (error) {
       console.error(`[FIRST-OFFICER-SERVICE] Failed to handle task completion:`, error);
@@ -579,11 +627,16 @@ export class FirstOfficerService {
       const expedition = await expeditionRepo.findById(expeditionId);
       if (expedition) {
         // Emit completion event
-        this.getSocketService().emitToUser(expedition.createdBy, 'expedition:completed', {
-          expeditionId,
-          result: finalResult,
-          timestamp: new Date().toISOString()
-        });
+        const socketService = this.getSocketService();
+        if (socketService) {
+          socketService.emitToUser(expedition.createdBy, 'expedition:completed', {
+            expeditionId,
+            status: 'completed',
+            previousStatus: expedition.status,
+            changedBy: expedition.createdBy,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
 
       // Clean up resources

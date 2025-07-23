@@ -335,31 +335,6 @@ export function AgentSelector({
               ? 'No agents match your filters'
               : AGENT_TEXT.NO_AGENTS_AVAILABLE}
           </p>
-          {showCreateButton && (
-            <div className="flex flex-col gap-3 justify-center max-w-xs mx-auto">
-              <AgentTemplateSelector
-                onSelectTemplate={template => {
-                  console.log('Template selected:', template)
-                }}
-                onCreateFromTemplate={handleCreateFromTemplate}
-                trigger={
-                  <Button size="sm" variant="outline" className="h-10 w-full">
-                    <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap">From Template</span>
-                  </Button>
-                }
-              />
-              <Button
-                onClick={handleCreateAgent}
-                size="sm"
-                variant="outline"
-                className="h-10 w-full"
-              >
-                <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span className="whitespace-nowrap">Create Your First Agent</span>
-              </Button>
-            </div>
-          )}
         </div>
       ) : (
         <div className="space-y-3 mt-4">

@@ -9,270 +9,30 @@ import type {
   TaskStatus,
   MessageRole,
   QualityScore,
-  SocketIOEvents
+  SocketIOEvents,
+  // Import unified socket event types
+  ExpeditionCreatedEvent,
+  ExpeditionUpdatedEvent,
+  ExpeditionDeletedEvent,
+  ExpeditionStatusEvent,
+  ExpeditionProgressEvent,
+  TaskAssignedEvent,
+  TaskCompletedEvent,
+  TaskProgressEvent,
+  ExpeditionMessageEvent,
+  ChatTypingEvent,
+  AgentActivityEvent,
+  AgentStatusEvent,
+  QualityScoreUpdateEvent,
+  ResultAvailableEvent,
+  PhaseChangeEvent,
+  MilestoneReachedEvent,
+  ExpeditionErrorEvent,
+  SystemStatusEvent,
+  RoomJoinedEvent,
+  RoomLeftEvent,
+  ConnectionStatusEvent
 } from '@starships/protocol';
-
-// ============================================================================
-// LOCAL SOCKET EVENT TYPE DEFINITIONS
-// ============================================================================
-// These types are based on the socket-events.ts file but defined locally
-// until the protocol package exports are properly configured
-
-export interface ExpeditionCreatedEvent {
-  expeditionId: string;
-  expedition: {
-    id: string;
-    title: string;
-    objective: string;
-    status: ExpeditionStatus;
-    priority: 'low' | 'medium' | 'high' | 'critical';
-    starshipId: string;
-    createdBy: string;
-    createdAt: string;
-  };
-  timestamp: string;
-}
-
-export interface ExpeditionUpdatedEvent {
-  expeditionId: string;
-  changes: {
-    title?: string;
-    objective?: string;
-    status?: string;
-    priority?: string;
-    tags?: string[];
-    estimatedDuration?: number;
-  };
-  updatedBy: string;
-  timestamp: string;
-}
-
-export interface ExpeditionDeletedEvent {
-  expeditionId: string;
-  deletedBy: string;
-  timestamp: string;
-}
-
-export interface ExpeditionStatusEvent {
-  expeditionId: string;
-  status: ExpeditionStatus;
-  previousStatus: string;
-  changedBy: string;
-  timestamp: string;
-}
-
-export interface ExpeditionProgressEvent {
-  expeditionId: string;
-  progress: {
-    overall: number;
-    currentPhase: string;
-    completedTasks: number;
-    totalTasks: number;
-    estimatedTimeRemaining?: number;
-    lastActivity: string;
-  };
-  timestamp: string;
-}
-
-export interface TaskAssignedEvent {
-  expeditionId: string;
-  taskId: string;
-  task: {
-    id: string;
-    title: string;
-    description: string;
-    status: TaskStatus;
-    priority: 'low' | 'medium' | 'high' | 'critical';
-    assignedTo?: string;
-    agentId?: string;
-    estimatedEffort?: number;
-  };
-  assignedBy: string;
-  timestamp: string;
-}
-
-export interface TaskCompletedEvent {
-  expeditionId: string;
-  taskId: string;
-  task: {
-    id: string;
-    title: string;
-    status: 'completed' | 'failed';
-    result?: string;
-    completedAt: string;
-    completedBy?: string;
-    agentId?: string;
-  };
-  timestamp: string;
-}
-
-export interface TaskProgressEvent {
-  expeditionId: string;
-  taskId: string;
-  progress: {
-    percentage: number;
-    currentStep?: string;
-    estimatedTimeRemaining?: number;
-    lastUpdate: string;
-  };
-  timestamp: string;
-}
-
-export interface ExpeditionMessageEvent {
-  expeditionId: string;
-  messageId: string;
-  message: {
-    id: string;
-    role: MessageRole;
-    content: string;
-    userId?: string;
-    agentId?: string;
-    threadId?: string;
-    attachments?: Array<{
-      id: string;
-      name: string;
-      type: string;
-      url: string;
-    }>;
-  };
-  timestamp: string;
-}
-
-export interface ChatTypingEvent {
-  expeditionId: string;
-  userId?: string;
-  agentId?: string;
-  role: 'user' | 'first-officer' | 'agent';
-  isTyping: boolean;
-  timestamp: string;
-}
-
-export interface AgentActivityEvent {
-  expeditionId: string;
-  agentId: string;
-  activity: {
-    type: 'task_started' | 'task_progress' | 'task_completed' | 'message_sent' | 'analysis_complete' | 'error_occurred';
-    description: string;
-    taskId?: string;
-    messageId?: string;
-    data?: Record<string, any>;
-  };
-  timestamp: string;
-}
-
-export interface AgentStatusEvent {
-  expeditionId: string;
-  agentId: string;
-  status: {
-    state: 'idle' | 'working' | 'thinking' | 'error' | 'offline';
-    currentTask?: string;
-    workload: number;
-    lastActivity: string;
-  };
-  timestamp: string;
-}
-
-export interface QualityScoreUpdateEvent {
-  expeditionId: string;
-  resultId: string;
-  qualityScore: QualityScore;
-  previousScore?: {
-    overall: number;
-    assessedBy: string;
-    assessedAt: string;
-  };
-  timestamp: string;
-}
-
-export interface ResultAvailableEvent {
-  expeditionId: string;
-  resultId: string;
-  result: {
-    id: string;
-    title: string;
-    description?: string;
-    resultType: 'analysis' | 'report' | 'data' | 'code' | 'document' | 'artifact';
-    format: 'text' | 'markdown' | 'json' | 'csv' | 'pdf' | 'image' | 'other';
-    createdBy: string;
-    createdAt: string;
-    quality: QualityScore;
-  };
-  timestamp: string;
-}
-
-export interface PhaseChangeEvent {
-  expeditionId: string;
-  phase: {
-    current: string;
-    previous?: string;
-    description: string;
-    estimatedDuration?: number;
-    startedAt: string;
-  };
-  data?: {
-    tasksInPhase?: number;
-    completedTasks?: number;
-    nextPhase?: string;
-    milestones?: string[];
-  };
-  timestamp: string;
-}
-
-export interface MilestoneReachedEvent {
-  expeditionId: string;
-  milestone: {
-    id: string;
-    name: string;
-    description: string;
-    achievedAt: string;
-    progress: number;
-  };
-  timestamp: string;
-}
-
-export interface ExpeditionErrorEvent {
-  expeditionId: string;
-  error: {
-    code: string;
-    message: string;
-    severity: 'low' | 'medium' | 'high' | 'critical';
-    source: 'system' | 'agent' | 'user' | 'external';
-    taskId?: string;
-    agentId?: string;
-    recoverable: boolean;
-    retryCount?: number;
-  };
-  timestamp: string;
-}
-
-export interface SystemStatusEvent {
-  expeditionId: string;
-  status: {
-    health: 'healthy' | 'degraded' | 'error';
-    activeAgents: number;
-    queuedTasks: number;
-    systemLoad: number;
-    lastHealthCheck: string;
-  };
-  timestamp: string;
-}
-
-export interface RoomJoinedEvent {
-  expeditionId: string;
-  userId: string;
-  userInfo: {
-    id: string;
-    name: string;
-    role: 'owner' | 'collaborator' | 'viewer';
-  };
-  timestamp: string;
-}
-
-export interface RoomLeftEvent {
-  expeditionId: string;
-  userId: string;
-  timestamp: string;
-}
 
 // ============================================================================
 // ENHANCED TYPES AND INTERFACES

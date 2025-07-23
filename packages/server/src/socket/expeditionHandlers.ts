@@ -9,7 +9,17 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { SocketIOService } from '../services/SocketIOService';
 import { FirstOfficerService } from '../services/FirstOfficerService';
 import { RepositoryFactory } from '@starships/models';
-import type { SocketIOEvents } from '@starships/protocol';
+import type {
+  SocketIOEvents,
+  ExpeditionStatusEvent,
+  ExpeditionProgressEvent,
+  ExpeditionMessageEvent,
+  ExpeditionErrorEvent,
+  TaskAssignedEvent,
+  TaskCompletedEvent,
+  PhaseChangeEvent,
+  ResultAvailableEvent
+} from '@starships/protocol';
 
 /**
  * Utility function to ensure error objects are never empty
@@ -37,18 +47,22 @@ function safeEmitError(socket: any, errorData: any, expeditionId?: string, sourc
     }
   }
   
-  const errorObject = {
-    error: errorMessage,
+  // Create properly structured error event matching protocol types
+  const errorEvent: ExpeditionErrorEvent = {
     expeditionId: expeditionId || 'unknown',
-    timestamp: new Date().toISOString(),
-    source: source || 'expedition-handler'
+    error: {
+      code: 'EXPEDITION_ERROR',
+      message: errorMessage,
+      severity: 'medium',
+      source: (source as any) || 'system',
+      recoverable: true
+    },
+    timestamp: new Date().toISOString()
   };
   
-  console.log('[EXPEDITION-SOCKET] About to emit error object:', errorObject);
-  console.log('[EXPEDITION-SOCKET] Error object keys:', Object.keys(errorObject));
-  console.log('[EXPEDITION-SOCKET] Error object JSON:', JSON.stringify(errorObject));
+  console.log('[EXPEDITION-SOCKET] About to emit error event:', errorEvent);
   
-  socket.emit('expedition:error', errorObject);
+  socket.emit('expedition:error', errorEvent);
   
   console.log('[EXPEDITION-SOCKET] Error emission completed');
 }
@@ -104,13 +118,21 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         const expeditionRoom = `expedition:${expeditionId}`;
         socket.join(expeditionRoom);
 
-        // Send current expedition status
+        // Send current expedition status using proper protocol types
         const progress = await firstOfficerService.getExpeditionProgress(expeditionId);
-        socket.emit('expedition:status-update', {
+        const statusEvent: ExpeditionProgressEvent = {
           expeditionId,
-          progress,
+          progress: {
+            overall: progress?.overallProgress || 0,
+            currentPhase: progress?.currentPhase || 'initializing',
+            completedTasks: progress?.tasksCompleted || 0,
+            totalTasks: progress?.tasksTotal || 0,
+            estimatedTimeRemaining: progress?.estimatedTimeRemaining,
+            lastActivity: new Date().toISOString()
+          },
           timestamp: new Date().toISOString()
-        });
+        };
+        socket.emit('expedition:status-update', statusEvent);
 
         console.log(`[EXPEDITION-SOCKET] User ${userId} joined expedition room: ${expeditionId}`);
       } catch (error) {
@@ -167,12 +189,16 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         // Start expedition through First Officer
         await firstOfficerService.startExpedition(expeditionId, userId, expedition.objective);
 
-        // Broadcast to expedition room
+        // Broadcast to expedition room using proper protocol types
         const expeditionRoom = `expedition:${expeditionId}`;
-        io.to(expeditionRoom).emit('expedition:started', {
+        const startedEvent: ExpeditionStatusEvent = {
           expeditionId,
+          status: 'in-progress',
+          previousStatus: expedition.status,
+          changedBy: userId,
           timestamp: new Date().toISOString()
-        });
+        };
+        io.to(expeditionRoom).emit('expedition:started', startedEvent);
 
         console.log(`[EXPEDITION-SOCKET] Expedition started: ${expeditionId}`);
       } catch (error: any) {
@@ -200,12 +226,16 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         // Pause expedition
         await firstOfficerService.pauseExpedition(expeditionId);
 
-        // Broadcast to expedition room
+        // Broadcast to expedition room using proper protocol types
         const expeditionRoom = `expedition:${expeditionId}`;
-        io.to(expeditionRoom).emit('expedition:paused', {
+        const pausedEvent: ExpeditionStatusEvent = {
           expeditionId,
+          status: 'paused',
+          previousStatus: expedition.status,
+          changedBy: userId,
           timestamp: new Date().toISOString()
-        });
+        };
+        io.to(expeditionRoom).emit('expedition:paused', pausedEvent);
 
         console.log(`[EXPEDITION-SOCKET] Expedition paused: ${expeditionId}`);
       } catch (error: any) {
@@ -233,12 +263,16 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         // Cancel expedition
         await firstOfficerService.cancelExpedition(expeditionId);
 
-        // Broadcast to expedition room
+        // Broadcast to expedition room using proper protocol types
         const expeditionRoom = `expedition:${expeditionId}`;
-        io.to(expeditionRoom).emit('expedition:cancelled', {
+        const cancelledEvent: ExpeditionStatusEvent = {
           expeditionId,
+          status: 'cancelled',
+          previousStatus: expedition.status,
+          changedBy: userId,
           timestamp: new Date().toISOString()
-        });
+        };
+        io.to(expeditionRoom).emit('expedition:cancelled', cancelledEvent);
 
         console.log(`[EXPEDITION-SOCKET] Expedition cancelled: ${expeditionId}`);
       } catch (error: any) {
@@ -262,23 +296,35 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         // Handle message through First Officer Service
         const response = await firstOfficerService.handleUserMessage(expeditionId, userId, message);
 
-        // Broadcast user message to expedition room
+        // Broadcast user message to expedition room using proper protocol types
         const expeditionRoom = `expedition:${expeditionId}`;
-        io.to(expeditionRoom).emit('expedition:message', {
+        const userMessageEvent: ExpeditionMessageEvent = {
           expeditionId,
-          role: 'user',
-          userId,
-          content: message,
+          messageId: `msg_${Date.now()}_user`,
+          message: {
+            id: `msg_${Date.now()}_user`,
+            role: 'user',
+            content: message,
+            userId,
+            threadId: expeditionId
+          },
           timestamp: new Date().toISOString()
-        });
+        };
+        io.to(expeditionRoom).emit('expedition:message', userMessageEvent);
 
-        // Send First Officer response
-        io.to(expeditionRoom).emit('expedition:message', {
+        // Send First Officer response using proper protocol types
+        const foMessageEvent: ExpeditionMessageEvent = {
           expeditionId,
-          role: 'first-officer',
-          content: response.reply,
+          messageId: `msg_${Date.now()}_fo`,
+          message: {
+            id: `msg_${Date.now()}_fo`,
+            role: 'first-officer',
+            content: response.reply,
+            threadId: expeditionId
+          },
           timestamp: new Date().toISOString()
-        });
+        };
+        io.to(expeditionRoom).emit('expedition:message', foMessageEvent);
 
         console.log(`[EXPEDITION-SOCKET] Message sent to expedition: ${expeditionId}`);
       } catch (error: any) {
@@ -312,15 +358,23 @@ export class ExpeditionSocketUtils {
   /**
    * Broadcast expedition status update to all participants
    */
-  static broadcastStatusUpdate(expeditionId: string, status: any) {
+  static broadcastStatusUpdate(expeditionId: string, progress: any) {
     if (!this.io) return;
     
     const expeditionRoom = `expedition:${expeditionId}`;
-    this.io.to(expeditionRoom).emit('expedition:status-update', {
+    const statusEvent: ExpeditionProgressEvent = {
       expeditionId,
-      status,
+      progress: {
+        overall: progress?.overall || 0,
+        currentPhase: progress?.currentPhase || 'initializing',
+        completedTasks: progress?.completedTasks || 0,
+        totalTasks: progress?.totalTasks || 0,
+        estimatedTimeRemaining: progress?.estimatedTimeRemaining,
+        lastActivity: new Date().toISOString()
+      },
       timestamp: new Date().toISOString()
-    });
+    };
+    this.io.to(expeditionRoom).emit('expedition:status-update', statusEvent);
   }
 
   /**
@@ -330,11 +384,23 @@ export class ExpeditionSocketUtils {
     if (!this.io) return;
     
     const expeditionRoom = `expedition:${expeditionId}`;
-    this.io.to(expeditionRoom).emit('expedition:task-assigned', {
+    const taskEvent: TaskAssignedEvent = {
       expeditionId,
-      ...taskData,
+      taskId: taskData.taskId || taskData.id,
+      task: {
+        id: taskData.taskId || taskData.id,
+        title: taskData.title || 'Task',
+        description: taskData.description || '',
+        status: taskData.status || 'assigned',
+        priority: taskData.priority || 'medium',
+        assignedTo: taskData.assignedTo,
+        agentId: taskData.agentId,
+        estimatedEffort: taskData.estimatedEffort
+      },
+      assignedBy: taskData.assignedBy || 'system',
       timestamp: new Date().toISOString()
-    });
+    };
+    this.io.to(expeditionRoom).emit('expedition:task-assigned', taskEvent);
   }
 
   /**
@@ -344,11 +410,21 @@ export class ExpeditionSocketUtils {
     if (!this.io) return;
     
     const expeditionRoom = `expedition:${expeditionId}`;
-    this.io.to(expeditionRoom).emit('expedition:task-completed', {
+    const taskEvent: TaskCompletedEvent = {
       expeditionId,
-      ...taskData,
+      taskId: taskData.taskId || taskData.id,
+      task: {
+        id: taskData.taskId || taskData.id,
+        title: taskData.title || 'Task',
+        status: taskData.status || 'completed',
+        result: taskData.result,
+        completedAt: new Date().toISOString(),
+        completedBy: taskData.completedBy,
+        agentId: taskData.agentId
+      },
       timestamp: new Date().toISOString()
-    });
+    };
+    this.io.to(expeditionRoom).emit('expedition:task-completed', taskEvent);
   }
 
   /**
@@ -358,11 +434,14 @@ export class ExpeditionSocketUtils {
     if (!this.io) return;
     
     const expeditionRoom = `expedition:${expeditionId}`;
-    this.io.to(expeditionRoom).emit('expedition:completed', {
+    const completionEvent: ExpeditionStatusEvent = {
       expeditionId,
-      result,
+      status: 'completed',
+      previousStatus: 'in-progress',
+      changedBy: 'system',
       timestamp: new Date().toISOString()
-    });
+    };
+    this.io.to(expeditionRoom).emit('expedition:completed', completionEvent);
   }
 
   /**
@@ -372,12 +451,19 @@ export class ExpeditionSocketUtils {
     if (!this.io) return;
     
     const expeditionRoom = `expedition:${expeditionId}`;
-    this.io.to(expeditionRoom).emit('expedition:phase-change', {
+    const phaseEvent: PhaseChangeEvent = {
       expeditionId,
-      phase,
-      data,
+      phase: {
+        current: phase,
+        previous: data?.previousPhase,
+        description: data?.description || `Phase changed to ${phase}`,
+        estimatedDuration: data?.estimatedDuration,
+        startedAt: new Date().toISOString()
+      },
+      data: data?.additionalData,
       timestamp: new Date().toISOString()
-    });
+    };
+    this.io.to(expeditionRoom).emit('expedition:phase-change', phaseEvent);
   }
 
   /**
@@ -387,10 +473,27 @@ export class ExpeditionSocketUtils {
     if (!this.io) return;
     
     const expeditionRoom = `expedition:${expeditionId}`;
-    this.io.to(expeditionRoom).emit('expedition:result-available', {
+    const resultEvent: ResultAvailableEvent = {
       expeditionId,
-      ...resultData,
+      resultId: resultData.resultId || resultData.id,
+      result: {
+        id: resultData.resultId || resultData.id,
+        title: resultData.title || 'Result',
+        description: resultData.description,
+        resultType: resultData.resultType || 'analysis',
+        format: resultData.format || 'text',
+        createdBy: resultData.createdBy || 'system',
+        createdAt: new Date().toISOString(),
+        quality: resultData.quality || {
+          overall: 80,
+          completeness: 80,
+          accuracy: 80,
+          relevance: 80,
+          clarity: 80
+        }
+      },
       timestamp: new Date().toISOString()
-    });
+    };
+    this.io.to(expeditionRoom).emit('expedition:result-available', resultEvent);
   }
 }

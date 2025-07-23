@@ -195,18 +195,19 @@ export function EnhancedConnectorSelector({
         case 'name':
           comparison = a.name.localeCompare(b.name)
           break
-        case 'status':
+        case 'status': {
           const statusOrder = { active: 0, connecting: 1, inactive: 2, error: 3, disconnected: 4 }
           comparison =
             (statusOrder[a.status as keyof typeof statusOrder] || 5) -
             (statusOrder[b.status as keyof typeof statusOrder] || 5)
           break
+        }
         case 'lastUsed':
           const aTime = a.lastUsed?.getTime() || 0
           const bTime = b.lastUsed?.getTime() || 0
           comparison = bTime - aTime
           break
-        case 'health':
+        case 'health': {
           const aHealth = a.healthMetrics?.healthStatus || 'unknown'
           const bHealth = b.healthMetrics?.healthStatus || 'unknown'
           const healthOrder = { healthy: 0, warning: 1, critical: 2, unknown: 3 }
@@ -214,6 +215,7 @@ export function EnhancedConnectorSelector({
             (healthOrder[aHealth as keyof typeof healthOrder] || 3) -
             (healthOrder[bHealth as keyof typeof healthOrder] || 3)
           break
+        }
       }
 
       return sortDirection === 'asc' ? comparison : -comparison

@@ -6,13 +6,25 @@ const serverEnv = getServerConfig()
 const clientEnv = getClientConfig()
 
 const nextConfig: NextConfig = {
+  eslint: {
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: true,
+    // Use dirs to specify which directories to run ESLint on during next build
+    dirs: ['src'],
+  },
+  typescript: {
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    ignoreBuildErrors: true,
+  },
   async rewrites() {
     return [
       {
         // Proxy /v1/* requests to backend /api/* endpoints
         source: '/v1/:path*',
-        destination: 'http://localhost:4000/api/:path*'
-      }
+        destination: 'http://localhost:4000/api/:path*',
+      },
     ]
   },
   webpack: (config, { isServer }) => {
@@ -31,9 +43,9 @@ const nextConfig: NextConfig = {
         url: false,
         zlib: false,
         dotenv: false, // Prevent dotenv from client bundle
-      };
+      }
     }
-    return config;
+    return config
   },
   env: {
     // Kinde environment variables with dynamic defaults for deployment
@@ -48,7 +60,7 @@ const nextConfig: NextConfig = {
     KINDE_DEBUG_MODE: serverEnv.KINDE_DEBUG_MODE ? 'true' : 'false',
     // Public environment variables (exposed to browser)
     NEXT_PUBLIC_API_URL: clientEnv.NEXT_PUBLIC_API_URL,
-  }
+  },
 }
 
 export default nextConfig

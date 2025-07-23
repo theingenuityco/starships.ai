@@ -619,9 +619,11 @@ router.post(
     try {
       const { id: starshipIdOrSlug, templateId } = req.params;
       const userId = req.user!.id;
+      const { env } = req.body; // Extract environment variables from request body
 
       console.log(
-        `[STARSHIPS] Creating connector instance from template ${templateId} for starship ${starshipIdOrSlug}, user: ${userId}`
+        `[STARSHIPS] Creating connector instance from template ${templateId} for starship ${starshipIdOrSlug}, user: ${userId}`,
+        env ? 'with environment variables' : 'without environment variables'
       );
 
       // Enhanced parameter validation
@@ -700,7 +702,11 @@ router.post(
       }
 
       // Create new connector instance from template
-      const connectorInstance = await mcpConnectorRepo.createFromTemplate(starship.id, templateId);
+      const connectorInstance = await mcpConnectorRepo.createFromTemplate(
+        starship.id,
+        templateId,
+        env
+      );
 
       console.log(
         `[STARSHIPS] Successfully created connector instance ${connectorInstance.id} from template ${templateId} for starship ${starship.id}`
@@ -714,6 +720,7 @@ router.post(
         status: connectorInstance.status,
         connectedAt: connectorInstance.connectedAt,
         createdAt: connectorInstance.createdAt,
+        env: connectorInstance.env,
       });
     } catch (error) {
       handleError(
@@ -1061,18 +1068,18 @@ router.get(
   }
 );
 
-// PUT /starships/:id/connectors/:connectorId/config - Update connector instance configuration
+// PUT /starships/:id/connectors/:connectorId/env - Update connector instance environment variables
 router.put(
-  '/starships/:id/connectors/:connectorId/config',
+  '/starships/:id/connectors/:connectorId/env',
   authMiddleware,
   async (req: Request, res: Response) => {
     try {
       const { id: starshipIdOrSlug, connectorId } = req.params;
       const userId = req.user!.id;
-      const { config, changeSummary } = req.body;
+      const { env, changeSummary } = req.body;
 
       console.log(
-        `[STARSHIPS] Updating configuration for connector instance ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`
+        `[STARSHIPS] Updating environment variables for connector instance ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`
       );
 
       // Enhanced parameter validation
@@ -1099,12 +1106,12 @@ router.put(
         return handleError(error, res, 'Invalid connector ID format');
       }
 
-      // Validate configuration payload
-      if (!config || typeof config !== 'object') {
+      // Validate environment variables payload
+      if (!env || typeof env !== 'string') {
         return handleError(
-          new ValidationError('Configuration is required and must be an object', 'config'),
+          new ValidationError('Environment variables are required and must be a string', 'env'),
           res,
-          'Invalid configuration payload'
+          'Invalid environment variables payload'
         );
       }
 
@@ -1144,28 +1151,28 @@ router.put(
         return;
       }
 
-      // Update the connector configuration
-      const updatedConnector = await mcpConnectorRepo.updateConfig(
+      // Update the connector environment variables
+      const updatedConnector = await mcpConnectorRepo.updateEnv(
         connectorId,
-        config,
+        env,
         userId,
         changeSummary
       );
 
       if (!updatedConnector) {
         console.error(
-          `[STARSHIPS] Failed to update configuration for connector instance ${connectorId}`
+          `[STARSHIPS] Failed to update environment variables for connector instance ${connectorId}`
         );
-        res.status(500).json({ error: 'Failed to update connector configuration' });
+        res.status(500).json({ error: 'Failed to update connector environment variables' });
         return;
       }
 
       console.log(
-        `[STARSHIPS] Successfully updated configuration for connector instance ${connectorId} on starship ${starship.id}`
+        `[STARSHIPS] Successfully updated environment variables for connector instance ${connectorId} on starship ${starship.id}`
       );
 
       res.json({
-        message: 'Connector configuration updated successfully',
+        message: 'Connector environment variables updated successfully',
         starshipId: starship.id,
         connector: updatedConnector,
       });
@@ -1173,125 +1180,7 @@ router.put(
       handleError(
         error,
         res,
-        `Error updating configuration for connector instance ${req.params.connectorId} on starship ${req.params.id}`
-      );
-    }
-  }
-);
-
-// POST /starships/:id/connectors/:connectorId/config/template - Apply configuration template
-router.post(
-  '/starships/:id/connectors/:connectorId/config/template',
-  authMiddleware,
-  async (req: Request, res: Response) => {
-    try {
-      const { id: starshipIdOrSlug, connectorId } = req.params;
-      const userId = req.user!.id;
-      const { templateId } = req.body;
-
-      console.log(
-        `[STARSHIPS] Applying configuration template ${templateId} to connector instance ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`
-      );
-
-      // Enhanced parameter validation
-      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
-        return handleError(
-          new ValidationError('Starship ID or slug is required', 'starshipId'),
-          res,
-          'Invalid starship parameter'
-        );
-      }
-
-      if (!connectorId || connectorId.trim().length === 0) {
-        return handleError(
-          new ValidationError('Connector ID is required', 'connectorId'),
-          res,
-          'Invalid connector parameter'
-        );
-      }
-
-      if (!templateId || templateId.trim().length === 0) {
-        return handleError(
-          new ValidationError('Template ID is required', 'templateId'),
-          res,
-          'Invalid template parameter'
-        );
-      }
-
-      // Validate UUID formats
-      try {
-        validateUUID(connectorId, 'connectorId');
-        validateUUID(templateId, 'templateId');
-      } catch (error) {
-        return handleError(error, res, 'Invalid ID format');
-      }
-
-      // Try to find starship by ID first, then by slug
-      let starship = await starshipRepo.findById(starshipIdOrSlug);
-      if (!starship) {
-        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
-      }
-
-      if (!starship) {
-        console.log(`[STARSHIPS] Starship not found: ${starshipIdOrSlug}`);
-        res.status(404).json({ error: 'Starship not found' });
-        return;
-      }
-
-      if (starship.ownerId !== userId) {
-        console.log(
-          `[STARSHIPS] Access denied for starship ${starshipIdOrSlug}, user ${userId} is not owner`
-        );
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
-
-      // Verify connector instance exists and belongs to this starship
-      const connectorInstance = await mcpConnectorRepo.findById(connectorId);
-      if (!connectorInstance) {
-        console.log(`[STARSHIPS] Connector instance not found: ${connectorId}`);
-        res.status(404).json({ error: 'Connector instance not found' });
-        return;
-      }
-
-      if (connectorInstance.starshipId !== starship.id) {
-        console.log(
-          `[STARSHIPS] Connector instance ${connectorId} does not belong to starship ${starship.id}`
-        );
-        res.status(403).json({ error: 'Connector instance does not belong to this starship' });
-        return;
-      }
-
-      // Apply the configuration template
-      const updatedConnector = await mcpConnectorRepo.applyConfigTemplate(
-        connectorId,
-        templateId,
-        userId
-      );
-
-      if (!updatedConnector) {
-        console.error(
-          `[STARSHIPS] Failed to apply configuration template to connector instance ${connectorId}`
-        );
-        res.status(500).json({ error: 'Failed to apply configuration template' });
-        return;
-      }
-
-      console.log(
-        `[STARSHIPS] Successfully applied configuration template ${templateId} to connector instance ${connectorId} on starship ${starship.id}`
-      );
-
-      res.json({
-        message: 'Configuration template applied successfully',
-        starshipId: starship.id,
-        connector: updatedConnector,
-        templateId,
-      });
-    } catch (error) {
-      handleError(
-        error,
-        res,
-        `Error applying configuration template to connector instance ${req.params.connectorId} on starship ${req.params.id}`
+        `Error updating environment variables for connector instance ${req.params.connectorId} on starship ${req.params.id}`
       );
     }
   }
@@ -1364,7 +1253,7 @@ router.get(
       res.json({
         starshipId: starship.id,
         connectorId: connectorInstance.id,
-        config: connectorInstance.config || {},
+        env: connectorInstance.env || '{}',
         configTemplateId: connectorInstance.configTemplateId,
         configVersion: connectorInstance.configVersion || 0,
       });
@@ -1731,11 +1620,11 @@ router.post(
         return;
       }
 
-      // Create a new history entry for the current config before rollback
-      if (connectorInstance.config) {
+      // Create a new history entry for the current env before rollback
+      if (connectorInstance.env) {
         await configHistoryRepo.createEntry(
           connectorId,
-          connectorInstance.config,
+          { environmentVariables: connectorInstance.env }, // Convert to config format for history
           userId,
           'Pre-rollback backup',
           'Automatic backup before rollback operation'

@@ -3,7 +3,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import { monitoringService, connectorMonitoring } from '@/lib/connector-monitoring'
+import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { ConnectorInstanceConfig } from './ConnectorInstanceConfig'
+import { ApiKeyInputModal } from './ApiKeyInputModal'
+import { ConnectorApiKeyManager } from '@/lib/connector-api-keys'
+import { ApiKeyRequirement } from '@/types/connector-api-keys'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +35,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Settings,
+  Key,
+  Minus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -95,6 +101,15 @@ export function ConnectorSelector({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [connectingIds, setConnectingIds] = useState<Set<string>>(new Set())
 
+  // API Key Modal state
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false)
+  const [currentConnectorForApiKeys, setCurrentConnectorForApiKeys] =
+    useState<MCPServerOption | null>(null)
+  const [apiKeyRequirements, setApiKeyRequirements] = useState<ApiKeyRequirement[]>([])
+
+  // API Key status tracking
+  const [apiKeyStatusMap, setApiKeyStatusMap] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
+
   // Create a map of template ID to connector instance for quick lookup
   const connectorInstanceMap = useMemo(() => {
     const map = new Map<string, MCPServerConnector>()
@@ -104,6 +119,27 @@ export function ConnectorSelector({
       }
     })
     return map
+  }, [connectorInstances])
+
+  // Update API key status when connector instances change
+  useEffect(() => {
+    console.log(
+      '[ConnectorSelector] API key status update triggered - instances:',
+      connectorInstances.length
+    )
+    const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
+    connectorInstances.forEach(instance => {
+      if (instance.templateId) {
+        const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(instance, instance.template)
+        newApiKeyStatus.set(instance.templateId, keyStatus)
+      }
+    })
+    console.log(
+      '[ConnectorSelector] Setting API key status map with',
+      newApiKeyStatus.size,
+      'entries'
+    )
+    setApiKeyStatusMap(newApiKeyStatus)
   }, [connectorInstances])
 
   // Fetch data on mount and when starshipId changes
@@ -138,6 +174,17 @@ export function ConnectorSelector({
     return instance ? instance.status : 'disconnected'
   }
 
+  // Check if connector requires API keys
+  const connectorRequiresApiKeys = (connector: MCPServerOption): boolean => {
+    const requirements = ConnectorApiKeyManager.detectRequirements(connector)
+    return requirements.length > 0
+  }
+
+  // Get API key requirements for a connector
+  const getApiKeyRequirements = (connector: MCPServerOption): ApiKeyRequirement[] => {
+    return ConnectorApiKeyManager.detectRequirements(connector)
+  }
+
   // Fetch available connector templates
   const fetchConnectorData = async () => {
     try {
@@ -161,6 +208,9 @@ export function ConnectorSelector({
 
     const isCurrentlySelected = isConnectorSelected(connector)
 
+    // Log connector interaction for debugging
+    console.log('[ConnectorSelector] Toggling connector:', connector.name)
+
     try {
       setConnectingIds(prev => new Set(prev).add(connector.id))
 
@@ -169,20 +219,102 @@ export function ConnectorSelector({
         const newSelected = selectedConnectors.filter(c => c.id !== connector.id)
         onConnectorsChange(newSelected)
       } else {
-        // Select - let parent handle the connector instance creation
-        const newSelected = [...selectedConnectors, connector]
-        onConnectorsChange(newSelected)
+        // Check if connector requires API keys
+        const requirements = getApiKeyRequirements(connector)
+
+        if (requirements.length > 0) {
+          // Show API key modal for configuration
+          setCurrentConnectorForApiKeys(connector)
+          setApiKeyRequirements(requirements)
+          setIsApiKeyModalOpen(true)
+          setIsDropdownOpen(false) // Close dropdown when modal opens
+        } else {
+          // Select directly - no API keys required
+          const newSelected = [...selectedConnectors, connector]
+          onConnectorsChange(newSelected)
+        }
       }
     } catch (err) {
       console.error('Failed to toggle connector:', err)
       setError(`Failed to ${isCurrentlySelected ? 'disconnect' : 'connect'} ${connector.name}`)
     } finally {
+      // Only clear connecting state if we're not showing the modal
+      if (!connectorRequiresApiKeys(connector) || isCurrentlySelected) {
+        setConnectingIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(connector.id)
+          return newSet
+        })
+      }
+    }
+  }
+
+  // Handle API key modal submission
+  const handleApiKeySubmit = async (apiKeys: Record<string, string>) => {
+    if (!currentConnectorForApiKeys) return
+
+    try {
+      console.log(
+        '[ConnectorSelector] Submitting API keys for connector:',
+        currentConnectorForApiKeys.name
+      )
+      console.log('[ConnectorSelector] API keys provided:', Object.keys(apiKeys))
+
+      // Build environment variables string for the connector configuration
+      const environmentVariables = ConnectorApiKeyManager.buildEnvironmentString(
+        currentConnectorForApiKeys,
+        apiKeys
+      )
+
+      console.log('[ConnectorSelector] Built environment variables:', environmentVariables)
+
+      // Create enhanced connector option with API keys in the template env field
+      // This is used for the UI display and template matching
+      const enhancedConnector: MCPServerOption = {
+        ...currentConnectorForApiKeys,
+        env: environmentVariables,
+      }
+
+      // Add to selected connectors - this will trigger the parent to create the connector instance
+      // The parent (StarshipCrewContent) will handle creating the actual connector instance
+      // with the API keys stored in config.environmentVariables
+      const newSelected = [...selectedConnectors, enhancedConnector]
+      onConnectorsChange(newSelected)
+
+      // Close modal and reset state
+      setIsApiKeyModalOpen(false)
+      setCurrentConnectorForApiKeys(null)
+      setApiKeyRequirements([])
+    } catch (err) {
+      console.error('Failed to submit API keys:', err)
+      throw new Error('Failed to configure connector with API keys')
+    } finally {
+      // Clear connecting state
+      if (currentConnectorForApiKeys) {
+        setConnectingIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(currentConnectorForApiKeys.id)
+          return newSet
+        })
+      }
+    }
+  }
+
+  // Handle API key modal cancellation
+  const handleApiKeyCancel = () => {
+    if (currentConnectorForApiKeys) {
+      // Clear connecting state
       setConnectingIds(prev => {
         const newSet = new Set(prev)
-        newSet.delete(connector.id)
+        newSet.delete(currentConnectorForApiKeys.id)
         return newSet
       })
     }
+
+    // Reset modal state
+    setIsApiKeyModalOpen(false)
+    setCurrentConnectorForApiKeys(null)
+    setApiKeyRequirements([])
   }
 
   // Render loading state
@@ -244,8 +376,8 @@ export function ConnectorSelector({
           </div>
           {selectedConnectors.length > 0 && (
             <Badge
-              variant="default"
-              className="text-sm px-3 py-1 bg-primary text-primary-foreground flex-shrink-0"
+              variant="outline"
+              className="text-xs px-2 py-1 bg-muted/50 text-muted-foreground border-muted-foreground/30 flex-shrink-0"
             >
               {selectedConnectors.length} Active
             </Badge>
@@ -260,36 +392,31 @@ export function ConnectorSelector({
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="w-full justify-between h-auto min-h-[3rem] p-4 bg-gradient-to-r from-card to-muted/30 hover:from-muted/50 hover:to-muted/70 transition-all duration-200 border-2 border-dashed border-primary/30 hover:border-primary/50 shadow-sm hover:shadow-md"
+              className="w-full justify-between h-auto min-h-[3rem] p-4 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 transition-all duration-200 border-2 border-primary/40 hover:border-primary/60 shadow-md hover:shadow-lg"
               disabled={disabled}
               aria-label="Select connectors"
               aria-expanded={isDropdownOpen}
               aria-haspopup="listbox"
             >
               <div className="flex flex-1 mr-2 items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"></div>
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
                 {selectedConnectors.length === 0 ? (
-                  <span className="text-muted-foreground font-medium">
-                    Browse & Select Connectors...
-                  </span>
+                  <span className="text-primary font-semibold">Browse Connectors...</span>
                 ) : (
-                  <span className="text-foreground font-medium">Browse More Connectors</span>
+                  <span className="text-primary font-semibold">Browse Connectors</span>
                 )}
               </div>
-              <ChevronDown className="w-5 h-5 flex-shrink-0 text-primary/70" />
+              <ChevronDown className="w-5 h-5 flex-shrink-0 text-primary" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[350px] overflow-y-auto bg-card/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl"
+            className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[400px] overflow-y-auto bg-card/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl"
             align="start"
           >
-            <DropdownMenuLabel className="text-primary font-semibold">
-              Available Connectors
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-primary/20" />
-
             {filteredConnectors.length === 0 ? (
-              <DropdownMenuItem disabled>No connectors available</DropdownMenuItem>
+              <DropdownMenuItem disabled className="py-4 text-center text-muted-foreground">
+                No connectors available
+              </DropdownMenuItem>
             ) : (
               filteredConnectors.map(connector => {
                 const isSelected = isConnectorSelected(connector)
@@ -363,13 +490,13 @@ export function ConnectorSelector({
                     onClick={() => handleConnectorToggle(connector)}
                     disabled={disabled || isConnecting}
                     className={cn(
-                      'flex items-start gap-3 p-4 cursor-pointer transition-all duration-200 border-l-4 border-transparent hover:border-primary/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent',
+                      'flex items-start gap-3 p-4 cursor-pointer transition-all duration-200 border-l-4 border-transparent hover:border-primary/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent min-h-[80px]',
                       isSelected && 'border-primary bg-gradient-to-r from-primary/10 to-primary/5'
                     )}
                     role="option"
                     aria-selected={isSelected}
                   >
-                    <div className="flex items-center justify-center w-5 h-5 mt-0.5">
+                    <div className="flex items-center justify-center w-5 h-5 mt-1 flex-shrink-0">
                       {isConnecting ? (
                         <Loader2 className="w-4 h-4 animate-spin text-primary" />
                       ) : isSelected ? (
@@ -381,29 +508,57 @@ export function ConnectorSelector({
                       )}
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-semibold text-sm text-foreground">
-                          {connector.name}
-                        </span>
-                        <Badge
-                          variant={getCommandBadgeVariant(connector.command)}
-                          className="text-xs font-medium"
-                        >
-                          {connector.command.toUpperCase()}
-                        </Badge>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-sm text-foreground truncate">
+                            {connector.name}
+                          </h4>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <Badge
+                            variant={getCommandBadgeVariant(connector.command)}
+                            className="text-xs font-medium"
+                          >
+                            {connector.command.toUpperCase()}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        {connectorRequiresApiKeys(connector) && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300"
+                                >
+                                  <Key className="w-3 h-3 mr-1" />
+                                  API Keys Required
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs">
+                                  This connector requires API keys to function
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-1.5 cursor-help px-2 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors">
                                 {getStatusIcon()}
-                                <span className="text-xs font-medium text-muted-foreground">
+                                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
                                   {getStatusText()}
                                 </span>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <div className="text-xs whitespace-pre-line">
+                              <div className="text-xs whitespace-pre-line max-w-xs">
                                 {getHealthTooltip()}
                               </div>
                             </TooltipContent>
@@ -412,13 +567,13 @@ export function ConnectorSelector({
                       </div>
 
                       {connector.env && (
-                        <p className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded">
+                        <p className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded truncate">
                           {formatEnvForDisplay(connector.env)}
                         </p>
                       )}
 
                       {connectorInstance?.errorMessage && status === 'error' && (
-                        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded mt-1 border border-red-200 dark:border-red-800">
+                        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800 line-clamp-2">
                           {connectorInstance.errorMessage}
                         </p>
                       )}
@@ -451,6 +606,9 @@ export function ConnectorSelector({
               const healthMetrics = connectorInstance
                 ? monitoringService.createHealthMetrics(connectorInstance, connector)
                 : null
+
+              // Get API key status for this connector
+              const apiKeyStatusInfo = apiKeyStatusMap.get(connector.id)
 
               const getStatusDisplay = () => {
                 if (isConnecting) {
@@ -504,12 +662,12 @@ export function ConnectorSelector({
                     ),
                     borderColor:
                       healthMetrics.healthStatus === 'healthy'
-                        ? 'border-green-200 dark:border-green-800'
+                        ? 'border-green-300 dark:border-green-700'
                         : healthMetrics.healthStatus === 'warning'
-                          ? 'border-yellow-200 dark:border-yellow-800'
+                          ? 'border-yellow-300 dark:border-yellow-700'
                           : healthMetrics.healthStatus === 'critical'
-                            ? 'border-red-200 dark:border-red-800'
-                            : 'border-gray-200 dark:border-gray-800',
+                            ? 'border-red-300 dark:border-red-700'
+                            : 'border-green-200 dark:border-green-800',
                   }
                 }
 
@@ -523,7 +681,7 @@ export function ConnectorSelector({
                           Active
                         </Badge>
                       ),
-                      borderColor: 'border-green-200 dark:border-green-800',
+                      borderColor: 'border-green-300 dark:border-green-700',
                     }
                   case 'connecting':
                     return {
@@ -533,7 +691,7 @@ export function ConnectorSelector({
                           Connecting...
                         </Badge>
                       ),
-                      borderColor: 'border-blue-200 dark:border-blue-800',
+                      borderColor: 'border-green-200 dark:border-green-800',
                     }
                   case 'error':
                     return {
@@ -543,7 +701,7 @@ export function ConnectorSelector({
                           Error
                         </Badge>
                       ),
-                      borderColor: 'border-red-200 dark:border-red-800',
+                      borderColor: 'border-red-300 dark:border-red-700',
                     }
                   case 'inactive':
                     return {
@@ -553,13 +711,13 @@ export function ConnectorSelector({
                           Inactive
                         </Badge>
                       ),
-                      borderColor: 'border-gray-200 dark:border-gray-800',
+                      borderColor: 'border-green-200 dark:border-green-800',
                     }
                   default:
                     return {
                       icon: <WifiOff className="w-4 h-4 text-muted-foreground" />,
                       badge: null,
-                      borderColor: 'border-border',
+                      borderColor: 'border-green-200 dark:border-green-800',
                     }
                 }
               }
@@ -570,76 +728,127 @@ export function ConnectorSelector({
                 <div
                   key={connector.id}
                   className={cn(
-                    'flex items-center justify-between p-4 border-2 rounded-xl bg-gradient-to-r from-card to-muted/20 transition-all duration-200 shadow-sm hover:shadow-md',
+                    'flex items-start gap-4 p-5 border-2 rounded-xl bg-gradient-to-r from-card to-muted/20 transition-all duration-200 shadow-sm hover:shadow-md',
                     statusDisplay.borderColor
                   )}
                 >
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 border-2 border-primary/20">
-                      {statusDisplay.icon}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <span className="font-bold text-base text-foreground">
-                          {connector.name}
-                        </span>
-                        <Badge
-                          variant={getCommandBadgeVariant(connector.command)}
-                          className="text-xs font-semibold px-2 py-1"
-                        >
-                          {connector.command.toUpperCase()}
-                        </Badge>
-                        {statusDisplay.badge}
-                      </div>
-
-                      {connector.env && (
-                        <p className="text-xs text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-full mb-2 inline-block">
-                          {formatEnvForDisplay(connector.env)}
-                        </p>
-                      )}
-
-                      {connectorInstance?.errorMessage && status === 'error' && (
-                        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-full border border-red-200 dark:border-red-800 mb-2 inline-block">
-                          {connectorInstance.errorMessage}
-                        </p>
-                      )}
-
-                      {connectorInstance?.lastUsed && (
-                        <p className="text-xs text-muted-foreground">
-                          Last used: {new Date(connectorInstance.lastUsed).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
+                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 border-2 border-primary/20 flex-shrink-0">
+                    {statusDisplay.icon}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    {/* Configuration button - only show if connector instance exists and callbacks are provided */}
-                    {connectorInstance && onConfigUpdate && onTemplateApply && (
-                      <ConnectorInstanceConfig
-                        connectorId={connectorInstance.id}
-                        starshipId={starshipId}
-                        connectorName={connector.name}
-                        currentConfig={connectorInstance.config}
-                        onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}
-                        onTemplateApply={templateId =>
-                          onTemplateApply(connectorInstance.id, templateId)
-                        }
-                        disabled={disabled}
-                        className="h-8 w-8 p-0"
-                      />
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-bold text-lg text-foreground truncate mb-1">
+                          {connector.name}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={getCommandBadgeVariant(connector.command)}
+                            className="text-xs font-semibold px-2 py-1"
+                          >
+                            {connector.command.toUpperCase()}
+                          </Badge>
+                          {statusDisplay.badge}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {/* Configuration button - only show if connector instance exists and callbacks are provided */}
+                        {connectorInstance && onConfigUpdate && onTemplateApply && (
+                          <ConnectorInstanceConfig
+                            connectorId={connectorInstance.id}
+                            starshipId={starshipId}
+                            connectorName={connector.name}
+                            currentConfig={{
+                              environmentVariables: connectorInstance.env || '{}',
+                            }}
+                            onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}
+                            onTemplateApply={templateId =>
+                              onTemplateApply(connectorInstance.id, templateId)
+                            }
+                            disabled={disabled}
+                            className="h-9 w-9 p-0"
+                          />
+                        )}
+
+                        <Button
+                          onClick={() => handleConnectorToggle(connector)}
+                          size="sm"
+                          variant="outline"
+                          disabled={disabled || isConnecting}
+                          className="h-9 w-9 p-0 border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive hover:text-destructive"
+                          aria-label={`Remove ${connector.name}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* API Key Status Badge */}
+                    {apiKeyStatusInfo && apiKeyStatusInfo.status !== 'not_required' && (
+                      <div className="flex items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge
+                                variant={
+                                  apiKeyStatusInfo.status === 'configured'
+                                    ? 'default'
+                                    : apiKeyStatusInfo.status === 'missing'
+                                      ? 'secondary'
+                                      : 'destructive'
+                                }
+                                className={cn(
+                                  'text-xs',
+                                  apiKeyStatusInfo.status === 'configured' &&
+                                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                                  apiKeyStatusInfo.status === 'missing' &&
+                                    'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                )}
+                              >
+                                🔑{' '}
+                                {apiKeyStatusInfo.status === 'configured'
+                                  ? 'API Keys Configured'
+                                  : apiKeyStatusInfo.status === 'missing'
+                                    ? 'API Keys Missing'
+                                    : 'API Keys Invalid'}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs whitespace-pre-line max-w-xs">
+                                {ConnectorApiKeyStatus.getTooltipContent(apiKeyStatusInfo)}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        {apiKeyStatusInfo.missingKeys.length > 0 && (
+                          <span className="text-xs text-amber-600 font-medium">
+                            Missing: {apiKeyStatusInfo.missingKeys.length} key
+                            {apiKeyStatusInfo.missingKeys.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
                     )}
 
-                    <Button
-                      onClick={() => handleConnectorToggle(connector)}
-                      size="sm"
-                      variant="outline"
-                      disabled={disabled || isConnecting}
-                      className="h-9 w-9 p-0 border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive hover:text-destructive"
-                      aria-label={`Remove ${connector.name}`}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                    {connector.env && (
+                      <div className="text-xs text-muted-foreground bg-muted/40 px-3 py-2 rounded-lg">
+                        {formatEnvForDisplay(connector.env)}
+                      </div>
+                    )}
+
+                    {connectorInstance?.errorMessage && status === 'error' && (
+                      <div className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800">
+                        <strong>Error:</strong> {connectorInstance.errorMessage}
+                      </div>
+                    )}
+
+                    {connectorInstance?.lastUsed && (
+                      <p className="text-xs text-muted-foreground">
+                        Last used: {new Date(connectorInstance.lastUsed).toLocaleString()}
+                      </p>
+                    )}
                   </div>
                 </div>
               )
@@ -662,6 +871,17 @@ export function ConnectorSelector({
             <X className="w-3 h-3" />
           </Button>
         </div>
+      )}
+
+      {/* API Key Input Modal */}
+      {isApiKeyModalOpen && currentConnectorForApiKeys && (
+        <ApiKeyInputModal
+          isOpen={isApiKeyModalOpen}
+          onClose={handleApiKeyCancel}
+          onSubmit={handleApiKeySubmit}
+          connector={currentConnectorForApiKeys}
+          requirements={apiKeyRequirements}
+        />
       )}
     </div>
   )

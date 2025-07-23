@@ -21,7 +21,7 @@ import {
   PaginationOptions,
   ExpeditionWorkflowState,
   WorkflowPhase,
-  TaskBreakdown
+  TaskBreakdown,
 } from '@starships/protocol';
 
 // Re-export Agent and expedition types for backward compatibility
@@ -45,7 +45,7 @@ export {
   PaginationOptions,
   ExpeditionWorkflowState,
   WorkflowPhase,
-  TaskBreakdown
+  TaskBreakdown,
 };
 
 export interface LLM {
@@ -95,7 +95,7 @@ export interface Starship {
 
 export interface Vision {
   id: string;
-  starshipId: string;    // Direct FK to Starship
+  starshipId: string; // Direct FK to Starship
   statement: string;
   confidence: number;
   refinementCount: number;
@@ -129,7 +129,6 @@ export interface DeployedOnRelationship {
     isActive?: boolean;
   };
 }
-
 
 // NEW: Expedition Relationships
 export interface HasExpeditionRelationship {
@@ -394,8 +393,8 @@ export interface MCPServerConnector {
   /** Error message if the connector is in error state (optional) */
   errorMessage?: string;
 
-  /** NEW: Instance-specific configuration */
-  config?: ConnectorInstanceConfig;
+  /** Environment variables as JSON string (simplified from nested config) */
+  env?: string;
   /** NEW: ID of the configuration template used (if any) */
   configTemplateId?: string;
   /** NEW: Configuration version for tracking changes */
@@ -432,13 +431,13 @@ export interface MCPServerConnectorRepository extends Repository<MCPServerConnec
    * Create a new connector instance from an MCP server template
    * @param starshipId - The ID of the starship to deploy the connector on
    * @param templateId - The ID of the MCP server template to instantiate
-   * @param config - Optional initial configuration for the connector instance
+   * @param env - Optional environment variables as JSON string
    * @returns Promise resolving to the created connector instance
    */
   createFromTemplate(
     starshipId: string,
     templateId: string,
-    config?: ConnectorInstanceConfig
+    env?: string
   ): Promise<MCPServerConnector>;
 
   /**
@@ -455,31 +454,18 @@ export interface MCPServerConnectorRepository extends Repository<MCPServerConnec
   ): Promise<MCPServerConnector | null>;
 
   /**
-   * Update the configuration of a connector instance
+   * Update the environment variables of a connector instance
    * @param id - The ID of the connector instance
-   * @param config - The new configuration to apply
+   * @param env - The new environment variables as JSON string
    * @param changedBy - ID of the user making the change
    * @param changeSummary - Optional summary of what was changed
    * @returns Promise resolving to the updated connector instance or null if not found
    */
-  updateConfig(
+  updateEnv(
     id: string,
-    config: ConnectorInstanceConfig,
+    env: string,
     changedBy: string,
     changeSummary?: string
-  ): Promise<MCPServerConnector | null>;
-
-  /**
-   * Apply a configuration template to a connector instance
-   * @param id - The ID of the connector instance
-   * @param templateId - The ID of the configuration template to apply
-   * @param changedBy - ID of the user making the change
-   * @returns Promise resolving to the updated connector instance or null if not found
-   */
-  applyConfigTemplate(
-    id: string,
-    templateId: string,
-    changedBy: string
   ): Promise<MCPServerConnector | null>;
 
   /**
@@ -667,7 +653,7 @@ export interface StarshipRepository {
   //   getVersionHistory(starshipId: string): Promise<Codex[]>;
   //   createVersion(starshipId: string, author: string, changeSummary: string): Promise<Codex>;
   //   deactivateCurrentVersion(starshipId: string): Promise<void>;
-  
+
   // Expedition integration methods
   updateActiveExpeditionsCount(starshipId: string, increment?: boolean): Promise<void>;
   getExpeditionCapacity(starshipId: string): Promise<{
@@ -687,16 +673,21 @@ export interface StarshipRepository {
       availableExpeditionSlots: number;
     };
   }>;
-  getAgentAvailabilityForExpeditions(starshipId: string): Promise<Array<{
-    agentId: string;
-    agentName: string;
-    category: string;
-    tags: string[];
-    availability: 'available' | 'busy' | 'offline';
-    currentExpeditions: string[];
-    workload: 'light' | 'moderate' | 'heavy';
-  }>>;
-  getExpeditionStats(starshipId: string, days?: number): Promise<{
+  getAgentAvailabilityForExpeditions(starshipId: string): Promise<
+    Array<{
+      agentId: string;
+      agentName: string;
+      category: string;
+      tags: string[];
+      availability: 'available' | 'busy' | 'offline';
+      currentExpeditions: string[];
+      workload: 'light' | 'moderate' | 'heavy';
+    }>
+  >;
+  getExpeditionStats(
+    starshipId: string,
+    days?: number
+  ): Promise<{
     expeditions: {
       total: number;
       completed: number;
@@ -783,7 +774,12 @@ export interface AgentTemplateRepository extends Repository<AgentTemplate> {
   updateRating(id: string, rating: number): Promise<void>;
 
   // Create agent from template
-  createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<Agent>;
+  createAgentFromTemplate(
+    templateId: string,
+    agentName: string,
+    authorId: string,
+    starshipId: string
+  ): Promise<Agent>;
 
   // Create template from public agent
   createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null>;
@@ -1047,7 +1043,12 @@ export interface ExpeditionRepository extends Repository<Expedition> {
   findByStarship(starshipId: string): Promise<Expedition[]>;
   findByStatus(starshipId: string, status: ExpeditionStatus): Promise<Expedition[]>;
   findByPriority(starshipId: string, priority: ExpeditionPriority): Promise<Expedition[]>;
-  findWithFilters(starshipId: string, filters: ExpeditionFilters, sort?: ExpeditionSort, pagination?: PaginationOptions): Promise<{
+  findWithFilters(
+    starshipId: string,
+    filters: ExpeditionFilters,
+    sort?: ExpeditionSort,
+    pagination?: PaginationOptions
+  ): Promise<{
     expeditions: Expedition[];
     total: number;
   }>;
@@ -1087,7 +1088,11 @@ export interface ExpeditionTaskRepository extends Repository<ExpeditionTask> {
 }
 
 export interface ExpeditionMessageRepository extends Repository<ExpeditionMessage> {
-  findByExpedition(expeditionId: string, limit?: number, offset?: number): Promise<ExpeditionMessage[]>;
+  findByExpedition(
+    expeditionId: string,
+    limit?: number,
+    offset?: number
+  ): Promise<ExpeditionMessage[]>;
   findByRole(expeditionId: string, role: MessageRole): Promise<ExpeditionMessage[]>;
   findByType(expeditionId: string, messageType: MessageType): Promise<ExpeditionMessage[]>;
   findByThread(threadId: string): Promise<ExpeditionMessage[]>;

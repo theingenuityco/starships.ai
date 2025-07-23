@@ -48,7 +48,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 router.post('/:templateId/create-agent', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { templateId } = req.params;
-    const { agentName } = req.body;
+    const { agentName, starshipId } = req.body;
 
     if (!agentName || !agentName.trim()) {
       res.status(400).json({ error: 'Agent name is required' });
@@ -69,17 +69,87 @@ router.post('/:templateId/create-agent', authMiddleware, async (req: Request, re
       return;
     }
 
-    // Create agent from template
+    // Determine the target starship ID
+    let targetStarshipId = starshipId;
+
+    // If no starshipId provided, get user's first active starship as fallback
+    if (!targetStarshipId) {
+      try {
+        const starshipRepository = await RepositoryFactory.getStarshipRepository();
+        const userStarships = await starshipRepository.findByOwner(req.user!.id);
+
+        // Find the first active starship
+        const activeStarship = userStarships.find((ship) => ship.status === 'active');
+
+        if (!activeStarship) {
+          res.status(400).json({
+            error: 'No starship specified and no active starships found',
+            details: 'Please provide a starshipId or create an active starship first',
+            code: 'NO_STARSHIP_AVAILABLE',
+          });
+          return;
+        }
+
+        targetStarshipId = activeStarship.id;
+        console.log(
+          `[TEMPLATE] Using fallback starship "${activeStarship.name}" (${targetStarshipId}) for agent creation`
+        );
+      } catch (starshipError) {
+        console.error('[TEMPLATE] Error finding user starships:', starshipError);
+        res.status(500).json({
+          error: 'Failed to determine target starship',
+          details: 'Could not retrieve user starships to create agent',
+        });
+        return;
+      }
+    } else {
+      // Validate provided starshipId exists and belongs to user
+      try {
+        const starshipRepository = await RepositoryFactory.getStarshipRepository();
+        const starship = await starshipRepository.findById(targetStarshipId);
+
+        if (!starship) {
+          res.status(404).json({
+            error: 'Starship not found',
+            details: `No starship found with ID: ${targetStarshipId}`,
+            code: 'STARSHIP_NOT_FOUND',
+          });
+          return;
+        }
+
+        if (starship.ownerId !== req.user!.id) {
+          res.status(403).json({
+            error: 'Access denied',
+            details: 'You do not have permission to create agents on this starship',
+            code: 'STARSHIP_ACCESS_DENIED',
+          });
+          return;
+        }
+
+        console.log(
+          `[TEMPLATE] Using specified starship "${starship.name}" (${targetStarshipId}) for agent creation`
+        );
+      } catch (starshipError) {
+        console.error('[TEMPLATE] Error validating starship:', starshipError);
+        res.status(500).json({
+          error: 'Failed to validate starship',
+          details: 'Could not verify starship ownership and existence',
+        });
+        return;
+      }
+    }
+
+    // Create agent from template with validated starship ID
     const agent = await templateService.createAgentFromTemplate(
       templateId,
       agentName.trim(),
       req.user!.id,
-      'default-starship-id' // TODO: Get actual starship ID from request or user context
+      targetStarshipId
     );
 
     // Log the creation for audit purposes
     console.log(
-      `[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${req.user!.id}`
+      `[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${req.user!.id} on starship ${targetStarshipId}`
     );
 
     res.status(201).json(agent);

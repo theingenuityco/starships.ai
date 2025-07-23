@@ -25,9 +25,9 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
       'ghcr.io/github/github-mcp-server',
     ],
     env: JSON.stringify({
-      GITHUB_PERSONAL_ACCESS_TOKEN: 'Github_API_key',
-      GITHUB_TOOLSETS: '',
-      GITHUB_READ_ONLY: '',
+      GITHUB_PERSONAL_ACCESS_TOKEN: '${GITHUB_PERSONAL_ACCESS_TOKEN}',
+      GITHUB_TOOLSETS: '${GITHUB_TOOLSETS}',
+      GITHUB_READ_ONLY: '${GITHUB_READ_ONLY}',
     }),
   },
   {
@@ -41,7 +41,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-filesystem', 'FILESYSTEM_PATH'],
     env: JSON.stringify({
-      FILESYSTEM_PATH: 'FILESYSTEM_PATH',
+      FILESYSTEM_PATH: '${FILESYSTEM_PATH}',
     }),
   },
   {
@@ -49,7 +49,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@notionhq/notion-mcp-server'],
     env: JSON.stringify({
-      OPENAPI_MCP_HEADERS: '{"Authorization": "Notion_API_Key", "Notion-Version": "2022-06-28"}',
+      OPENAPI_MCP_HEADERS: '{"Authorization": "${NOTION_API_KEY}", "Notion-Version": "2022-06-28"}',
     }),
   },
   {
@@ -57,7 +57,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-postgres'],
     env: JSON.stringify({
-      POSTGRES_CONNECTION_STRING: 'POSTGRES_CONNECTION_STRING',
+      POSTGRES_CONNECTION_STRING: '${POSTGRES_CONNECTION_STRING}',
     }),
   },
   {
@@ -65,7 +65,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-brave-search'],
     env: JSON.stringify({
-      BRAVE_API_KEY: 'Brave_API_Key',
+      BRAVE_API_KEY: '${BRAVE_API_KEY}',
     }),
   },
   {
@@ -73,7 +73,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-gdrive'],
     env: JSON.stringify({
-      GDRIVE_CREDENTIALS_PATH: 'Path_To_JSON',
+      GDRIVE_CREDENTIALS_PATH: '${GDRIVE_CREDENTIALS_PATH}',
     }),
   },
   {
@@ -81,7 +81,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-slack'],
     env: JSON.stringify({
-      SLACK_BOT_TOKEN: 'Slack_API_key',
+      SLACK_BOT_TOKEN: '${SLACK_BOT_TOKEN}',
     }),
   },
   {
@@ -101,7 +101,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@stripe/mcp', '--tools=all', '--api-key=Stripe_API_Key'],
     env: JSON.stringify({
-      STRIPE_API_KEY: 'Stripe_API_Key',
+      STRIPE_API_KEY: '${STRIPE_API_KEY}',
     }),
   },
 ];

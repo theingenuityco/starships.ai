@@ -1,64 +1,64 @@
-'use client';
+'use client'
 
-import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'motion/react';
-import { Navigation } from '@/components/navigation/Navigation';
-import { AuthGate } from '@/components/auth/AuthGate';
-import { useStarshipStore } from '@/store/starship-store';
-import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard';
-import { useAuth } from '@/hooks/useAuth';
-import { useState, useEffect } from 'react';
-import { Menu } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { usePathname } from 'next/navigation'
+import { motion, AnimatePresence } from 'motion/react'
+import { Navigation } from '@/components/navigation/Navigation'
+import { AuthGate } from '@/components/auth/AuthGate'
+import { useStarshipStore } from '@/store/starship-store'
+import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard'
+import { useAuth } from '@/hooks/useAuth'
+import { useState, useEffect } from 'react'
+import { Menu } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface ClientLayoutProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 // Enhanced animation variants
 const dashboardVariants = {
   initial: { opacity: 0, scale: 0.95 },
   animate: { opacity: 1, scale: 1 },
-  exit: { opacity: 0, scale: 1.05 }
-};
+  exit: { opacity: 0, scale: 1.05 },
+}
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -20 }
-};
+  exit: { opacity: 0, y: -20 },
+}
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center h-screen command-deck-bg">
     <motion.div
       className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
       animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
     />
   </div>
-);
+)
 
 export function ClientLayout({ children }: ClientLayoutProps) {
-  const pathname = usePathname();
-  const { commandDeck, expandCommandDeck } = useStarshipStore();
-  const { isAuthenticated, isLoading } = useAuth();
-  const isDashboard = pathname === '/';
-  
+  const pathname = usePathname()
+  const { commandDeck, expandCommandDeck } = useStarshipStore()
+  const { isAuthenticated, isLoading } = useAuth()
+  const isDashboard = pathname === '/'
+
   // Enable keyboard shortcuts only for authenticated users
-  useCommandDeckKeyboard();
+  useCommandDeckKeyboard()
 
   // Mobile detection
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+      setIsMobile(window.innerWidth < 768)
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   if (isDashboard) {
     // Landing page route - no CommandDeck, no authentication required
@@ -74,11 +74,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           {children}
         </motion.div>
       </AnimatePresence>
-    );
+    )
   }
 
   // Check if this is a route that should not show navigation
-  const shouldHideNavigation = pathname === '/ships';
+  const shouldHideNavigation = pathname === '/ships'
 
   // Regular pages with conditional navigation sidebar
   return (
@@ -99,7 +99,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             </motion.aside>
           </div>
         )}
-        
+
         {/* Mobile Toggle Button (only shown when navigation is hidden on mobile) */}
         {isMobile && !shouldHideNavigation && (
           <motion.button
@@ -112,7 +112,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             <Menu className="w-5 h-5" />
           </motion.button>
         )}
-        
+
         {/* Main Content Area - Dynamic positioning based on navigation visibility */}
         <AnimatePresence mode="wait">
           <motion.main
@@ -122,12 +122,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             exit="exit"
             variants={pageVariants}
             className={cn(
-              "flex-1 min-h-full w-full transition-all duration-300 overflow-auto",
+              'flex-1 min-h-full w-full transition-all duration-300 overflow-auto',
               // Position content next to navigation with fixed margin when navigation is shown
-              !shouldHideNavigation ? "ml-[320px]" : ""
+              !shouldHideNavigation ? 'ml-[320px]' : ''
             )}
             style={{
-              width: !shouldHideNavigation ? 'calc(100% - 320px)' : '100%'
+              width: !shouldHideNavigation ? 'calc(100% - 320px)' : '100%',
             }}
           >
             {children}
@@ -135,5 +135,5 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         </AnimatePresence>
       </div>
     </AuthGate>
-  );
-} 
+  )
+}

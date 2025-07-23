@@ -7,7 +7,7 @@ export const UI_TEXT = {
   // Welcome Messages
   WELCOME_TITLE: 'Welcome to Starships AI',
   WELCOME_MESSAGE: 'Select an AI agent from the sidebar to start a conversation',
-  
+
   // Chat Interface
   CHAT: {
     MESSAGE_PLACEHOLDER: 'Type your message...',
@@ -19,7 +19,7 @@ export const UI_TEXT = {
 
   // Agent Selection
   AGENTS: {
-    SECTION_TITLE: 'Available Agents',
+    SECTION_TITLE: 'Agents',
     LOADING_AGENTS: 'Loading agents...',
     NO_AGENTS_AVAILABLE: 'No agents available',
     CREATED_PREFIX: 'Created',
@@ -65,4 +65,4 @@ export const UI_TEXT = {
 export const CHAT_TEXT = UI_TEXT.CHAT
 export const ERROR_TEXT = UI_TEXT.ERRORS
 export const LOADING_TEXT = UI_TEXT.LOADING
-export const AGENT_TEXT = UI_TEXT.AGENTS 
+export const AGENT_TEXT = UI_TEXT.AGENTS

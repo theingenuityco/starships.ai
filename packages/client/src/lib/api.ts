@@ -21,31 +21,96 @@ const api = axios.create({
 
 // Token provider function for dynamic token retrieval
 let getTokenFunction: (() => Promise<string | null>) | null = null
+let tokenProviderReady = false
+const tokenProviderPromises: Array<{ resolve: () => void; reject: (error: Error) => void }> = []
 
 export const setTokenProvider = (tokenProvider: () => Promise<string | null>) => {
   getTokenFunction = tokenProvider
+  tokenProviderReady = true
   console.log('[API] Token provider set')
+
+  // Resolve all pending promises waiting for token provider
+  tokenProviderPromises.forEach(({ resolve }) => resolve())
+  tokenProviderPromises.length = 0
+}
+
+// Wait for token provider to be ready
+const waitForTokenProvider = (): Promise<void> => {
+  if (tokenProviderReady) {
+    return Promise.resolve()
+  }
+
+  return new Promise((resolve, reject) => {
+    tokenProviderPromises.push({ resolve, reject })
+
+    // Add timeout to prevent infinite waiting
+    setTimeout(() => {
+      const index = tokenProviderPromises.findIndex(p => p.resolve === resolve)
+      if (index !== -1) {
+        tokenProviderPromises.splice(index, 1)
+        reject(new Error('Token provider setup timeout'))
+      }
+    }, 10000) // 10 second timeout
+  })
 }
 
 // Request interceptor to add authentication token
 api.interceptors.request.use(
   async config => {
-    console.log('[API] Request interceptor running for:', config.url)
+    console.log(
+      '[API] Request interceptor running for:',
+      config.url,
+      'at',
+      new Date().toISOString()
+    )
+
+    // Check if this is an authenticated endpoint
+    const requiresAuth =
+      config.url?.includes('/api/starships') ||
+      config.url?.includes('/api/agents') ||
+      config.url?.includes('/api/users')
+
+    if (requiresAuth) {
+      console.log('[API] Authenticated endpoint detected, waiting for token provider...')
+
+      try {
+        // Wait for token provider to be ready before proceeding
+        await waitForTokenProvider()
+        console.log('[API] Token provider ready, proceeding with request')
+      } catch (error) {
+        console.error('[API] Token provider timeout, proceeding without token:', error)
+      }
+    }
+
+    console.log('[API] Token provider status:', {
+      hasTokenFunction: !!getTokenFunction,
+      tokenProviderReady,
+      requiresAuth,
+      timestamp: new Date().toISOString(),
+    })
+
     if (getTokenFunction) {
       const token = await getTokenFunction()
       console.log('[API] Token from provider:', token ? 'Token present' : 'No token')
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
-        console.log('[API] Authorization header added')
+        console.log('[API] Authorization header added successfully')
       } else {
-        console.log('[API] No token available, skipping Authorization header')
+        console.log('[API] No token available, proceeding without Authorization header')
       }
     } else {
-      console.log('[API] No token provider configured')
+      console.warn('[API] ⚠️  NO TOKEN PROVIDER CONFIGURED - Request may fail with 401/404')
+      console.log('[API] Request details:', {
+        url: config.url,
+        method: config.method,
+        requiresAuth,
+        timestamp: new Date().toISOString(),
+      })
     }
     return config
   },
   error => {
+    console.error('[API] Request interceptor error:', error)
     return Promise.reject(error)
   }
 )
@@ -198,8 +263,8 @@ export interface MCPServerConnector {
   connectedAt: string
   lastUsed?: string
   errorMessage?: string
-  // NEW: Configuration support
-  config?: ConnectorInstanceConfig
+  // NEW: Simplified environment variables support
+  env?: string
   configTemplateId?: string
   configVersion?: number
   createdAt: string
@@ -472,10 +537,19 @@ export const templateAPI = {
     return data
   },
 
-  createAgentFromTemplate: async (templateId: string, agentName: string): Promise<Agent> => {
+  createAgentFromTemplate: async (
+    templateId: string,
+    agentName: string,
+    starshipId?: string
+  ): Promise<Agent> => {
     try {
+      const requestBody: { agentName: string; starshipId?: string } = { agentName }
+      if (starshipId) {
+        requestBody.starshipId = starshipId
+      }
+
       const data = await api
-        .post(`/api/agent-templates/${templateId}/create-agent`, { agentName })
+        .post(`/api/agent-templates/${templateId}/create-agent`, requestBody)
         .then((res: AxiosResponse<Agent>) => res.data)
 
       // Invalidate agent caches since we've created a new agent
@@ -540,14 +614,14 @@ export const chatAPI = {
 
 // Define starship API types locally since they're not exported from protocol
 interface UpdateStarshipRequest {
-  name?: string;
-  status?: 'active' | 'inactive';
-  class?: 'scout' | 'cruiser';
-  maxActiveExpeditions?: number;
+  name?: string
+  status?: 'active' | 'inactive'
+  class?: 'scout' | 'cruiser'
+  maxActiveExpeditions?: number
 }
 
 interface UpdateStarshipStatusRequest {
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive'
 }
 
 interface StarshipResponse {
@@ -594,7 +668,7 @@ export const starshipAPI = {
   // Get user's starships
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
     api.get('/api/starships').then(res => res.data),
-  
+
   // Get user's starships list (simple list for dropdowns)
   getUserStarshipsList: async (): Promise<Starship[]> => {
     const cacheKey = 'starships:list'
@@ -613,8 +687,7 @@ export const starshipAPI = {
     name: string
     class: 'scout' | 'cruiser'
     maxActiveExpeditions?: number
-  }): Promise<{ starship: Starship }> =>
-    api.post('/api/starships', data).then(res => res.data),
+  }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
 
   // Get starship details with caching (supports both ID and slug)
   getStarship: async (
@@ -704,7 +777,6 @@ export const starshipAPI = {
     apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
     return data
   },
-
 }
 
 // NEW: Vision API
@@ -908,13 +980,20 @@ export const mcpServerAPI = {
   // Create connector instance from template with cache invalidation
   createConnectorInstance: async (
     starshipId: string,
-    templateId: string
+    templateId: string,
+    env?: string
   ): Promise<MCPServerConnector> => {
-    console.log('[API] Creating connector instance for starship:', { starshipId, templateId })
+    console.log('[API] Creating connector instance for starship:', {
+      starshipId,
+      templateId,
+      hasEnv: !!env,
+    })
 
     try {
+      const requestBody = env ? { env } : {}
+
       const data = await api
-        .post(`/api/starships/${starshipId}/connectors/${templateId}`)
+        .post(`/api/starships/${starshipId}/connectors/${templateId}`, requestBody)
         .then((res: AxiosResponse<any>) => {
           console.log('[API] Successfully created connector instance:', res.data.connectorId)
           // Transform response to match MCPServerConnector interface
@@ -927,6 +1006,7 @@ export const mcpServerAPI = {
             connectedAt: res.data.connectedAt,
             createdAt: res.data.createdAt,
             updatedAt: res.data.createdAt,
+            env: res.data.env,
           }
         })
 
@@ -963,6 +1043,7 @@ export const mcpServerAPI = {
           connectedAt: error.response.data.connectedAt,
           createdAt: error.response.data.connectedAt,
           updatedAt: error.response.data.connectedAt,
+          env: error.response.data.env,
         }
       }
 

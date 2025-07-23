@@ -15,10 +15,10 @@ import type {
   ConnectorConfigHistoryRepository,
 } from '@starships/models';
 import {
-  ValidationError,
-  ConstraintViolationError,
-  NotFoundError,
-} from '@starships/models/src/types';
+  EnhancedValidationError as ValidationError,
+  EnhancedConstraintViolationError as ConstraintViolationError,
+  EnhancedNotFoundError as NotFoundError,
+} from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 
 /**

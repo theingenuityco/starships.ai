@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { CreateExpeditionModal } from './CreateExpeditionModal';
 import { ExpeditionCard } from './ExpeditionCard';
 import { useExpeditionData } from '@/hooks/useExpeditionData';
-import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
+// Socket import removed - using HTTP-only implementation
 import { expeditionAPI } from '@/lib/expeditionApi';
 import type { Expedition, ExpeditionStatus, ExpeditionPriority } from '@starships/protocol';
 
@@ -44,33 +44,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
     refreshInterval: 30000
   });
 
-  // Enhanced socket integration for real-time updates
-  const { realtimeData } = useEnhancedExpeditionSocket({
-    autoJoin: false, // Don't auto-join specific expeditions in list view
-    enableReconnection: true,
-    debugMode: false,
-    onExpeditionStarted: () => {
-      refreshExpeditions();
-    },
-    onExpeditionCompleted: () => {
-      refreshExpeditions();
-    },
-    onExpeditionPaused: () => {
-      refreshExpeditions();
-    },
-    onExpeditionCancelled: () => {
-      refreshExpeditions();
-    },
-    onStatusUpdate: () => {
-      refreshExpeditions();
-    },
-    onTaskCompleted: () => {
-      refreshExpeditions();
-    },
-    onResultAvailable: () => {
-      refreshExpeditions();
-    }
-  });
+  // HTTP-only implementation: Real-time updates disabled
+  // Socket integration removed to use HTTP API only
+  // Manual refresh is now the primary way to update expedition data
 
   // Fetch starship by slug to get the real ID
   useEffect(() => {
@@ -300,7 +276,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   expedition={expedition}
                   onClick={() => handleExpeditionClick(expedition.id)}
                   showActions={true}
-                  enableRealTimeUpdates={true}
+                  enableRealTimeUpdates={false}
                   enableContextMenu={true}
                   showAgentAvatars={true}
                   showQualityScore={true}

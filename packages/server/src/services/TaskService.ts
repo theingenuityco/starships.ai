@@ -16,7 +16,7 @@ import {
   StandardError,
   NotFoundError,
   ValidationError
-} from '@starships/protocol/src/types/error-classes';
+} from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
 import { SocketIOService } from './SocketIOService';
 import { Logger } from '../utils/logger';

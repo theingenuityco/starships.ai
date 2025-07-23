@@ -7,10 +7,21 @@ import {
   monitoringService,
   connectorMonitoring,
 } from '@/lib/connector-monitoring'
+import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CheckCircle, XCircle, AlertTriangle, Clock, RefreshCw, Activity } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  RefreshCw,
+  Activity,
+  Key,
+  Minus,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConnectorStatusDashboardProps {
@@ -27,6 +38,7 @@ export function ConnectorStatusDashboard({
   compact = false,
 }: ConnectorStatusDashboardProps) {
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
+  const [apiKeyStatus, setApiKeyStatus] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Calculate overall health summary
@@ -61,15 +73,22 @@ export function ConnectorStatusDashboard({
     return { total, healthy, warning, critical, active }
   }, [connectorInstances, healthMetrics])
 
-  // Update health metrics when connector instances change
+  // Update health metrics and API key status when connector instances change
   useEffect(() => {
     const updateMetrics = () => {
       const newMetrics = new Map<string, ConnectorHealthMetrics>()
+      const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
+
       connectorInstances.forEach(connector => {
         const metrics = monitoringService.createHealthMetrics(connector, connector.template)
         newMetrics.set(connector.id, metrics)
+
+        const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
+        newApiKeyStatus.set(connector.id, keyStatus)
       })
+
       setHealthMetrics(newMetrics)
+      setApiKeyStatus(newApiKeyStatus)
     }
     updateMetrics()
   }, [connectorInstances])
@@ -77,11 +96,18 @@ export function ConnectorStatusDashboard({
   const handleRefresh = () => {
     setIsRefreshing(true)
     const newMetrics = new Map<string, ConnectorHealthMetrics>()
+    const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
+
     connectorInstances.forEach(connector => {
       const metrics = monitoringService.createHealthMetrics(connector, connector.template)
       newMetrics.set(connector.id, metrics)
+
+      const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
+      newApiKeyStatus.set(connector.id, keyStatus)
     })
+
     setHealthMetrics(newMetrics)
+    setApiKeyStatus(newApiKeyStatus)
     setTimeout(() => setIsRefreshing(false), 500)
   }
 
@@ -164,7 +190,25 @@ export function ConnectorStatusDashboard({
         <div className="space-y-2">
           {connectorInstances.map(connector => {
             const metrics = healthMetrics.get(connector.id)
+            const keyStatusInfo = apiKeyStatus.get(connector.id)
             if (!metrics) return null
+
+            const getApiKeyIcon = () => {
+              if (!keyStatusInfo || keyStatusInfo.status === 'not_required') {
+                return <Minus className="w-3 h-3 text-gray-400" />
+              }
+
+              switch (keyStatusInfo.status) {
+                case 'configured':
+                  return <Key className="w-3 h-3 text-green-500" />
+                case 'missing':
+                  return <Key className="w-3 h-3 text-green-500" />
+                case 'invalid':
+                  return <Key className="w-3 h-3 text-red-500" />
+                default:
+                  return <Key className="w-3 h-3 text-gray-400" />
+              }
+            }
 
             return (
               <div
@@ -182,6 +226,22 @@ export function ConnectorStatusDashboard({
                     )}
                   />
                   <span className="text-sm font-medium">{metrics.name}</span>
+
+                  {/* API Key Status Indicator */}
+                  {keyStatusInfo && keyStatusInfo.status !== 'not_required' && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center">{getApiKeyIcon()}</div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs whitespace-pre-line max-w-xs">
+                            {ConnectorApiKeyStatus.getTooltipContent(keyStatusInfo)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge
@@ -198,6 +258,34 @@ export function ConnectorStatusDashboard({
                   >
                     {metrics.healthStatus}
                   </Badge>
+
+                  {/* API Key Status Badge */}
+                  {keyStatusInfo && keyStatusInfo.status !== 'not_required' && (
+                    <Badge
+                      variant={
+                        keyStatusInfo.status === 'configured'
+                          ? 'default'
+                          : keyStatusInfo.status === 'missing'
+                            ? 'secondary'
+                            : 'destructive'
+                      }
+                      className={cn(
+                        'text-xs',
+                        keyStatusInfo.status === 'configured' &&
+                          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                        keyStatusInfo.status === 'missing' &&
+                          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                      )}
+                    >
+                      🔑{' '}
+                      {keyStatusInfo.status === 'configured'
+                        ? 'Configured'
+                        : keyStatusInfo.status === 'missing'
+                          ? 'Missing'
+                          : 'Invalid'}
+                    </Badge>
+                  )}
+
                   {connector.errorMessage && (
                     <span
                       className="text-xs text-red-500 max-w-32 truncate"

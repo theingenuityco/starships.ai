@@ -8,6 +8,7 @@ import {
   monitoringService,
   connectorMonitoring,
 } from '@/lib/connector-monitoring'
+import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,8 @@ import {
   Settings,
   Info,
   Lightbulb,
+  Key,
+  Minus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +51,7 @@ interface ConnectorInstanceMonitorProps {
 interface ConnectorMonitorCardProps {
   connector: MCPServerConnector
   healthMetrics: ConnectorHealthMetrics
+  apiKeyStatus: ApiKeyStatusInfo
   onToggleDetails: (connectorId: string) => void
   showDetails: boolean
   statusHistory: ConnectorStatusHistoryEntry[]
@@ -57,6 +61,7 @@ interface ConnectorMonitorCardProps {
 function ConnectorMonitorCard({
   connector,
   healthMetrics,
+  apiKeyStatus,
   onToggleDetails,
   showDetails,
   statusHistory,
@@ -104,15 +109,32 @@ function ConnectorMonitorCard({
     }
   }
 
+  const getApiKeyIcon = () => {
+    if (apiKeyStatus.status === 'not_required') {
+      return <Minus className="w-3 h-3 text-gray-500" />
+    }
+
+    switch (apiKeyStatus.status) {
+      case 'configured':
+        return <Key className="w-3 h-3 text-green-500" />
+      case 'missing':
+        return <Key className="w-3 h-3 text-green-500" />
+      case 'invalid':
+        return <Key className="w-3 h-3 text-red-500" />
+      default:
+        return <Key className="w-3 h-3 text-gray-500" />
+    }
+  }
+
   const recentHistory = statusHistory.slice(-10).reverse()
 
   return (
     <Card
       className={cn(
         'transition-all duration-200 hover:shadow-md',
-        healthMetrics.healthStatus === 'critical' && 'border-red-200 dark:border-red-800',
-        healthMetrics.healthStatus === 'warning' && 'border-yellow-200 dark:border-yellow-800',
-        healthMetrics.healthStatus === 'healthy' && 'border-green-200 dark:border-green-800'
+        healthMetrics.healthStatus === 'critical' && 'border-red-300 dark:border-red-700',
+        healthMetrics.healthStatus === 'warning' && 'border-green-200 dark:border-green-800',
+        healthMetrics.healthStatus === 'healthy' && 'border-green-300 dark:border-green-700'
       )}
     >
       <CardHeader className="pb-3">
@@ -159,7 +181,7 @@ function ConnectorMonitorCard({
 
       <CardContent className="pt-0">
         {/* Status Overview */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="space-y-1">
             <div className="flex items-center gap-1">
               <Wifi className="w-3 h-3 text-muted-foreground" />
@@ -185,6 +207,49 @@ function ConnectorMonitorCard({
             >
               {healthMetrics.performanceLevel}
             </span>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              {getApiKeyIcon()}
+              <span className="text-xs text-muted-foreground">API Keys</span>
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant={
+                      apiKeyStatus.status === 'configured'
+                        ? 'default'
+                        : apiKeyStatus.status === 'missing'
+                          ? 'secondary'
+                          : apiKeyStatus.status === 'invalid'
+                            ? 'destructive'
+                            : 'outline'
+                    }
+                    className={cn(
+                      'text-xs cursor-help',
+                      apiKeyStatus.status === 'configured' &&
+                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                      apiKeyStatus.status === 'missing' &&
+                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                    )}
+                  >
+                    {apiKeyStatus.status === 'not_required'
+                      ? 'N/A'
+                      : apiKeyStatus.status === 'configured'
+                        ? 'Configured'
+                        : apiKeyStatus.status === 'missing'
+                          ? 'Missing'
+                          : 'Invalid'}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-xs whitespace-pre-line max-w-xs">
+                    {ConnectorApiKeyStatus.getTooltipContent(apiKeyStatus)}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -232,9 +297,12 @@ function ConnectorMonitorCard({
         {showDetails && (
           <div className="space-y-4 pt-4 border-t">
             <Tabs defaultValue="metrics" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-8">
+              <TabsList className="grid w-full grid-cols-4 h-8">
                 <TabsTrigger value="metrics" className="text-xs">
                   Metrics
+                </TabsTrigger>
+                <TabsTrigger value="apikeys" className="text-xs">
+                  API Keys
                 </TabsTrigger>
                 <TabsTrigger value="history" className="text-xs">
                   History
@@ -270,6 +338,82 @@ function ConnectorMonitorCard({
                     </div>
                   </div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="apikeys" className="space-y-3 mt-3">
+                {apiKeyStatus.status === 'not_required' ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Minus className="w-3 h-3" />
+                    <span>This connector does not require API keys</span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">Configuration Status</span>
+                      <Badge
+                        variant={
+                          apiKeyStatus.status === 'configured'
+                            ? 'default'
+                            : apiKeyStatus.status === 'missing'
+                              ? 'secondary'
+                              : 'destructive'
+                        }
+                        className={cn(
+                          'text-xs',
+                          apiKeyStatus.status === 'configured' &&
+                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                          apiKeyStatus.status === 'missing' &&
+                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        )}
+                      >
+                        {ConnectorApiKeyStatus.getStatusMessage(apiKeyStatus)}
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-xs font-medium">Required Keys:</span>
+                      <div className="space-y-1">
+                        {apiKeyStatus.requirements.map(req => {
+                          const isConfigured = apiKeyStatus.maskedValues[req.envKey]
+                          return (
+                            <div
+                              key={req.envKey}
+                              className="flex items-center justify-between text-xs"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isConfigured ? (
+                                  <CheckCircle className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <XCircle className="w-3 h-3 text-red-500" />
+                                )}
+                                <span>{req.displayName}</span>
+                              </div>
+                              {isConfigured && (
+                                <span className="font-mono text-muted-foreground">
+                                  {apiKeyStatus.maskedValues[req.envKey]}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {apiKeyStatus.missingKeys.length > 0 && (
+                      <div className="p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+                        <div className="flex items-center gap-1 mb-1">
+                          <AlertTriangle className="w-3 h-3 text-green-600" />
+                          <span className="text-xs font-medium text-green-800 dark:text-green-300">
+                            Missing Keys
+                          </span>
+                        </div>
+                        <div className="text-xs text-green-700 dark:text-green-400">
+                          Configure the missing API keys to enable full functionality
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="history" className="space-y-2 mt-3">
@@ -339,6 +483,7 @@ export function ConnectorInstanceMonitor({
   refreshInterval = 30000,
 }: ConnectorInstanceMonitorProps) {
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
+  const [apiKeyStatus, setApiKeyStatus] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
   const [statusHistory, setStatusHistory] = useState<Map<string, ConnectorStatusHistoryEntry[]>>(
     new Map()
   )
@@ -381,15 +526,19 @@ export function ConnectorInstanceMonitor({
     return { total, healthy, warning, critical, unknown }
   }, [connectorInstances, healthMetrics])
 
-  // Update health metrics when connector instances change
+  // Update health metrics and API key status when connector instances change
   useEffect(() => {
     const updateMetrics = () => {
       const newMetrics = new Map<string, ConnectorHealthMetrics>()
+      const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
       const newHistory = new Map<string, ConnectorStatusHistoryEntry[]>()
 
       connectorInstances.forEach(connector => {
         const metrics = monitoringService.createHealthMetrics(connector, connector.template)
         newMetrics.set(connector.id, metrics)
+
+        const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
+        newApiKeyStatus.set(connector.id, keyStatus)
 
         const history = monitoringService.getStatusHistory(connector.id)
         newHistory.set(connector.id, history)
@@ -404,6 +553,7 @@ export function ConnectorInstanceMonitor({
       })
 
       setHealthMetrics(newMetrics)
+      setApiKeyStatus(newApiKeyStatus)
       setStatusHistory(newHistory)
     }
 
@@ -418,11 +568,18 @@ export function ConnectorInstanceMonitor({
       setIsRefreshing(true)
       // Trigger a refresh by updating metrics
       const newMetrics = new Map<string, ConnectorHealthMetrics>()
+      const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
+
       connectorInstances.forEach(connector => {
         const metrics = monitoringService.createHealthMetrics(connector, connector.template)
         newMetrics.set(connector.id, metrics)
+
+        const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
+        newApiKeyStatus.set(connector.id, keyStatus)
       })
+
       setHealthMetrics(newMetrics)
+      setApiKeyStatus(newApiKeyStatus)
       setIsRefreshing(false)
     }, refreshInterval)
 
@@ -443,11 +600,18 @@ export function ConnectorInstanceMonitor({
     setIsRefreshing(true)
     // Force refresh metrics
     const newMetrics = new Map<string, ConnectorHealthMetrics>()
+    const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
+
     connectorInstances.forEach(connector => {
       const metrics = monitoringService.createHealthMetrics(connector, connector.template)
       newMetrics.set(connector.id, metrics)
+
+      const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
+      newApiKeyStatus.set(connector.id, keyStatus)
     })
+
     setHealthMetrics(newMetrics)
+    setApiKeyStatus(newApiKeyStatus)
     setTimeout(() => setIsRefreshing(false), 1000)
   }
 
@@ -531,15 +695,17 @@ export function ConnectorInstanceMonitor({
       <div className="grid gap-4">
         {connectorInstances.map(connector => {
           const metrics = healthMetrics.get(connector.id)
+          const keyStatus = apiKeyStatus.get(connector.id)
           const history = statusHistory.get(connector.id) || []
 
-          if (!metrics) return null
+          if (!metrics || !keyStatus) return null
 
           return (
             <ConnectorMonitorCard
               key={connector.id}
               connector={connector}
               healthMetrics={metrics}
+              apiKeyStatus={keyStatus}
               onToggleDetails={handleToggleDetails}
               showDetails={expandedConnectors.has(connector.id)}
               statusHistory={history}

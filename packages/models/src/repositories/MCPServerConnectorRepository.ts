@@ -2,10 +2,6 @@ import { getConnection } from '../connection';
 import {
   MCPServerConnector,
   MCPServerConnectorRepository as MCPServerConnectorRepositoryInterface,
-  ConnectorInstanceConfig,
-  ConnectorConfigTemplate,
-  ConnectorConfigHistory,
-  DEFAULT_CONNECTOR_CONFIG,
   ValidationError,
   ConstraintViolationError,
   NotFoundError,
@@ -179,8 +175,20 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       throw new ValidationError('isActive must be a boolean value', 'isActive');
     }
 
+    // Validate env field if provided
+    if (data.env !== undefined) {
+      if (data.env !== null && typeof data.env !== 'string') {
+        throw new ValidationError('env must be a string or null', 'env');
+      }
+      console.log('[MCPServerConnectorRepository] Env validation passed');
+    }
+
     const connection = getConnection();
     const now = new Date().toISOString();
+
+    console.log('[MCPServerConnectorRepository] Env field:', {
+      originalEnv: data.env,
+    });
 
     const connector: MCPServerConnector = {
       id: uuidv4(),
@@ -191,6 +199,9 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       connectedAt: data.connectedAt || now,
       lastUsed: data.lastUsed,
       errorMessage: data.errorMessage,
+      env: data.env,
+      configTemplateId: data.configTemplateId,
+      configVersion: data.configVersion || (data.env ? 1 : 0),
       createdAt: now,
       updatedAt: now,
     };
@@ -199,6 +210,14 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       console.log(
         `[MCPServerConnectorRepository] Creating connector instance: ${connector.id} for starship ${connector.starshipId} from template ${connector.templateId}`
       );
+      console.log(
+        '[MCPServerConnectorRepository] Connector object being created:',
+        JSON.stringify(connector, null, 2)
+      );
+      console.log('[MCPServerConnectorRepository] Env field present:', !!connector.env);
+      if (connector.env) {
+        console.log('[MCPServerConnectorRepository] Env content:', connector.env);
+      }
 
       // Validate that starship and template exist before creating connector
       const validationResult = await connection.executeQuery<{
@@ -246,20 +265,38 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       }
 
       // Create the connector instance and relationships in a single transaction
-      await connection.executeWrite(
-        `MATCH (s:Starship {id: $starshipId})
-         MATCH (t:MCPServerOption {id: $templateId})
-         CREATE (c:MCPServerConnector $connectorProps)
-         CREATE (s)-[:HAS_CONNECTOR_INSTANCE {createdAt: $timestamp}]->(c)
-         CREATE (c)-[:CREATED_FROM {createdAt: $timestamp}]->(t)
-         RETURN c`,
-        {
-          starshipId: connector.starshipId,
-          templateId: connector.templateId,
-          connectorProps: connector,
-          timestamp: connector.createdAt,
-        }
+      console.log('[MCPServerConnectorRepository] About to execute Neo4j write operation');
+      console.log(
+        '[MCPServerConnectorRepository] Connector props being sent to Neo4j:',
+        JSON.stringify(connector, null, 2)
       );
+
+      try {
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId})
+           MATCH (t:MCPServerOption {id: $templateId})
+           CREATE (c:MCPServerConnector $connectorProps)
+           CREATE (s)-[:HAS_CONNECTOR_INSTANCE {createdAt: $timestamp}]->(c)
+           CREATE (c)-[:CREATED_FROM {createdAt: $timestamp}]->(t)
+           RETURN c`,
+          {
+            starshipId: connector.starshipId,
+            templateId: connector.templateId,
+            connectorProps: connector,
+            timestamp: connector.createdAt,
+          }
+        );
+        console.log('[MCPServerConnectorRepository] Neo4j write operation completed successfully');
+      } catch (dbError: any) {
+        console.error('[MCPServerConnectorRepository] Neo4j database error:', dbError);
+        console.error('[MCPServerConnectorRepository] Error details:', {
+          message: dbError?.message || 'Unknown error',
+          code: dbError?.code || 'Unknown code',
+          name: dbError?.name || 'Unknown name',
+          stack: dbError?.stack || 'No stack trace',
+        });
+        throw dbError;
+      }
 
       console.log(
         `[MCPServerConnectorRepository] Successfully created connector instance: ${connector.id}`
@@ -439,6 +476,7 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       );
 
       const connectors = result.map((record) => record.c);
+
       console.log(
         `[MCPServerConnectorRepository] Found ${connectors.length} connector instances for starship: ${starshipId}`
       );
@@ -505,7 +543,7 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
   async createFromTemplate(
     starshipId: string,
     templateId: string,
-    config?: ConnectorInstanceConfig
+    env?: string
   ): Promise<MCPServerConnector> {
     if (!starshipId) {
       throw new Error('starshipId parameter is required');
@@ -517,6 +555,13 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
     console.log(
       `[MCPServerConnectorRepository] Creating connector instance from template ${templateId} for starship ${starshipId}`
     );
+    console.log(
+      '[MCPServerConnectorRepository] Environment variables provided:',
+      env ? 'YES' : 'NO'
+    );
+    if (env) {
+      console.log('[MCPServerConnectorRepository] Environment variables:', env);
+    }
 
     // Use the create method which already handles validation and relationship creation
     return this.create({
@@ -524,7 +569,7 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       templateId,
       status: 'connecting',
       isActive: true,
-      config,
+      env,
     });
   }
 
@@ -656,30 +701,32 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
   }
 
   /**
-   * Update the configuration of a connector instance
+   * Update the environment variables of a connector instance
    * @param id - The ID of the connector instance
-   * @param config - The new configuration to apply
+   * @param env - The new environment variables as JSON string
    * @param changedBy - ID of the user making the change
    * @param changeSummary - Optional summary of what was changed
    * @returns Promise resolving to the updated connector instance or null if not found
    */
-  async updateConfig(
+  async updateEnv(
     id: string,
-    config: ConnectorInstanceConfig,
+    env: string,
     changedBy: string,
     changeSummary?: string
   ): Promise<MCPServerConnector | null> {
     this.validateUUID(id, 'id');
 
-    if (!config || typeof config !== 'object') {
-      throw new ValidationError('Configuration is required and must be an object', 'config');
+    if (!env || typeof env !== 'string') {
+      throw new ValidationError('Environment variables are required and must be a string', 'env');
     }
 
     if (!changedBy) {
       throw new ValidationError('changedBy parameter is required', 'changedBy');
     }
 
-    console.log(`[MCPServerConnectorRepository] Updating configuration for connector: ${id}`);
+    console.log(
+      `[MCPServerConnectorRepository] Updating environment variables for connector: ${id}`
+    );
 
     try {
       // First, get the current connector to create a history entry
@@ -692,18 +739,18 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       // Create configuration history entry (if we had the history repository)
       // For now, we'll just log the change
       console.log(
-        `[MCPServerConnectorRepository] Configuration updated by user: ${changedBy}${changeSummary ? `, Summary: ${changeSummary}` : ''}`
+        `[MCPServerConnectorRepository] Environment variables updated by user: ${changedBy}${changeSummary ? `, Summary: ${changeSummary}` : ''}`
       );
 
-      // Update the connector with new configuration
+      // Update the connector with new environment variables
       const updates: Partial<MCPServerConnector> = {
-        config,
+        env,
         configVersion: (currentConnector.configVersion || 0) + 1,
       };
 
       return this.update(id, updates);
     } catch (error) {
-      console.error(`[MCPServerConnectorRepository] Error in updateConfig for id ${id}:`, error);
+      console.error(`[MCPServerConnectorRepository] Error in updateEnv for id ${id}:`, error);
 
       if (
         error instanceof ValidationError ||
@@ -714,68 +761,7 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       }
 
       throw new Error(
-        `Failed to update connector configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
-
-  /**
-   * Apply a configuration template to a connector instance
-   * @param id - The ID of the connector instance
-   * @param templateId - The ID of the configuration template to apply
-   * @param changedBy - ID of the user making the change
-   * @returns Promise resolving to the updated connector instance or null if not found
-   */
-  async applyConfigTemplate(
-    id: string,
-    templateId: string,
-    changedBy: string
-  ): Promise<MCPServerConnector | null> {
-    this.validateUUID(id, 'id');
-    this.validateUUID(templateId, 'templateId');
-
-    if (!changedBy) {
-      throw new ValidationError('changedBy parameter is required', 'changedBy');
-    }
-
-    console.log(
-      `[MCPServerConnectorRepository] Applying configuration template ${templateId} to connector: ${id}`
-    );
-
-    try {
-      // For now, we'll use a placeholder implementation since we don't have the template repository yet
-      // In a full implementation, we would:
-      // 1. Fetch the configuration template
-      // 2. Apply its configuration to the connector
-      // 3. Update the configTemplateId field
-
-      console.warn(
-        `[MCPServerConnectorRepository] Configuration template application not fully implemented yet. Template ID: ${templateId}`
-      );
-
-      // Placeholder: just update the configTemplateId for now
-      const updates: Partial<MCPServerConnector> = {
-        configTemplateId: templateId,
-        configVersion: 1, // Reset version when applying template
-      };
-
-      return this.update(id, updates);
-    } catch (error) {
-      console.error(
-        `[MCPServerConnectorRepository] Error in applyConfigTemplate for id ${id}:`,
-        error
-      );
-
-      if (
-        error instanceof ValidationError ||
-        error instanceof ConstraintViolationError ||
-        error instanceof NotFoundError
-      ) {
-        throw error;
-      }
-
-      throw new Error(
-        `Failed to apply configuration template: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to update connector environment variables: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

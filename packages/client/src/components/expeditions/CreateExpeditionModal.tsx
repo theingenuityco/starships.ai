@@ -1,140 +1,191 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
-import { 
-  X, 
-  Plus, 
-  Minus, 
-  Calendar, 
-  Clock, 
-  Target, 
-  Users, 
-  AlertCircle, 
+import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import {
+  X,
+  Plus,
+  Minus,
+  Calendar,
+  Clock,
+  Target,
+  Users,
+  AlertCircle,
   CheckCircle2,
   Loader2,
   Rocket,
   Settings,
   Tag,
-  Zap
-} from 'lucide-react';
-import { expeditionAPI } from '@/lib/expeditionApi';
-import { useExpeditionSocket } from '@/hooks/useExpeditionSocket';
-import type { 
-  CreateExpeditionRequest, 
+  Zap,
+} from 'lucide-react'
+import { expeditionAPI } from '@/lib/expeditionApi'
+import { useExpeditionSocket } from '@/hooks/useExpeditionSocket'
+import type {
+  CreateExpeditionRequest,
   ExpeditionPriority,
-  CreateTaskRequest 
-} from '@starships/protocol';
+  CreateTaskRequest,
+} from '@starships/protocol'
 
 // ============================================================================
 // TYPES AND INTERFACES
 // ============================================================================
 
 interface CreateExpeditionModalProps {
-  open: boolean;
-  onClose: () => void;
-  onExpeditionCreated: (expeditionId: string) => void;
-  starshipId: string;
-  starshipSlug: string;
+  open: boolean
+  onClose: () => void
+  onExpeditionCreated: (expeditionId: string) => void
+  starshipId: string
+  starshipSlug: string
 }
 
 interface FormData {
-  title: string;
-  description: string;
-  objective: string;
-  priority: ExpeditionPriority;
-  estimatedDuration: number | null;
-  tags: string[];
-  dueDate: string;
-  autoStart: boolean;
+  title: string
+  description: string
+  objective: string
+  priority: ExpeditionPriority
+  estimatedDuration: number | null
+  tags: string[]
+  dueDate: string
+  autoStart: boolean
   // Task configuration
-  enableTaskBreakdown: boolean;
-  initialTasks: TaskFormData[];
+  enableTaskBreakdown: boolean
+  initialTasks: TaskFormData[]
   // Agent configuration - MANDATORY (no toggle)
-  selectedAgents: string[];
-  maxAgents: number;
+  selectedAgents: string[]
+  maxAgents: number
   // Advanced settings
-  enableAdvancedSettings: boolean;
-  resourceRequirements: string;
-  successCriteria: string;
-  riskAssessment: string;
+  enableAdvancedSettings: boolean
+  resourceRequirements: string
+  successCriteria: string
+  riskAssessment: string
 }
 
 interface TaskFormData {
-  id: string;
-  title: string;
-  description: string;
-  requiredSkills: string[];
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  estimatedEffort: number | null;
-  deliverable: string;
+  id: string
+  title: string
+  description: string
+  requiredSkills: string[]
+  priority: 'low' | 'medium' | 'high' | 'critical'
+  estimatedEffort: number | null
+  deliverable: string
 }
 
 interface ValidationErrors {
-  title?: string;
-  description?: string;
-  objective?: string;
-  priority?: string;
-  estimatedDuration?: string;
-  dueDate?: string;
-  tasks?: Record<string, { title?: string; description?: string; deliverable?: string }>;
-  general?: string;
+  title?: string
+  description?: string
+  objective?: string
+  priority?: string
+  estimatedDuration?: string
+  dueDate?: string
+  tasks?: Record<string, { title?: string; description?: string; deliverable?: string }>
+  general?: string
 }
 
 interface Agent {
-  id: string;
-  name: string;
-  category: string;
-  tags: string[];
-  status: 'available' | 'busy' | 'offline';
-  description?: string;
+  id: string
+  name: string
+  category: string
+  tags: string[]
+  status: 'available' | 'busy' | 'offline'
+  description?: string
 }
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const PRIORITY_OPTIONS: { value: ExpeditionPriority; label: string; color: string; description: string }[] = [
-  { value: 'low', label: 'Low', color: 'bg-gray-500', description: 'Non-urgent, can be scheduled flexibly' },
-  { value: 'medium', label: 'Medium', color: 'bg-blue-500', description: 'Standard priority, normal timeline' },
-  { value: 'high', label: 'High', color: 'bg-orange-500', description: 'Important, needs attention soon' },
-  { value: 'urgent', label: 'Urgent', color: 'bg-red-500', description: 'Critical, requires immediate action' }
-];
+const PRIORITY_OPTIONS: {
+  value: ExpeditionPriority
+  label: string
+  color: string
+  description: string
+}[] = [
+  {
+    value: 'low',
+    label: 'Low',
+    color: 'bg-gray-500',
+    description: 'Non-urgent, can be scheduled flexibly',
+  },
+  {
+    value: 'medium',
+    label: 'Medium',
+    color: 'bg-blue-500',
+    description: 'Standard priority, normal timeline',
+  },
+  {
+    value: 'high',
+    label: 'High',
+    color: 'bg-orange-500',
+    description: 'Important, needs attention soon',
+  },
+  {
+    value: 'urgent',
+    label: 'Urgent',
+    color: 'bg-red-500',
+    description: 'Critical, requires immediate action',
+  },
+]
 
 const TASK_PRIORITY_OPTIONS: { value: TaskFormData['priority']; label: string }[] = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
   { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' }
-];
+  { value: 'critical', label: 'Critical' },
+]
 
 const COMMON_TAGS = [
-  'research', 'development', 'analysis', 'design', 'testing', 'documentation',
-  'planning', 'implementation', 'review', 'optimization', 'integration', 'deployment'
-];
+  'research',
+  'development',
+  'analysis',
+  'design',
+  'testing',
+  'documentation',
+  'planning',
+  'implementation',
+  'review',
+  'optimization',
+  'integration',
+  'deployment',
+]
 
 const COMMON_SKILLS = [
-  'analysis', 'research', 'writing', 'coding', 'design', 'testing', 'planning',
-  'communication', 'problem-solving', 'creativity', 'technical-review', 'documentation'
-];
+  'analysis',
+  'research',
+  'writing',
+  'coding',
+  'design',
+  'testing',
+  'planning',
+  'communication',
+  'problem-solving',
+  'creativity',
+  'technical-review',
+  'documentation',
+]
 
 // ============================================================================
 // MAIN COMPONENT
@@ -145,20 +196,20 @@ export function CreateExpeditionModal({
   onClose,
   onExpeditionCreated,
   starshipId,
-  starshipSlug
+  starshipSlug,
 }: CreateExpeditionModalProps) {
   // ============================================================================
   // STATE MANAGEMENT
   // ============================================================================
 
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
-  
+  const [currentStep, setCurrentStep] = useState(1)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
+
   // Available agents state
-  const [availableAgents, setAvailableAgents] = useState<Agent[]>([]);
-  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [availableAgents, setAvailableAgents] = useState<Agent[]>([])
+  const [loadingAgents, setLoadingAgents] = useState(false)
 
   // Form data state
   const [formData, setFormData] = useState<FormData>({
@@ -177,151 +228,160 @@ export function CreateExpeditionModal({
     enableAdvancedSettings: false,
     resourceRequirements: '',
     successCriteria: '',
-    riskAssessment: ''
-  });
+    riskAssessment: '',
+  })
 
   // Tag input state
-  const [tagInput, setTagInput] = useState('');
+  const [tagInput, setTagInput] = useState('')
 
   // Socket integration
   const { isConnected } = useExpeditionSocket({
-    onExpeditionCreated: (event) => {
+    onExpeditionCreated: event => {
       if (event.expedition.starshipId === starshipId) {
-        onExpeditionCreated(event.expeditionId);
+        onExpeditionCreated(event.expeditionId)
       }
-    }
-  });
+    },
+  })
 
   // ============================================================================
   // FORM VALIDATION
   // ============================================================================
 
-  const validateStep = useCallback((step: number): boolean => {
-    const errors: ValidationErrors = {};
+  const validateStep = useCallback(
+    (step: number): boolean => {
+      const errors: ValidationErrors = {}
 
-    if (step === 1) {
-      // Basic information validation
-      if (!formData.title.trim()) {
-        errors.title = 'Title is required';
-      } else if (formData.title.length < 3) {
-        errors.title = 'Title must be at least 3 characters';
-      } else if (formData.title.length > 100) {
-        errors.title = 'Title must be less than 100 characters';
-      }
-
-      if (!formData.description.trim()) {
-        errors.description = 'Description is required';
-      } else if (formData.description.length < 10) {
-        errors.description = 'Description must be at least 10 characters';
-      } else if (formData.description.length > 500) {
-        errors.description = 'Description must be less than 500 characters';
-      }
-
-      if (!formData.objective.trim()) {
-        errors.objective = 'Objective is required';
-      } else if (formData.objective.length < 10) {
-        errors.objective = 'Objective must be at least 10 characters';
-      } else if (formData.objective.length > 300) {
-        errors.objective = 'Objective must be less than 300 characters';
-      }
-
-      if (formData.estimatedDuration !== null && formData.estimatedDuration <= 0) {
-        errors.estimatedDuration = 'Duration must be greater than 0';
-      }
-
-      if (formData.dueDate) {
-        const dueDate = new Date(formData.dueDate);
-        const now = new Date();
-        if (dueDate <= now) {
-          errors.dueDate = 'Due date must be in the future';
-        }
-      }
-    }
-
-    if (step === 2 && formData.enableTaskBreakdown) {
-      // Task validation
-      const taskErrors: ValidationErrors['tasks'] = {};
-      
-      formData.initialTasks.forEach((task, index) => {
-        const taskError: any = {};
-        
-        if (!task.title.trim()) {
-          taskError.title = 'Task title is required';
-        } else if (task.title.length > 100) {
-          taskError.title = 'Task title must be less than 100 characters';
+      if (step === 1) {
+        // Basic information validation
+        if (!formData.title.trim()) {
+          errors.title = 'Title is required'
+        } else if (formData.title.length < 3) {
+          errors.title = 'Title must be at least 3 characters'
+        } else if (formData.title.length > 100) {
+          errors.title = 'Title must be less than 100 characters'
         }
 
-        if (!task.description.trim()) {
-          taskError.description = 'Task description is required';
-        } else if (task.description.length > 300) {
-          taskError.description = 'Task description must be less than 300 characters';
+        if (!formData.description.trim()) {
+          errors.description = 'Description is required'
+        } else if (formData.description.length < 10) {
+          errors.description = 'Description must be at least 10 characters'
+        } else if (formData.description.length > 500) {
+          errors.description = 'Description must be less than 500 characters'
         }
 
-        if (!task.deliverable.trim()) {
-          taskError.deliverable = 'Deliverable description is required';
-        } else if (task.deliverable.length > 200) {
-          taskError.deliverable = 'Deliverable must be less than 200 characters';
+        if (!formData.objective.trim()) {
+          errors.objective = 'Objective is required'
+        } else if (formData.objective.length < 10) {
+          errors.objective = 'Objective must be at least 10 characters'
+        } else if (formData.objective.length > 300) {
+          errors.objective = 'Objective must be less than 300 characters'
         }
 
-        if (Object.keys(taskError).length > 0) {
-          taskErrors[task.id] = taskError;
+        if (formData.estimatedDuration !== null && formData.estimatedDuration <= 0) {
+          errors.estimatedDuration = 'Duration must be greater than 0'
         }
-      });
 
-      if (Object.keys(taskErrors).length > 0) {
-        errors.tasks = taskErrors;
+        if (formData.dueDate) {
+          const dueDate = new Date(formData.dueDate)
+          const now = new Date()
+          if (dueDate <= now) {
+            errors.dueDate = 'Due date must be in the future'
+          }
+        }
       }
-    }
 
-    if (step === 3) {
-      // Agent selection validation - MANDATORY
-      console.log('[VALIDATION] Step 3 - Agent selection validation');
-      console.log('[VALIDATION] selectedAgents:', formData.selectedAgents);
-      console.log('[VALIDATION] selectedAgents length:', formData.selectedAgents?.length);
-      
-      if (!formData.selectedAgents || formData.selectedAgents.length === 0) {
-        console.log('[VALIDATION] Agent selection validation failed');
-        errors.general = 'At least one agent must be selected for the expedition';
-      } else {
-        console.log('[VALIDATION] Agent selection validation passed');
+      if (step === 2 && formData.enableTaskBreakdown) {
+        // Task validation
+        const taskErrors: ValidationErrors['tasks'] = {}
+
+        formData.initialTasks.forEach((task, index) => {
+          const taskError: any = {}
+
+          if (!task.title.trim()) {
+            taskError.title = 'Task title is required'
+          } else if (task.title.length > 100) {
+            taskError.title = 'Task title must be less than 100 characters'
+          }
+
+          if (!task.description.trim()) {
+            taskError.description = 'Task description is required'
+          } else if (task.description.length > 300) {
+            taskError.description = 'Task description must be less than 300 characters'
+          }
+
+          if (!task.deliverable.trim()) {
+            taskError.deliverable = 'Deliverable description is required'
+          } else if (task.deliverable.length > 200) {
+            taskError.deliverable = 'Deliverable must be less than 200 characters'
+          }
+
+          if (Object.keys(taskError).length > 0) {
+            taskErrors[task.id] = taskError
+          }
+        })
+
+        if (Object.keys(taskErrors).length > 0) {
+          errors.tasks = taskErrors
+        }
       }
-    }
 
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  }, [formData]);
+      if (step === 3) {
+        // Agent selection validation - MANDATORY
+        console.log('[VALIDATION] Step 3 - Agent selection validation')
+        console.log('[VALIDATION] selectedAgents:', formData.selectedAgents)
+        console.log('[VALIDATION] selectedAgents length:', formData.selectedAgents?.length)
+
+        if (!formData.selectedAgents || formData.selectedAgents.length === 0) {
+          console.log('[VALIDATION] Agent selection validation failed')
+          errors.general = 'At least one agent must be selected for the expedition'
+        } else {
+          console.log('[VALIDATION] Agent selection validation passed')
+        }
+      }
+
+      setValidationErrors(errors)
+      return Object.keys(errors).length === 0
+    },
+    [formData]
+  )
 
   const validateForm = useCallback((): boolean => {
-    return validateStep(1) && validateStep(2) && validateStep(3);
-  }, [validateStep]);
+    return validateStep(1) && validateStep(2) && validateStep(3)
+  }, [validateStep])
 
   // ============================================================================
   // FORM HANDLERS
   // ============================================================================
 
   const updateFormData = useCallback((updates: Partial<FormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
+    setFormData(prev => ({ ...prev, ...updates }))
     // Clear related validation errors
     setValidationErrors(prev => {
-      const newErrors = { ...prev };
+      const newErrors = { ...prev }
       Object.keys(updates).forEach(key => {
-        delete newErrors[key as keyof ValidationErrors];
-      });
-      return newErrors;
-    });
-  }, []);
+        delete newErrors[key as keyof ValidationErrors]
+      })
+      return newErrors
+    })
+  }, [])
 
-  const handleAddTag = useCallback((tag: string) => {
-    const trimmedTag = tag.trim().toLowerCase();
-    if (trimmedTag && !formData.tags.includes(trimmedTag)) {
-      updateFormData({ tags: [...formData.tags, trimmedTag] });
-    }
-    setTagInput('');
-  }, [formData.tags, updateFormData]);
+  const handleAddTag = useCallback(
+    (tag: string) => {
+      const trimmedTag = tag.trim().toLowerCase()
+      if (trimmedTag && !formData.tags.includes(trimmedTag)) {
+        updateFormData({ tags: [...formData.tags, trimmedTag] })
+      }
+      setTagInput('')
+    },
+    [formData.tags, updateFormData]
+  )
 
-  const handleRemoveTag = useCallback((tagToRemove: string) => {
-    updateFormData({ tags: formData.tags.filter(tag => tag !== tagToRemove) });
-  }, [formData.tags, updateFormData]);
+  const handleRemoveTag = useCallback(
+    (tagToRemove: string) => {
+      updateFormData({ tags: formData.tags.filter(tag => tag !== tagToRemove) })
+    },
+    [formData.tags, updateFormData]
+  )
 
   const handleAddTask = useCallback(() => {
     const newTask: TaskFormData = {
@@ -331,86 +391,104 @@ export function CreateExpeditionModal({
       requiredSkills: [],
       priority: 'medium',
       estimatedEffort: null,
-      deliverable: ''
-    };
-    updateFormData({ initialTasks: [...formData.initialTasks, newTask] });
-  }, [formData.initialTasks, updateFormData]);
+      deliverable: '',
+    }
+    updateFormData({ initialTasks: [...formData.initialTasks, newTask] })
+  }, [formData.initialTasks, updateFormData])
 
-  const handleRemoveTask = useCallback((taskId: string) => {
-    updateFormData({ 
-      initialTasks: formData.initialTasks.filter(task => task.id !== taskId) 
-    });
-  }, [formData.initialTasks, updateFormData]);
+  const handleRemoveTask = useCallback(
+    (taskId: string) => {
+      updateFormData({
+        initialTasks: formData.initialTasks.filter(task => task.id !== taskId),
+      })
+    },
+    [formData.initialTasks, updateFormData]
+  )
 
-  const handleUpdateTask = useCallback((taskId: string, updates: Partial<TaskFormData>) => {
-    updateFormData({
-      initialTasks: formData.initialTasks.map(task =>
-        task.id === taskId ? { ...task, ...updates } : task
-      )
-    });
-  }, [formData.initialTasks, updateFormData]);
+  const handleUpdateTask = useCallback(
+    (taskId: string, updates: Partial<TaskFormData>) => {
+      updateFormData({
+        initialTasks: formData.initialTasks.map(task =>
+          task.id === taskId ? { ...task, ...updates } : task
+        ),
+      })
+    },
+    [formData.initialTasks, updateFormData]
+  )
 
-  const handleAddSkillToTask = useCallback((taskId: string, skill: string) => {
-    const trimmedSkill = skill.trim().toLowerCase();
-    if (!trimmedSkill) return;
+  const handleAddSkillToTask = useCallback(
+    (taskId: string, skill: string) => {
+      const trimmedSkill = skill.trim().toLowerCase()
+      if (!trimmedSkill) return
 
-    updateFormData({
-      initialTasks: formData.initialTasks.map(task =>
-        task.id === taskId && !task.requiredSkills.includes(trimmedSkill)
-          ? { ...task, requiredSkills: [...task.requiredSkills, trimmedSkill] }
-          : task
-      )
-    });
-  }, [formData.initialTasks, updateFormData]);
+      updateFormData({
+        initialTasks: formData.initialTasks.map(task =>
+          task.id === taskId && !task.requiredSkills.includes(trimmedSkill)
+            ? { ...task, requiredSkills: [...task.requiredSkills, trimmedSkill] }
+            : task
+        ),
+      })
+    },
+    [formData.initialTasks, updateFormData]
+  )
 
-  const handleRemoveSkillFromTask = useCallback((taskId: string, skillToRemove: string) => {
-    updateFormData({
-      initialTasks: formData.initialTasks.map(task =>
-        task.id === taskId
-          ? { ...task, requiredSkills: task.requiredSkills.filter(skill => skill !== skillToRemove) }
-          : task
-      )
-    });
-  }, [formData.initialTasks, updateFormData]);
+  const handleRemoveSkillFromTask = useCallback(
+    (taskId: string, skillToRemove: string) => {
+      updateFormData({
+        initialTasks: formData.initialTasks.map(task =>
+          task.id === taskId
+            ? {
+                ...task,
+                requiredSkills: task.requiredSkills.filter(skill => skill !== skillToRemove),
+              }
+            : task
+        ),
+      })
+    },
+    [formData.initialTasks, updateFormData]
+  )
 
   // ============================================================================
   // AGENT MANAGEMENT
   // ============================================================================
 
   const loadAvailableAgents = useCallback(async () => {
-    if (!starshipId) return;
+    if (!starshipId) return
 
-    setLoadingAgents(true);
+    setLoadingAgents(true)
     try {
       // Import the API dynamically to avoid circular dependencies
-      const { default: api } = await import('@/lib/api');
-      const response = await api.get(`/api/starships/${starshipId}/agents`);
-      
+      const { default: api } = await import('@/lib/api')
+      const response = await api.get(`/api/starships/${starshipId}/agents`)
+
       if (response.data?.deployedAgents) {
-        setAvailableAgents(response.data.deployedAgents);
+        setAvailableAgents(response.data.deployedAgents)
       }
     } catch (error) {
-      console.error('Failed to load available agents:', error);
+      console.error('Failed to load available agents:', error)
       // Set empty array to prevent loading state from persisting
-      setAvailableAgents([]);
+      setAvailableAgents([])
     } finally {
-      setLoadingAgents(false);
+      setLoadingAgents(false)
     }
-  }, [starshipId]);
+  }, [starshipId])
 
-  const handleToggleAgent = useCallback((agentId: string) => {
-    const isSelected = formData.selectedAgents.includes(agentId);
-    
-    if (isSelected) {
-      updateFormData({
-        selectedAgents: formData.selectedAgents.filter(id => id !== agentId)
-      });
-    } else if (formData.selectedAgents.length < formData.maxAgents) {
-      updateFormData({
-        selectedAgents: [...formData.selectedAgents, agentId]
-      });
-    }
-  }, [formData.selectedAgents, formData.maxAgents, updateFormData]);
+  const handleToggleAgent = useCallback(
+    (agentId: string) => {
+      const isSelected = formData.selectedAgents.includes(agentId)
+
+      if (isSelected) {
+        updateFormData({
+          selectedAgents: formData.selectedAgents.filter(id => id !== agentId),
+        })
+      } else if (formData.selectedAgents.length < formData.maxAgents) {
+        updateFormData({
+          selectedAgents: [...formData.selectedAgents, agentId],
+        })
+      }
+    },
+    [formData.selectedAgents, formData.maxAgents, updateFormData]
+  )
 
   // ============================================================================
   // STEP NAVIGATION
@@ -418,37 +496,40 @@ export function CreateExpeditionModal({
 
   const handleNextStep = useCallback(() => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 4));
+      setCurrentStep(prev => Math.min(prev + 1, 4))
     }
-  }, [currentStep, validateStep]);
+  }, [currentStep, validateStep])
 
   const handlePrevStep = useCallback(() => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
-  }, []);
+    setCurrentStep(prev => Math.max(prev - 1, 1))
+  }, [])
 
-  const handleStepClick = useCallback((step: number) => {
-    // Allow navigation to previous steps or current step
-    if (step <= currentStep) {
-      setCurrentStep(step);
-    }
-  }, [currentStep]);
+  const handleStepClick = useCallback(
+    (step: number) => {
+      // Allow navigation to previous steps or current step
+      if (step <= currentStep) {
+        setCurrentStep(step)
+      }
+    },
+    [currentStep]
+  )
 
   // ============================================================================
   // FORM SUBMISSION
   // ============================================================================
 
   const handleSubmit = useCallback(async () => {
-    console.log('[CREATE-EXPEDITION] Starting form submission...');
-    console.log('[CREATE-EXPEDITION] Form data:', formData);
-    
+    console.log('[CREATE-EXPEDITION] Starting form submission...')
+    console.log('[CREATE-EXPEDITION] Form data:', formData)
+
     if (!validateForm()) {
-      console.log('[CREATE-EXPEDITION] Form validation failed');
-      setSubmitError('Please fix the validation errors before submitting');
-      return;
+      console.log('[CREATE-EXPEDITION] Form validation failed')
+      setSubmitError('Please fix the validation errors before submitting')
+      return
     }
 
-    setIsSubmitting(true);
-    setSubmitError(null);
+    setIsSubmitting(true)
+    setSubmitError(null)
 
     try {
       // Prepare expedition request
@@ -461,14 +542,14 @@ export function CreateExpeditionModal({
         estimatedDuration: formData.estimatedDuration || undefined,
         tags: formData.tags,
         dueDate: formData.dueDate || undefined,
-        selectedAgents: formData.selectedAgents // MANDATORY: Always include selected agents
-      };
+        selectedAgents: formData.selectedAgents, // MANDATORY: Always include selected agents
+      }
 
-      console.log('[CREATE-EXPEDITION] Expedition request:', expeditionRequest);
+      console.log('[CREATE-EXPEDITION] Expedition request:', expeditionRequest)
 
       // Create the expedition
-      const response = await expeditionAPI.createExpedition(expeditionRequest);
-      const expeditionId = response.expedition.id;
+      const response = await expeditionAPI.createExpedition(expeditionRequest)
+      const expeditionId = response.expedition.id
 
       // Create initial tasks if enabled
       if (formData.enableTaskBreakdown && formData.initialTasks.length > 0) {
@@ -480,57 +561,51 @@ export function CreateExpeditionModal({
             requiredSkills: task.requiredSkills,
             priority: task.priority,
             deliverable: task.deliverable.trim(),
-            estimatedEffort: task.estimatedEffort || undefined
-          };
-          return expeditionAPI.createTask(starshipId, taskRequest);
-        });
+            estimatedEffort: task.estimatedEffort || undefined,
+          }
+          return expeditionAPI.createTask(starshipId, taskRequest)
+        })
 
-        await Promise.all(taskPromises);
+        await Promise.all(taskPromises)
       }
 
       // Auto-start expedition if enabled
       if (formData.autoStart) {
-        await expeditionAPI.startExpedition(starshipId, expeditionId);
+        await expeditionAPI.startExpedition(starshipId, expeditionId)
       }
 
       // Notify parent component
-      onExpeditionCreated(expeditionId);
-      
-      // Reset form and close modal
-      handleReset();
-      onClose();
+      onExpeditionCreated(expeditionId)
 
+      // Reset form and close modal
+      handleReset()
+      onClose()
     } catch (error: any) {
-      console.error('Failed to create expedition:', error);
-      
+      console.error('Failed to create expedition:', error)
+
       // Provide more specific error messages based on error type
-      let errorMessage = 'Failed to create expedition. Please check your input and try again.';
-      
+      let errorMessage = 'Failed to create expedition. Please check your input and try again.'
+
       if (error?.code === 'VALIDATION_ERROR') {
-        errorMessage = error.message || 'Please check that all required fields are filled correctly.';
+        errorMessage =
+          error.message || 'Please check that all required fields are filled correctly.'
       } else if (error?.statusCode === 400) {
-        errorMessage = 'Invalid request. Please check your input and try again.';
+        errorMessage = 'Invalid request. Please check your input and try again.'
       } else if (error?.statusCode === 401) {
-        errorMessage = 'Authentication failed. Please refresh the page and try again.';
+        errorMessage = 'Authentication failed. Please refresh the page and try again.'
       } else if (error?.statusCode === 403) {
-        errorMessage = 'You do not have permission to create expeditions for this starship.';
+        errorMessage = 'You do not have permission to create expeditions for this starship.'
       } else if (error?.statusCode >= 500) {
-        errorMessage = 'Server error. Please try again in a moment.';
+        errorMessage = 'Server error. Please try again in a moment.'
       } else if (error?.message) {
-        errorMessage = error.message;
+        errorMessage = error.message
       }
-      
-      setSubmitError(errorMessage);
+
+      setSubmitError(errorMessage)
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  }, [
-    validateForm, 
-    starshipId, 
-    formData, 
-    onExpeditionCreated, 
-    onClose
-  ]);
+  }, [validateForm, starshipId, formData, onExpeditionCreated, onClose])
 
   // ============================================================================
   // FORM RESET
@@ -553,13 +628,13 @@ export function CreateExpeditionModal({
       enableAdvancedSettings: false,
       resourceRequirements: '',
       successCriteria: '',
-      riskAssessment: ''
-    });
-    setCurrentStep(1);
-    setValidationErrors({});
-    setSubmitError(null);
-    setTagInput('');
-  }, []);
+      riskAssessment: '',
+    })
+    setCurrentStep(1)
+    setValidationErrors({})
+    setSubmitError(null)
+    setTagInput('')
+  }, [])
 
   // ============================================================================
   // EFFECTS
@@ -568,16 +643,16 @@ export function CreateExpeditionModal({
   // Load agents when modal opens (always enabled now)
   useEffect(() => {
     if (open && availableAgents.length === 0) {
-      loadAvailableAgents();
+      loadAvailableAgents()
     }
-  }, [open, availableAgents.length, loadAvailableAgents]);
+  }, [open, availableAgents.length, loadAvailableAgents])
 
   // Reset form when modal closes
   useEffect(() => {
     if (!open) {
-      handleReset();
+      handleReset()
     }
-  }, [open, handleReset]);
+  }, [open, handleReset])
 
   // ============================================================================
   // RENDER HELPERS
@@ -585,7 +660,7 @@ export function CreateExpeditionModal({
 
   const renderStepIndicator = () => (
     <div className="flex items-center justify-center space-x-4 mb-8">
-      {[1, 2, 3, 4].map((step) => (
+      {[1, 2, 3, 4].map(step => (
         <div key={step} className="flex items-center">
           <button
             onClick={() => handleStepClick(step)}
@@ -593,34 +668,28 @@ export function CreateExpeditionModal({
               step === currentStep
                 ? 'bg-primary text-primary-foreground'
                 : step < currentStep
-                ? 'bg-green-500 text-white cursor-pointer hover:bg-green-600'
-                : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  ? 'bg-green-500 text-white cursor-pointer hover:bg-green-600'
+                  : 'bg-muted text-muted-foreground cursor-not-allowed'
             }`}
             disabled={step > currentStep}
           >
-            {step < currentStep ? (
-              <CheckCircle2 className="h-4 w-4" />
-            ) : (
-              step
-            )}
+            {step < currentStep ? <CheckCircle2 className="h-4 w-4" /> : step}
           </button>
           {step < 4 && (
-            <div className={`w-12 h-0.5 mx-2 ${
-              step < currentStep ? 'bg-green-500' : 'bg-muted'
-            }`} />
+            <div
+              className={`w-12 h-0.5 mx-2 ${step < currentStep ? 'bg-green-500' : 'bg-muted'}`}
+            />
           )}
         </div>
       ))}
     </div>
-  );
+  )
 
   const renderBasicInformation = () => (
     <div className="space-y-6">
       <div className="text-center mb-6">
         <h3 className="text-lg font-semibold mb-2">Basic Information</h3>
-        <p className="text-sm text-muted-foreground">
-          Define the core details of your expedition
-        </p>
+        <p className="text-sm text-muted-foreground">Define the core details of your expedition</p>
       </div>
 
       <div className="space-y-4">
@@ -633,7 +702,7 @@ export function CreateExpeditionModal({
             id="title"
             placeholder="Enter a clear, descriptive title for your expedition"
             value={formData.title}
-            onChange={(e) => updateFormData({ title: e.target.value })}
+            onChange={e => updateFormData({ title: e.target.value })}
             className={validationErrors.title ? 'border-red-500' : ''}
             maxLength={100}
           />
@@ -643,9 +712,7 @@ export function CreateExpeditionModal({
               {validationErrors.title}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
-            {formData.title.length}/100 characters
-          </p>
+          <p className="text-xs text-muted-foreground">{formData.title.length}/100 characters</p>
         </div>
 
         {/* Description */}
@@ -657,7 +724,7 @@ export function CreateExpeditionModal({
             id="description"
             placeholder="Provide a detailed description of what this expedition will accomplish"
             value={formData.description}
-            onChange={(e) => updateFormData({ description: e.target.value })}
+            onChange={e => updateFormData({ description: e.target.value })}
             className={validationErrors.description ? 'border-red-500' : ''}
             rows={3}
             maxLength={500}
@@ -682,7 +749,7 @@ export function CreateExpeditionModal({
             id="objective"
             placeholder="Define the specific goal or outcome you want to achieve"
             value={formData.objective}
-            onChange={(e) => updateFormData({ objective: e.target.value })}
+            onChange={e => updateFormData({ objective: e.target.value })}
             className={validationErrors.objective ? 'border-red-500' : ''}
             rows={2}
             maxLength={300}
@@ -705,13 +772,13 @@ export function CreateExpeditionModal({
             <Label className="text-sm font-medium">Priority Level *</Label>
             <Select
               value={formData.priority}
-              onValueChange={(value) => updateFormData({ priority: value as ExpeditionPriority })}
+              onValueChange={value => updateFormData({ priority: value as ExpeditionPriority })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
               <SelectContent>
-                {PRIORITY_OPTIONS.map((option) => (
+                {PRIORITY_OPTIONS.map(option => (
                   <SelectItem key={option.value} value={option.value}>
                     <div className="flex items-center space-x-2">
                       <div className={`w-3 h-3 rounded-full ${option.color}`} />
@@ -736,9 +803,11 @@ export function CreateExpeditionModal({
               type="number"
               placeholder="e.g., 120"
               value={formData.estimatedDuration || ''}
-              onChange={(e) => updateFormData({ 
-                estimatedDuration: e.target.value ? parseInt(e.target.value) : null 
-              })}
+              onChange={e =>
+                updateFormData({
+                  estimatedDuration: e.target.value ? parseInt(e.target.value) : null,
+                })
+              }
               className={validationErrors.estimatedDuration ? 'border-red-500' : ''}
               min="1"
             />
@@ -760,7 +829,7 @@ export function CreateExpeditionModal({
             id="dueDate"
             type="datetime-local"
             value={formData.dueDate}
-            onChange={(e) => updateFormData({ dueDate: e.target.value })}
+            onChange={e => updateFormData({ dueDate: e.target.value })}
             className={validationErrors.dueDate ? 'border-red-500' : ''}
             min={new Date().toISOString().slice(0, 16)}
           />
@@ -780,11 +849,11 @@ export function CreateExpeditionModal({
               <Input
                 placeholder="Add tags to categorize your expedition"
                 value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => {
+                onChange={e => setTagInput(e.target.value)}
+                onKeyPress={e => {
                   if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddTag(tagInput);
+                    e.preventDefault()
+                    handleAddTag(tagInput)
                   }
                 }}
               />
@@ -798,10 +867,10 @@ export function CreateExpeditionModal({
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
-            
+
             {/* Common tags */}
             <div className="flex flex-wrap gap-1">
-              {COMMON_TAGS.map((tag) => (
+              {COMMON_TAGS.map(tag => (
                 <Button
                   key={tag}
                   type="button"
@@ -819,7 +888,7 @@ export function CreateExpeditionModal({
             {/* Selected tags */}
             {formData.tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {formData.tags.map((tag) => (
+                {formData.tags.map(tag => (
                   <Badge key={tag} variant="secondary" className="text-xs">
                     {tag}
                     <button
@@ -837,7 +906,7 @@ export function CreateExpeditionModal({
         </div>
       </div>
     </div>
-  );
+  )
 
   const renderTaskConfiguration = () => (
     <div className="space-y-6">
@@ -860,20 +929,15 @@ export function CreateExpeditionModal({
             </div>
             <Switch
               checked={formData.enableTaskBreakdown}
-              onCheckedChange={(checked) => updateFormData({ enableTaskBreakdown: checked })}
+              onCheckedChange={checked => updateFormData({ enableTaskBreakdown: checked })}
             />
           </div>
         </CardHeader>
-        
+
         {formData.enableTaskBreakdown && (
           <CardContent className="space-y-4">
             {/* Add Task Button */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleAddTask}
-              className="w-full"
-            >
+            <Button type="button" variant="outline" onClick={handleAddTask} className="w-full">
               <Plus className="h-4 w-4 mr-2" />
               Add Task
             </Button>
@@ -903,8 +967,10 @@ export function CreateExpeditionModal({
                           <Input
                             placeholder="Task title"
                             value={task.title}
-                            onChange={(e) => handleUpdateTask(task.id, { title: e.target.value })}
-                            className={validationErrors.tasks?.[task.id]?.title ? 'border-red-500' : ''}
+                            onChange={e => handleUpdateTask(task.id, { title: e.target.value })}
+                            className={
+                              validationErrors.tasks?.[task.id]?.title ? 'border-red-500' : ''
+                            }
                             maxLength={100}
                           />
                           {validationErrors.tasks?.[task.id]?.title && (
@@ -920,8 +986,12 @@ export function CreateExpeditionModal({
                           <Textarea
                             placeholder="Task description"
                             value={task.description}
-                            onChange={(e) => handleUpdateTask(task.id, { description: e.target.value })}
-                            className={validationErrors.tasks?.[task.id]?.description ? 'border-red-500' : ''}
+                            onChange={e =>
+                              handleUpdateTask(task.id, { description: e.target.value })
+                            }
+                            className={
+                              validationErrors.tasks?.[task.id]?.description ? 'border-red-500' : ''
+                            }
                             rows={2}
                             maxLength={300}
                           />
@@ -938,13 +1008,17 @@ export function CreateExpeditionModal({
                           <div>
                             <Select
                               value={task.priority}
-                              onValueChange={(value) => handleUpdateTask(task.id, { priority: value as TaskFormData['priority'] })}
+                              onValueChange={value =>
+                                handleUpdateTask(task.id, {
+                                  priority: value as TaskFormData['priority'],
+                                })
+                              }
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Priority" />
                               </SelectTrigger>
                               <SelectContent>
-                                {TASK_PRIORITY_OPTIONS.map((option) => (
+                                {TASK_PRIORITY_OPTIONS.map(option => (
                                   <SelectItem key={option.value} value={option.value}>
                                     {option.label}
                                   </SelectItem>
@@ -957,9 +1031,11 @@ export function CreateExpeditionModal({
                               type="number"
                               placeholder="Effort (min)"
                               value={task.estimatedEffort || ''}
-                              onChange={(e) => handleUpdateTask(task.id, {
-                                estimatedEffort: e.target.value ? parseInt(e.target.value) : null
-                              })}
+                              onChange={e =>
+                                handleUpdateTask(task.id, {
+                                  estimatedEffort: e.target.value ? parseInt(e.target.value) : null,
+                                })
+                              }
                               min="1"
                             />
                           </div>
@@ -969,7 +1045,7 @@ export function CreateExpeditionModal({
                         <div className="space-y-2">
                           <Label className="text-xs font-medium">Required Skills</Label>
                           <div className="flex flex-wrap gap-1">
-                            {COMMON_SKILLS.map((skill) => (
+                            {COMMON_SKILLS.map(skill => (
                               <Button
                                 key={skill}
                                 type="button"
@@ -985,7 +1061,7 @@ export function CreateExpeditionModal({
                           </div>
                           {task.requiredSkills.length > 0 && (
                             <div className="flex flex-wrap gap-1">
-                              {task.requiredSkills.map((skill) => (
+                              {task.requiredSkills.map(skill => (
                                 <Badge key={skill} variant="outline" className="text-xs">
                                   {skill}
                                   <button
@@ -1006,8 +1082,12 @@ export function CreateExpeditionModal({
                           <Input
                             placeholder="Expected deliverable"
                             value={task.deliverable}
-                            onChange={(e) => handleUpdateTask(task.id, { deliverable: e.target.value })}
-                            className={validationErrors.tasks?.[task.id]?.deliverable ? 'border-red-500' : ''}
+                            onChange={e =>
+                              handleUpdateTask(task.id, { deliverable: e.target.value })
+                            }
+                            className={
+                              validationErrors.tasks?.[task.id]?.deliverable ? 'border-red-500' : ''
+                            }
                             maxLength={200}
                           />
                           {validationErrors.tasks?.[task.id]?.deliverable && (
@@ -1027,7 +1107,7 @@ export function CreateExpeditionModal({
         )}
       </Card>
     </div>
-  );
+  )
 
   const renderAgentSelection = () => (
     <div className="space-y-6">
@@ -1044,16 +1124,14 @@ export function CreateExpeditionModal({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base">Agent Assignment *</CardTitle>
-              <CardDescription>
-                Select agents for this expedition (required)
-              </CardDescription>
+              <CardDescription>Select agents for this expedition (required)</CardDescription>
             </div>
             <Badge variant="secondary" className="text-xs">
               Required
             </Badge>
           </div>
         </CardHeader>
-        
+
         {/* Always show agent selection - no toggle */}
         <CardContent className="space-y-4">
           <CardContent className="space-y-4">
@@ -1075,7 +1153,9 @@ export function CreateExpeditionModal({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => updateFormData({ maxAgents: Math.min(10, formData.maxAgents + 1) })}
+                  onClick={() =>
+                    updateFormData({ maxAgents: Math.min(10, formData.maxAgents + 1) })
+                  }
                   disabled={formData.maxAgents >= 10}
                 >
                   <Plus className="h-4 w-4" />
@@ -1095,23 +1175,15 @@ export function CreateExpeditionModal({
               <div className="text-center py-8">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-sm text-muted-foreground">No agents available</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={loadAvailableAgents}
-                  className="mt-2"
-                >
-                  Retry
-                </Button>
               </div>
             ) : (
               <ScrollArea className="max-h-64">
                 <div className="space-y-2">
-                  {availableAgents.map((agent) => {
-                    const isSelected = formData.selectedAgents.includes(agent.id);
-                    const canSelect = isSelected || formData.selectedAgents.length < formData.maxAgents;
-                    
+                  {availableAgents.map(agent => {
+                    const isSelected = formData.selectedAgents.includes(agent.id)
+                    const canSelect =
+                      isSelected || formData.selectedAgents.length < formData.maxAgents
+
                     return (
                       <Card
                         key={agent.id}
@@ -1119,35 +1191,38 @@ export function CreateExpeditionModal({
                           isSelected
                             ? 'border-primary bg-primary/5'
                             : canSelect
-                            ? 'hover:border-primary/50'
-                            : 'opacity-50 cursor-not-allowed'
+                              ? 'hover:border-primary/50'
+                              : 'opacity-50 cursor-not-allowed'
                         }`}
                         onClick={() => canSelect && handleToggleAgent(agent.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <div className={`w-3 h-3 rounded-full ${
-                              agent.status === 'available' ? 'bg-green-500' :
-                              agent.status === 'busy' ? 'bg-yellow-500' : 'bg-gray-500'
-                            }`} />
+                            <div
+                              className={`w-3 h-3 rounded-full ${
+                                agent.status === 'available'
+                                  ? 'bg-green-500'
+                                  : agent.status === 'busy'
+                                    ? 'bg-yellow-500'
+                                    : 'bg-gray-500'
+                              }`}
+                            />
                             <div>
                               <p className="font-medium text-sm">{agent.name}</p>
                               <p className="text-xs text-muted-foreground">{agent.category}</p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            {agent.tags.slice(0, 2).map((tag) => (
+                            {agent.tags.slice(0, 2).map(tag => (
                               <Badge key={tag} variant="outline" className="text-xs">
                                 {tag}
                               </Badge>
                             ))}
-                            {isSelected && (
-                              <CheckCircle2 className="h-4 w-4 text-primary" />
-                            )}
+                            {isSelected && <CheckCircle2 className="h-4 w-4 text-primary" />}
                           </div>
                         </div>
                       </Card>
-                    );
+                    )
                   })}
                 </div>
               </ScrollArea>
@@ -1160,8 +1235,8 @@ export function CreateExpeditionModal({
                   Selected Agents ({formData.selectedAgents.length}/{formData.maxAgents})
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {formData.selectedAgents.map((agentId) => {
-                    const agent = availableAgents.find(a => a.id === agentId);
+                  {formData.selectedAgents.map(agentId => {
+                    const agent = availableAgents.find(a => a.id === agentId)
                     return agent ? (
                       <Badge key={agentId} variant="secondary" className="text-xs">
                         {agent.name}
@@ -1173,7 +1248,7 @@ export function CreateExpeditionModal({
                           <X className="h-3 w-3" />
                         </button>
                       </Badge>
-                    ) : null;
+                    ) : null
                   })}
                 </div>
               </div>
@@ -1182,15 +1257,13 @@ export function CreateExpeditionModal({
         </CardContent>
       </Card>
     </div>
-  );
+  )
 
   const renderAdvancedSettings = () => (
     <div className="space-y-6">
       <div className="text-center mb-6">
         <h3 className="text-lg font-semibold mb-2">Advanced Settings</h3>
-        <p className="text-sm text-muted-foreground">
-          Configure additional expedition parameters
-        </p>
+        <p className="text-sm text-muted-foreground">Configure additional expedition parameters</p>
       </div>
 
       {/* Auto-start Option */}
@@ -1199,13 +1272,11 @@ export function CreateExpeditionModal({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base">Auto-start Expedition</CardTitle>
-              <CardDescription>
-                Automatically start the expedition after creation
-              </CardDescription>
+              <CardDescription>Automatically start the expedition after creation</CardDescription>
             </div>
             <Switch
               checked={formData.autoStart}
-              onCheckedChange={(checked) => updateFormData({ autoStart: checked })}
+              onCheckedChange={checked => updateFormData({ autoStart: checked })}
             />
           </div>
         </CardHeader>
@@ -1217,17 +1288,15 @@ export function CreateExpeditionModal({
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base">Additional Configuration</CardTitle>
-              <CardDescription>
-                Optional advanced settings for the expedition
-              </CardDescription>
+              <CardDescription>Optional advanced settings for the expedition</CardDescription>
             </div>
             <Switch
               checked={formData.enableAdvancedSettings}
-              onCheckedChange={(checked) => updateFormData({ enableAdvancedSettings: checked })}
+              onCheckedChange={checked => updateFormData({ enableAdvancedSettings: checked })}
             />
           </div>
         </CardHeader>
-        
+
         {formData.enableAdvancedSettings && (
           <CardContent className="space-y-4">
             {/* Resource Requirements */}
@@ -1239,7 +1308,7 @@ export function CreateExpeditionModal({
                 id="resources"
                 placeholder="Describe any specific resources, tools, or access needed"
                 value={formData.resourceRequirements}
-                onChange={(e) => updateFormData({ resourceRequirements: e.target.value })}
+                onChange={e => updateFormData({ resourceRequirements: e.target.value })}
                 rows={2}
                 maxLength={300}
               />
@@ -1257,7 +1326,7 @@ export function CreateExpeditionModal({
                 id="success"
                 placeholder="Define what constitutes success for this expedition"
                 value={formData.successCriteria}
-                onChange={(e) => updateFormData({ successCriteria: e.target.value })}
+                onChange={e => updateFormData({ successCriteria: e.target.value })}
                 rows={2}
                 maxLength={300}
               />
@@ -1275,7 +1344,7 @@ export function CreateExpeditionModal({
                 id="risks"
                 placeholder="Identify potential risks and mitigation strategies"
                 value={formData.riskAssessment}
-                onChange={(e) => updateFormData({ riskAssessment: e.target.value })}
+                onChange={e => updateFormData({ riskAssessment: e.target.value })}
                 rows={2}
                 maxLength={300}
               />
@@ -1287,32 +1356,37 @@ export function CreateExpeditionModal({
         )}
       </Card>
     </div>
-  );
+  )
 
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
-        return renderBasicInformation();
+        return renderBasicInformation()
       case 2:
-        return renderTaskConfiguration();
+        return renderTaskConfiguration()
       case 3:
-        return renderAgentSelection();
+        return renderAgentSelection()
       case 4:
-        return renderAdvancedSettings();
+        return renderAdvancedSettings()
       default:
-        return renderBasicInformation();
+        return renderBasicInformation()
     }
-  };
+  }
 
   const getStepTitle = (step: number) => {
     switch (step) {
-      case 1: return 'Basic Information';
-      case 2: return 'Task Configuration';
-      case 3: return 'Agent Selection';
-      case 4: return 'Advanced Settings';
-      default: return 'Basic Information';
+      case 1:
+        return 'Basic Information'
+      case 2:
+        return 'Task Configuration'
+      case 3:
+        return 'Agent Selection'
+      case 4:
+        return 'Advanced Settings'
+      default:
+        return 'Basic Information'
     }
-  };
+  }
 
   // ============================================================================
   // MAIN RENDER
@@ -1327,7 +1401,8 @@ export function CreateExpeditionModal({
             <span>Create New Expedition</span>
           </DialogTitle>
           <DialogDescription>
-            Set up a new expedition for {starshipSlug}. Follow the steps to configure all aspects of your mission.
+            Set up a new expedition for {starshipSlug}. Follow the steps to configure all aspects of
+            your mission.
           </DialogDescription>
         </DialogHeader>
 
@@ -1383,13 +1458,9 @@ export function CreateExpeditionModal({
                 Previous
               </Button>
             )}
-            
+
             {currentStep < 4 ? (
-              <Button
-                type="button"
-                onClick={handleNextStep}
-                disabled={isSubmitting}
-              >
+              <Button type="button" onClick={handleNextStep} disabled={isSubmitting}>
                 Next
               </Button>
             ) : (
@@ -1416,5 +1487,5 @@ export function CreateExpeditionModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

@@ -237,10 +237,10 @@ export function AgentSelector({
   return (
     <div className="space-y-6">
       {/* Enhanced Header with better visual hierarchy */}
-      <div className="p-4 bg-gradient-to-r from-blue-500/5 to-blue-500/10 border border-blue-500/20 rounded-lg space-y-4">
+      <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-4">
         <div className="flex items-center gap-4">
-          <span className="bg-blue-500/20 p-3 rounded-lg shadow-sm flex-shrink-0">
-            <Bot className="h-6 w-6 text-blue-500" />
+          <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
+            <Bot className="h-6 w-6 text-primary" />
           </span>
           <div className="flex-1 min-w-0">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
@@ -257,9 +257,9 @@ export function AgentSelector({
               onCreateFromTemplate={handleCreateFromTemplate}
               trigger={
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="h-9 whitespace-nowrap border-blue-500/30 hover:border-blue-500/50"
+                  className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0"
                 >
                   <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
                   <span>From Template</span>
@@ -269,7 +269,8 @@ export function AgentSelector({
             <Button
               onClick={handleCreateAgent}
               size="sm"
-              className="h-9 whitespace-nowrap bg-blue-500 hover:bg-blue-600"
+              variant="outline"
+              className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80"
             >
               <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>Create Agent</span>
@@ -283,11 +284,11 @@ export function AgentSelector({
           {/* Enhanced Search Section */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 px-1">
-              <div className="h-px bg-gradient-to-r from-blue-500/50 to-transparent flex-1"></div>
-              <h4 className="text-sm font-semibold text-blue-500 uppercase tracking-wide">
+              <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
+              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
                 Search & Filter
               </h4>
-              <div className="h-px bg-gradient-to-l from-blue-500/50 to-transparent flex-1"></div>
+              <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
             </div>
 
             <div className="relative">
@@ -298,7 +299,7 @@ export function AgentSelector({
                 placeholder="Search agents..."
                 value={filters.searchQuery}
                 onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                className="pl-12 pr-4 h-12 bg-gradient-to-r from-card to-muted/30 border-2 border-dashed border-blue-500/30 hover:border-blue-500/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                className="pl-12 pr-4 h-12 bg-background border-2 border-dashed border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
               />
             </div>
 
@@ -334,31 +335,6 @@ export function AgentSelector({
               ? 'No agents match your filters'
               : AGENT_TEXT.NO_AGENTS_AVAILABLE}
           </p>
-          {showCreateButton && (
-            <div className="flex flex-col gap-3 justify-center max-w-xs mx-auto">
-              <AgentTemplateSelector
-                onSelectTemplate={template => {
-                  console.log('Template selected:', template)
-                }}
-                onCreateFromTemplate={handleCreateFromTemplate}
-                trigger={
-                  <Button size="sm" variant="outline" className="h-10 w-full">
-                    <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
-                    <span className="whitespace-nowrap">From Template</span>
-                  </Button>
-                }
-              />
-              <Button
-                onClick={handleCreateAgent}
-                size="sm"
-                variant="outline"
-                className="h-10 w-full"
-              >
-                <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
-                <span className="whitespace-nowrap">Create Your First Agent</span>
-              </Button>
-            </div>
-          )}
         </div>
       ) : (
         <div className="space-y-3 mt-4">

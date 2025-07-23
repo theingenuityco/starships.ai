@@ -65,10 +65,26 @@ export function AgentCard({
 
       try {
         setLoadingStarship(true)
+        console.log('[AGENT-CARD] Attempting to fetch starship:', (agent as any).starshipId)
+        console.log('[AGENT-CARD] Agent details:', {
+          id: agent.id,
+          name: agent.name,
+          starshipId: (agent as any).starshipId,
+        })
+
         const starshipData = await starshipAPI.getStarship((agent as any).starshipId)
+        console.log('[AGENT-CARD] Successfully fetched starship:', starshipData.starship.name)
         setStarship(starshipData.starship)
       } catch (error) {
-        console.error('Failed to fetch starship:', error)
+        console.error('[AGENT-CARD] Failed to fetch starship:', {
+          starshipId: (agent as any).starshipId,
+          agentId: agent.id,
+          agentName: agent.name,
+          error: error,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          errorStatus: (error as any)?.response?.status,
+          timestamp: new Date().toISOString(),
+        })
       } finally {
         setLoadingStarship(false)
       }
@@ -241,7 +257,6 @@ export function AgentCard({
                   )}
                 </div>
               )}
-              
               {/* Starship Information */}
               {(agent as any)?.starshipId && (
                 <div className="mb-3">
@@ -272,7 +287,6 @@ export function AgentCard({
                   )}
                 </div>
               )}
-              
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span className="bg-secondary/50 px-2.5 py-1 rounded-md font-mono">
                   {agent.model}

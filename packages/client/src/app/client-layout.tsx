@@ -122,7 +122,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             exit="exit"
             variants={pageVariants}
             className={cn(
-              'flex-1 h-full w-full transition-all duration-300',
+              'flex-1 min-h-full w-full transition-all duration-300 overflow-auto',
               // Position content next to navigation with fixed margin when navigation is shown
               !shouldHideNavigation ? 'ml-[320px]' : ''
             )}

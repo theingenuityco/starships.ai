@@ -145,15 +145,79 @@ async function withRetry<T>(
       console.log(`[EXPEDITION-API] [${attemptId}] Operation type:`, typeof operation);
       console.log(`[EXPEDITION-API] [${attemptId}] Operation name:`, operation.name || 'anonymous');
       
-      // Add timeout wrapper to detect hanging operations
+      // Enhanced timeout wrapper with proper error handling
       console.log(`[EXPEDITION-API] [${attemptId}] Creating operation promise...`);
-      const operationPromise = operation();
-      console.log(`[EXPEDITION-API] [${attemptId}] Operation promise created, setting up timeout...`);
       
+      let timeoutId: NodeJS.Timeout | undefined;
+      let operationCompleted = false;
+      
+      // Wrap the operation with enhanced error handling
+      const operationPromise = new Promise<T>((resolve, reject) => {
+        (async () => {
+          try {
+            console.log(`[EXPEDITION-API] [${attemptId}] Executing operation...`);
+            const result = await operation();
+            
+            if (!operationCompleted) {
+              operationCompleted = true;
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              console.log(`[EXPEDITION-API] [${attemptId}] Operation completed successfully`);
+              resolve(result);
+            }
+          } catch (error) {
+            if (!operationCompleted) {
+              operationCompleted = true;
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              console.error(`[EXPEDITION-API] [${attemptId}] Operation failed:`, {
+                error,
+                errorType: typeof error,
+                errorMessage: (error as any)?.message,
+                errorCode: (error as any)?.code,
+                errorStatus: (error as any)?.response?.status
+              });
+              reject(error);
+            }
+          }
+        })();
+      });
+      
+      // Create timeout promise with proper error details
       const timeoutPromise = new Promise<T>((_, reject) => {
-        setTimeout(() => {
-          console.error(`[EXPEDITION-API] [${attemptId}] TIMEOUT: Operation exceeded 30 seconds`);
-          reject(new Error('Operation timeout after 30 seconds'));
+        timeoutId = setTimeout(() => {
+          if (!operationCompleted) {
+            operationCompleted = true;
+            console.error(`[EXPEDITION-API] [${attemptId}] TIMEOUT: Operation exceeded 30 seconds`);
+            console.error(`[EXPEDITION-API] [${attemptId}] TIMEOUT DETAILS:`, {
+              operationName: operation.name || 'anonymous',
+              operationType: typeof operation,
+              attemptNumber: attempt + 1,
+              maxRetries,
+              timestamp: new Date().toISOString()
+            });
+            
+            reject(new ExpeditionAPIError(
+              'Request timeout - the operation took longer than 30 seconds to complete. This may indicate server issues or network problems.',
+              'WORKFLOW_FAILED' as ExpeditionErrorCode,
+              408,
+              {
+                timeoutDuration: 30000,
+                attemptNumber: attempt + 1,
+                operationId: attemptId,
+                timestamp: new Date().toISOString(),
+                possibleCauses: [
+                  'Server is not responding',
+                  'Network connectivity issues',
+                  'API endpoint is down or overloaded',
+                  'Authentication token issues',
+                  'Request is hanging without proper error handling'
+                ]
+              }
+            ));
+          }
         }, 30000);
       });
       
@@ -311,17 +375,34 @@ async function withRetry<T>(
     console.error(`[EXPEDITION-API] [${operationId}] 2. A network interruption occurred`);
     console.error(`[EXPEDITION-API] [${operationId}] 3. The operation timed out without throwing an error`);
     console.error(`[EXPEDITION-API] [${operationId}] 4. There is a bug in the error handling logic`);
+    console.error(`[EXPEDITION-API] [${operationId}] 5. Axios timeout (10s) conflicted with custom timeout (30s)`);
+    console.error(`[EXPEDITION-API] [${operationId}] 6. Authentication token expired during request`);
     
     throw new ExpeditionAPIError(
-      'Request failed unexpectedly - no error information available. This may indicate a network issue or request cancellation.',
+      'Request failed - the operation completed all retry attempts but no error information was captured. This typically indicates a timeout or network connectivity issue.',
       'WORKFLOW_FAILED',
-      500,
+      408, // Use 408 Request Timeout instead of 500
       {
-        note: 'No error object available',
+        note: 'No error object available after all retry attempts',
         operationSucceeded,
         operationId,
         attemptHistory: attemptResults,
-        debugInfo: 'withRetry completed all attempts but no error was captured'
+        debugInfo: 'withRetry completed all attempts but no error was captured',
+        possibleCauses: [
+          'Network timeout occurred',
+          'Server took too long to respond',
+          'Request was cancelled or interrupted',
+          'Authentication token expired during request',
+          'API endpoint is temporarily unavailable',
+          'Axios timeout (10s) conflicted with Promise.race timeout (30s)'
+        ],
+        troubleshooting: [
+          'Check network connectivity',
+          'Verify API server is running on http://localhost:4000',
+          'Check authentication status',
+          'Try again in a few moments',
+          'Check browser console for additional error details'
+        ]
       }
     );
   }
@@ -639,7 +720,7 @@ export const expeditionAPI = {
           throw error; // Re-throw to let withRetry handle it
         }
       },
-      { maxRetries: options?.retries }
+      { maxRetries: options?.retries || DEFAULT_RETRY_CONFIG.maxRetries }
     )
   },
 

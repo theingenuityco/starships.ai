@@ -66,3 +66,6 @@ export {
   RequestContext,
   logger,
 } from './logging';
+
+// Export scripts
+export { seedMCPServers } from './scripts/seed-mcp-servers';

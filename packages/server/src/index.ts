@@ -22,7 +22,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedMCPServers } from '@starships/models/src/scripts/seed-mcp-servers';
+import { seedMCPServers } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -212,6 +212,7 @@ httpServer.listen(PORT, async () => {
 
     // Initialize MCPServerConnectorRepository (validate schema and constraints)
     try {
+      console.log('🔄 Checking for missing servers to add...');
       const connectorCount = await mcpServerConnectorRepository
         .findAll()
         .then((connectors) => connectors.length);

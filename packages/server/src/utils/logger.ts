@@ -7,14 +7,11 @@
 
 import {
   StandardError,
-  isStandardError
-} from '@starships/protocol/src/types/error-classes';
-
-import {
+  isStandardError,
   ErrorSeverity,
   ErrorCategory,
   StandardErrorCode
-} from '@starships/protocol/src/types/errors';
+} from '@starships/protocol';
 
 // ============================================================================
 // LOGGING CONFIGURATION AND TYPES

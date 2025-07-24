@@ -109,19 +109,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
 async function seedMCPServers() {
   console.log('🌱 Starting MCP Server Options seeding...');
 
-  const config: Neo4jConfig = {
-    uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
-    username: process.env.NEO4J_USERNAME || 'neo4j',
-    [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
-    database: process.env.NEO4J_DATABASE || 'neo4j',
-  };
-
-  const connection = createConnection(config);
-
   try {
-    await connection.connect();
-    console.log('✅ Connected to Neo4j');
-
     const mcpServerRepo = new MCPServerOptionRepository();
 
     // Check if any MCP servers already exist
@@ -176,16 +164,34 @@ async function seedMCPServers() {
     });
   } catch (error) {
     console.error('❌ Seeding failed:', error);
-    process.exit(1);
-  } finally {
-    await connection.disconnect();
-    console.log('🔌 Database connection closed');
+    throw error; // Re-throw to allow caller to handle
   }
 }
 
 // Run seeding if this script is executed directly
 if (require.main === module) {
-  seedMCPServers().catch(console.error);
+  (async () => {
+    const config: Neo4jConfig = {
+      uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
+      username: process.env.NEO4J_USERNAME || 'neo4j',
+      [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
+      database: process.env.NEO4J_DATABASE || 'neo4j',
+    };
+
+    const connection = createConnection(config);
+
+    try {
+      await connection.connect();
+      console.log('✅ Connected to Neo4j');
+      await seedMCPServers();
+    } catch (error) {
+      console.error('❌ Seeding failed:', error);
+      process.exit(1);
+    } finally {
+      await connection.disconnect();
+      console.log('🔌 Database connection closed');
+    }
+  })().catch(console.error);
 }
 
 export { seedMCPServers, DEFAULT_MCP_SERVERS };

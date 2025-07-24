@@ -32,14 +32,14 @@ import {
 import Link from 'next/link';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
-import { TypingIndicator } from './TypingIndicator';
+// TypingIndicator removed - not available in HTTP mode
 import { MessageSearch } from './MessageSearch';
 import { ExpeditionProgress } from './ExpeditionProgress';
 import { TaskTimeline } from './TaskTimeline';
 import { ParticipantsList } from './ParticipantsList';
 import { useExpeditionData } from '@/hooks/useExpeditionData';
 import { useExpeditionChat } from '@/hooks/useExpeditionChat';
-import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
+// Socket import removed - using HTTP-only implementation
 import { expeditionAPI } from '@/lib/expeditionApi';
 import { agentAPI } from '@/lib/api';
 
@@ -73,7 +73,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [typingUsers, setTypingUsers] = useState<any[]>([]);
+  // Typing users state removed - not available in HTTP mode
   
   // Enhanced state for new features
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -140,52 +140,8 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     autoScroll: true
   });
 
-  // Enhanced socket integration
-  const {
-    startExpedition,
-    pauseExpedition,
-    cancelExpedition,
-    error: socketError,
-    realtimeData,
-    startTyping,
-    stopTyping
-  } = useEnhancedExpeditionSocket({
-    expeditionId,
-    enableTypingIndicators: true,
-    debugMode: false,
-    onExpeditionStarted: () => {
-      refreshExpedition();
-    },
-    onExpeditionCompleted: () => {
-      refreshExpedition();
-    },
-    onExpeditionPaused: () => {
-      refreshExpedition();
-    },
-    onExpeditionCancelled: () => {
-      refreshExpedition();
-    },
-    onStatusUpdate: () => {
-      refreshExpedition();
-    },
-    onTypingStart: (event: { expeditionId: string; userId?: string; agentId?: string; agentName?: string; role: string; timestamp: string }) => {
-      setTypingUsers(prev => [...prev.filter(u => u.id !== (event.userId || event.agentId)), {
-        id: event.userId || event.agentId || 'unknown',
-        name: event.userId ? 'User' :
-              event.agentId ? (agentDetails[event.agentId]?.name || event.agentName || event.agentId) :
-              'Unknown',
-        role: event.role as any
-      }]);
-    },
-    onTypingStop: (event: { expeditionId: string; userId?: string; agentId?: string; role: string; timestamp: string }) => {
-      setTypingUsers(prev => prev.filter(u => u.id !== (event.userId || event.agentId)));
-    },
-    onMessage: (event) => {
-      // Real-time message handling is already done by useExpeditionChat
-      // This is just for additional processing if needed
-      console.log('[EXPEDITION CHAT] Real-time message received:', event);
-    }
-  });
+  // HTTP-only implementation - socket integration removed
+  // Expedition control functions now use HTTP API calls
 
   // Fetch agent details when expedition loads
   useEffect(() => {
@@ -315,7 +271,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     try {
       const success = await handleRetry('start', { starshipId, expeditionId });
       if (success) {
-        startExpedition(expeditionId);
+        await refreshExpedition(); // Refresh data after status change
       }
     } catch (error) {
       console.error('Failed to start expedition:', error);
@@ -331,7 +287,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     try {
       const success = await handleRetry('pause', { starshipId, expeditionId });
       if (success) {
-        pauseExpedition(expeditionId);
+        await refreshExpedition(); // Refresh data after status change
       }
     } catch (error) {
       console.error('Failed to pause expedition:', error);
@@ -347,7 +303,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     try {
       const success = await handleRetry('cancel', { starshipId, expeditionId });
       if (success) {
-        cancelExpedition(expeditionId);
+        await refreshExpedition(); // Refresh data after status change
       }
     } catch (error) {
       console.error('Failed to cancel expedition:', error);
@@ -677,9 +633,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
             >
               <MessageSquare className="h-4 w-4 inline mr-2" />
               Chat
-              {typingUsers.length > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-              )}
+              {/* Typing indicator removed - not available in HTTP mode */}
             </button>
             <button
               onClick={() => setActiveTab('progress')}
@@ -808,10 +762,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                       </>
                     )}
                     
-                    {/* Typing Indicator */}
-                    {typingUsers.length > 0 && (
-                      <TypingIndicator typingUsers={typingUsers} />
-                    )}
+                    {/* Typing Indicator removed - not available in HTTP mode */}
                     
                     <div ref={messagesEndRef} />
                   </div>
@@ -839,8 +790,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                     replyingTo={replyingTo}
                     data-testid="message-input"
                     className="p-4"
-                    onTypingStart={() => startTyping(expeditionId)}
-                    onTypingStop={() => stopTyping(expeditionId)}
+                    // Typing indicators removed - not available in HTTP mode
                   />
                 </div>
 

@@ -1,8 +1,6 @@
 import { SocketIOService } from '../services/SocketIOService';
 import { setupSibilHandlers } from './sibilHandlers';
 import { setupAgentHandlers } from './agentHandlers';
-import { setupExpeditionHandlers, ExpeditionSocketUtils } from './expeditionHandlers';
-import { setupEnhancedExpeditionHandlers, EnhancedExpeditionSocketUtils } from './enhancedExpeditionHandlers';
 import type { Server as HTTPServer } from 'http';
 
 export function initializeSocketIO(httpServer: HTTPServer) {
@@ -20,16 +18,6 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   // Setup Agent-specific handlers
   setupAgentHandlers(io);
 
-  // Setup Expedition-specific handlers (legacy)
-  setupExpeditionHandlers(io);
-
-  // Setup Enhanced Expedition-specific handlers
-  setupEnhancedExpeditionHandlers(io);
-
-  // Initialize expedition socket utilities
-  ExpeditionSocketUtils.initialize(io);
-  EnhancedExpeditionSocketUtils.initialize(socketService);
-
   // Log connection statistics periodically
   setInterval(() => {
     const stats = socketService.getConnectionStats();
@@ -45,4 +33,4 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   return socketService;
 }
 
-export { SocketIOService, ExpeditionSocketUtils };
+export { SocketIOService };

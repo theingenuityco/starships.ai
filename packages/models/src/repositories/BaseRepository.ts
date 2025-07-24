@@ -11,13 +11,10 @@ import {
   NotFoundError,
   ConflictError,
   ValidationError,
-  ErrorFactory
-} from '@starships/protocol/src/types/error-classes';
-
-import {
+  ErrorFactory,
   StandardErrorCode,
   ErrorContext
-} from '@starships/protocol/src/types/errors';
+} from '@starships/protocol';
 
 // ============================================================================
 // BASE REPOSITORY CLASS

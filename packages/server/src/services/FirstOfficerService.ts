@@ -7,7 +7,6 @@
 
 import { FirstOfficerAgent, LangChainMemoryStore } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
-import { SocketIOService } from './SocketIOService';
 import {
   ExpeditionWorkflowState,
   WorkflowPhase,
@@ -27,11 +26,9 @@ export class FirstOfficerService {
   private static instance: FirstOfficerService;
   private activeAgents: Map<string, FirstOfficerAgent> = new Map();
   private memoryStores: Map<string, LangChainMemoryStore> = new Map();
-  private socketService?: SocketIOService;
   private logger: Logger;
 
   private constructor() {
-    // SocketIOService will be initialized lazily to avoid initialization order issues
     this.logger = Logger.getInstance({ service: 'FirstOfficerService' });
   }
 
@@ -40,15 +37,6 @@ export class FirstOfficerService {
       FirstOfficerService.instance = new FirstOfficerService();
     }
     return FirstOfficerService.instance;
-  }
-
-  private getSocketService(): SocketIOService | null {
-    try {
-      return SocketIOService.getInstance();
-    } catch (error) {
-      console.warn('[FIRST-OFFICER-SERVICE] SocketIOService not yet initialized');
-      return null;
-    }
   }
 
   /**
@@ -191,21 +179,6 @@ export class FirstOfficerService {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       await expeditionRepo.updateStatus(expeditionId, 'review');
 
-      // Emit pause event
-      const expedition = await expeditionRepo.findById(expeditionId);
-      if (expedition) {
-        const socketService = this.getSocketService();
-        if (socketService) {
-          socketService.emitToUser(expedition.createdBy, 'expedition:paused', {
-          expeditionId,
-          status: 'paused',
-          previousStatus: 'in-progress',
-          changedBy: expedition.createdBy,
-          timestamp: new Date().toISOString()
-          });
-        }
-      }
-
       this.logger.info('Expedition orchestration paused successfully', context);
     } catch (error) {
       if (error instanceof StandardError) {
@@ -259,21 +232,6 @@ export class FirstOfficerService {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       await expeditionRepo.updateStatus(expeditionId, 'in-progress');
 
-      // Emit resume event
-      const expedition = await expeditionRepo.findById(expeditionId);
-      if (expedition) {
-        const socketService = this.getSocketService();
-        if (socketService) {
-          socketService.emitToUser(expedition.createdBy, 'expedition:resumed', {
-          expeditionId,
-          status: 'in-progress',
-          previousStatus: 'paused',
-          changedBy: expedition.createdBy,
-          timestamp: new Date().toISOString()
-          });
-        }
-      }
-
       this.logger.info('Expedition orchestration resumed successfully', context);
     } catch (error) {
       if (error instanceof StandardError) {
@@ -309,21 +267,6 @@ export class FirstOfficerService {
     // Update expedition status
     const expeditionRepo = RepositoryFactory.getExpeditionRepository();
     await expeditionRepo.updateStatus(expeditionId, 'cancelled');
-
-    // Emit cancel event
-    const expedition = await expeditionRepo.findById(expeditionId);
-    if (expedition) {
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(expedition.createdBy, 'expedition:cancelled', {
-        expeditionId,
-        status: 'cancelled',
-        previousStatus: expedition.status,
-        changedBy: expedition.createdBy,
-        timestamp: new Date().toISOString()
-        });
-      }
-    }
 
     console.log(`[FIRST-OFFICER-SERVICE] Expedition cancelled: ${expeditionId}`);
   }
@@ -387,7 +330,8 @@ export class FirstOfficerService {
         userId,
         content: message,
         messageType: 'user-input',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        metadata: {}
       });
 
       // Get response from First Officer
@@ -399,25 +343,9 @@ export class FirstOfficerService {
         role: 'first-officer',
         content: response.reply,
         messageType: 'coordination',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        metadata: {}
       });
-
-      // Emit message events
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:message', {
-        expeditionId,
-        messageId: `fo_${Date.now()}`,
-        message: {
-          id: `fo_${Date.now()}`,
-          role: 'first-officer',
-          content: response.reply,
-          userId: undefined,
-          agentId: 'first-officer'
-        },
-        timestamp: new Date().toISOString()
-        });
-      }
 
       this.logger.info('User message handled successfully', {
         ...context,
@@ -532,23 +460,6 @@ export class FirstOfficerService {
         };
 
         await expeditionRepo.updateWorkflowState(expeditionId, workflowState);
-
-        // Emit real-time status update
-        const socketService = this.getSocketService();
-        if (socketService) {
-          socketService.emitToUser(expedition.createdBy, 'expedition:status-update', {
-          expeditionId,
-          progress: {
-            overall: progress.overallProgress || 0,
-            currentPhase: phase,
-            completedTasks: progress.tasksCompleted || 0,
-            totalTasks: progress.tasksTotal || 0,
-            estimatedTimeRemaining: progress.estimatedTimeRemaining,
-            lastActivity: new Date().toISOString()
-          },
-          timestamp: new Date().toISOString()
-          });
-        }
       }
     } catch (error) {
       console.error(`[FIRST-OFFICER-SERVICE] Failed to handle status update:`, error);
@@ -579,26 +490,6 @@ export class FirstOfficerService {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       const expedition = await expeditionRepo.findById(expeditionId);
 
-      if (expedition) {
-        // Emit task completion event
-        const socketService = this.getSocketService();
-        if (socketService) {
-          socketService.emitToUser(expedition.createdBy, 'expedition:task-completed', {
-          expeditionId,
-          taskId,
-          task: {
-            id: taskId,
-            title: 'Task',
-            status: 'completed',
-            result,
-            completedAt: new Date().toISOString(),
-            completedBy: agentId,
-            agentId
-          },
-          timestamp: new Date().toISOString()
-          });
-        }
-      }
     } catch (error) {
       console.error(`[FIRST-OFFICER-SERVICE] Failed to handle task completion:`, error);
     }
@@ -623,21 +514,6 @@ export class FirstOfficerService {
         updatedAt: new Date().toISOString()
       });
 
-      // Get expedition details
-      const expedition = await expeditionRepo.findById(expeditionId);
-      if (expedition) {
-        // Emit completion event
-        const socketService = this.getSocketService();
-        if (socketService) {
-          socketService.emitToUser(expedition.createdBy, 'expedition:completed', {
-            expeditionId,
-            status: 'completed',
-            previousStatus: expedition.status,
-            changedBy: expedition.createdBy,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
 
       // Clean up resources
       await this.cleanupExpedition(expeditionId);

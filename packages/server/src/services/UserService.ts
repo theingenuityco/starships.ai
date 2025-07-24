@@ -81,8 +81,19 @@ export class UserService {
    * Get user by Kinde ID
    */
   static async getUserByKindeId(kindeId: string): Promise<User | null> {
-    const userRepo = RepositoryFactory.getUserRepository();
-    return await userRepo.findByKindeId(kindeId);
+    try {
+      console.log(`[USER-SERVICE] Getting user repository for Kinde ID: ${kindeId}`);
+      const userRepo = RepositoryFactory.getUserRepository();
+      console.log(`[USER-SERVICE] Repository obtained, executing findByKindeId for: ${kindeId}`);
+      const result = await userRepo.findByKindeId(kindeId);
+      console.log(`[USER-SERVICE] findByKindeId completed for ${kindeId}, result: ${result ? 'found' : 'not found'}`);
+      return result;
+    } catch (error: any) {
+      console.error(`[USER-SERVICE] Error in getUserByKindeId for ${kindeId}:`, error);
+      console.error(`[USER-SERVICE] Error type: ${error?.constructor?.name}`);
+      console.error(`[USER-SERVICE] Error message: ${error?.message}`);
+      throw error; // Re-throw to let auth middleware handle it
+    }
   }
 
   /**

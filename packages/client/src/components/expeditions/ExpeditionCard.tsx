@@ -43,9 +43,9 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useEnhancedExpeditionSocket } from '@/hooks/useEnhancedExpeditionSocket';
+// Socket import removed - using HTTP-only implementation
 import { expeditionAPI } from '@/lib/expeditionApi';
-import { ConnectionStatus } from '@/components/ui/ConnectionStatus';
+// ConnectionStatus removed - not needed in HTTP mode
 import type {
   Expedition,
   ExpeditionTask,
@@ -139,7 +139,7 @@ export function ExpeditionCard({
   expedition,
   onClick,
   showActions = false,
-  enableRealTimeUpdates = true,
+  enableRealTimeUpdates = false,
   enableContextMenu = true,
   showAgentAvatars = true,
   showQualityScore = true,
@@ -167,70 +167,11 @@ export function ExpeditionCard({
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Real-time updates via enhanced socket with connection management
-  const {
-    isConnected,
-    connectionState,
-    connectionQuality,
-    realtimeData,
-    getHealthStatus,
-    getOfflineQueueStatus,
-    getCircuitBreakerStatus,
-    forceReconnect,
-    resetCircuitBreaker,
-    clearOfflineQueue,
-    error: socketError
-  } = useEnhancedExpeditionSocket({
-    expeditionId: enableRealTimeUpdates ? expedition.id : undefined,
-    autoJoin: enableRealTimeUpdates,
-    enableReconnection: true,
-    debugMode: false,
-    onExpeditionStarted: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
-      }
-    },
-    onExpeditionResumed: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: 'in-progress' as ExpeditionStatus }));
-      }
-    },
-    onExpeditionCompleted: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: 'completed' as ExpeditionStatus }));
-      }
-    },
-    onExpeditionCancelled: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: 'cancelled' as ExpeditionStatus }));
-      }
-    },
-    onExpeditionFailed: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setLocalExpedition(prev => ({ ...prev, status: 'failed' as ExpeditionStatus }));
-      }
-    },
-    onStatusUpdate: (event) => {
-      if (event.expeditionId === expedition.id) {
-        // Update progress or other status information
-        console.log('Status update for expedition:', event);
-      }
-    },
-    onError: (event) => {
-      if (event.expeditionId === expedition.id) {
-        setError(event.error.message);
-        setTimeout(() => setError(null), 5000);
-      }
-    },
-    onConnectionChange: (connected: boolean) => {
-      if (!connected) {
-        setError('Connection lost - operations will be queued until reconnected');
-      }
-    }
-  });
-
-  // Combine socket error with local error
-  const displayError = error || socketError;
+  // HTTP-only implementation: Real-time updates disabled
+  // Socket integration removed to use HTTP API only
+  const isConnected = false; // Always false in HTTP mode
+  const connectionState = { circuitBreakerState: 'closed' }; // Default state for HTTP mode
+  const displayError = error; // Only local errors in HTTP mode
 
   // Update local state when expedition prop changes
   useEffect(() => {
@@ -248,40 +189,17 @@ export function ExpeditionCard({
     setError(null);
 
     try {
-      // Show different messages based on connection state
-      if (!isConnected) {
-        setError(`${action} queued - will execute when connection is restored`);
-      }
-
       const success = await handler(localExpedition.id);
       if (!success) {
-        // Provide more specific error messages based on connection state
-        if (connectionState.circuitBreakerState === 'open') {
-          setError(`Cannot ${action} expedition - connection temporarily suspended. Try again later.`);
-        } else if (!isConnected) {
-          setError(`${action} queued for when connection is restored`);
-        } else {
-          setError(`Failed to ${action} expedition`);
-        }
-      } else if (!isConnected) {
-        // Success but offline - operation was queued
-        setError(`${action} queued successfully - will execute when connected`);
+        setError(`Failed to ${action} expedition`);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : `Failed to ${action} expedition`;
-      
-      // Enhance error message with connection context
-      if (!isConnected) {
-        setError(`${errorMessage} - operation queued for retry`);
-      } else if (connectionState.circuitBreakerState === 'open') {
-        setError(`${errorMessage} - connection issues detected`);
-      } else {
-        setError(errorMessage);
-      }
+      setError(errorMessage);
     } finally {
       setActionLoading(null);
     }
-  }, [localExpedition.id, isConnected, connectionState.circuitBreakerState]);
+  }, [localExpedition.id]);
 
   // Get status styling
   const getStatusConfig = (status: ExpeditionStatus) => {
@@ -442,7 +360,6 @@ export function ExpeditionCard({
           relative cursor-pointer transition-all duration-200 group
           hover:shadow-lg hover:border-primary/50
           ${error ? 'border-red-200 bg-red-50/50' : ''}
-          ${isConnected && enableRealTimeUpdates ? 'ring-1 ring-green-200' : ''}
         `}
         onClick={onClick}
         role="button"
@@ -455,21 +372,7 @@ export function ExpeditionCard({
           }
         }}
       >
-        {/* Enhanced connection status indicator */}
-        {enableRealTimeUpdates && (
-          <div className="absolute top-2 right-2">
-            <ConnectionStatus
-              connectionState={connectionState}
-              onForceReconnect={forceReconnect}
-              onResetCircuitBreaker={resetCircuitBreaker}
-              onClearQueue={clearOfflineQueue}
-              getHealthStatus={getHealthStatus}
-              getOfflineQueueStatus={getOfflineQueueStatus}
-              getCircuitBreakerStatus={getCircuitBreakerStatus}
-              compact={true}
-            />
-          </div>
-        )}
+        {/* Connection status removed - HTTP mode only */}
 
         {/* Enhanced error banner */}
         <AnimatePresence>
@@ -478,29 +381,11 @@ export function ExpeditionCard({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className={`border-b px-4 py-2 ${
-                !isConnected || connectionState.circuitBreakerState === 'open'
-                  ? 'bg-yellow-100 border-yellow-200'
-                  : 'bg-red-100 border-red-200'
-              }`}
+              className="border-b px-4 py-2 bg-red-100 border-red-200"
             >
-              <div className={`flex items-center space-x-2 text-sm ${
-                !isConnected || connectionState.circuitBreakerState === 'open'
-                  ? 'text-yellow-700'
-                  : 'text-red-700'
-              }`}>
+              <div className="flex items-center space-x-2 text-sm text-red-700">
                 <AlertCircle className="h-4 w-4" />
                 <span>{displayError}</span>
-                {!isConnected && (
-                  <Badge variant="outline" className="text-xs ml-2">
-                    Offline Mode
-                  </Badge>
-                )}
-                {connectionState.circuitBreakerState === 'open' && (
-                  <Badge variant="outline" className="text-xs ml-2">
-                    Connection Suspended
-                  </Badge>
-                )}
               </div>
             </motion.div>
           )}
@@ -732,78 +617,54 @@ export function ExpeditionCard({
               >
                 <div className="flex space-x-2">
                   {localExpedition.status === 'draft' && onStart && (
-                    <div className="relative">
-                      <ActionButton
-                        icon={Play}
-                        label={!isConnected ? "Start Expedition (will queue)" : "Start Expedition"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction('start', onStart);
-                        }}
-                        loading={actionLoading === 'start'}
-                        variant="default"
-                        disabled={connectionState.circuitBreakerState === 'open'}
-                      />
-                      {!isConnected && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
-                      )}
-                    </div>
+                    <ActionButton
+                      icon={Play}
+                      label="Start Expedition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction('start', onStart);
+                      }}
+                      loading={actionLoading === 'start'}
+                      variant="default"
+                    />
                   )}
 
                   {localExpedition.status === 'in-progress' && onPause && (
-                    <div className="relative">
-                      <ActionButton
-                        icon={Pause}
-                        label={!isConnected ? "Pause Expedition (will queue)" : "Pause Expedition"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction('pause', onPause);
-                        }}
-                        loading={actionLoading === 'pause'}
-                        disabled={connectionState.circuitBreakerState === 'open'}
-                      />
-                      {!isConnected && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
-                      )}
-                    </div>
+                    <ActionButton
+                      icon={Pause}
+                      label="Pause Expedition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction('pause', onPause);
+                      }}
+                      loading={actionLoading === 'pause'}
+                    />
                   )}
 
                   {['paused', 'failed'].includes(localExpedition.status) && onResume && (
-                    <div className="relative">
-                      <ActionButton
-                        icon={RotateCcw}
-                        label={!isConnected ? "Resume Expedition (will queue)" : "Resume Expedition"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction('resume', onResume);
-                        }}
-                        loading={actionLoading === 'resume'}
-                        variant="default"
-                        disabled={connectionState.circuitBreakerState === 'open'}
-                      />
-                      {!isConnected && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
-                      )}
-                    </div>
+                    <ActionButton
+                      icon={RotateCcw}
+                      label="Resume Expedition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction('resume', onResume);
+                      }}
+                      loading={actionLoading === 'resume'}
+                      variant="default"
+                    />
                   )}
 
                   {['draft', 'planning', 'in-progress'].includes(localExpedition.status) && onCancel && (
-                    <div className="relative">
-                      <ActionButton
-                        icon={XCircle}
-                        label={!isConnected ? "Cancel Expedition (will queue)" : "Cancel Expedition"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction('cancel', onCancel);
-                        }}
-                        loading={actionLoading === 'cancel'}
-                        variant="destructive"
-                        disabled={connectionState.circuitBreakerState === 'open'}
-                      />
-                      {!isConnected && (
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full" />
-                      )}
-                    </div>
+                    <ActionButton
+                      icon={XCircle}
+                      label="Cancel Expedition"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction('cancel', onCancel);
+                      }}
+                      loading={actionLoading === 'cancel'}
+                      variant="destructive"
+                    />
                   )}
                 </div>
 

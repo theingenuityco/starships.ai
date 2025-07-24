@@ -338,7 +338,8 @@ export {
   DatabaseError,
   NetworkError,
   BusinessLogicError,
-  ErrorFactory
+  ErrorFactory,
+  isStandardError
 } from './types/error-classes';
 
 // Re-export specific types to resolve naming conflicts

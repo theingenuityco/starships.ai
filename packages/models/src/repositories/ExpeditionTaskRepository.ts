@@ -150,8 +150,28 @@ export class ExpeditionTaskRepository implements ExpeditionTaskRepositoryInterfa
    */
   async update(id: string, updates: Partial<ExpeditionTask>): Promise<ExpeditionTask | null> {
     const connection = getConnection();
+    
+    // Ensure all properties are primitive types for Neo4j
+    const sanitizedUpdates: any = {};
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (value instanceof Map) {
+        // Convert Map to plain object then to JSON string
+        sanitizedUpdates[key] = JSON.stringify(Object.fromEntries(value));
+      } else if (typeof value === 'object' && value !== null && value.constructor === Object) {
+        // Convert plain objects to JSON string for complex nested objects
+        sanitizedUpdates[key] = JSON.stringify(value);
+      } else if (Array.isArray(value)) {
+        // Arrays are allowed in Neo4j, keep as-is
+        sanitizedUpdates[key] = value;
+      } else {
+        // Keep primitive values as-is
+        sanitizedUpdates[key] = value;
+      }
+    }
+    
     const updateProps = {
-      ...updates,
+      ...sanitizedUpdates,
       updatedAt: new Date().toISOString()
     };
 

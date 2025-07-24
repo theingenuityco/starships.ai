@@ -43,7 +43,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { expeditionAPI } from '@/lib/expeditionApi'
-import { useExpeditionSocket } from '@/hooks/useExpeditionSocket'
+// Socket import removed - using HTTP-only implementation
 import type {
   CreateExpeditionRequest,
   ExpeditionPriority,
@@ -234,14 +234,9 @@ export function CreateExpeditionModal({
   // Tag input state
   const [tagInput, setTagInput] = useState('')
 
-  // Socket integration
-  const { isConnected } = useExpeditionSocket({
-    onExpeditionCreated: event => {
-      if (event.expedition.starshipId === starshipId) {
-        onExpeditionCreated(event.expeditionId)
-      }
-    },
-  })
+  // HTTP-only implementation: Socket integration removed
+  // Expedition creation events are now handled via direct API response
+  const isConnected = false; // Always false in HTTP mode
 
   // ============================================================================
   // FORM VALIDATION
@@ -1439,12 +1434,7 @@ export function CreateExpeditionModal({
         {/* Footer */}
         <DialogFooter className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            {!isConnected && (
-              <div className="flex items-center space-x-1 text-yellow-600">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-xs">Offline mode</span>
-              </div>
-            )}
+            {/* Connection status removed - HTTP mode only */}
           </div>
 
           <div className="flex items-center space-x-2">

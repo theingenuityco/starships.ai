@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { useExpeditionSocket } from './useExpeditionSocket';
 import { expeditionAPI } from '@/lib/expeditionApi';
 
 // Local type definitions
@@ -47,37 +46,8 @@ export function useExpeditionChat({
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Socket integration for real-time updates
-  const { isConnected, error: socketError } = useExpeditionSocket({
-    expeditionId,
-    onMessage: (data) => {
-      console.log('[EXPEDITION CHAT] New message received:', data);
-      // Extract the message from the ExpeditionMessageEvent
-      const message: ExpeditionMessage = {
-        id: data.message.id,
-        expeditionId: data.expeditionId,
-        role: data.message.role,
-        content: data.message.content,
-        messageType: 'user-input', // Default to user-input as messageType is not in the event
-        timestamp: data.timestamp,
-        agentId: data.message.agentId,
-        userId: data.message.userId
-      };
-      
-      setMessages(prev => {
-        // Avoid duplicates
-        const exists = prev.some(msg => msg.id === message.id);
-        if (exists) return prev;
-        
-        const newMessages = [...prev, message];
-        // Keep only the latest messages if we exceed maxMessages
-        return newMessages.slice(-maxMessages);
-      });
-    },
-    onExpeditionError: (error) => {
-      setError(error.error.message || 'Socket error occurred');
-    }
-  });
+  // NOTE: Socket functionality removed - now HTTP-only
+  // Real-time updates are no longer available
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -189,12 +159,7 @@ export function useExpeditionChat({
     }
   }, [expeditionId, refreshMessages]);
 
-  // Update error state from socket
-  useEffect(() => {
-    if (socketError) {
-      setError(socketError);
-    }
-  }, [socketError]);
+  // Socket error handling removed - HTTP-only mode
 
   return {
     messages,

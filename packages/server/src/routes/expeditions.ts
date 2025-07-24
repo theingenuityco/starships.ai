@@ -36,7 +36,6 @@ import {
   ExpeditionSort,
   PaginationOptions,
 } from '@starships/protocol';
-import { SocketIOService } from '../services/SocketIOService';
 
 const router: Router = Router();
 
@@ -46,43 +45,6 @@ const firstOfficerService = ServiceFactory.getFirstOfficerService();
 const taskService = ServiceFactory.getTaskService();
 const messageService = ServiceFactory.getMessageService();
 const resultService = ServiceFactory.getResultService();
-
-// Helper function to safely get SocketIO service
-function getSocketService() {
-  try {
-    return SocketIOService.getInstance();
-  } catch (error) {
-    console.warn('[EXPEDITION-API] SocketIO service not available:', error);
-    return null;
-  }
-}
-
-// Helper function to emit Socket.IO events with error handling
-async function emitSocketEvent(
-  eventType: string,
-  expeditionId: string,
-  data: any,
-  userId?: string
-) {
-  const socketService = getSocketService();
-  if (!socketService) return;
-
-  try {
-    // Emit to expedition room
-    await socketService.emitToExpeditionRoomWithRetry(expeditionId, eventType as any, data);
-
-    // Also emit to user room if specified
-    if (userId) {
-      await socketService.emitToUserWithRetry(userId, eventType as any, data);
-    }
-
-    console.log(
-      `[EXPEDITION-API] Socket event emitted: ${eventType} for expedition ${expeditionId}`
-    );
-  } catch (error) {
-    console.error(`[EXPEDITION-API] Failed to emit socket event ${eventType}:`, error);
-  }
-}
 
 // ============================================================================
 // EXPEDITION MANAGEMENT ENDPOINTS
@@ -137,29 +99,7 @@ router.post(
         timestamp: new Date().toISOString()
       });
 
-      console.log(`[EXPEDITION-API] [${requestId}] Step 5: Emitting real-time event`);
-      // Emit real-time event for expedition creation
-      await emitSocketEvent(
-        'expedition:created',
-        expeditionResponse.expedition.id,
-        {
-          expeditionId: expeditionResponse.expedition.id,
-          expedition: {
-            id: expeditionResponse.expedition.id,
-            title: expeditionResponse.expedition.title,
-            objective: expeditionResponse.expedition.objective,
-            status: expeditionResponse.expedition.status,
-            priority: expeditionResponse.expedition.priority,
-            starshipId: expeditionResponse.expedition.starshipId,
-            createdBy: userId,
-            createdAt: expeditionResponse.expedition.createdAt,
-          },
-          timestamp: new Date().toISOString(),
-        },
-        userId
-      );
-
-      console.log(`[EXPEDITION-API] [${requestId}] Step 6: Sending response`);
+      console.log(`[EXPEDITION-API] [${requestId}] Step 5: Sending response`);
       res.status(201).json({
         success: true,
         data: expeditionResponse,
@@ -489,33 +429,6 @@ router.post(
 
       const expeditionResponse = await expeditionService.startExpedition(expeditionId, userId);
 
-      // Emit real-time event for expedition start
-      await emitSocketEvent(
-        'expedition:started',
-        expeditionId,
-        {
-          expeditionId,
-          status: 'in-progress',
-          previousStatus: 'draft',
-          changedBy: userId,
-          timestamp: new Date().toISOString(),
-        },
-        userId
-      );
-
-      // Also emit status update with progress
-      await emitSocketEvent('expedition:status-update', expeditionId, {
-        expeditionId,
-        progress: {
-          overall: 0,
-          currentPhase: 'initializing',
-          completedTasks: 0,
-          totalTasks: 0,
-          lastActivity: new Date().toISOString(),
-        },
-        timestamp: new Date().toISOString(),
-      });
-
       res.json({
         success: true,
         data: expeditionResponse,
@@ -555,20 +468,6 @@ router.post(
       console.log(`[EXPEDITION-API] Pausing expedition: ${expeditionId}`);
 
       const expeditionResponse = await expeditionService.pauseExpedition(expeditionId, userId);
-
-      // Emit real-time event for expedition pause
-      await emitSocketEvent(
-        'expedition:paused',
-        expeditionId,
-        {
-          expeditionId,
-          status: 'paused',
-          previousStatus: 'in-progress',
-          changedBy: userId,
-          timestamp: new Date().toISOString(),
-        },
-        userId
-      );
 
       res.json({
         success: true,
@@ -610,20 +509,6 @@ router.post(
 
       const expeditionResponse = await expeditionService.resumeExpedition(expeditionId, userId);
 
-      // Emit real-time event for expedition resume
-      await emitSocketEvent(
-        'expedition:resumed',
-        expeditionId,
-        {
-          expeditionId,
-          status: 'in-progress',
-          previousStatus: 'paused',
-          changedBy: userId,
-          timestamp: new Date().toISOString(),
-        },
-        userId
-      );
-
       res.json({
         success: true,
         data: expeditionResponse,
@@ -663,20 +548,6 @@ router.post(
       console.log(`[EXPEDITION-API] Cancelling expedition: ${expeditionId}`);
 
       await expeditionService.cancelExpedition(expeditionId, userId);
-
-      // Emit real-time event for expedition cancellation
-      await emitSocketEvent(
-        'expedition:cancelled',
-        expeditionId,
-        {
-          expeditionId,
-          status: 'cancelled',
-          previousStatus: 'in-progress',
-          changedBy: userId,
-          timestamp: new Date().toISOString(),
-        },
-        userId
-      );
 
       res.json({
         success: true,
@@ -1073,24 +944,6 @@ router.post(
         return;
       }
 
-      // Emit real-time event for task assignment
-      await emitSocketEvent('expedition:task-assigned', expeditionId, {
-        expeditionId,
-        taskId,
-        task: {
-          id: updatedTask.id,
-          title: updatedTask.title,
-          description: updatedTask.description,
-          status: updatedTask.status,
-          priority: updatedTask.priority,
-          assignedTo: updatedTask.assignedAgentId,
-          agentId: updatedTask.assignedAgentId,
-          estimatedEffort: updatedTask.estimatedEffort,
-        },
-        assignedBy: userId,
-        timestamp: new Date().toISOString(),
-      });
-
       res.json({
         success: true,
         data: { task: updatedTask },
@@ -1180,22 +1033,6 @@ router.post(
         });
         return;
       }
-
-      // Emit real-time event for task completion
-      await emitSocketEvent('expedition:task-completed', expeditionId, {
-        expeditionId,
-        taskId,
-        task: {
-          id: updatedTask.id,
-          title: updatedTask.title,
-          status: updatedTask.status,
-          result: updatedTask.result,
-          completedAt: updatedTask.updatedAt || new Date().toISOString(),
-          completedBy: updatedTask.assignedAgentId,
-          agentId: updatedTask.assignedAgentId,
-        },
-        timestamp: new Date().toISOString(),
-      });
 
       res.json({
         success: true,
@@ -1291,6 +1128,9 @@ router.post(
   authMiddleware,
   validateSendMessage,
   async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST START =====`);
+    
     try {
       const { expeditionId } = req.params;
       const userId = req.user!.id;
@@ -1299,17 +1139,53 @@ router.post(
         ...req.body,
       };
 
-      console.log(`[EXPEDITION-API] Sending message to expedition: ${expeditionId}`);
+      console.log(`[EXPEDITION-API] [${requestId}] Request details:`, {
+        expeditionId,
+        userId,
+        messageType: sendMessageRequest.messageType,
+        agentId: sendMessageRequest.agentId,
+        contentLength: sendMessageRequest.content?.length
+      });
 
-      // Use MessageService for message handling
-      const message = await messageService.sendMessage(userId, sendMessageRequest);
+      // Use MessageService for message handling - now returns both user and First Officer messages
+      console.log(`[EXPEDITION-API] [${requestId}] Calling messageService.sendMessage...`);
+      const messageResponse = await messageService.sendMessage(userId, sendMessageRequest);
+
+      console.log(`[EXPEDITION-API] [${requestId}] Message response received:`, {
+        hasUserMessage: !!messageResponse.userMessage,
+        hasFirstOfficerMessage: !!messageResponse.firstOfficerMessage,
+        userMessageId: messageResponse.userMessage?.id,
+        firstOfficerMessageId: messageResponse.firstOfficerMessage?.id
+      });
+
+      // Prepare response data
+      const responseData: any = {
+        userMessage: messageResponse.userMessage
+      };
+
+      if (messageResponse.firstOfficerMessage) {
+        responseData.firstOfficerMessage = messageResponse.firstOfficerMessage;
+        responseData.messages = [messageResponse.userMessage, messageResponse.firstOfficerMessage];
+      } else {
+        responseData.messages = [messageResponse.userMessage];
+      }
+
+      console.log(`[EXPEDITION-API] [${requestId}] Sending HTTP response with ${responseData.messages.length} message(s)`);
 
       res.json({
         success: true,
-        data: { message },
+        data: responseData,
       });
+
+      console.log(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST SUCCESS =====`);
     } catch (error: any) {
-      console.error('[EXPEDITION-API] Failed to send message:', error);
+      console.error(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST ERROR =====`);
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to send message:`, {
+        error: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      
       const statusCode =
         error.code === 'EXPEDITION_NOT_FOUND'
           ? 404
@@ -1320,7 +1196,13 @@ router.post(
         success: false,
         error: error.message || 'Failed to send message',
         code: error.code,
+        debug: {
+          requestId,
+          timestamp: new Date().toISOString()
+        }
       });
+      
+      console.error(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST FAILED =====`);
     }
   }
 );

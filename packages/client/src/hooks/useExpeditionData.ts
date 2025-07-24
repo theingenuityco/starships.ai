@@ -200,11 +200,10 @@ export function useExpeditionData({
     }
   };
 
-  // API options with retry configuration
+  // API options configuration (removed retry since we're using direct HTTP calls)
   const getAPIOptions = useCallback((options?: APIOptions): APIOptions => ({
-    retries: enableRetry ? maxRetries : 0,
     ...options
-  }), [enableRetry, maxRetries]);
+  }), []);
 
   // Load expeditions for a starship
   const loadExpeditions = useCallback(async (
@@ -637,7 +636,9 @@ export function useExpeditionData({
   }, []);
 
   const isRetryableError = useCallback((error: ExpeditionAPIError): boolean => {
-    return expeditionAPI.isRetryableError(error);
+    // Since we removed withRetry, we'll consider server errors (5xx) and network errors as retryable
+    // but handle this at the component level rather than API level
+    return error.statusCode >= 500 || error.statusCode === 0;
   }, []);
 
   // Initial data loading

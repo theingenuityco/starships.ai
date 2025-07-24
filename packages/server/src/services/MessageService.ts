@@ -5,7 +5,7 @@
  * thread management, real-time broadcasting, and integration with First Officer.
  */
 
-import { 
+import {
   ExpeditionMessage,
   MessageRole,
   MessageType,
@@ -14,8 +14,8 @@ import {
   ExpeditionErrorCode
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
-import { SocketIOService } from './SocketIOService';
 import { FirstOfficerService } from './FirstOfficerService';
+import { ExpeditionService } from './ExpeditionService';
 
 export interface UpdateMessageRequest {
   content?: string;
@@ -73,22 +73,13 @@ export interface FileAttachment {
 export class MessageService {
   private static instance: MessageService;
   private firstOfficerService: FirstOfficerService;
+  private expeditionService: ExpeditionService;
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
+    this.expeditionService = ExpeditionService.getInstance();
   }
 
-  /**
-   * Safely get SocketIOService instance with lazy initialization
-   */
-  private getSocketService(): SocketIOService | null {
-    try {
-      return SocketIOService.getInstance();
-    } catch (error) {
-      console.warn('[MESSAGE-SERVICE] SocketIOService not yet initialized');
-      return null;
-    }
-  }
 
   static getInstance(): MessageService {
     if (!MessageService.instance) {
@@ -103,8 +94,12 @@ export class MessageService {
   async sendMessage(
     userId: string,
     request: SendMessageRequest
-  ): Promise<ExpeditionMessage> {
-    console.log(`[MESSAGE-SERVICE] Sending message to expedition: ${request.expeditionId}`);
+  ): Promise<{ userMessage: ExpeditionMessage; firstOfficerMessage?: ExpeditionMessage }> {
+    console.log(`[MESSAGE-SERVICE] ===== SENDING MESSAGE =====`);
+    console.log(`[MESSAGE-SERVICE] Expedition: ${request.expeditionId}`);
+    console.log(`[MESSAGE-SERVICE] Message Type: ${request.messageType}`);
+    console.log(`[MESSAGE-SERVICE] Agent ID: ${request.agentId}`);
+    console.log(`[MESSAGE-SERVICE] Content Length: ${request.content?.length}`);
 
     try {
       // Validate expedition access
@@ -115,9 +110,10 @@ export class MessageService {
         await this.validateThreadAccess(request.threadId, request.expeditionId);
       }
 
-      // Create message
+      // Create user message
+      console.log(`[MESSAGE-SERVICE] Creating user message in database...`);
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      const message = await messageRepo.create({
+      const userMessage = await messageRepo.create({
         expeditionId: request.expeditionId,
         role: 'user',
         userId,
@@ -128,34 +124,49 @@ export class MessageService {
         parentMessageId: request.parentMessageId,
         metadata: {}
       });
+      console.log(`[MESSAGE-SERVICE] User message created: ${userMessage.id}`);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:message', {
-          expeditionId: request.expeditionId,
-          messageId: message.id,
-          message: {
-            id: message.id,
-            role: message.role,
-            content: message.content,
-            userId: message.userId,
-            agentId: message.agentId,
-            threadId: message.threadId
-          },
-          timestamp: message.timestamp
-        });
-      }
+      let firstOfficerMessage: ExpeditionMessage | undefined = undefined;
 
       // Handle First Officer integration for coordination messages
       if (request.messageType === 'user-input' || request.agentId === 'first-officer') {
-        await this.handleFirstOfficerMessage(request.expeditionId, userId, request.content);
+        console.log(`[MESSAGE-SERVICE] Handling First Officer integration...`);
+        const firstOfficerResponse = await this.handleFirstOfficerMessage(
+          request.expeditionId,
+          request.content,
+          request.messageType,
+          userId
+        );
+
+        if (firstOfficerResponse && firstOfficerResponse.reply) {
+          console.log(`[MESSAGE-SERVICE] Creating First Officer message in database...`);
+          firstOfficerMessage = await messageRepo.create({
+            expeditionId: request.expeditionId,
+            role: 'first-officer',
+            content: firstOfficerResponse.reply,
+            messageType: 'coordination',
+            timestamp: new Date().toISOString(),
+            threadId: request.threadId,
+            parentMessageId: userMessage.id,
+            metadata: { usage: firstOfficerResponse.usage }
+          });
+          console.log(`[MESSAGE-SERVICE] First Officer message created: ${firstOfficerMessage.id}`);
+        } else {
+          console.log(`[MESSAGE-SERVICE] No First Officer response received`);
+        }
       }
 
-      console.log(`[MESSAGE-SERVICE] Message sent: ${message.id}`);
-      return message;
+      console.log(`[MESSAGE-SERVICE] ===== MESSAGE SENDING COMPLETED =====`);
+      console.log(`[MESSAGE-SERVICE] User message: ${userMessage.id}`);
+      console.log(`[MESSAGE-SERVICE] First Officer message: ${firstOfficerMessage?.id || 'none'}`);
+      
+      return {
+        userMessage,
+        firstOfficerMessage
+      };
     } catch (error) {
-      console.error('[MESSAGE-SERVICE] Failed to send message:', error);
+      console.error('[MESSAGE-SERVICE] ===== MESSAGE SENDING FAILED =====');
+      console.error('[MESSAGE-SERVICE] Error details:', error);
       throw this.handleError(error, 'SEND_MESSAGE_FAILED');
     }
   }
@@ -247,23 +258,6 @@ export class MessageService {
         throw this.createError('UPDATE_FAILED', 'Failed to update message');
       }
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:message', {
-          expeditionId: message.expeditionId,
-          messageId: updatedMessage.id,
-          message: {
-            id: updatedMessage.id,
-            role: updatedMessage.role,
-            content: updatedMessage.content,
-            userId: updatedMessage.userId,
-            agentId: updatedMessage.agentId,
-            threadId: updatedMessage.threadId
-          },
-          timestamp: updatedMessage.timestamp
-        });
-      }
 
       console.log(`[MESSAGE-SERVICE] Message updated: ${messageId}`);
       return updatedMessage;
@@ -296,18 +290,6 @@ export class MessageService {
       // Delete message
       await messageRepo.delete(messageId);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:updated', {
-          expeditionId: message.expeditionId,
-          changes: {
-            status: 'Message deleted'
-          },
-          updatedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[MESSAGE-SERVICE] Message deleted: ${messageId}`);
     } catch (error) {
@@ -544,16 +526,6 @@ export class MessageService {
       // Validate expedition access
       await this.validateExpeditionAccess(expeditionId, userId);
 
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:typing-start', {
-          expeditionId,
-          userId,
-          role: 'user',
-          isTyping: true,
-          timestamp: new Date().toISOString()
-        });
-      }
     } catch (error) {
       console.error('[MESSAGE-SERVICE] Failed to start typing:', error);
     }
@@ -567,16 +539,6 @@ export class MessageService {
       // Validate expedition access
       await this.validateExpeditionAccess(expeditionId, userId);
 
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:typing-stop', {
-          expeditionId,
-          userId,
-          role: 'user',
-          isTyping: false,
-          timestamp: new Date().toISOString()
-        });
-      }
     } catch (error) {
       console.error('[MESSAGE-SERVICE] Failed to stop typing:', error);
     }
@@ -613,17 +575,73 @@ export class MessageService {
 
   private async handleFirstOfficerMessage(
     expeditionId: string,
-    userId: string,
-    message: string
-  ): Promise<void> {
+    message: string,
+    messageType: MessageType,
+    userId?: string
+  ): Promise<{ reply: string; usage?: any } | null> {
     try {
-      // Check if First Officer is active for this expedition
-      if (this.firstOfficerService.isExpeditionActive(expeditionId)) {
-        await this.firstOfficerService.handleUserMessage(expeditionId, userId, message);
+      console.log(`[MESSAGE-SERVICE] ===== HANDLING FIRST OFFICER MESSAGE =====`);
+      console.log(`[MESSAGE-SERVICE] Expedition: ${expeditionId}`);
+      console.log(`[MESSAGE-SERVICE] Message Type: ${messageType}`);
+      console.log(`[MESSAGE-SERVICE] User ID: ${userId}`);
+      console.log(`[MESSAGE-SERVICE] Message Length: ${message?.length}`);
+      
+      // Get expedition details to check status
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        console.error(`[MESSAGE-SERVICE] Expedition ${expeditionId} not found`);
+        throw new Error(`Expedition ${expeditionId} not found`);
       }
+
+      console.log(`[MESSAGE-SERVICE] Expedition found - Status: ${expedition.status}`);
+
+      // Auto-start expedition if it's not started and this is a user message
+      if (messageType === 'user-input' && expedition.status === 'draft' && userId) {
+        console.log(`[MESSAGE-SERVICE] Auto-starting expedition ${expeditionId} for user message`);
+        try {
+          await this.expeditionService.startExpedition(expeditionId, userId);
+          console.log(`[MESSAGE-SERVICE] Expedition ${expeditionId} auto-started successfully`);
+        } catch (startError) {
+          console.error(`[MESSAGE-SERVICE] Failed to auto-start expedition ${expeditionId}:`, startError);
+          // Continue with message handling even if auto-start fails
+        }
+      }
+
+      // Check if First Officer is active for this expedition and handle user messages
+      if (messageType === 'user-input' && userId) {
+        console.log(`[MESSAGE-SERVICE] Checking if First Officer is active for expedition ${expeditionId}`);
+        
+        const isActive = this.firstOfficerService.isExpeditionActive(expeditionId);
+        console.log(`[MESSAGE-SERVICE] First Officer active status: ${isActive}`);
+        
+        if (isActive) {
+          console.log(`[MESSAGE-SERVICE] Sending message to First Officer Service...`);
+          const response = await this.firstOfficerService.handleUserMessage(expeditionId, userId, message);
+          console.log(`[MESSAGE-SERVICE] First Officer response received:`, {
+            hasReply: !!response?.reply,
+            replyLength: response?.reply?.length,
+            hasUsage: !!response?.usage
+          });
+          console.log(`[MESSAGE-SERVICE] First Officer reply preview: ${response?.reply?.substring(0, 100)}...`);
+          console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY =====`);
+          return response;
+        } else {
+          console.log(`[MESSAGE-SERVICE] First Officer not active for expedition ${expeditionId}`);
+          console.log(`[MESSAGE-SERVICE] ===== NO FIRST OFFICER RESPONSE =====`);
+          return null;
+        }
+      }
+      
+      console.log(`[MESSAGE-SERVICE] No First Officer handling needed for messageType: ${messageType}`);
+      console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLING SKIPPED =====`);
+      return null;
     } catch (error) {
-      console.error('[MESSAGE-SERVICE] Failed to handle First Officer message:', error);
+      console.error('[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLING FAILED =====');
+      console.error('[MESSAGE-SERVICE] Error details:', error);
       // Don't throw error - message was still sent successfully
+      return null;
     }
   }
 

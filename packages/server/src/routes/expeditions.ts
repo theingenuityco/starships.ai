@@ -1128,6 +1128,9 @@ router.post(
   authMiddleware,
   validateSendMessage,
   async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST START =====`);
+    
     try {
       const { expeditionId } = req.params;
       const userId = req.user!.id;
@@ -1136,17 +1139,53 @@ router.post(
         ...req.body,
       };
 
-      console.log(`[EXPEDITION-API] Sending message to expedition: ${expeditionId}`);
+      console.log(`[EXPEDITION-API] [${requestId}] Request details:`, {
+        expeditionId,
+        userId,
+        messageType: sendMessageRequest.messageType,
+        agentId: sendMessageRequest.agentId,
+        contentLength: sendMessageRequest.content?.length
+      });
 
-      // Use MessageService for message handling
-      const message = await messageService.sendMessage(userId, sendMessageRequest);
+      // Use MessageService for message handling - now returns both user and First Officer messages
+      console.log(`[EXPEDITION-API] [${requestId}] Calling messageService.sendMessage...`);
+      const messageResponse = await messageService.sendMessage(userId, sendMessageRequest);
+
+      console.log(`[EXPEDITION-API] [${requestId}] Message response received:`, {
+        hasUserMessage: !!messageResponse.userMessage,
+        hasFirstOfficerMessage: !!messageResponse.firstOfficerMessage,
+        userMessageId: messageResponse.userMessage?.id,
+        firstOfficerMessageId: messageResponse.firstOfficerMessage?.id
+      });
+
+      // Prepare response data
+      const responseData: any = {
+        userMessage: messageResponse.userMessage
+      };
+
+      if (messageResponse.firstOfficerMessage) {
+        responseData.firstOfficerMessage = messageResponse.firstOfficerMessage;
+        responseData.messages = [messageResponse.userMessage, messageResponse.firstOfficerMessage];
+      } else {
+        responseData.messages = [messageResponse.userMessage];
+      }
+
+      console.log(`[EXPEDITION-API] [${requestId}] Sending HTTP response with ${responseData.messages.length} message(s)`);
 
       res.json({
         success: true,
-        data: { message },
+        data: responseData,
       });
+
+      console.log(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST SUCCESS =====`);
     } catch (error: any) {
-      console.error('[EXPEDITION-API] Failed to send message:', error);
+      console.error(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST ERROR =====`);
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to send message:`, {
+        error: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      
       const statusCode =
         error.code === 'EXPEDITION_NOT_FOUND'
           ? 404
@@ -1157,7 +1196,13 @@ router.post(
         success: false,
         error: error.message || 'Failed to send message',
         code: error.code,
+        debug: {
+          requestId,
+          timestamp: new Date().toISOString()
+        }
       });
+      
+      console.error(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST FAILED =====`);
     }
   }
 );

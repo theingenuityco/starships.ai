@@ -6,11 +6,9 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
-import { SocketIOService } from './SocketIOService';
 
 export class ExpeditionService {
   private static instance: ExpeditionService;
-  private socketService?: SocketIOService;
 
   private constructor() {
     // SocketIOService will be initialized lazily to avoid initialization order issues
@@ -52,11 +50,6 @@ export class ExpeditionService {
       // Get assigned agents info
       const assignedAgents = await this.getAssignedAgentsInfo(expedition.assignedAgents);
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:created', {
-        expedition,
-        assignedAgents
-      });
 
       console.log(`[EXPEDITION-SERVICE] Expedition created: ${expedition.id}`);
 
@@ -168,11 +161,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition.assignedAgents)
       ]);
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:updated', {
-        expedition: updatedExpedition,
-        assignedAgents
-      });
 
       return {
         expedition: updatedExpedition,
@@ -206,10 +194,6 @@ export class ExpeditionService {
       // Delete expedition and related data
       await this.deleteExpeditionData(expeditionId);
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:deleted', {
-        expeditionId
-      });
 
       console.log(`[EXPEDITION-SERVICE] Expedition deleted: ${expeditionId}`);
     } catch (error) {
@@ -248,11 +232,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition.assignedAgents)
       ]);
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:started', {
-        expedition: updatedExpedition,
-        assignedAgents
-      });
 
       console.log(`[EXPEDITION-SERVICE] Expedition started: ${expeditionId}`);
 
@@ -296,11 +275,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents)
       ]);
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:paused', {
-        expedition: updatedExpedition,
-        assignedAgents
-      });
 
       return {
         expedition: updatedExpedition!,
@@ -342,11 +316,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents)
       ]);
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:resumed', {
-        expedition: updatedExpedition,
-        assignedAgents
-      });
 
       return {
         expedition: updatedExpedition!,
@@ -380,10 +349,6 @@ export class ExpeditionService {
       // Update status to cancelled
       await expeditionRepo.updateStatus(expeditionId, 'cancelled');
 
-      // Emit real-time event
-      this.emitToUser(userId, 'expedition:cancelled', {
-        expeditionId
-      });
 
       console.log(`[EXPEDITION-SERVICE] Expedition cancelled: ${expeditionId}`);
     } catch (error) {
@@ -518,19 +483,4 @@ export class ExpeditionService {
     };
   }
 
-  private getSocketService(): SocketIOService {
-    if (!this.socketService) {
-      this.socketService = SocketIOService.getInstance();
-    }
-    return this.socketService;
-  }
-
-  private emitToUser(userId: string, event: string, data: any) {
-    try {
-      // Use any type to bypass Socket.IO event type checking for now
-      (this.getSocketService() as any).emitToUser(userId, event, data);
-    } catch (error) {
-      console.error('[EXPEDITION-SERVICE] Failed to emit event:', error);
-    }
-  }
 }

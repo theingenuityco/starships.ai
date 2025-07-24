@@ -98,9 +98,15 @@ export const authMiddleware = async (
     // Look up user in database by Kinde ID
     let user;
     try {
+      console.log(`[AUTH] Attempting database lookup for Kinde ID: ${payload.sub}`);
       user = await UserService.getUserByKindeId(payload.sub as string);
-    } catch (dbError) {
-      console.error(`[AUTH] Database error when looking up user: ${payload.sub}`, dbError);
+      console.log(`[AUTH] Database lookup completed for Kinde ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`);
+    } catch (dbError: any) {
+      console.error(`[AUTH] Database error when looking up user: ${payload.sub}`);
+      console.error(`[AUTH] Error type: ${dbError?.constructor?.name}`);
+      console.error(`[AUTH] Error message: ${dbError?.message}`);
+      console.error(`[AUTH] Error stack:`, dbError?.stack);
+      console.error(`[AUTH] Full error object:`, dbError);
       res.status(500).json({ error: 'Database error during authentication' });
       return;
     }

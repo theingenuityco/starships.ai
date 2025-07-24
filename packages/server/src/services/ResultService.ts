@@ -15,7 +15,6 @@ import {
   ExpeditionErrorCode
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
-import { SocketIOService } from './SocketIOService';
 
 export interface UpdateResultRequest {
   title?: string;
@@ -90,17 +89,6 @@ export class ResultService {
 
   private constructor() {}
 
-  /**
-   * Safely get SocketIOService instance with lazy initialization
-   */
-  private getSocketService(): SocketIOService | null {
-    try {
-      return SocketIOService.getInstance();
-    } catch (error) {
-      console.warn('[RESULT-SERVICE] SocketIOService not yet initialized');
-      return null;
-    }
-  }
 
   static getInstance(): ResultService {
     if (!ResultService.instance) {
@@ -144,31 +132,6 @@ export class ResultService {
         metadata: request.metadata || {}
       });
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:result-available', {
-          expeditionId: request.expeditionId,
-          resultId: result.id,
-          result: {
-            id: result.id,
-            title: result.title,
-            description: result.description,
-            resultType: result.resultType,
-            format: result.format,
-            createdBy: result.createdBy,
-            createdAt: result.createdAt,
-            quality: {
-              overall: result.quality.overall,
-              completeness: result.quality.completeness,
-              accuracy: result.quality.accuracy,
-              relevance: result.quality.relevance,
-              clarity: result.quality.clarity
-            }
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[RESULT-SERVICE] Result created: ${result.id}`);
       return result;
@@ -268,31 +231,6 @@ export class ResultService {
         updatedResult.quality = newQuality;
       }
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:result-available', {
-          expeditionId: result.expeditionId,
-          resultId: updatedResult.id,
-          result: {
-            id: updatedResult.id,
-            title: updatedResult.title,
-            description: updatedResult.description,
-            resultType: updatedResult.resultType,
-            format: updatedResult.format,
-            createdBy: updatedResult.createdBy,
-            createdAt: updatedResult.createdAt,
-            quality: {
-              overall: updatedResult.quality.overall,
-              completeness: updatedResult.quality.completeness,
-              accuracy: updatedResult.quality.accuracy,
-              relevance: updatedResult.quality.relevance,
-              clarity: updatedResult.quality.clarity
-            }
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[RESULT-SERVICE] Result updated: ${resultId}`);
       return updatedResult;
@@ -323,18 +261,6 @@ export class ResultService {
       // Delete result
       await resultRepo.delete(resultId);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:updated', {
-          expeditionId: result.expeditionId,
-          changes: {
-            status: 'Result deleted'
-          },
-          updatedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[RESULT-SERVICE] Result deleted: ${resultId}`);
     } catch (error) {
@@ -386,25 +312,6 @@ export class ResultService {
         throw this.createError('UPDATE_FAILED', 'Failed to update quality score');
       }
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:result-available', {
-          expeditionId: result.expeditionId,
-          resultId: assessment.resultId,
-          result: {
-            id: updatedResult.id,
-            title: updatedResult.title,
-            description: updatedResult.description,
-            resultType: updatedResult.resultType,
-            format: updatedResult.format,
-            createdBy: updatedResult.createdBy,
-            createdAt: updatedResult.createdAt,
-            quality: newQuality
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[RESULT-SERVICE] Quality assessed for result: ${assessment.resultId}`);
       return updatedResult;

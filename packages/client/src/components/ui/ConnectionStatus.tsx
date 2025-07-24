@@ -24,7 +24,17 @@ import {
   Loader2,
   X
 } from 'lucide-react';
-import type { ConnectionMetrics } from '@/lib/expeditionSocketClient';
+// Note: ConnectionMetrics type definition for socket client connections
+interface ConnectionMetrics {
+  isConnected: boolean;
+  connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
+  circuitBreakerState: 'closed' | 'open' | 'half-open';
+  eventCount: number;
+  failureCount: number;
+  reconnectAttempts: number;
+  lastPing: number | null;
+  uptime: number | null;
+}
 
 interface ConnectionStatusProps {
   connectionState: ConnectionMetrics;

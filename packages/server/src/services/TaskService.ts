@@ -16,9 +16,8 @@ import {
   StandardError,
   NotFoundError,
   ValidationError
-} from '@starships/protocol/src/types/error-classes';
+} from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
-import { SocketIOService } from './SocketIOService';
 import { Logger } from '../utils/logger';
 
 export interface UpdateTaskRequest {
@@ -69,17 +68,6 @@ export class TaskService {
     this.logger = Logger.getInstance({ service: 'TaskService' });
   }
 
-  /**
-   * Safely get SocketIOService instance with lazy initialization
-   */
-  private getSocketService(): SocketIOService | null {
-    try {
-      return SocketIOService.getInstance();
-    } catch (error) {
-      console.warn('[TASK-SERVICE] SocketIOService not yet initialized');
-      return null;
-    }
-  }
 
   static getInstance(): TaskService {
     if (!TaskService.instance) {
@@ -152,26 +140,6 @@ export class TaskService {
         dueDate: request.dueDate
       });
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:task-assigned', {
-          expeditionId: request.expeditionId,
-          taskId: task.id,
-          task: {
-            id: task.id,
-            title: task.title,
-            description: task.description,
-            status: task.status as 'pending' | 'assigned' | 'in-progress' | 'completed' | 'failed',
-            priority: task.priority as 'low' | 'medium' | 'high' | 'critical',
-            assignedTo: undefined,
-            agentId: undefined,
-            estimatedEffort: task.estimatedEffort
-          },
-          assignedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       this.logger.info('Task created successfully', {
         ...context,
@@ -279,26 +247,6 @@ export class TaskService {
         throw this.createError('UPDATE_FAILED', 'Failed to update task');
       }
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:task-assigned', {
-          expeditionId: task.expeditionId,
-          taskId: updatedTask.id,
-          task: {
-            id: updatedTask.id,
-            title: updatedTask.title,
-            description: updatedTask.description,
-            status: updatedTask.status as 'pending' | 'assigned' | 'in-progress' | 'completed' | 'failed',
-            priority: updatedTask.priority as 'low' | 'medium' | 'high' | 'critical',
-            assignedTo: updatedTask.assignedAgentId,
-            agentId: updatedTask.assignedAgentId,
-            estimatedEffort: updatedTask.estimatedEffort
-          },
-          assignedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[TASK-SERVICE] Task updated: ${taskId}`);
       return updatedTask;
@@ -346,26 +294,6 @@ export class TaskService {
         throw this.createError('UPDATE_FAILED', 'Failed to assign task');
       }
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:task-assigned', {
-          expeditionId: assignment.expeditionId,
-          taskId: updatedTask.id,
-          task: {
-            id: updatedTask.id,
-            title: updatedTask.title,
-            description: updatedTask.description,
-            status: updatedTask.status as 'pending' | 'assigned' | 'in-progress' | 'completed' | 'failed',
-            priority: updatedTask.priority as 'low' | 'medium' | 'high' | 'critical',
-            assignedTo: assignment.agentId,
-            agentId: assignment.agentId,
-            estimatedEffort: updatedTask.estimatedEffort
-          },
-          assignedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[TASK-SERVICE] Task assigned: ${assignment.taskId} to ${assignment.agentId}`);
       return updatedTask;
@@ -406,21 +334,6 @@ export class TaskService {
         throw this.createError('UPDATE_FAILED', 'Failed to start task');
       }
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:task-progress', {
-          expeditionId: task.expeditionId,
-          taskId: updatedTask.id,
-          progress: {
-            percentage: 50, // Task started, assume 50% progress
-            currentStep: 'Task execution started',
-            estimatedTimeRemaining: updatedTask.estimatedEffort,
-            lastUpdate: new Date().toISOString()
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[TASK-SERVICE] Task started: ${taskId}`);
       return updatedTask;
@@ -468,24 +381,6 @@ export class TaskService {
       // Check if this completion unblocks other tasks
       await this.checkAndUnblockDependentTasks(task.expeditionId, taskId);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:task-completed', {
-          expeditionId: task.expeditionId,
-          taskId: updatedTask.id,
-          task: {
-            id: updatedTask.id,
-            title: updatedTask.title,
-            status: updatedTask.status as 'completed' | 'failed',
-            result: updatedTask.result,
-            completedAt: updatedTask.updatedAt,
-            completedBy: userId,
-            agentId: updatedTask.assignedAgentId
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[TASK-SERVICE] Task completed: ${taskId}`);
       return updatedTask;
@@ -519,18 +414,6 @@ export class TaskService {
       // Delete task
       await taskRepo.delete(taskId);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:updated', {
-          expeditionId: task.expeditionId,
-          changes: {
-            status: 'Task deleted'
-          },
-          updatedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[TASK-SERVICE] Task deleted: ${taskId}`);
     } catch (error) {

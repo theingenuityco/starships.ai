@@ -32,7 +32,6 @@ import {
 import { getLogger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
-import { SocketIOService } from './SocketIOService';
 
 export class ExpeditionService {
   private static instance: ExpeditionService;
@@ -45,18 +44,6 @@ export class ExpeditionService {
     this.firstOfficerService = FirstOfficerService.getInstance();
   }
 
-  /**
-   * Safely get SocketIOService instance with lazy initialization
-   * Returns null if SocketIOService is not yet initialized
-   */
-  private getSocketService(): SocketIOService | null {
-    try {
-      return SocketIOService.getInstance();
-    } catch (error) {
-      console.warn('[EXPEDITION-SERVICE] SocketIOService not yet initialized');
-      return null;
-    }
-  }
 
   static getInstance(): ExpeditionService {
     if (!ExpeditionService.instance) {
@@ -147,30 +134,6 @@ export class ExpeditionService {
       const assignedAgents = await this.getAssignedAgentsInfo(finalExpedition.assignedAgents);
       console.log(`[EXPEDITION-SERVICE] Step 8: Assigned agents info retrieved:`, assignedAgents);
 
-      console.log(`[EXPEDITION-SERVICE] Step 9: Emitting real-time event`);
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:created', {
-          expeditionId: finalExpedition.id,
-          expedition: {
-            id: finalExpedition.id,
-            title: finalExpedition.title,
-            objective: finalExpedition.objective,
-            status: finalExpedition.status as 'draft' | 'planning' | 'in-progress' | 'paused' | 'completed' | 'cancelled' | 'failed',
-            priority: finalExpedition.priority as 'low' | 'medium' | 'high' | 'critical',
-            starshipId: finalExpedition.starshipId,
-            createdBy: finalExpedition.createdBy,
-            createdAt: finalExpedition.createdAt
-          },
-          timestamp: new Date().toISOString()
-        });
-        console.log(`[EXPEDITION-SERVICE] Step 9: Real-time event emitted successfully`);
-      } else {
-        console.log(
-          `[EXPEDITION-SERVICE] Step 9: SocketService not available, skipping real-time event`
-        );
-      }
 
       console.log(`[EXPEDITION-SERVICE] Expedition created successfully: ${finalExpedition.id}`);
 
@@ -308,21 +271,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition.assignedAgents),
       ]);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:updated', {
-          expeditionId: updatedExpedition.id,
-          changes: {
-            title: updatedExpedition.title,
-            objective: updatedExpedition.objective,
-            status: updatedExpedition.status,
-            priority: updatedExpedition.priority as 'low' | 'medium' | 'high' | 'critical'
-          },
-          updatedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       return {
         expedition: updatedExpedition,
@@ -356,15 +304,6 @@ export class ExpeditionService {
       // Delete expedition and related data
       await this.deleteExpeditionData(expeditionId);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:deleted', {
-          expeditionId,
-          deletedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[EXPEDITION-SERVICE] Expedition deleted: ${expeditionId}`);
     } catch (error) {
@@ -406,17 +345,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition.assignedAgents),
       ]);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:started', {
-          expeditionId: updatedExpedition.id,
-          status: 'planning',
-          previousStatus: 'draft',
-          changedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[EXPEDITION-SERVICE] Expedition started: ${expeditionId}`);
 
@@ -463,17 +391,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents),
       ]);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:paused', {
-          expeditionId: expeditionId,
-          status: 'paused',
-          previousStatus: expedition.status,
-          changedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       return {
         expedition: updatedExpedition!,
@@ -518,17 +435,6 @@ export class ExpeditionService {
         this.getAssignedAgentsInfo(updatedExpedition!.assignedAgents),
       ]);
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:resumed', {
-          expeditionId: expeditionId,
-          status: 'in-progress',
-          previousStatus: expedition.status,
-          changedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       return {
         expedition: updatedExpedition!,
@@ -565,17 +471,6 @@ export class ExpeditionService {
       // Update status to cancelled
       await expeditionRepo.updateStatus(expeditionId, 'cancelled');
 
-      // Emit real-time event
-      const socketService = this.getSocketService();
-      if (socketService) {
-        socketService.emitToUser(userId, 'expedition:cancelled', {
-          expeditionId,
-          status: 'cancelled',
-          previousStatus: expedition.status,
-          changedBy: userId,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       console.log(`[EXPEDITION-SERVICE] Expedition cancelled: ${expeditionId}`);
     } catch (error) {

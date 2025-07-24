@@ -30,7 +30,6 @@ export class SocketIOService {
   private static instance: SocketIOService;
   private io: SocketIOServer<SocketIOEvents>;
   private connections: Map<string, SocketConnectionState> = new Map();
-  private expeditionRooms: Map<string, Set<string>> = new Map(); // expeditionId -> Set<socketId>
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
   private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> = new Map();
@@ -173,8 +172,6 @@ export class SocketIOService {
         socket.emit('pong');
       });
 
-      // Handle expedition room management
-      this.setupExpeditionHandlers(socket);
 
       // Handle disconnection with cleanup
       socket.on('disconnect', (reason) => {
@@ -192,79 +189,6 @@ export class SocketIOService {
     });
   }
 
-  private setupExpeditionHandlers(socket: any) {
-    // Join expedition room
-    socket.on('expedition:join', (expeditionId: string) => {
-      try {
-        const currentUserId = socket.data.userId; // This will be updated when user is resolved
-        const expeditionRoom = this.getExpeditionRoom(expeditionId);
-        socket.join(expeditionRoom);
-        
-        // Track expedition room membership
-        if (!this.expeditionRooms.has(expeditionId)) {
-          this.expeditionRooms.set(expeditionId, new Set());
-        }
-        this.expeditionRooms.get(expeditionId)!.add(socket.id);
-
-        console.log(`[SOCKET.IO] User ${currentUserId} joined expedition room: ${expeditionId}`);
-        
-        // Emit room joined event (works with both temp and resolved IDs)
-        this.emitToExpeditionRoom(expeditionId, 'expedition:room-joined', {
-          expeditionId,
-          userId: currentUserId,
-          userInfo: {
-            id: currentUserId,
-            name: socket.data.name || 'User',
-            role: 'viewer' // Default role for safety
-          },
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error(`[SOCKET.IO] Failed to join expedition room ${expeditionId}:`, error);
-        socket.emit('expedition:error', {
-          expeditionId,
-          error: {
-            code: 'ROOM_JOIN_FAILED',
-            message: 'Failed to join expedition room',
-            severity: 'medium',
-            source: 'system',
-            recoverable: true,
-            retryCount: 0
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
-    });
-
-    // Leave expedition room
-    socket.on('expedition:leave', (expeditionId: string) => {
-      try {
-        const currentUserId = socket.data.userId;
-        const expeditionRoom = this.getExpeditionRoom(expeditionId);
-        socket.leave(expeditionRoom);
-        
-        // Remove from expedition room tracking
-        const roomMembers = this.expeditionRooms.get(expeditionId);
-        if (roomMembers) {
-          roomMembers.delete(socket.id);
-          if (roomMembers.size === 0) {
-            this.expeditionRooms.delete(expeditionId);
-          }
-        }
-
-        console.log(`[SOCKET.IO] User ${currentUserId} left expedition room: ${expeditionId}`);
-        
-        // Emit room left event
-        this.emitToExpeditionRoom(expeditionId, 'expedition:room-left', {
-          expeditionId,
-          userId: currentUserId,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error(`[SOCKET.IO] Failed to leave expedition room ${expeditionId}:`, error);
-      }
-    });
-  }
 
   private handleDisconnection(socketId: string, userId: string, reason: string) {
     console.log(`[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`);
@@ -281,15 +205,6 @@ export class SocketIOService {
       }
     }
 
-    // Clean up expedition room memberships
-    this.expeditionRooms.forEach((members, expeditionId) => {
-      if (members.has(socketId)) {
-        members.delete(socketId);
-        if (members.size === 0) {
-          this.expeditionRooms.delete(expeditionId);
-        }
-      }
-    });
 
     // Reset reconnection attempts if clean disconnect
     if (reason === 'client namespace disconnect' || reason === 'server namespace disconnect') {
@@ -563,9 +478,6 @@ export class SocketIOService {
     return `user:${userId}`;
   }
 
-  getExpeditionRoom(expeditionId: string): string {
-    return `expedition:${expeditionId}`;
-  }
 
   // Agent-specific room management (backward compatibility)
   getAgentRoom(agentId: string, userId: string): string {
@@ -602,10 +514,6 @@ export class SocketIOService {
     return this.userSockets.size;
   }
 
-  getExpeditionMembersCount(expeditionId: string): number {
-    const members = this.expeditionRooms.get(expeditionId);
-    return members ? members.size : 0;
-  }
 
   // Enhanced event emission with error handling and retry logic
   async emitToUser<K extends keyof SocketIOEvents>(
@@ -618,15 +526,6 @@ export class SocketIOService {
     return this.emitToRoom(userRoom, event, data, { ...options, expeditionId: options?.expeditionId || 'user-room' });
   }
 
-  async emitToExpeditionRoom<K extends keyof SocketIOEvents>(
-    expeditionId: string,
-    event: K,
-    data: Parameters<SocketIOEvents[K]>[0],
-    options?: Partial<EventEmissionOptions>
-  ): Promise<EventEmissionResult> {
-    const expeditionRoom = this.getExpeditionRoom(expeditionId);
-    return this.emitToRoom(expeditionRoom, event, data, { ...options, expeditionId });
-  }
 
   // Legacy method for backward compatibility
   async emitToUserWithRetry(
@@ -638,14 +537,6 @@ export class SocketIOService {
     return this.emitToUser(userId, event, data, options);
   }
 
-  async emitToExpeditionRoomWithRetry(
-    expeditionId: string,
-    event: keyof SocketIOEvents,
-    data: any,
-    options: EventEmissionOptions = { expeditionId }
-  ): Promise<EventEmissionResult> {
-    return this.emitToExpeditionRoom(expeditionId, event, data, options);
-  }
 
   private async emitToRoom<K extends keyof SocketIOEvents>(
     room: string,
@@ -744,7 +635,7 @@ export class SocketIOService {
       totalConnections: this.connections.size,
       totalUsers: this.userSockets.size,
       connectedUsers: this.userSockets.size, // For backward compatibility
-      expeditionRooms: this.expeditionRooms.size,
+      expeditionRooms: 0,
       queuedEvents: Array.from(this.eventQueue.values()).reduce((sum, queue) => sum + queue.length, 0),
       averagePingTime: this.getAveragePingTime(),
       healthyConnections: this.getHealthyConnectionsCount(),

@@ -17,6 +17,57 @@ import { int } from 'neo4j-driver';
 export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryInterface {
   
   /**
+   * Map Neo4j record to ExpeditionMessage, parsing metadata from JSON string
+   */
+  private mapRecord(record: any): ExpeditionMessage {
+    const rawMessage = record.m || record;
+    return {
+      ...rawMessage,
+      metadata: rawMessage.metadata ? JSON.parse(rawMessage.metadata) : {}
+    };
+  }
+
+  /**
+   * Sanitize an object to ensure it only contains Neo4j-compatible types
+   */
+  private sanitizeObject(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
+    if (obj instanceof Map) {
+      // Convert Map to plain object
+      const plainObject: any = {};
+      for (const [key, value] of obj) {
+        plainObject[key] = this.sanitizeObject(value);
+      }
+      return plainObject;
+    }
+    
+    if (obj instanceof Set) {
+      // Convert Set to array
+      return Array.from(obj).map(value => this.sanitizeObject(value));
+    }
+    
+    if (Array.isArray(obj)) {
+      // Recursively sanitize array elements
+      return obj.map(item => this.sanitizeObject(item));
+    }
+    
+    if (typeof obj === 'object' && obj.constructor === Object) {
+      // Recursively sanitize plain object properties
+      const sanitized: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        sanitized[key] = this.sanitizeObject(value);
+      }
+      return sanitized;
+    }
+    
+    // Return primitive types as-is (string, number, boolean, etc.)
+    return obj;
+  }
+
+  /**
    * Find all messages (admin use only)
    */
   async findAll(): Promise<ExpeditionMessage[]> {
@@ -24,7 +75,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
     const result = await connection.executeQuery<{ m: ExpeditionMessage }>(
       'MATCH (m:ExpeditionMessage) RETURN m ORDER BY m.timestamp DESC'
     );
-    return result.map(record => record.m);
+    return result.map(record => this.mapRecord(record));
   }
 
   /**
@@ -36,7 +87,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
       'MATCH (m:ExpeditionMessage) WHERE m.id = $id RETURN m',
       { id }
     );
-    return result[0]?.m || null;
+    return result[0] ? this.mapRecord(result[0]) : null;
   }
 
   /**
@@ -62,7 +113,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
     }
     
     const result = await connection.executeQuery<{ m: ExpeditionMessage }>(query, params);
-    return result.map(record => record.m);
+    return result.map(record => this.mapRecord(record));
   }
 
   /**
@@ -76,7 +127,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
        RETURN m ORDER BY m.timestamp ASC`,
       { expeditionId, role }
     );
-    return result.map(record => record.m);
+    return result.map(record => this.mapRecord(record));
   }
 
   /**
@@ -90,7 +141,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
        RETURN m ORDER BY m.timestamp ASC`,
       { expeditionId, messageType }
     );
-    return result.map(record => record.m);
+    return result.map(record => this.mapRecord(record));
   }
 
   /**
@@ -99,12 +150,12 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
   async findByThread(threadId: string): Promise<ExpeditionMessage[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ m: ExpeditionMessage }>(
-      `MATCH (m:ExpeditionMessage) 
+      `MATCH (m:ExpeditionMessage)
        WHERE m.threadId = $threadId
        RETURN m ORDER BY m.timestamp ASC`,
       { threadId }
     );
-    return result.map(record => record.m);
+    return result.map(record => this.mapRecord(record));
   }
 
   /**
@@ -118,7 +169,7 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
        RETURN m ORDER BY m.timestamp ASC`,
       { expeditionId, agentId }
     );
-    return result.map(record => record.m);
+    return result.map(record => this.mapRecord(record));
   }
 
   /**
@@ -135,10 +186,28 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
       metadata: entity.metadata || {}
     };
 
+    // Sanitize metadata to ensure no Map objects or complex types
+    const sanitizedMetadata = this.sanitizeObject(message.metadata);
+
+    // Ensure all properties are primitive types for Neo4j
+    const messageProps = {
+      id: message.id,
+      expeditionId: message.expeditionId,
+      role: message.role,
+      content: message.content,
+      messageType: message.messageType,
+      timestamp: message.timestamp,
+      userId: message.userId || null,
+      agentId: message.agentId || null,
+      threadId: message.threadId || null,
+      parentMessageId: message.parentMessageId || null,
+      metadata: JSON.stringify(sanitizedMetadata) // Store as JSON string
+    };
+
     // Create message node
     await connection.executeWrite(
       'CREATE (m:ExpeditionMessage $props) RETURN m',
-      { props: message }
+      { props: messageProps }
     );
 
     // Create relationship with expedition
@@ -200,12 +269,33 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
   async update(id: string, updates: Partial<ExpeditionMessage>): Promise<ExpeditionMessage | null> {
     const connection = getConnection();
     
+    // Ensure all properties are primitive types for Neo4j
+    const sanitizedUpdates: any = {};
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (key === 'metadata') {
+        // Convert metadata to JSON string
+        sanitizedUpdates[key] = typeof value === 'object' && value !== null
+          ? JSON.stringify(value)
+          : value;
+      } else if (value instanceof Map) {
+        // Convert Map to plain object then to JSON string
+        sanitizedUpdates[key] = JSON.stringify(Object.fromEntries(value));
+      } else if (typeof value === 'object' && value !== null && value.constructor === Object) {
+        // Convert plain objects to JSON string for complex nested objects
+        sanitizedUpdates[key] = JSON.stringify(value);
+      } else {
+        // Keep primitive values as-is
+        sanitizedUpdates[key] = value;
+      }
+    }
+    
     const result = await connection.executeWrite<{ m: ExpeditionMessage }>(
       'MATCH (m:ExpeditionMessage) WHERE m.id = $id SET m += $updates RETURN m',
-      { id, updates }
+      { id, updates: sanitizedUpdates }
     );
 
-    return result[0]?.m || null;
+    return result[0] ? this.mapRecord(result[0]) : null;
   }
 
   /**

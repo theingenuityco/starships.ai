@@ -35,15 +35,11 @@ export class ExpeditionService {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       const expedition = await expeditionRepo.create({
         starshipId: request.starshipId,
-        title: request.title,
-        description: request.description,
-        objective: request.objective,
+        name: request.name,
+        mission: request.mission,
         status: 'draft',
-        priority: request.priority || 'medium',
         assignedAgents: [],
         createdBy: userId,
-        estimatedDuration: request.estimatedDuration,
-        tags: request.tags || [],
         updatedAt: new Date().toISOString()
       });
 

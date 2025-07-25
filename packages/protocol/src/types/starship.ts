@@ -154,7 +154,6 @@ export interface UpdateStarshipExpeditionSettingsRequest {
   maxConcurrentExpeditions?: number;
   expeditionNotifications?: boolean;
   autoAssignAgents?: boolean;
-  defaultExpeditionPriority?: 'low' | 'medium' | 'high' | 'urgent';
   expeditionTimeoutHours?: number;
 }
 

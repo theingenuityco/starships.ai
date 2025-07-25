@@ -5,10 +5,9 @@ import { ExpeditionMessage } from '@starships/protocol';
 // Import interfaces from VirtualFirstOfficer.ts
 interface ExpeditionDetails {
   id: string;
-  title: string;
-  description: string;
+  name: string;
+  mission: string;
   status: string;
-  priority: string;
   createdAt: string;
   updatedAt: string;
   startedAt?: string;
@@ -167,10 +166,9 @@ export class ContextBuilder {
 
       return {
         id: expedition.id,
-        title: expedition.title,
-        description: expedition.description || '',
+        name: expedition.name,
+        mission: expedition.mission || '',
         status: expedition.status,
-        priority: expedition.priority || 'medium',
         createdAt: expedition.createdAt,
         updatedAt: expedition.updatedAt,
         startedAt: undefined, // Not available in Expedition model

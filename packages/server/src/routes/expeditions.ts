@@ -94,7 +94,7 @@ router.post(
 
       console.log(`[EXPEDITION-API] [${requestId}] Step 4: Expedition created successfully`, {
         expeditionId: expeditionResponse.expedition.id,
-        expeditionTitle: expeditionResponse.expedition.title,
+        expeditionTitle: expeditionResponse.expedition.name,
         assignedAgentsCount: expeditionResponse.assignedAgents?.length || 0,
         timestamp: new Date().toISOString()
       });
@@ -171,15 +171,8 @@ router.get(
           ? (req.query.status as any[])
           : [req.query.status as any];
       }
-      if (req.query.priority) {
-        filters.priority = Array.isArray(req.query.priority)
-          ? (req.query.priority as any[])
-          : [req.query.priority as any];
-      }
-      if (req.query.tags) {
-        filters.tags = Array.isArray(req.query.tags)
-          ? (req.query.tags as string[])
-          : [req.query.tags as string];
+      if (req.query.assignedAgent) {
+        filters.assignedAgent = req.query.assignedAgent as string;
       }
       if (req.query.search) {
         filters.search = req.query.search as string;

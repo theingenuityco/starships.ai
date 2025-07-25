@@ -6,7 +6,15 @@ import { env } from '../config/environment';
  * Service for managing AI agents with Neo4j persistence
  */
 export class AgentService {
+  private static instance: AgentService;
   private static isInitialized = false;
+
+  static getInstance(): AgentService {
+    if (!AgentService.instance) {
+      AgentService.instance = new AgentService();
+    }
+    return AgentService.instance;
+  }
 
   static async initialize(): Promise<void> {
     if (this.isInitialized) {
@@ -136,6 +144,13 @@ export class AgentService {
     const agentRepo = RepositoryFactory.getAgentRepository();
     const agents = await agentRepo.findByTags(tags);
     return agents.map(this.convertToAgentConfig);
+  }
+
+  async getAvailableAgents(starshipId: string): Promise<Agent[]> {
+    await AgentService.initialize();
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const agents = await agentRepo.findByStarship(starshipId);
+    return agents;
   }
 
   static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentConfig[]> {

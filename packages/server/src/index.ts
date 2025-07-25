@@ -36,6 +36,7 @@ import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import expeditionRoutes from './routes/expeditions';
+import agentCommunicationRoutes from './routes/agent-communication';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
@@ -167,6 +168,7 @@ app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
+app.use('/api/agent-communication', agentCommunicationRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

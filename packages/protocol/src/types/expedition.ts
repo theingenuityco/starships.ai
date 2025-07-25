@@ -252,10 +252,10 @@ export interface CreateTaskRequest {
 export interface SendMessageRequest {
   expeditionId: string;
   content: string;
-  messageType: MessageType;
-  agentId?: string; // For directing message to specific agent
-  threadId?: string; // For threaded conversations
-  parentMessageId?: string; // For replies
+  participantId?: string;    // Defaults to 'first-officer'
+  threadId?: string;
+  parentMessageId?: string;
+  metadata?: Record<string, any>;
 }
 
 /**

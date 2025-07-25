@@ -65,7 +65,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
 
     return {
       expeditionId: expedition.id,
-      expeditionTitle: expedition.title,
+      expeditionTitle: expedition.name,
       firstOfficerId: `vfo-${expeditionId}`, // Virtual First Officer ID
       firstOfficerName: 'First Officer',
       communicationProtocol: 'bidirectional',

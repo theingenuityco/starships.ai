@@ -15,20 +15,15 @@
 export interface Expedition {
   id: string;
   starshipId: string; // Foreign key to Starship
-  title: string;
-  description: string;
-  objective: string; // Clear mission objective
-  status: ExpeditionStatus;
-  priority: ExpeditionPriority;
+  name: string; // Expedition name
+  mission: string; // Mission description
   assignedAgents: string[]; // Agent IDs from starship's deployed crew
+  status: ExpeditionStatus;
   workflowState?: any; // LangGraph state persistence
   result?: string; // Final expedition outcome
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID who created the expedition
-  estimatedDuration?: number; // In minutes
-  actualDuration?: number; // In minutes
-  tags: string[]; // For categorization and filtering
 }
 
 /**
@@ -105,14 +100,6 @@ export type ExpeditionStatus =
   | 'failed'       // Failed or abandoned
   | 'cancelled';   // Cancelled by user
 
-/**
- * Expedition priority levels
- */
-export type ExpeditionPriority = 
-  | 'low'
-  | 'medium' 
-  | 'high'
-  | 'urgent';
 
 /**
  * Task status within expeditions
@@ -207,13 +194,8 @@ export interface QualityScore {
  */
 export interface CreateExpeditionRequest {
   starshipId: string;
-  title: string;
-  description: string;
-  objective: string;
-  priority?: ExpeditionPriority;
-  estimatedDuration?: number;
-  tags?: string[];
-  dueDate?: string;
+  name: string;
+  mission: string;
   selectedAgents: string[]; // REQUIRED: At least one agent must be selected
 }
 
@@ -221,14 +203,10 @@ export interface CreateExpeditionRequest {
  * Request to update an expedition
  */
 export interface UpdateExpeditionRequest {
-  title?: string;
-  description?: string;
-  objective?: string;
-  priority?: ExpeditionPriority;
+  name?: string;
+  mission?: string;
   status?: ExpeditionStatus;
-  estimatedDuration?: number;
-  tags?: string[];
-  dueDate?: string;
+  assignedAgents?: string[];
 }
 
 /**
@@ -302,8 +280,6 @@ export interface ExpeditionListResponse {
   limit: number;
   filters?: {
     status?: ExpeditionStatus[];
-    priority?: ExpeditionPriority[];
-    tags?: string[];
   };
 }
 
@@ -334,22 +310,20 @@ export interface ExpeditionStatsResponse {
  */
 export interface ExpeditionFilters {
   status?: ExpeditionStatus[];
-  priority?: ExpeditionPriority[];
-  tags?: string[];
   createdBy?: string;
   assignedAgent?: string;
   dateRange?: {
     start: string;
     end: string;
   };
-  search?: string; // Text search in title/description
+  search?: string; // Text search in name/mission
 }
 
 /**
  * Sorting options for expeditions
  */
 export interface ExpeditionSort {
-  field: 'createdAt' | 'updatedAt' | 'priority' | 'status' | 'title';
+  field: 'createdAt' | 'updatedAt' | 'status' | 'name';
   direction: 'asc' | 'desc';
 }
 

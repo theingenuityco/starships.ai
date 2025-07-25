@@ -57,7 +57,7 @@ export class AgentExpeditionContextService {
 
       // Build context string
       let context = `\n\nEXPEDITION CONTEXT:\n`;
-      context += `You are currently assigned to the expedition: "${currentExpedition.title}"\n`;
+      context += `You are currently assigned to the expedition: "${currentExpedition.name}"\n`;
       context += `Your manager is the First Officer who coordinates this expedition.\n`;
       context += `The First Officer is responsible for:\n`;
       context += `- Assigning tasks to agents based on their expertise\n`;

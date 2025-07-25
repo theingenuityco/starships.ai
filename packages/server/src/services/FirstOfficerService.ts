@@ -493,7 +493,7 @@ export class FirstOfficerService {
         const workflowState: ExpeditionWorkflowState = {
           expeditionId,
           currentPhase: phase,
-          requirements: expedition.objective,
+          requirements: expedition.mission,
           taskBreakdown: [],
           agentAssignments: {},
           agentResults: {},
@@ -555,7 +555,6 @@ export class FirstOfficerService {
       await expeditionRepo.update(expeditionId, {
         status: 'completed',
         result: finalResult,
-        actualDuration: this.calculateExpeditionDuration(expeditionId),
         updatedAt: new Date().toISOString()
       });
 
@@ -698,8 +697,8 @@ export class FirstOfficerService {
       expeditionId: expedition.id,
       starshipId: expedition.starshipId,
       state: expedition.status || 'active',
-      title: expedition.title || 'Expedition',
-      objective: expedition.objective || 'Complete expedition tasks',
+      title: expedition.name || 'Expedition',
+      objective: expedition.mission || 'Complete expedition tasks',
       createdAt: expedition.createdAt,
       assignedAgents,
       tasks: taskSummaries,

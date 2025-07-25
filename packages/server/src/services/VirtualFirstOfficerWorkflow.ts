@@ -169,8 +169,8 @@ export class VirtualFirstOfficerWorkflow {
         expeditionId: state.expeditionId,
         starshipId: state.starshipId,
         state: contextData.expeditionDetails.status as any,
-        title: contextData.expeditionDetails.title,
-        objective: contextData.expeditionDetails.description,
+        title: contextData.expeditionDetails.name,
+        objective: contextData.expeditionDetails.mission,
         createdAt: contextData.expeditionDetails.createdAt,
         assignedAgents: contextData.agents.map(agent => ({
           id: agent.id,

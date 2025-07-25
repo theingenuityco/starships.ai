@@ -15,7 +15,7 @@ import { ExpeditionCard } from './ExpeditionCard';
 import { useExpeditionData } from '@/hooks/useExpeditionData';
 // Socket import removed - using HTTP-only implementation
 import { expeditionAPI } from '@/lib/expeditionApi';
-import type { Expedition, ExpeditionStatus, ExpeditionPriority } from '@starships/protocol';
+import type { Expedition, ExpeditionStatus } from '@starships/protocol';
 
 interface StarshipExpeditionsContentProps {
   slug: string;
@@ -26,7 +26,6 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ExpeditionStatus | 'all'>('all');
-  const [priorityFilter, setPriorityFilter] = useState<ExpeditionPriority | 'all'>('all');
 
   // Get starship data (we'll need to fetch this)
   const [starshipId, setStarshipId] = useState<string>('');
@@ -80,14 +79,12 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
   // Filter expeditions based on search and filters
   const filteredExpeditions = (expeditions || []).filter(expedition => {
-    const matchesSearch = expedition.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         expedition.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         expedition.objective.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = expedition.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         expedition.mission.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || expedition.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || expedition.priority === priorityFilter;
     
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus;
   });
 
   const handleExpeditionClick = (expeditionId: string) => {
@@ -199,18 +196,6 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={priorityFilter} onValueChange={(value) => setPriorityFilter(value as ExpeditionPriority | 'all')}>
-            <SelectTrigger className="w-full md:w-48">
-              <SelectValue placeholder="Filter by priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Priority</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
             </SelectContent>
           </Select>
         </div>

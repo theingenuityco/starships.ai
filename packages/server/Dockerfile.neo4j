@@ -11,9 +11,9 @@ COPY . .
 # Install dependencies with a frozen lockfile
 RUN pnpm install --frozen-lockfile
 
-# Build the models and mcp-server packages
+# Build the models and server packages
 RUN pnpm turbo run build --filter=@starships/models...
-RUN pnpm turbo run build --filter=@starships/mcp-server...
+RUN pnpm turbo run build --filter=@starships/server...
 
 # ---- Runtime Stage ----
 FROM node:20-alpine AS runtime
@@ -37,8 +37,19 @@ COPY --from=base /app/packages/protocol ./packages/protocol
 # Copy agent-engine package (still needed for some types)
 COPY --from=base /app/packages/agent-engine ./packages/agent-engine
 
+# Copy env-config package
+COPY --from=base /app/packages/env-config ./packages/env-config
+
+# Copy server package
+COPY --from=base /app/packages/server ./packages/server
+
 # Copy node_modules from the build stage
 COPY --from=base /app/node_modules ./node_modules
+
+# Copy root package files
+COPY --from=base /app/package.json ./package.json
+COPY --from=base /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=base /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 
 # Create a non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -56,4 +67,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:4000/ || exit 1
 
 # Start the application
-CMD ["node", "dist/index.js"] 
+CMD ["node", "packages/server/dist/index.js"] 

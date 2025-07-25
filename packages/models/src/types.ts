@@ -8,7 +8,6 @@ import {
   ExpeditionMessage,
   ExpeditionResult,
   ExpeditionStatus,
-  ExpeditionPriority,
   TaskStatus,
   TaskPriority,
   MessageRole,
@@ -32,7 +31,6 @@ export {
   ExpeditionMessage,
   ExpeditionResult,
   ExpeditionStatus,
-  ExpeditionPriority,
   TaskStatus,
   TaskPriority,
   MessageRole,
@@ -1042,7 +1040,6 @@ export const BUILTIN_CONFIG_TEMPLATES: Omit<
 export interface ExpeditionRepository extends Repository<Expedition> {
   findByStarship(starshipId: string): Promise<Expedition[]>;
   findByStatus(starshipId: string, status: ExpeditionStatus): Promise<Expedition[]>;
-  findByPriority(starshipId: string, priority: ExpeditionPriority): Promise<Expedition[]>;
   findWithFilters(
     starshipId: string,
     filters: ExpeditionFilters,

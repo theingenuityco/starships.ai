@@ -8,7 +8,6 @@
 import {
   Expedition,
   ExpeditionStatus,
-  ExpeditionPriority,
   CreateExpeditionRequest,
   UpdateExpeditionRequest,
   ExpeditionFilters,
@@ -99,15 +98,11 @@ export class ExpeditionService {
       console.log(`[EXPEDITION-SERVICE] Step 6: Creating expedition in database`);
       const expeditionData = {
         starshipId: request.starshipId,
-        title: request.title,
-        description: request.description,
-        objective: request.objective,
+        name: request.name,
+        mission: request.mission,
         status: 'draft' as const,
-        priority: request.priority || 'medium',
         assignedAgents: [], // Will be populated in next step
         createdBy: userId,
-        estimatedDuration: request.estimatedDuration,
-        tags: request.tags || [],
         updatedAt: new Date().toISOString(),
       };
       console.log(`[EXPEDITION-SERVICE] Step 6: Expedition data prepared:`, expeditionData);
@@ -335,7 +330,7 @@ export class ExpeditionService {
       }
 
       // Start First Officer orchestration
-      await this.firstOfficerService.startExpedition(expeditionId, userId, expedition.objective);
+      await this.firstOfficerService.startExpedition(expeditionId, userId, expedition.mission);
 
       // Get updated data
       const [tasks, messages, results, assignedAgents] = await Promise.all([

@@ -670,8 +670,8 @@ private async getVirtualFirstOfficerResponse(
       expeditionId: expeditionContext.expeditionDetails.id,
       starshipId: starshipId,
       state: expeditionContext.expeditionDetails.status as any,
-      title: expeditionContext.expeditionDetails.title,
-      objective: expeditionContext.expeditionDetails.description,
+      title: expeditionContext.expeditionDetails.name,
+      objective: expeditionContext.expeditionDetails.mission,
       createdAt: expeditionContext.expeditionDetails.createdAt,
       assignedAgents: expeditionContext.agents.map(agent => ({
         id: agent.id,

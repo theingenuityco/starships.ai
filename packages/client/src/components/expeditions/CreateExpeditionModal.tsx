@@ -2,53 +2,23 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Switch } from '@/components/ui/switch'
-import {
-  X,
-  Plus,
-  Minus,
-  Calendar,
-  Clock,
-  Target,
-  Users,
-  AlertCircle,
-  CheckCircle2,
-  Loader2,
-  Rocket,
-  Settings,
-  Tag,
-  Zap,
+import { Card } from '@/components/ui/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Checkbox } from '@/components/ui/checkbox'
+import { 
+  Rocket, X, Check, AlertCircle, Sparkles, 
+  Target, Bot, Search, Zap, Star, CircleCheck, 
+  Wand2, ArrowRight, Shield, Brain, Code, Palette,
+  ChevronRight, Loader2
 } from 'lucide-react'
 import { expeditionAPI } from '@/lib/expeditionApi'
-// Socket import removed - using HTTP-only implementation
-import type {
-  CreateExpeditionRequest,
-  ExpeditionPriority,
-  CreateTaskRequest,
-} from '@starships/protocol'
+import type { CreateExpeditionRequest } from '@starships/protocol'
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -63,129 +33,28 @@ interface CreateExpeditionModalProps {
 }
 
 interface FormData {
-  title: string
-  description: string
-  objective: string
-  priority: ExpeditionPriority
-  estimatedDuration: number | null
-  tags: string[]
-  dueDate: string
-  autoStart: boolean
-  // Task configuration
-  enableTaskBreakdown: boolean
-  initialTasks: TaskFormData[]
-  // Agent configuration - MANDATORY (no toggle)
+  name: string
+  mission: string
   selectedAgents: string[]
-  maxAgents: number
-  // Advanced settings
-  enableAdvancedSettings: boolean
-  resourceRequirements: string
-  successCriteria: string
-  riskAssessment: string
-}
-
-interface TaskFormData {
-  id: string
-  title: string
-  description: string
-  requiredSkills: string[]
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  estimatedEffort: number | null
-  deliverable: string
 }
 
 interface ValidationErrors {
-  title?: string
-  description?: string
-  objective?: string
-  priority?: string
-  estimatedDuration?: string
-  dueDate?: string
-  tasks?: Record<string, { title?: string; description?: string; deliverable?: string }>
-  general?: string
+  name?: string
+  mission?: string
+  agents?: string
 }
 
 interface Agent {
   id: string
   name: string
   category: string
-  tags: string[]
-  status: 'available' | 'busy' | 'offline'
+  role?: string
+  skills?: string[]
+  tags?: string[]
+  status: 'active' | 'busy' | 'offline'
+  avatar?: string
   description?: string
 }
-
-// ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const PRIORITY_OPTIONS: {
-  value: ExpeditionPriority
-  label: string
-  color: string
-  description: string
-}[] = [
-  {
-    value: 'low',
-    label: 'Low',
-    color: 'bg-gray-500',
-    description: 'Non-urgent, can be scheduled flexibly',
-  },
-  {
-    value: 'medium',
-    label: 'Medium',
-    color: 'bg-blue-500',
-    description: 'Standard priority, normal timeline',
-  },
-  {
-    value: 'high',
-    label: 'High',
-    color: 'bg-orange-500',
-    description: 'Important, needs attention soon',
-  },
-  {
-    value: 'urgent',
-    label: 'Urgent',
-    color: 'bg-red-500',
-    description: 'Critical, requires immediate action',
-  },
-]
-
-const TASK_PRIORITY_OPTIONS: { value: TaskFormData['priority']; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' },
-]
-
-const COMMON_TAGS = [
-  'research',
-  'development',
-  'analysis',
-  'design',
-  'testing',
-  'documentation',
-  'planning',
-  'implementation',
-  'review',
-  'optimization',
-  'integration',
-  'deployment',
-]
-
-const COMMON_SKILLS = [
-  'analysis',
-  'research',
-  'writing',
-  'coding',
-  'design',
-  'testing',
-  'planning',
-  'communication',
-  'problem-solving',
-  'creativity',
-  'technical-review',
-  'documentation',
-]
 
 // ============================================================================
 // MAIN COMPONENT
@@ -198,261 +67,53 @@ export function CreateExpeditionModal({
   starshipId,
   starshipSlug,
 }: CreateExpeditionModalProps) {
-  // ============================================================================
-  // STATE MANAGEMENT
-  // ============================================================================
-
-  const [currentStep, setCurrentStep] = useState(1)
+  // State Management
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
-
+  const [searchQuery, setSearchQuery] = useState('')
+  
   // Available agents state
   const [availableAgents, setAvailableAgents] = useState<Agent[]>([])
   const [loadingAgents, setLoadingAgents] = useState(false)
 
   // Form data state
   const [formData, setFormData] = useState<FormData>({
-    title: '',
-    description: '',
-    objective: '',
-    priority: 'medium',
-    estimatedDuration: null,
-    tags: [],
-    dueDate: '',
-    autoStart: false,
-    enableTaskBreakdown: false,
-    initialTasks: [],
-    selectedAgents: [], // MANDATORY: Always enabled, no toggle
-    maxAgents: 5,
-    enableAdvancedSettings: false,
-    resourceRequirements: '',
-    successCriteria: '',
-    riskAssessment: '',
+    name: '',
+    mission: '',
+    selectedAgents: [],
   })
 
-  // Tag input state
-  const [tagInput, setTagInput] = useState('')
-
-  // HTTP-only implementation: Socket integration removed
-  // Expedition creation events are now handled via direct API response
-  const isConnected = false; // Always false in HTTP mode
-
-  // ============================================================================
-  // FORM VALIDATION
-  // ============================================================================
-
-  const validateStep = useCallback(
-    (step: number): boolean => {
-      const errors: ValidationErrors = {}
-
-      if (step === 1) {
-        // Basic information validation
-        if (!formData.title.trim()) {
-          errors.title = 'Title is required'
-        } else if (formData.title.length < 3) {
-          errors.title = 'Title must be at least 3 characters'
-        } else if (formData.title.length > 100) {
-          errors.title = 'Title must be less than 100 characters'
-        }
-
-        if (!formData.description.trim()) {
-          errors.description = 'Description is required'
-        } else if (formData.description.length < 10) {
-          errors.description = 'Description must be at least 10 characters'
-        } else if (formData.description.length > 500) {
-          errors.description = 'Description must be less than 500 characters'
-        }
-
-        if (!formData.objective.trim()) {
-          errors.objective = 'Objective is required'
-        } else if (formData.objective.length < 10) {
-          errors.objective = 'Objective must be at least 10 characters'
-        } else if (formData.objective.length > 300) {
-          errors.objective = 'Objective must be less than 300 characters'
-        }
-
-        if (formData.estimatedDuration !== null && formData.estimatedDuration <= 0) {
-          errors.estimatedDuration = 'Duration must be greater than 0'
-        }
-
-        if (formData.dueDate) {
-          const dueDate = new Date(formData.dueDate)
-          const now = new Date()
-          if (dueDate <= now) {
-            errors.dueDate = 'Due date must be in the future'
-          }
-        }
-      }
-
-      if (step === 2 && formData.enableTaskBreakdown) {
-        // Task validation
-        const taskErrors: ValidationErrors['tasks'] = {}
-
-        formData.initialTasks.forEach((task, index) => {
-          const taskError: any = {}
-
-          if (!task.title.trim()) {
-            taskError.title = 'Task title is required'
-          } else if (task.title.length > 100) {
-            taskError.title = 'Task title must be less than 100 characters'
-          }
-
-          if (!task.description.trim()) {
-            taskError.description = 'Task description is required'
-          } else if (task.description.length > 300) {
-            taskError.description = 'Task description must be less than 300 characters'
-          }
-
-          if (!task.deliverable.trim()) {
-            taskError.deliverable = 'Deliverable description is required'
-          } else if (task.deliverable.length > 200) {
-            taskError.deliverable = 'Deliverable must be less than 200 characters'
-          }
-
-          if (Object.keys(taskError).length > 0) {
-            taskErrors[task.id] = taskError
-          }
-        })
-
-        if (Object.keys(taskErrors).length > 0) {
-          errors.tasks = taskErrors
-        }
-      }
-
-      if (step === 3) {
-        // Agent selection validation - MANDATORY
-        console.log('[VALIDATION] Step 3 - Agent selection validation')
-        console.log('[VALIDATION] selectedAgents:', formData.selectedAgents)
-        console.log('[VALIDATION] selectedAgents length:', formData.selectedAgents?.length)
-
-        if (!formData.selectedAgents || formData.selectedAgents.length === 0) {
-          console.log('[VALIDATION] Agent selection validation failed')
-          errors.general = 'At least one agent must be selected for the expedition'
-        } else {
-          console.log('[VALIDATION] Agent selection validation passed')
-        }
-      }
-
-      setValidationErrors(errors)
-      return Object.keys(errors).length === 0
-    },
-    [formData]
-  )
-
+  // Validation
   const validateForm = useCallback((): boolean => {
-    return validateStep(1) && validateStep(2) && validateStep(3)
-  }, [validateStep])
+    const errors: ValidationErrors = {}
 
-  // ============================================================================
-  // FORM HANDLERS
-  // ============================================================================
-
-  const updateFormData = useCallback((updates: Partial<FormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }))
-    // Clear related validation errors
-    setValidationErrors(prev => {
-      const newErrors = { ...prev }
-      Object.keys(updates).forEach(key => {
-        delete newErrors[key as keyof ValidationErrors]
-      })
-      return newErrors
-    })
-  }, [])
-
-  const handleAddTag = useCallback(
-    (tag: string) => {
-      const trimmedTag = tag.trim().toLowerCase()
-      if (trimmedTag && !formData.tags.includes(trimmedTag)) {
-        updateFormData({ tags: [...formData.tags, trimmedTag] })
-      }
-      setTagInput('')
-    },
-    [formData.tags, updateFormData]
-  )
-
-  const handleRemoveTag = useCallback(
-    (tagToRemove: string) => {
-      updateFormData({ tags: formData.tags.filter(tag => tag !== tagToRemove) })
-    },
-    [formData.tags, updateFormData]
-  )
-
-  const handleAddTask = useCallback(() => {
-    const newTask: TaskFormData = {
-      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      title: '',
-      description: '',
-      requiredSkills: [],
-      priority: 'medium',
-      estimatedEffort: null,
-      deliverable: '',
+    if (!formData.name.trim()) {
+      errors.name = 'Expedition name is required'
+    } else if (formData.name.length < 3) {
+      errors.name = 'Name must be at least 3 characters'
     }
-    updateFormData({ initialTasks: [...formData.initialTasks, newTask] })
-  }, [formData.initialTasks, updateFormData])
 
-  const handleRemoveTask = useCallback(
-    (taskId: string) => {
-      updateFormData({
-        initialTasks: formData.initialTasks.filter(task => task.id !== taskId),
-      })
-    },
-    [formData.initialTasks, updateFormData]
-  )
+    if (!formData.mission.trim()) {
+      errors.mission = 'Mission description is required'
+    } else if (formData.mission.length < 10) {
+      errors.mission = 'Mission must be at least 10 characters'
+    }
 
-  const handleUpdateTask = useCallback(
-    (taskId: string, updates: Partial<TaskFormData>) => {
-      updateFormData({
-        initialTasks: formData.initialTasks.map(task =>
-          task.id === taskId ? { ...task, ...updates } : task
-        ),
-      })
-    },
-    [formData.initialTasks, updateFormData]
-  )
+    if (formData.selectedAgents.length === 0) {
+      errors.agents = 'Select at least one agent for the expedition'
+    }
 
-  const handleAddSkillToTask = useCallback(
-    (taskId: string, skill: string) => {
-      const trimmedSkill = skill.trim().toLowerCase()
-      if (!trimmedSkill) return
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }, [formData])
 
-      updateFormData({
-        initialTasks: formData.initialTasks.map(task =>
-          task.id === taskId && !task.requiredSkills.includes(trimmedSkill)
-            ? { ...task, requiredSkills: [...task.requiredSkills, trimmedSkill] }
-            : task
-        ),
-      })
-    },
-    [formData.initialTasks, updateFormData]
-  )
-
-  const handleRemoveSkillFromTask = useCallback(
-    (taskId: string, skillToRemove: string) => {
-      updateFormData({
-        initialTasks: formData.initialTasks.map(task =>
-          task.id === taskId
-            ? {
-                ...task,
-                requiredSkills: task.requiredSkills.filter(skill => skill !== skillToRemove),
-              }
-            : task
-        ),
-      })
-    },
-    [formData.initialTasks, updateFormData]
-  )
-
-  // ============================================================================
-  // AGENT MANAGEMENT
-  // ============================================================================
-
+  // Load available agents
   const loadAvailableAgents = useCallback(async () => {
     if (!starshipId) return
 
     setLoadingAgents(true)
     try {
-      // Import the API dynamically to avoid circular dependencies
       const { default: api } = await import('@/lib/api')
       const response = await api.get(`/api/starships/${starshipId}/agents`)
 
@@ -461,1021 +122,527 @@ export function CreateExpeditionModal({
       }
     } catch (error) {
       console.error('Failed to load available agents:', error)
-      // Set empty array to prevent loading state from persisting
       setAvailableAgents([])
     } finally {
       setLoadingAgents(false)
     }
   }, [starshipId])
 
-  const handleToggleAgent = useCallback(
-    (agentId: string) => {
-      const isSelected = formData.selectedAgents.includes(agentId)
-
-      if (isSelected) {
-        updateFormData({
-          selectedAgents: formData.selectedAgents.filter(id => id !== agentId),
-        })
-      } else if (formData.selectedAgents.length < formData.maxAgents) {
-        updateFormData({
-          selectedAgents: [...formData.selectedAgents, agentId],
-        })
-      }
-    },
-    [formData.selectedAgents, formData.maxAgents, updateFormData]
-  )
-
-  // ============================================================================
-  // STEP NAVIGATION
-  // ============================================================================
-
-  const handleNextStep = useCallback(() => {
-    if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 4))
+  // Agent toggle handler
+  const handleToggleAgent = useCallback((agentId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedAgents: prev.selectedAgents.includes(agentId)
+        ? prev.selectedAgents.filter(id => id !== agentId)
+        : [...prev.selectedAgents, agentId]
+    }))
+    
+    // Clear agent validation error
+    if (validationErrors.agents) {
+      setValidationErrors(prev => ({ ...prev, agents: undefined }))
     }
-  }, [currentStep, validateStep])
+  }, [validationErrors.agents])
 
-  const handlePrevStep = useCallback(() => {
-    setCurrentStep(prev => Math.max(prev - 1, 1))
-  }, [])
-
-  const handleStepClick = useCallback(
-    (step: number) => {
-      // Allow navigation to previous steps or current step
-      if (step <= currentStep) {
-        setCurrentStep(step)
-      }
-    },
-    [currentStep]
-  )
-
-  // ============================================================================
-  // FORM SUBMISSION
-  // ============================================================================
-
+  // Form submission
   const handleSubmit = useCallback(async () => {
-    console.log('[CREATE-EXPEDITION] Starting form submission...')
-    console.log('[CREATE-EXPEDITION] Form data:', formData)
-
-    if (!validateForm()) {
-      console.log('[CREATE-EXPEDITION] Form validation failed')
-      setSubmitError('Please fix the validation errors before submitting')
-      return
-    }
+    if (!validateForm()) return
 
     setIsSubmitting(true)
     setSubmitError(null)
 
     try {
-      // Prepare expedition request
       const expeditionRequest: CreateExpeditionRequest = {
         starshipId,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        objective: formData.objective.trim(),
-        priority: formData.priority,
-        estimatedDuration: formData.estimatedDuration || undefined,
-        tags: formData.tags,
-        dueDate: formData.dueDate || undefined,
-        selectedAgents: formData.selectedAgents, // MANDATORY: Always include selected agents
+        name: formData.name.trim(),
+        mission: formData.mission.trim(),
+        selectedAgents: formData.selectedAgents,
       }
 
-      console.log('[CREATE-EXPEDITION] Expedition request:', expeditionRequest)
-
-      // Create the expedition
       const response = await expeditionAPI.createExpedition(expeditionRequest)
-      const expeditionId = response.expedition.id
-
-      // Create initial tasks if enabled
-      if (formData.enableTaskBreakdown && formData.initialTasks.length > 0) {
-        const taskPromises = formData.initialTasks.map(task => {
-          const taskRequest: CreateTaskRequest = {
-            expeditionId,
-            title: task.title.trim(),
-            description: task.description.trim(),
-            requiredSkills: task.requiredSkills,
-            priority: task.priority,
-            deliverable: task.deliverable.trim(),
-            estimatedEffort: task.estimatedEffort || undefined,
-          }
-          return expeditionAPI.createTask(starshipId, taskRequest)
-        })
-
-        await Promise.all(taskPromises)
-      }
-
-      // Auto-start expedition if enabled
-      if (formData.autoStart) {
-        await expeditionAPI.startExpedition(starshipId, expeditionId)
-      }
-
-      // Notify parent component
-      onExpeditionCreated(expeditionId)
-
-      // Reset form and close modal
-      handleReset()
+      onExpeditionCreated(response.expedition.id)
       onClose()
     } catch (error: any) {
       console.error('Failed to create expedition:', error)
-
-      // Provide more specific error messages based on error type
-      let errorMessage = 'Failed to create expedition. Please check your input and try again.'
-
-      if (error?.code === 'VALIDATION_ERROR') {
-        errorMessage =
-          error.message || 'Please check that all required fields are filled correctly.'
-      } else if (error?.statusCode === 400) {
-        errorMessage = 'Invalid request. Please check your input and try again.'
-      } else if (error?.statusCode === 401) {
-        errorMessage = 'Authentication failed. Please refresh the page and try again.'
-      } else if (error?.statusCode === 403) {
-        errorMessage = 'You do not have permission to create expeditions for this starship.'
-      } else if (error?.statusCode >= 500) {
-        errorMessage = 'Server error. Please try again in a moment.'
-      } else if (error?.message) {
-        errorMessage = error.message
-      }
-
-      setSubmitError(errorMessage)
+      setSubmitError(error?.message || 'Failed to create expedition')
     } finally {
       setIsSubmitting(false)
     }
   }, [validateForm, starshipId, formData, onExpeditionCreated, onClose])
 
-  // ============================================================================
-  // FORM RESET
-  // ============================================================================
-
-  const handleReset = useCallback(() => {
-    setFormData({
-      title: '',
-      description: '',
-      objective: '',
-      priority: 'medium',
-      estimatedDuration: null,
-      tags: [],
-      dueDate: '',
-      autoStart: false,
-      enableTaskBreakdown: false,
-      initialTasks: [],
-      selectedAgents: [], // MANDATORY: Always enabled, no toggle
-      maxAgents: 5,
-      enableAdvancedSettings: false,
-      resourceRequirements: '',
-      successCriteria: '',
-      riskAssessment: '',
-    })
-    setCurrentStep(1)
-    setValidationErrors({})
-    setSubmitError(null)
-    setTagInput('')
-  }, [])
-
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
-
-  // Load agents when modal opens (always enabled now)
+  // Load agents when modal opens
   useEffect(() => {
-    if (open && availableAgents.length === 0) {
+    if (open) {
       loadAvailableAgents()
+    } else {
+      // Reset form when modal closes
+      setFormData({ name: '', mission: '', selectedAgents: [] })
+      setValidationErrors({})
+      setSubmitError(null)
+      setSearchQuery('')
     }
-  }, [open, availableAgents.length, loadAvailableAgents])
+  }, [open, loadAvailableAgents])
 
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!open) {
-      handleReset()
+  // Filter agents based on search
+  const filteredAgents = availableAgents.filter(agent => {
+    const query = searchQuery.toLowerCase()
+    return (
+      agent.name.toLowerCase().includes(query) ||
+      agent.category.toLowerCase().includes(query) ||
+      agent.role?.toLowerCase().includes(query) ||
+      agent.skills?.some(skill => skill.toLowerCase().includes(query))
+    )
+  })
+
+  // Get category color and icon
+  const getCategoryStyle = (category: string) => {
+    const styles: Record<string, { color: string; icon: any }> = {
+      research: { color: 'bg-blue-500', icon: Brain },
+      engineering: { color: 'bg-purple-500', icon: Code },
+      analysis: { color: 'bg-green-500', icon: Shield },
+      creative: { color: 'bg-pink-500', icon: Palette },
+      operations: { color: 'bg-orange-500', icon: Zap },
+      default: { color: 'bg-gray-500', icon: Bot },
     }
-  }, [open, handleReset])
-
-  // ============================================================================
-  // RENDER HELPERS
-  // ============================================================================
-
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center space-x-4 mb-8">
-      {[1, 2, 3, 4].map(step => (
-        <div key={step} className="flex items-center">
-          <button
-            onClick={() => handleStepClick(step)}
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-              step === currentStep
-                ? 'bg-primary text-primary-foreground'
-                : step < currentStep
-                  ? 'bg-green-500 text-white cursor-pointer hover:bg-green-600'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed'
-            }`}
-            disabled={step > currentStep}
-          >
-            {step < currentStep ? <CheckCircle2 className="h-4 w-4" /> : step}
-          </button>
-          {step < 4 && (
-            <div
-              className={`w-12 h-0.5 mx-2 ${step < currentStep ? 'bg-green-500' : 'bg-muted'}`}
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  )
-
-  const renderBasicInformation = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold mb-2">Basic Information</h3>
-        <p className="text-sm text-muted-foreground">Define the core details of your expedition</p>
-      </div>
-
-      <div className="space-y-4">
-        {/* Title */}
-        <div className="space-y-2">
-          <Label htmlFor="title" className="text-sm font-medium">
-            Expedition Title *
-          </Label>
-          <Input
-            id="title"
-            placeholder="Enter a clear, descriptive title for your expedition"
-            value={formData.title}
-            onChange={e => updateFormData({ title: e.target.value })}
-            className={validationErrors.title ? 'border-red-500' : ''}
-            maxLength={100}
-          />
-          {validationErrors.title && (
-            <p className="text-sm text-red-500 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {validationErrors.title}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">{formData.title.length}/100 characters</p>
-        </div>
-
-        {/* Description */}
-        <div className="space-y-2">
-          <Label htmlFor="description" className="text-sm font-medium">
-            Description *
-          </Label>
-          <Textarea
-            id="description"
-            placeholder="Provide a detailed description of what this expedition will accomplish"
-            value={formData.description}
-            onChange={e => updateFormData({ description: e.target.value })}
-            className={validationErrors.description ? 'border-red-500' : ''}
-            rows={3}
-            maxLength={500}
-          />
-          {validationErrors.description && (
-            <p className="text-sm text-red-500 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {validationErrors.description}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            {formData.description.length}/500 characters
-          </p>
-        </div>
-
-        {/* Objective */}
-        <div className="space-y-2">
-          <Label htmlFor="objective" className="text-sm font-medium">
-            Primary Objective *
-          </Label>
-          <Textarea
-            id="objective"
-            placeholder="Define the specific goal or outcome you want to achieve"
-            value={formData.objective}
-            onChange={e => updateFormData({ objective: e.target.value })}
-            className={validationErrors.objective ? 'border-red-500' : ''}
-            rows={2}
-            maxLength={300}
-          />
-          {validationErrors.objective && (
-            <p className="text-sm text-red-500 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {validationErrors.objective}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            {formData.objective.length}/300 characters
-          </p>
-        </div>
-
-        {/* Priority and Duration Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Priority */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Priority Level *</Label>
-            <Select
-              value={formData.priority}
-              onValueChange={value => updateFormData({ priority: value as ExpeditionPriority })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${option.color}`} />
-                      <span>{option.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {PRIORITY_OPTIONS.find(p => p.value === formData.priority)?.description}
-            </p>
-          </div>
-
-          {/* Estimated Duration */}
-          <div className="space-y-2">
-            <Label htmlFor="duration" className="text-sm font-medium">
-              Estimated Duration (minutes)
-            </Label>
-            <Input
-              id="duration"
-              type="number"
-              placeholder="e.g., 120"
-              value={formData.estimatedDuration || ''}
-              onChange={e =>
-                updateFormData({
-                  estimatedDuration: e.target.value ? parseInt(e.target.value) : null,
-                })
-              }
-              className={validationErrors.estimatedDuration ? 'border-red-500' : ''}
-              min="1"
-            />
-            {validationErrors.estimatedDuration && (
-              <p className="text-sm text-red-500 flex items-center">
-                <AlertCircle className="h-4 w-4 mr-1" />
-                {validationErrors.estimatedDuration}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Due Date */}
-        <div className="space-y-2">
-          <Label htmlFor="dueDate" className="text-sm font-medium">
-            Due Date (Optional)
-          </Label>
-          <Input
-            id="dueDate"
-            type="datetime-local"
-            value={formData.dueDate}
-            onChange={e => updateFormData({ dueDate: e.target.value })}
-            className={validationErrors.dueDate ? 'border-red-500' : ''}
-            min={new Date().toISOString().slice(0, 16)}
-          />
-          {validationErrors.dueDate && (
-            <p className="text-sm text-red-500 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-1" />
-              {validationErrors.dueDate}
-            </p>
-          )}
-        </div>
-
-        {/* Tags */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Tags</Label>
-          <div className="space-y-2">
-            <div className="flex space-x-2">
-              <Input
-                placeholder="Add tags to categorize your expedition"
-                value={tagInput}
-                onChange={e => setTagInput(e.target.value)}
-                onKeyPress={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    handleAddTag(tagInput)
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => handleAddTag(tagInput)}
-                disabled={!tagInput.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Common tags */}
-            <div className="flex flex-wrap gap-1">
-              {COMMON_TAGS.map(tag => (
-                <Button
-                  key={tag}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => handleAddTag(tag)}
-                  disabled={formData.tags.includes(tag)}
-                >
-                  {tag}
-                </Button>
-              ))}
-            </div>
-
-            {/* Selected tags */}
-            {formData.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {formData.tags.map(tag => (
-                  <Badge key={tag} variant="secondary" className="text-xs">
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      className="ml-1 hover:text-red-500"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
-  const renderTaskConfiguration = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold mb-2">Task Configuration</h3>
-        <p className="text-sm text-muted-foreground">
-          Break down your expedition into manageable tasks
-        </p>
-      </div>
-
-      {/* Enable Task Breakdown */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Task Breakdown</CardTitle>
-              <CardDescription>
-                Define specific tasks to organize the expedition workflow
-              </CardDescription>
-            </div>
-            <Switch
-              checked={formData.enableTaskBreakdown}
-              onCheckedChange={checked => updateFormData({ enableTaskBreakdown: checked })}
-            />
-          </div>
-        </CardHeader>
-
-        {formData.enableTaskBreakdown && (
-          <CardContent className="space-y-4">
-            {/* Add Task Button */}
-            <Button type="button" variant="outline" onClick={handleAddTask} className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
-
-            {/* Tasks List */}
-            {formData.initialTasks.length > 0 && (
-              <ScrollArea className="max-h-96">
-                <div className="space-y-4">
-                  {formData.initialTasks.map((task, index) => (
-                    <Card key={task.id} className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-medium text-sm">Task {index + 1}</h4>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveTask(task.id)}
-                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      <div className="space-y-3">
-                        {/* Task Title */}
-                        <div>
-                          <Input
-                            placeholder="Task title"
-                            value={task.title}
-                            onChange={e => handleUpdateTask(task.id, { title: e.target.value })}
-                            className={
-                              validationErrors.tasks?.[task.id]?.title ? 'border-red-500' : ''
-                            }
-                            maxLength={100}
-                          />
-                          {validationErrors.tasks?.[task.id]?.title && (
-                            <p className="text-sm text-red-500 flex items-center">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              {validationErrors.tasks[task.id].title}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Task Description */}
-                        <div>
-                          <Textarea
-                            placeholder="Task description"
-                            value={task.description}
-                            onChange={e =>
-                              handleUpdateTask(task.id, { description: e.target.value })
-                            }
-                            className={
-                              validationErrors.tasks?.[task.id]?.description ? 'border-red-500' : ''
-                            }
-                            rows={2}
-                            maxLength={300}
-                          />
-                          {validationErrors.tasks?.[task.id]?.description && (
-                            <p className="text-sm text-red-500 flex items-center">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              {validationErrors.tasks[task.id].description}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Task Priority and Effort */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <Select
-                              value={task.priority}
-                              onValueChange={value =>
-                                handleUpdateTask(task.id, {
-                                  priority: value as TaskFormData['priority'],
-                                })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Priority" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {TASK_PRIORITY_OPTIONS.map(option => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Input
-                              type="number"
-                              placeholder="Effort (min)"
-                              value={task.estimatedEffort || ''}
-                              onChange={e =>
-                                handleUpdateTask(task.id, {
-                                  estimatedEffort: e.target.value ? parseInt(e.target.value) : null,
-                                })
-                              }
-                              min="1"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Required Skills */}
-                        <div className="space-y-2">
-                          <Label className="text-xs font-medium">Required Skills</Label>
-                          <div className="flex flex-wrap gap-1">
-                            {COMMON_SKILLS.map(skill => (
-                              <Button
-                                key={skill}
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={() => handleAddSkillToTask(task.id, skill)}
-                                disabled={task.requiredSkills.includes(skill)}
-                              >
-                                {skill}
-                              </Button>
-                            ))}
-                          </div>
-                          {task.requiredSkills.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {task.requiredSkills.map(skill => (
-                                <Badge key={skill} variant="outline" className="text-xs">
-                                  {skill}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveSkillFromTask(task.id, skill)}
-                                    className="ml-1 hover:text-red-500"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Deliverable */}
-                        <div>
-                          <Input
-                            placeholder="Expected deliverable"
-                            value={task.deliverable}
-                            onChange={e =>
-                              handleUpdateTask(task.id, { deliverable: e.target.value })
-                            }
-                            className={
-                              validationErrors.tasks?.[task.id]?.deliverable ? 'border-red-500' : ''
-                            }
-                            maxLength={200}
-                          />
-                          {validationErrors.tasks?.[task.id]?.deliverable && (
-                            <p className="text-sm text-red-500 flex items-center">
-                              <AlertCircle className="h-4 w-4 mr-1" />
-                              {validationErrors.tasks[task.id].deliverable}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        )}
-      </Card>
-    </div>
-  )
-
-  const renderAgentSelection = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold mb-2">Agent Selection</h3>
-        <p className="text-sm text-muted-foreground">
-          Choose agents to participate in this expedition
-        </p>
-      </div>
-
-      {/* Agent Selection - MANDATORY */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Agent Assignment *</CardTitle>
-              <CardDescription>Select agents for this expedition (required)</CardDescription>
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              Required
-            </Badge>
-          </div>
-        </CardHeader>
-
-        {/* Always show agent selection - no toggle */}
-        <CardContent className="space-y-4">
-          <CardContent className="space-y-4">
-            {/* Max Agents Setting */}
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Maximum Agents</Label>
-              <div className="flex items-center space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => updateFormData({ maxAgents: Math.max(1, formData.maxAgents - 1) })}
-                  disabled={formData.maxAgents <= 1}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <span className="w-8 text-center text-sm">{formData.maxAgents}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    updateFormData({ maxAgents: Math.min(10, formData.maxAgents + 1) })
-                  }
-                  disabled={formData.maxAgents >= 10}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Agent List */}
-            {loadingAgents ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span className="text-sm text-muted-foreground">Loading agents...</span>
-              </div>
-            ) : availableAgents.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">No agents available</p>
-              </div>
-            ) : (
-              <ScrollArea className="max-h-64">
-                <div className="space-y-2">
-                  {availableAgents.map(agent => {
-                    const isSelected = formData.selectedAgents.includes(agent.id)
-                    const canSelect =
-                      isSelected || formData.selectedAgents.length < formData.maxAgents
-
-                    return (
-                      <Card
-                        key={agent.id}
-                        className={`p-3 cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'border-primary bg-primary/5'
-                            : canSelect
-                              ? 'hover:border-primary/50'
-                              : 'opacity-50 cursor-not-allowed'
-                        }`}
-                        onClick={() => canSelect && handleToggleAgent(agent.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div
-                              className={`w-3 h-3 rounded-full ${
-                                agent.status === 'available'
-                                  ? 'bg-green-500'
-                                  : agent.status === 'busy'
-                                    ? 'bg-yellow-500'
-                                    : 'bg-gray-500'
-                              }`}
-                            />
-                            <div>
-                              <p className="font-medium text-sm">{agent.name}</p>
-                              <p className="text-xs text-muted-foreground">{agent.category}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {agent.tags.slice(0, 2).map(tag => (
-                              <Badge key={tag} variant="outline" className="text-xs">
-                                {tag}
-                              </Badge>
-                            ))}
-                            {isSelected && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                          </div>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
-              </ScrollArea>
-            )}
-
-            {/* Selected Agents Summary */}
-            {formData.selectedAgents.length > 0 && (
-              <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-2">
-                  Selected Agents ({formData.selectedAgents.length}/{formData.maxAgents})
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {formData.selectedAgents.map(agentId => {
-                    const agent = availableAgents.find(a => a.id === agentId)
-                    return agent ? (
-                      <Badge key={agentId} variant="secondary" className="text-xs">
-                        {agent.name}
-                        <button
-                          type="button"
-                          onClick={() => handleToggleAgent(agentId)}
-                          className="ml-1 hover:text-red-500"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ) : null
-                  })}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </CardContent>
-      </Card>
-    </div>
-  )
-
-  const renderAdvancedSettings = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold mb-2">Advanced Settings</h3>
-        <p className="text-sm text-muted-foreground">Configure additional expedition parameters</p>
-      </div>
-
-      {/* Auto-start Option */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Auto-start Expedition</CardTitle>
-              <CardDescription>Automatically start the expedition after creation</CardDescription>
-            </div>
-            <Switch
-              checked={formData.autoStart}
-              onCheckedChange={checked => updateFormData({ autoStart: checked })}
-            />
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Advanced Settings */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Additional Configuration</CardTitle>
-              <CardDescription>Optional advanced settings for the expedition</CardDescription>
-            </div>
-            <Switch
-              checked={formData.enableAdvancedSettings}
-              onCheckedChange={checked => updateFormData({ enableAdvancedSettings: checked })}
-            />
-          </div>
-        </CardHeader>
-
-        {formData.enableAdvancedSettings && (
-          <CardContent className="space-y-4">
-            {/* Resource Requirements */}
-            <div className="space-y-2">
-              <Label htmlFor="resources" className="text-sm font-medium">
-                Resource Requirements
-              </Label>
-              <Textarea
-                id="resources"
-                placeholder="Describe any specific resources, tools, or access needed"
-                value={formData.resourceRequirements}
-                onChange={e => updateFormData({ resourceRequirements: e.target.value })}
-                rows={2}
-                maxLength={300}
-              />
-              <p className="text-xs text-muted-foreground">
-                {formData.resourceRequirements.length}/300 characters
-              </p>
-            </div>
-
-            {/* Success Criteria */}
-            <div className="space-y-2">
-              <Label htmlFor="success" className="text-sm font-medium">
-                Success Criteria
-              </Label>
-              <Textarea
-                id="success"
-                placeholder="Define what constitutes success for this expedition"
-                value={formData.successCriteria}
-                onChange={e => updateFormData({ successCriteria: e.target.value })}
-                rows={2}
-                maxLength={300}
-              />
-              <p className="text-xs text-muted-foreground">
-                {formData.successCriteria.length}/300 characters
-              </p>
-            </div>
-
-            {/* Risk Assessment */}
-            <div className="space-y-2">
-              <Label htmlFor="risks" className="text-sm font-medium">
-                Risk Assessment
-              </Label>
-              <Textarea
-                id="risks"
-                placeholder="Identify potential risks and mitigation strategies"
-                value={formData.riskAssessment}
-                onChange={e => updateFormData({ riskAssessment: e.target.value })}
-                rows={2}
-                maxLength={300}
-              />
-              <p className="text-xs text-muted-foreground">
-                {formData.riskAssessment.length}/300 characters
-              </p>
-            </div>
-          </CardContent>
-        )}
-      </Card>
-    </div>
-  )
-
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 1:
-        return renderBasicInformation()
-      case 2:
-        return renderTaskConfiguration()
-      case 3:
-        return renderAgentSelection()
-      case 4:
-        return renderAdvancedSettings()
-      default:
-        return renderBasicInformation()
-    }
+    return styles[category.toLowerCase()] || styles.default
   }
-
-  const getStepTitle = (step: number) => {
-    switch (step) {
-      case 1:
-        return 'Basic Information'
-      case 2:
-        return 'Task Configuration'
-      case 3:
-        return 'Agent Selection'
-      case 4:
-        return 'Advanced Settings'
-      default:
-        return 'Basic Information'
-    }
-  }
-
-  // ============================================================================
-  // MAIN RENDER
-  // ============================================================================
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <Rocket className="h-5 w-5" />
-            <span>Create New Expedition</span>
-          </DialogTitle>
-          <DialogDescription>
-            Set up a new expedition for {starshipSlug}. Follow the steps to configure all aspects of
-            your mission.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-hidden">
-          {/* Step Indicator */}
-          {renderStepIndicator()}
-
-          {/* Step Content */}
-          <ScrollArea className="h-[60vh] px-1">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
+    <AnimatePresence>
+      {open && (
+        <Dialog open={open} onOpenChange={onClose}>
+          <DialogContent className="max-w-4xl max-h-[85vh] p-0 flex flex-col bg-gradient-to-br from-background via-background to-primary/5 [&>button]:hidden">
+            {/* Accessibility: Hidden dialog title for screen readers */}
+            <DialogHeader className="sr-only">
+              <DialogTitle>Launch New Expedition</DialogTitle>
+            </DialogHeader>
+            
+            {/* Enhanced Header */}
+            <div className="relative flex-shrink-0 overflow-hidden border-b bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
+              <div className="absolute inset-0 bg-grid-white/[0.02]" />
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative px-6 py-4"
               >
-                {renderCurrentStep()}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <motion.div 
+                      className="relative"
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 4, repeat: Infinity }}
+                    >
+                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
+                      <div className="relative p-2.5 bg-gradient-to-br from-primary to-primary/80 rounded-xl shadow-lg">
+                        <Rocket className="h-6 w-6 text-primary-foreground" />
+                      </div>
+                    </motion.div>
+                    <div>
+                      <h2 className="text-xl font-semibold tracking-tight">Launch New Expedition</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">Coordinate your AI agents on {starshipSlug}</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onClose}
+                    className="rounded-full hover:bg-background/80"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
               </motion.div>
-            </AnimatePresence>
-          </ScrollArea>
-        </div>
+            </div>
 
-        {/* Error Display */}
-        {submitError && (
-          <div className="px-6 py-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-600 flex items-center">
-              <AlertCircle className="h-4 w-4 mr-2" />
-              {submitError}
-            </p>
-          </div>
-        )}
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide">
+              <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="p-6 space-y-6">
+                {/* Mission Details Section */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl">
+                      <Target className="h-4 w-4 text-primary" />
+                    </div>
+                    <h3 className="text-base font-semibold">Mission Details</h3>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {/* Name Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-medium flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        Expedition Name
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="name"
+                          placeholder="e.g., Market Analysis Deep Dive"
+                          value={formData.name}
+                          onChange={(e) => {
+                            setFormData({ ...formData, name: e.target.value })
+                            if (validationErrors.name) {
+                              setValidationErrors({ ...validationErrors, name: undefined })
+                            }
+                          }}
+                          className="h-10 px-3 bg-background/50 backdrop-blur-sm border-border/50 focus:border-primary/50 transition-all"
+                          maxLength={100}
+                        />
+                        <AnimatePresence>
+                          {formData.name && !validationErrors.name && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0 }}
+                              className="absolute right-4 top-1/2 -translate-y-1/2"
+                            >
+                              <CircleCheck className="h-5 w-5 text-green-500" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      {validationErrors.name && (
+                        <motion.p 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="text-sm text-destructive flex items-center gap-2"
+                        >
+                          <AlertCircle className="h-4 w-4" />
+                          {validationErrors.name}
+                        </motion.p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {formData.name.length}/100 characters
+                      </p>
+                    </div>
 
-        {/* Footer */}
-        <DialogFooter className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            {/* Connection status removed - HTTP mode only */}
-          </div>
+                    {/* Mission Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="mission" className="text-sm font-medium flex items-center gap-2">
+                        <Wand2 className="h-4 w-4 text-primary" />
+                        Mission Objectives
+                      </Label>
+                      <div className="relative">
+                        <Textarea
+                          id="mission"
+                          placeholder="Describe what you want your AI agents to accomplish..."
+                          value={formData.mission}
+                          onChange={(e) => {
+                            setFormData({ ...formData, mission: e.target.value })
+                            if (validationErrors.mission) {
+                              setValidationErrors({ ...validationErrors, mission: undefined })
+                            }
+                          }}
+                          rows={3}
+                          className="resize-none text-sm p-3 bg-background/50 backdrop-blur-sm border-border/50 focus:border-primary/50 transition-all"
+                          maxLength={500}
+                        />
+                        <div className="absolute bottom-3 right-3 text-xs text-muted-foreground">
+                          {formData.mission.length}/500
+                        </div>
+                      </div>
+                      {validationErrors.mission && (
+                        <motion.p 
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="text-sm text-destructive flex items-center gap-2"
+                        >
+                          <AlertCircle className="h-4 w-4" />
+                          {validationErrors.mission}
+                        </motion.p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
 
-          <div className="flex items-center space-x-2">
-            {currentStep > 1 && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrevStep}
-                disabled={isSubmitting}
-              >
-                Previous
-              </Button>
-            )}
+                {/* Agent Selection Section */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl">
+                        <Bot className="h-4 w-4 text-primary" />
+                      </div>
+                      <h3 className="text-base font-semibold">Assign AI Agents</h3>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {formData.selectedAgents.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full"
+                        >
+                          <Star className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">{formData.selectedAgents.length} selected</span>
+                        </motion.div>
+                      )}
+                      {availableAgents.length > 0 && (
+                        <Button 
+                          type="button"
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            if (formData.selectedAgents.length === availableAgents.length) {
+                              setFormData({ ...formData, selectedAgents: [] })
+                            } else {
+                              setFormData({ ...formData, selectedAgents: availableAgents.map(a => a.id) })
+                            }
+                          }}
+                        >
+                          {formData.selectedAgents.length === availableAgents.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
 
-            {currentStep < 4 ? (
-              <Button type="button" onClick={handleNextStep} disabled={isSubmitting}>
-                Next
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="min-w-[120px]"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Rocket className="h-4 w-4 mr-2" />
-                    Create Expedition
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+                  {validationErrors.agents && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-4"
+                    >
+                      <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        <p className="text-sm text-destructive">{validationErrors.agents}</p>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Search Bar */}
+                  {availableAgents.length > 3 && (
+                    <div className="relative mb-4">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search agents by name, role, or skills..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10 bg-background/50 backdrop-blur-sm"
+                      />
+                    </div>
+                  )}
+
+                  <div className="min-h-[250px]">
+                    {loadingAgents ? (
+                      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Loader2 className="h-8 w-8 text-primary" />
+                        </motion.div>
+                        <p className="text-muted-foreground">Loading available agents...</p>
+                      </div>
+                    ) : availableAgents.length === 0 ? (
+                      <Card className="border-dashed">
+                        <div className="flex flex-col items-center justify-center p-12 text-center">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-primary/10 blur-3xl rounded-full" />
+                            <Bot className="relative h-12 w-12 text-muted-foreground/50" />
+                          </div>
+                          <h4 className="text-base font-semibold mt-6 mb-2">No Agents Available</h4>
+                          <p className="text-muted-foreground mb-6 max-w-sm">
+                            Deploy agents to your starship first to assign them to expeditions
+                          </p>
+                          <Button variant="outline" size="sm" className="gap-2" asChild>
+                            <a href={`/ship/${starshipSlug}/crew`}>
+                              <ChevronRight className="h-4 w-4" />
+                              Go to Crew Management
+                            </a>
+                          </Button>
+                        </div>
+                      </Card>
+                    ) : (
+                      <div className="grid gap-3">
+                        {filteredAgents.map((agent, index) => {
+                          const isSelected = formData.selectedAgents.includes(agent.id)
+                          const categoryStyle = getCategoryStyle(agent.category)
+                          const IconComponent = categoryStyle.icon
+
+                          return (
+                            <motion.div
+                              key={agent.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.05 }}
+                            >
+                              <label
+                                htmlFor={`agent-checkbox-${agent.id}`}
+                                className="block"
+                              >
+                                <Card 
+                                  className={`
+                                    group relative cursor-pointer transition-all duration-200
+                                    ${isSelected
+                                      ? 'border-primary shadow-lg shadow-primary/10 bg-primary/5'
+                                      : 'hover:border-primary/30 hover:shadow-md'
+                                    }
+                                  `}
+                                >
+                                  <div className="flex items-center gap-4 p-4">
+                                    {/* Checkbox */}
+                                    <Checkbox
+                                      id={`agent-checkbox-${agent.id}`}
+                                      checked={isSelected}
+                                      onCheckedChange={() => handleToggleAgent(agent.id)}
+                                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                                    />
+                                  
+                                  {/* Agent Avatar */}
+                                  <div className="relative">
+                                    <Avatar className="h-10 w-10 border-2 border-background">
+                                      <AvatarImage src={agent.avatar} alt={agent.name} />
+                                      <AvatarFallback className={`${categoryStyle.color} text-white`}>
+                                        <IconComponent className="h-5 w-5" />
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    {agent.status === 'active' && (
+                                      <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
+                                    )}
+                                  </div>
+
+                                  {/* Agent Info */}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-semibold">{agent.name}</p>
+                                      <Badge variant="outline" className="text-xs">
+                                        {agent.category}
+                                      </Badge>
+                                    </div>
+                                    {agent.role && (
+                                      <p className="text-sm text-muted-foreground mt-0.5">{agent.role}</p>
+                                    )}
+                                    {agent.skills && agent.skills.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-2">
+                                        {agent.skills.slice(0, 4).map((skill, i) => (
+                                          <Badge key={i} variant="secondary" className="text-xs">
+                                            {skill}
+                                          </Badge>
+                                        ))}
+                                        {agent.skills.length > 4 && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            +{agent.skills.length - 4}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Selection Indicator */}
+                                  <AnimatePresence>
+                                    {isSelected && (
+                                      <motion.div
+                                        initial={{ scale: 0, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0, opacity: 0 }}
+                                        className="shrink-0"
+                                      >
+                                        <div className="p-2 bg-primary rounded-lg">
+                                          <Check className="h-4 w-4 text-primary-foreground" />
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              </Card>
+                            </label>
+                            </motion.div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Error Display */}
+                <AnimatePresence>
+                  {submitError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg"
+                    >
+                      <p className="text-sm text-destructive flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        {submitError}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </form>
+            </div>
+
+            {/* Footer Actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+            >
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex -space-x-2">
+                    {formData.selectedAgents.slice(0, 3).map((agentId) => {
+                      const agent = availableAgents.find(a => a.id === agentId)
+                      const categoryStyle = agent ? getCategoryStyle(agent.category) : { color: 'bg-gray-500' }
+                      return (
+                        <Avatar key={agentId} className="h-8 w-8 border-2 border-background">
+                          <AvatarFallback className={`${categoryStyle.color} text-white text-xs`}>
+                            {agent?.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      )
+                    })}
+                    {formData.selectedAgents.length > 3 && (
+                      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                        +{formData.selectedAgents.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  {formData.selectedAgents.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {formData.selectedAgents.length} agent{formData.selectedAgents.length !== 1 ? 's' : ''} ready
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={onClose}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || availableAgents.length === 0}
+                    className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Launching...
+                      </>
+                    ) : (
+                      <>
+                        <Rocket className="h-4 w-4" />
+                        Launch Expedition
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </AnimatePresence>
   )
 }

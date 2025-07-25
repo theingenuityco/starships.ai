@@ -302,17 +302,26 @@ export function validateSendMessage(req: Request, res: Response, next: NextFunct
   const body = req.body as SendMessageRequest;
   let errors: ValidationError[] = [];
   
-  // Required fields
+  // Only require content
   errors = errors.concat(validateRequired(body, ['content']));
-  
-  // String length validations
   errors = errors.concat(validateStringLength(body, 'content', 1, 5000));
   
-  // Enum validations
-  errors = errors.concat(validateEnum(body, 'messageType', ['coordination', 'task-work', 'user-input', 'status-update', 'result', 'question', 'notification'] as MessageType[]));
+  // Optional participant validation - allow 'first-officer' or valid UUID
+  if (body.participantId !== undefined && body.participantId !== null) {
+    if (body.participantId !== 'first-officer') {
+      // Only validate UUID if it's not 'first-officer'
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(body.participantId)) {
+        errors.push({
+          field: 'participantId',
+          message: 'participantId must be either "first-officer" or a valid UUID',
+          value: body.participantId
+        });
+      }
+    }
+  }
   
-  // UUID validations
-  errors = errors.concat(validateUUID(body, 'agentId'));
+  // Optional thread/parent validation
   errors = errors.concat(validateUUID(body, 'threadId'));
   errors = errors.concat(validateUUID(body, 'parentMessageId'));
   

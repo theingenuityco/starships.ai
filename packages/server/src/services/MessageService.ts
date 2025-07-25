@@ -1,6 +1,6 @@
 /**
  * Message Service - Messaging and Communication Layer
- * 
+ *
  * Handles all business logic for expedition messaging including message creation,
  * thread management, real-time broadcasting, and integration with First Officer.
  */
@@ -16,6 +16,12 @@ import {
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionService } from './ExpeditionService';
+import { VirtualFirstOfficer } from './VirtualFirstOfficer';
+import { ContextBuilder } from './ContextBuilder';
+import { chat as agentChat } from '@starships/agent-engine';
+import type { ChatRequest } from '@starships/protocol';
+import getStore from '../store';
+import { env } from '../config/environment';
 
 export interface UpdateMessageRequest {
   content?: string;
@@ -89,86 +95,126 @@ export class MessageService {
   }
 
   /**
+   * Send message to a specific agent
+   */
+  async sendMessageToAgent(
+    expeditionId: string,
+    agentId: string,
+    content: string,
+    metadata?: any
+  ): Promise<ExpeditionMessage> {
+    try {
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      
+      // Create a message from the system to the agent
+      const message = await messageRepo.create({
+        expeditionId,
+        role: metadata?.fromRole || 'system',
+        agentId,
+        content,
+        messageType: metadata?.messageType || 'task-work',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          targetAgent: agentId,
+          sourceType: 'workflow'
+        }
+      });
+
+      console.log(`[MESSAGE-SERVICE] Message sent to agent ${agentId} in expedition ${expeditionId}`);
+      return message;
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] Failed to send message to agent:', error);
+      throw this.handleError(error, 'SEND_MESSAGE_FAILED');
+    }
+  }
+
+  /**
    * Send a message in an expedition
+   *
+   * Phase 2.1 - Simplified routing:
+   * - Routes based on participantId only (no messageType routing)
+   * - Defaults to 'first-officer' if no participant specified
+   * - Stores participantId as agentId in database
    */
   async sendMessage(
     userId: string,
     request: SendMessageRequest
-  ): Promise<{ userMessage: ExpeditionMessage; firstOfficerMessage?: ExpeditionMessage }> {
-    console.log(`[MESSAGE-SERVICE] ===== SENDING MESSAGE =====`);
-    console.log(`[MESSAGE-SERVICE] Expedition: ${request.expeditionId}`);
-    console.log(`[MESSAGE-SERVICE] Message Type: ${request.messageType}`);
-    console.log(`[MESSAGE-SERVICE] Agent ID: ${request.agentId}`);
-    console.log(`[MESSAGE-SERVICE] Content Length: ${request.content?.length}`);
+  ): Promise<{ userMessage: ExpeditionMessage; participantMessage?: ExpeditionMessage }> {
+    
+    // Validate expedition access
+    await this.validateExpeditionAccess(request.expeditionId, userId);
 
-    try {
-      // Validate expedition access
-      await this.validateExpeditionAccess(request.expeditionId, userId);
+    // Determine participant - default to 'first-officer' if not provided
+    const participantId = request.participantId || 'first-officer';
 
-      // Validate thread if specified
-      if (request.threadId) {
-        await this.validateThreadAccess(request.threadId, request.expeditionId);
+    // Create user message
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+    const userMessage = await messageRepo.create({
+      expeditionId: request.expeditionId,
+      role: 'user',
+      userId,
+      content: request.content,
+      messageType: 'user-input',
+      timestamp: new Date().toISOString(),
+      threadId: request.threadId,
+      parentMessageId: request.parentMessageId,
+      agentId: participantId, // Store participantId as agentId in database
+      metadata: request.metadata || {}
+    });
+
+    // Route to participant
+    let participantMessage: ExpeditionMessage | undefined = undefined;
+
+    // Check if participantId is a valid UUID (specific agent) or 'first-officer'
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participantId);
+    
+    if (participantId === 'first-officer' || !isValidUUID) {
+      // Route to First Officer
+      const response = await this.handleFirstOfficerMessage(
+        request.expeditionId,
+        request.content,
+        'user-input',
+        userId
+      );
+
+      if (response?.reply) {
+        participantMessage = await messageRepo.create({
+          expeditionId: request.expeditionId,
+          role: 'first-officer',
+          agentId: 'first-officer',
+          content: response.reply,
+          messageType: 'coordination',
+          timestamp: new Date().toISOString(),
+          threadId: request.threadId,
+          parentMessageId: userMessage.id,
+          metadata: { usage: response.usage }
+        });
       }
+    } else {
+      // Route to specific agent
+      const response = await this.handleAgentMessage(
+        request.expeditionId,
+        participantId,
+        request.content,
+        userId
+      );
 
-      // Create user message
-      console.log(`[MESSAGE-SERVICE] Creating user message in database...`);
-      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      const userMessage = await messageRepo.create({
-        expeditionId: request.expeditionId,
-        role: 'user',
-        userId,
-        content: request.content,
-        messageType: request.messageType,
-        timestamp: new Date().toISOString(),
-        threadId: request.threadId,
-        parentMessageId: request.parentMessageId,
-        metadata: {}
-      });
-      console.log(`[MESSAGE-SERVICE] User message created: ${userMessage.id}`);
-
-      let firstOfficerMessage: ExpeditionMessage | undefined = undefined;
-
-      // Handle First Officer integration for coordination messages
-      if (request.messageType === 'user-input' || request.agentId === 'first-officer') {
-        console.log(`[MESSAGE-SERVICE] Handling First Officer integration...`);
-        const firstOfficerResponse = await this.handleFirstOfficerMessage(
-          request.expeditionId,
-          request.content,
-          request.messageType,
-          userId
-        );
-
-        if (firstOfficerResponse && firstOfficerResponse.reply) {
-          console.log(`[MESSAGE-SERVICE] Creating First Officer message in database...`);
-          firstOfficerMessage = await messageRepo.create({
-            expeditionId: request.expeditionId,
-            role: 'first-officer',
-            content: firstOfficerResponse.reply,
-            messageType: 'coordination',
-            timestamp: new Date().toISOString(),
-            threadId: request.threadId,
-            parentMessageId: userMessage.id,
-            metadata: { usage: firstOfficerResponse.usage }
-          });
-          console.log(`[MESSAGE-SERVICE] First Officer message created: ${firstOfficerMessage.id}`);
-        } else {
-          console.log(`[MESSAGE-SERVICE] No First Officer response received`);
-        }
+      if (response?.reply) {
+        participantMessage = await messageRepo.create({
+          expeditionId: request.expeditionId,
+          role: 'agent',
+          agentId: participantId,
+          content: response.reply,
+          messageType: 'task-work',
+          timestamp: new Date().toISOString(),
+          threadId: request.threadId,
+          parentMessageId: userMessage.id,
+          metadata: { usage: response.usage }
+        });
       }
-
-      console.log(`[MESSAGE-SERVICE] ===== MESSAGE SENDING COMPLETED =====`);
-      console.log(`[MESSAGE-SERVICE] User message: ${userMessage.id}`);
-      console.log(`[MESSAGE-SERVICE] First Officer message: ${firstOfficerMessage?.id || 'none'}`);
-      
-      return {
-        userMessage,
-        firstOfficerMessage
-      };
-    } catch (error) {
-      console.error('[MESSAGE-SERVICE] ===== MESSAGE SENDING FAILED =====');
-      console.error('[MESSAGE-SERVICE] Error details:', error);
-      throw this.handleError(error, 'SEND_MESSAGE_FAILED');
     }
+
+    return { userMessage, participantMessage };
   }
 
   /**
@@ -572,6 +618,155 @@ export class MessageService {
       throw this.createError('VALIDATION_ERROR', `Thread not found: ${threadId}`);
     }
   }
+/**
+ * Check if any active First Officer agents exist
+ */
+private async checkActiveFirstOfficer(expeditionId: string): Promise<boolean> {
+  try {
+    const expedition = await RepositoryFactory.getExpeditionRepository().findById(expeditionId);
+    if (!expedition) {
+      return false;
+    }
+
+    // Get available first officer agents
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const starshipAgents = await agentRepo.findByStarship(expedition.starshipId);
+    
+    // Look for a First Officer agent
+    const firstOfficerAgent = starshipAgents.find(agent =>
+      agent.tags.includes('first-officer') ||
+      agent.name.toLowerCase().includes('first officer') ||
+      agent.category === 'support'
+    );
+    
+    return !!firstOfficerAgent;
+  } catch (error) {
+    console.error('[MESSAGE-SERVICE] Error checking active First Officer:', error);
+    return false;
+  }
+}
+
+/**
+ * Get response from Virtual First Officer
+ */
+private async getVirtualFirstOfficerResponse(
+  expeditionId: string,
+  starshipId: string,
+  message: string,
+  userId: string
+): Promise<string> {
+  try {
+    // Get or create a Virtual First Officer instance
+    const virtualFirstOfficer = await this.firstOfficerService.getOrCreateVirtualFirstOfficer(
+      starshipId
+    );
+
+    // Build context using ContextBuilder
+    const contextBuilder = new ContextBuilder();
+    const expeditionContext = await contextBuilder.buildContext(expeditionId, starshipId);
+
+    // Convert to the format expected by VirtualFirstOfficer
+    const context = {
+      expeditionId: expeditionContext.expeditionDetails.id,
+      starshipId: starshipId,
+      state: expeditionContext.expeditionDetails.status as any,
+      title: expeditionContext.expeditionDetails.title,
+      objective: expeditionContext.expeditionDetails.description,
+      createdAt: expeditionContext.expeditionDetails.createdAt,
+      assignedAgents: expeditionContext.agents.map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        status: agent.status === 'active' ? 'online' as const : 'offline' as const
+      })),
+      tasks: expeditionContext.taskSummaries.map(task => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        assignedTo: task.assignedAgent,
+        createdAt: task.createdAt,
+        completedAt: task.completedAt
+      })),
+      results: expeditionContext.recentResults.map(result => ({
+        id: result.id,
+        taskId: result.taskId || '',
+        content: JSON.stringify(result.data || {}),
+        createdAt: result.createdAt,
+        createdBy: result.agentId || 'system'
+      })),
+      recentMessages: expeditionContext.recentMessages.map(msg => ({
+        id: msg.id,
+        sender: msg.userId || msg.agentId || 'system',
+        content: msg.content,
+        timestamp: msg.timestamp,
+        type: msg.role === 'user' ? 'user' as const : msg.role === 'agent' ? 'agent' as const : 'system' as const
+      })),
+      statistics: {
+        totalTasks: expeditionContext.statistics.totalTasks,
+        completedTasks: expeditionContext.statistics.completedTasks,
+        activeTasks: expeditionContext.statistics.inProgressTasks,
+        failedTasks: expeditionContext.statistics.failedTasks,
+        totalMessages: expeditionContext.statistics.totalMessages,
+        averageCompletionTime: expeditionContext.statistics.averageCompletionTime
+      }
+    };
+
+    // Update the Virtual First Officer's context
+    virtualFirstOfficer.updateContext(context);
+
+    // Process the message and get response
+    const response = await virtualFirstOfficer.processMessage(message, userId);
+
+    return response;
+  } catch (error) {
+    console.error('[MESSAGE-SERVICE] Error getting Virtual First Officer response:', error);
+    throw error;
+  }
+}
+
+private async handleAgentMessage(
+  expeditionId: string,
+  agentId: string,
+  content: string,
+  userId: string
+): Promise<{ reply: string; usage?: any }> {
+    try {
+      console.log(`[MESSAGE-SERVICE] ===== HANDLING AGENT MESSAGE =====`);
+      console.log(`[MESSAGE-SERVICE] Expedition: ${expeditionId}`);
+      console.log(`[MESSAGE-SERVICE] Agent ID: ${agentId}`);
+      console.log(`[MESSAGE-SERVICE] User ID: ${userId}`);
+      console.log(`[MESSAGE-SERVICE] Message Length: ${content?.length}`);
+      
+      // Use the agent engine's chat function (same as crew chat)
+      const chatRequest: ChatRequest = {
+        agent_id: agentId,
+        user_id: userId,
+        message: content,
+        channel_id: `expedition-${expeditionId}`,
+        stream: false
+      };
+
+      console.log(`[MESSAGE-SERVICE] Sending request to agent engine...`);
+      const store = getStore();
+      const result = await agentChat(chatRequest, store);
+
+      console.log(`[MESSAGE-SERVICE] Agent response generated:`, {
+        replyLength: result.reply?.length,
+        usage: result.usage
+      });
+      console.log(`[MESSAGE-SERVICE] Agent reply preview: ${result.reply?.substring(0, 100)}...`);
+      console.log(`[MESSAGE-SERVICE] ===== AGENT MESSAGE HANDLED SUCCESSFULLY =====`);
+
+      return {
+        reply: result.reply || 'I apologize, I was unable to generate a response.',
+        usage: result.usage
+      };
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] ===== AGENT MESSAGE HANDLING FAILED =====');
+      console.error('[MESSAGE-SERVICE] Error details:', error);
+      throw error;
+    }
+  }
 
   private async handleFirstOfficerMessage(
     expeditionId: string,
@@ -609,29 +804,78 @@ export class MessageService {
         }
       }
 
-      // Check if First Officer is active for this expedition and handle user messages
+      // Handle user messages to First Officer
       if (messageType === 'user-input' && userId) {
-        console.log(`[MESSAGE-SERVICE] Checking if First Officer is active for expedition ${expeditionId}`);
+        console.log(`[MESSAGE-SERVICE] Handling First Officer message for expedition`);
         
-        const isActive = this.firstOfficerService.isExpeditionActive(expeditionId);
-        console.log(`[MESSAGE-SERVICE] First Officer active status: ${isActive}`);
-        
-        if (isActive) {
-          console.log(`[MESSAGE-SERVICE] Sending message to First Officer Service...`);
-          const response = await this.firstOfficerService.handleUserMessage(expeditionId, userId, message);
-          console.log(`[MESSAGE-SERVICE] First Officer response received:`, {
-            hasReply: !!response?.reply,
-            replyLength: response?.reply?.length,
-            hasUsage: !!response?.usage
-          });
-          console.log(`[MESSAGE-SERVICE] First Officer reply preview: ${response?.reply?.substring(0, 100)}...`);
-          console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY =====`);
-          return response;
-        } else {
-          console.log(`[MESSAGE-SERVICE] First Officer not active for expedition ${expeditionId}`);
-          console.log(`[MESSAGE-SERVICE] ===== NO FIRST OFFICER RESPONSE =====`);
-          return null;
+        // Check for active First Officer agents
+        const hasActiveFirstOfficer = await this.checkActiveFirstOfficer(expeditionId);
+
+        if (!hasActiveFirstOfficer) {
+          // Use Virtual First Officer as fallback
+          console.log(`[MESSAGE-SERVICE] Using Virtual First Officer for expedition ${expeditionId}`);
+          
+          const virtualResponse = await this.getVirtualFirstOfficerResponse(
+            expeditionId,
+            expedition.starshipId,
+            message,
+            userId
+          );
+
+          console.log(`[MESSAGE-SERVICE] Virtual First Officer response generated`);
+          console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY (Virtual) =====`);
+
+          return {
+            reply: virtualResponse,
+            usage: undefined
+          };
         }
+
+        // Traditional agent handling
+        const agentRepo = RepositoryFactory.getAgentRepository();
+        const starshipAgents = await agentRepo.findByStarship(expedition.starshipId);
+        
+        // Look for a First Officer agent
+        const firstOfficerAgent = starshipAgents.find(agent =>
+          agent.tags.includes('first-officer') ||
+          agent.name.toLowerCase().includes('first officer') ||
+          agent.category === 'support'
+        );
+        
+        if (!firstOfficerAgent) {
+          console.error(`[MESSAGE-SERVICE] No First Officer agent found for starship ${expedition.starshipId}`);
+          return {
+            reply: 'I apologize, but there is no First Officer assigned to this starship. Please assign a First Officer agent to handle expedition coordination.',
+            usage: undefined
+          };
+        }
+        
+        console.log(`[MESSAGE-SERVICE] Using First Officer agent: ${firstOfficerAgent.name} (${firstOfficerAgent.id})`);
+        
+        // Use the agent engine's chat function with the First Officer agent ID
+        const chatRequest: ChatRequest = {
+          agent_id: firstOfficerAgent.id,
+          user_id: userId,
+          message: message,
+          channel_id: `expedition-${expeditionId}`,
+          stream: false
+        };
+
+        console.log(`[MESSAGE-SERVICE] Sending request to agent engine for First Officer...`);
+        const store = getStore();
+        const result = await agentChat(chatRequest, store);
+
+        console.log(`[MESSAGE-SERVICE] First Officer response generated:`, {
+          replyLength: result.reply?.length,
+          usage: result.usage
+        });
+        console.log(`[MESSAGE-SERVICE] First Officer reply preview: ${result.reply?.substring(0, 100)}...`);
+        console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY =====`);
+
+        return {
+          reply: result.reply || 'I apologize, I was unable to generate a response.',
+          usage: result.usage
+        };
       }
       
       console.log(`[MESSAGE-SERVICE] No First Officer handling needed for messageType: ${messageType}`);

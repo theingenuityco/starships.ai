@@ -321,6 +321,9 @@ export * from './types/starship';
 // Export expedition-related types
 export * from './types/expedition';
 
+// Export agent communication types
+export * from './types/agent-communication';
+
 // Export enhanced Socket.IO event types
 export * from './types/socket-events';
 

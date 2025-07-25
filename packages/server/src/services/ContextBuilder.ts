@@ -5,16 +5,9 @@ import { ExpeditionMessage } from '@starships/protocol';
 // Import interfaces from VirtualFirstOfficer.ts
 interface ExpeditionDetails {
   id: string;
-<<<<<<< HEAD
   name: string;
   mission: string;
   status: string;
-=======
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
->>>>>>> e81f867dde987984d6cbc1f8eb53c61539cb4235
   createdAt: string;
   updatedAt: string;
   startedAt?: string;

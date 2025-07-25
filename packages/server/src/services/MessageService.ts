@@ -100,7 +100,8 @@ export class MessageService {
   async sendMessageToAgent(
     expeditionId: string,
     agentId: string,
-    content: string
+    content: string,
+    metadata?: any
   ): Promise<ExpeditionMessage> {
     try {
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
@@ -108,10 +109,10 @@ export class MessageService {
       // Create a message from the system to the agent
       const message = await messageRepo.create({
         expeditionId,
-        role: 'system',
+        role: metadata?.fromRole || 'system',
         agentId,
         content,
-        messageType: 'task-work',
+        messageType: metadata?.messageType || 'task-work',
         timestamp: new Date().toISOString(),
         metadata: {
           targetAgent: agentId,

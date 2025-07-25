@@ -95,6 +95,39 @@ export class MessageService {
   }
 
   /**
+   * Send message to a specific agent
+   */
+  async sendMessageToAgent(
+    expeditionId: string,
+    agentId: string,
+    content: string
+  ): Promise<ExpeditionMessage> {
+    try {
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      
+      // Create a message from the system to the agent
+      const message = await messageRepo.create({
+        expeditionId,
+        role: 'system',
+        agentId,
+        content,
+        messageType: 'task-work',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          targetAgent: agentId,
+          sourceType: 'workflow'
+        }
+      });
+
+      console.log(`[MESSAGE-SERVICE] Message sent to agent ${agentId} in expedition ${expeditionId}`);
+      return message;
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] Failed to send message to agent:', error);
+      throw this.handleError(error, 'SEND_MESSAGE_FAILED');
+    }
+  }
+
+  /**
    * Send a message in an expedition
    *
    * Phase 2.1 - Simplified routing:

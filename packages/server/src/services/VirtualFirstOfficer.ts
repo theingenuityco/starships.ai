@@ -13,6 +13,15 @@ interface AgentInfo {
   name: string;
   role: string;
   status: 'online' | 'offline' | 'busy';
+  currentTasks?: Array<{
+    id: string;
+    title: string;
+    status: string;
+    priority: string;
+    progress: number;
+  }>;
+  completedTasksCount?: number;
+  totalTasksCount?: number;
 }
 
 interface TaskSummary {
@@ -20,6 +29,9 @@ interface TaskSummary {
   title: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   assignedTo?: string;
+  assignedAgentName?: string;
+  priority?: string;
+  progress?: number;
   createdAt: string;
   completedAt?: string;
 }
@@ -45,8 +57,11 @@ interface ExpeditionStats {
   completedTasks: number;
   activeTasks: number;
   failedTasks: number;
+  blockedTasks?: number;
   totalMessages: number;
   averageCompletionTime?: number;
+  agentsWorking?: number;
+  totalAgents?: number;
 }
 
 // VirtualFirstOfficer specific interfaces
@@ -118,7 +133,12 @@ export class VirtualFirstOfficer {
       starshipId: this.starshipId,
       status: this.context.state,
       llmProvider: env.DEFAULT_LLM_PROVIDER || 'not configured',
-      messageRepositoryAvailable: !!this.messageRepository
+      messageRepositoryAvailable: !!this.messageRepository,
+      assignedAgents: this.context.assignedAgents.map(a => ({ 
+        id: a.id, 
+        name: a.name, 
+        role: a.role 
+      }))
     });
 
     // Load conversation history if repository is available
@@ -275,7 +295,14 @@ export class VirtualFirstOfficer {
       }, {
         expeditionId: this.expeditionId,
         oldState: this.context.state,
-        newState: context.state
+        newState: context.state,
+        oldAgentCount: this.context.assignedAgents.length,
+        newAgentCount: context.assignedAgents.length,
+        newAgents: context.assignedAgents.map(a => ({
+          id: a.id,
+          name: a.name,
+          role: a.role
+        }))
       });
 
       this.context = context;
@@ -288,7 +315,12 @@ export class VirtualFirstOfficer {
         expeditionId: this.expeditionId,
         state: this.context.state,
         taskCount: this.context.tasks.length,
-        agentCount: this.context.assignedAgents.length
+        agentCount: this.context.assignedAgents.length,
+        agents: this.context.assignedAgents.map(a => ({
+          id: a.id,
+          name: a.name,
+          role: a.role
+        }))
       });
     } catch (error) {
       this.logger.error('Error updating context', error instanceof Error ? error : new Error(String(error)), {
@@ -888,12 +920,60 @@ export class VirtualFirstOfficer {
   }
 
   /**
+   * Detect the user's intent from their message
+   */
+  private detectUserIntent(message: string): string {
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Greeting patterns
+    const greetingPatterns = ['hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening', 'greetings', 'howdy'];
+    if (greetingPatterns.some(pattern => lowerMessage === pattern || lowerMessage.startsWith(pattern + ' ') || lowerMessage.startsWith(pattern + ','))) {
+      return 'greeting';
+    }
+    
+    // Status inquiry patterns
+    if (lowerMessage.includes('status') || lowerMessage.includes('how is') || lowerMessage.includes('how are things') || 
+        lowerMessage.includes('progress') || lowerMessage.includes('update')) {
+      return 'status_inquiry';
+    }
+    
+    // Agent inquiry patterns
+    if (lowerMessage.includes('agent') || lowerMessage.includes('who is') || lowerMessage.includes('team') ||
+        lowerMessage.includes('crew') || lowerMessage.includes('assigned')) {
+      return 'agent_inquiry';
+    }
+    
+    // Task inquiry patterns
+    if (lowerMessage.includes('task') || lowerMessage.includes('what is being') || lowerMessage.includes('working on') ||
+        lowerMessage.includes('doing') || lowerMessage.includes('activities')) {
+      return 'task_inquiry';
+    }
+    
+    // Help patterns
+    if (lowerMessage.includes('help') || lowerMessage.includes('assist') || lowerMessage.includes('what can you')) {
+      return 'help_request';
+    }
+    
+    return 'general';
+  }
+
+  /**
    * Generate a context-aware prompt for the LLM
    * Phase 2: Enhanced with vector search results for better context
    */
   private async generatePromptWithVectorSearch(userMessage: string): Promise<string> {
     const contextSummary = this.generateContextSummary();
     const conversationHistory = this.generateConversationHistory();
+    
+    // Log agent details for debugging
+    this.logger.debug('Generating prompt with agent context', {
+      service: 'VirtualFirstOfficer',
+      operation: 'generatePromptWithVectorSearch'
+    }, {
+      expeditionId: this.expeditionId,
+      agentCount: this.context.assignedAgents.length,
+      agents: this.context.assignedAgents.map(a => ({ id: a.id, name: a.name }))
+    });
 
     // Phase 2: Perform semantic search to find relevant context
     let vectorSearchContext = '';
@@ -932,6 +1012,18 @@ ${relevantContext}\n`;
       });
     }
 
+    // Detect user intent to provide appropriate response
+    const userIntent = this.detectUserIntent(userMessage);
+    
+    // Log the detected intent for debugging
+    this.logger.debug('Detected user intent', {
+      service: 'VirtualFirstOfficer',
+      operation: 'generatePromptWithVectorSearch'
+    }, {
+      userIntent,
+      messagePreview: userMessage.substring(0, 50)
+    });
+
     const prompt = `You are a Virtual First Officer for an expedition management system. You are assisting with expedition "${this.context.title}".
 
 EXPEDITION CONTEXT:
@@ -943,49 +1035,101 @@ ${conversationHistory}${vectorSearchContext}
 USER MESSAGE:
 ${userMessage}
 
-Please provide a helpful, context-aware response that assists the user with their expedition. Consider the current state, assigned agents, tasks, recent activity, and any relevant context from past conversations when formulating your response.`;
+DETECTED INTENT: ${userIntent}
+
+CRITICAL: The expedition has ID "${this.context.expeditionId}" but you must NEVER mention this ID. Always refer to it as "${this.context.title}" instead.
+
+IMPORTANT INSTRUCTIONS:
+- Be conversational and natural. Don't dump information unless asked.
+- The detected intent is a hint, but analyze the actual message for nuance.
+- For greetings, respond warmly and briefly. Ask how you can help. DO NOT provide expedition details.
+- Only provide expedition status, agent details, or task information when specifically requested.
+- When discussing agents, ALWAYS use their names (not IDs)
+- NEVER include UUID strings (like "b7017750-f8f5-440c-b36a-2a9db64dbbdc") in responses
+- Be concise by default. Elaborate only when the user asks for details.
+
+RESPONSE GUIDELINES BY INTENT:
+- greeting: "Hello! How can I assist you today?" or similar. Keep it short and friendly.
+- status_inquiry: Provide current expedition status and key metrics.
+- agent_inquiry: List agents with their names, roles, and current activities.
+- task_inquiry: Show task information with assignments and progress.
+- help_request: Ask what specific area they need help with.
+- general: Respond appropriately to the query without over-sharing.
+
+Remember: 
+- Less is more. Answer what was asked, nothing more.
+- CRITICAL: Never include any IDs (expedition IDs, agent IDs, task IDs) in your responses.
+- Always use names and titles instead of IDs.
+- For expeditions, say "the expedition 'title'" not "expedition with ID: xxx-xxx-xxx".`;
 
     return prompt;
   }
 
-  /**
-   * Generate a context-aware prompt for the LLM (legacy method for backward compatibility)
-   */
-  private generatePrompt(userMessage: string): string {
-    const contextSummary = this.generateContextSummary();
-    const conversationHistory = this.generateConversationHistory();
-
-    const prompt = `You are a Virtual First Officer for an expedition management system. You are assisting with expedition "${this.context.title}".
-
-EXPEDITION CONTEXT:
-${contextSummary}
-
-CONVERSATION HISTORY:
-${conversationHistory}
-
-USER MESSAGE:
-${userMessage}
-
-Please provide a helpful, context-aware response that assists the user with their expedition. Consider the current state, assigned agents, tasks, and recent activity when formulating your response.`;
-
-    return prompt;
-  }
 
   /**
    * Generate a summary of the current expedition context
+   * Note: This is included in every prompt, so it should be comprehensive
+   * The LLM will decide what information to share based on user intent
    */
   private generateContextSummary(): string {
     const { context } = this;
-    const activeTasks = context.tasks.filter(t => t.status === 'in_progress').length;
     const onlineAgents = context.assignedAgents.filter(a => a.status === 'online').length;
+    const busyAgents = context.assignedAgents.filter(a => a.status === 'busy').length;
+    
+    // Build detailed agent information
+    const agentDetails = context.assignedAgents.length > 0 
+      ? context.assignedAgents.map(agent => {
+          let agentInfo = `\n  - ${agent.name} (${agent.role}) - Status: ${agent.status}`;
+          
+          // Add current task information if agent is busy
+          if (agent.currentTasks && agent.currentTasks.length > 0) {
+            agentInfo += `\n    Currently working on:`;
+            agent.currentTasks.forEach(task => {
+              agentInfo += `\n      • ${task.title} [${task.status}] (${task.progress}% complete)`;
+            });
+          }
+          
+          // Add task statistics
+          if (agent.totalTasksCount !== undefined) {
+            agentInfo += `\n    Task Statistics: ${agent.completedTasksCount || 0} completed out of ${agent.totalTasksCount} assigned`;
+          }
+          
+          return agentInfo;
+        }).join('')
+      : '\n  - No agents assigned';
+
+    // Build task overview by status
+    const tasksByStatus = {
+      pending: context.tasks.filter(t => t.status === 'pending').length,
+      in_progress: context.tasks.filter(t => t.status === 'in_progress').length,
+      completed: context.tasks.filter(t => t.status === 'completed').length,
+      failed: context.tasks.filter(t => t.status === 'failed').length
+    };
+    
+    // Get tasks in progress with agent assignments
+    const tasksInProgress = context.tasks
+      .filter(t => t.status === 'in_progress')
+      .map(t => `\n    • ${t.title} - Assigned to: ${t.assignedAgentName || 'Unassigned'}`)
+      .join('');
 
     return `
-- Expedition ID: ${context.expeditionId}
+- Expedition Title: "${context.title}"
 - Status: ${context.state}
 - Objective: ${context.objective}
 - Created: ${new Date(context.createdAt).toLocaleString()}
-- Assigned Agents: ${context.assignedAgents.length} (${onlineAgents} online)
-- Tasks: ${context.statistics.totalTasks} total (${activeTasks} active, ${context.statistics.completedTasks} completed, ${context.statistics.failedTasks} failed)
+
+- Assigned Agents: ${context.assignedAgents.length} total (${onlineAgents} available, ${busyAgents} working)${agentDetails}
+
+- Task Overview:
+  • Total Tasks: ${context.statistics.totalTasks}
+  • Pending: ${tasksByStatus.pending}
+  • In Progress: ${tasksByStatus.in_progress}
+  • Completed: ${tasksByStatus.completed}
+  • Failed: ${tasksByStatus.failed}
+  ${context.statistics.blockedTasks ? `• Blocked: ${context.statistics.blockedTasks}` : ''}
+
+- Tasks Currently In Progress:${tasksInProgress || '\n  • No tasks currently in progress'}
+
 - Recent Activity: ${context.recentMessages.length} messages
 - Results Generated: ${context.results.length}`;
   }
@@ -1009,7 +1153,7 @@ Please provide a helpful, context-aware response that assists the user with thei
    * Placeholder method to simulate LLM response
    * TODO: Replace with actual LLM provider call
    */
-  private async simulateLLMResponse(prompt: string, userMessage: string): Promise<string> {
+  private async simulateLLMResponse(_prompt: string, userMessage: string): Promise<string> {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 100));
 

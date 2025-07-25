@@ -74,6 +74,18 @@ export class ContextBuilder {
     this.logger = getLogger({ service: 'ContextBuilder' });
   }
 
+  async buildExpeditionContext(expeditionId: string): Promise<ExpeditionContext> {
+    // Fetch expedition to get starshipId
+    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+    const expedition = await expeditionRepo.findById(expeditionId);
+    
+    if (!expedition) {
+      throw new Error(`Expedition ${expeditionId} not found`);
+    }
+    
+    return this.buildContext(expeditionId, expedition.starshipId);
+  }
+
   async buildContext(expeditionId: string, starshipId: string): Promise<ExpeditionContext> {
     this.logger.info('Building context for expedition', {
       service: 'ContextBuilder',

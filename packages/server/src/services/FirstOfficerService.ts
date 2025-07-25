@@ -22,16 +22,21 @@ import {
 } from '@starships/protocol/src/types/error-classes';
 import { Logger } from '../utils/logger';
 import { VirtualFirstOfficer } from './VirtualFirstOfficer';
+import { VirtualFirstOfficerWorkflow } from './VirtualFirstOfficerWorkflow';
+import { ContextBuilder } from './ContextBuilder';
 
 export class FirstOfficerService {
   private static instance: FirstOfficerService;
   private activeAgents: Map<string, FirstOfficerAgent> = new Map();
   private memoryStores: Map<string, LangChainMemoryStore> = new Map();
   private virtualFirstOfficers: Map<string, VirtualFirstOfficer> = new Map();
+  private virtualFirstOfficerWorkflows: Map<string, VirtualFirstOfficerWorkflow> = new Map();
+  private contextBuilder: ContextBuilder;
   private logger: Logger;
 
   private constructor() {
     this.logger = Logger.getInstance({ service: 'FirstOfficerService' });
+    this.contextBuilder = new ContextBuilder();
   }
 
   static getInstance(): FirstOfficerService {
@@ -327,8 +332,21 @@ export class FirstOfficerService {
             expedition
           );
           
-          // Process message with Virtual First Officer
-          const response = await virtualFirstOfficer.processMessage(message, userId);
+          // Get or create workflow for LangGraph orchestration
+          const workflow = await this.getOrCreateVirtualFirstOfficerWorkflow(
+            expeditionId,
+            virtualFirstOfficer
+          );
+          
+          // Process message with LangGraph workflow
+          const workflowResult = await workflow.executeWorkflow({
+            expeditionId,
+            starshipId: expedition.starshipId,
+            userId,
+            userMessage: message
+          });
+          
+          const response = workflowResult.response || "I encountered an error processing your message.";
           
           this.logger.info('Message handled by Virtual First Officer', {
             ...context,
@@ -559,6 +577,199 @@ export class FirstOfficerService {
   }
 
   /**
+   * Build complete expedition context with all details
+   */
+  private async buildCompleteExpeditionContext(expedition: any): Promise<any> {
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const resultRepo = RepositoryFactory.getExpeditionResultRepository();
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+
+    // Fetch all tasks for the expedition first
+    const allTasks = await taskRepo.findByExpedition(expedition.id);
+
+    // Fetch agent details with their current tasks
+    const assignedAgents = [];
+    for (const agentId of (expedition.assignedAgents || [])) {
+      try {
+        const agent = await agentRepo.findById(agentId);
+        if (agent) {
+          // Get tasks assigned to this agent
+          const agentTasks = allTasks.filter(task => task.assignedAgentId === agentId);
+          const activeTasks = agentTasks.filter(t => t.status === 'in-progress' || t.status === 'assigned');
+          const completedTasks = agentTasks.filter(t => t.status === 'completed');
+          
+          this.logger.debug('Found agent details with tasks', {
+            service: 'FirstOfficerService',
+            operation: 'buildCompleteExpeditionContext'
+          }, {
+            agentId: agent.id,
+            agentName: agent.name,
+            agentCategory: agent.category,
+            totalTasks: agentTasks.length,
+            activeTasks: activeTasks.length,
+            completedTasks: completedTasks.length
+          });
+          
+          // Determine agent status based on active tasks
+          let agentStatus: 'online' | 'offline' | 'busy' = 'online';
+          if (activeTasks.length > 0) {
+            agentStatus = 'busy';
+          }
+          
+          assignedAgents.push({
+            id: agent.id,
+            name: agent.name,
+            role: agent.category || 'general',
+            status: agentStatus,
+            currentTasks: activeTasks.map(t => ({
+              id: t.id,
+              title: t.title,
+              status: t.status,
+              priority: t.priority,
+              progress: 0  // ExpeditionTask doesn't have progress field
+            })),
+            completedTasksCount: completedTasks.length,
+            totalTasksCount: agentTasks.length
+          });
+        } else {
+          this.logger.warn('Agent not found in database', {
+            service: 'FirstOfficerService',
+            operation: 'buildCompleteExpeditionContext'
+          }, {
+            agentId
+          });
+        }
+      } catch (error) {
+        this.logger.warn('Failed to fetch agent details', {
+          service: 'FirstOfficerService',
+          operation: 'buildCompleteExpeditionContext'
+        }, {
+          agentId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    // Create enhanced task summaries with agent names
+    const agentMap = new Map(assignedAgents.map(a => [a.id, a]));
+    const taskSummaries = allTasks.map(task => {
+      const assignedAgent = task.assignedAgentId ? agentMap.get(task.assignedAgentId) : null;
+      return {
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        assignedTo: task.assignedAgentId,
+        assignedAgentName: assignedAgent?.name || 'Unassigned',
+        priority: task.priority || 'medium',
+        progress: 0,  // ExpeditionTask doesn't have progress field
+        createdAt: task.createdAt,
+        completedAt: task.status === 'completed' ? task.updatedAt : undefined
+      };
+    });
+
+    // Fetch recent results
+    const results = await resultRepo.findByExpedition(expedition.id);
+    const resultSummaries = results.slice(0, 10).map(result => ({
+      id: result.id,
+      taskId: '',
+      content: result.content,
+      createdAt: result.createdAt,
+      createdBy: result.createdBy
+    }));
+
+    // Fetch recent messages
+    const messages = await messageRepo.getLatestMessages(expedition.id, 20);
+    const messageSummaries = messages.map(msg => ({
+      id: msg.id,
+      sender: msg.agentId || msg.userId || 'system',
+      content: msg.content,
+      timestamp: msg.timestamp,
+      type: msg.role === 'user' ? 'user' as const : msg.role === 'agent' ? 'agent' as const : 'system' as const
+    }));
+
+    // Calculate statistics
+    const completedTasks = allTasks.filter(t => t.status === 'completed').length;
+    const activeTasks = allTasks.filter(t => t.status === 'in-progress' || t.status === 'assigned').length;
+    const failedTasks = allTasks.filter(t => t.status === 'failed').length;
+    const blockedTasks = allTasks.filter(t => t.status === 'blocked').length;
+
+    return {
+      expeditionId: expedition.id,
+      starshipId: expedition.starshipId,
+      state: expedition.status || 'active',
+      title: expedition.title || 'Expedition',
+      objective: expedition.objective || 'Complete expedition tasks',
+      createdAt: expedition.createdAt,
+      assignedAgents,
+      tasks: taskSummaries,
+      results: resultSummaries,
+      recentMessages: messageSummaries,
+      statistics: {
+        totalTasks: allTasks.length,
+        completedTasks,
+        activeTasks,
+        failedTasks,
+        blockedTasks,
+        totalMessages: messages.length,
+        averageCompletionTime: 0,
+        agentsWorking: assignedAgents.filter(a => a.currentTasks && a.currentTasks.length > 0).length,
+        totalAgents: assignedAgents.length
+      }
+    };
+  }
+
+  /**
+   * Get or create a Virtual First Officer workflow instance
+   */
+  async getOrCreateVirtualFirstOfficerWorkflow(
+    expeditionId: string,
+    virtualFirstOfficer: VirtualFirstOfficer
+  ): Promise<VirtualFirstOfficerWorkflow> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'getOrCreateVirtualFirstOfficerWorkflow',
+      resource: 'virtualFirstOfficerWorkflow',
+      resourceId: expeditionId
+    };
+
+    try {
+      // Check if we already have a workflow for this expedition
+      if (this.virtualFirstOfficerWorkflows.has(expeditionId)) {
+        return this.virtualFirstOfficerWorkflows.get(expeditionId)!;
+      }
+
+      // Create a new workflow
+      const workflow = new VirtualFirstOfficerWorkflow(
+        virtualFirstOfficer,
+        this.contextBuilder,
+        {
+          maxRetries: 3,
+          enableSemanticSearch: true,
+          contextRefreshInterval: 60000
+        }
+      );
+      
+      // Store it in our map
+      this.virtualFirstOfficerWorkflows.set(expeditionId, workflow);
+      
+      this.logger.info('Created Virtual First Officer workflow for expedition', {
+        ...context,
+        metadata: { expeditionId }
+      });
+      
+      return workflow;
+    } catch (error) {
+      this.logger.error(
+        'Failed to create Virtual First Officer workflow',
+        error instanceof Error ? error : undefined,
+        context
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Get or create a Virtual First Officer instance for a starship
    */
   async getOrCreateVirtualFirstOfficer(starshipId: string): Promise<VirtualFirstOfficer> {
@@ -656,27 +867,8 @@ export class FirstOfficerService {
       // Get message repository for persistence
       const messageRepository = RepositoryFactory.getExpeditionMessageRepository();
 
-      // Create expedition context from real expedition data
-      const expeditionContext = {
-        expeditionId: expedition.id,
-        starshipId: expedition.starshipId,
-        state: expedition.status || 'active',
-        title: expedition.title || 'Expedition',
-        objective: expedition.objective || 'Complete expedition tasks',
-        createdAt: expedition.createdAt,
-        assignedAgents: expedition.assignedAgents || [],
-        tasks: [], // Would be populated from ExpeditionTaskRepository
-        results: [], // Would be populated from ExpeditionResultRepository
-        recentMessages: [], // Will be loaded from message history
-        statistics: {
-          totalTasks: 0,
-          completedTasks: 0,
-          activeTasks: 0,
-          failedTasks: 0,
-          totalMessages: 0,
-          averageCompletionTime: 0
-        }
-      };
+      // Build complete expedition context with agent details
+      const expeditionContext = await this.buildCompleteExpeditionContext(expedition);
 
       const config = {
         expeditionId: expedition.id,

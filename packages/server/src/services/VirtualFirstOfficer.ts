@@ -4,7 +4,6 @@ import { LLMChatPrompt, LLMProvider } from '@starships/protocol';
 import { env } from '../config/environment';
 import { ExpeditionMessageRepository, ExpeditionMessage, MessageRole, MessageType } from '@starships/models';
 import { LangChainMemoryStore } from '@starships/agent-engine/src/memory/langchain-memory';
-import { ConversationCompressionService, CompressionOptions } from './memory/ConversationCompressionService';
 
 // Type definitions from other parts of the system
 type ExpeditionStatus = 'active' | 'completed' | 'failed' | 'paused';

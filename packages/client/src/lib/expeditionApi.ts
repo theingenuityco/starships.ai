@@ -799,14 +799,20 @@ export const expeditionAPI = {
     starshipId: string,
     request: SendMessageRequest,
     options?: APIOptions
-  ): Promise<{ response: string }> => {
-    validateRequest(request, ['expeditionId', 'content', 'messageType'])
+  ): Promise<{ userMessage: ExpeditionMessage; participantMessage?: ExpeditionMessage }> => {
+    validateRequest(request, ['expeditionId', 'content'])
 
     const response = await api.post(
       `/api/starships/${starshipId}/expeditions/${request.expeditionId}/messages`,
-      request
+      {
+        content: request.content,
+        participantId: request.participantId,
+        threadId: request.threadId,
+        parentMessageId: request.parentMessageId,
+        metadata: request.metadata
+      }
     )
-    const data = validateResponse<{ response: string }>(response.data.data, ['response'])
+    const data = response.data.data
     invalidateExpeditionCaches(request.expeditionId, starshipId)
     return data
   },

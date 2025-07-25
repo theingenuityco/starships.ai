@@ -1,7 +1,7 @@
 import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
-import { RepositoryFactory } from "@starships/models";
+import { RepositoryFactory, AgentExpeditionContextService } from "@starships/models";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
 /**
@@ -75,7 +75,25 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   }
   
   let visionContext = "";
+  let expeditionContext = "";
   let starshipLookupStrategies: string[] = [];
+  
+  // Load expedition context for agent awareness
+  try {
+    const contextService = AgentExpeditionContextService.getInstance();
+    expeditionContext = await contextService.getAgentExpeditionContext(req.agent_id);
+    
+    if (expeditionContext) {
+      console.log('🚢 [AGENT-ENGINE] Expedition context loaded for agent:', {
+        agentId: req.agent_id,
+        contextLength: expeditionContext.length,
+        hasExpedition: true
+      });
+    }
+  } catch (contextError) {
+    console.log('⚠️ [AGENT-ENGINE] Could not load expedition context:', contextError);
+    // Continue without expedition context
+  }
   
   // Step 2: Enhanced starship lookup with multiple strategies
   try {
@@ -234,7 +252,9 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     memoryEntries: memory.length,
     hasRelevantContext: !!relevantContext,
     hasVisionContext: !!visionContext,
-    visionContextLength: visionContext.length
+    visionContextLength: visionContext.length,
+    hasExpeditionContext: !!expeditionContext,
+    expeditionContextLength: expeditionContext.length
   });
 
   const prompt = buildPrompt(
@@ -242,7 +262,8 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     memory,
     req.message,
     relevantContext,
-    visionContext
+    visionContext,
+    expeditionContext
   );
 
   console.log('✅ [AGENT-ENGINE] Prompt built:', {
@@ -381,7 +402,25 @@ async function* chatStream(
   }
   
   let visionContext = "";
+  let expeditionContext = "";
   let starshipLookupStrategies: string[] = [];
+  
+  // Load expedition context for agent awareness (STREAMING)
+  try {
+    const contextService = AgentExpeditionContextService.getInstance();
+    expeditionContext = await contextService.getAgentExpeditionContext(req.agent_id);
+    
+    if (expeditionContext) {
+      console.log('🚢 [AGENT-ENGINE-STREAM] Expedition context loaded for agent:', {
+        agentId: req.agent_id,
+        contextLength: expeditionContext.length,
+        hasExpedition: true
+      });
+    }
+  } catch (contextError) {
+    console.log('⚠️ [AGENT-ENGINE-STREAM] Could not load expedition context:', contextError);
+    // Continue without expedition context
+  }
   
   // Step 2: Enhanced starship lookup with multiple strategies
   try {
@@ -537,7 +576,9 @@ async function* chatStream(
     memoryEntries: memory.length,
     hasRelevantContext: !!relevantContext,
     hasVisionContext: !!visionContext,
-    visionContextLength: visionContext.length
+    visionContextLength: visionContext.length,
+    hasExpeditionContext: !!expeditionContext,
+    expeditionContextLength: expeditionContext.length
   });
 
   const prompt = buildPrompt(
@@ -545,7 +586,8 @@ async function* chatStream(
     memory,
     req.message,
     relevantContext,
-    visionContext
+    visionContext,
+    expeditionContext
   );
 
   console.log('✅ [AGENT-ENGINE-STREAM] Prompt built:', {

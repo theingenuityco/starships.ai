@@ -274,7 +274,7 @@ export const expeditionAPI = {
     options?: APIOptions
   ): Promise<ExpeditionResponse> => {
     // Enhanced validation to include selectedAgents
-    validateRequest(request, ['starshipId', 'title', 'description', 'objective', 'selectedAgents'])
+    validateRequest(request, ['starshipId', 'name', 'mission', 'selectedAgents'])
 
     // Additional validation for selectedAgents array
     if (!Array.isArray(request.selectedAgents) || request.selectedAgents.length === 0) {

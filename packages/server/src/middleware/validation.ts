@@ -12,7 +12,6 @@ import {
   SendMessageRequest,
   CreateResultRequest,
   ExpeditionStatus,
-  ExpeditionPriority,
   TaskStatus,
   TaskPriority,
   MessageType,
@@ -201,22 +200,14 @@ export function validateCreateExpedition(req: Request, res: Response, next: Next
   let errors: ValidationError[] = [];
   
   // Required fields
-  errors = errors.concat(validateRequired(body, ['title', 'description', 'objective', 'selectedAgents']));
+  errors = errors.concat(validateRequired(body, ['name', 'mission', 'selectedAgents']));
   
   // String length validations
-  errors = errors.concat(validateStringLength(body, 'title', 1, 200));
-  errors = errors.concat(validateStringLength(body, 'description', 1, 1000));
-  errors = errors.concat(validateStringLength(body, 'objective', 1, 500));
-  
-  // Enum validations
-  errors = errors.concat(validateEnum(body, 'priority', ['low', 'medium', 'high', 'urgent'] as ExpeditionPriority[]));
+  errors = errors.concat(validateStringLength(body, 'name', 1, 200));
+  errors = errors.concat(validateStringLength(body, 'mission', 1, 1000));
   
   // Array validations
-  errors = errors.concat(validateArray(body, 'tags', false, 10));
   errors = errors.concat(validateArray(body, 'selectedAgents', true, 10)); // Required array with max 10 agents
-  
-  // Number validations
-  errors = errors.concat(validateNumberRange(body, 'estimatedDuration', 1, 10080)); // Max 1 week in minutes
   
   if (errors.length > 0) {
     sendValidationError(res, errors);
@@ -234,25 +225,20 @@ export function validateUpdateExpedition(req: Request, res: Response, next: Next
   let errors: ValidationError[] = [];
   
   // String length validations (optional fields)
-  if (body.title !== undefined) {
-    errors = errors.concat(validateStringLength(body, 'title', 1, 200));
+  if (body.name !== undefined) {
+    errors = errors.concat(validateStringLength(body, 'name', 1, 200));
   }
-  if (body.description !== undefined) {
-    errors = errors.concat(validateStringLength(body, 'description', 1, 1000));
-  }
-  if (body.objective !== undefined) {
-    errors = errors.concat(validateStringLength(body, 'objective', 1, 500));
+  if (body.mission !== undefined) {
+    errors = errors.concat(validateStringLength(body, 'mission', 1, 1000));
   }
   
   // Enum validations
-  errors = errors.concat(validateEnum(body, 'priority', ['low', 'medium', 'high', 'urgent'] as ExpeditionPriority[]));
   errors = errors.concat(validateEnum(body, 'status', ['draft', 'planning', 'in-progress', 'review', 'completed', 'failed', 'cancelled'] as ExpeditionStatus[]));
   
   // Array validations
-  errors = errors.concat(validateArray(body, 'tags', false, 10));
-  
-  // Number validations
-  errors = errors.concat(validateNumberRange(body, 'estimatedDuration', 1, 10080));
+  if (body.assignedAgents !== undefined) {
+    errors = errors.concat(validateArray(body, 'assignedAgents', false, 20));
+  }
   
   if (errors.length > 0) {
     sendValidationError(res, errors);

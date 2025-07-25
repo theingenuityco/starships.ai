@@ -50,7 +50,6 @@ import type {
   Expedition,
   ExpeditionTask,
   ExpeditionStatus,
-  ExpeditionPriority,
   QualityScore
 } from '@starships/protocol';
 
@@ -271,21 +270,6 @@ export function ExpeditionCard({
     }
   };
 
-  // Get priority styling
-  const getPriorityConfig = (priority: ExpeditionPriority) => {
-    switch (priority) {
-      case 'low':
-        return { color: 'text-green-600', bg: 'bg-green-100', label: 'Low', icon: Shield };
-      case 'medium':
-        return { color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Medium', icon: TrendingUp };
-      case 'high':
-        return { color: 'text-orange-600', bg: 'bg-orange-100', label: 'High', icon: Zap };
-      case 'urgent':
-        return { color: 'text-red-600', bg: 'bg-red-100', label: 'Urgent', icon: AlertCircle };
-      default:
-        return { color: 'text-gray-600', bg: 'bg-gray-100', label: priority, icon: Shield };
-    }
-  };
 
   // Calculate enhanced progress
   const getProgress = () => {
@@ -333,11 +317,9 @@ export function ExpeditionCard({
   };
 
   const statusConfig = getStatusConfig(localExpedition.status);
-  const priorityConfig = getPriorityConfig(localExpedition.priority);
   const progress = getProgress();
   const qualityDisplay = getQualityDisplay();
   const StatusIcon = statusConfig.icon;
-  const PriorityIcon = priorityConfig.icon;
 
   // Get assigned agents for display
   const assignedAgents = agents.filter(agent =>
@@ -364,7 +346,7 @@ export function ExpeditionCard({
         onClick={onClick}
         role="button"
         tabIndex={0}
-        aria-label={`Expedition: ${localExpedition.title}`}
+        aria-label={`Expedition: ${localExpedition.name}`}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -396,7 +378,7 @@ export function ExpeditionCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-2 mb-1">
                 <CardTitle className="text-lg font-semibold truncate">
-                  {localExpedition.title}
+                  {localExpedition.name}
                 </CardTitle>
                 {qualityDisplay && (
                   <TooltipProvider>
@@ -422,7 +404,7 @@ export function ExpeditionCard({
                 )}
               </div>
               <CardDescription className="mt-1 line-clamp-2">
-                {localExpedition.description}
+                {localExpedition.mission}
               </CardDescription>
             </div>
 
@@ -434,13 +416,6 @@ export function ExpeditionCard({
                 >
                   <StatusIcon className="h-3 w-3" />
                   <span>{statusConfig.label}</span>
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className={`${priorityConfig.color} ${priorityConfig.bg} border-current flex items-center space-x-1`}
-                >
-                  <PriorityIcon className="h-3 w-3" />
-                  <span>{priorityConfig.label}</span>
                 </Badge>
               </div>
 
@@ -508,13 +483,6 @@ export function ExpeditionCard({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Objective */}
-          <div className="flex items-start space-x-2">
-            <Target className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {localExpedition.objective}
-            </p>
-          </div>
 
           {/* Progress Bar */}
           <div className="space-y-2">
@@ -579,7 +547,7 @@ export function ExpeditionCard({
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">
-                {localExpedition.estimatedDuration ? `${localExpedition.estimatedDuration}m` : 'No estimate'}
+                Duration
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -590,21 +558,6 @@ export function ExpeditionCard({
             </div>
           </div>
 
-          {/* Tags */}
-          {localExpedition.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {localExpedition.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {localExpedition.tags.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{localExpedition.tags.length - 3} more
-                </Badge>
-              )}
-            </div>
-          )}
 
           {/* Enhanced Action Buttons with offline support */}
           <AnimatePresence>

@@ -194,7 +194,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
         timestamp: msg.timestamp,
         role: msg.role,
         content: msg.content,
-        messageType: msg.messageType,
         agentId: msg.agentId
       }))
     };
@@ -769,12 +768,17 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                 </ScrollArea>
 
                 {/* Message Input */}
-                <div className="border-t">
+                <div className="border-t p-4">
                   <MessageInput
-                    onSendMessage={async (content, messageType, agentId) => {
-                      await sendMessage(content, messageType, agentId);
+                    onSendMessage={async (content, participantId) => {
+                      // Pass participantId directly (undefined for First Officer)
+                      await sendMessage(content, 'user-input', participantId);
                     }}
-                    disabled={sending || expedition.status === 'completed' || expedition.status === 'cancelled'}
+                    agents={memoizedAvailableAgents.map(agent => ({
+                      id: agent.id,
+                      name: agent.name
+                    }))}
+                    disabled={sending || ['completed', 'cancelled'].includes(expedition.status)}
                     placeholder={
                       expedition.status === 'completed'
                         ? 'Expedition completed'
@@ -782,15 +786,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                         ? 'Expedition cancelled'
                         : 'Type your message...'
                     }
-                    showMessageType={true}
-                    showAgentSelector={expedition.assignedAgents.length > 0}
-                    showFormatting={true}
-                    showAttachments={true}
-                    availableAgents={memoizedAvailableAgents}
-                    replyingTo={replyingTo}
-                    data-testid="message-input"
-                    className="p-4"
-                    // Typing indicators removed - not available in HTTP mode
                   />
                 </div>
 

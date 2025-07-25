@@ -85,7 +85,7 @@ export function useExpeditionChat({
   const sendMessage = useCallback(async (
     content: string,
     messageType: ExpeditionMessage['messageType'] = 'user-input',
-    agentId?: string
+    participantId?: string
   ) => {
     if (!content.trim() || !expeditionId || !starshipId) return;
 
@@ -101,37 +101,37 @@ export function useExpeditionChat({
         content: content.trim(),
         messageType,
         timestamp: new Date().toISOString(),
-        agentId,
+        agentId: participantId,
         metadata: { sending: true }
       };
 
       // Add optimistic message to UI
       setMessages(prev => [...prev, optimisticMessage]);
 
-      // Send via API
+      // Send via API with participantId
       const response = await expeditionAPI.sendMessage(starshipId, {
         expeditionId,
         content: content.trim(),
-        messageType,
-        agentId
+        participantId
       });
 
-      // Create a proper message from the response
-      const sentMessage: ExpeditionMessage = {
-        id: `sent-${Date.now()}`,
-        expeditionId,
-        role: 'first-officer',
-        content: response.response,
-        messageType: 'coordination',
-        timestamp: new Date().toISOString()
-      };
-
-      // Replace optimistic message with real one
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === optimisticMessage.id ? sentMessage : msg
-        )
-      );
+      // Replace optimistic message with actual user message
+      setMessages(prev => {
+        const filtered = prev.filter(msg => msg.id !== optimisticMessage.id);
+        const newMessages: ExpeditionMessage[] = [];
+        
+        // Add the actual user message
+        if (response.userMessage) {
+          newMessages.push(response.userMessage);
+        }
+        
+        // Add the participant response if any
+        if (response.participantMessage) {
+          newMessages.push(response.participantMessage);
+        }
+        
+        return [...filtered, ...newMessages];
+      });
 
     } catch (err) {
       // Remove optimistic message on error

@@ -13,20 +13,37 @@ export function buildPrompt(
 ): LLMChatPrompt {
   const messages: LLMChatPrompt['messages'] = [];
 
-  if (systemPrompt) {
-    messages.push({ role: "system", content: systemPrompt });
-  }
-
+  // Combine all system context into a single system message
+  let combinedSystemPrompt = '';
+  
+  // Add vision context FIRST to ensure it takes priority
   if (visionContext) {
-    messages.push({ role: "system", content: visionContext });
+    console.log('[PROMPT-BUILDER] Adding vision context, length:', visionContext.length);
+    combinedSystemPrompt += visionContext + '\n\n';
   }
-
+  
+  // Then add the agent's base system prompt
+  if (systemPrompt) {
+    console.log('[PROMPT-BUILDER] Adding system prompt, length:', systemPrompt.length);
+    combinedSystemPrompt += systemPrompt + '\n\n';
+  }
+  
+  // Add expedition context if available
   if (expeditionContext) {
-    messages.push({ role: "system", content: expeditionContext });
+    console.log('[PROMPT-BUILDER] Adding expedition context, length:', expeditionContext.length);
+    combinedSystemPrompt += expeditionContext + '\n\n';
   }
-
+  
+  // Add relevant context from history
   if (relevantContext) {
-    messages.push({ role: "system", content: `Relevant context from conversation history:\n${relevantContext}` });
+    console.log('[PROMPT-BUILDER] Adding relevant context, length:', relevantContext.length);
+    combinedSystemPrompt += `Relevant context from conversation history:\n${relevantContext}\n\n`;
+  }
+  
+  // Add the combined system message
+  if (combinedSystemPrompt.trim()) {
+    console.log('[PROMPT-BUILDER] Final combined prompt length:', combinedSystemPrompt.length);
+    messages.push({ role: "system", content: combinedSystemPrompt.trim() });
   }
 
   const memoryMessages = memory.map(entry => ({

@@ -231,8 +231,9 @@ export interface LLMRepository extends Repository<LLM> {
 
 // NEW: MCP Server Option Entity
 export interface MCPServerOption {
-  id: string; // Unique identifier (e.g., "github", "puppeteer")
-  name: string; // Display name (e.g., "Github", "Puppeteer")
+  id: string; // Unique identifier (UUID)
+  name: string; // Display name (e.g., "Github", "Puppeteer") 
+  slug: string; // Docker-compatible identifier (e.g., "github", "puppeteer")
   command: string; // Execution command (e.g., "docker", "npx", "uvx")
   args: string[]; // Command arguments array
   env?: string; // Environment variables as JSON string (optional)
@@ -369,10 +370,10 @@ export interface ConnectorConfigHistory {
 }
 
 /**
- * MCPServerConnector Entity (Enhanced with Configuration Support)
+ * MCPServerConnector Entity (Enhanced with Docker Support)
  *
  * Represents an instance of an MCP server connector that is deployed on a specific starship.
- * This entity tracks the connection status, usage, lifecycle, and configuration of connector instances.
+ * This entity tracks the connection status, usage, lifecycle, and Docker deployment information.
  */
 export interface MCPServerConnector {
   /** Unique identifier for the connector instance */
@@ -399,6 +400,24 @@ export interface MCPServerConnector {
   configTemplateId?: string;
   /** NEW: Configuration version for tracking changes */
   configVersion?: number;
+
+  // NEW: Docker-specific fields
+  /** Docker service name (e.g., mcp-ship456-github) */
+  dockerServiceName?: string;
+  /** Docker deployment status */
+  dockerStatus?: 'pending' | 'building' | 'running' | 'stopped' | 'error';
+  /** Docker container ID from Docker daemon */
+  dockerContainerId?: string;
+  /** Docker health status from health checks */
+  dockerHealthStatus?: 'healthy' | 'unhealthy' | 'starting';
+  /** Timestamp of last health check */
+  dockerLastHealthCheck?: string;
+  /** Docker network name (e.g., starship-ship456) */
+  dockerNetworkName?: string;
+  /** Docker image used for deployment */
+  dockerImageName?: string;
+  /** Docker deployment error message (if dockerStatus is 'error') */
+  dockerErrorMessage?: string;
 
   /** Timestamp when the connector instance was created */
   createdAt: string;
@@ -491,6 +510,65 @@ export interface MCPServerConnectorRepository extends Repository<MCPServerConnec
   findByStarshipAndTemplate(
     starshipId: string,
     templateId: string
+  ): Promise<MCPServerConnector | null>;
+
+  // NEW: Docker-specific repository methods
+
+  /**
+   * Update Docker deployment status and related fields
+   * @param id - The ID of the connector instance
+   * @param dockerStatus - The new Docker status
+   * @param containerInfo - Optional container information
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  updateDockerStatus(
+    id: string,
+    dockerStatus: MCPServerConnector['dockerStatus'],
+    containerInfo?: {
+      containerId?: string;
+      serviceName?: string;
+      networkName?: string;
+      imageName?: string;
+      errorMessage?: string;
+    }
+  ): Promise<MCPServerConnector | null>;
+
+  /**
+   * Update Docker health status
+   * @param id - The ID of the connector instance
+   * @param healthStatus - The new health status
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  updateDockerHealth(
+    id: string,
+    healthStatus: MCPServerConnector['dockerHealthStatus']
+  ): Promise<MCPServerConnector | null>;
+
+  /**
+   * Find connector instances by Docker status
+   * @param dockerStatus - The Docker status to filter by
+   * @returns Promise resolving to array of connector instances
+   */
+  findByDockerStatus(
+    dockerStatus: MCPServerConnector['dockerStatus']
+  ): Promise<MCPServerConnector[]>;
+
+  /**
+   * Find connector instances by starship with Docker information
+   * @param starshipId - The ID of the starship
+   * @returns Promise resolving to array of connector instances with Docker fields populated
+   */
+  findByStarshipWithDockerInfo(starshipId: string): Promise<MCPServerConnector[]>;
+
+  /**
+   * Update Docker container ID after deployment
+   * @param id - The ID of the connector instance
+   * @param containerId - The Docker container ID
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  updateDockerContainerId(
+    id: string,
+    containerId: string
   ): Promise<MCPServerConnector | null>;
 }
 

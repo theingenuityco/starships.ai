@@ -792,18 +792,6 @@ private async handleAgentMessage(
 
       console.log(`[MESSAGE-SERVICE] Expedition found - Status: ${expedition.status}`);
 
-      // Auto-start expedition if it's not started and this is a user message
-      if (messageType === 'user-input' && expedition.status === 'draft' && userId) {
-        console.log(`[MESSAGE-SERVICE] Auto-starting expedition ${expeditionId} for user message`);
-        try {
-          await this.expeditionService.startExpedition(expeditionId, userId);
-          console.log(`[MESSAGE-SERVICE] Expedition ${expeditionId} auto-started successfully`);
-        } catch (startError) {
-          console.error(`[MESSAGE-SERVICE] Failed to auto-start expedition ${expeditionId}:`, startError);
-          // Continue with message handling even if auto-start fails
-        }
-      }
-
       // Handle user messages to First Officer
       if (messageType === 'user-input' && userId) {
         console.log(`[MESSAGE-SERVICE] Handling First Officer message for expedition`);
@@ -961,11 +949,11 @@ private async handleAgentMessage(
   }
 
   private generateThreadId(): string {
-    return `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `thread_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
   private generateFileId(): string {
-    return `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `file_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
   private createError(code: ExpeditionErrorCode, message: string): ExpeditionError {

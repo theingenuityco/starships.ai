@@ -18,26 +18,31 @@ export function buildPrompt(
   
   // Add vision context FIRST to ensure it takes priority
   if (visionContext) {
+    console.log('[PROMPT-BUILDER] Adding vision context, length:', visionContext.length);
     combinedSystemPrompt += visionContext + '\n\n';
   }
   
   // Then add the agent's base system prompt
   if (systemPrompt) {
+    console.log('[PROMPT-BUILDER] Adding system prompt, length:', systemPrompt.length);
     combinedSystemPrompt += systemPrompt + '\n\n';
   }
   
   // Add expedition context if available
   if (expeditionContext) {
+    console.log('[PROMPT-BUILDER] Adding expedition context, length:', expeditionContext.length);
     combinedSystemPrompt += expeditionContext + '\n\n';
   }
   
   // Add relevant context from history
   if (relevantContext) {
+    console.log('[PROMPT-BUILDER] Adding relevant context, length:', relevantContext.length);
     combinedSystemPrompt += `Relevant context from conversation history:\n${relevantContext}\n\n`;
   }
   
   // Add the combined system message
   if (combinedSystemPrompt.trim()) {
+    console.log('[PROMPT-BUILDER] Final combined prompt length:', combinedSystemPrompt.length);
     messages.push({ role: "system", content: combinedSystemPrompt.trim() });
   }
 

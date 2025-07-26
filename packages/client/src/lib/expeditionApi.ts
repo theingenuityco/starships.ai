@@ -386,12 +386,20 @@ export const expeditionAPI = {
   ): Promise<{ message: string }> => {
     validateRequest({ starshipId, expeditionId }, ['starshipId', 'expeditionId'])
 
-    const response = await api.delete(
-      `/api/starships/${starshipId}/expeditions/${expeditionId}`
-    )
-    const data = validateResponse<{ message: string }>(response.data, ['message'])
-    invalidateExpeditionCaches(expeditionId, starshipId)
-    return data
+    try {
+      const response = await api.delete(
+        `/api/starships/${starshipId}/expeditions/${expeditionId}`
+      )
+      const data = validateResponse<{ message: string }>(response.data, ['message'])
+      invalidateExpeditionCaches(expeditionId, starshipId)
+      return data
+    } catch (error: any) {
+      // Convert AxiosError to ExpeditionAPIError
+      if (error && typeof error === 'object' && 'response' in error) {
+        throw ExpeditionAPIError.fromAxiosError(error as AxiosError, expeditionId)
+      }
+      throw error
+    }
   },
 
   // ============================================================================
@@ -810,6 +818,9 @@ export const expeditionAPI = {
         threadId: request.threadId,
         parentMessageId: request.parentMessageId,
         metadata: request.metadata
+      },
+      {
+        timeout: options?.timeout || 30000 // Increase timeout to 30 seconds for message sending
       }
     )
     const data = response.data.data

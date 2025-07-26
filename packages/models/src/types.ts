@@ -419,6 +419,22 @@ export interface MCPServerConnector {
   /** Docker deployment error message (if dockerStatus is 'error') */
   dockerErrorMessage?: string;
 
+  // NEW: HTTP Bridge-specific fields
+  /** Whether this connector uses HTTP bridge */
+  httpBridgeEnabled?: boolean;
+  /** Internal URL for HTTP bridge communication (e.g., http://mcp-ship456-github-http:8080) */
+  internalUrl?: string;
+  /** HTTP bridge version */
+  bridgeVersion?: string;
+  /** Timestamp of last tools/capabilities synchronization */
+  lastToolsSync?: string;
+  /** Available tools from the MCP server (cached from bridge) */
+  availableTools?: string;
+  /** Available resources from the MCP server (cached from bridge) */
+  availableResources?: string;
+  /** Bridge capabilities metadata (cached from bridge) */
+  bridgeCapabilities?: string;
+
   /** Timestamp when the connector instance was created */
   createdAt: string;
   /** Timestamp when the connector instance was last updated */

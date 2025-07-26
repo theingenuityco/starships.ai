@@ -18,6 +18,13 @@ export interface DeploymentStatus {
   errorMessage?: string;
   deployedAt?: string;
   lastUpdated: string;
+  // HTTP bridge specific fields
+  httpBridgeEnabled?: boolean;
+  internalUrl?: string;
+  bridgeVersion?: string;
+  availableTools?: string[];
+  availableResources?: string[];
+  lastToolsSync?: string;
 }
 
 export interface DeploymentResult {

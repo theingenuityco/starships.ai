@@ -1,0 +1,26 @@
+{
+  "name": "mcp-http-bridge",
+  "version": "1.0.0",
+  "description": "HTTP to MCP Protocol Bridge Service for containerized deployment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "mcp",
+    "http",
+    "bridge",
+    "docker",
+    "model-context-protocol"
+  ],
+  "author": "Starships.ai",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

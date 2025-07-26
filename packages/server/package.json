@@ -18,6 +18,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
     "@starships/agent-engine": "workspace:*",
+    "@starships/core": "workspace:*",
     "@starships/env-config": "workspace:*",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",

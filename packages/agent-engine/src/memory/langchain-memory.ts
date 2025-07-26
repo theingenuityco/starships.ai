@@ -35,26 +35,91 @@ export class LangChainMemoryStore {
   private async initializeVectorStore() {
     console.log('🔧 [MEMORY-STORE] Initializing vector store...');
     console.log('📁 [MEMORY-STORE] FAISS index path:', this.indexPath);
-    console.log('📂 [MEMORY-STORE] Index exists:', fs.existsSync(this.indexPath));
+    
+    // Ensure directory exists
+    const indexDir = path.dirname(this.indexPath);
+    if (!fs.existsSync(indexDir)) {
+      console.log('📁 [MEMORY-STORE] Creating index directory:', indexDir);
+      fs.mkdirSync(indexDir, { recursive: true });
+    }
+    
+    // Check if both index files exist and are valid
+    const indexFile = path.join(this.indexPath, 'faiss.index');
+    const pklFile = path.join(this.indexPath, 'index.pkl');
+    const indexExists = fs.existsSync(indexFile) && fs.existsSync(pklFile);
+    
+    console.log('📂 [MEMORY-STORE] Index files exist:', {
+      indexFile: fs.existsSync(indexFile),
+      pklFile: fs.existsSync(pklFile),
+      fullPath: indexExists
+    });
     
     try {
-      if (fs.existsSync(this.indexPath)) {
-        console.log('📖 [MEMORY-STORE] Loading existing FAISS index...');
-        this.vectorStore = await FaissStore.load(this.indexPath, this.embeddings);
-        console.log('✅ [MEMORY-STORE] FAISS index loaded successfully');
-      } else {
-        console.log('🆕 [MEMORY-STORE] Creating new FAISS index...');
-        const docs = [new Document({ pageContent: "Initial document", metadata: {} })];
-        this.vectorStore = await FaissStore.fromDocuments(docs, this.embeddings);
-        
-        fs.mkdirSync(path.dirname(this.indexPath), { recursive: true });
-        console.log('✅ [MEMORY-STORE] New FAISS index created');
+      if (indexExists) {
+        try {
+          console.log('📖 [MEMORY-STORE] Loading existing FAISS index...');
+          this.vectorStore = await FaissStore.load(this.indexPath, this.embeddings);
+          console.log('✅ [MEMORY-STORE] FAISS index loaded successfully');
+          return;
+        } catch (loadError) {
+          const errorMessage = loadError instanceof Error ? loadError.message : String(loadError);
+          console.warn('⚠️ [MEMORY-STORE] Failed to load existing index, corrupted files detected:', errorMessage);
+          console.log('🗑️ [MEMORY-STORE] Cleaning up corrupted index files...');
+          
+          // Remove corrupted files
+          try {
+            if (fs.existsSync(indexFile)) fs.unlinkSync(indexFile);
+            if (fs.existsSync(pklFile)) fs.unlinkSync(pklFile);
+            // Also clean up the directory if it's empty
+            if (fs.existsSync(this.indexPath) && fs.readdirSync(this.indexPath).length === 0) {
+              fs.rmdirSync(this.indexPath);
+            }
+          } catch (cleanupError) {
+            const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+            console.warn('⚠️ [MEMORY-STORE] Failed to cleanup corrupted files:', cleanupMessage);
+          }
+        }
       }
+      
+      // Create new index
+      console.log('🆕 [MEMORY-STORE] Creating new FAISS index...');
+      const docs = [new Document({ 
+        pageContent: "Memory store initialized", 
+        metadata: { 
+          type: "system",
+          timestamp: Date.now(),
+          id: "init-doc"
+        } 
+      })];
+      
+      this.vectorStore = await FaissStore.fromDocuments(docs, this.embeddings);
+      
+      // Ensure directory exists before saving
+      fs.mkdirSync(this.indexPath, { recursive: true });
+      
+      // Save the new index
+      await this.vectorStore.save(this.indexPath);
+      console.log('✅ [MEMORY-STORE] New FAISS index created and saved');
+      
     } catch (error) {
       console.error("❌ [MEMORY-STORE] Failed to initialize vector store:", error);
       console.log('🔄 [MEMORY-STORE] Falling back to in-memory vector store...');
-      const docs = [new Document({ pageContent: "Initial document", metadata: {} })];
-      this.vectorStore = await FaissStore.fromDocuments(docs, this.embeddings);
+      
+      try {
+        const docs = [new Document({ 
+          pageContent: "In-memory fallback initialized", 
+          metadata: { 
+            type: "system",
+            timestamp: Date.now(),
+            id: "fallback-doc"
+          } 
+        })];
+        this.vectorStore = await FaissStore.fromDocuments(docs, this.embeddings);
+        console.log('✅ [MEMORY-STORE] In-memory vector store created successfully');
+      } catch (fallbackError) {
+        console.error("❌ [MEMORY-STORE] Even fallback initialization failed:", fallbackError);
+        this.vectorStore = null;
+      }
     }
   }
 
@@ -86,8 +151,8 @@ export class LangChainMemoryStore {
     console.log('💬 [MEMORY-STORE] Chat history messages found:', chatHistory.length);
     
     const entries = chatHistory.map(msg => ({
-      role: msg._getType() === "human" ? "user" as const :
-            msg._getType() === "ai" ? "assistant" as const : "system" as const,
+      role: msg instanceof HumanMessage ? "user" as const :
+            msg instanceof AIMessage ? "assistant" as const : "system" as const,
       content: msg.content as string,
       timestamp: Date.now(),
     }));
@@ -123,17 +188,27 @@ export class LangChainMemoryStore {
       await this.initializeVectorStore();
     }
 
-    const doc = new Document({
-      pageContent: entry.content,
-      metadata: {
-        sessionKey,
-        role: entry.role,
-        timestamp: entry.timestamp || Date.now(),
-        id: uuidv4(),
-      },
-    });
+    if (!this.vectorStore) {
+      console.warn('⚠️ [MEMORY-STORE] Vector store not available, skipping vector storage for entry');
+      return;
+    }
 
-    await this.vectorStore!.addDocuments([doc]);
+    try {
+      const doc = new Document({
+        pageContent: entry.content,
+        metadata: {
+          sessionKey,
+          role: entry.role,
+          timestamp: entry.timestamp || Date.now(),
+          id: uuidv4(),
+        },
+      });
+
+      await this.vectorStore.addDocuments([doc]);
+    } catch (error) {
+      console.error('❌ [MEMORY-STORE] Failed to add document to vector store:', error);
+      // Don't throw error - memory should still work without vector search
+    }
   }
 
   async semanticSearch(sessionKey: SessionKey, query: string, limit: number = 5): Promise<MemorySearchResult> {
@@ -218,12 +293,18 @@ export class LangChainMemoryStore {
   }
 
   async saveIndex(): Promise<void> {
-    if (this.vectorStore) {
-      try {
-        await this.vectorStore.save(this.indexPath);
-      } catch (error) {
-        console.error("Failed to save vector index:", error);
-      }
+    if (!this.vectorStore) {
+      console.warn('⚠️ [MEMORY-STORE] No vector store to save');
+      return;
+    }
+    
+    try {
+      // Ensure directory exists before saving
+      fs.mkdirSync(this.indexPath, { recursive: true });
+      await this.vectorStore.save(this.indexPath);
+      console.log('✅ [MEMORY-STORE] Vector index saved successfully');
+    } catch (error) {
+      console.error("❌ [MEMORY-STORE] Failed to save vector index:", error);
     }
   }
 
@@ -242,7 +323,8 @@ export class LangChainMemoryStore {
       const messages = await bufferMemory.chatHistory.getMessages();
       
       const serializedMessages = messages.map(msg => ({
-        type: msg._getType(),
+        type: msg instanceof HumanMessage ? 'human' : 
+              msg instanceof AIMessage ? 'ai' : 'system',
         content: msg.content,
         timestamp: Date.now()
       }));

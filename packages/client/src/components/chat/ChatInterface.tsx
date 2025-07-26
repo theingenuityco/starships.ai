@@ -18,9 +18,10 @@ interface ChatInterfaceProps {
   agent: Agent
   sessionId: string | null
   onSessionCreated: (sessionId: string) => void
+  starshipSlug?: string
 }
 
-export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterfaceProps) {
+export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug }: ChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   
   // Socket.IO connection
@@ -61,7 +62,13 @@ export function ChatInterface({ agent, sessionId, onSessionCreated }: ChatInterf
     }
 
     // TODO: Add debouncing for rapid agent switching
-    const newSessionId = generateSessionId(agent.id, userId) // Use real user ID from auth
+    let newSessionId = generateSessionId(agent.id, userId) // Use real user ID from auth
+    
+    // If we have a starship slug, modify the session ID to include it
+    if (starshipSlug) {
+      newSessionId = `starship-${starshipSlug}:${newSessionId}`
+    }
+    
     currentSessionId.current = newSessionId
     onSessionCreated(newSessionId)
     setError(null)

@@ -156,13 +156,14 @@ export default function HomePage() {
                 strokeLinejoin="round"
                 className="text-primary"
               >
-                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path>
-                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
-                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
-                {/* Three parallel flame lines representing thrust */}
-                <line x1="6.5" y1="14.5" x2="3.5" y2="17.5"></line>
-                <line x1="8" y1="16" x2="5" y2="19"></line>
-                <line x1="9.5" y1="17.5" x2="6.5" y2="20.5"></line>
+                <path d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path>
+                <path d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
+                <path d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
+                <circle cx="14.5" cy="8" r="1.5" fill="none"></circle>
+                {/* Three parallel flame lines representing thrust with varied lengths */}
+                <line x1="6" y1="15" x2="2.5" y2="18.5"></line>
+                <line x1="7.5" y1="16.5" x2="5.4" y2="18.6"></line>
+                <line x1="9" y1="18" x2="7.6" y2="19.4"></line>
               </svg>
             </div>
           </motion.div>

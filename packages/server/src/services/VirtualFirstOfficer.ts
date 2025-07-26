@@ -2,7 +2,7 @@ import { getLogger, Logger } from '../utils/logger';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { LLMChatPrompt, LLMProvider } from '@starships/protocol';
 import { env } from '../config/environment';
-import { ExpeditionMessageRepository, ExpeditionMessage, MessageRole, MessageType } from '@starships/models';
+import { ExpeditionMessageRepository, ExpeditionMessage, MessageRole, MessageType, RepositoryFactory } from '@starships/models';
 import { LangChainMemoryStore } from '@starships/agent-engine/src/memory/langchain-memory';
 
 // Type definitions from other parts of the system
@@ -106,6 +106,7 @@ export class VirtualFirstOfficer {
   private llmProvider: LLMProvider;
   private messageRepository?: ExpeditionMessageRepository;
   private memoryStore: LangChainMemoryStore;
+  private visionContext: string = '';
 
   constructor(config: VirtualFirstOfficerConfig) {
     this.logger = getLogger({ service: 'VirtualFirstOfficer' });
@@ -124,6 +125,17 @@ export class VirtualFirstOfficer {
 
     // Initialize memory store for vector search
     this.memoryStore = new LangChainMemoryStore();
+
+    // Load starship vision
+    this.loadStarshipVision().catch(error => {
+      this.logger.warn('Failed to load starship vision, continuing without it', {
+        service: 'VirtualFirstOfficer',
+        operation: 'constructor'
+      }, {
+        error: error instanceof Error ? error.message : String(error),
+        starshipId: config.starshipId
+      });
+    });
 
     this.logger.info('VirtualFirstOfficer initialized', {
       service: 'VirtualFirstOfficer',
@@ -149,6 +161,59 @@ export class VirtualFirstOfficer {
           operation: 'constructor'
         });
       });
+    }
+  }
+
+  /**
+   * Load starship vision from database
+   */
+  private async loadStarshipVision(): Promise<void> {
+    try {
+      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const visionRepo = RepositoryFactory.getVisionRepository();
+      
+      // First get the starship
+      const starship = await starshipRepo.findById(this.starshipId);
+      if (!starship) {
+        this.logger.warn('Starship not found for vision loading', {
+          service: 'VirtualFirstOfficer',
+          operation: 'loadStarshipVision'
+        }, {
+          starshipId: this.starshipId
+        });
+        return;
+      }
+      
+      // Then get the vision
+      const vision = await visionRepo.findByStarship(this.starshipId);
+      if (vision?.statement && vision.statement.trim().length > 0) {
+        this.visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. When asked about the company vision, mission, or what the company does, refer to this vision. You are the First Officer of this starship/company and should embody this vision in all your responses.\n`;
+        
+        this.logger.info('Starship vision loaded successfully', {
+          service: 'VirtualFirstOfficer',
+          operation: 'loadStarshipVision'
+        }, {
+          starshipId: this.starshipId,
+          visionLength: vision.statement.length
+        });
+      } else {
+        this.logger.warn('No vision found for starship', {
+          service: 'VirtualFirstOfficer',
+          operation: 'loadStarshipVision'
+        }, {
+          starshipId: this.starshipId,
+          visionFound: !!vision,
+          hasStatement: !!vision?.statement
+        });
+      }
+    } catch (error) {
+      this.logger.error('Failed to load starship vision', error instanceof Error ? error : new Error(String(error)), {
+        service: 'VirtualFirstOfficer',
+        operation: 'loadStarshipVision'
+      }, {
+        starshipId: this.starshipId
+      });
+      throw error;
     }
   }
 
@@ -1025,7 +1090,7 @@ ${relevantContext}\n`;
     });
 
     const prompt = `You are a Virtual First Officer for an expedition management system. You are assisting with expedition "${this.context.title}".
-
+${this.visionContext}
 EXPEDITION CONTEXT:
 ${contextSummary}
 

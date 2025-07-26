@@ -45,12 +45,23 @@ export class MCPServerOptionRepository implements MCPServerOptionRepositoryInter
   }
 
   async create(entity: Omit<MCPServerOption, 'id'>): Promise<MCPServerOption> {
-    if (!entity.name || !entity.command) {
-      throw new Error('Name and command are required fields');
+    if (!entity.name || !entity.command || !entity.slug) {
+      throw new Error('Name, command, and slug are required fields');
     }
 
     if (!Array.isArray(entity.args)) {
       throw new Error('Args must be an array');
+    }
+
+    // Validate slug format (Docker-compatible: lowercase, alphanumeric, hyphens)
+    if (!/^[a-z0-9-]+$/.test(entity.slug)) {
+      throw new Error('Slug must contain only lowercase letters, numbers, and hyphens');
+    }
+
+    // Check slug uniqueness
+    const existingSlug = await this.findBySlug(entity.slug);
+    if (existingSlug) {
+      throw new Error(`A MCP server option with slug '${entity.slug}' already exists`);
     }
 
     // Validate env is valid JSON string if provided
@@ -213,6 +224,26 @@ export class MCPServerOptionRepository implements MCPServerOptionRepositoryInter
       );
       throw new Error(
         `Failed to search MCP server options by name: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  async findBySlug(slug: string): Promise<MCPServerOption | null> {
+    if (!slug) {
+      throw new Error('Slug parameter is required');
+    }
+
+    const connection = getConnection();
+    try {
+      const result = await connection.executeQuery<{ m: MCPServerOption }>(
+        'MATCH (m:MCPServerOption) WHERE m.slug = $slug RETURN m',
+        { slug }
+      );
+      return result[0]?.m || null;
+    } catch (error) {
+      console.error(`[MCPServerOptionRepository] Error in findBySlug for slug ${slug}:`, error);
+      throw new Error(
+        `Failed to retrieve MCP server option by slug: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

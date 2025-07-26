@@ -765,4 +765,256 @@ export class MCPServerConnectorRepository implements MCPServerConnectorRepositor
       );
     }
   }
+
+  // NEW: Docker-specific repository methods
+
+  /**
+   * Update Docker deployment status and related fields
+   * @param id - The ID of the connector instance
+   * @param dockerStatus - The new Docker status
+   * @param containerInfo - Optional container information
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  async updateDockerStatus(
+    id: string,
+    dockerStatus: MCPServerConnector['dockerStatus'],
+    containerInfo?: {
+      containerId?: string;
+      serviceName?: string;
+      networkName?: string;
+      imageName?: string;
+      errorMessage?: string;
+    }
+  ): Promise<MCPServerConnector | null> {
+    this.validateUUID(id, 'id');
+
+    if (!dockerStatus) {
+      throw new ValidationError('dockerStatus parameter is required', 'dockerStatus');
+    }
+
+    // Validate Docker status
+    const validDockerStatuses: MCPServerConnector['dockerStatus'][] = [
+      'pending',
+      'building',
+      'running',
+      'stopped',
+      'error',
+    ];
+    if (!validDockerStatuses.includes(dockerStatus)) {
+      throw new ValidationError(
+        `dockerStatus must be one of: ${validDockerStatuses.join(', ')}. Got: ${dockerStatus}`,
+        'dockerStatus'
+      );
+    }
+
+    console.log(
+      `[MCPServerConnectorRepository] Updating Docker status of connector ${id} to ${dockerStatus}`
+    );
+
+    const updates: Partial<MCPServerConnector> = {
+      dockerStatus,
+      dockerContainerId: containerInfo?.containerId,
+      dockerServiceName: containerInfo?.serviceName,
+      dockerNetworkName: containerInfo?.networkName,
+      dockerImageName: containerInfo?.imageName,
+      dockerErrorMessage: dockerStatus === 'error' ? containerInfo?.errorMessage : undefined,
+    };
+
+    // If Docker status is running, also update main status to active
+    if (dockerStatus === 'running') {
+      updates.status = 'active';
+      updates.isActive = true;
+      updates.lastUsed = new Date().toISOString();
+    } else if (dockerStatus === 'error') {
+      updates.status = 'error';
+      updates.isActive = false;
+      updates.errorMessage = containerInfo?.errorMessage;
+    } else if (dockerStatus === 'stopped') {
+      updates.status = 'inactive';
+      updates.isActive = false;
+    }
+
+    try {
+      return await this.update(id, updates);
+    } catch (error) {
+      console.error(`[MCPServerConnectorRepository] Error in updateDockerStatus for id ${id}:`, error);
+      throw new Error(
+        `Failed to update Docker status: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Update Docker health status
+   * @param id - The ID of the connector instance
+   * @param healthStatus - The new health status
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  async updateDockerHealth(
+    id: string,
+    healthStatus: MCPServerConnector['dockerHealthStatus']
+  ): Promise<MCPServerConnector | null> {
+    this.validateUUID(id, 'id');
+
+    if (!healthStatus) {
+      throw new ValidationError('healthStatus parameter is required', 'healthStatus');
+    }
+
+    // Validate health status
+    const validHealthStatuses: MCPServerConnector['dockerHealthStatus'][] = [
+      'healthy',
+      'unhealthy',
+      'starting',
+    ];
+    if (!validHealthStatuses.includes(healthStatus)) {
+      throw new ValidationError(
+        `dockerHealthStatus must be one of: ${validHealthStatuses.join(', ')}. Got: ${healthStatus}`,
+        'dockerHealthStatus'
+      );
+    }
+
+    console.log(
+      `[MCPServerConnectorRepository] Updating Docker health status of connector ${id} to ${healthStatus}`
+    );
+
+    const updates: Partial<MCPServerConnector> = {
+      dockerHealthStatus: healthStatus,
+      dockerLastHealthCheck: new Date().toISOString(),
+    };
+
+    // If health becomes unhealthy, update main status accordingly
+    if (healthStatus === 'unhealthy') {
+      updates.status = 'error';
+      updates.isActive = false;
+      updates.errorMessage = 'Container health check failed';
+    } else if (healthStatus === 'healthy' && updates.dockerStatus === 'running') {
+      updates.status = 'active';
+      updates.isActive = true;
+      updates.errorMessage = undefined;
+    }
+
+    try {
+      return await this.update(id, updates);
+    } catch (error) {
+      console.error(`[MCPServerConnectorRepository] Error in updateDockerHealth for id ${id}:`, error);
+      throw new Error(
+        `Failed to update Docker health status: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Find connector instances by Docker status
+   * @param dockerStatus - The Docker status to filter by
+   * @returns Promise resolving to array of connector instances
+   */
+  async findByDockerStatus(
+    dockerStatus: MCPServerConnector['dockerStatus']
+  ): Promise<MCPServerConnector[]> {
+    if (!dockerStatus) {
+      throw new ValidationError('dockerStatus parameter is required', 'dockerStatus');
+    }
+
+    const connection = getConnection();
+    try {
+      console.log(
+        `[MCPServerConnectorRepository] Finding connector instances with Docker status: ${dockerStatus}`
+      );
+
+      const result = await connection.executeQuery<{ c: MCPServerConnector }>(
+        'MATCH (c:MCPServerConnector) WHERE c.dockerStatus = $dockerStatus RETURN c ORDER BY c.createdAt DESC',
+        { dockerStatus }
+      );
+
+      const connectors = result.map((record) => record.c);
+      console.log(
+        `[MCPServerConnectorRepository] Found ${connectors.length} connector instances with Docker status: ${dockerStatus}`
+      );
+
+      return connectors;
+    } catch (error) {
+      console.error(
+        `[MCPServerConnectorRepository] Error in findByDockerStatus for status ${dockerStatus}:`,
+        error
+      );
+      throw new Error(
+        `Failed to find connector instances by Docker status: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Find connector instances by starship with Docker information
+   * @param starshipId - The ID of the starship
+   * @returns Promise resolving to array of connector instances with Docker fields populated
+   */
+  async findByStarshipWithDockerInfo(starshipId: string): Promise<MCPServerConnector[]> {
+    if (!starshipId) {
+      throw new ValidationError('starshipId parameter is required', 'starshipId');
+    }
+
+    const connection = getConnection();
+    try {
+      console.log(
+        `[MCPServerConnectorRepository] Finding connector instances with Docker info for starship: ${starshipId}`
+      );
+
+      const result = await connection.executeQuery<{ c: MCPServerConnector }>(
+        `MATCH (s:Starship {id: $starshipId})-[:HAS_CONNECTOR_INSTANCE]->(c:MCPServerConnector)
+         WHERE c.dockerServiceName IS NOT NULL OR c.dockerStatus IS NOT NULL
+         RETURN c
+         ORDER BY c.createdAt DESC`,
+        { starshipId }
+      );
+
+      const connectors = result.map((record) => record.c);
+      console.log(
+        `[MCPServerConnectorRepository] Found ${connectors.length} connector instances with Docker info for starship: ${starshipId}`
+      );
+
+      return connectors;
+    } catch (error) {
+      console.error(
+        `[MCPServerConnectorRepository] Error in findByStarshipWithDockerInfo for starshipId ${starshipId}:`,
+        error
+      );
+      throw new Error(
+        `Failed to find connector instances with Docker info: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Update Docker container ID after deployment
+   * @param id - The ID of the connector instance
+   * @param containerId - The Docker container ID
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  async updateDockerContainerId(
+    id: string,
+    containerId: string
+  ): Promise<MCPServerConnector | null> {
+    this.validateUUID(id, 'id');
+
+    if (!containerId || typeof containerId !== 'string') {
+      throw new ValidationError('containerId parameter is required and must be a string', 'containerId');
+    }
+
+    console.log(
+      `[MCPServerConnectorRepository] Updating Docker container ID for connector ${id} to ${containerId}`
+    );
+
+    const updates: Partial<MCPServerConnector> = {
+      dockerContainerId: containerId,
+    };
+
+    try {
+      return await this.update(id, updates);
+    } catch (error) {
+      console.error(`[MCPServerConnectorRepository] Error in updateDockerContainerId for id ${id}:`, error);
+      throw new Error(
+        `Failed to update Docker container ID: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
 }

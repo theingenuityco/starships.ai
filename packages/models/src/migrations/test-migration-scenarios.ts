@@ -110,6 +110,7 @@ export class MigrationTestDataSetup {
       const server: MCPServerOption = {
         id: `test-mcp-server-${i + 1}-${uuidv4()}`,
         name: `Test MCP Server ${i + 1}`,
+        slug: `test-server-${i + 1}`,
         command: i % 2 === 0 ? 'npx' : 'docker',
         args: [`@test/server-${i + 1}`],
         env: JSON.stringify({ TEST_VAR: `value-${i + 1}` }),
@@ -117,6 +118,7 @@ export class MigrationTestDataSetup {
 
       const createdServer = await this.mcpServerRepo.create({
         name: server.name,
+        slug: server.slug,
         command: server.command,
         args: server.args,
         env: server.env,

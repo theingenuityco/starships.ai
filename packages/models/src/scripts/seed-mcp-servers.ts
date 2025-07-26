@@ -11,6 +11,7 @@ import { MCPServerOption } from '../types';
 const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   {
     name: 'GitHub',
+    slug: 'github',
     command: 'docker',
     args: [
       'run',
@@ -32,12 +33,14 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'Puppeteer',
+    slug: 'puppeteer',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-puppeteer'],
     env: JSON.stringify({}),
   },
   {
     name: 'Filesystem',
+    slug: 'filesystem',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-filesystem', 'FILESYSTEM_PATH'],
     env: JSON.stringify({
@@ -46,6 +49,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'Notion',
+    slug: 'notion',
     command: 'npx',
     args: ['-y', '@notionhq/notion-mcp-server'],
     env: JSON.stringify({
@@ -54,6 +58,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'PostgreSQL',
+    slug: 'postgresql',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-postgres'],
     env: JSON.stringify({
@@ -62,6 +67,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'Brave Search',
+    slug: 'brave',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-brave-search'],
     env: JSON.stringify({
@@ -70,6 +76,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'Google Drive',
+    slug: 'gdrive',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-gdrive'],
     env: JSON.stringify({
@@ -78,6 +85,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'Slack',
+    slug: 'slack',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-slack'],
     env: JSON.stringify({
@@ -86,18 +94,21 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   },
   {
     name: 'Memory',
+    slug: 'memory',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-memory'],
     env: JSON.stringify({}),
   },
   {
     name: 'Time',
+    slug: 'time',
     command: 'uvx',
     args: ['mcp-server-time', '--local-timezone=America/New_York'],
     env: JSON.stringify({}),
   },
   {
     name: 'Stripe',
+    slug: 'stripe',
     command: 'npx',
     args: ['-y', '@stripe/mcp', '--tools=all', '--api-key=Stripe_API_Key'],
     env: JSON.stringify({

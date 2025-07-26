@@ -13,20 +13,32 @@ export function buildPrompt(
 ): LLMChatPrompt {
   const messages: LLMChatPrompt['messages'] = [];
 
-  if (systemPrompt) {
-    messages.push({ role: "system", content: systemPrompt });
-  }
-
+  // Combine all system context into a single system message
+  let combinedSystemPrompt = '';
+  
+  // Add vision context FIRST to ensure it takes priority
   if (visionContext) {
-    messages.push({ role: "system", content: visionContext });
+    combinedSystemPrompt += visionContext + '\n\n';
   }
-
+  
+  // Then add the agent's base system prompt
+  if (systemPrompt) {
+    combinedSystemPrompt += systemPrompt + '\n\n';
+  }
+  
+  // Add expedition context if available
   if (expeditionContext) {
-    messages.push({ role: "system", content: expeditionContext });
+    combinedSystemPrompt += expeditionContext + '\n\n';
   }
-
+  
+  // Add relevant context from history
   if (relevantContext) {
-    messages.push({ role: "system", content: `Relevant context from conversation history:\n${relevantContext}` });
+    combinedSystemPrompt += `Relevant context from conversation history:\n${relevantContext}\n\n`;
+  }
+  
+  // Add the combined system message
+  if (combinedSystemPrompt.trim()) {
+    messages.push({ role: "system", content: combinedSystemPrompt.trim() });
   }
 
   const memoryMessages = memory.map(entry => ({

@@ -737,12 +737,27 @@ private async handleAgentMessage(
       console.log(`[MESSAGE-SERVICE] User ID: ${userId}`);
       console.log(`[MESSAGE-SERVICE] Message Length: ${content?.length}`);
       
+      // Look up the expedition to get the starshipId
+      let channelId = `expedition-${expeditionId}`;
+      try {
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        const expedition = await expeditionRepo.findById(expeditionId);
+        if (expedition && expedition.starshipId) {
+          // Include both expedition and starship info for better context
+          // Use a delimiter that won't appear in UUIDs
+          channelId = `expedition:${expeditionId}:starship:${expedition.starshipId}`;
+          console.log(`[MESSAGE-SERVICE] Enhanced channel_id with starship:`, channelId);
+        }
+      } catch (error) {
+        console.log(`[MESSAGE-SERVICE] Could not enhance channel_id with starship:`, error);
+      }
+
       // Use the agent engine's chat function (same as crew chat)
       const chatRequest: ChatRequest = {
         agent_id: agentId,
         user_id: userId,
         message: content,
-        channel_id: `expedition-${expeditionId}`,
+        channel_id: channelId,
         stream: false
       };
 

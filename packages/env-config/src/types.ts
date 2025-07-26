@@ -43,6 +43,9 @@ export interface ServerEnvironmentConfig {
   KINDE_POST_LOGIN_REDIRECT_URL: string;
   KINDE_POST_LOGOUT_REDIRECT_URL: string;
   KINDE_DEBUG_MODE?: boolean;
+  
+  // MCP Feature Flags
+  MCP_HTTP_BRIDGE_ENABLED: boolean;
 }
 
 /**

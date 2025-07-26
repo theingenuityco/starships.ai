@@ -115,6 +115,13 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
       STRIPE_API_KEY: '${STRIPE_API_KEY}',
     }),
   },
+  {
+    name: 'Sequential Thinking',
+    slug: 'sequentialthinking',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
+    env: JSON.stringify({}),
+  },
 ];
 
 async function seedMCPServers() {

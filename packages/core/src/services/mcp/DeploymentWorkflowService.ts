@@ -8,7 +8,10 @@
 import { MCPServerConnector, MCPServerConnectorRepository, MCPServerOptionRepository } from '@starships/models';
 import { MCPDeployer, DeploymentResult, DeploymentStatus } from './MCPDeployer';
 import { DockerComposeDeployer } from './DockerComposeDeployer';
-import { getDockerServiceTemplate } from './DockerServiceTemplate';
+import { getDockerServiceTemplate, isHttpBridgeTemplate, getHttpBridgeTemplate, setHttpBridgeEnabled, getTemplateForDeployment } from './DockerServiceTemplate';
+import { serviceRegistry } from './ServiceRegistry';
+import { CapabilitySyncService } from './CapabilitySyncService';
+import { bridgeMonitoringService } from './BridgeMonitoringService';
 
 export interface DeploymentWorkflowOptions {
   starshipId: string;
@@ -43,6 +46,7 @@ export class DeploymentWorkflowService {
   private mcpConnectorRepo: MCPServerConnectorRepository;
   private mcpServerOptionRepo: MCPServerOptionRepository;
   private deployer: MCPDeployer;
+  private capabilitySync: CapabilitySyncService;
   private notificationCallbacks: ((notification: DeploymentNotification) => void)[] = [];
   private healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
 
@@ -54,6 +58,7 @@ export class DeploymentWorkflowService {
     this.mcpConnectorRepo = mcpConnectorRepo || new MCPServerConnectorRepository();
     this.mcpServerOptionRepo = mcpServerOptionRepo || new MCPServerOptionRepository();
     this.deployer = deployer || new DockerComposeDeployer();
+    this.capabilitySync = new CapabilitySyncService(this.mcpConnectorRepo);
   }
 
   /**
@@ -80,16 +85,26 @@ export class DeploymentWorkflowService {
         metadata: { userId, templateId }
       });
 
-      // 3. Get template info and generate service names
+      // 3. Get template info and determine deployment type based on feature flag
       const template = await this.getTemplate(templateId);
-      const serviceName = `mcp-${starshipId}-${template.slug}`;
+      const dockerTemplate = getTemplateForDeployment(template.slug);
+      const useHttpBridge = dockerTemplate && isHttpBridgeTemplate(dockerTemplate);
+      
+      // Generate service names based on deployment type
+      const serviceName = useHttpBridge ? 
+        `mcp-${starshipId}-${template.slug}-http` : 
+        `mcp-${starshipId}-${template.slug}`;
       const networkName = `starship-${starshipId}`;
+      const internalUrl = useHttpBridge ? `http://${serviceName}:8080` : null;
 
-      // 4. Update connector with Docker info and set status to building
+      // 4. Update connector with Docker info and HTTP bridge details
       await this.updateConnectorDockerInfo(connector.id, {
         dockerServiceName: serviceName,
         dockerNetworkName: networkName,
-        dockerStatus: 'building'
+        dockerStatus: 'building',
+        httpBridgeEnabled: useHttpBridge || false,
+        internalUrl: internalUrl || undefined,
+        bridgeVersion: useHttpBridge ? '1.0.0' : undefined
       });
 
       // 5. Deploy container using MCPDeployer
@@ -131,18 +146,40 @@ export class DeploymentWorkflowService {
       // 7. Start health monitoring
       await this.startHealthMonitoring(connector.id);
 
-      // 8. Send success notification
+      // 8. Start monitoring and observability for HTTP bridge deployments
+      if (useHttpBridge) {
+        try {
+          console.log(`[DeploymentWorkflow] Starting monitoring for HTTP bridge connector ${connector.id}`);
+          await bridgeMonitoringService.startMonitoring(connector.id);
+        } catch (error) {
+          console.error(`[DeploymentWorkflow] Failed to start monitoring for ${connector.id}:`, error);
+        }
+
+        // Schedule initial capability sync after a brief startup delay
+        setTimeout(async () => {
+          try {
+            console.log(`[DeploymentWorkflow] Starting capability synchronization for HTTP bridge connector ${connector.id}`);
+            await this.capabilitySync.startCapabilitySync(connector.id);
+          } catch (error) {
+            console.error(`[DeploymentWorkflow] Failed to start capability sync for ${connector.id}:`, error);
+          }
+        }, 15000); // 15 second delay for container startup
+      }
+
+      // 9. Send success notification
       this.sendNotification({
         type: 'deployment_success',
         connectorId: connector.id,
         starshipId,
         serviceName: deploymentResult.serviceName,
-        message: `Successfully deployed ${template.slug} MCP server`,
+        message: `Successfully deployed ${template.slug} ${useHttpBridge ? 'HTTP bridge' : 'MCP server'}`,
         timestamp: new Date().toISOString(),
         metadata: { 
           containerId: deploymentResult.containerId,
           networkName: deploymentResult.networkName,
-          deploymentTime: deploymentResult.deploymentTime
+          deploymentTime: deploymentResult.deploymentTime,
+          httpBridgeEnabled: useHttpBridge,
+          internalUrl: internalUrl
         }
       });
 
@@ -273,6 +310,9 @@ export class DeploymentWorkflowService {
       dockerContainerId?: string;
       dockerHealthStatus?: MCPServerConnector['dockerHealthStatus'];
       dockerErrorMessage?: string;
+      httpBridgeEnabled?: boolean;
+      internalUrl?: string;
+      bridgeVersion?: string;
     }
   ): Promise<void> {
     await this.mcpConnectorRepo.updateDockerStatus(connectorId, dockerInfo.dockerStatus, {
@@ -329,18 +369,51 @@ export class DeploymentWorkflowService {
    * Perform health check for a connector
    */
   private async performHealthCheck(connectorId: string): Promise<void> {
+    const startTime = Date.now();
     const connector = await this.mcpConnectorRepo.findById(connectorId);
     if (!connector || !connector.starshipId) {
       throw new Error('Connector not found or missing starship ID');
     }
 
-    // Use deployer's health check functionality
-    const healthResult = await this.deployer.checkHealth(connector.starshipId, connectorId);
-    
-    // Update connector health status
-    await this.mcpConnectorRepo.updateDockerHealth(connectorId, healthResult.healthy ? 'healthy' : 'unhealthy');
+    // Check if this is an HTTP bridge deployment
+    const template = await this.mcpServerOptionRepo.findById(connector.templateId);
+    if (template) {
+      const dockerTemplate = getHttpBridgeTemplate(template.slug);
+      const useHttpBridge = dockerTemplate && isHttpBridgeTemplate(dockerTemplate);
+      
+      if (useHttpBridge) {
+        // Use ServiceRegistry for HTTP bridge health checks
+        const serviceEndpoint = serviceRegistry.getService(connector.starshipId, connectorId);
+        
+        if (serviceEndpoint) {
+          const responseTime = Date.now() - startTime;
+          const isHealthy = serviceEndpoint.status === 'healthy';
+          
+          // Record health check in monitoring service
+          bridgeMonitoringService.recordHealthCheck(connectorId, isHealthy, responseTime);
+          
+          // ServiceRegistry automatically updates health status via its monitoring
+          await this.mcpConnectorRepo.updateDockerHealth(
+            connectorId, 
+            isHealthy ? 'healthy' : 'unhealthy'
+          );
+          
+          // Sync capabilities if available
+          if (serviceEndpoint.availableTools || serviceEndpoint.availableResources) {
+            await this.syncMCPCapabilities(connectorId, serviceEndpoint);
+          }
+          
+          console.log(`[DeploymentWorkflow] HTTP bridge health check for ${connectorId}: ${serviceEndpoint.status} (${responseTime}ms)`);
+          return;
+        }
+      }
+    }
 
-    console.log(`[DeploymentWorkflow] Health check for ${connectorId}: ${healthResult.status}`);
+    // Fallback to legacy health check for stdio deployments
+    const healthResult = await this.deployer.checkHealth(connector.starshipId, connectorId);
+    const responseTime = Date.now() - startTime;
+    await this.mcpConnectorRepo.updateDockerHealth(connectorId, healthResult.healthy ? 'healthy' : 'unhealthy');
+    console.log(`[DeploymentWorkflow] Legacy health check for ${connectorId}: ${healthResult.status} (${responseTime}ms)`);
   }
 
   /**
@@ -368,8 +441,11 @@ export class DeploymentWorkflowService {
         return false;
       }
 
-      // Stop health monitoring
+      // Stop health monitoring and bridge monitoring
       await this.stopHealthMonitoring(connectorId);
+      if (connector.httpBridgeEnabled) {
+        bridgeMonitoringService.stopMonitoring(connectorId);
+      }
 
       // Remove container if it exists
       if (connector.starshipId) {
@@ -400,6 +476,12 @@ export class DeploymentWorkflowService {
       // Get additional status from deployer if available
       const deployerStatus = await this.deployer.getStatus(connectorId);
 
+      // Get service registry information for HTTP bridge deployments
+      let serviceEndpoint = null;
+      if (connector.httpBridgeEnabled && connector.starshipId) {
+        serviceEndpoint = serviceRegistry.getService(connector.starshipId, connectorId);
+      }
+
       return {
         connectorId,
         status: connector.dockerStatus || 'pending',
@@ -410,11 +492,38 @@ export class DeploymentWorkflowService {
         lastHealthCheck: connector.dockerLastHealthCheck,
         errorMessage: connector.dockerErrorMessage,
         lastUpdated: connector.updatedAt,
+        // HTTP bridge specific fields
+        httpBridgeEnabled: connector.httpBridgeEnabled || false,
+        internalUrl: connector.internalUrl,
+        bridgeVersion: connector.bridgeVersion,
+        availableTools: serviceEndpoint?.availableTools || [],
+        availableResources: serviceEndpoint?.availableResources || [],
+        lastToolsSync: connector.lastToolsSync,
         ...deployerStatus
       };
     } catch (error) {
       console.error(`[DeploymentWorkflow] Failed to get deployment status for ${connectorId}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Sync MCP capabilities from HTTP bridge endpoint (now uses CapabilitySyncService)
+   */
+  private async syncMCPCapabilities(connectorId: string, serviceEndpoint?: any): Promise<void> {
+    try {
+      console.log(`[DeploymentWorkflow] Triggering capability sync for connector ${connectorId}`);
+      
+      // Use the dedicated CapabilitySyncService for robust capability synchronization
+      const result = await this.capabilitySync.syncConnectorCapabilities(connectorId);
+      
+      if (result.success) {
+        console.log(`[DeploymentWorkflow] Successfully synced ${result.toolsCount} tools and ${result.resourcesCount} resources for connector ${connectorId}`);
+      } else {
+        console.error(`[DeploymentWorkflow] Capability sync failed for connector ${connectorId}: ${result.errorMessage}`);
+      }
+    } catch (error) {
+      console.error(`[DeploymentWorkflow] Failed to sync capabilities for connector ${connectorId}:`, error);
     }
   }
 

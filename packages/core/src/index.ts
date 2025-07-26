@@ -17,6 +17,7 @@ export { NetworkBandwidthManager } from './services/mcp/NetworkBandwidthManager'
 export { VolumeManager } from './services/mcp/VolumeManager';
 export { SecurityManager } from './services/mcp/SecurityManager';
 export { NetworkCleanupService } from './services/mcp/NetworkCleanupService';
+export { ConnectorMigrationService, connectorMigrationService } from './services/mcp/ConnectorMigrationService';
 
 // API Routes
 export { createDeploymentApiRoutes } from './services/mcp/DeploymentApiRoutes';
@@ -59,3 +60,9 @@ export type {
 export type {
   DockerServiceTemplate
 } from './services/mcp/DockerServiceTemplate';
+
+export type {
+  MigrationOptions,
+  MigrationResult,
+  MigrationStatus
+} from './services/mcp/ConnectorMigrationService';

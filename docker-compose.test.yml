@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Quick test of HTTP Bridge deployment
+  mcp-test-brave-http:
+    image: starships/mcp-http-bridge:latest
+    container_name: mcp-test-brave-http-staging
+    environment:
+      # HTTP Bridge configuration
+      - MCP_SERVER_CMD=npx
+      - MCP_SERVER_ARGS=-y @modelcontextprotocol/server-brave-search
+      - HTTP_PORT=8080
+      - LOG_LEVEL=info
+      - HEALTH_CHECK_TIMEOUT=10000
+      - MAX_CONCURRENT_REQUESTS=10
+      # Test API key
+      - BRAVE_API_KEY=test_key_staging
+    ports:
+      - "8083:8080"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    labels:
+      - "starship.id=test-starship"
+      - "connector.id=test-brave-connector"
+      - "mcp.type=brave"
+      - "mcp.protocol=http"
+      - "mcp.runtime=bridge"
+      - "mcp.version=1.0.0"
+      - "managed-by=starships-staging"
+      - "service.type=mcp-http-bridge"
+
+networks:
+  test-network:
+    driver: bridge

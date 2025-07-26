@@ -160,20 +160,51 @@ export class FirstOfficerAgent {
         console.log(`✅ [FIRST-OFFICER] Expedition completed successfully: ${expeditionId}`);
         return finalState.finalResult;
       } else {
-        await expeditionRepo.updateStatus(expeditionId, 'failed');
-        const errorMessage = finalState.errors?.join('; ') || 'Unknown error occurred';
-        await this.chatCoordinator.sendErrorReport(errorMessage, finalState.currentPhase);
+        // Check if tasks actually failed
+        const hasFailedTasks = finalState.completedTasks?.some((task: any) => 
+          task.result?.status === 'failed' || task.result?.error
+        );
         
-        console.error(`❌ [FIRST-OFFICER] Expedition failed: ${expeditionId}`, finalState.errors);
-        throw new Error(`Expedition failed: ${errorMessage}`);
+        if (hasFailedTasks) {
+          await expeditionRepo.updateStatus(expeditionId, 'failed');
+          const errorMessage = finalState.errors?.join('; ') || 'Task execution failed';
+          await this.chatCoordinator.sendErrorReport(errorMessage, finalState.currentPhase);
+          
+          console.error(`❌ [FIRST-OFFICER] Expedition failed due to task failures: ${expeditionId}`, finalState.errors);
+          throw new Error(`Expedition failed: ${errorMessage}`);
+        } else {
+          // No task failures, just workflow completion without final result
+          await expeditionRepo.updateStatus(expeditionId, 'review');
+          const message = 'Workflow completed but no final result synthesized. Expedition requires review.';
+          await this.chatCoordinator.sendCoordinationMessage('phase-update', 'waiting_for_approval', message);
+          
+          console.warn(`⚠️ [FIRST-OFFICER] Expedition completed without final result: ${expeditionId}`);
+          return message;
+        }
       }
 
     } catch (error) {
       console.error(`❌ [FIRST-OFFICER] Expedition orchestration failed:`, error);
       
-      // Update expedition status to failed
+      // Check if it's a workflow initialization error vs actual task failure
+      const isInitializationError = error instanceof Error && (
+        error.message.includes('Property values can only be of primitive types') ||
+        error.message.includes('serialization') ||
+        error.message.includes('workflow') ||
+        error.message.includes('initialization')
+      );
+      
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      await expeditionRepo.updateStatus(expeditionId, 'failed');
+      
+      if (isInitializationError) {
+        // For workflow initialization errors, put expedition in review state
+        console.log(`⚠️ [FIRST-OFFICER] Workflow initialization error, setting expedition to review state`);
+        await expeditionRepo.updateStatus(expeditionId, 'review');
+      } else {
+        // Only fail expedition for actual execution failures
+        console.log(`❌ [FIRST-OFFICER] Actual execution failure, setting expedition to failed state`);
+        await expeditionRepo.updateStatus(expeditionId, 'failed');
+      }
       
       if (this.chatCoordinator) {
         await this.chatCoordinator.sendErrorReport(
@@ -706,9 +737,24 @@ export class FirstOfficerAgent {
       
       await this.chatCoordinator.sendErrorReport(errorMessage, state.currentPhase);
       
-      // Update expedition status to failed
+      // Check if the error is due to task failures or just workflow issues
+      const isTaskFailure = state.completedTasks?.some((task: any) => 
+        task.result?.status === 'failed' || 
+        task.result?.error
+      ) || state.errors?.some((err: string) => 
+        err.toLowerCase().includes('task failed') || 
+        err.toLowerCase().includes('execution failed')
+      );
+      
+      // Only fail the expedition if actual tasks failed
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      await expeditionRepo.updateStatus(state.expeditionId, 'failed');
+      if (isTaskFailure) {
+        console.log(`❌ [FIRST-OFFICER] Task execution failed, updating expedition status to failed`);
+        await expeditionRepo.updateStatus(state.expeditionId, 'failed');
+      } else {
+        console.log(`⚠️ [FIRST-OFFICER] Workflow error occurred but no task failures, keeping expedition in review state`);
+        await expeditionRepo.updateStatus(state.expeditionId, 'review');
+      }
 
       return {
         currentPhase: 'failed',

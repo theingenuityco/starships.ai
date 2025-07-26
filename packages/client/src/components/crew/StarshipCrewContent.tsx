@@ -239,6 +239,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               agent={selectedAgent}
               sessionId={sessionId}
               onSessionCreated={handleSessionCreated}
+              starshipSlug={slug}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full bg-muted/5">

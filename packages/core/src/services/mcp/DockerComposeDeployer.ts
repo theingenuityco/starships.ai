@@ -21,8 +21,11 @@ import {
   DockerServiceTemplate, 
   getDockerServiceTemplate, 
   buildVolumeMapping,
-  getDefaultResourceLimits 
+  getDefaultResourceLimits,
+  getHttpBridgeTemplate,
+  isHttpBridgeTemplate
 } from './DockerServiceTemplate';
+import { serviceRegistry } from './ServiceRegistry';
 
 const execAsync = promisify(exec);
 
@@ -104,6 +107,7 @@ export class DockerComposeDeployer implements MCPDeployer {
     const templateIdToSlugMap: Record<string, string> = {
       '54f39175-4d64-49d1-90b5-d48491ce8cf2': 'brave', // Brave Search template
       'e054bf0a-5f93-4b0a-bf3e-aaade290118f': 'puppeteer', // Puppeteer template
+      '9e1b6668-d3fa-47fb-9447-b8e1e9dabd9f': 'sequentialthinking', // Sequential Thinking template
       // Add other known mappings here as needed
     };
     
@@ -117,7 +121,7 @@ export class DockerComposeDeployer implements MCPDeployer {
     // Verify we have a Docker service template for this slug
     const dockerTemplate = getDockerServiceTemplate(slug);
     if (!dockerTemplate) {
-      throw new Error(`No Docker service template found for slug: ${slug}. Available: brave, github, puppeteer, filesystem, postgres, sqlite`);
+      throw new Error(`No Docker service template found for slug: ${slug}. Available: brave, github, puppeteer, filesystem, postgres, sqlite, sequentialthinking`);
     }
 
     // Create a basic MCPServerOption based on the Docker template
@@ -138,8 +142,9 @@ export class DockerComposeDeployer implements MCPDeployer {
   /**
    * Generate Docker service name
    */
-  private generateServiceName(starshipId: string, templateSlug: string): string {
-    return `mcp-${starshipId}-${templateSlug}`;
+  private generateServiceName(starshipId: string, templateSlug: string, useHttpBridge: boolean = true): string {
+    const suffix = useHttpBridge ? '-http' : '';
+    return `mcp-${starshipId}-${templateSlug}${suffix}`;
   }
 
   /**
@@ -198,6 +203,38 @@ export class DockerComposeDeployer implements MCPDeployer {
   }
 
   /**
+   * Build environment variables for service deployment
+   */
+  private buildEnvironmentVariables(
+    dockerTemplate: DockerServiceTemplate, 
+    userEnv: Record<string, string>,
+    useHttpBridge: boolean
+  ): Record<string, string> {
+    if (useHttpBridge && dockerTemplate.bridgeConfig) {
+      // HTTP Bridge deployment - merge bridge config with user environment
+      const bridgeEnvironment = {
+        // Bridge configuration from template
+        ...dockerTemplate.environment,
+        
+        // User-provided environment variables (API keys, etc.)
+        ...userEnv
+      };
+      
+      console.log(`[DockerComposeDeployer] HTTP Bridge environment:`, bridgeEnvironment);
+      return bridgeEnvironment;
+    } else {
+      // Legacy stdio deployment - traditional merge
+      const environment = {
+        ...dockerTemplate.environment,
+        ...userEnv
+      };
+      
+      console.log(`[DockerComposeDeployer] Legacy environment:`, environment);
+      return environment;
+    }
+  }
+
+  /**
    * Build Docker service configuration using Docker service templates
    */
   private buildServiceConfig(
@@ -205,36 +242,34 @@ export class DockerComposeDeployer implements MCPDeployer {
     connector: MCPServerConnector,
     template: MCPServerOption
   ): DockerComposeService {
-    const serviceName = this.generateServiceName(starshipId, template.slug);
-    const networkName = this.generateNetworkName(starshipId);
-    
-    // Get Docker service template
-    const dockerTemplate = getDockerServiceTemplate(template.slug);
+    // Get Docker service template - prefer HTTP bridge version
+    const dockerTemplate = getHttpBridgeTemplate(template.slug);
     if (!dockerTemplate) {
       throw new Error(`No Docker service template found for slug: ${template.slug}`);
     }
     
+    const useHttpBridge = isHttpBridgeTemplate(dockerTemplate);
+    const serviceName = this.generateServiceName(starshipId, template.slug, useHttpBridge);
+    const networkName = this.generateNetworkName(starshipId);
+    
     // Parse environment variables from connector (handle double-encoded JSON)
-    let env: Record<string, string> = {};
+    let userEnv: Record<string, string> = {};
     try {
       const parsedEnv = JSON.parse(connector.env || '{}');
       // Check if the result is a string (double-encoded JSON)
       if (typeof parsedEnv === 'string') {
-        env = JSON.parse(parsedEnv);
+        userEnv = JSON.parse(parsedEnv);
       } else if (typeof parsedEnv === 'object' && parsedEnv !== null) {
-        env = parsedEnv;
+        userEnv = parsedEnv;
       }
-      console.log(`[DockerComposeDeployer] Parsed environment:`, env);
+      console.log(`[DockerComposeDeployer] Parsed user environment:`, userEnv);
     } catch (error) {
       console.warn(`[DockerComposeDeployer] Failed to parse environment variables:`, error);
-      env = {};
+      userEnv = {};
     }
     
-    // Merge static environment variables from template
-    const environment = {
-      ...dockerTemplate.environment,
-      ...env
-    };
+    // Build environment variables based on template type
+    const environment = this.buildEnvironmentVariables(dockerTemplate, userEnv, useHttpBridge);
 
     // Build volumes using template configuration
     const volumes = buildVolumeMapping(dockerTemplate, starshipId);
@@ -279,6 +314,21 @@ export class DockerComposeDeployer implements MCPDeployer {
   }
 
   /**
+   * Update service registry for container discovery
+   */
+  private async updateServiceRegistry(
+    starshipId: string, 
+    endpoint: any
+  ): Promise<void> {
+    try {
+      await serviceRegistry.registerService(starshipId, endpoint);
+      console.log(`[DockerComposeDeployer] Registered service in registry: ${endpoint.containerName}`);
+    } catch (error) {
+      console.error(`[DockerComposeDeployer] Failed to register service:`, error);
+    }
+  }
+
+  /**
    * Deploy a MCP server connector
    */
   async deploy(starshipId: string, connector: MCPServerConnector): Promise<DeploymentResult> {
@@ -289,7 +339,15 @@ export class DockerComposeDeployer implements MCPDeployer {
 
       // Get template information
       const template = await this.getTemplate(connector.templateId);
-      const serviceName = this.generateServiceName(starshipId, template.slug);
+      
+      // Determine if we're using HTTP bridge
+      const dockerTemplate = getHttpBridgeTemplate(template.slug);
+      if (!dockerTemplate) {
+        throw new Error(`No Docker service template found for slug: ${template.slug}`);
+      }
+      const useHttpBridge = isHttpBridgeTemplate(dockerTemplate);
+      
+      const serviceName = this.generateServiceName(starshipId, template.slug, useHttpBridge);
       const networkName = this.generateNetworkName(starshipId);
 
       // Ensure network exists
@@ -332,6 +390,18 @@ export class DockerComposeDeployer implements MCPDeployer {
 
       // Get container ID
       const containerId = await this.getContainerId(serviceName);
+      
+      // Update service registry for HTTP bridge containers
+      if (useHttpBridge) {
+        await this.updateServiceRegistry(starshipId, {
+          connectorId: connector.id,
+          containerName: serviceName,
+          internalUrl: `http://${serviceName}:8080`,
+          templateSlug: template.slug,
+          status: 'starting',
+          lastHealthCheck: new Date().toISOString()
+        });
+      }
       
       const deploymentTime = Date.now() - startTime;
       console.log(`[DockerComposeDeployer] Successfully deployed ${serviceName} (${deploymentTime}ms)`);
@@ -439,6 +509,14 @@ export class DockerComposeDeployer implements MCPDeployer {
       // Remove service from compose file
       delete compose.services[serviceToRemove];
       await this.saveComposeFile(starshipId, compose);
+
+      // Unregister from service registry
+      try {
+        await serviceRegistry.unregisterService(starshipId, connectorId);
+        console.log(`[DockerComposeDeployer] Unregistered service from registry: ${serviceToRemove}`);
+      } catch (error) {
+        console.warn(`[DockerComposeDeployer] Failed to unregister service from registry:`, error);
+      }
 
       console.log(`[DockerComposeDeployer] Successfully removed service ${serviceToRemove}`);
       return true;

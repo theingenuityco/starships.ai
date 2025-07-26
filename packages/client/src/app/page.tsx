@@ -40,7 +40,7 @@ const SystemCard = ({ icon: Icon, title, description, accent = false }: {
     whileHover={{ y: -5, transition: { duration: 0.2 } }}
     className="group"
   >
-    <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 ${accent ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
+    <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 relative overflow-hidden ${accent ? 'ring-1 ring-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-br from-white/5 via-white/3 to-transparent'}`}>
       <div className="flex items-start space-x-4">
         <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
           <Icon className={`w-6 h-6 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
@@ -399,6 +399,17 @@ export default function HomePage() {
       {/* System Flow Section */}
       <section className="py-20 px-4 relative bg-black">
         <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/20 to-black" />
+        {/* Subtle ambient glow */}
+        <motion.div 
+          className="absolute inset-0 opacity-10"
+          style={{
+            background: 'radial-gradient(circle at 30% 40%, rgba(var(--primary-rgb), 0.15) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(var(--primary-rgb), 0.1) 0%, transparent 50%)'
+          }}
+          animate={{
+            opacity: [0.05, 0.15, 0.05]
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
         <div className="relative z-10 max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -413,53 +424,48 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <SystemCard
-              icon={Eye}
-              title="Vision"
-              description="The foundational intent behind your Starship. Not just a goal, but a long-term dream that drives everything else."
-              accent
-            />
-            <SystemCard
-              icon={Book}
-              title="The Codex"
-              description="A living, persistent artifact that reflects your Vision's current state. Where purpose becomes programmable."
-            />
-            <SystemCard
-              icon={Brain}
-              title="Aether Cortex"
-              description="The synthetic mind of your Starship. Orchestrates your Crew, maintains mission state, and translates Vision into action."
-            />
-            <SystemCard
-              icon={Sparkles}
-              title="The Echo"
-              description="Your reflective companion. A semi-sentient entity that helps refine your Vision and monitor alignment."
-            />
-            <SystemCard
-              icon={Compass}
-              title="Expeditions"
-              description="Scoped, executable ventures that fulfill pieces of your Vision. Each has a goal, context, timeline, and output."
-            />
-            <SystemCard
-              icon={Zap}
-              title="Aether Drive"
-              description="The engine that converts time, compute, and tokens into meaningful progress. Powers your Starship's operations."
-            />
-            <SystemCard
-              icon={Navigation}
-              title="Command Deck"
-              description="Your control center. Launch Expeditions, monitor agent activity, and command your living vessel."
-            />
-            <SystemCard
-              icon={Users}
-              title="Crew"
-              description="Intelligent agents specialized for different tasks. Your Crew carries out the work of your Expeditions."
-            />
-            <SystemCard
-              icon={Layers}
-              title="Starship Class"
-              description="Determines your vessel's capabilities: max Crew slots, concurrent Expeditions, and burn rate ceiling."
-            />
+          <div className="relative">
+            {/* Connecting lines */}
+            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-y-1/2 z-0" />
+            <div className="hidden md:block absolute top-1/2 left-1/3 w-px h-16 bg-gradient-to-b from-white/20 to-transparent transform -translate-y-1/2 z-0" />
+            <div className="hidden md:block absolute top-1/2 left-2/3 w-px h-16 bg-gradient-to-b from-white/20 to-transparent transform -translate-y-1/2 z-0" />
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+              >
+                <SystemCard
+                  icon={Eye}
+                  title="Vision Chamber"
+                  description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
+                  accent
+                />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
+              >
+                <SystemCard
+                  icon={Compass}
+                  title="Expeditions"
+                  description="Your idea becomes reality through focused missions. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
+                />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
+              >
+                <SystemCard
+                  icon={Users}
+                  title="Crew"
+                  description="The specialists your project needs, available when you need them. Development, design, strategy, growth. Not someday when you can afford them. Today."
+                />
+              </motion.div>
+            </div>
           </div>
         </div>
       </section>

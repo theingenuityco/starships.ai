@@ -24,6 +24,21 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
   constructor() {
     super('ExpeditionRepository');
   }
+
+  /**
+   * Helper method to parse workflow state from string
+   */
+  private parseWorkflowState(expedition: Expedition): Expedition {
+    if (expedition && expedition.workflowState && typeof expedition.workflowState === 'string') {
+      try {
+        expedition.workflowState = JSON.parse(expedition.workflowState);
+      } catch (error) {
+        console.error('Failed to parse workflow state:', error);
+        expedition.workflowState = null;
+      }
+    }
+    return expedition;
+  }
   
   /**
    * Find all expeditions (admin use only)
@@ -33,7 +48,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
     const result = await connection.executeQuery<{ e: Expedition }>(
       'MATCH (e:Expedition) RETURN e ORDER BY e.createdAt DESC'
     );
-    return result.map(record => record.e);
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
   /**
@@ -54,7 +69,20 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
         id
       );
       
-      return result[0]?.e || null;
+      // Parse workflow state if it's a string
+      if (result[0]?.e) {
+        const expedition = result[0].e;
+        if (expedition.workflowState && typeof expedition.workflowState === 'string') {
+          try {
+            expedition.workflowState = JSON.parse(expedition.workflowState);
+          } catch (error) {
+            console.error('Failed to parse workflow state:', error);
+          }
+        }
+        return expedition;
+      }
+      
+      return null;
     } catch (error) {
       throw this.handleDatabaseError(error, 'findById', 'expedition', id);
     }
@@ -70,7 +98,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
        RETURN e ORDER BY e.createdAt DESC`,
       { starshipId }
     );
-    return result.map(record => record.e);
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
   /**
@@ -84,7 +112,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
        RETURN e ORDER BY e.createdAt DESC`,
       { starshipId, status }
     );
-    return result.map(record => record.e);
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
 
@@ -307,18 +335,34 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
    */
   async updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null> {
     const connection = getConnection();
+    // Serialize the workflow state to JSON string for Neo4j storage
+    const serializedState = JSON.stringify(state);
+    
     const result = await connection.executeWrite<{ e: Expedition }>(
       `MATCH (e:Expedition) WHERE e.id = $id 
        SET e.workflowState = $state, e.updatedAt = $timestamp 
        RETURN e`,
       { 
         id, 
-        state, 
+        state: serializedState, 
         timestamp: new Date().toISOString() 
       }
     );
 
-    return result[0]?.e || null;
+    // Parse the workflow state back when returning
+    if (result[0]?.e) {
+      const expedition = result[0].e;
+      if (expedition.workflowState && typeof expedition.workflowState === 'string') {
+        try {
+          expedition.workflowState = JSON.parse(expedition.workflowState);
+        } catch (error) {
+          console.error('Failed to parse workflow state:', error);
+        }
+      }
+      return expedition;
+    }
+    
+    return null;
   }
 
   /**

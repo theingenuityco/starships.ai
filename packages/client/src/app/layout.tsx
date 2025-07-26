@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { QueryProvider } from '@/providers/query-provider'
 import { AuthProvider } from '@/providers/auth-provider'
+import { SocketProvider } from '@/providers/socket-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
@@ -34,11 +35,13 @@ export default function RootLayout({
         >
           <AuthProvider>
             <QueryProvider>
-              <TooltipProvider>
-                <div className="min-h-screen bg-background">
-                  <ClientLayout>{children}</ClientLayout>
-                </div>
-              </TooltipProvider>
+              <SocketProvider>
+                <TooltipProvider>
+                  <div className="min-h-screen bg-background">
+                    <ClientLayout>{children}</ClientLayout>
+                  </div>
+                </TooltipProvider>
+              </SocketProvider>
             </QueryProvider>
           </AuthProvider>
         </ThemeProvider>

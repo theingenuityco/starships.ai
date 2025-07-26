@@ -41,12 +41,13 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   } = useExpeditionData({
     starshipId,
     autoRefresh: true,
-    refreshInterval: 30000
+    refreshInterval: 30000,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
-  // HTTP-only implementation: Real-time updates disabled
-  // Socket integration removed to use HTTP API only
-  // Manual refresh is now the primary way to update expedition data
+  // WebSocket integration enabled for real-time updates
+  // Socket integration provides live expedition status updates
+  // Manual refresh combined with automatic real-time updates via WebSocket
 
   // Fetch starship by slug to get the real ID
   useEffect(() => {

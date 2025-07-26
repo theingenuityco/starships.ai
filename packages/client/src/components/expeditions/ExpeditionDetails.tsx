@@ -91,7 +91,8 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
     starshipId,
     expeditionId,
     autoRefresh: false, // Disable auto-refresh to prevent chat re-renders
-    refreshInterval: 30000
+    refreshInterval: 30000,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
   // Chat hook - only use when starshipId is available
@@ -104,7 +105,8 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
   } = useExpeditionChat({
     expeditionId,
     starshipId: starshipId || '', // Provide empty string as fallback
-    autoScroll: true
+    autoScroll: true,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
   // Filter messages to remove old workflow messages

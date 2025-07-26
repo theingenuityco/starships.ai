@@ -52,6 +52,7 @@
     /* Command Deck Light - Gradient backgrounds */
     --command-bg: linear-gradient(135deg, hsl(220 30% 95%), hsl(220 20% 98%));
     --starship-accent: hsl(220 70% 50%);
+    --primary-rgb: 59 130 246;
   }
 
   .dark {
@@ -77,6 +78,7 @@
     /* Command Deck Dark - Deep space gradients */
     --command-bg: linear-gradient(135deg, hsl(220 25% 12%), hsl(220 15% 8%));
     --starship-accent: hsl(220 70% 60%);
+    --primary-rgb: 59 130 246;
   }
 
   /* 
@@ -265,5 +267,27 @@
   .scrollbar-hide {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Gradient animation for landing page */
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .animate-gradient {
+    background-size: 300% 300%;
+    animation: gradient 8s ease infinite;
+  }
+
+  .bg-300\% {
+    background-size: 300% 300%;
   }
 }

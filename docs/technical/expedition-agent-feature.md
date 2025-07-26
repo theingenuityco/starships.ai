@@ -165,6 +165,22 @@ sequenceDiagram
   - Error handling
   - Result collection
 
+## Current Implementation Status (Updated: January 26, 2025)
+
+### Overall Progress: ~70% Complete
+- **Backend**: 90% Complete ✅
+- **Frontend**: 40% Complete 🔴
+- **Integration**: 50% Complete 🟡
+
+### Critical Gaps Identified
+1. **No Navigation Integration** - Expeditions not discoverable in UI
+2. **Agent Selection Broken** - Modal doesn't properly connect to backend
+3. **WebSocket Client Missing** - No real-time updates on frontend
+4. **Incomplete Chat Interface** - Missing phase indicators and task visualization
+5. **Missing UI Components** - TaskTimeline, AgentActivityFeed, QualityScoreDisplay
+
+*See [expedition-implementation-gaps.md](./expedition-implementation-gaps.md) for detailed analysis*
+
 ## Implementation Plan
 
 ### Phase 0: Foundation (Week 1)
@@ -247,9 +263,9 @@ const workflow = new StateGraph({
 ```
 
 ### Phase 2: Integration (Week 3-4)
-**Status**: 🔴 Critical Gap - API Routes Missing
+**Status**: ✅ Backend Complete, 🔴 Frontend Integration Missing
 
-#### Required API Endpoints
+#### API Endpoints (✅ ALL IMPLEMENTED)
 ```typescript
 // Expedition management
 POST   /api/starships/:starshipId/expeditions
@@ -900,6 +916,73 @@ class AgentPool {
     }
   }
 }
+```
+
+## Immediate Action Items (Critical for MVP)
+
+### 🚨 Priority 1: Make Feature Discoverable (1 day)
+```typescript
+// 1. Add to Navigation.tsx
+<NavigationLink href={`/ship/${slug}/expeditions`} icon={Rocket}>
+  Expeditions
+</NavigationLink>
+
+// 2. Add to StarshipDashboard.tsx quick actions
+<QuickActionCard
+  icon={Rocket}
+  title="Launch Expedition"
+  description="Coordinate AI agents on missions"
+  href={`/ship/${slug}/expeditions`}
+/>
+```
+
+### 🚨 Priority 2: Fix Agent Selection (2-3 days)
+```typescript
+// 1. Fix CreateExpeditionModal agent loading
+const response = await api.get(`/api/starships/${starshipId}/agents`)
+
+// 2. Ensure selectedAgents are passed correctly
+const expeditionRequest: CreateExpeditionRequest = {
+  starshipId,
+  name: formData.name.trim(),
+  mission: formData.mission.trim(),
+  selectedAgents: formData.selectedAgents, // Must not be empty
+}
+```
+
+### 🚨 Priority 3: Basic Chat Integration (3-4 days)
+```typescript
+// 1. Connect ExpeditionChat to backend
+const sendMessage = async (content: string) => {
+  const response = await expeditionAPI.sendMessage(starshipId, {
+    expeditionId,
+    content,
+    participantId: selectedAgentId || undefined
+  })
+  // Handle both userMessage and participantMessage
+}
+
+// 2. Show phase indicators
+<PhaseIndicator phase={expedition.currentPhase} />
+```
+
+### 🚨 Priority 4: WebSocket Connection (1 week)
+```typescript
+// 1. Create socket context
+export const useExpeditionSocket = (expeditionId: string) => {
+  const socket = useSocket()
+  
+  useEffect(() => {
+    socket.emit('expedition:join', { expeditionId })
+    return () => socket.emit('expedition:leave', { expeditionId })
+  }, [expeditionId])
+  
+  return socket
+}
+
+// 2. Handle real-time events
+socket.on('expedition:phase-update', updatePhase)
+socket.on('expedition:message', addMessage)
 ```
 
 ## Appendix

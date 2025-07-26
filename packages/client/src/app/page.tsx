@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useScroll, useTransform } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,14 +88,60 @@ const StarshipClass = ({ name, description, features, highlight = false }: {
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [currentTextIndex, setCurrentTextIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
+  const dynamicTexts = [
+    "your own intelligent vessel",
+    "a digital media company", 
+    "the next big SaaS",
+    "your dream startup",
+    "an AI-powered platform",
+    "the future of work",
+    "your vision into reality"
+  ];
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const currentText = dynamicTexts[currentTextIndex];
+    let timeout: NodeJS.Timeout;
+
+    if (isDeleting) {
+      // Deleting characters
+      if (displayedText.length > 0) {
+        timeout = setTimeout(() => {
+          setDisplayedText(displayedText.slice(0, -1));
+        }, 50); // Delete speed
+      } else {
+        // Finished deleting, move to next text
+        setIsDeleting(false);
+        setCurrentTextIndex((prev) => (prev + 1) % dynamicTexts.length);
+      }
+    } else {
+      // Typing characters
+      if (displayedText.length < currentText.length) {
+        timeout = setTimeout(() => {
+          setDisplayedText(currentText.slice(0, displayedText.length + 1));
+        }, 100); // Type speed
+      } else {
+        // Finished typing, wait then start deleting
+        timeout = setTimeout(() => {
+          setIsDeleting(true);
+        }, 2000); // Pause before deleting
+      }
+    }
+
+    return () => clearTimeout(timeout);
+  }, [displayedText, isDeleting, currentTextIndex, dynamicTexts]);
 
   if (!mounted || isLoading) return null;
 
@@ -133,19 +179,121 @@ export default function HomePage() {
           className="relative z-10 max-w-4xl mx-auto"
         >
           <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.5, duration: 1.5, type: "spring", stiffness: 80 }}
-            className="mb-8 relative"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
+            className="mb-6 relative"
           >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-transparent blur-xl"
-            />
-            <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/5 backdrop-blur-sm rounded-full border border-primary/20">
-              <Rocket className="w-12 h-12 text-primary" />
-            </div>
+            <motion.svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="128"
+              height="128"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="url(#gradient)"
+              strokeWidth="1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mx-auto"
+            >
+              <defs>
+                <motion.linearGradient
+                  id="gradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                  animate={{
+                    x1: ["-200%", "200%"],
+                    x2: ["-100%", "300%"],
+                    y1: ["-200%", "200%"],
+                    y2: ["-100%", "300%"]
+                  }}
+                  transition={{ 
+                    duration: 5, 
+                    repeat: Infinity, 
+                    ease: "easeInOut",
+                    repeatDelay: 3
+                  }}
+                >
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.9)" />
+                  <stop offset="15%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="20%" stopColor="white" />
+                  <stop offset="25%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="30%" stopColor="rgba(255,255,255,0.5)" />
+                  <stop offset="35%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="38%" stopColor="rgba(0,0,0,0.01)" />
+                  <stop offset="42%" stopColor="rgba(0,0,0,0.05)" />
+                  <stop offset="46%" stopColor="rgba(0,0,0,0.08)" />
+                  <stop offset="50%" stopColor="rgba(0,0,0,0.1)" />
+                  <stop offset="54%" stopColor="rgba(0,0,0,0.08)" />
+                  <stop offset="58%" stopColor="rgba(0,0,0,0.05)" />
+                  <stop offset="62%" stopColor="rgba(0,0,0,0.01)" />
+                  <stop offset="65%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="70%" stopColor="rgba(255,255,255,0.5)" />
+                  <stop offset="75%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="80%" stopColor="white" />
+                  <stop offset="85%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.9)" />
+                </motion.linearGradient>
+              </defs>
+              <motion.path
+                d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+              />
+              <motion.path
+                d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.7 }}
+              />
+              <motion.path
+                d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.8 }}
+              />
+              <motion.circle
+                cx="14.5"
+                cy="9"
+                r="1.5"
+                fill="none"
+                strokeLinecap="butt"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1.2 }}
+                transition={{ duration: 0.2, delay: 0.9 }}
+              />
+              {/* Three parallel flame lines representing thrust with varied lengths */}
+              <motion.line
+                x1="6"
+                y1="15"
+                x2="2.5"
+                y2="18.5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.0 }}
+              />
+              <motion.line
+                x1="7.5"
+                y1="16.5"
+                x2="5.4"
+                y2="18.6"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.1 }}
+              />
+              <motion.line
+                x1="9"
+                y1="18"
+                x2="7.6"
+                y2="19.4"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.2 }}
+              />
+            </motion.svg>
           </motion.div>
           
           <motion.h1 
@@ -165,13 +313,17 @@ export default function HomePage() {
             transition={{ delay: 1, duration: 1 }}
             className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed"
           >
-            Build and pilot your own <motion.span 
-              initial={{ opacity: 0.5 }}
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="text-primary font-semibold"
-            >intelligent vessel</motion.span> 
-            <br />powered by your Vision
+            Build and pilot{" "}
+            <span className="text-primary font-semibold">
+              {displayedText}
+              <motion.span
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                className="text-primary ml-1"
+              >
+                |
+              </motion.span>
+            </span>
           </motion.p>
           
           <motion.div

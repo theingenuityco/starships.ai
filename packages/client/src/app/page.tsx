@@ -140,8 +140,8 @@ export default function HomePage() {
           >
             <motion.svg
               xmlns="http://www.w3.org/2000/svg"
-              width="96"
-              height="96"
+              width="128"
+              height="128"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -170,11 +170,12 @@ export default function HomePage() {
               />
               <motion.circle
                 cx="14.5"
-                cy="8"
+                cy="9"
                 r="1.5"
                 fill="none"
+                strokeLinecap="butt"
                 initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
+                animate={{ pathLength: 1.2 }}
                 transition={{ duration: 0.2, delay: 0.9 }}
               />
               {/* Three parallel flame lines representing thrust with varied lengths */}

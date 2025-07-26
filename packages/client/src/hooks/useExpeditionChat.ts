@@ -133,15 +133,36 @@ export function useExpeditionChat({
         return [...filtered, ...newMessages];
       });
 
-    } catch (err) {
+    } catch (err: any) {
       // Remove optimistic message on error
       setMessages(prev =>
         prev.filter(msg => !msg.id.startsWith('temp-'))
       );
       
-      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      let errorMessage = 'Failed to send message';
+      
+      // Check for timeout error
+      if (err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')) {
+        errorMessage = 'Message sending timed out. The server is taking longer than expected to respond. Please try again.';
+      } else if (err?.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       console.error('[EXPEDITION CHAT] Failed to send message:', err);
+      
+      // Add error message to chat to show something went wrong
+      const errorMsg: ExpeditionMessage = {
+        id: `error-${Date.now()}`,
+        expeditionId,
+        role: 'system',
+        content: errorMessage,
+        messageType: 'notification',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setSending(false);
     }

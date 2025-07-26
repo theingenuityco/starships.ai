@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Plus, Search, Filter, Rocket, Clock, Users, Target } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Filter, Rocket, Clock, Users, Target, TrendingUp, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CreateExpeditionModal } from './CreateExpeditionModal';
@@ -129,41 +130,64 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
       {/* Stats Overview */}
       {stats && (
-        <div className="p-6 border-b bg-muted/20">
+        <div className="p-6 border-b bg-gradient-to-br from-background to-muted/10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="p-4">
-              <div className="flex items-center space-x-2">
-                <Rocket className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{stats.totalExpeditions}</p>
+            <Card className="relative overflow-hidden border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10" />
+              <div className="relative p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Total Missions</p>
+                    <p className="text-3xl font-bold mt-1">{stats.totalExpeditions}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Rocket className="h-6 w-6 text-primary" />
+                  </div>
                 </div>
               </div>
             </Card>
-            <Card className="p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="h-5 w-5 text-blue-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                  <p className="text-2xl font-bold">{stats.activeExpeditions}</p>
+            <Card className="relative overflow-hidden border-blue-500/20 shadow-sm hover:shadow-md transition-shadow">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-500/10" />
+              <div className="relative p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Active Now</p>
+                    <p className="text-3xl font-bold mt-1">{stats.activeExpeditions}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-blue-500" />
+                  </div>
                 </div>
               </div>
             </Card>
-            <Card className="p-4">
-              <div className="flex items-center space-x-2">
-                <Target className="h-5 w-5 text-green-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Completed</p>
-                  <p className="text-2xl font-bold">{stats.completedExpeditions}</p>
+            <Card className="relative overflow-hidden border-green-500/20 shadow-sm hover:shadow-md transition-shadow">
+              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-green-500/10" />
+              <div className="relative p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Completed</p>
+                    <p className="text-3xl font-bold mt-1">{stats.completedExpeditions}</p>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  </div>
                 </div>
               </div>
             </Card>
-            <Card className="p-4">
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-purple-500" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Success Rate</p>
-                  <p className="text-2xl font-bold">{Math.round(stats.successRate)}%</p>
+            <Card className="relative overflow-hidden border-purple-500/20 shadow-sm hover:shadow-md transition-shadow">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-purple-500/10" />
+              <div className="relative p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Success Rate</p>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <p className="text-3xl font-bold">{Math.round(stats.successRate)}</p>
+                      <span className="text-lg text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                  <div className="h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
+                    <TrendingUp className="h-6 w-6 text-purple-500" />
+                  </div>
                 </div>
               </div>
             </Card>
@@ -172,52 +196,169 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
       )}
 
       {/* Filters and Search */}
-      <div className="p-6 border-b">
+      <div className="p-6 border-b bg-muted/5">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search expeditions..."
+              placeholder="Search by name, mission, or agent..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-11 bg-background/60 backdrop-blur-sm border-muted-foreground/20 focus:border-primary/50 transition-colors"
             />
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as ExpeditionStatus | 'all')}>
-            <SelectTrigger className="w-full md:w-48">
-              <SelectValue placeholder="Filter by status" />
+            <SelectTrigger className="w-full md:w-56 h-11 bg-background/60 backdrop-blur-sm border-muted-foreground/20">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filter by status" />
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="planning">Planning</SelectItem>
-              <SelectItem value="in-progress">In Progress</SelectItem>
-              <SelectItem value="review">Review</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="failed">Failed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="all">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-gray-400" />
+                  All Status
+                </div>
+              </SelectItem>
+              <SelectItem value="draft">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-gray-500" />
+                  Draft
+                </div>
+              </SelectItem>
+              <SelectItem value="planning">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                  Planning
+                </div>
+              </SelectItem>
+              <SelectItem value="in-progress">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                  In Progress
+                </div>
+              </SelectItem>
+              <SelectItem value="review">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-purple-500" />
+                  Review
+                </div>
+              </SelectItem>
+              <SelectItem value="completed">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  Completed
+                </div>
+              </SelectItem>
+              <SelectItem value="failed">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                  Failed
+                </div>
+              </SelectItem>
+              <SelectItem value="cancelled">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-gray-500" />
+                  Cancelled
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Status badges */}
-        <div className="flex flex-wrap gap-2 mt-4">
-          {Object.entries(statusCounts).map(([status, count]) => (
-            <Badge key={status} variant="secondary" className="text-xs">
-              {status}: {count as number}
-            </Badge>
-          ))}
-        </div>
+        {Object.keys(statusCounts).length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {Object.entries(statusCounts).map(([status, count]) => {
+              const statusConfig = {
+                'draft': { 
+                  className: 'text-slate-600 bg-slate-100/80 dark:bg-slate-900/50 dark:text-slate-400',
+                  dotColor: 'bg-slate-400'
+                },
+                'planning': { 
+                  className: 'text-blue-600 bg-blue-100/80 dark:bg-blue-900/50 dark:text-blue-400',
+                  dotColor: 'bg-blue-500'
+                },
+                'in-progress': { 
+                  className: 'text-amber-600 bg-amber-100/80 dark:bg-amber-900/50 dark:text-amber-400',
+                  dotColor: 'bg-amber-500'
+                },
+                'review': { 
+                  className: 'text-purple-600 bg-purple-100/80 dark:bg-purple-900/50 dark:text-purple-400',
+                  dotColor: 'bg-purple-500'
+                },
+                'completed': { 
+                  className: 'text-emerald-600 bg-emerald-100/80 dark:bg-emerald-900/50 dark:text-emerald-400',
+                  dotColor: 'bg-emerald-500'
+                },
+                'failed': { 
+                  className: 'text-red-600 bg-red-100/80 dark:bg-red-900/50 dark:text-red-400',
+                  dotColor: 'bg-red-500'
+                },
+                'cancelled': { 
+                  className: 'text-gray-600 bg-gray-100/80 dark:bg-gray-900/50 dark:text-gray-400',
+                  dotColor: 'bg-gray-400'
+                }
+              }[status] || { 
+                className: 'text-gray-600 bg-gray-100/80 dark:bg-gray-900/50 dark:text-gray-400',
+                dotColor: 'bg-gray-400'
+              };
+              
+              return (
+                <div
+                  key={status}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${statusConfig.className} transition-transform hover:scale-105`}
+                >
+                  <div className={`h-2 w-2 rounded-full ${statusConfig.dotColor}`} />
+                  <span>{status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}</span>
+                  <span className="font-semibold">{count as number}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Expeditions List */}
-      <div className="flex-1 p-6 overflow-auto">
-        {expeditionsLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading expeditions...</p>
-            </div>
+      <div className="flex-1 p-6 overflow-auto bg-gradient-to-b from-background to-muted/5">
+        {expeditionsLoading || !starshipId ? (
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {[...Array(6)].map((_, index) => (
+              <Card key={index} className="relative overflow-hidden">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <Skeleton className="h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6 mt-1" />
+                    </div>
+                    <div className="flex flex-col items-end space-y-2">
+                      <Skeleton className="h-6 w-20" />
+                      <Skeleton className="h-6 w-16" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-4 w-10" />
+                    </div>
+                    <Skeleton className="h-2 w-full" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex -space-x-2">
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} className="h-7 w-7 rounded-full" />
+                      ))}
+                    </div>
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <Skeleton className="h-8 w-full rounded-lg" />
+                </CardContent>
+              </Card>
+            ))}
           </div>
         ) : expeditionsError ? (
           <div className="flex items-center justify-center h-64">
@@ -249,13 +390,13 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             </Card>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {filteredExpeditions.map((expedition, index) => (
               <motion.div
                 key={expedition.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
+                transition={{ duration: 0.4, delay: index * 0.05, type: "spring", stiffness: 100 }}
               >
                 <ExpeditionCard
                   expedition={expedition}
@@ -306,30 +447,19 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       return false;
                     }
                   }}
-                  onViewDetails={(expeditionId) => {
-                    router.push(`/ship/${slug}/expeditions/${expeditionId}`);
-                  }}
                   onViewChat={(expeditionId) => {
                     router.push(`/ship/${slug}/expeditions/${expeditionId}?tab=chat`);
                   }}
-                  onViewAnalytics={(expeditionId) => {
-                    router.push(`/ship/${slug}/expeditions/${expeditionId}?tab=analytics`);
-                  }}
-                  onEdit={(expeditionId) => {
-                    // TODO: Implement edit functionality
-                    console.log('Edit expedition:', expeditionId);
-                  }}
-                  onDuplicate={(expeditionId) => {
-                    // TODO: Implement duplicate functionality
-                    console.log('Duplicate expedition:', expeditionId);
-                  }}
                   onDelete={async (expeditionId) => {
-                    if (confirm('Are you sure you want to delete this expedition?')) {
+                    if (confirm('Are you sure you want to delete this expedition? This action cannot be undone.')) {
                       try {
                         await expeditionAPI.deleteExpedition(starshipId, expeditionId);
                         refreshExpeditions();
-                      } catch (error) {
+                      } catch (error: any) {
                         console.error('Failed to delete expedition:', error);
+                        // Show a user-friendly error message
+                        const errorMessage = error?.response?.data?.message || error?.message || 'Failed to delete expedition';
+                        alert(`Error: ${errorMessage}`);
                       }
                     }
                   }}

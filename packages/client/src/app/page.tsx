@@ -133,39 +133,79 @@ export default function HomePage() {
           className="relative z-10 max-w-4xl mx-auto"
         >
           <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.5, duration: 1.5, type: "spring", stiffness: 80 }}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
             className="mb-8 relative"
           >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-transparent blur-xl"
-            />
-            <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/5 backdrop-blur-sm rounded-full border border-primary/20">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="48"
-                height="48"
-                viewBox="0 0 24 24"
+            <motion.svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="96"
+              height="96"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-primary mx-auto"
+            >
+              <motion.path
+                d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+              />
+              <motion.path
+                d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.7 }}
+              />
+              <motion.path
+                d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.8 }}
+              />
+              <motion.circle
+                cx="14.5"
+                cy="8"
+                r="1.5"
                 fill="none"
-                stroke="currentColor"
-                strokeWidth="1"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-primary"
-              >
-                <path d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path>
-                <path d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
-                <path d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
-                <circle cx="14.5" cy="8" r="1.5" fill="none"></circle>
-                {/* Three parallel flame lines representing thrust with varied lengths */}
-                <line x1="6" y1="15" x2="2.5" y2="18.5"></line>
-                <line x1="7.5" y1="16.5" x2="5.4" y2="18.6"></line>
-                <line x1="9" y1="18" x2="7.6" y2="19.4"></line>
-              </svg>
-            </div>
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 0.9 }}
+              />
+              {/* Three parallel flame lines representing thrust with varied lengths */}
+              <motion.line
+                x1="6"
+                y1="15"
+                x2="2.5"
+                y2="18.5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.0 }}
+              />
+              <motion.line
+                x1="7.5"
+                y1="16.5"
+                x2="5.4"
+                y2="18.6"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.1 }}
+              />
+              <motion.line
+                x1="9"
+                y1="18"
+                x2="7.6"
+                y2="19.4"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.2 }}
+              />
+            </motion.svg>
           </motion.div>
           
           <motion.h1 

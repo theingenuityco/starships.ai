@@ -18,6 +18,7 @@ import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionService } from './ExpeditionService';
 import { VirtualFirstOfficer } from './VirtualFirstOfficer';
 import { ContextBuilder } from './ContextBuilder';
+import { SocketIOService } from './SocketIOService';
 import { chat as agentChat } from '@starships/agent-engine';
 import type { ChatRequest } from '@starships/protocol';
 import getStore from '../store';
@@ -80,10 +81,18 @@ export class MessageService {
   private static instance: MessageService;
   private firstOfficerService: FirstOfficerService;
   private expeditionService: ExpeditionService;
+  private socketService: SocketIOService | null = null;
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
     this.expeditionService = ExpeditionService.getInstance();
+    
+    // Get socket service instance if available
+    try {
+      this.socketService = SocketIOService.getInstance();
+    } catch (error) {
+      console.log('[MESSAGE-SERVICE] SocketIO service not initialized, WebSocket events will be disabled');
+    }
   }
 
 
@@ -162,6 +171,16 @@ export class MessageService {
       metadata: request.metadata || {}
     });
 
+    // Emit WebSocket event for user message
+    if (this.socketService) {
+      const expeditionRoom = `expedition:${request.expeditionId}`;
+      this.socketService.getIO().to(expeditionRoom).emit('message:sent', {
+        expeditionId: request.expeditionId,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Route to participant
     let participantMessage: ExpeditionMessage | undefined = undefined;
 
@@ -189,6 +208,16 @@ export class MessageService {
           parentMessageId: userMessage.id,
           metadata: { usage: response.usage }
         });
+
+        // Emit WebSocket event for First Officer response
+        if (this.socketService && participantMessage) {
+          const expeditionRoom = `expedition:${request.expeditionId}`;
+          this.socketService.getIO().to(expeditionRoom).emit('message:sent', {
+            expeditionId: request.expeditionId,
+            message: participantMessage,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     } else {
       // Route to specific agent
@@ -211,6 +240,16 @@ export class MessageService {
           parentMessageId: userMessage.id,
           metadata: { usage: response.usage }
         });
+
+        // Emit WebSocket event for agent response
+        if (this.socketService && participantMessage) {
+          const expeditionRoom = `expedition:${request.expeditionId}`;
+          this.socketService.getIO().to(expeditionRoom).emit('message:sent', {
+            expeditionId: request.expeditionId,
+            message: participantMessage,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     }
 

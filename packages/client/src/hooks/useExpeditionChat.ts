@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { expeditionAPI } from '@/lib/expeditionApi';
+import { expeditionSocketAPI } from '@/lib/expedition-socket-api';
+import { useAuth } from '@/hooks/useAuth';
 
 // Local type definitions
 interface ExpeditionMessage {
@@ -21,6 +23,7 @@ interface UseExpeditionChatProps {
   starshipId: string;
   autoScroll?: boolean;
   maxMessages?: number;
+  enableWebSocket?: boolean;
 }
 
 interface UseExpeditionChatReturn {
@@ -38,16 +41,15 @@ export function useExpeditionChat({
   expeditionId,
   starshipId,
   autoScroll = true,
-  maxMessages = 1000
+  maxMessages = 1000,
+  enableWebSocket = true
 }: UseExpeditionChatProps): UseExpeditionChatReturn {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ExpeditionMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // NOTE: Socket functionality removed - now HTTP-only
-  // Real-time updates are no longer available
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -180,7 +182,36 @@ export function useExpeditionChat({
     }
   }, [expeditionId, refreshMessages]);
 
-  // Socket error handling removed - HTTP-only mode
+  // WebSocket setup for real-time message updates
+  useEffect(() => {
+    if (!enableWebSocket || !expeditionId || !user?.id) return;
+
+    // Join expedition room
+    expeditionSocketAPI.joinExpeditionRoom(expeditionId, user.id);
+
+    // Subscribe to new messages
+    const unsubscribe = expeditionSocketAPI.subscribeToMessages(expeditionId, (newMessage) => {
+      console.log('[EXPEDITION CHAT] New message via WebSocket:', newMessage);
+      
+      // Add message to state if not already present
+      setMessages(prev => {
+        // Check if message already exists (by ID)
+        const exists = prev.some(msg => msg.id === newMessage.id);
+        if (!exists) {
+          // Add new message and limit to maxMessages
+          const updated = [...prev, newMessage];
+          return updated.slice(-maxMessages);
+        }
+        return prev;
+      });
+    });
+
+    // Cleanup
+    return () => {
+      unsubscribe();
+      expeditionSocketAPI.leaveExpeditionRoom(expeditionId, user.id);
+    };
+  }, [enableWebSocket, expeditionId, user?.id, maxMessages]);
 
   return {
     messages,

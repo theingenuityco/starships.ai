@@ -11,6 +11,7 @@
 // Core agents (original and enhanced)
 export { FirstOfficerAgent } from './FirstOfficerAgent';
 export { EnhancedFirstOfficerAgent } from './EnhancedFirstOfficerAgent';
+export { EnhancedFirstOfficerAgentV2 } from './EnhancedFirstOfficerAgentV2';
 
 // Core components
 export { AgentSelector } from './AgentSelector';
@@ -26,8 +27,16 @@ export {
   WorkflowStatePersistence
 } from './WorkflowEnhancements';
 
-// LangGraph workflow (for future API compatibility)
-export { LangGraphWorkflow } from './LangGraphWorkflow';
+// LangGraph workflow components
+export * from './workflow';
+
+// Parallel execution framework
+export { ParallelExecutionFramework } from './parallel/ParallelExecutionFramework';
+export { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
+export { DependencyResolver } from './parallel/DependencyResolver';
+export { ResourceManager } from './parallel/ResourceManager';
+export { TaskScheduler } from './parallel/TaskScheduler';
+export { PerformanceMonitor } from './parallel/PerformanceMonitor';
 
 // Testing utilities
 export {

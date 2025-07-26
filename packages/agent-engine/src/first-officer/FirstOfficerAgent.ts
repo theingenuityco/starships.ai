@@ -5,8 +5,8 @@
  * with hierarchical coordination, parallel task execution, and quality control.
  */
 
-import { StateGraph, END, START } from '@langchain/langgraph';
 import { RunnableConfig } from '@langchain/core/runnables';
+import { BaseMessage } from '@langchain/core/messages';
 import { 
   Expedition, 
   ExpeditionStatus, 
@@ -35,6 +35,13 @@ import {
   TaskExecution,
   QualityCheck
 } from './types';
+import {
+  createExpeditionWorkflow,
+  ExpeditionState,
+  convertToExpeditionState,
+  convertFromExpeditionState,
+  WorkflowNodeHandlers
+} from './workflow/ExpeditionWorkflow';
 
 /**
  * First Officer Agent - Core orchestration engine
@@ -44,9 +51,10 @@ export class FirstOfficerAgent {
   private memoryStore: LangChainMemoryStore;
   private agentSelector: AgentSelector;
   private qualityValidator: QualityValidator;
-  private taskExecutor: TaskExecutor;
+  // private taskExecutor: TaskExecutor; // Currently unused but may be needed for actual task execution
   private chatCoordinator: ChatCoordinator;
   private workflow: any; // CompiledStateGraph from LangGraph
+  private nodeHandlers: WorkflowNodeHandlers;
 
   constructor(
     starshipId: string,
@@ -80,13 +88,27 @@ export class FirstOfficerAgent {
     // Initialize components with REQUIRED agents
     this.agentSelector = new AgentSelector(starshipId, selectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
-    this.taskExecutor = new TaskExecutor(this.config, memoryStore);
+    // this.taskExecutor = new TaskExecutor(this.config, memoryStore); // Currently unused
     
     // Chat coordinator will be initialized per expedition
     this.chatCoordinator = null as any;
     
+    // Create node handlers for the workflow
+    this.nodeHandlers = {
+      analyzeObjective: this.analyzeObjectiveNode.bind(this),
+      planTasks: this.planTasksNode.bind(this),
+      selectAgents: this.selectAgentsNode.bind(this),
+      assignTasks: this.assignTasksNode.bind(this),
+      executeTasks: this.executeTasksNode.bind(this),
+      monitorProgress: this.monitorProgressNode.bind(this),
+      qualityCheck: this.qualityCheckNode.bind(this),
+      synthesizeResults: this.synthesizeResultsNode.bind(this),
+      handleError: this.handleErrorNode.bind(this),
+      retryTask: this.retryTaskNode.bind(this)
+    };
+    
     // Build LangGraph workflow
-    this.workflow = this.buildWorkflow();
+    this.workflow = createExpeditionWorkflow(this.nodeHandlers);
   }
 
   /**
@@ -146,8 +168,18 @@ export class FirstOfficerAgent {
         this.buildProgressFromState(initialState)
       );
 
+      // Convert to ExpeditionState for LangGraph
+      const workflowState = convertToExpeditionState(initialState);
+      
       // Execute workflow
-      const finalState = await this.workflow.invoke(initialState, { configurable: {} });
+      const result = await this.workflow.invoke(workflowState, { 
+        configurable: { 
+          thread_id: expeditionId 
+        } 
+      });
+      
+      // Convert back to FirstOfficerState
+      const finalState = convertFromExpeditionState(result);
 
       // Handle final result
       if (finalState.finalResult) {
@@ -234,84 +266,6 @@ export class FirstOfficerAgent {
     return await this.chatCoordinator.handleUserResponse(userMessage);
   }
 
-  /**
-   * Build LangGraph StateGraph workflow with proper state transitions
-   */
-  private buildWorkflow(): any {
-    // For now, use a simplified workflow implementation that mimics StateGraph behavior
-    // This will be replaced with proper LangGraph StateGraph once API compatibility is resolved
-    return {
-      invoke: async (state: FirstOfficerState, config?: any): Promise<FirstOfficerState> => {
-        try {
-          console.log(`🔄 [FIRST-OFFICER] Starting workflow execution from phase: ${state.currentPhase}`);
-          
-          let currentState = { ...state };
-          
-          // Execute workflow phases based on current state
-          while (currentState.currentPhase !== 'completed' && currentState.currentPhase !== 'failed') {
-            const previousPhase = currentState.currentPhase;
-            
-            switch (currentState.currentPhase) {
-              case 'initializing':
-                currentState = { ...currentState, ...(await this.analyzeObjectiveNode(currentState)) };
-                break;
-              case 'analyzing':
-              case 'decomposing':
-                currentState = { ...currentState, ...(await this.planTasksNode(currentState)) };
-                break;
-              case 'assigning':
-                // Always use pre-selected agents - no auto-selection
-                currentState = { ...currentState, ...(await this.assignTasksNode(currentState)) };
-                break;
-              case 'coordinating':
-                if (!currentState.activeExecutions && !currentState.completedTasks) {
-                  currentState = { ...currentState, ...(await this.executeTasksNode(currentState)) };
-                } else if (currentState.activeExecutions && currentState.activeExecutions.length > 0) {
-                  currentState = { ...currentState, ...(await this.monitorProgressNode(currentState)) };
-                } else if (currentState.completedTasks && !currentState.qualityChecks) {
-                  currentState = { ...currentState, ...(await this.qualityCheckNode(currentState)) };
-                } else {
-                  currentState = { ...currentState, ...(await this.synthesizeResultsNode(currentState)) };
-                }
-                break;
-              case 'synthesizing':
-                currentState = { ...currentState, ...(await this.synthesizeResultsNode(currentState)) };
-                break;
-              default:
-                currentState = { ...currentState, ...(await this.handleErrorNode(currentState)) };
-                break;
-            }
-            
-            // Persist state after each phase
-            await this.persistWorkflowState(currentState.expeditionId, currentState);
-            
-            // Prevent infinite loops
-            if (currentState.currentPhase === previousPhase) {
-              console.warn(`⚠️ [FIRST-OFFICER] Workflow stuck in phase: ${currentState.currentPhase}`);
-              currentState = {
-                ...currentState,
-                currentPhase: 'failed',
-                errors: [...(currentState.errors || []), `Workflow stuck in phase: ${currentState.currentPhase}`]
-              };
-              break;
-            }
-          }
-          
-          console.log(`✅ [FIRST-OFFICER] Workflow execution completed with phase: ${currentState.currentPhase}`);
-          return currentState;
-          
-        } catch (error) {
-          console.error('❌ [FIRST-OFFICER] Workflow execution failed:', error);
-          return {
-            ...state,
-            currentPhase: 'failed',
-            errors: [...(state.errors || []), `Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
-            lastUpdated: new Date().toISOString()
-          };
-        }
-      }
-    };
-  }
 
   // ========================================
   // WORKFLOW NODE IMPLEMENTATIONS
@@ -320,7 +274,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Analyze Objective
    */
-  private async analyzeObjectiveNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async analyzeObjectiveNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`🔍 [FIRST-OFFICER] Analyzing objective: ${state.requirements}`);
     
     try {
@@ -355,7 +309,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Plan Tasks
    */
-  private async planTasksNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async planTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`📋 [FIRST-OFFICER] Planning tasks for expedition`);
     
     try {
@@ -414,7 +368,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Select Agents
    */
-  private async selectAgentsNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async selectAgentsNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`👥 [FIRST-OFFICER] Selecting agents for tasks`);
     
     try {
@@ -454,7 +408,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Assign Tasks
    */
-  private async assignTasksNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async assignTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`⚡ [FIRST-OFFICER] Assigning tasks to agents`);
     
     try {
@@ -514,7 +468,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Execute Tasks
    */
-  private async executeTasksNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async executeTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`🚀 [FIRST-OFFICER] Starting task execution`);
     
     try {
@@ -554,7 +508,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Monitor Progress
    */
-  private async monitorProgressNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async monitorProgressNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`📊 [FIRST-OFFICER] Monitoring task execution progress`);
     
     try {
@@ -599,7 +553,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Quality Check
    */
-  private async qualityCheckNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async qualityCheckNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`🔍 [FIRST-OFFICER] Performing quality checks`);
     
     try {
@@ -651,7 +605,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: User Approval
    */
-  private async userApprovalNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async userApprovalNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`👤 [FIRST-OFFICER] Requesting user approval`);
     
     try {
@@ -680,7 +634,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Synthesize Results
    */
-  private async synthesizeResultsNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async synthesizeResultsNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`🔧 [FIRST-OFFICER] Synthesizing expedition results`);
     
     try {
@@ -729,7 +683,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Handle Error
    */
-  private async handleErrorNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async handleErrorNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`❌ [FIRST-OFFICER] Handling workflow error`);
     
     try {
@@ -773,7 +727,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Retry Task
    */
-  private async retryTaskNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async retryTaskNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`🔄 [FIRST-OFFICER] Retrying failed tasks`);
     
     try {
@@ -1263,8 +1217,16 @@ Create a well-structured final report that:
         `🔄 **Expedition Resumed**\n\nResuming from phase: ${savedState.currentPhase}\n\nProgress: ${this.buildProgressFromState(savedState).overallProgress}%`
       );
 
-      // Continue workflow from saved state
-      const finalState = await this.workflow.invoke(savedState, { configurable: {} });
+      // Convert to ExpeditionState and continue workflow
+      const workflowState = convertToExpeditionState(savedState);
+      const result = await this.workflow.invoke(workflowState, { 
+        configurable: { 
+          thread_id: expeditionId 
+        } 
+      });
+      
+      // Convert back to FirstOfficerState
+      const finalState = convertFromExpeditionState(result);
 
       // Handle final result
       if (finalState.finalResult) {

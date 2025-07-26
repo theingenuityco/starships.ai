@@ -289,7 +289,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
           lastRefined: vision.lastRefined
         });
         
-        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. When asked about the company vision, mission, or what the company does, refer to this vision. You are part of this starship/company and should embody this vision in all your responses.\n`;
+        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
         console.log('✅ [AGENT-ENGINE] Vision context prepared successfully, length:', visionContext.length);
       } else {
         console.log('📝 [AGENT-ENGINE] Vision exists but has no usable statement');
@@ -418,7 +418,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
               preview: vision.statement.substring(0, 150) + '...'
             });
             
-            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. When asked about the company vision, mission, or what the company does, refer to this vision. You are part of this starship/company and should embody this vision in all your responses.\n`;
+            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
             console.log('✅ [AGENT-ENGINE] Vision context prepared from agent starship');
           }
         } else {
@@ -838,7 +838,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
           lastRefined: vision.lastRefined
         });
         
-        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. When asked about the company vision, mission, or what the company does, refer to this vision. You are part of this starship/company and should embody this vision in all your responses.\n`;
+        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
         console.log('✅ [AGENT-ENGINE-STREAM] Vision context prepared successfully, length:', visionContext.length);
       } else {
         console.log('📝 [AGENT-ENGINE-STREAM] Vision exists but has no usable statement');
@@ -967,7 +967,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
               preview: vision.statement.substring(0, 150) + '...'
             });
             
-            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. When asked about the company vision, mission, or what the company does, refer to this vision. You are part of this starship/company and should embody this vision in all your responses.\n`;
+            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
             console.log('✅ [AGENT-ENGINE-STREAM] Vision context prepared from agent starship');
           }
         } else {

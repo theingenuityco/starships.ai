@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useScroll, useTransform } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,14 +88,60 @@ const StarshipClass = ({ name, description, features, highlight = false }: {
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
+  const [currentTextIndex, setCurrentTextIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
   const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
+  const dynamicTexts = [
+    "your own intelligent vessel",
+    "a digital media company", 
+    "the next big SaaS",
+    "your dream startup",
+    "an AI-powered platform",
+    "the future of work",
+    "your vision into reality"
+  ];
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const currentText = dynamicTexts[currentTextIndex];
+    let timeout: NodeJS.Timeout;
+
+    if (isDeleting) {
+      // Deleting characters
+      if (displayedText.length > 0) {
+        timeout = setTimeout(() => {
+          setDisplayedText(displayedText.slice(0, -1));
+        }, 50); // Delete speed
+      } else {
+        // Finished deleting, move to next text
+        setIsDeleting(false);
+        setCurrentTextIndex((prev) => (prev + 1) % dynamicTexts.length);
+      }
+    } else {
+      // Typing characters
+      if (displayedText.length < currentText.length) {
+        timeout = setTimeout(() => {
+          setDisplayedText(currentText.slice(0, displayedText.length + 1));
+        }, 100); // Type speed
+      } else {
+        // Finished typing, wait then start deleting
+        timeout = setTimeout(() => {
+          setIsDeleting(true);
+        }, 2000); // Pause before deleting
+      }
+    }
+
+    return () => clearTimeout(timeout);
+  }, [displayedText, isDeleting, currentTextIndex, dynamicTexts]);
 
   if (!mounted || isLoading) return null;
 
@@ -136,7 +182,7 @@ export default function HomePage() {
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
-            className="mb-8 relative"
+            className="mb-6 relative"
           >
             <motion.svg
               xmlns="http://www.w3.org/2000/svg"
@@ -144,12 +190,30 @@ export default function HomePage() {
               height="128"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="currentColor"
+              stroke="url(#gradient)"
               strokeWidth="1"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-primary mx-auto"
+              className="mx-auto"
             >
+              <defs>
+                <motion.linearGradient
+                  id="gradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="0%"
+                  animate={{
+                    x1: ["-100%", "100%"],
+                    x2: ["0%", "200%"]
+                  }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                >
+                  <stop offset="0%" stopColor="white" />
+                  <stop offset="50%" stopColor="hsl(var(--primary))" />
+                  <stop offset="100%" stopColor="white" />
+                </motion.linearGradient>
+              </defs>
               <motion.path
                 d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
                 initial={{ pathLength: 0 }}
@@ -226,13 +290,17 @@ export default function HomePage() {
             transition={{ delay: 1, duration: 1 }}
             className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed"
           >
-            Build and pilot your own <motion.span 
-              initial={{ opacity: 0.5 }}
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="text-primary font-semibold"
-            >intelligent vessel</motion.span> 
-            <br />powered by your Vision
+            Build and pilot{" "}
+            <span className="text-primary font-semibold">
+              {displayedText}
+              <motion.span
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                className="text-primary ml-1"
+              >
+                |
+              </motion.span>
+            </span>
           </motion.p>
           
           <motion.div

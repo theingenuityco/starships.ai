@@ -144,7 +144,26 @@ export default function HomePage() {
               className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-transparent blur-xl"
             />
             <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/5 backdrop-blur-sm rounded-full border border-primary/20">
-              <Rocket className="w-12 h-12 text-primary" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-primary"
+              >
+                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"></path>
+                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
+                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
+                {/* Three parallel flame lines representing thrust */}
+                <line x1="6.5" y1="14.5" x2="3.5" y2="17.5"></line>
+                <line x1="8" y1="16" x2="5" y2="19"></line>
+                <line x1="9.5" y1="17.5" x2="6.5" y2="20.5"></line>
+              </svg>
             </div>
           </motion.div>
           

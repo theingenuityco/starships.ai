@@ -1,14 +1,13 @@
 'use client';
 
-import { motion } from 'motion/react';
+import { motion, useScroll, useTransform } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { LoginButton } from '@/components/auth/LoginButton';
 import { useAuth } from '@/hooks/useAuth';
-import Link from 'next/link';
+import { StarfieldBackground } from '@/components/StarfieldBackground';
 import { 
   Sparkles, 
   Rocket, 
@@ -19,40 +18,13 @@ import {
   Users, 
   Book, 
   ArrowRight,
-  Github,
   ChevronDown,
   Star,
-  Orbit,
-  Target,
   Layers,
-  Navigation
+  Navigation,
+  Github
 } from 'lucide-react';
 
-// Floating particles component for cosmic effect
-const FloatingParticles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {[...Array(20)].map((_, i) => (
-      <motion.div
-        key={i}
-        className="absolute w-1 h-1 bg-primary/20 rounded-full"
-        style={{
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-        }}
-        animate={{
-          y: [0, -100, 0],
-          opacity: [0, 1, 0],
-          scale: [0, 1, 0],
-        }}
-        transition={{
-          duration: 3 + Math.random() * 2,
-          repeat: Infinity,
-          delay: Math.random() * 2,
-        }}
-      />
-    ))}
-  </div>
-);
 
 // System component cards
 const SystemCard = ({ icon: Icon, title, description, accent = false }: {
@@ -68,14 +40,14 @@ const SystemCard = ({ icon: Icon, title, description, accent = false }: {
     whileHover={{ y: -5, transition: { duration: 0.2 } }}
     className="group"
   >
-    <Card className={`p-6 h-full bg-card/50 backdrop-blur-sm border-border/50 transition-all duration-300 hover:bg-card/80 hover:border-primary/30 ${accent ? 'ring-1 ring-primary/20' : ''}`}>
+    <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 ${accent ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}>
       <div className="flex items-start space-x-4">
-        <div className={`p-3 rounded-lg ${accent ? 'bg-primary/10' : 'bg-secondary/50'} group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className={`w-6 h-6 ${accent ? 'text-primary' : 'text-muted-foreground'} group-hover:text-primary transition-colors`} />
+        <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
+          <Icon className={`w-6 h-6 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
         </div>
         <div className="flex-1">
           <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">{title}</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+          <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
         </div>
       </div>
     </Card>
@@ -95,7 +67,7 @@ const StarshipClass = ({ name, description, features, highlight = false }: {
     transition={{ duration: 0.6 }}
     className="group"
   >
-    <Card className={`p-6 h-full transition-all duration-300 hover:shadow-xl ${highlight ? 'ring-2 ring-primary bg-primary/5' : 'hover:ring-1 hover:ring-primary/30'}`}>
+    <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:bg-white/10 ${highlight ? 'ring-2 ring-primary bg-primary/10 scale-105' : 'hover:ring-1 hover:ring-primary/50'}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold">{name}</h3>
         {highlight && <Badge className="bg-primary/10 text-primary">Recommended</Badge>}
@@ -115,7 +87,11 @@ const StarshipClass = ({ name, description, features, highlight = false }: {
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
+  const [launching, setLaunching] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
+  const { scrollYProgress } = useScroll();
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
   useEffect(() => {
     setMounted(true);
@@ -123,18 +99,32 @@ export default function HomePage() {
 
   if (!mounted || isLoading) return null;
 
+  const handleLaunch = () => {
+    setLaunching(true);
+    // Don't reset launching state - let it continue until page unloads
+    setTimeout(() => {
+      if (isAuthenticated) {
+        window.location.href = '/ships';
+      } else {
+        // Trigger login
+        const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement;
+        if (loginButton) loginButton.click();
+        // Reset launching state after login trigger
+        setTimeout(() => setLaunching(false), 3000);
+      }
+    }, 1000);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/80 relative overflow-hidden">
-      <FloatingParticles />
+    <div className="min-h-screen bg-black relative overflow-hidden">
+      <StarfieldBackground launching={launching} density={600} speed={1.5} />
       
       {/* Hero Section */}
       <motion.section 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        className="relative h-screen flex flex-col items-center justify-center text-center px-4"
+        style={{ opacity: heroOpacity, scale: heroScale }}
+        className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pb-20"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 pointer-events-none" />
         
         <motion.div
           initial={{ opacity: 0, y: 50 }}
@@ -143,32 +133,44 @@ export default function HomePage() {
           className="relative z-10 max-w-4xl mx-auto"
         >
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.5, type: "spring", stiffness: 100 }}
-            className="mb-8"
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.5, duration: 1.5, type: "spring", stiffness: 80 }}
+            className="mb-8 relative"
           >
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-primary/10 rounded-full mb-6">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-transparent blur-xl"
+            />
+            <div className="relative inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/5 backdrop-blur-sm rounded-full border border-primary/20">
               <Rocket className="w-12 h-12 text-primary" />
             </div>
           </motion.div>
           
           <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 1 }}
-            className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 1, type: "spring" }}
+            className="text-5xl md:text-7xl font-bold mb-6"
           >
-            Starships.ai
+            <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
+              Starships.ai
+            </span>
           </motion.h1>
           
           <motion.p 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1, duration: 1 }}
-            className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed"
+            className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed"
           >
-            Build and pilot your own <strong className="text-primary">intelligent vessel</strong> 
+            Build and pilot your own <motion.span 
+              initial={{ opacity: 0.5 }}
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="text-primary font-semibold"
+            >intelligent vessel</motion.span> 
             <br />powered by your Vision
           </motion.p>
           
@@ -179,22 +181,50 @@ export default function HomePage() {
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             {isAuthenticated ? (
-              <Link href="/ships">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                  Enter Command Deck
-                  <ArrowRight className="w-5 h-5 ml-2" />
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  size="lg" 
+                  onClick={handleLaunch}
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">Enter Command Deck</span>
+                  <ArrowRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
                 </Button>
-              </Link>
+              </motion.div>
             ) : (
-              <LoginButton size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                Launch Your Starship
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </LoginButton>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <LoginButton 
+                  size="lg" 
+                  data-login-button
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">Launch Your Starship</span>
+                  <ArrowRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
+                </LoginButton>
+              </motion.div>
             )}
-            <Button variant="outline" size="lg" className="px-8 py-4 text-lg rounded-full">
-              <Github className="w-5 h-5 mr-2" />
-              View on GitHub
-            </Button>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="px-8 py-4 text-lg rounded-full border-white/20 hover:border-white/40 text-white hover:bg-white/10 backdrop-blur-sm"
+              >
+                <Github className="w-5 h-5 mr-2" />
+                View on GitHub
+              </Button>
+            </motion.div>
           </motion.div>
         </motion.div>
         
@@ -206,8 +236,8 @@ export default function HomePage() {
         >
           <motion.div
             animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-muted-foreground"
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="text-white/50"
           >
             <ChevronDown className="w-6 h-6" />
           </motion.div>
@@ -215,8 +245,8 @@ export default function HomePage() {
       </motion.section>
 
       {/* System Flow Section */}
-      <section className="py-20 px-4 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-background/50 to-background" />
+      <section className="py-20 px-4 relative bg-black">
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/20 to-black" />
         <div className="relative z-10 max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -283,8 +313,9 @@ export default function HomePage() {
       </section>
 
       {/* Starship Classes Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-secondary/20 via-background to-secondary/20">
-        <div className="max-w-6xl mx-auto">
+      <section className="py-20 px-4 bg-gradient-to-r from-gray-900/50 via-black to-gray-900/50 relative">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
+        <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -334,8 +365,19 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
+      <section className="py-20 px-4 relative bg-black">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10" />
+        <motion.div 
+          className="absolute inset-0 opacity-20"
+          style={{
+            background: 'radial-gradient(circle at 50% 50%, rgba(var(--primary-rgb), 0.3) 0%, transparent 70%)'
+          }}
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.3, 0.2]
+          }}
+          transition={{ duration: 8, repeat: Infinity }}
+        />
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -348,38 +390,64 @@ export default function HomePage() {
               that transforms intention into reality.
             </p>
             {isAuthenticated ? (
-              <Link href="/ships">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                  <Rocket className="w-5 h-5 mr-2" />
-                  Enter Command Deck
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  size="lg" 
+                  onClick={handleLaunch}
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">
+                    <Rocket className="w-5 h-5 mr-2 inline" />
+                    Enter Command Deck
+                  </span>
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
                 </Button>
-              </Link>
+              </motion.div>
             ) : (
-              <LoginButton size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                <Rocket className="w-5 h-5 mr-2" />
-                Begin Your Journey
-              </LoginButton>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  onClick={handleLaunch}
+                  size="lg" 
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">
+                    <Rocket className="w-5 h-5 mr-2 inline" />
+                    Begin Your Journey
+                  </span>
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
+                </Button>
+              </motion.div>
             )}
           </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-border/50 bg-card/20 backdrop-blur-sm">
+      <footer className="py-12 px-4 border-t border-white/10 bg-black/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <p className="text-muted-foreground">
+              <p className="text-gray-400">
                 © 2024 Starships.ai - Where Vision meets Intelligence
               </p>
             </div>
             <div className="flex space-x-6">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">
                 <Github className="w-4 h-4 mr-2" />
                 GitHub
               </Button>
-              <Button variant="ghost" size="sm">Documentation</Button>
-              <Button variant="ghost" size="sm">Community</Button>
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">Documentation</Button>
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">Community</Button>
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { EventEmitter } from 'events';
 import express, { Request, Response, Router } from 'express';
+import { isValidJsonRpcMessage, parseJsonRpcMessage } from '../../utils/message-filter';
 // UUID generation - use crypto.randomUUID if available, fallback to simple implementation
 const uuidv4 = (() => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -278,12 +279,10 @@ export class MCPHttpBridge extends EventEmitter {
     this.buffer = lines.pop() || '';
 
     for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const response = JSON.parse(line) as MCPResponse;
-          this.handleMCPResponse(response);
-        } catch (error) {
-          console.error('[HttpBridge] Failed to parse MCP response:', line);
+      if (line.trim() && isValidJsonRpcMessage(line)) {
+        const response = parseJsonRpcMessage(line);
+        if (response) {
+          this.handleMCPResponse(response as MCPResponse);
         }
       }
     }

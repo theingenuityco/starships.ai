@@ -221,40 +221,41 @@ export default function HomePage() {
                 <motion.linearGradient
                   id="gradient"
                   x1="0%"
-                  y1="0%"
+                  y1="75%"
                   x2="100%"
-                  y2="100%"
+                  y2="0%"
                   animate={{
-                    x1: ["-200%", "200%"],
-                    x2: ["-100%", "300%"],
-                    y1: ["-200%", "200%"],
-                    y2: ["-100%", "300%"]
+                    x1: ["-150%", "150%"],
+                    x2: ["-50%", "250%"],
+                    y1: ["150%", "-50%"],
+                    y2: ["100%", "-100%"]
                   }}
                   transition={{ 
-                    duration: 5, 
+                    duration: 2, 
                     repeat: Infinity, 
                     ease: "easeInOut",
-                    repeatDelay: 3
+                    repeatDelay: 10,
+                    delay: 2
                   }}
                 >
                   <stop offset="0%" stopColor="rgba(255,255,255,0.9)" />
-                  <stop offset="15%" stopColor="rgba(255,255,255,0.95)" />
-                  <stop offset="20%" stopColor="white" />
-                  <stop offset="25%" stopColor="rgba(255,255,255,0.8)" />
-                  <stop offset="30%" stopColor="rgba(255,255,255,0.5)" />
-                  <stop offset="35%" stopColor="rgba(255,255,255,0.2)" />
-                  <stop offset="38%" stopColor="rgba(0,0,0,0.01)" />
-                  <stop offset="42%" stopColor="rgba(0,0,0,0.05)" />
-                  <stop offset="46%" stopColor="rgba(0,0,0,0.08)" />
+                  <stop offset="12%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="15%" stopColor="white" />
+                  <stop offset="18%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="20%" stopColor="rgba(255,255,255,0.5)" />
+                  <stop offset="22%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="25%" stopColor="rgba(0,0,0,0.01)" />
+                  <stop offset="30%" stopColor="rgba(0,0,0,0.05)" />
+                  <stop offset="35%" stopColor="rgba(0,0,0,0.08)" />
                   <stop offset="50%" stopColor="rgba(0,0,0,0.1)" />
-                  <stop offset="54%" stopColor="rgba(0,0,0,0.08)" />
-                  <stop offset="58%" stopColor="rgba(0,0,0,0.05)" />
-                  <stop offset="62%" stopColor="rgba(0,0,0,0.01)" />
-                  <stop offset="65%" stopColor="rgba(255,255,255,0.2)" />
-                  <stop offset="70%" stopColor="rgba(255,255,255,0.5)" />
-                  <stop offset="75%" stopColor="rgba(255,255,255,0.8)" />
-                  <stop offset="80%" stopColor="white" />
-                  <stop offset="85%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="65%" stopColor="rgba(0,0,0,0.08)" />
+                  <stop offset="70%" stopColor="rgba(0,0,0,0.05)" />
+                  <stop offset="75%" stopColor="rgba(0,0,0,0.01)" />
+                  <stop offset="78%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="80%" stopColor="rgba(255,255,255,0.5)" />
+                  <stop offset="82%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="85%" stopColor="white" />
+                  <stop offset="88%" stopColor="rgba(255,255,255,0.95)" />
                   <stop offset="100%" stopColor="rgba(255,255,255,0.9)" />
                 </motion.linearGradient>
               </defs>

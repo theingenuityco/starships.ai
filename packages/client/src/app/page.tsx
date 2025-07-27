@@ -807,6 +807,10 @@ export default function HomePage() {
         </div>
       </section>
 
+      
+      {/* Single overlay covering Ready to Launch and Footer sections */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-md z-0" style={{ height: '85vh' }} />
+      
       {/* CTA Section */}
       <section className="py-48 px-4 relative">
         <div className="relative z-10 max-w-4xl mx-auto text-center">
@@ -864,21 +868,23 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-white/10 bg-black/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto">
+      <footer className="py-12 px-4 relative z-10">
+        {/* Gradient horizontal line */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <p className="text-gray-400">
+              <p className="text-white/70">
                 © 2024 Starships.ai - Where Vision meets Intelligence
               </p>
             </div>
             <div className="flex space-x-6">
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">
+              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">
                 <GithubIcon className="w-4 h-4 mr-2" />
                 GitHub
               </Button>
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">Documentation</Button>
-              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">Community</Button>
+              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">Documentation</Button>
+              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">Community</Button>
             </div>
           </div>
         </div>

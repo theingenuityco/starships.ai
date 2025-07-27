@@ -75,9 +75,10 @@ const StarshipClass = memo(({ name, description, features, highlight = false }: 
   highlight?: boolean;
 }) => (
   <motion.div
-    initial={{ opacity: 0, scale: 0.9 }}
-    whileInView={{ opacity: 1, scale: 1 }}
-    transition={{ duration: 0.6 }}
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-50px" }}
+    transition={{ duration: 0.3 }}
     className="group"
   >
     <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:bg-white/10 ${highlight ? 'ring-2 ring-primary bg-primary/10 scale-105' : 'hover:ring-1 hover:ring-primary/50'}`}>
@@ -109,8 +110,6 @@ export default function HomePage() {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, isLoading } = useAuth();
   const { scrollYProgress } = useScroll();
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
-  const heroScale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
   const dynamicTexts = [
     "your own intelligent vessel",
@@ -188,7 +187,6 @@ export default function HomePage() {
       
       {/* Hero Section */}
       <motion.section 
-        style={{ opacity: heroOpacity, scale: heroScale }}
         className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pb-20"
       >
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 pointer-events-none" />
@@ -764,7 +762,7 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            className="text-center mb-36"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">Choose Your Starship Class</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">

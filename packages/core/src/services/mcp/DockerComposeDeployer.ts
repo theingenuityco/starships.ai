@@ -20,6 +20,7 @@ import { NetworkManager } from '../docker/NetworkManager';
 import { 
   DockerServiceTemplate, 
   getDockerServiceTemplate, 
+  getAllDockerServiceTemplates,
   buildVolumeMapping,
   getDefaultResourceLimits,
   getHttpBridgeTemplate,
@@ -108,6 +109,7 @@ export class DockerComposeDeployer implements MCPDeployer {
       '54f39175-4d64-49d1-90b5-d48491ce8cf2': 'brave', // Brave Search template
       'e054bf0a-5f93-4b0a-bf3e-aaade290118f': 'puppeteer', // Puppeteer template
       '9e1b6668-d3fa-47fb-9447-b8e1e9dabd9f': 'sequentialthinking', // Sequential Thinking template
+      'edaaba13-d587-406d-b300-59e6b3b8aa9f': 'memory', // Memory template
       // Add other known mappings here as needed
     };
     
@@ -121,7 +123,8 @@ export class DockerComposeDeployer implements MCPDeployer {
     // Verify we have a Docker service template for this slug
     const dockerTemplate = getDockerServiceTemplate(slug);
     if (!dockerTemplate) {
-      throw new Error(`No Docker service template found for slug: ${slug}. Available: brave, github, puppeteer, filesystem, postgres, sqlite, sequentialthinking`);
+      const availableTemplates = Object.keys(getAllDockerServiceTemplates()).join(', ');
+      throw new Error(`No Docker service template found for slug: ${slug}. Available: ${availableTemplates}`);
     }
 
     // Create a basic MCPServerOption based on the Docker template

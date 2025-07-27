@@ -11,11 +11,13 @@
 // Core agents (original and enhanced)
 export { FirstOfficerAgent } from './FirstOfficerAgent';
 export { EnhancedFirstOfficerAgent } from './EnhancedFirstOfficerAgent';
+export { createMCPEnabledFirstOfficerAgent } from './MCPEnabledFirstOfficerAgent';
 
 // Core components
 export { AgentSelector } from './AgentSelector';
 export { QualityValidator } from './QualityValidator';
 export { TaskExecutor } from './TaskExecutor';
+export { MCPEnhancedTaskExecutor } from './MCPEnhancedTaskExecutor';
 export { ChatCoordinator } from './ChatCoordinator';
 
 // Enhanced workflow components
@@ -61,3 +63,8 @@ export type {
   TaskDependency,
   ParallelExecutionGroup
 } from './types';
+
+export type { 
+  MCPEnabledFirstOfficerConfig,
+  MCPEnabledFirstOfficerAgent 
+} from './MCPEnabledFirstOfficerAgent';

@@ -205,8 +205,9 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
       LOG_LEVEL: 'info',
       HEALTH_CHECK_TIMEOUT: '30000',
       MAX_CONCURRENT_REQUESTS: '10',
-      INIT_TIMEOUT: '90000',
-      NPX_DOWNLOAD_TIMEOUT: '60000'
+      INIT_TIMEOUT: '120000',
+      NPX_DOWNLOAD_TIMEOUT: '60000',
+      IGNORE_STARTUP_MESSAGES: 'true'
     },
     healthcheck: {
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],

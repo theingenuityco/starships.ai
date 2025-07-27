@@ -1,13 +1,13 @@
 'use client';
 
 import { motion, useScroll, useTransform } from 'motion/react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, memo, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LoginButton } from '@/components/auth/LoginButton';
 import { useAuth } from '@/hooks/useAuth';
-import { StarfieldBackground } from '@/components/StarfieldBackground';
+const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import { 
   Sparkles, 
   Rocket, 
@@ -23,14 +23,14 @@ import {
   Star,
   Layers,
   Navigation,
-  Github,
+  GithubIcon,
   Lightbulb,
   Minus
 } from 'lucide-react';
 
 
 // System component cards
-const SystemCard = ({ icon: Icon, title, description, accent = false, imageContent }: {
+const SystemCard = memo(({ icon: Icon, title, description, accent = false, imageContent }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
@@ -63,10 +63,12 @@ const SystemCard = ({ icon: Icon, title, description, accent = false, imageConte
       </div>
     </Card>
   </motion.div>
-);
+));
+
+SystemCard.displayName = 'SystemCard';
 
 // Starship class showcase
-const StarshipClass = ({ name, description, features, highlight = false }: {
+const StarshipClass = memo(({ name, description, features, highlight = false }: {
   name: string;
   description: string;
   features: string[];
@@ -94,15 +96,17 @@ const StarshipClass = ({ name, description, features, highlight = false }: {
       </ul>
     </Card>
   </motion.div>
-);
+));
+
+StarshipClass.displayName = 'StarshipClass';
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
-  const [isTyping, setIsTyping] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, isLoading } = useAuth();
   const { scrollYProgress } = useScroll();
   const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
@@ -122,37 +126,41 @@ export default function HomePage() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
+  const typewriterEffect = useCallback(() => {
     const currentText = dynamicTexts[currentTextIndex];
-    let timeout: NodeJS.Timeout;
-
+    
     if (isDeleting) {
-      // Deleting characters
       if (displayedText.length > 0) {
-        timeout = setTimeout(() => {
-          setDisplayedText(displayedText.slice(0, -1));
-        }, 50); // Delete speed
+        timeoutRef.current = setTimeout(() => {
+          setDisplayedText(prev => prev.slice(0, -1));
+        }, 50);
       } else {
-        // Finished deleting, move to next text
         setIsDeleting(false);
         setCurrentTextIndex((prev) => (prev + 1) % dynamicTexts.length);
       }
     } else {
-      // Typing characters
       if (displayedText.length < currentText.length) {
-        timeout = setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
           setDisplayedText(currentText.slice(0, displayedText.length + 1));
-        }, 100); // Type speed
+        }, 100);
       } else {
-        // Finished typing, wait then start deleting
-        timeout = setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
           setIsDeleting(true);
-        }, 2000); // Pause before deleting
+        }, 2000);
       }
     }
-
-    return () => clearTimeout(timeout);
   }, [displayedText, isDeleting, currentTextIndex, dynamicTexts]);
+
+  useEffect(() => {
+    typewriterEffect();
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [typewriterEffect]);
 
   if (!mounted || isLoading) return null;
 
@@ -174,7 +182,9 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
-      <StarfieldBackground launching={launching} density={600} speed={1.5} />
+      <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
+        <StarfieldBackground launching={launching} density={600} speed={1.5} />
+      </Suspense>
       
       {/* Hero Section */}
       <motion.section 
@@ -384,7 +394,7 @@ export default function HomePage() {
                 size="lg" 
                 className="px-8 py-4 text-lg rounded-full border-white/20 hover:border-white/40 text-white hover:bg-white/10 backdrop-blur-sm"
               >
-                <Github className="w-5 h-5 mr-2" />
+                <GithubIcon className="w-5 h-5 mr-2" />
                 View on GitHub
               </Button>
             </motion.div>
@@ -397,13 +407,9 @@ export default function HomePage() {
           transition={{ delay: 2, duration: 1 }}
           className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
         >
-          <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            className="text-white/50"
-          >
+          <div className="text-white/50 animate-float will-change-transform">
             <ChevronDown className="w-6 h-6" />
-          </motion.div>
+          </div>
         </motion.div>
       </motion.section>
 
@@ -443,20 +449,9 @@ export default function HomePage() {
               className="flex justify-center"
             >
               <div className="flex flex-col items-center space-y-4 max-w-md text-center">
-                <motion.div
-                  animate={{ 
-                    scale: [1, 1.05, 1],
-                    boxShadow: [
-                      "0 0 20px rgba(255,255,255,0.1)",
-                      "0 0 30px rgba(255,255,255,0.2)", 
-                      "0 0 20px rgba(255,255,255,0.1)"
-                    ]
-                  }}
-                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-full border border-white/30 backdrop-blur-sm flex items-center justify-center"
-                >
+                <div className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-full border border-white/30 backdrop-blur-sm flex items-center justify-center animate-pulse-glow will-change-transform">
                   <User className="w-8 h-8 text-white/80" />
-                </motion.div>
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-2">You</h3>
                   <p className="text-gray-400 leading-relaxed">
@@ -879,7 +874,7 @@ export default function HomePage() {
             </div>
             <div className="flex space-x-6">
               <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">
-                <Github className="w-4 h-4 mr-2" />
+                <GithubIcon className="w-4 h-4 mr-2" />
                 GitHub
               </Button>
               <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white hover:bg-white/10">Documentation</Button>

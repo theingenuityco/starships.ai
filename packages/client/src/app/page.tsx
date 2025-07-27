@@ -16,39 +16,50 @@ import {
   Compass, 
   Zap, 
   Users, 
+  User,
   Book, 
   ArrowRight,
   ChevronDown,
   Star,
   Layers,
   Navigation,
-  Github
+  Github,
+  Lightbulb,
+  Minus
 } from 'lucide-react';
 
 
 // System component cards
-const SystemCard = ({ icon: Icon, title, description, accent = false }: {
+const SystemCard = ({ icon: Icon, title, description, accent = false, imageContent }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   accent?: boolean;
+  imageContent?: React.ReactNode;
 }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
     whileHover={{ y: -5, transition: { duration: 0.2 } }}
-    className="group"
+    className="group max-w-2xl mx-auto"
   >
-    <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 relative overflow-hidden ${accent ? 'ring-1 ring-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-br from-white/5 via-white/3 to-transparent'}`}>
-      <div className="flex items-start space-x-4">
-        <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
-          <Icon className={`w-6 h-6 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
+    <Card className={`p-8 bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 relative overflow-hidden ${accent ? 'ring-1 ring-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-br from-white/5 via-white/3 to-transparent'}`}>
+      <div className="grid md:grid-cols-2 gap-8 items-center">
+        <div>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
+              <Icon className={`w-7 h-7 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
+            </div>
+            <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">{title}</h3>
+          </div>
+          <p className="text-gray-400 leading-relaxed">{description}</p>
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">{title}</h3>
-          <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
-        </div>
+        {imageContent && (
+          <div className="flex justify-center">
+            {imageContent}
+          </div>
+        )}
       </div>
     </Card>
   </motion.div>
@@ -397,7 +408,7 @@ export default function HomePage() {
       </motion.section>
 
       {/* System Flow Section */}
-      <section className="py-20 px-4 relative bg-black">
+      <section className="py-20 px-4 relative">
         <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/20 to-black" />
         {/* Subtle ambient glow */}
         <motion.div 
@@ -415,64 +426,343 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            className="text-center mb-36"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">The Starship Journey</h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              You arrive with a <strong className="text-primary">Vision</strong>, inscribe it into <strong className="text-primary">The Codex</strong>, 
-              guided by <strong className="text-primary">The Echo</strong>, launch <strong className="text-primary">Expeditions</strong> powered by the <strong className="text-primary">Aether Drive</strong>
+              Your idea becomes a plan. Your plan becomes focused missions. Your missions become reality.
             </p>
           </motion.div>
 
-          <div className="relative">
-            {/* Connecting lines */}
-            <div className="hidden md:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent transform -translate-y-1/2 z-0" />
-            <div className="hidden md:block absolute top-1/2 left-1/3 w-px h-16 bg-gradient-to-b from-white/20 to-transparent transform -translate-y-1/2 z-0" />
-            <div className="hidden md:block absolute top-1/2 left-2/3 w-px h-16 bg-gradient-to-b from-white/20 to-transparent transform -translate-y-1/2 z-0" />
+          <div className="space-y-16 relative">
+            {/* You - Starting Point */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="flex justify-center"
+            >
+              <div className="flex flex-col items-center space-y-4 max-w-md text-center">
+                <motion.div
+                  animate={{ 
+                    scale: [1, 1.05, 1],
+                    boxShadow: [
+                      "0 0 20px rgba(255,255,255,0.1)",
+                      "0 0 30px rgba(255,255,255,0.2)", 
+                      "0 0 20px rgba(255,255,255,0.1)"
+                    ]
+                  }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                  className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-full border border-white/30 backdrop-blur-sm flex items-center justify-center"
+                >
+                  <User className="w-8 h-8 text-white/80" />
+                </motion.div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">You</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    You arrive with an idea, a vision of what could be. The journey begins here.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Connector: You → Vision Chamber */}
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+            >
+              <div className="flex flex-col items-center relative">
+                <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
+                  {[...Array(1)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white/80 rounded-full left-1/2 transform -translate-x-1/2"
+                      initial={{ top: 0, opacity: 0 }}
+                      animate={{
+                        top: ["0%", "100%"],
+                        opacity: [0, 1, 0],
+                      }}
+                      transition={{
+                        duration: 2,
+                        delay: i * 0.4,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent"
+                    animate={{
+                      opacity: [0, 0.7, 0],
+                      scaleX: [0.5, 1, 0.5]
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </div>
+              </div>
+            </motion.div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.2 }}
-              >
-                <SystemCard
-                  icon={Eye}
-                  title="Vision Chamber"
-                  description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
-                  accent
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
-              >
-                <SystemCard
-                  icon={Compass}
-                  title="Expeditions"
-                  description="Your idea becomes reality through focused missions. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
-                />
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.6 }}
-              >
-                <SystemCard
-                  icon={Users}
-                  title="Crew"
-                  description="The specialists your project needs, available when you need them. Development, design, strategy, growth. Not someday when you can afford them. Today."
-                />
-              </motion.div>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              <SystemCard
+                icon={Brain}
+                title="Vision Chamber"
+                description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
+                imageContent={
+                  <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <div className="absolute inset-0 bg-grid-white/10 bg-[size:20px_20px] opacity-30" />
+                    <div className="relative flex items-center space-x-4">
+                      <motion.div
+                        animate={{ 
+                          scale: [0, 1.1, 1.1, 0],
+                          rotate: [0, 180, 180, 360]
+                        }}
+                        transition={{ 
+                          duration: 6, 
+                          repeat: Infinity, 
+                          ease: "easeInOut",
+                          delay: 0,
+                          times: [0, 0.05, 0.55, 0.65]
+                        }}
+                      >
+                        <Sparkles className="w-7 h-7 text-white/50" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ 
+                          opacity: [0.1, 0.1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 1, 1, 0.1, 1, 0.1, 1, 0.1]
+                        }}
+                        transition={{ 
+                          duration: 9,
+                          repeat: Infinity, 
+                          ease: "linear",
+                          delay: 3,
+                          times: [0, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.70, 0.90, 0.91, 0.92, 0.93, 0.94, 1]
+                        }}
+                      >
+                        <Lightbulb className="w-8 h-8 text-white/60" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ opacity: [0.2, 1, 0.2] }}
+                        transition={{ 
+                          duration: 6, 
+                          repeat: Infinity, 
+                          ease: "easeInOut"
+                        }}
+                        className="relative"
+                      >
+                        <Brain className="w-8 h-8 text-white/80" />
+                      </motion.div>
+                    </div>
+                  </div>
+                }
+              />
+            </motion.div>
+            
+            {/* Connector 1: Vision Chamber → Expeditions */}
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+            >
+              <div className="flex flex-col items-center relative">
+                {/* Main connection line */}
+                <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
+                  {/* Flowing particles */}
+                  {[...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white/80 rounded-full left-1/2 transform -translate-x-1/2"
+                      initial={{ top: 0, opacity: 0 }}
+                      animate={{
+                        top: ["0%", "100%"],
+                        opacity: [0, 1, 0],
+                      }}
+                      transition={{
+                        duration: 2,
+                        delay: i * 0.4,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Energy pulse */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent"
+                    animate={{
+                      opacity: [0, 0.7, 0],
+                      scaleX: [0.5, 1, 0.5]
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              <SystemCard
+                icon={Compass}
+                title="Expeditions"
+                description="Your idea becomes reality through focused missions. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
+                imageContent={
+                  <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm overflow-hidden">
+                    {/* Strategic Line Icons around rocket */}
+                    {[
+                      { x: "50px", y: "15px" },   // Top left
+                      { x: "140px", y: "20px" },  // Top right
+                      { x: "30px", y: "50px" },   // Mid left
+                      { x: "160px", y: "55px" },  // Mid right
+                      { x: "70px", y: "85px" },   // Bottom left
+                      { x: "120px", y: "90px" }   // Bottom right
+                    ].map((pos, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute"
+                        style={{
+                          left: pos.x,
+                          top: pos.y,
+                        }}
+                        animate={{ 
+                          opacity: [0, 0.6, 0],
+                          scale: [0.8, 1, 0.8],
+                        }}
+                        transition={{ 
+                          duration: 1.5,
+                          repeat: Infinity,
+                          delay: i * 0.4,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        <Minus className="w-8 h-8 text-white/40 rotate-90" />
+                      </motion.div>
+                    ))}
+                    
+                    {/* Stationary Rocket in Center */}
+                    <div className="absolute inset-0 flex items-center justify-center -mt-6">
+                      {/* Rocket Icon - Vigorously Vibrating */}
+                      <motion.div
+                        animate={{ 
+                          rotate: [-45, -42, -48, -43, -47, -45],
+                          x: [0.5, 1, -0.5, 0.8, -0.3, 0.3],
+                          y: [0.3, -0.5, 0.8, -0.8, 0.5, -0.3]
+                        }}
+                        transition={{ 
+                          duration: 0.3,
+                          repeat: Infinity,
+                          ease: "linear"
+                        }}
+                      >
+                        <Rocket className="w-8 h-8 text-white/90" />
+                      </motion.div>
+                    </div>
+
+                    {/* Background Gradient Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                  </div>
+                }
+              />
+            </motion.div>
+            
+            {/* Connector 2: Expeditions → Crew */}
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.5 }}
+            >
+              <div className="flex flex-col items-center relative">
+                {/* Main connection line */}
+                <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
+                  {/* Flowing particles with different timing */}
+                  {[...Array(5)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white/80 rounded-full left-1/2 transform -translate-x-1/2"
+                      initial={{ top: 0, opacity: 0 }}
+                      animate={{
+                        top: ["0%", "100%"],
+                        opacity: [0, 1, 0],
+                      }}
+                      transition={{
+                        duration: 2.5,
+                        delay: (i * 0.3) + 0.5,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Energy pulse with different timing */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent"
+                    animate={{
+                      opacity: [0, 0.7, 0],
+                      scaleX: [0.5, 1, 0.5]
+                    }}
+                    transition={{
+                      duration: 3.5,
+                      delay: 0.7,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+            >
+              <SystemCard
+                icon={Users}
+                title="Crew"
+                description="The specialists your project needs, available when you need them. Development, design, strategy, growth. Not someday when you can afford them. Today."
+                imageContent={
+                  <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <div className="grid grid-cols-3 gap-2">
+                      {[...Array(6)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0.3 }}
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 2, delay: i * 0.3, repeat: Infinity }}
+                          className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center"
+                        >
+                          <div className="w-3 h-3 bg-white/40 rounded-full" />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                }
+              />
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Starship Classes Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-gray-900/50 via-black to-gray-900/50 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
+      <section className="py-48 px-4 relative">
         <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -523,19 +813,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 relative bg-black">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10" />
-        <motion.div 
-          className="absolute inset-0 opacity-20"
-          style={{
-            background: 'radial-gradient(circle at 50% 50%, rgba(var(--primary-rgb), 0.3) 0%, transparent 70%)'
-          }}
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.2, 0.3, 0.2]
-          }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
+      <section className="py-48 px-4 relative">
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

@@ -464,6 +464,39 @@ export class DeploymentWorkflowService {
   }
 
   /**
+   * Remove deployment for a connector (stop and remove Docker container)
+   * This is called when a connector is deleted from the UI
+   */
+  async removeDeployment(starshipId: string, connectorId: string): Promise<boolean> {
+    try {
+      console.log(`[DeploymentWorkflow] Removing deployment for connector ${connectorId} on starship ${starshipId}`);
+
+      // Stop health monitoring and bridge monitoring
+      await this.stopHealthMonitoring(connectorId);
+      const connector = await this.mcpConnectorRepo.findById(connectorId);
+      if (connector?.httpBridgeEnabled) {
+        bridgeMonitoringService.stopMonitoring(connectorId);
+      }
+
+      // Remove container using deployer
+      const removed = await this.deployer.remove(starshipId, connectorId);
+
+      if (removed) {
+        // Unregister from service registry
+        await serviceRegistry.unregisterService(starshipId, connectorId);
+        console.log(`[DeploymentWorkflow] Successfully removed deployment for connector ${connectorId}`);
+      } else {
+        console.warn(`[DeploymentWorkflow] Failed to remove deployment for connector ${connectorId}`);
+      }
+
+      return removed;
+    } catch (error) {
+      console.error(`[DeploymentWorkflow] Error removing deployment for connector ${connectorId}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Get deployment status for a connector
    */
   async getDeploymentStatus(connectorId: string): Promise<DeploymentStatus | null> {

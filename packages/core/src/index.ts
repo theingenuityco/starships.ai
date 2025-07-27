@@ -19,6 +19,12 @@ export { SecurityManager } from './services/mcp/SecurityManager';
 export { NetworkCleanupService } from './services/mcp/NetworkCleanupService';
 export { ConnectorMigrationService, connectorMigrationService } from './services/mcp/ConnectorMigrationService';
 
+// Agent-MCP Integration Services
+export { MCPToolGateway, mcpToolGateway } from './services/mcp/MCPToolGateway';
+export { ServiceRegistry, serviceRegistry } from './services/mcp/ServiceRegistry';
+export { ToolDiscoveryCache } from './services/mcp/ToolDiscoveryCache';
+export { MCPNetworkClient } from './services/mcp/MCPNetworkClient';
+
 // API Routes
 export { createDeploymentApiRoutes } from './services/mcp/DeploymentApiRoutes';
 
@@ -66,3 +72,23 @@ export type {
   MigrationResult,
   MigrationStatus
 } from './services/mcp/ConnectorMigrationService';
+
+// Agent-MCP Integration Types
+export type {
+  MCPTool,
+  MCPResource
+} from './services/mcp/ToolDiscoveryCache';
+
+export type {
+  ToolInvocationResult
+} from './services/mcp/MCPToolGateway';
+
+export type {
+  MCPServiceEndpoint,
+  ServiceRegistryEntry
+} from './services/mcp/ServiceRegistry';
+
+export type {
+  ToolExecutionOptions,
+  ToolExecutionResult
+} from './services/mcp/MCPNetworkClient';

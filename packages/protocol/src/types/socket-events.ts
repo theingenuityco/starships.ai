@@ -80,6 +80,9 @@ export interface ExpeditionSocketEvents {
   'expedition:join-room': (data: { expeditionId: string; userId: string }) => void;
   'expedition:leave-room': (data: { expeditionId: string; userId: string }) => void;
   
+  // Message sending
+  'expedition:send-message': (data: { expeditionId: string; content: string; messageType?: string; participantId?: string; timestamp: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  
   // User presence events
   'expedition:user-joined': (data: { userId: string; expeditionId: string; timestamp: string }) => void;
   'expedition:user-left': (data: { userId: string; expeditionId: string; timestamp: string }) => void;

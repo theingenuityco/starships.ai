@@ -1,5 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { SocketIOEvents } from '@starships/protocol';
+import type { ExpeditionMessageData } from '../types/socket-types';
 
 /**
  * Setup expedition-specific Socket.IO event handlers
@@ -10,76 +11,104 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
   console.log('[SOCKET.IO] Setting up expedition-specific handlers');
 
   io.on('connection', (socket) => {
-    // Handle joining expedition rooms
-    socket.on('expedition:join-room', ({ expeditionId, userId }) => {
-      const roomId = `expedition:${expeditionId}`;
+    console.log('[SOCKET.IO] Client connected to expedition handlers');
+    
+    // Handle expedition room joining
+    socket.on('expedition:join-room', (data) => {
+      const roomId = `expedition:${data.expeditionId}`;
       socket.join(roomId);
-      console.log(`[SOCKET.IO] User ${userId} joined expedition room: ${roomId}`);
+      socket.data.userId = data.userId;
+      socket.data.expeditionId = data.expeditionId;
+      console.log(`[SOCKET.IO] User ${data.userId} joined expedition room: ${roomId}`);
+      console.log(`[SOCKET.IO] Socket ${socket.id} is now in rooms:`, Array.from(socket.rooms));
       
-      // Notify others in the room that a user joined
+      // Notify other users in the room
       socket.to(roomId).emit('expedition:user-joined', {
-        userId,
-        expeditionId,
+        userId: data.userId,
+        expeditionId: data.expeditionId,
         timestamp: new Date().toISOString()
       });
     });
 
-    // Handle leaving expedition rooms
-    socket.on('expedition:leave-room', ({ expeditionId, userId }) => {
-      const roomId = `expedition:${expeditionId}`;
+    // Handle expedition room leaving
+    socket.on('expedition:leave-room', (data) => {
+      const roomId = `expedition:${data.expeditionId}`;
       socket.leave(roomId);
-      console.log(`[SOCKET.IO] User ${userId} left expedition room: ${roomId}`);
+      console.log(`[SOCKET.IO] User ${data.userId} left expedition room: ${roomId}`);
       
-      // Notify others in the room that a user left
+      // Notify other users in the room
       socket.to(roomId).emit('expedition:user-left', {
-        userId,
-        expeditionId,
+        userId: data.userId,
+        expeditionId: data.expeditionId,
         timestamp: new Date().toISOString()
       });
     });
 
-    // Handle expedition status updates (could be used for manual triggers)
-    socket.on('expedition:request-status', async ({ expeditionId }) => {
+    // Handle message sending via WebSocket
+    socket.on('expedition:send-message', async (data: ExpeditionMessageData, callback) => {
       try {
-        // This could trigger a status refresh from the server
-        console.log(`[SOCKET.IO] Status request for expedition: ${expeditionId}`);
+        console.log('[SOCKET.IO] Received expedition message:', data);
         
-        // Emit current status back to the requesting client
-        socket.emit('expedition:status-update', {
-          expeditionId,
-          timestamp: new Date().toISOString()
-        });
+        // Get the authenticated user ID from the socket
+        const userId = socket.data.userId;
+        if (!userId) {
+          throw new Error('User not authenticated');
+        }
+        
+        console.log('[SOCKET.IO] Authenticated user:', userId);
+        
+        // Import MessageService to handle the message
+        const { MessageService } = await import('../services/MessageService');
+        const messageService = MessageService.getInstance();
+        
+        // Check if streaming is requested
+        const enableStreaming = data.enableStreaming === true; // Default to false
+        
+        console.log('[SOCKET.IO] Message enableStreaming:', enableStreaming);
+        
+        if (enableStreaming) {
+          console.log('[SOCKET.IO] Using streaming message handling');
+          // Send message with streaming support
+          await messageService.sendExpeditionMessageWithStreaming(data, userId, socket);
+        } else {
+          console.log('[SOCKET.IO] Using regular message handling');
+          // Send the message through the service with the authenticated user ID
+          const result = await messageService.sendExpeditionMessage(data, userId);
+        }
+        
+        // Acknowledge success to the sender
+        if (callback) {
+          callback({ success: true });
+        }
+        
+        console.log('[SOCKET.IO] Message sent successfully via WebSocket');
+        
       } catch (error) {
-        console.error('[SOCKET.IO] Error handling status request:', error);
-        socket.emit('expedition:error', {
-          expeditionId,
-          error: 'Failed to get expedition status',
+        console.error('[SOCKET.IO] Failed to send message via WebSocket:', error);
+        
+        // Send error response to the sender
+        if (callback) {
+          callback({ 
+            success: false, 
+            error: error instanceof Error ? error.message : 'Failed to send message' 
+          });
+        }
+      }
+    });
+    
+    // Basic connection handling
+    socket.on('disconnect', () => {
+      console.log('[SOCKET.IO] Client disconnected from expedition handlers');
+      
+      // Leave all expedition rooms this socket was in
+      if (socket.data.expeditionId && socket.data.userId) {
+        const roomId = `expedition:${socket.data.expeditionId}`;
+        socket.to(roomId).emit('expedition:user-left', {
+          userId: socket.data.userId,
+          expeditionId: socket.data.expeditionId,
           timestamp: new Date().toISOString()
         });
       }
-    });
-
-    // Handle typing indicators for expedition chat
-    socket.on('expedition:typing-start', ({ expeditionId, userId, agentId }) => {
-      const roomId = `expedition:${expeditionId}`;
-      socket.to(roomId).emit('expedition:user-typing', {
-        expeditionId,
-        userId,
-        agentId,
-        isTyping: true,
-        timestamp: new Date().toISOString()
-      });
-    });
-
-    socket.on('expedition:typing-stop', ({ expeditionId, userId, agentId }) => {
-      const roomId = `expedition:${expeditionId}`;
-      socket.to(roomId).emit('expedition:user-typing', {
-        expeditionId,
-        userId,
-        agentId,
-        isTyping: false,
-        timestamp: new Date().toISOString()
-      });
     });
   });
 }

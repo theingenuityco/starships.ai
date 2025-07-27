@@ -19,6 +19,7 @@ import {
 import { VirtualFirstOfficer } from './VirtualFirstOfficer';
 import { FirstOfficerService } from './FirstOfficerService';
 import { MessageService } from './MessageService';
+import { SocketIOService } from './SocketIOService';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -29,6 +30,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
   private logger: Logger;
   private firstOfficerService: FirstOfficerService;
   private messageService: MessageService;
+  private socketService: SocketIOService | null = null;
   
   // Track active conversations
   private activeConversations: Map<string, {
@@ -42,6 +44,23 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     this.logger = getLogger({ service: 'BidirectionalCommunicationService' });
     this.firstOfficerService = FirstOfficerService.getInstance();
     this.messageService = MessageService.getInstance();
+    // Note: SocketIOService will be accessed lazily when needed
+  }
+
+  /**
+   * Get SocketIOService instance lazily
+   */
+  private getSocketService(): SocketIOService | null {
+    if (!this.socketService) {
+      try {
+        this.socketService = SocketIOService.getInstance();
+        this.logger.info('SocketIOService successfully connected');
+      } catch (error) {
+        this.logger.warn('SocketIOService not available', undefined, { error: error instanceof Error ? error.message : String(error) });
+        return null;
+      }
+    }
+    return this.socketService;
   }
 
   /**
@@ -602,7 +621,7 @@ Please decide whether to approve this assistance request and coordinate accordin
   private async persistAgentMessage(message: AgentToOfficerMessage): Promise<void> {
     const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
     
-    await messageRepo.create({
+    const createdMessage = await messageRepo.create({
       expeditionId: message.expeditionId,
       role: 'agent',
       agentId: message.agentId,
@@ -621,6 +640,18 @@ Please decide whether to approve this assistance request and coordinate accordin
         ...message.metadata
       }
     });
+
+    // Emit WebSocket event for real-time updates
+    const socketService = this.getSocketService();
+    if (socketService && createdMessage) {
+      const expeditionRoom = `expedition:${message.expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: message.expeditionId,
+        message: createdMessage,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`[BIDIRECTIONAL-COMM] Emitted agent message via WebSocket for expedition ${message.expeditionId}`);
+    }
   }
 
   /**
@@ -629,7 +660,7 @@ Please decide whether to approve this assistance request and coordinate accordin
   private async persistOfficerMessage(message: OfficerToAgentMessage): Promise<void> {
     const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
     
-    await messageRepo.create({
+    const createdMessage = await messageRepo.create({
       expeditionId: message.expeditionId,
       role: 'first-officer',
       content: message.content,
@@ -647,6 +678,18 @@ Please decide whether to approve this assistance request and coordinate accordin
         ...message.metadata
       }
     });
+
+    // Emit WebSocket event for real-time updates
+    const socketService = this.getSocketService();
+    if (socketService && createdMessage) {
+      const expeditionRoom = `expedition:${message.expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: message.expeditionId,
+        message: createdMessage,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`[BIDIRECTIONAL-COMM] Emitted First Officer message via WebSocket for expedition ${message.expeditionId}`);
+    }
   }
 
   /**
@@ -655,7 +698,7 @@ Please decide whether to approve this assistance request and coordinate accordin
   private async notifyCriticalBlocker(report: BlockerReport): Promise<void> {
     const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
     
-    await messageRepo.create({
+    const createdMessage = await messageRepo.create({
       expeditionId: report.expeditionId,
       role: 'system',
       content: `⚠️ CRITICAL BLOCKER: Agent "${report.agentName}" is blocked on ${report.blocker.type} issue: ${report.blocker.description}`,
@@ -668,6 +711,18 @@ Please decide whether to approve this assistance request and coordinate accordin
         agentName: report.agentName
       }
     });
+
+    // Emit WebSocket event for real-time updates
+    const socketService = this.getSocketService();
+    if (socketService && createdMessage) {
+      const expeditionRoom = `expedition:${report.expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: report.expeditionId,
+        message: createdMessage,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`[BIDIRECTIONAL-COMM] Emitted critical blocker notification via WebSocket for expedition ${report.expeditionId}`);
+    }
   }
 }
 

@@ -22,8 +22,22 @@ export class ProviderFactory {
 
     try {
       const agent = await this.agentRepository.findById(agentId);
+      
+      // If agent not found, use default configuration (especially for system agents like first-officer-system)
       if (!agent) {
-        throw new Error(`Agent not found: ${agentId}`);
+        console.warn(`Agent not found: ${agentId}, using default LLM configuration`);
+        const defaultModel = {
+          id: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
+          name: process.env.DEFAULT_CHAT_MODEL || 'gpt-4',
+          provider: (process.env.DEFAULT_PROVIDER as 'openai' | 'anthropic') || 'openai',
+          temperature: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
+          maxTokens: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
+          createdAt: new Date().toISOString(),
+        };
+        
+        const provider = new LangChainProvider(defaultModel);
+        this.providers.set(agentId, provider);
+        return provider;
       }
 
       const llm = await this.llmRepository.findById(agent.model);

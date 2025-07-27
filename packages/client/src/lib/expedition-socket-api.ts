@@ -49,7 +49,7 @@ class ExpeditionSocketAPI {
 
   private constructor() {
     this.socketClient = SocketClient.getInstance();
-    this.setupEventHandlers();
+    // Note: Event handlers will be set up when joining rooms to ensure socket is connected
   }
 
   static getInstance(): ExpeditionSocketAPI {
@@ -64,7 +64,12 @@ class ExpeditionSocketAPI {
    */
   private setupEventHandlers() {
     const socket = this.socketClient.getSocket();
-    if (!socket) return;
+    if (!socket) {
+      console.warn('[EXPEDITION-SOCKET] Cannot setup event handlers - socket not available');
+      return;
+    }
+
+    console.log('[EXPEDITION-SOCKET] Setting up event handlers for connected socket');
 
     // Handle expedition events
     socket.on('expedition:created', this.handleExpeditionEvent.bind(this, 'expedition:created'));
@@ -78,8 +83,21 @@ class ExpeditionSocketAPI {
     socket.on('task:assigned', this.handleExpeditionEvent.bind(this, 'task:assigned'));
     socket.on('task:completed', this.handleExpeditionEvent.bind(this, 'task:completed'));
     
-    // Handle message events
+    // Handle message events - THIS IS THE CRITICAL ONE
     socket.on('message:sent', this.handleExpeditionEvent.bind(this, 'message:sent'));
+    console.log('[EXPEDITION-SOCKET] ✅ Set up message:sent event listener');
+    
+    // Add test listener to see if we're receiving ANY message:sent events
+    socket.on('message:sent', (data) => {
+      console.log('[EXPEDITION-SOCKET] 🔥 RAW message:sent event received:', data);
+    });
+    
+    // Handle streaming events
+    socket.on('expedition:stream-start', this.handleStreamStart.bind(this));
+    socket.on('expedition:stream-chunk', this.handleStreamChunk.bind(this));
+    socket.on('expedition:stream-complete', this.handleStreamComplete.bind(this));
+    socket.on('expedition:stream-error', this.handleStreamError.bind(this));
+    console.log('[EXPEDITION-SOCKET] Set up streaming event listeners');
     
     // Handle agent events
     socket.on('agent:assigned', this.handleExpeditionEvent.bind(this, 'agent:assigned'));
@@ -92,6 +110,8 @@ class ExpeditionSocketAPI {
     
     // Handle tool usage
     socket.on('expedition:tool-usage', this.handleToolUsage.bind(this));
+
+    console.log('[EXPEDITION-SOCKET] Event handlers setup completed');
   }
 
   /**
@@ -107,7 +127,8 @@ class ExpeditionSocketAPI {
       agentId: data.agentId
     };
 
-    console.log('[EXPEDITION-SOCKET] Received event:', event);
+    console.log('[EXPEDITION-SOCKET] Received event:', type, event);
+    console.log('[EXPEDITION-SOCKET] Raw data received:', data);
 
     // Notify all listeners for this expedition
     const expeditionSubs = this.subscriptions.get(event.expeditionId);
@@ -129,7 +150,10 @@ class ExpeditionSocketAPI {
         this.notifyTaskUpdate(data.task);
         break;
       case 'message:sent':
-        this.notifyMessage(data.message);
+        // For message:sent events, the message is nested in data.message
+        const message = data.message || data;
+        console.log('[EXPEDITION-SOCKET] Processing message:', message);
+        this.notifyMessage(message);
         break;
     }
   }
@@ -194,6 +218,91 @@ class ExpeditionSocketAPI {
   }
 
   /**
+   * Handle streaming start
+   */
+  private handleStreamStart(data: any) {
+    console.log('[EXPEDITION-SOCKET] 🚀 Stream started:', data);
+    
+    // Notify streaming listeners
+    const expeditionSubs = this.subscriptions.get(data.expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.all.forEach(listener => listener({
+        type: 'expedition:stream-start' as any,
+        expeditionId: data.expeditionId,
+        data,
+        timestamp: data.timestamp,
+        userId: undefined,
+        agentId: data.participantId
+      }));
+    }
+  }
+
+  /**
+   * Handle streaming chunks
+   */
+  private handleStreamChunk(data: any) {
+    console.log('[EXPEDITION-SOCKET] ⚡ Stream chunk:', data.content);
+    
+    // Notify streaming listeners
+    const expeditionSubs = this.subscriptions.get(data.expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.all.forEach(listener => listener({
+        type: 'expedition:stream-chunk' as any,
+        expeditionId: data.expeditionId,
+        data,
+        timestamp: data.timestamp,
+        userId: undefined,
+        agentId: data.participantId
+      }));
+    }
+  }
+
+  /**
+   * Handle streaming complete
+   */
+  private handleStreamComplete(data: any) {
+    console.log('[EXPEDITION-SOCKET] ✅ Stream completed:', data);
+    
+    // Notify streaming listeners
+    const expeditionSubs = this.subscriptions.get(data.expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.all.forEach(listener => listener({
+        type: 'expedition:stream-complete' as any,
+        expeditionId: data.expeditionId,
+        data,
+        timestamp: data.timestamp,
+        userId: undefined,
+        agentId: data.participantId
+      }));
+    }
+
+    // Also add the final message to regular message listeners
+    if (data.message) {
+      this.notifyMessage(data.message);
+    }
+  }
+
+  /**
+   * Handle streaming error
+   */
+  private handleStreamError(data: any) {
+    console.error('[EXPEDITION-SOCKET] Stream error:', data);
+    
+    // Notify streaming listeners
+    const expeditionSubs = this.subscriptions.get(data.expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.all.forEach(listener => listener({
+        type: 'expedition:stream-error' as any,
+        expeditionId: data.expeditionId,
+        data,
+        timestamp: data.timestamp,
+        userId: undefined,
+        agentId: data.participantId
+      }));
+    }
+  }
+
+  /**
    * Notify status change listeners
    */
   private notifyStatusChange(expeditionId: string, newStatus: string, oldStatus?: string) {
@@ -249,11 +358,21 @@ class ExpeditionSocketAPI {
       return;
     }
 
+    // Ensure event handlers are set up when socket is connected
+    this.setupEventHandlers();
+
     const roomId = `expedition:${expeditionId}`;
     if (!this.expeditionRooms.has(roomId)) {
+      console.log(`[EXPEDITION-SOCKET] 🚀 Attempting to join expedition room: ${roomId}`);
+      console.log(`[EXPEDITION-SOCKET] 🚀 User ID: ${userId}`);
+      console.log(`[EXPEDITION-SOCKET] 🚀 Socket connected: ${socket.connected}, Socket ID: ${socket.id}`);
+      
       socket.emit('expedition:join-room', { expeditionId, userId });
       this.expeditionRooms.add(roomId);
-      console.log(`[EXPEDITION-SOCKET] Joined expedition room: ${roomId}`);
+      console.log(`[EXPEDITION-SOCKET] ✅ Joined expedition room: ${roomId}`);
+      console.log(`[EXPEDITION-SOCKET] ✅ Current rooms:`, Array.from(this.expeditionRooms));
+    } else {
+      console.log(`[EXPEDITION-SOCKET] ⚠️ Already in expedition room: ${roomId}`);
     }
   }
 
@@ -422,6 +541,39 @@ class ExpeditionSocketAPI {
     return () => {
       this.globalSubscriptions.all.delete(listener);
     };
+  }
+
+  /**
+   * Send a message via WebSocket
+   */
+  sendMessage(expeditionId: string, content: string, messageType: string = 'user-input', participantId?: string, enableStreaming: boolean = false): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const socket = this.socketClient.getSocket();
+      if (!socket) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      const messageData = {
+        expeditionId,
+        content: content.trim(),
+        messageType,
+        participantId,
+        timestamp: new Date().toISOString(),
+        enableStreaming
+      };
+
+      console.log('[EXPEDITION-SOCKET] Sending message with streaming:', enableStreaming);
+
+      // Send message via WebSocket
+      socket.emit('expedition:send-message', messageData, (response: any) => {
+        if (response.success) {
+          resolve();
+        } else {
+          reject(new Error(response.error || 'Failed to send message'));
+        }
+      });
+    });
   }
 
   /**

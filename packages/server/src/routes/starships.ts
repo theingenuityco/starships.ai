@@ -947,7 +947,22 @@ router.delete(
         return;
       }
 
-      // Delete the connector instance
+      // First, stop and remove the Docker container if it's deployed
+      if (connectorInstance.dockerStatus === 'running' || connectorInstance.dockerStatus === 'building') {
+        console.log(`[STARSHIPS] Removing Docker deployment for connector ${connectorInstance.id}`);
+        try {
+          const deploymentService = new DeploymentWorkflowService(mcpConnectorRepo, mcpServerRepo);
+          const removed = await deploymentService.removeDeployment(starship.id, connectorInstance.id);
+          if (!removed) {
+            console.warn(`[STARSHIPS] Failed to remove Docker deployment for connector ${connectorInstance.id}`);
+          }
+        } catch (error) {
+          console.error(`[STARSHIPS] Error removing Docker deployment:`, error);
+          // Continue with deletion even if Docker removal fails
+        }
+      }
+
+      // Delete the connector instance from database
       const deleted = await mcpConnectorRepo.delete(connectorInstance.id);
 
       if (!deleted) {

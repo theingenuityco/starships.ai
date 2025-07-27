@@ -112,12 +112,14 @@ export default function HomePage() {
   const { scrollYProgress } = useScroll();
 
   const dynamicTexts = [
-    "your own intelligent vessel",
-    "a digital media company", 
-    "the next big SaaS",
     "your dream startup",
+    "the next breakthrough SaaS",
     "an AI-powered platform",
+    "your creative digital agency",
+    "your strategic consultancy",
+    "your research studio",
     "the future of work",
+    "your own intelligent vessel",
     "your vision into reality"
   ];
 
@@ -430,7 +432,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 1.2 }}
             className="text-center mb-36"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">The Starship Journey</h2>
@@ -761,7 +763,7 @@ export default function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 1.2 }}
             className="text-center mb-36"
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">Choose Your Starship Class</h2>
@@ -771,37 +773,58 @@ export default function HomePage() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <StarshipClass
-              name="Scout Class"
-              description="Perfect for focused exploration and individual missions. Efficient and nimble."
-              features={[
-                "3 Crew Members",
-                "1 Concurrent Expedition",
-                "Minimal Burn Rate",
-                "Quick Deployment"
-              ]}
-            />
-            <StarshipClass
-              name="Cruiser Class"
-              description="Balanced power and capability. Ideal for ambitious projects and sustained operations."
-              features={[
-                "6-8 Crew Members",
-                "Up to 3 Expeditions",
-                "Moderate Burn Rate",
-                "Advanced Coordination"
-              ]}
-              highlight
-            />
-            <StarshipClass
-              name="Dreadnought Class"
-              description="Maximum capability for complex, multi-faceted Visions. Built for large-scale operations."
-              features={[
-                "12+ Crew Members",
-                "Unlimited Expeditions",
-                "High Burn Rate",
-                "Epic Scale Missions"
-              ]}
-            />
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              viewport={{ once: false, margin: "-50px" }}
+            >
+              <StarshipClass
+                name="Scout Class"
+                description="Perfect for focused exploration and individual missions. Efficient and nimble."
+                features={[
+                  "3 Crew Members",
+                  "1 Concurrent Expedition",
+                  "Minimal Burn Rate",
+                  "Quick Deployment"
+                ]}
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              viewport={{ once: false, margin: "-50px" }}
+            >
+              <StarshipClass
+                name="Cruiser Class"
+                description="Balanced power and capability. Ideal for ambitious projects and sustained operations."
+                features={[
+                  "6-8 Crew Members",
+                  "Up to 3 Expeditions",
+                  "Moderate Burn Rate",
+                  "Advanced Coordination"
+                ]}
+                highlight
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              viewport={{ once: false, margin: "-50px" }}
+            >
+              <StarshipClass
+                name="Dreadnought Class"
+                description="Maximum capability for complex, multi-faceted Visions. Built for large-scale operations."
+                features={[
+                  "12+ Crew Members",
+                  "Unlimited Expeditions",
+                  "High Burn Rate",
+                  "Epic Scale Missions"
+                ]}
+              />
+            </motion.div>
           </div>
         </div>
       </section>
@@ -811,12 +834,12 @@ export default function HomePage() {
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-md z-0" style={{ height: '85vh' }} />
       
       {/* CTA Section */}
-      <section className="py-48 px-4 relative">
+      <section className="py-72 px-4 relative">
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 1.2 }}
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Launch?</h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">

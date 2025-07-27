@@ -113,15 +113,14 @@ export default function HomePage() {
   const { scrollYProgress } = useScroll();
 
   const dynamicTexts = [
-    "your dream startup",
-    "the next breakthrough SaaS",
+    "your vision into reality",
+    "the next big SaaS",
+    "your strategic consultancy",
     "an AI-powered platform",
     "your creative digital agency",
-    "your strategic consultancy",
-    "your research studio",
     "the future of work",
+    "your research studio",
     "your own intelligent vessel",
-    "your vision into reality"
   ];
 
   useEffect(() => {

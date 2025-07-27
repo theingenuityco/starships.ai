@@ -152,27 +152,30 @@ export class ServiceRegistry {
           return;
         }
         
-        const response = await fetch(`${endpoint.internalUrl}/health`, {
-          signal: AbortSignal.timeout(5000) // 5 second timeout
-        });
+        // For health checks from the host, we need to use Docker's internal health check
+        // The container's health is managed by Docker's healthcheck configuration
+        // We'll check the container status instead of making HTTP calls
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
         
-        if (response.ok) {
-          const healthData = await response.json();
+        try {
+          const { stdout } = await execAsync(`docker inspect --format='{{.State.Health.Status}}' ${endpoint.containerName}`);
+          const healthStatus = stdout.trim();
           
-          await this.updateServiceHealth(
-            entry.starshipId,
-            endpoint.connectorId,
-            healthData.status === 'healthy' ? 'healthy' : 'unhealthy',
-            healthData.tools,
-            healthData.resources,
-            healthData.capabilities
-          );
-        } else {
-          await this.updateServiceHealth(
-            entry.starshipId,
-            endpoint.connectorId,
-            'unhealthy'
-          );
+          if (healthStatus === 'healthy') {
+            await this.updateServiceHealth(entry.starshipId, endpoint.connectorId, 'healthy');
+          } else if (healthStatus === 'unhealthy') {
+            await this.updateServiceHealth(entry.starshipId, endpoint.connectorId, 'unhealthy');
+          } else {
+            // starting, none, or other status
+            await this.updateServiceHealth(entry.starshipId, endpoint.connectorId, 'starting');
+          }
+          return;
+        } catch (dockerError) {
+          console.warn(`[ServiceRegistry] Docker inspect failed, falling back to marking as unhealthy:`, dockerError);
+          await this.updateServiceHealth(entry.starshipId, endpoint.connectorId, 'unhealthy');
+          return;
         }
       }
     } catch (error) {

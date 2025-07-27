@@ -140,6 +140,53 @@
 }
 
 /* 
+ * FIXED THEME SYSTEM
+ * ==================
+ * For components that need a specific theme regardless of user preference
+ */
+
+/* Fixed Dark Theme - For landing page */
+.fixed-theme-dark {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 220 15% 5%;
+  --card-foreground: 0 0% 95%;
+  --primary: 220 70% 60%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 220 15% 10%;
+  --secondary-foreground: 0 0% 95%;
+  --muted: 220 15% 10%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 220 15% 15%;
+  --accent-foreground: 0 0% 95%;
+  --border: 220 15% 20%;
+  --input: 220 15% 20%;
+  --ring: 220 70% 60%;
+  
+  /* Ensure text color is applied */
+  color: hsl(var(--foreground));
+}
+
+/* Fixed Light Theme - If needed */
+.fixed-theme-light {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 8%;
+  --primary: 220 70% 50%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 0 0% 8%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 0 0% 8%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 220 70% 50%;
+}
+
+/* 
  * ACCESSIBILITY UTILITIES - FUTURE ENHANCEMENT
  * ===========================================
  * TODO: Implement these classes for improved accessibility:

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LoginButton } from '@/components/auth/LoginButton';
+import { FixedTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
 const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import { 
@@ -53,7 +54,7 @@ const SystemCard = memo(({ icon: Icon, title, description, accent = false, image
             </div>
             <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">{title}</h3>
           </div>
-          <p className="text-gray-400 leading-relaxed">{description}</p>
+          <p className="text-muted-foreground leading-relaxed">{description}</p>
         </div>
         {imageContent && (
           <div className="flex justify-center">
@@ -182,8 +183,9 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
+    <FixedTheme theme="dark">
+      <div className="min-h-screen bg-background relative overflow-hidden">
+        <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
         <StarfieldBackground launching={launching} density={600} speed={1.5} />
       </Suspense>
       
@@ -333,7 +335,7 @@ export default function HomePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1, duration: 1 }}
-            className="text-xl md:text-2xl text-gray-300 mb-8 leading-relaxed"
+            className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed"
           >
             Build and pilot{" "}
             <span className="text-primary font-semibold">
@@ -393,7 +395,8 @@ export default function HomePage() {
               <Button 
                 variant="outline" 
                 size="lg" 
-                className="px-8 py-4 text-lg rounded-full border-white/20 hover:border-white/40 text-white hover:bg-white/10 backdrop-blur-sm"
+                onClick={() => window.open('https://github.com/theingenuityco/starships.ai', '_blank')}
+                className="px-8 py-4 text-lg rounded-full backdrop-blur-sm"
               >
                 <GithubIcon className="w-5 h-5 mr-2" />
                 View on GitHub
@@ -454,8 +457,8 @@ export default function HomePage() {
                   <User className="w-8 h-8 text-white/80" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white mb-2">You</h3>
-                  <p className="text-gray-400 leading-relaxed">
+                  <h3 className="text-lg font-semibold mb-2">You</h3>
+                  <p className="text-muted-foreground leading-relaxed">
                     You arrive with an idea, a vision of what could be. The journey begins here.
                   </p>
                 </div>
@@ -896,21 +899,26 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <p className="text-white/70">
+              <p className="text-muted-foreground">
                 © 2025 Starships.ai - Where Vision meets Intelligence
               </p>
             </div>
             <div className="flex space-x-6">
-              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => window.open('https://github.com/theingenuityco/starships.ai', '_blank')}
+              >
                 <GithubIcon className="w-4 h-4 mr-2" />
                 GitHub
               </Button>
-              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">Documentation</Button>
-              <Button variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10">Community</Button>
+              <Button variant="ghost" size="sm">Documentation</Button>
+              <Button variant="ghost" size="sm">Community</Button>
             </div>
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </FixedTheme>
   );
 } 

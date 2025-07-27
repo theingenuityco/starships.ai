@@ -34,7 +34,9 @@ import {
   Bot,
   User,
   Copy,
-  Check
+  Check,
+  ListTodo,
+  BarChart
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
@@ -43,6 +45,9 @@ import { useExpeditionData } from '@/hooks/useExpeditionData';
 import { useExpeditionChat } from '@/hooks/useExpeditionChat';
 import { expeditionAPI } from '@/lib/expeditionApi';
 import { agentAPI } from '@/lib/api';
+import { TaskTimeline } from './TaskTimeline';
+import { AgentActivityFeed } from './AgentActivityFeed';
+import { QualityScoreDisplay } from './QualityScoreDisplay';
 import type { Expedition, ExpeditionStatus, ExpeditionTask } from '@starships/protocol';
 
 interface ExpeditionDetailsProps {
@@ -58,6 +63,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
   const [starshipId, setStarshipId] = useState<string>('');
   const [agentDetails, setAgentDetails] = useState<Record<string, any>>({});
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
+  const [realtimeActivities, setRealtimeActivities] = useState<any[]>([]);
 
   // Fetch starship by slug
   useEffect(() => {
@@ -86,6 +92,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
     expeditionLoading,
     expeditionError,
     tasks,
+    results,
     refreshExpedition
   } = useExpeditionData({
     starshipId,
@@ -148,6 +155,49 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
       });
     }
   }, [expedition, messages.length]);
+
+  // Subscribe to real-time agent activities
+  useEffect(() => {
+    if (!expeditionId || !starshipId) return;
+
+    let unsubscribe: (() => void) | undefined;
+
+    // Dynamic import to handle client-side only
+    import('@/lib/expedition-socket-api').then((module) => {
+      const api = module.default;
+      
+      if (!api) {
+        console.warn('[EXPEDITION DETAILS] Socket API not available');
+        return;
+      }
+
+      // Subscribe to agent activities
+      unsubscribe = api.subscribeToAgentActivities(expeditionId, (agentId: string, activity: any) => {
+        console.log('[EXPEDITION DETAILS] Received agent activity:', activity);
+        
+        // Add to realtime activities
+        setRealtimeActivities((prev) => {
+          const newActivity = {
+            ...activity,
+            id: activity.id || `activity-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+            timestamp: activity.timestamp || new Date().toISOString()
+          };
+          
+          // Keep last 50 activities
+          const updated = [newActivity, ...prev].slice(0, 50);
+          return updated;
+        });
+      });
+    }).catch((error) => {
+      console.error('[EXPEDITION DETAILS] Failed to load socket API:', error);
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [expeditionId, starshipId]);
 
 
   // Fetch agent details
@@ -325,6 +375,93 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
 
   const statusConfig = getStatusConfig(expedition.status);
   const StatusIcon = statusConfig.icon;
+
+  // Generate agent activities from messages and tasks
+  const generateActivities = () => {
+    const activities: any[] = [];
+    
+    // Add real-time activities first
+    activities.push(...realtimeActivities);
+    
+    // Add task-based activities only if not already in real-time
+    tasks.forEach((task) => {
+      if (task.assignedAgentId) {
+        const agent = agentDetails[task.assignedAgentId];
+        
+        // Check if we already have this activity from real-time
+        const hasStartActivity = realtimeActivities.some(a => 
+          a.taskId === task.id && a.type === 'task_started'
+        );
+        
+        if (!hasStartActivity) {
+          // Task assignment activity
+          activities.push({
+            id: `task-assign-${task.id}`,
+            agentId: task.assignedAgentId,
+            agentName: agent?.name || task.assignedAgentId.slice(0, 8),
+            type: 'task_started',
+            taskId: task.id,
+            taskTitle: task.title,
+            message: `started working on "${task.title}"`,
+            timestamp: task.createdAt,
+            metadata: {}
+          });
+        }
+        
+        // Task completion activity
+        if (task.status === 'completed' && task.result) {
+          const hasCompleteActivity = realtimeActivities.some(a => 
+            a.taskId === task.id && a.type === 'task_completed'
+          );
+          
+          if (!hasCompleteActivity) {
+            activities.push({
+              id: `task-complete-${task.id}`,
+              agentId: task.assignedAgentId,
+              agentName: agent?.name || task.assignedAgentId.slice(0, 8),
+              type: 'task_completed',
+              taskId: task.id,
+              taskTitle: task.title,
+              message: `completed "${task.title}"`,
+              timestamp: task.updatedAt,
+              metadata: {
+                duration: task.actualEffort || 30
+              }
+            });
+          }
+        }
+      }
+    });
+    
+    // Add message-based activities only if not in real-time
+    messages.filter(msg => msg.role === 'agent' && msg.agentId).forEach((msg) => {
+      const hasMessageActivity = realtimeActivities.some(a => 
+        a.timestamp === msg.timestamp && a.agentId === msg.agentId
+      );
+      
+      if (!hasMessageActivity) {
+        const agent = agentDetails[msg.agentId];
+        activities.push({
+          id: `msg-${msg.id}`,
+          agentId: msg.agentId,
+          agentName: agent?.name || msg.agentId.slice(0, 8),
+          type: 'agent_thinking',
+          message: 'processing request',
+          timestamp: msg.timestamp,
+          metadata: {}
+        });
+      }
+    });
+    
+    // Remove duplicates and sort
+    const uniqueActivities = activities.filter((activity, index, self) =>
+      index === self.findIndex(a => a.id === activity.id)
+    );
+    
+    return uniqueActivities.sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  };
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -656,97 +793,144 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
             </div>
           </div>
 
-          {/* Right Column - Info */}
-          <aside className="w-80 flex-shrink-0 overflow-y-auto">
-            <div className="space-y-4">
-              {/* Overview Card */}
-              <Card className="bg-card/50 backdrop-blur-sm border-muted">
-              <CardHeader>
-                <CardTitle className="text-base">Overview</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">Created</p>
-                    <p className="font-medium">
-                      {formatDistanceToNow(new Date(expedition.createdAt), { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">Assigned Agents</p>
-                    <p className="font-medium">{expedition.assignedAgents.length} agents</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm">
-                    <p className="text-muted-foreground">Tasks</p>
-                    <p className="font-medium">{tasks.length} total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-              {/* Tasks Card */}
-              <Card className="bg-card/50 backdrop-blur-sm border-muted">
-              <CardHeader>
-                <CardTitle className="text-base">Tasks</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {tasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No tasks yet</p>
-                ) : (
-                  <div className="space-y-2">
-                    {tasks.slice(0, 5).map((task) => (
-                      <div key={task.id} className="flex items-center gap-2">
-                        <div className={`h-2 w-2 rounded-full ${
-                          task.status === 'completed' ? 'bg-emerald-500' :
-                          task.status === 'in-progress' ? 'bg-amber-500' :
-                          'bg-gray-300'
-                        }`} />
-                        <span className="text-sm truncate">{task.title}</span>
-                      </div>
-                    ))}
-                    {tasks.length > 5 && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        +{tasks.length - 5} more tasks
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-              {/* Agents Card */}
-              <Card className="bg-card/50 backdrop-blur-sm border-muted">
-              <CardHeader>
-                <CardTitle className="text-base">Assigned Agents</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {expedition.assignedAgents.map((agentId) => {
-                    const agent = agentDetails[agentId];
-                    return (
-                      <div key={agentId} className="flex items-center gap-2">
-                        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-xs font-medium">
-                            {agent?.name?.slice(0, 2).toUpperCase() || 'AG'}
-                          </span>
+          {/* Right Column - Tabs */}
+          <aside className="w-96 flex-shrink-0 flex flex-col">
+            <Tabs defaultValue="overview" className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+                <TabsTrigger value="quality">Quality</TabsTrigger>
+              </TabsList>
+              
+              <div className="flex-1 overflow-hidden mt-4">
+                <TabsContent value="overview" className="h-full overflow-y-auto pr-2 mt-0 space-y-4">
+                  {/* Overview Card */}
+                  <Card className="bg-card/50 backdrop-blur-sm border-muted">
+                    <CardHeader>
+                      <CardTitle className="text-base">Overview</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div className="text-sm">
+                          <p className="text-muted-foreground">Created</p>
+                          <p className="font-medium">
+                            {formatDistanceToNow(new Date(expedition.createdAt), { addSuffix: true })}
+                          </p>
                         </div>
-                        <span className="text-sm">{agent?.name || agentId.slice(0, 8)}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-            </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <div className="text-sm">
+                          <p className="text-muted-foreground">Assigned Agents</p>
+                          <p className="font-medium">{expedition.assignedAgents.length} agents</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div className="text-sm">
+                          <p className="text-muted-foreground">Tasks</p>
+                          <p className="font-medium">{tasks.length} total</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Tasks Card */}
+                  <Card className="bg-card/50 backdrop-blur-sm border-muted">
+                    <CardHeader>
+                      <CardTitle className="text-base">Tasks</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {tasks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No tasks yet</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {tasks.slice(0, 5).map((task) => (
+                            <div key={task.id} className="flex items-center gap-2">
+                              <div className={`h-2 w-2 rounded-full ${
+                                task.status === 'completed' ? 'bg-emerald-500' :
+                                task.status === 'in-progress' ? 'bg-amber-500' :
+                                'bg-gray-300'
+                              }`} />
+                              <span className="text-sm truncate">{task.title}</span>
+                            </div>
+                          ))}
+                          {tasks.length > 5 && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              +{tasks.length - 5} more tasks
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Agents Card */}
+                  <Card className="bg-card/50 backdrop-blur-sm border-muted">
+                    <CardHeader>
+                      <CardTitle className="text-base">Assigned Agents</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {expedition.assignedAgents.map((agentId) => {
+                          const agent = agentDetails[agentId];
+                          return (
+                            <div key={agentId} className="flex items-center gap-2">
+                              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                <span className="text-xs font-medium">
+                                  {agent?.name?.slice(0, 2).toUpperCase() || 'AG'}
+                                </span>
+                              </div>
+                              <span className="text-sm">{agent?.name || agentId.slice(0, 8)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="timeline" className="h-full overflow-y-auto pr-2 mt-0">
+                  <TaskTimeline tasks={tasks} showDetails={true} />
+                </TabsContent>
+                
+                <TabsContent value="activity" className="h-full overflow-y-auto pr-2 mt-0">
+                  <AgentActivityFeed 
+                    agents={expedition.assignedAgents.map(agentId => ({
+                      agentId,
+                      agentName: agentDetails[agentId]?.name || agentId.slice(0, 8),
+                      assignedTasks: tasks.filter(t => t.assignedAgentId === agentId).map(t => t.id),
+                      skillMatch: 0.85, // Default skill match
+                      workload: tasks.filter(t => t.assignedAgentId === agentId).length,
+                      reasoning: 'Agent selected for expedition'
+                    }))}
+                    activities={generateActivities()}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="quality" className="h-full overflow-y-auto pr-2 mt-0">
+                  <QualityScoreDisplay 
+                    qualityChecks={results
+                      .filter(r => r.quality)
+                      .map(r => ({
+                        taskId: r.taskId || r.id,
+                        result: r.content,
+                        score: r.quality?.overall || 0,
+                        issues: [], // TODO: Extract from quality data
+                        suggestions: [],
+                        approved: (r.quality?.overall || 0) >= 70,
+                        assessedBy: r.quality?.assessedBy || 'first-officer',
+                        assessedAt: r.quality?.assessedAt || r.createdAt
+                      }))}
+                    threshold={70}
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
           </aside>
         </div>
       </div>

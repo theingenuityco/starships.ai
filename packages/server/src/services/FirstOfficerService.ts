@@ -5,7 +5,12 @@
  * Handles agent lifecycle, state persistence, and real-time communication.
  */
 
-import { FirstOfficerAgent, LangChainMemoryStore, ProviderFactory } from '@starships/agent-engine';
+import { 
+  FirstOfficerAgent, 
+  LangChainMemoryStore, 
+  ProviderFactory,
+  WebSocketEventEmitter
+} from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
 import {
   ExpeditionWorkflowState,
@@ -148,6 +153,13 @@ export class FirstOfficerService {
       const llmRepo = RepositoryFactory.getLLMRepository();
       ProviderFactory.initialize(agentRepo, llmRepo);
 
+      // Create WebSocketEventEmitter with socket server
+      const webSocketEmitter = new WebSocketEventEmitter();
+      const socketSvc = this.getSocketService();
+      if (socketSvc) {
+        webSocketEmitter.setSocketServer(socketSvc.getIO());
+      }
+
       // Create First Officer Agent instance with proper configuration
       const firstOfficer = new FirstOfficerAgent(
         expedition.starshipId,
@@ -157,21 +169,22 @@ export class FirstOfficerService {
           qualityThreshold: 70,
           timeoutMinutes: 60,
           requireUserApproval: false,
-          enableParallelExecution: true,
+          enableParallelExecution: false, // Disable parallel execution as per plan
           autoEscalation: true
         },
         expedition.assignedAgents, // Pass selected agents from expedition
-        messageEmitCallback // Pass WebSocket emission callback
+        messageEmitCallback, // Pass WebSocket emission callback
+        webSocketEmitter // Pass WebSocket event emitter for activity events
       );
 
       // Store active agent
       this.activeAgents.set(expeditionId, firstOfficer);
 
       // Emit expedition started event
-      const socketSvc = this.getSocketService();
-      if (socketSvc) {
+      const socketSvcStart = this.getSocketService();
+      if (socketSvcStart) {
         const expeditionRoom = `expedition:${expeditionId}`;
-        socketSvc.getIO().to(expeditionRoom).emit('expedition:started' as any, {
+        socketSvcStart.getIO().to(expeditionRoom).emit('expedition:started' as any, {
           expeditionId,
           userId,
           objective,
@@ -184,10 +197,10 @@ export class FirstOfficerService {
       const result = await firstOfficer.startExpedition(expeditionId, userId, objective);
 
       // Emit expedition completed event
-      const socketSvc2 = this.getSocketService();
-      if (socketSvc2) {
+      const socketSvcEnd = this.getSocketService();
+      if (socketSvcEnd) {
         const expeditionRoom = `expedition:${expeditionId}`;
-        socketSvc2.getIO().to(expeditionRoom).emit('expedition:completed' as any, {
+        socketSvcEnd.getIO().to(expeditionRoom).emit('expedition:completed' as any, {
           expeditionId,
           result: result.substring(0, 500), // Truncate for performance
           timestamp: new Date().toISOString()
@@ -220,6 +233,123 @@ export class FirstOfficerService {
 
       this.logger.error('Failed to start expedition', error instanceof Error ? error : undefined, context);
       throw standardError;
+    }
+  }
+
+  /**
+   * Resume an interrupted expedition
+   */
+  async resumeExpedition(
+    expeditionId: string,
+    userId: string
+  ): Promise<string> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'resumeExpedition',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId }
+    };
+
+    this.logger.info('Resuming expedition from checkpoint', context);
+
+    try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation([
+          { field: 'expeditionId', message: 'Expedition ID is required' }
+        ], context);
+      }
+
+      if (!userId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
+          context
+        );
+      }
+
+      // Get the active First Officer agent
+      const firstOfficer = this.activeAgents.get(expeditionId);
+      
+      if (!firstOfficer) {
+        this.logger.warn('No active First Officer found, creating new instance', context);
+        
+        // Recreate the First Officer instance
+        const expedition = await RepositoryFactory.getExpeditionRepository().findById(expeditionId);
+        if (!expedition) {
+          throw ErrorFactory.notFound('Expedition', expeditionId, context);
+        }
+
+        // Get or create memory store
+        let memoryStore = this.memoryStores.get(expeditionId);
+        if (!memoryStore) {
+          memoryStore = new LangChainMemoryStore();
+          this.memoryStores.set(expeditionId, memoryStore);
+        }
+
+        // Create WebSocket message emission callback
+        const messageEmitCallback = async (message: any) => {
+          const socketSvc = this.getSocketService();
+          if (socketSvc) {
+            const expeditionRoom = `expedition:${expeditionId}`;
+            socketSvc.getIO().to(expeditionRoom).emit('message:sent', {
+              expeditionId,
+              message,
+              timestamp: new Date().toISOString()
+            });
+          }
+        };
+
+        // Create WebSocketEventEmitter with socket server
+        const webSocketEmitter = new WebSocketEventEmitter();
+        const socketSvcEmitter = this.getSocketService();
+        if (socketSvcEmitter) {
+          webSocketEmitter.setSocketServer(socketSvcEmitter.getIO());
+        }
+
+        // Create First Officer Agent instance
+        const newFirstOfficer = new FirstOfficerAgent(
+          expedition.starshipId,
+          memoryStore,
+          {
+            maxRetries: 3,
+            qualityThreshold: 70,
+            timeoutMinutes: 60,
+            requireUserApproval: false,
+            enableParallelExecution: false,
+            autoEscalation: true
+          },
+          expedition.assignedAgents,
+          messageEmitCallback,
+          webSocketEmitter
+        );
+
+        this.activeAgents.set(expeditionId, newFirstOfficer);
+        
+        // Resume the expedition
+        const result = await (newFirstOfficer as any).resumeExpedition(expeditionId, userId);
+        
+        this.logger.info('Expedition resumed successfully', {
+          ...context,
+          metadata: { ...context.metadata, fromCheckpoint: true }
+        });
+        
+        return result;
+      }
+      
+      // Use existing First Officer to resume
+      const result = await (firstOfficer as any).resumeExpedition(expeditionId, userId);
+      
+      this.logger.info('Expedition resumed successfully', {
+        ...context,
+        metadata: { ...context.metadata, fromCheckpoint: true }
+      });
+      
+      return result;
+      
+    } catch (error) {
+      this.logger.error('Failed to resume expedition', error instanceof Error ? error : undefined, context);
+      throw error;
     }
   }
 
@@ -277,9 +407,9 @@ export class FirstOfficerService {
   }
 
   /**
-   * Resume expedition orchestration
+   * Resume expedition orchestration (deprecated - use resumeExpedition with userId)
    */
-  async resumeExpedition(expeditionId: string): Promise<void> {
+  async resumeExpeditionDeprecated(expeditionId: string): Promise<void> {
     const context = {
       service: 'FirstOfficerService',
       operation: 'resumeExpedition',

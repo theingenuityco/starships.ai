@@ -107,6 +107,7 @@ class ExpeditionSocketAPI {
     
     // Handle agent activities
     socket.on('expedition:agent-activity', this.handleAgentActivity.bind(this));
+    socket.on('agent:activity', this.handleAgentActivity.bind(this)); // Also listen for the direct event
     
     // Handle tool usage
     socket.on('expedition:tool-usage', this.handleToolUsage.bind(this));
@@ -346,6 +347,53 @@ class ExpeditionSocketAPI {
 
     // Notify global listeners
     this.globalSubscriptions.message.forEach(listener => listener(message));
+  }
+
+  /**
+   * Handle progress update
+   */
+  private handleProgressUpdate(data: any) {
+    console.log('[EXPEDITION-SOCKET] Progress update:', data);
+    
+    const expeditionId = data.expeditionId;
+    
+    // Notify expedition-specific listeners
+    const expeditionSubs = this.subscriptions.get(expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.progressUpdate.forEach(listener => listener(expeditionId, data));
+    }
+
+    // Notify global listeners
+    this.globalSubscriptions.progressUpdate.forEach(listener => listener(expeditionId, data));
+  }
+
+  /**
+   * Handle agent activity
+   */
+  private handleAgentActivity(data: any) {
+    console.log('[EXPEDITION-SOCKET] Agent activity:', data);
+    
+    const expeditionId = data.expeditionId;
+    const agentId = data.agentId;
+    
+    // Notify expedition-specific listeners
+    const expeditionSubs = this.subscriptions.get(expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.agentActivity.forEach(listener => listener(agentId, data));
+    }
+
+    // Notify global listeners
+    this.globalSubscriptions.agentActivity.forEach(listener => listener(agentId, data));
+  }
+
+  /**
+   * Handle tool usage
+   */
+  private handleToolUsage(data: any) {
+    console.log('[EXPEDITION-SOCKET] Tool usage:', data);
+    
+    // Handle as a general expedition event
+    this.handleExpeditionEvent('expedition:tool-usage' as any, data);
   }
 
   /**

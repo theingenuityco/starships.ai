@@ -39,6 +39,13 @@ export class ChatCoordinator {
   }
 
   /**
+   * Get the user ID
+   */
+  getUserId(): string {
+    return this.userId;
+  }
+
+  /**
    * Send coordination message to expedition chat
    */
   async sendCoordinationMessage(

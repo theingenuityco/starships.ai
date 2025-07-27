@@ -13,10 +13,11 @@
 
 import { Observable, Subject, BehaviorSubject, merge, timer, from, EMPTY, throwError } from 'rxjs';
 import { map, filter, takeUntil, timeout, catchError, retry, delay, mergeMap, concatMap, switchMap } from 'rxjs/operators';
-import { TaskBreakdown, ChatRequest } from '@starships/protocol';
+import { TaskBreakdown, ChatRequest, AgentActivity, AgentActivityType } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
 import { chat } from '../index';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
+import { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
 import {
   TaskExecution,
   CompletedTask,
@@ -188,10 +189,13 @@ export class TaskExecutor {
   private executionStrategy!: ExecutionStrategy;
   private taskQueue: TaskSchedule[] = [];
   private performanceHistory: Map<string, TaskPerformanceMetrics[]> = new Map();
+  private webSocketEmitter: WebSocketEventEmitter;
+  private agentNames: Map<string, string> = new Map();
 
-  constructor(config: FirstOfficerConfig, memoryStore: LangChainMemoryStore) {
+  constructor(config: FirstOfficerConfig, memoryStore: LangChainMemoryStore, webSocketEmitter?: WebSocketEventEmitter) {
     this.config = config;
     this.memoryStore = memoryStore;
+    this.webSocketEmitter = webSocketEmitter || new WebSocketEventEmitter();
     this.initializeResourcePool();
     this.initializeExecutionStrategy();
   }
@@ -209,6 +213,9 @@ export class TaskExecutor {
     console.log(`🚀 [TASK-EXECUTOR] Starting enhanced execution of ${tasks.length} tasks`);
 
     try {
+      // Load agent details for activity tracking
+      await this.loadAgentDetails(assignments);
+      
       // Create enhanced execution plan with resource allocation
       const executionPlan = await this.createEnhancedExecutionPlan(tasks, assignments, options);
       
@@ -521,6 +528,22 @@ export class TaskExecutor {
     execution.actualStartTime = new Date().toISOString();
     execution.status = 'in-progress';
     
+    // Get task details for activity tracking
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const task = await taskRepo.findById(execution.taskId);
+    const taskTitle = task?.title || 'Unknown Task';
+    
+    // Emit task started activity
+    this.emitAgentActivity(
+      expeditionId,
+      execution.agentId,
+      'task_started',
+      `Started working on "${taskTitle}"`,
+      execution.taskId,
+      taskTitle,
+      { priority: execution.priority }
+    );
+    
     try {
       // Allocate resources
       const allocatedResources = await this.allocateResources(
@@ -559,7 +582,7 @@ export class TaskExecutor {
 
     } catch (error) {
       console.error(`❌ [TASK-EXECUTOR] Enhanced task execution failed:`, error);
-      await this.handleEnhancedTaskError(execution, error, options);
+      await this.handleEnhancedTaskError(execution, error, options, expeditionId, taskTitle);
     } finally {
       // Release allocated resources
       if (execution.allocatedResources) {
@@ -580,6 +603,11 @@ export class TaskExecutor {
     const maxRetries = options.retryLimit || this.config.maxRetries;
     let lastError: Error | null = null;
 
+    // Get task details for activity tracking
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const task = await taskRepo.findById(execution.taskId);
+    const taskTitle = task?.title || 'Unknown Task';
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
@@ -587,10 +615,31 @@ export class TaskExecutor {
           const backoffDelay = this.calculateBackoffDelay(attempt, execution.priority);
           console.log(`🔄 [TASK-EXECUTOR] Retrying task ${execution.taskId} (attempt ${attempt + 1}/${maxRetries + 1}) after ${backoffDelay}ms delay`);
           
+          // Emit retry activity
+          this.emitAgentActivity(
+            expeditionId,
+            execution.agentId,
+            'retry_attempt',
+            `Retrying "${taskTitle}" (attempt ${attempt + 1}/${maxRetries + 1})`,
+            execution.taskId,
+            taskTitle,
+            { retryCount: attempt, delay: backoffDelay }
+          );
+          
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           execution.retryCount = attempt;
           execution.lastRetryAt = new Date().toISOString();
         }
+
+        // Emit thinking activity before execution
+        this.emitAgentActivity(
+          expeditionId,
+          execution.agentId,
+          'agent_thinking',
+          `Processing "${taskTitle}"`,
+          execution.taskId,
+          taskTitle
+        );
 
         // Execute the actual task
         const result = await this.executeTaskWithAgent(execution, expeditionId, userId);
@@ -734,6 +783,25 @@ Please complete this task with enhanced focus on quality and performance optimiz
     await taskRepo.updateStatus(execution.taskId, 'completed');
     await taskRepo.updateResult(execution.taskId, result);
     
+    // Get task details for activity tracking
+    const task = await taskRepo.findById(execution.taskId);
+    const taskTitle = task?.title || 'Unknown Task';
+    
+    // Emit task completed activity
+    this.emitAgentActivity(
+      expeditionId,
+      execution.agentId,
+      'task_completed',
+      `Completed "${taskTitle}"`,
+      execution.taskId,
+      taskTitle,
+      { 
+        duration: Math.round(actualDuration),
+        qualityScore: execution.performanceMetrics?.qualityScore,
+        retryCount: execution.retryCount
+      }
+    );
+    
     // Store performance metrics
     if (execution.performanceMetrics) {
       const agentHistory = this.performanceHistory.get(execution.agentId) || [];
@@ -769,7 +837,9 @@ Please complete this task with enhanced focus on quality and performance optimiz
   private async handleEnhancedTaskError(
     execution: EnhancedTaskExecution,
     error: any,
-    options: TaskExecutionOptions
+    options: TaskExecutionOptions,
+    expeditionId: string,
+    taskTitle: string
   ): Promise<void> {
     console.error(`❌ [TASK-EXECUTOR] Enhanced task failed: ${execution.taskId}`, error);
     
@@ -789,7 +859,21 @@ Please complete this task with enhanced focus on quality and performance optimiz
       execution.progress = 0;
       // Retry will be handled by the intelligent retry mechanism
     } else {
-      // Final failure - clean up
+      // Final failure - emit task failed activity
+      this.emitAgentActivity(
+        expeditionId,
+        execution.agentId,
+        'task_failed',
+        `Failed to complete "${taskTitle}"`,
+        execution.taskId,
+        taskTitle,
+        { 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          retryCount: execution.retryCount
+        }
+      );
+      
+      // Clean up
       this.activeExecutions.delete(execution.taskId);
       const subject = this.executionSubjects.get(execution.taskId);
       if (subject) {
@@ -961,6 +1045,67 @@ Please complete this task with enhanced focus on quality and performance optimiz
   // ============================================================================
   // HELPER METHODS
   // ============================================================================
+
+  /**
+   * Load agent details for activity tracking
+   */
+  private async loadAgentDetails(assignments: AgentAssignment[]): Promise<void> {
+    const agentIds = [...new Set(assignments.map(a => a.agentId))];
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    
+    for (const agentId of agentIds) {
+      try {
+        const agent = await agentRepo.findById(agentId);
+        if (agent) {
+          this.agentNames.set(agentId, agent.name);
+        }
+      } catch (error) {
+        console.warn(`Failed to load agent details for ${agentId}:`, error);
+        this.agentNames.set(agentId, agentId.slice(0, 8));
+      }
+    }
+  }
+
+  /**
+   * Emit agent activity event
+   */
+  private emitAgentActivity(
+    expeditionId: string,
+    agentId: string,
+    type: AgentActivityType,
+    message: string,
+    taskId?: string,
+    taskTitle?: string,
+    metadata?: any
+  ): void {
+    const agentName = this.agentNames.get(agentId) || agentId.slice(0, 8);
+    
+    const activity: AgentActivity = {
+      id: `activity-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      expeditionId,
+      agentId,
+      agentName,
+      type,
+      taskId,
+      taskTitle,
+      message,
+      timestamp: new Date().toISOString(),
+      metadata
+    };
+
+    // Emit via WebSocket if available
+    if (this.webSocketEmitter) {
+      this.webSocketEmitter.emitAgentActivity(expeditionId, {
+        agentId: activity.agentId,
+        activity: `${activity.type}: ${activity.message}`,
+        taskId: activity.taskId
+      });
+
+      // Also emit as a specific activity event
+      // Note: The socketServer property is private, so we rely on the emitAgentActivity method
+      // to handle the emission internally
+    }
+  }
 
   /**
    * Initialize resource pool

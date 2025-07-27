@@ -49,6 +49,40 @@ export interface ExpeditionTask {
 }
 
 /**
+ * Agent activity types for real-time tracking
+ */
+export type AgentActivityType = 
+  | 'task_started' 
+  | 'task_completed' 
+  | 'task_failed' 
+  | 'agent_thinking' 
+  | 'agent_blocked'
+  | 'quality_check'
+  | 'retry_attempt';
+
+/**
+ * Agent activity event for real-time updates
+ */
+export interface AgentActivity {
+  id: string;
+  expeditionId: string;
+  agentId: string;
+  agentName: string;
+  type: AgentActivityType;
+  taskId?: string;
+  taskTitle?: string;
+  message: string;
+  timestamp: string;
+  metadata?: {
+    qualityScore?: number;
+    duration?: number;
+    retryCount?: number;
+    blockedReason?: string;
+    error?: string;
+  };
+}
+
+/**
  * Messages within expedition chat system
  */
 export interface ExpeditionMessage {

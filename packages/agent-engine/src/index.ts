@@ -1115,3 +1115,6 @@ export { ProviderFactory } from './llm/provider-factory';
 
 // Export First Officer Agent functionality
 export * from './first-officer';
+
+// Export specific types that might be needed
+export { ExpeditionProgress } from './first-officer/types';

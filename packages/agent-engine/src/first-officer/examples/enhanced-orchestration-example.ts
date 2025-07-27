@@ -169,7 +169,8 @@ async function handleQualityFailureExample(
  */
 async function resumeExpeditionExample(
   firstOfficer: EnhancedFirstOfficerAgentV2,
-  expeditionId: string
+  expeditionId: string,
+  userId: string
 ) {
   try {
     console.log('🔄 Resuming expedition...');
@@ -179,7 +180,7 @@ async function resumeExpeditionExample(
     console.log('Current status:', status);
     
     // Resume from saved state
-    const result = await firstOfficer.resumeExpedition(expeditionId);
+    const result = await firstOfficer.resumeExpedition(expeditionId, userId);
     console.log('✅ Expedition resumed and completed:', result);
     
   } catch (error) {

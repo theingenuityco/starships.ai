@@ -458,7 +458,7 @@ export class ExpeditionService {
       this.validateExpeditionResume(expedition);
 
       // Resume First Officer orchestration
-      await this.firstOfficerService.resumeExpedition(expeditionId);
+      await this.firstOfficerService.resumeExpedition(expeditionId, userId);
 
       // Get updated expedition
       const updatedExpedition = await expeditionRepo.findById(expeditionId);

@@ -508,8 +508,8 @@ Complexity: ${visionRequirements.estimatedComplexity}
   /**
    * Resume expedition
    */
-  async resumeExpedition(expeditionId: string): Promise<string> {
-    return await this.firstOfficer.resumeExpedition(expeditionId);
+  async resumeExpedition(expeditionId: string, userId: string): Promise<string> {
+    return await this.firstOfficer.resumeExpedition(expeditionId, userId);
   }
   
   /**

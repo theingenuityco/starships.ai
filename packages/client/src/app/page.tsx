@@ -660,17 +660,17 @@ export default function HomePage() {
                       {/* Rocket Icon - Vigorously Vibrating */}
                       <motion.div
                         animate={{ 
-                          rotate: [-45, -42, -48, -43, -47, -45],
-                          x: [0.5, 1, -0.5, 0.8, -0.3, 0.3],
-                          y: [0.3, -0.5, 0.8, -0.8, 0.5, -0.3]
+                          rotate: [-45, -44, -46, -44.5, -45.5, -44.8, -45.2, -45],
+                          x: [0, 1, -0.8, 0.4, -1, 0.6, -0.4, 0.8, -0.2, 0],
+                          y: [0, -0.6, 1, -0.4, 0.8, -1, 0.2, -0.8, 0.6, 0]
                         }}
                         transition={{ 
-                          duration: 0.3,
+                          duration: 0.1,
                           repeat: Infinity,
                           ease: "linear"
                         }}
                       >
-                        <Rocket className="w-8 h-8 text-white/90" />
+                        <Rocket className="w-8 h-8 text-white/60" />
                       </motion.div>
                     </div>
 

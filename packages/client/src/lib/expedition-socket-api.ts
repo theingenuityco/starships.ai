@@ -31,7 +31,11 @@ interface EventSubscriptions {
   message: Set<MessageListener>;
   agentActivity: Set<AgentActivityListener>;
   progressUpdate: Set<ProgressUpdateListener>;
+  typingStart: Set<TypingListener>;
+  typingStop: Set<TypingListener>;
 }
+
+type TypingListener = (agentId: string, agentName?: string) => void;
 
 class ExpeditionSocketAPI {
   private static instance: ExpeditionSocketAPI;
@@ -43,9 +47,12 @@ class ExpeditionSocketAPI {
     taskUpdate: new Set(),
     message: new Set(),
     agentActivity: new Set(),
-    progressUpdate: new Set()
+    progressUpdate: new Set(),
+    typingStart: new Set(),
+    typingStop: new Set()
   };
   private expeditionRooms: Set<string> = new Set();
+  private eventHandlersSetup = false;
 
   private constructor() {
     this.socketClient = SocketClient.getInstance();
@@ -63,6 +70,12 @@ class ExpeditionSocketAPI {
    * Setup global event handlers for expedition events
    */
   private setupEventHandlers() {
+    // Prevent duplicate setup
+    if (this.eventHandlersSetup) {
+      console.log('[EXPEDITION-SOCKET] Event handlers already set up, skipping');
+      return;
+    }
+    
     const socket = this.socketClient.getSocket();
     if (!socket) {
       console.warn('[EXPEDITION-SOCKET] Cannot setup event handlers - socket not available');
@@ -70,6 +83,7 @@ class ExpeditionSocketAPI {
     }
 
     console.log('[EXPEDITION-SOCKET] Setting up event handlers for connected socket');
+    this.eventHandlersSetup = true;
 
     // Handle expedition events
     socket.on('expedition:created', this.handleExpeditionEvent.bind(this, 'expedition:created'));
@@ -109,8 +123,43 @@ class ExpeditionSocketAPI {
     socket.on('expedition:agent-activity', this.handleAgentActivity.bind(this));
     socket.on('agent:activity', this.handleAgentActivity.bind(this)); // Also listen for the direct event
     
+    // Handle task events
+    socket.on('task:start', (data: any) => {
+      console.log('[EXPEDITION-SOCKET] Task start:', data);
+      // Convert to agent activity for typing indicator
+      this.handleAgentActivity({
+        expeditionId: data.expeditionId,
+        agentId: data.agentId,
+        activity: `Started working on task ${data.taskId}`,
+        timestamp: new Date().toISOString()
+      });
+    });
+    
+    // Handle typing events
+    socket.on('agent:typing-start', (data: any) => {
+      console.log('[EXPEDITION-SOCKET] Agent started typing:', data);
+      this.notifyTypingStart(data.expeditionId, data.agentId, data.agentName);
+    });
+    
+    socket.on('agent:typing-stop', (data: any) => {
+      console.log('[EXPEDITION-SOCKET] Agent stopped typing:', data);
+      this.notifyTypingStop(data.expeditionId, data.agentId);
+    });
+    
     // Handle tool usage
     socket.on('expedition:tool-usage', this.handleToolUsage.bind(this));
+    
+    // Handle sync required events
+    socket.on('expedition:sync-required', (data: any) => {
+      console.log('[EXPEDITION-SOCKET] Sync required:', data);
+      this.handleExpeditionEvent('expedition:sync-required' as any, data);
+    });
+    
+    // Handle disconnection to reset state
+    socket.on('disconnect', () => {
+      console.log('[EXPEDITION-SOCKET] Socket disconnected, resetting event handlers flag');
+      this.eventHandlersSetup = false;
+    });
 
     console.log('[EXPEDITION-SOCKET] Event handlers setup completed');
   }
@@ -366,6 +415,34 @@ class ExpeditionSocketAPI {
     // Notify global listeners
     this.globalSubscriptions.progressUpdate.forEach(listener => listener(expeditionId, data));
   }
+  
+  /**
+   * Notify typing start listeners
+   */
+  private notifyTypingStart(expeditionId: string, agentId: string, agentName?: string) {
+    // Notify expedition-specific listeners
+    const expeditionSubs = this.subscriptions.get(expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.typingStart.forEach(listener => listener(agentId, agentName));
+    }
+
+    // Notify global listeners
+    this.globalSubscriptions.typingStart.forEach(listener => listener(agentId, agentName));
+  }
+  
+  /**
+   * Notify typing stop listeners
+   */
+  private notifyTypingStop(expeditionId: string, agentId: string) {
+    // Notify expedition-specific listeners
+    const expeditionSubs = this.subscriptions.get(expeditionId);
+    if (expeditionSubs) {
+      expeditionSubs.typingStop.forEach(listener => listener(agentId));
+    }
+
+    // Notify global listeners
+    this.globalSubscriptions.typingStop.forEach(listener => listener(agentId));
+  }
 
   /**
    * Handle agent activity
@@ -402,14 +479,38 @@ class ExpeditionSocketAPI {
   joinExpeditionRoom(expeditionId: string, userId: string) {
     const socket = this.socketClient.getSocket();
     if (!socket) {
-      console.warn('[EXPEDITION-SOCKET] Cannot join room - not connected');
+      console.warn('[EXPEDITION-SOCKET] Cannot join room - socket not available');
       return;
     }
 
-    // Ensure event handlers are set up when socket is connected
+    const roomId = `expedition:${expeditionId}`;
+    
+    // If socket is not connected yet, wait for connection
+    if (!socket.connected) {
+      console.log('[EXPEDITION-SOCKET] Socket not connected yet, waiting for connection...');
+      
+      const onConnect = () => {
+        console.log('[EXPEDITION-SOCKET] Socket connected, now joining room');
+        this.setupEventHandlers();
+        
+        if (!this.expeditionRooms.has(roomId)) {
+          console.log(`[EXPEDITION-SOCKET] 🚀 Joining expedition room after connection: ${roomId}`);
+          socket.emit('expedition:join-room', { expeditionId, userId });
+          this.expeditionRooms.add(roomId);
+          console.log(`[EXPEDITION-SOCKET] ✅ Joined expedition room: ${roomId}`);
+        }
+        
+        // Remove the connect listener after use
+        socket.off('connect', onConnect);
+      };
+      
+      socket.once('connect', onConnect);
+      return;
+    }
+
+    // Socket is already connected, join immediately
     this.setupEventHandlers();
 
-    const roomId = `expedition:${expeditionId}`;
     if (!this.expeditionRooms.has(roomId)) {
       console.log(`[EXPEDITION-SOCKET] 🚀 Attempting to join expedition room: ${roomId}`);
       console.log(`[EXPEDITION-SOCKET] 🚀 User ID: ${userId}`);
@@ -454,7 +555,9 @@ class ExpeditionSocketAPI {
         taskUpdate: new Set(),
         message: new Set(),
         agentActivity: new Set(),
-        progressUpdate: new Set()
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
       });
     }
     
@@ -477,7 +580,9 @@ class ExpeditionSocketAPI {
         taskUpdate: new Set(),
         message: new Set(),
         agentActivity: new Set(),
-        progressUpdate: new Set()
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
       });
     }
     
@@ -500,7 +605,9 @@ class ExpeditionSocketAPI {
         taskUpdate: new Set(),
         message: new Set(),
         agentActivity: new Set(),
-        progressUpdate: new Set()
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
       });
     }
     
@@ -523,7 +630,9 @@ class ExpeditionSocketAPI {
         taskUpdate: new Set(),
         message: new Set(),
         agentActivity: new Set(),
-        progressUpdate: new Set()
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
       });
     }
     
@@ -546,7 +655,9 @@ class ExpeditionSocketAPI {
         taskUpdate: new Set(),
         message: new Set(),
         agentActivity: new Set(),
-        progressUpdate: new Set()
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
       });
     }
     
@@ -555,6 +666,56 @@ class ExpeditionSocketAPI {
 
     return () => {
       subs.agentActivity.delete(listener);
+    };
+  }
+  
+  /**
+   * Subscribe to typing start events for a specific expedition
+   */
+  subscribeToTypingStart(expeditionId: string, listener: TypingListener) {
+    if (!this.subscriptions.has(expeditionId)) {
+      this.subscriptions.set(expeditionId, {
+        all: new Set(),
+        statusChange: new Set(),
+        taskUpdate: new Set(),
+        message: new Set(),
+        agentActivity: new Set(),
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
+      });
+    }
+    
+    const subs = this.subscriptions.get(expeditionId)!;
+    subs.typingStart.add(listener);
+
+    return () => {
+      subs.typingStart.delete(listener);
+    };
+  }
+  
+  /**
+   * Subscribe to typing stop events for a specific expedition
+   */
+  subscribeToTypingStop(expeditionId: string, listener: TypingListener) {
+    if (!this.subscriptions.has(expeditionId)) {
+      this.subscriptions.set(expeditionId, {
+        all: new Set(),
+        statusChange: new Set(),
+        taskUpdate: new Set(),
+        message: new Set(),
+        agentActivity: new Set(),
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
+      });
+    }
+    
+    const subs = this.subscriptions.get(expeditionId)!;
+    subs.typingStop.add(listener);
+
+    return () => {
+      subs.typingStop.delete(listener);
     };
   }
 
@@ -569,7 +730,9 @@ class ExpeditionSocketAPI {
         taskUpdate: new Set(),
         message: new Set(),
         agentActivity: new Set(),
-        progressUpdate: new Set()
+        progressUpdate: new Set(),
+        typingStart: new Set(),
+        typingStop: new Set()
       });
     }
     

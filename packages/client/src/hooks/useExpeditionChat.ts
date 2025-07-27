@@ -198,9 +198,9 @@ export function useExpeditionChat({
   // WebSocket setup for real-time message updates
   useEffect(() => {
     console.log('[EXPEDITION CHAT] 🔧 Setting up WebSocket for real-time updates');
-    console.log('[EXPEDITION CHAT] 🔧 enableWebSocket:', enableWebSocket, 'expeditionId:', expeditionId, 'user.id:', user?.id);
+    console.log('[EXPEDITION CHAT] 🔧 enableWebSocket:', enableWebSocket, 'expeditionId:', expeditionId, 'starshipId:', starshipId, 'user.id:', user?.id);
     
-    if (!enableWebSocket || !expeditionId || !user?.id) {
+    if (!enableWebSocket || !expeditionId || !starshipId || !user?.id) {
       console.log('[EXPEDITION CHAT] ❌ WebSocket setup skipped - missing requirements');
       return;
     }
@@ -208,6 +208,12 @@ export function useExpeditionChat({
     // Join expedition room
     console.log('[EXPEDITION CHAT] 🚀 Joining expedition room...');
     expeditionSocketAPI.joinExpeditionRoom(expeditionId, user.id);
+    
+    // Refresh messages after joining room to ensure we have latest
+    setTimeout(() => {
+      console.log('[EXPEDITION CHAT] 🔄 Refreshing messages after room join');
+      refreshMessages();
+    }, 500);
 
     // Subscribe to new messages
     const unsubscribeMessages = expeditionSocketAPI.subscribeToMessages(expeditionId, (newMessage) => {
@@ -301,6 +307,10 @@ export function useExpeditionChat({
         
         // Remove streaming message on error
         setMessages(prev => prev.filter(msg => msg.id !== `streaming-${event.data.streamId}`));
+      } else if (event.type === 'expedition:sync-required') {
+        console.log('[EXPEDITION CHAT] Sync required, refreshing messages');
+        // Refresh messages to ensure we have all the latest
+        refreshMessages();
       }
     });
 
@@ -310,7 +320,7 @@ export function useExpeditionChat({
       unsubscribeStreaming();
       expeditionSocketAPI.leaveExpeditionRoom(expeditionId, user.id);
     };
-  }, [enableWebSocket, expeditionId, user?.id, maxMessages]);
+  }, [enableWebSocket, expeditionId, starshipId, user?.id, maxMessages, refreshMessages]);
 
   return {
     messages,

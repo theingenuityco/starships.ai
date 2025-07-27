@@ -651,6 +651,43 @@ Please decide whether to approve this assistance request and coordinate accordin
         timestamp: new Date().toISOString()
       });
       console.log(`[BIDIRECTIONAL-COMM] Emitted agent message via WebSocket for expedition ${message.expeditionId}`);
+      
+      // Check if this is a review request and trigger automatic review
+      if (createdMessage.messageType === 'review-request' && message.taskId) {
+        console.log(`[BIDIRECTIONAL-COMM] Detected review request for task ${message.taskId}, triggering automatic review`);
+        
+        // Trigger First Officer review after a short delay to ensure message is processed
+        setTimeout(async () => {
+          try {
+            const firstOfficerService = FirstOfficerService.getInstance();
+            
+            // Extract the actual result from the formatted message
+            const resultMatch = message.content.match(/\*\*Result:\*\*\n([\s\S]*?)\n\n\*Waiting for First Officer approval/);
+            const actualResult = resultMatch ? resultMatch[1].trim() : message.content;
+            
+            const reviewResult = await firstOfficerService.reviewTaskCompletion(
+              message.expeditionId,
+              message.taskId!,  // We've already checked taskId exists above
+              message.agentId,
+              actualResult
+            );
+            
+            console.log(`[BIDIRECTIONAL-COMM] Review completed for task ${message.taskId}:`, reviewResult);
+            
+            // Emit the review result
+            socketService.getIO().to(expeditionRoom).emit('expedition:task-reviewed', {
+              expeditionId: message.expeditionId,
+              taskId: message.taskId!,  // We've already checked taskId exists above
+              agentId: message.agentId,
+              approved: reviewResult.approved,
+              feedback: reviewResult.feedback,
+              timestamp: new Date().toISOString()
+            });
+          } catch (error) {
+            console.error(`[BIDIRECTIONAL-COMM] Failed to trigger automatic review:`, error);
+          }
+        }, 1000); // 1 second delay to ensure message is stored
+      }
     }
   }
 

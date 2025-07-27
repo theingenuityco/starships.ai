@@ -1252,6 +1252,8 @@ The implementation was completed by enhancing the existing FirstOfficerAgent and
 1. **TaskTimeline** - Already existed, showing task progress with visual timeline (scrolling fixed)
 2. **AgentActivityFeed** - Created to show real-time agent status and activities
 3. **QualityScoreDisplay** - Created to visualize task quality metrics and trends
+4. **Chain of Thought** - Added agent reasoning visibility in expedition chat
+5. **First Officer Review** - Implemented task review and feedback system
 
 ### Integration Details
 The three components are now integrated into ExpeditionDetails page:
@@ -1260,6 +1262,82 @@ The three components are now integrated into ExpeditionDetails page:
 - AgentActivityFeed displays agent status and activities generated from tasks/messages
 - QualityScoreDisplay shows quality metrics from expedition results
 - Fixed scrolling issues in all tabs and TaskTimeline component
+
+### New Features Added (January 27, 2025)
+1. **Chain of Thought Visibility**:
+   - Agents now emit their reasoning process as chain-of-thought messages
+   - Special blue-themed styling for chain of thought messages
+   - Confidence level display with visual progress bar
+   - Shows agent's step-by-step thinking process
+
+2. **Enhanced Chain of Reasoning (Latest)**:
+   - Structured reasoning format with multiple sections:
+     - **Thinking Process**: Understanding, assumptions, constraints
+     - **Approach**: Steps, alternatives, tools, dependencies
+     - **Risk Analysis**: Risks, mitigations, confidence level
+     - **Execution**: Actual implementation
+     - **Reflection**: Insights and learnings
+   - Expandable UI sections for detailed exploration
+   - Separate display of reasoning vs actual results
+   - Automatic extraction and parsing of structured thoughts
+
+3. **First Officer Task Review System**:
+   - All completed tasks are now sent to First Officer for review
+   - Tasks enter "review" status before final completion
+   - First Officer evaluates against quality criteria and vision alignment
+   - Provides qualitative feedback and quality scores
+
+4. **Feedback Loop for Rejected Tasks**:
+   - Tasks rejected by First Officer are sent back to agents
+   - Review feedback is included in task instructions for retry
+   - Special amber/red styling for review messages
+   - Agents must address specific feedback before resubmission
+
+### Technical Implementation Details
+
+#### Chain of Thought Implementation:
+1. **Message Types**: Added new message types to protocol
+   - `chain-of-thought`: Agent reasoning process
+   - `review-request`: Task awaiting review
+   - `review-feedback`: First Officer feedback
+
+2. **ExpeditionMessage Interface**: Extended with:
+   ```typescript
+   chainOfThought?: {
+     reasoning?: string;
+     steps?: string[];
+     alternatives?: string[];
+     confidence?: number;
+     assumptions?: string[];
+     constraints?: string[];
+     risks?: string[];
+     mitigations?: string[];
+     dependencies?: string[];
+     tools?: string[];
+     learnings?: string[];
+   };
+   reviewStatus?: 'pending' | 'approved' | 'rejected';
+   reviewFeedback?: string;
+   ```
+
+3. **TaskExecutor Changes**:
+   - Emits chain of thought messages after agent responses
+   - Sets tasks to "review" status instead of "completed"
+   - Includes review feedback in retry instructions
+   - Parses structured reasoning sections from agent responses
+   - Separates chain of thought from actual task results
+   - Formats reasoning for optimal readability
+
+4. **FirstOfficerAgent.reviewTaskCompletion()**:
+   - Evaluates task results against requirements
+   - Checks alignment with starship vision
+   - Provides structured feedback with quality scores
+   - Updates task status based on review outcome
+
+5. **UI Enhancements**:
+   - Color-coded message types (blue for CoT, amber for review, green/red for feedback)
+   - Confidence level visualization
+   - Special formatting for review messages
 
 ### Remaining Tasks (Low Priority)
 1. **Testing & Validation**:

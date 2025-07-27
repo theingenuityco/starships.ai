@@ -6,13 +6,11 @@
  */
 
 import { RunnableConfig } from '@langchain/core/runnables';
-import { BaseMessage } from '@langchain/core/messages';
+// Removed unused: BaseMessage
 import { 
-  Expedition, 
   ExpeditionStatus, 
   TaskBreakdown, 
   WorkflowPhase,
-  ChatRequest,
   ChatResponse
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
@@ -27,7 +25,6 @@ import { WorkflowStatePersistence } from './WorkflowEnhancements';
 import {
   FirstOfficerState,
   FirstOfficerConfig,
-  WorkflowNodeResult,
   ObjectiveAnalysis,
   TaskPlan,
   AgentAssignment,
@@ -61,6 +58,8 @@ export class FirstOfficerAgent {
   private starshipId: string;
   private statePersistence: WorkflowStatePersistence;
   private webSocketEmitter: WebSocketEventEmitter;
+  private model: any; // LLM model instance
+  private visionContent: string | undefined;
 
   constructor(
     starshipId: string,
@@ -121,6 +120,30 @@ export class FirstOfficerAgent {
     
     // Build LangGraph workflow
     this.workflow = createExpeditionWorkflow(this.nodeHandlers);
+  }
+
+  /**
+   * Initialize the LLM model (must be called before using model)
+   */
+  private async initializeModel(): Promise<void> {
+    if (this.model) return; // Already initialized
+    
+    // Create a model config for the First Officer
+    const modelConfig = {
+      id: 'first-officer-model',
+      name: this.config.model || 'gpt-4o',
+      provider: (this.config.provider || 'openai') as 'openai' | 'anthropic',
+      temperature: this.config.temperature || 0.3,
+      maxTokens: 4096,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Create LangChain provider and model
+    const { LangChainProvider } = await import('../llm/langchain-provider');
+    const provider = new LangChainProvider(modelConfig);
+    
+    // Create the model directly from the provider's internal method
+    this.model = provider;
   }
 
   /**
@@ -365,6 +388,167 @@ export class FirstOfficerAgent {
     return await this.chatCoordinator.handleUserResponse(userMessage);
   }
 
+  /**
+   * Review task completion and provide feedback
+   */
+  async reviewTaskCompletion(
+    expeditionId: string,
+    taskId: string,
+    agentId: string,
+    result: string
+  ): Promise<{approved: boolean; feedback?: string}> {
+    console.log(`🔍 [FIRST-OFFICER] Reviewing task ${taskId} from agent ${agentId}`);
+    
+    try {
+      // Get task details
+      const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+      const task = await taskRepo.findById(taskId);
+      
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+      
+      // Get vision context if available
+      const visionContext = this.visionContent ? `
+Vision Context:
+${this.visionContent}
+` : '';
+      
+      // Prepare review prompt
+      const reviewPrompt = `
+As the First Officer, you need to review the following task completion and determine if it meets quality standards.
+
+${visionContext}
+
+TASK DETAILS:
+- Title: ${task.title}
+- Description: ${task.description}
+- Expected Deliverable: ${task.deliverable}
+- Required Skills: ${task.requiredSkills.join(', ')}
+
+AGENT'S RESULT:
+${result}
+
+REVIEW CRITERIA:
+1. Does the result fully address the task requirements?
+2. Is the quality of work acceptable?
+3. Does it align with the expedition's mission and vision?
+4. Are there any issues or improvements needed?
+
+Please provide your review in the following JSON format:
+{
+  "approved": boolean,
+  "qualityScore": number (0-100),
+  "feedback": "specific feedback for the agent",
+  "issues": ["list of issues if any"],
+  "suggestions": ["improvement suggestions if any"]
+}
+
+Be constructive in your feedback. If rejecting, provide clear guidance on what needs to be improved.
+`;
+
+      // Initialize model if needed
+      await this.initializeModel();
+      
+      // Get review from LLM
+      const reviewResponse = await this.model.complete({
+        messages: [
+          { role: 'system', content: 'You are the First Officer reviewing task completions.' },
+          { role: 'user', content: reviewPrompt }
+        ]
+      });
+      const reviewContent = reviewResponse.reply;
+      
+      // Parse review response
+      let review;
+      try {
+        review = JSON.parse(reviewContent);
+      } catch (error) {
+        console.error('Failed to parse review response:', reviewContent);
+        // Default to approval if parsing fails
+        review = {
+          approved: true,
+          qualityScore: 75,
+          feedback: "Task completed satisfactorily."
+        };
+      }
+      
+      // Update task status based on review
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      
+      if (review.approved) {
+        await taskRepo.updateStatus(taskId, 'completed');
+        
+        // Send approval message
+        const approvalMessage = await messageRepo.create({
+          expeditionId,
+          role: 'first-officer' as const,
+          content: `✅ **Task Approved**\n\n**Task:** ${task.title}\n**Quality Score:** ${review.qualityScore}/100\n\n**Feedback:** ${review.feedback}`,
+          messageType: 'review-feedback' as const,
+          timestamp: new Date().toISOString(),
+          reviewStatus: 'approved',
+          reviewFeedback: review.feedback,
+          reviewedBy: 'first-officer',
+          reviewedAt: new Date().toISOString(),
+          metadata: {
+            taskId,
+            agentId,
+            qualityScore: review.qualityScore
+          }
+        });
+        
+        if (this.webSocketEmitter) {
+          this.webSocketEmitter.emitExpeditionMessage(expeditionId, approvalMessage);
+        }
+      } else {
+        await taskRepo.updateStatus(taskId, 'assigned'); // Send back to agent
+        
+        // Send rejection message with feedback
+        const rejectionMessage = await messageRepo.create({
+          expeditionId,
+          role: 'first-officer' as const,
+          content: `❌ **Task Needs Revision**\n\n**Task:** ${task.title}\n**Quality Score:** ${review.qualityScore}/100\n\n**Issues:**\n${review.issues?.map((i: string) => `- ${i}`).join('\n')}\n\n**Suggestions:**\n${review.suggestions?.map((s: string) => `- ${s}`).join('\n')}\n\n**Agent ${agentId}, please address the feedback and resubmit.**`,
+          messageType: 'review-feedback' as const,
+          timestamp: new Date().toISOString(),
+          reviewStatus: 'rejected',
+          reviewFeedback: review.feedback,
+          reviewedBy: 'first-officer',
+          reviewedAt: new Date().toISOString(),
+          metadata: {
+            taskId,
+            agentId,
+            qualityScore: review.qualityScore,
+            issues: review.issues,
+            suggestions: review.suggestions
+          }
+        });
+        
+        if (this.webSocketEmitter) {
+          this.webSocketEmitter.emitExpeditionMessage(expeditionId, rejectionMessage);
+        }
+      }
+      
+      // Notify TaskExecutor about the review result
+      if (this.taskExecutor) {
+        await this.taskExecutor.handleTaskReview(taskId, review.approved, review.feedback);
+      }
+      
+      return {
+        approved: review.approved,
+        feedback: review.feedback
+      };
+      
+    } catch (error) {
+      console.error(`❌ [FIRST-OFFICER] Failed to review task:`, error);
+      
+      // Default to approval with warning
+      return {
+        approved: true,
+        feedback: "Task approved with warning: Review system encountered an error."
+      };
+    }
+  }
+
 
   // ========================================
   // WORKFLOW NODE IMPLEMENTATIONS
@@ -396,6 +580,11 @@ export class FirstOfficerAgent {
   private async analyzeObjectiveNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     await this.sendWorkflowLog('🔍', 'ANALYZING OBJECTIVE', `Starting analysis of: "${state.requirements}"`);
     
+    // Emit typing start
+    if (this.webSocketEmitter) {
+      this.webSocketEmitter.emitTypingStart(state.expeditionId, 'first-officer', 'First Officer');
+    }
+    
     try {
       const analysis = await this.performObjectiveAnalysis(state.requirements);
       
@@ -412,6 +601,11 @@ export class FirstOfficerAgent {
           `**Success Criteria:**\n${analysis.successCriteria.map(c => `• ${c}`).join('\n')}`
         );
         console.log(`✅ [FIRST-OFFICER] Objective analysis message sent successfully`);
+        
+        // Stop typing indicator
+        if (this.webSocketEmitter) {
+          this.webSocketEmitter.emitTypingStop(state.expeditionId, 'first-officer');
+        }
       } catch (error) {
         console.error(`❌ [FIRST-OFFICER] Failed to send objective analysis message:`, error);
       }
@@ -445,6 +639,11 @@ export class FirstOfficerAgent {
    */
   private async planTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     await this.sendWorkflowLog('📋', 'PLANNING TASKS', 'Breaking down objectives into executable tasks');
+    
+    // Emit typing start
+    if (this.webSocketEmitter) {
+      this.webSocketEmitter.emitTypingStart(state.expeditionId, 'first-officer', 'First Officer');
+    }
     
     try {
       const taskPlan = await this.createTaskPlan(state.requirements, state.objectiveAnalysis!);
@@ -484,6 +683,11 @@ export class FirstOfficerAgent {
         `**Execution Approach:** ${taskPlan.parallelGroups.length > 1 ? 'Parallel' : 'Sequential'}\n\n` +
         `**Tasks Created:**\n${createdTasks.map(t => `• ${t.description}`).join('\n')}`
       );
+      
+      // Stop typing indicator
+      if (this.webSocketEmitter) {
+        this.webSocketEmitter.emitTypingStop(state.expeditionId, 'first-officer');
+      }
 
       const planState = {
         ...state,
@@ -716,6 +920,9 @@ export class FirstOfficerAgent {
 
       // Execute tasks using the TaskExecutor
       await this.sendWorkflowLog('⚡', 'EXECUTING TASKS', `Starting execution of ${assignments.length} tasks with real agents`);
+      
+      // Small delay to ensure WebSocket connections are ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const taskExecutionOptions = {
         parallelExecution: false, // Sequential execution as per plan

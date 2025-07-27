@@ -135,7 +135,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -154,7 +154,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -173,7 +173,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -192,7 +192,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
       
       // Also emit agent activity
@@ -218,7 +218,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -237,7 +237,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
       
       // Emit completion as task update
@@ -266,7 +266,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
       
       // Emit failure as task update
@@ -295,7 +295,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -333,7 +333,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -352,7 +352,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -371,7 +371,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -390,7 +390,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit(event, payload);
     }
   }
@@ -405,5 +405,52 @@ export class WebSocketEventEmitter extends EventEmitter {
         (this as any)[methodName](expeditionId, data);
       }
     });
+  }
+
+  /**
+   * Emit expedition message
+   */
+  emitExpeditionMessage(expeditionId: string, message: any): void {
+    const event = 'message:sent';
+    
+    this.emit(event, { expeditionId, message });
+    
+    if (this.socketServer) {
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit(event, { expeditionId, message });
+    }
+  }
+  
+  /**
+   * Emit typing start event
+   */
+  emitTypingStart(expeditionId: string, agentId: string, agentName?: string): void {
+    const event = 'agent:typing-start';
+    const payload = { expeditionId, agentId, agentName };
+    
+    this.emit(event, payload);
+    
+    if (this.socketServer) {
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit(event, payload);
+    }
+  }
+  
+  /**
+   * Emit typing stop event
+   */
+  emitTypingStop(expeditionId: string, agentId: string): void {
+    const event = 'agent:typing-stop';
+    const payload = { expeditionId, agentId };
+    
+    this.emit(event, payload);
+    
+    if (this.socketServer) {
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit(event, payload);
+    }
   }
 }

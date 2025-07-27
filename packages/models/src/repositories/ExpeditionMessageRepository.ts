@@ -422,7 +422,10 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
           'status-update': 0,
           result: 0,
           question: 0,
-          notification: 0
+          notification: 0,
+          'chain-of-thought': 0,
+          'review-request': 0,
+          'review-feedback': 0
         },
         threaded: 0,
         replies: 0
@@ -460,7 +463,10 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
         'status-update': statusUpdateMessagesNum,
         result: resultMessagesNum,
         question: questionMessagesNum,
-        notification: notificationMessagesNum
+        notification: notificationMessagesNum,
+        'chain-of-thought': 0, // TODO: Add query for chain-of-thought messages
+        'review-request': 0, // TODO: Add query for review-request messages
+        'review-feedback': 0 // TODO: Add query for review-feedback messages
       },
       threaded: threadedMessagesNum,
       replies: replyMessagesNum

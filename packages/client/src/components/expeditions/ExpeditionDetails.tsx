@@ -48,6 +48,8 @@ import { agentAPI } from '@/lib/api';
 import { TaskTimeline } from './TaskTimeline';
 import { AgentActivityFeed } from './AgentActivityFeed';
 import { QualityScoreDisplay } from './QualityScoreDisplay';
+import { ChatMessageMarkdown } from './ChatMessageMarkdown';
+import { TypingIndicator } from './TypingIndicator';
 import type { Expedition, ExpeditionStatus, ExpeditionTask } from '@starships/protocol';
 
 interface ExpeditionDetailsProps {
@@ -64,6 +66,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
   const [agentDetails, setAgentDetails] = useState<Record<string, any>>({});
   const [pendingMessageId, setPendingMessageId] = useState<string | null>(null);
   const [realtimeActivities, setRealtimeActivities] = useState<any[]>([]);
+  const [typingAgents, setTypingAgents] = useState<Map<string, { agentId: string; agentName?: string; timestamp: number }>>(new Map());
 
   // Fetch starship by slug
   useEffect(() => {
@@ -108,7 +111,8 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
     loading: messagesLoading,
     sending,
     sendMessage,
-    messagesEndRef
+    messagesEndRef,
+    refreshMessages
   } = useExpeditionChat({
     expeditionId,
     starshipId: starshipId || '', // Provide empty string as fallback
@@ -144,6 +148,13 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
   }, [rawMessages, expedition?.status]);
   
 
+  // Refresh messages when starshipId becomes available
+  useEffect(() => {
+    if (starshipId && expeditionId) {
+      refreshMessages();
+    }
+  }, [starshipId, expeditionId, refreshMessages]);
+
   // Debug expedition status
   useEffect(() => {
     if (expedition) {
@@ -156,11 +167,13 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
     }
   }, [expedition, messages.length]);
 
-  // Subscribe to real-time agent activities
+  // Subscribe to real-time agent activities and typing events
   useEffect(() => {
     if (!expeditionId || !starshipId) return;
 
-    let unsubscribe: (() => void) | undefined;
+    let unsubscribeActivities: (() => void) | undefined;
+    let unsubscribeTypingStart: (() => void) | undefined;
+    let unsubscribeTypingStop: (() => void) | undefined;
 
     // Dynamic import to handle client-side only
     import('@/lib/expedition-socket-api').then((module) => {
@@ -172,7 +185,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
       }
 
       // Subscribe to agent activities
-      unsubscribe = api.subscribeToAgentActivities(expeditionId, (agentId: string, activity: any) => {
+      unsubscribeActivities = api.subscribeToAgentActivities(expeditionId, (agentId: string, activity: any) => {
         console.log('[EXPEDITION DETAILS] Received agent activity:', activity);
         
         // Add to realtime activities
@@ -188,16 +201,40 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
           return updated;
         });
       });
+      
+      // Subscribe to typing start events
+      unsubscribeTypingStart = api.subscribeToTypingStart(expeditionId, (agentId: string, agentName?: string) => {
+        console.log('[EXPEDITION DETAILS] Agent started typing:', agentId, agentName);
+        setTypingAgents(prev => {
+          const newMap = new Map(prev);
+          newMap.set(agentId, {
+            agentId,
+            agentName: agentName || agentDetails[agentId]?.name || (agentId === 'first-officer' ? 'First Officer' : 'Agent'),
+            timestamp: Date.now()
+          });
+          return newMap;
+        });
+      });
+      
+      // Subscribe to typing stop events
+      unsubscribeTypingStop = api.subscribeToTypingStop(expeditionId, (agentId: string) => {
+        console.log('[EXPEDITION DETAILS] Agent stopped typing:', agentId);
+        setTypingAgents(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(agentId);
+          return newMap;
+        });
+      });
     }).catch((error) => {
       console.error('[EXPEDITION DETAILS] Failed to load socket API:', error);
     });
 
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      if (unsubscribeActivities) unsubscribeActivities();
+      if (unsubscribeTypingStart) unsubscribeTypingStart();
+      if (unsubscribeTypingStop) unsubscribeTypingStop();
     };
-  }, [expeditionId, starshipId]);
+  }, [expeditionId, starshipId, agentDetails]);
 
 
   // Fetch agent details
@@ -595,20 +632,28 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                           const isSystem = message.role === 'system';
                           const agent = message.agentId ? agentDetails[message.agentId] : null;
                           const isOptimistic = message.id.startsWith('temp-');
+                          const isChainOfThought = message.messageType === 'chain-of-thought';
+                          const isReviewRequest = message.messageType === 'review-request';
+                          const isReviewFeedback = message.messageType === 'review-feedback';
                           
                           // System messages styling
                           if (isSystem) {
                             return (
                               <motion.div
                                 key={message.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
+                                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.2 }}
+                                transition={{ 
+                                  duration: 0.3,
+                                  type: "spring",
+                                  stiffness: 200,
+                                  damping: 20
+                                }}
                                 className="flex justify-center my-2"
                               >
                                 <div className="bg-muted/30 text-muted-foreground text-xs px-3 py-1.5 rounded-full">
-                                  {message.content}
+                                  <ChatMessageMarkdown content={message.content} isUser={false} messageType="default" />
                                 </div>
                               </motion.div>
                             );
@@ -617,10 +662,16 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                           return (
                             <motion.div
                               key={message.id}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
+                              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ duration: 0.2 }}
+                              transition={{ 
+                                duration: 0.4,
+                                type: "spring",
+                                stiffness: 150,
+                                damping: 20,
+                                delay: isOptimistic ? 0 : 0.1
+                              }}
                               className={`flex gap-3 ${isUser ? 'justify-end' : ''}`}
                             >
                               {!isUser && (
@@ -658,10 +709,82 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                                       className={`px-4 py-2.5 ${
                                         isUser
                                           ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-md shadow-sm'
+                                          : isChainOfThought
+                                          ? 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl rounded-tl-md shadow-sm'
+                                          : isReviewRequest
+                                          ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl rounded-tl-md shadow-sm'
+                                          : isReviewFeedback
+                                          ? message.reviewStatus === 'approved' 
+                                            ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-2xl rounded-tl-md shadow-sm'
+                                            : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl rounded-tl-md shadow-sm'
                                           : 'bg-muted/50 border border-border rounded-2xl rounded-tl-md shadow-sm'
                                       }`}
                                     >
-                                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                      <div className="text-sm">
+                                        <ChatMessageMarkdown 
+                                          content={message.content} 
+                                          isUser={isUser}
+                                          messageType={
+                                            isChainOfThought ? 'chain-of-thought' :
+                                            isReviewRequest ? 'review-request' :
+                                            isReviewFeedback ? 'review-feedback' :
+                                            'default'
+                                          }
+                                          reviewStatus={isReviewFeedback ? message.reviewStatus : undefined}
+                                        />
+                                      </div>
+                                      {/* Show chain of thought details */}
+                                      {isChainOfThought && message.chainOfThought && (
+                                        <div className="mt-3 pt-3 border-t border-blue-200/50 text-xs space-y-2">
+                                          {message.chainOfThought.confidence && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-blue-700">Confidence:</span>
+                                              <div className="flex-1 h-2 bg-blue-200 rounded-full overflow-hidden">
+                                                <div 
+                                                  className="h-full bg-blue-500 transition-all"
+                                                  style={{ width: `${message.chainOfThought.confidence * 100}%` }}
+                                                />
+                                              </div>
+                                              <span className="text-blue-700 font-medium">{Math.round(message.chainOfThought.confidence * 100)}%</span>
+                                            </div>
+                                          )}
+                                          
+                                          {message.chainOfThought.alternatives && message.chainOfThought.alternatives.length > 0 && (
+                                            <details className="text-blue-700">
+                                              <summary className="cursor-pointer hover:text-blue-800 font-medium">
+                                                Alternatives Considered ({message.chainOfThought.alternatives.length})
+                                              </summary>
+                                              <ul className="mt-1 ml-4 space-y-1">
+                                                {message.chainOfThought.alternatives.map((alt: string, idx: number) => (
+                                                  <li key={idx} className="text-blue-600">• {alt}</li>
+                                                ))}
+                                              </ul>
+                                            </details>
+                                          )}
+                                          
+                                          {message.chainOfThought.risks && message.chainOfThought.risks.length > 0 && (
+                                            <details className="text-orange-700">
+                                              <summary className="cursor-pointer hover:text-orange-800 font-medium">
+                                                ⚠️ Risks Identified ({message.chainOfThought.risks.length})
+                                              </summary>
+                                              <ul className="mt-1 ml-4 space-y-1">
+                                                {message.chainOfThought.risks.map((risk: string, idx: number) => (
+                                                  <li key={idx} className="text-orange-600">• {risk}</li>
+                                                ))}
+                                              </ul>
+                                            </details>
+                                          )}
+                                          
+                                          {message.chainOfThought.tools && message.chainOfThought.tools.length > 0 && (
+                                            <div className="text-blue-700">
+                                              <span className="font-medium">Tools Used:</span>
+                                              <span className="ml-2 text-blue-600">
+                                                {message.chainOfThought.tools.join(', ')}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                     {/* Show sending indicator on optimistic messages */}
                                     {isUser && isOptimistic && (
@@ -708,6 +831,18 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                         })}
                       </AnimatePresence>
                     )}
+                    
+                    {/* Typing Indicators */}
+                    <AnimatePresence>
+                      {Array.from(typingAgents.values()).map((typingAgent) => (
+                        <TypingIndicator
+                          key={typingAgent.agentId}
+                          agentId={typingAgent.agentId}
+                          agentName={typingAgent.agentName}
+                        />
+                      ))}
+                    </AnimatePresence>
+                    
                     <div ref={messagesEndRef} />
                   </div>
                 </div>

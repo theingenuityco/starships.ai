@@ -15,6 +15,8 @@ interface Star {
   twinkleSpeed: number;
   twinkleOffset: number;
   color: string;
+  id: number;
+  isActive: boolean;
 }
 
 interface StarfieldBackgroundProps {
@@ -32,6 +34,8 @@ export function StarfieldBackground({
   const starsRef = useRef<Star[]>([]);
   const animationRef = useRef<number>();
   const timeRef = useRef<number>(0);
+  const starIdCounter = useRef<number>(0);
+  const deadStars = useRef<Set<number>>(new Set());
   const [dimensions, setDimensions] = useState({ 
     width: typeof window !== 'undefined' ? window.innerWidth : 1920,
     height: typeof window !== 'undefined' ? window.innerHeight : 1080
@@ -72,8 +76,11 @@ export function StarfieldBackground({
     // Initialize stars
     const initStars = () => {
       starsRef.current = [];
+      deadStars.current.clear();
+      starIdCounter.current = 0;
       for (let i = 0; i < density; i++) {
         starsRef.current.push({
+          id: starIdCounter.current++,
           x: (Math.random() - 0.5) * dimensions.width * 2,
           y: (Math.random() - 0.5) * dimensions.height * 2,
           z: Math.random() * 800 + 200,  // Stars start closer for better initial visibility
@@ -82,7 +89,53 @@ export function StarfieldBackground({
           brightness: Math.random() * 0.5 + 0.5, // Brighter stars
           twinkleSpeed: Math.random() * 0.03 + 0.01,
           twinkleOffset: Math.random() * Math.PI * 2,
-          color: starColors[Math.floor(Math.random() * starColors.length)]
+          color: starColors[Math.floor(Math.random() * starColors.length)],
+          isActive: true
+        });
+      }
+    };
+
+    // Garbage collection for off-screen stars
+    const garbageCollectStars = () => {
+      const centerX = dimensions.width / 2;
+      const centerY = dimensions.height / 2;
+      const margin = 100; // Extra margin for smooth transitions
+      
+      starsRef.current = starsRef.current.filter((star) => {
+        const x = star.x / star.z * 400 + centerX;
+        const y = star.y / star.z * 400 + centerY;
+        
+        // Mark stars as dead if they go off-screen or behind camera
+        const isOffScreen = x < -margin || x > dimensions.width + margin || 
+                           y < -margin || y > dimensions.height + margin;
+        const isBehindCamera = star.z <= 0;
+        
+        if (isOffScreen || isBehindCamera) {
+          deadStars.current.add(star.id);
+          star.isActive = false;
+          return false; // Remove from active stars
+        }
+        
+        return star.isActive;
+      });
+      
+      // Maintain star density by creating new stars
+      const currentCount = starsRef.current.length;
+      const targetCount = Math.min(density, 800); // Cap max stars for performance
+      
+      for (let i = currentCount; i < targetCount; i++) {
+        starsRef.current.push({
+          id: starIdCounter.current++,
+          x: (Math.random() - 0.5) * dimensions.width * 2,
+          y: (Math.random() - 0.5) * dimensions.height * 2,
+          z: Math.random() * 800 + 200,
+          size: Math.pow(Math.random(), 1.5) * 2 + 0.3,
+          speed: Math.random() * 0.5 + 0.1,
+          brightness: Math.random() * 0.5 + 0.5,
+          twinkleSpeed: Math.random() * 0.03 + 0.01,
+          twinkleOffset: Math.random() * Math.PI * 2,
+          color: starColors[Math.floor(Math.random() * starColors.length)],
+          isActive: true
         });
       }
     };
@@ -96,7 +149,13 @@ export function StarfieldBackground({
       const centerX = dimensions.width / 2;
       const centerY = dimensions.height / 2;
 
+      // Run garbage collection every 60 frames (~1 second at 60fps)
+      if (clearWithTrail && Math.floor(timeRef.current * 60) % 60 === 0) {
+        garbageCollectStars();
+      }
+
       starsRef.current.forEach((star) => {
+        if (!star.isActive) return;
         // Store previous position for trail effect
         star.prevX = star.x / star.z * 400 + centerX;
         star.prevY = star.y / star.z * 400 + centerY;
@@ -106,13 +165,11 @@ export function StarfieldBackground({
           star.z -= (launching ? speed * 15 : speed) * star.speed;
         }
 
-        // Reset star if it goes behind camera
+        // Mark star for garbage collection if it goes behind camera
         if (star.z <= 0) {
-          star.x = (Math.random() - 0.5) * dimensions.width * 2;
-          star.y = (Math.random() - 0.5) * dimensions.height * 2;
-          star.z = 1000;
-          star.prevX = undefined;
-          star.prevY = undefined;
+          star.isActive = false;
+          deadStars.current.add(star.id);
+          return;
         }
 
         // Calculate 3D projection with wider field of view

@@ -140,6 +140,53 @@
 }
 
 /* 
+ * STAR THEME SYSTEM
+ * =================
+ * Starships.ai themed components with space aesthetics
+ */
+
+/* Star Dark Theme - For landing page */
+.star-theme-dark {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+  --card: 220 15% 5%;
+  --card-foreground: 0 0% 95%;
+  --primary: 220 70% 60%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 220 15% 10%;
+  --secondary-foreground: 0 0% 95%;
+  --muted: 220 15% 10%;
+  --muted-foreground: 0 0% 70%;
+  --accent: 220 15% 15%;
+  --accent-foreground: 0 0% 95%;
+  --border: 220 15% 20%;
+  --input: 220 15% 20%;
+  --ring: 220 70% 60%;
+  
+  /* Ensure text color is applied */
+  color: hsl(var(--foreground));
+}
+
+/* Star Light Theme - If needed */
+.star-theme-light {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 0%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 8%;
+  --primary: 220 70% 50%;
+  --primary-foreground: 0 0% 98%;
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 0 0% 8%;
+  --muted: 220 14% 96%;
+  --muted-foreground: 0 0% 45%;
+  --accent: 220 14% 96%;
+  --accent-foreground: 0 0% 8%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 220 70% 50%;
+}
+
+/* 
  * ACCESSIBILITY UTILITIES - FUTURE ENHANCEMENT
  * ===========================================
  * TODO: Implement these classes for improved accessibility:
@@ -289,5 +336,49 @@
 
   .bg-300\% {
     background-size: 300% 300%;
+  }
+
+  /* Performance optimized animations */
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(255,255,255,0.1);
+      transform: scale(1);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(255,255,255,0.2);
+      transform: scale(1.05);
+    }
+  }
+
+  .animate-float {
+    animation: float 2s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  /* Performance optimizations */
+  .will-change-transform {
+    will-change: transform;
+  }
+
+  .will-change-opacity {
+    will-change: opacity;
+  }
+
+  .gpu-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
   }
 }

@@ -7,12 +7,12 @@
 
 import { DynamicTool } from '@langchain/core/tools';
 import { z } from 'zod';
-import { MCPToolGateway, MCPTool } from '@starships/core';
+import { MCPToolGateway, MCPToolGatewayDB, MCPTool } from '@starships/core';
 
 export interface MCPToolConfig {
   starshipId: string;
   agentId: string;
-  gateway: MCPToolGateway;
+  gateway: MCPToolGateway | MCPToolGatewayDB;
   enableLogging?: boolean;
 }
 

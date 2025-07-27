@@ -5,7 +5,7 @@
  * Handles agent lifecycle, state persistence, and real-time communication.
  */
 
-import { FirstOfficerAgent, LangChainMemoryStore } from '@starships/agent-engine';
+import { FirstOfficerAgent, LangChainMemoryStore, createMCPEnabledFirstOfficerAgent } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
 import {
   ExpeditionWorkflowState,
@@ -95,8 +95,8 @@ export class FirstOfficerService {
       const memoryStore = new LangChainMemoryStore();
       this.memoryStores.set(expeditionId, memoryStore);
 
-      // Create First Officer Agent instance
-      const firstOfficer = new FirstOfficerAgent(
+      // Create MCP-enabled First Officer Agent instance
+      const firstOfficer = createMCPEnabledFirstOfficerAgent(
         expedition.starshipId,
         memoryStore,
         {
@@ -105,7 +105,9 @@ export class FirstOfficerService {
           timeoutMinutes: 60,
           requireUserApproval: false,
           enableParallelExecution: true,
-          autoEscalation: true
+          autoEscalation: true,
+          mcpEnabled: true,
+          mcpStarshipId: expedition.starshipId
         },
         expedition.assignedAgents // Pass selected agents from expedition
       );

@@ -399,12 +399,12 @@ export default function HomePage() {
                   whileTap={{ scale: 0.95 }}
                   className="relative rounded-full"
                 >
-                <LoginButton 
-                  size="lg" 
-                  data-login-button
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full transition-colors"
-                >
-                  Launch Your Starship
+                  <LoginButton 
+                    size="lg" 
+                    data-login-button
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full transition-colors"
+                  >
+                    Launch Your Starship
                   </LoginButton>
                 </motion.div>
               </div>
@@ -413,14 +413,14 @@ export default function HomePage() {
               <Button 
                 variant="outline" 
                 size="lg" 
-                onClick={() => window.open('https://github.com/theingenuityco/starships.ai', '_blank')}
                 className="px-8 py-4 text-lg rounded-full backdrop-blur-sm"
               >
-                <GithubIcon className="w-5 h-5 mr-2" />
-                View on GitHub
+                <Book className="w-5 h-5 mr-2" />
+                View Documentation
               </Button>
             </motion.div>
           </motion.div>
+          
         </motion.div>
         
         <motion.div
@@ -1042,27 +1042,32 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 relative z-10">
+      <footer className="py-16 px-4 relative z-10">
         {/* Gradient horizontal line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <p className="text-muted-foreground">
+            <div className="mb-6 md:mb-0 text-center md:text-left">
+              <p className="text-muted-foreground mb-2">
                 © 2025 Starships.ai - Where Vision meets Intelligence
+              </p>
+              <p className="text-muted-foreground text-sm">
+                🪐 Manifested by <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline">The Ingenuity Co</a>
               </p>
             </div>
             <div className="flex space-x-6">
+              <Button variant="ghost" size="sm">
+                <Book className="w-4 h-4 mr-2" />
+                Documentation
+              </Button>
               <Button 
                 variant="ghost" 
-                size="sm" 
-                onClick={() => window.open('https://github.com/theingenuityco/starships.ai', '_blank')}
+                size="sm"
+                onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}
               >
-                <GithubIcon className="w-4 h-4 mr-2" />
-                GitHub
+                <Users className="w-4 h-4 mr-2" />
+                Discord
               </Button>
-              <Button variant="ghost" size="sm">Documentation</Button>
-              <Button variant="ghost" size="sm">Community</Button>
             </div>
           </div>
         </div>

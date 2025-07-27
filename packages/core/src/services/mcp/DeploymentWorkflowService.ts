@@ -388,15 +388,18 @@ export class DeploymentWorkflowService {
         if (serviceEndpoint) {
           const responseTime = Date.now() - startTime;
           const isHealthy = serviceEndpoint.status === 'healthy';
+          const isStarting = serviceEndpoint.status === 'starting';
           
-          // Record health check in monitoring service
-          bridgeMonitoringService.recordHealthCheck(connectorId, isHealthy, responseTime);
+          // Don't record failed health checks for containers that are still starting
+          if (!isStarting) {
+            // Record health check in monitoring service
+            bridgeMonitoringService.recordHealthCheck(connectorId, isHealthy, responseTime);
+          }
           
           // ServiceRegistry automatically updates health status via its monitoring
-          await this.mcpConnectorRepo.updateDockerHealth(
-            connectorId, 
-            isHealthy ? 'healthy' : 'unhealthy'
-          );
+          // Use appropriate status based on container state
+          const dockerHealthStatus = isHealthy ? 'healthy' : (isStarting ? 'starting' : 'unhealthy');
+          await this.mcpConnectorRepo.updateDockerHealth(connectorId, dockerHealthStatus);
           
           // Sync capabilities if available
           if (serviceEndpoint.availableTools || serviceEndpoint.availableResources) {

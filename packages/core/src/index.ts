@@ -21,6 +21,7 @@ export { ConnectorMigrationService, connectorMigrationService } from './services
 
 // Agent-MCP Integration Services
 export { MCPToolGateway, mcpToolGateway } from './services/mcp/MCPToolGateway';
+export { MCPToolGatewayDB, mcpToolGatewayDB } from './services/mcp/MCPToolGatewayDB';
 export { ServiceRegistry, serviceRegistry } from './services/mcp/ServiceRegistry';
 export { ToolDiscoveryCache } from './services/mcp/ToolDiscoveryCache';
 export { MCPNetworkClient } from './services/mcp/MCPNetworkClient';

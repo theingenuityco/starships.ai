@@ -625,6 +625,8 @@ async function* chatStream(
 
 
 export { LangChainMemoryStore, chatStream };
+export { chatWithMCP } from './chat-with-mcp';
+export { chatWithMCPStream } from './chat-with-mcp-stream';
 
 // Export First Officer Agent functionality
 export * from './first-officer';

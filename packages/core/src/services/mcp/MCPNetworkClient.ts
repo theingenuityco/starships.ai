@@ -37,7 +37,7 @@ export class MCPNetworkClient {
       const baseUrl = await this.getServiceUrl(service);
       console.log(`[MCPNetworkClient] Fetching tools from ${service.containerName} at ${baseUrl}`);
 
-      const response = await this.makeRequest('GET', `${baseUrl}/tools/list`, null, {
+      const response = await this.makeRequest('GET', `${baseUrl}/tools`, null, {
         timeout: 5000 // Quick timeout for discovery
       });
 
@@ -59,7 +59,7 @@ export class MCPNetworkClient {
       const baseUrl = await this.getServiceUrl(service);
       console.log(`[MCPNetworkClient] Fetching resources from ${service.containerName} at ${baseUrl}`);
 
-      const response = await this.makeRequest('GET', `${baseUrl}/resources/list`, null, {
+      const response = await this.makeRequest('GET', `${baseUrl}/resources`, null, {
         timeout: 5000
       });
 

@@ -20,13 +20,11 @@ import {
   EnhancedNotFoundError as NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
-import { serviceRegistry } from '@starships/core/dist/services/mcp/ServiceRegistry';
-import { DeploymentWorkflowService } from '@starships/core/dist/services/mcp/DeploymentWorkflowService';
+import { serviceRegistry, DeploymentWorkflowService, connectorMigrationService } from '@starships/core';
+import type { MigrationOptions, MigrationResult } from '@starships/core';
 import { bridgeMonitoringService } from '@starships/core/dist/services/mcp/BridgeMonitoringService';
 import { toggleHttpBridge, getFeatureFlags } from '@starships/core/dist/services/mcp/FeatureFlagService';
 import { getHttpBridgeEnabled } from '@starships/core/dist/services/mcp/DockerServiceTemplate';
-import { connectorMigrationService } from '@starships/core/dist/services/mcp/ConnectorMigrationService';
-import type { MigrationOptions, MigrationResult } from '@starships/core/dist/services/mcp/ConnectorMigrationService';
 
 /**
  * Input validation helpers

@@ -874,7 +874,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
               <p className="text-white/70">
-                © 2024 Starships.ai - Where Vision meets Intelligence
+                © 2025 Starships.ai - Where Vision meets Intelligence
               </p>
             </div>
             <div className="flex space-x-6">

@@ -278,6 +278,56 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     }
   },
 
+  // Memory MCP Server (HTTP Bridge)
+  'memory': {
+    slug: 'memory',
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    volumes: [
+      {
+        source: '/Users/dsolanski/Documents/DevEx/starships.ai/packages/server/data/memory/{starshipId}',
+        target: '/data',
+        mode: 'rw'
+      }
+    ],
+    environment: {
+      MCP_SERVER_CMD: 'npx',
+      MCP_SERVER_ARGS: '-y @modelcontextprotocol/server-memory --data-dir /data',
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '15000',
+      MAX_CONCURRENT_REQUESTS: '10'
+    },
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 3,
+      start_period: '30s'
+    },
+    resourceLimits: {
+      cpus: '0.3',
+      memory: '256M'
+    },
+    labels: {
+      'mcp.type': 'memory',
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: false,
+      requiresFileAccess: true,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: 'npx',
+      mcpServerArgs: ['-y', '@modelcontextprotocol/server-memory', '--data-dir', '/data']
+    },
+    requiresFileAccess: true,
+    requiresCredentials: false
+  },
+
   // Puppeteer MCP Server (HTTP Bridge)
   'puppeteer': {
     slug: 'puppeteer',

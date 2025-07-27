@@ -2,14 +2,14 @@
 
 import * as React from "react"
 
-interface FixedThemeProps {
+interface StarThemeProps {
   children: React.ReactNode
   theme: "dark" | "light"
 }
 
-export function FixedTheme({ children, theme }: FixedThemeProps) {
+export function StarTheme({ children, theme }: StarThemeProps) {
   return (
-    <div className={`fixed-theme-${theme}`}>
+    <div className={`star-theme-${theme}`}>
       {children}
     </div>
   )

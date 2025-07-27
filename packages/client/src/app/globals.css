@@ -140,13 +140,13 @@
 }
 
 /* 
- * FIXED THEME SYSTEM
- * ==================
- * For components that need a specific theme regardless of user preference
+ * STAR THEME SYSTEM
+ * =================
+ * Starships.ai themed components with space aesthetics
  */
 
-/* Fixed Dark Theme - For landing page */
-.fixed-theme-dark {
+/* Star Dark Theme - For landing page */
+.star-theme-dark {
   --background: 0 0% 0%;
   --foreground: 0 0% 100%;
   --card: 220 15% 5%;
@@ -167,8 +167,8 @@
   color: hsl(var(--foreground));
 }
 
-/* Fixed Light Theme - If needed */
-.fixed-theme-light {
+/* Star Light Theme - If needed */
+.star-theme-light {
   --background: 0 0% 100%;
   --foreground: 0 0% 0%;
   --card: 0 0% 100%;

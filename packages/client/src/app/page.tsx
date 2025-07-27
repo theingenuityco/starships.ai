@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { LoginButton } from '@/components/auth/LoginButton';
-import { FixedTheme } from '@/components/theme-context';
+import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
 const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import { 
@@ -183,7 +183,7 @@ export default function HomePage() {
   };
 
   return (
-    <FixedTheme theme="dark">
+    <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden">
         <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
         <StarfieldBackground launching={launching} density={600} speed={1.5} />
@@ -919,6 +919,6 @@ export default function HomePage() {
         </div>
       </footer>
       </div>
-    </FixedTheme>
+    </StarTheme>
   );
 } 

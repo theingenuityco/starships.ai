@@ -1,4 +1,4 @@
-import neo4j, { Driver, Session, auth, ManagedTransaction } from 'neo4j-driver';
+import neo4j, { Driver, Session, auth, ManagedTransaction, Integer, isInt } from 'neo4j-driver';
 
 export interface Neo4jConfig {
   uri: string;
@@ -70,8 +70,11 @@ export class Neo4jConnection {
     const session = this.getSession();
 
     try {
+      // Convert any Map objects to plain objects for Neo4j compatibility
+      const sanitizedParameters = this.sanitizeParameters(parameters);
+      
       const result = await session.executeRead((tx: ManagedTransaction) =>
-        tx.run(cypher, parameters)
+        tx.run(cypher, sanitizedParameters)
       );
 
       return result.records.map((record) => {
@@ -98,8 +101,11 @@ export class Neo4jConnection {
     const session = this.getSession();
 
     try {
+      // Convert any Map objects to plain objects for Neo4j compatibility
+      const sanitizedParameters = this.sanitizeParameters(parameters);
+      
       const result = await session.executeWrite((tx: ManagedTransaction) =>
-        tx.run(cypher, parameters)
+        tx.run(cypher, sanitizedParameters)
       );
 
       return result.records.map((record) => {
@@ -204,6 +210,54 @@ export class Neo4jConnection {
     } finally {
       await session.close();
     }
+  }
+
+  /**
+   * Recursively converts Map objects and other incompatible types to Neo4j-compatible values
+   * - Converts Map objects to plain objects
+   * - Preserves Neo4j Integer objects as-is
+   * - Preserves primitive types and Neo4j-compatible objects
+   */
+  private sanitizeParameters(params: any, depth: number = 0): any {
+    // Prevent infinite recursion
+    if (depth > 10) {
+      console.warn('[Neo4j] Maximum sanitization depth reached, returning value as-is:', typeof params);
+      return params;
+    }
+    if (params === null || params === undefined) {
+      return params;
+    }
+
+    // Handle Neo4j Integer objects - keep them as-is since Neo4j expects them
+    if (isInt(params)) {
+      return params;
+    }
+
+    // Handle Map objects - convert to plain objects
+    if (params instanceof Map) {
+      const obj: any = {};
+      for (const [key, value] of params.entries()) {
+        obj[key] = this.sanitizeParameters(value, depth + 1);
+      }
+      return obj;
+    }
+
+    // Handle arrays
+    if (Array.isArray(params)) {
+      return params.map(item => this.sanitizeParameters(item, depth + 1));
+    }
+
+    // Handle plain objects (but not Neo4j objects like Node, Relationship, etc.)
+    if (typeof params === 'object' && params.constructor === Object) {
+      const sanitized: any = {};
+      for (const [key, value] of Object.entries(params)) {
+        sanitized[key] = this.sanitizeParameters(value, depth + 1);
+      }
+      return sanitized;
+    }
+
+    // For primitives (string, number, boolean) and Neo4j objects (Node, Relationship, etc.), return as-is
+    return params;
   }
 }
 

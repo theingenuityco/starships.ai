@@ -820,7 +820,7 @@ export const expeditionAPI = {
         metadata: request.metadata
       },
       {
-        timeout: options?.timeout || 30000 // Increase timeout to 30 seconds for message sending
+        timeout: options?.timeout || 600000 // Increase timeout to 10 minutes for First Officer operations
       }
     )
     const data = response.data.data

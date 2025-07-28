@@ -6,7 +6,6 @@ import { ContextBuilder } from './ContextBuilder';
 import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionStatus, WorkflowPhase } from '@starships/protocol';
 import { ExpeditionMessageRepository } from '@starships/models';
-// import { WorkflowStatePersistence } from './WorkflowStatePersistence';
 
 interface VFOWorkflowState {
   expeditionId: string;

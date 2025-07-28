@@ -119,7 +119,8 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   } = useExpeditionData({
     starshipId,
     expeditionId,
-    autoRefresh: true
+    autoRefresh: true,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
   // Chat hook
@@ -133,11 +134,12 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   } = useExpeditionChat({
     expeditionId,
     starshipId,
-    autoScroll: true
+    autoScroll: true,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
-  // HTTP-only implementation - socket integration removed
-  // Expedition control functions now use HTTP API calls
+  // WebSocket integration enabled for real-time updates
+  // Expedition control functions use HTTP API calls with real-time WebSocket updates
 
   // Fetch agent details when expedition loads
   useEffect(() => {

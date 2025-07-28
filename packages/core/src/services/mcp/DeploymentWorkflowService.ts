@@ -378,7 +378,7 @@ export class DeploymentWorkflowService {
     // Check if this is an HTTP bridge deployment
     const template = await this.mcpServerOptionRepo.findById(connector.templateId);
     if (template) {
-      const dockerTemplate = getHttpBridgeTemplate(template.slug);
+      const dockerTemplate = getDockerServiceTemplate(template.slug);
       const useHttpBridge = dockerTemplate && isHttpBridgeTemplate(dockerTemplate);
       
       if (useHttpBridge) {

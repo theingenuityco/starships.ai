@@ -237,16 +237,27 @@ router.post('/:id/track-usage', authMiddleware, async (req: Request, res: Respon
 });
 
 // NEW: Get agents by starship ID
-router.get('/by-starship/:starshipId', authMiddleware, async (req: Request, res: Response) => {
+router.get('/starship/:starshipId', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { starshipId } = req.params;
     
-    // TODO: Add validation to ensure starshipId references valid, accessible starship
-    // For now, we'll fetch agents by starshipId without additional validation
+    // Validate that the user has access to this starship
+    const starshipRepository = await import('@starships/models').then(m => m.RepositoryFactory.getStarshipRepository());
+    const starship = await starshipRepository.findById(starshipId);
     
-    // This would use AgentRepository.findByStarshipId(starshipId) when implemented
-    // For now, we'll return an empty array or implement basic functionality
-    const agents: any[] = []; // Placeholder
+    if (!starship) {
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+    
+    // Verify ownership
+    if (starship.ownerId !== req.user!.id) {
+      res.status(403).json({ error: 'Access denied to this starship' });
+      return;
+    }
+    
+    // Fetch agents by starshipId
+    const agents = await AgentService.getAgentsByStarshipId(starshipId);
     
     res.json(agents);
   } catch (error) {

@@ -29,6 +29,8 @@ import {
 import { serviceRegistry } from './ServiceRegistry';
 import { deploymentConfig } from './DeploymentConfig';
 import { portAllocator } from './PortAllocator';
+import { MCPToolGatewayDB } from './MCPToolGatewayDB';
+import { RepositoryFactory } from '@starships/models';
 
 const execAsync = promisify(exec);
 
@@ -418,6 +420,43 @@ export class DockerComposeDeployer implements MCPDeployer {
         });
       }
       
+      // Update connector with Docker deployment info
+      const allocatedPort = deploymentConfig.shouldExposePort() 
+        ? portAllocator.getAllocatedPort(connector.id) 
+        : undefined;
+      
+      const connectorRepository = RepositoryFactory.getMCPServerConnectorRepository();
+      await connectorRepository.updateDockerStatus(connector.id, 'running', {
+        containerId,
+        serviceName,
+        networkName,
+        imageName: useHttpBridge ? 'starships/mcp-http-bridge:latest' : (dockerTemplate?.image || 'unknown')
+      });
+      
+      // Store allocated port if in development
+      if (allocatedPort) {
+        await connectorRepository.update(connector.id, {
+          dockerPort: allocatedPort
+        });
+      }
+      
+      // Wait for container to be healthy and update status
+      console.log(`[DockerComposeDeployer] Waiting for container ${serviceName} to be healthy...`);
+      const isHealthy = await this.waitForContainerHealth(serviceName, connector.id);
+      
+      if (isHealthy) {
+        await connectorRepository.updateDockerHealth(connector.id, 'healthy');
+        console.log(`[DockerComposeDeployer] Container ${serviceName} is healthy`);
+        
+        // Trigger tool discovery after container is healthy
+        if (useHttpBridge) {
+          await this.triggerToolDiscovery(connector.id, starshipId);
+        }
+      } else {
+        await connectorRepository.updateDockerHealth(connector.id, 'unhealthy');
+        console.warn(`[DockerComposeDeployer] Container ${serviceName} failed health check`);
+      }
+      
       const deploymentTime = Date.now() - startTime;
       console.log(`[DockerComposeDeployer] Successfully deployed ${serviceName} (${deploymentTime}ms)`);
 
@@ -686,6 +725,87 @@ export class DockerComposeDeployer implements MCPDeployer {
   async checkHealth(starshipId: string, connectorId: string): Promise<{ healthy: boolean; status: string; details?: any }> {
     // Implementation would check container health
     return { healthy: true, status: 'healthy' };
+  }
+
+  /**
+   * Wait for container to be healthy
+   */
+  private async waitForContainerHealth(serviceName: string, connectorId: string): Promise<boolean> {
+    const maxAttempts = 30; // 30 attempts
+    const delayMs = 2000; // 2 seconds between attempts
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // Check container health status
+        const { stdout } = await execAsync(
+          `docker inspect ${serviceName} --format='{{json .State.Health}}'`
+        );
+        
+        const health = JSON.parse(stdout.trim());
+        
+        if (health && health.Status === 'healthy') {
+          return true;
+        } else if (health && health.Status === 'unhealthy') {
+          console.warn(`[DockerComposeDeployer] Container ${serviceName} is unhealthy`);
+          return false;
+        }
+        
+        console.log(`[DockerComposeDeployer] Waiting for container health (attempt ${attempt}/${maxAttempts})...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } catch (error) {
+        // Container might not have health check, try HTTP endpoint
+        if (attempt > 5) { // Give container time to start
+          try {
+            const allocatedPort = portAllocator.getAllocatedPort(connectorId);
+            const url = allocatedPort 
+              ? `http://localhost:${allocatedPort}/health`
+              : `http://${serviceName}:8080/health`;
+              
+            const response = await fetch(url, { 
+              signal: AbortSignal.timeout(3000) 
+            });
+            
+            if (response.ok) {
+              return true;
+            }
+          } catch (fetchError) {
+            // Continue waiting
+          }
+        }
+        
+        if (attempt === maxAttempts) {
+          console.error(`[DockerComposeDeployer] Health check failed for ${serviceName}:`, error);
+          return false;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Trigger tool discovery for a healthy container
+   */
+  private async triggerToolDiscovery(connectorId: string, starshipId: string): Promise<void> {
+    try {
+      console.log(`[DockerComposeDeployer] Triggering tool discovery for connector ${connectorId}`);
+      
+      // Use singleton instance to ensure cache consistency
+      const { mcpToolGatewayDB } = await import('./MCPToolGatewayDB');
+      
+      // Clear cache to force fresh discovery
+      mcpToolGatewayDB.clearCacheForStarship(starshipId);
+      
+      // Force a tool discovery by calling getToolsForStarship
+      // This will populate the cache with fresh data
+      const tools = await mcpToolGatewayDB.getToolsForStarship(starshipId);
+      
+      console.log(`[DockerComposeDeployer] Discovered ${tools.length} tools for starship ${starshipId}`);
+    } catch (error) {
+      console.error(`[DockerComposeDeployer] Failed to trigger tool discovery:`, error);
+    }
   }
 
   /**

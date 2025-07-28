@@ -19,6 +19,7 @@ interface AgentSelectorProps {
   onAgentSelect: (agent: Agent) => void
   showCreateButton?: boolean
   showFilters?: boolean
+  starshipId?: string
 }
 
 interface FilterState {
@@ -33,6 +34,7 @@ export function AgentSelector({
   onAgentSelect,
   showCreateButton = true,
   showFilters = true,
+  starshipId,
 }: AgentSelectorProps) {
   const [agents, setAgents] = useState<Agent[]>([])
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
@@ -59,7 +61,7 @@ export function AgentSelector({
 
   useEffect(() => {
     fetchAgents()
-  }, [])
+  }, [starshipId])
 
   useEffect(() => {
     applyFilters()
@@ -71,7 +73,7 @@ export function AgentSelector({
       setLoading(true) // Prevent multiple submissions
       // Use the real API to create agent from template
       const { templateAPI } = await import('@/lib/api')
-      const newAgent = await templateAPI.createAgentFromTemplate(templateId, agentName)
+      const newAgent = await templateAPI.createAgentFromTemplate(templateId, agentName, starshipId)
 
       // Refresh the agents list
       await fetchAgents()
@@ -89,7 +91,11 @@ export function AgentSelector({
   const fetchAgents = async () => {
     try {
       setLoading(true)
-      const fetchedAgents = await agentAPI.getAll()
+      // If starshipId is provided, fetch agents for that specific starship
+      // Otherwise, fetch all agents (for backward compatibility)
+      const fetchedAgents = starshipId 
+        ? await agentAPI.getByStarshipId(starshipId)
+        : await agentAPI.getAll()
       setAgents(fetchedAgents)
       setError(null)
     } catch (err) {

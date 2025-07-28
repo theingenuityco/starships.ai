@@ -138,6 +138,14 @@ export class AgentService {
     return agents.map(this.convertToAgentConfig);
   }
 
+  static async getAgentsByStarshipId(starshipId: string): Promise<AgentConfig[]> {
+    await this.initialize();
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    // Use the property-based query method
+    const agents = await agentRepo.findByStarshipId(starshipId);
+    return agents.map(this.convertToAgentConfig);
+  }
+
   static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentConfig[]> {
     try {
       await this.initialize();

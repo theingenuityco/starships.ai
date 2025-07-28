@@ -993,7 +993,9 @@ export const mcpServerAPI = {
       const requestBody = env ? { env } : {}
 
       const data = await api
-        .post(`/api/starships/${starshipId}/connectors/${templateId}`, requestBody)
+        .post(`/api/starships/${starshipId}/connectors/${templateId}`, requestBody, {
+          timeout: 60000 // 60 seconds timeout for connector creation
+        })
         .then((res: AxiosResponse<any>) => {
           console.log('[API] Successfully created connector instance:', res.data.connectorId)
           // Transform response to match MCPServerConnector interface
@@ -1057,7 +1059,9 @@ export const mcpServerAPI = {
     console.log('[API] Removing connector instance from starship:', { starshipId, connectorId })
 
     try {
-      await api.delete(`/api/starships/${starshipId}/connectors/${connectorId}`)
+      await api.delete(`/api/starships/${starshipId}/connectors/${connectorId}`, {
+        timeout: 30000 // 30 seconds timeout for connector removal
+      })
       console.log('[API] Successfully removed connector instance from starship')
 
       // Invalidate relevant caches

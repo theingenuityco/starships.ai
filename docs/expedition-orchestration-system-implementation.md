@@ -142,10 +142,10 @@ Based on detailed analysis and clarification:
 ## CORRECT USER FLOW (Starship-Level)
 
 ### Navigation Flow
-Fleet Command (/ships) → Select Starship → Starship Expeditions (/ship/[slug]/expeditions) → Individual Expedition Chat
+Fleet Command (/fleet) → Select Starship → Starship Expeditions (/ship/[slug]/expeditions) → Individual Expedition Chat
 
 ### Detailed User Journey
-1. **Fleet Command Page** (`/ships`)
+1. **Fleet Command Page** (`/fleet`)
    - User sees all their starships
    - Clicks on a starship to enter its command interface
 

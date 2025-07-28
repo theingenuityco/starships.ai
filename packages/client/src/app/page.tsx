@@ -170,7 +170,7 @@ export default function HomePage() {
     // Don't reset launching state - let it continue until page unloads
     setTimeout(() => {
       if (isAuthenticated) {
-        window.location.href = '/ships';
+        window.location.href = '/fleet';
       } else {
         // Trigger login
         const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement;

@@ -1,15 +1,7 @@
 /**
- * Parallel Task Execution Framework
+ * WebSocket Event Emitter
  * 
- * Export all components of the parallel execution system
+ * Export WebSocket event emitter for real-time expedition updates
  */
 
-export * from './ParallelExecutionFramework';
 export * from './WebSocketEventEmitter';
-export * from './DependencyResolver';
-export * from './ResourceManager';
-export * from './TaskScheduler';
-export * from './PerformanceMonitor';
-
-// Re-export main framework class for convenience
-export { ParallelExecutionFramework } from './ParallelExecutionFramework';

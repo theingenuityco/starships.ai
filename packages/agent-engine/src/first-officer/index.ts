@@ -8,10 +8,8 @@
  * advanced LangGraph integration features.
  */
 
-// Core agents (original and enhanced)
+// Core agents
 export { FirstOfficerAgent } from './FirstOfficerAgent';
-export { EnhancedFirstOfficerAgent } from './EnhancedFirstOfficerAgent';
-export { EnhancedFirstOfficerAgentV2 } from './EnhancedFirstOfficerAgentV2';
 
 // Core components
 export { AgentSelector } from './AgentSelector';
@@ -19,31 +17,14 @@ export { QualityValidator } from './QualityValidator';
 export { TaskExecutor } from './TaskExecutor';
 export { ChatCoordinator } from './ChatCoordinator';
 
-// Enhanced workflow components
-export {
-  TaskDependencyResolver,
-  ConditionalWorkflowManager,
-  UserApprovalManager,
-  WorkflowStatePersistence
-} from './WorkflowEnhancements';
+// State persistence utility
+export { StatePersistence } from './StatePersistence';
 
 // LangGraph workflow components
 export * from './workflow';
 
-// Parallel execution framework
-export { ParallelExecutionFramework } from './parallel/ParallelExecutionFramework';
+// WebSocket event emitter for real-time updates
 export { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
-export { DependencyResolver } from './parallel/DependencyResolver';
-export { ResourceManager } from './parallel/ResourceManager';
-export { TaskScheduler } from './parallel/TaskScheduler';
-export { PerformanceMonitor } from './parallel/PerformanceMonitor';
-
-// Testing utilities
-export {
-  testEnhancedIntegration,
-  testErrorScenarios,
-  runAllTests
-} from './test-integration';
 
 // Export types
 export type {
@@ -63,10 +44,7 @@ export type {
   CoordinationMessage,
   AgentWorkload,
   
-  // Enhanced types
+  // Workflow types  
   UserApprovalResponse,
-  EnhancedWorkflowOptions,
-  WorkflowCheckpoint,
-  TaskDependency,
-  ParallelExecutionGroup
+  WorkflowCheckpoint
 } from './types';

@@ -83,6 +83,7 @@ export interface ExpeditionSocketEvents {
   // Room management
   'expedition:join-room': (data: { expeditionId: string; userId: string }) => void;
   'expedition:leave-room': (data: { expeditionId: string; userId: string }) => void;
+  'expedition:sync-required': (data: { expeditionId: string; reason: string; timestamp: string }) => void;
   
   // Message sending
   'expedition:send-message': (data: { expeditionId: string; content: string; messageType?: string; participantId?: string; timestamp: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;

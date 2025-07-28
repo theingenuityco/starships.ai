@@ -21,7 +21,7 @@ import { AgentSelector } from './AgentSelector';
 import { QualityValidator } from './QualityValidator';
 import { TaskExecutor } from './TaskExecutor';
 import { ChatCoordinator } from './ChatCoordinator';
-import { WorkflowStatePersistence } from './WorkflowEnhancements';
+import { StatePersistence } from './StatePersistence';
 import {
   FirstOfficerState,
   FirstOfficerConfig,
@@ -56,7 +56,7 @@ export class FirstOfficerAgent {
   private nodeHandlers: WorkflowNodeHandlers;
   private messageEmitCallback?: (message: any) => Promise<void>;
   private starshipId: string;
-  private statePersistence: WorkflowStatePersistence;
+  private statePersistence: StatePersistence;
   private webSocketEmitter: WebSocketEventEmitter;
   private model: any; // LLM model instance
   private visionContent: string | undefined;
@@ -99,7 +99,7 @@ export class FirstOfficerAgent {
     this.agentSelector = new AgentSelector(starshipId, selectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
     this.taskExecutor = new TaskExecutor(this.config, memoryStore, this.webSocketEmitter);
-    this.statePersistence = new WorkflowStatePersistence(this.config);
+    this.statePersistence = new StatePersistence();
     
     // Chat coordinator will be initialized per expedition
     this.chatCoordinator = null as any;
@@ -701,8 +701,7 @@ Be constructive in your feedback. If rejecting, provide clear guidance on what n
       if (this.statePersistence) {
         await this.statePersistence.persistState(
           state.expeditionId,
-          convertFromExpeditionState(planState),
-          'phase_transition'
+          convertFromExpeditionState(planState)
         );
       }
 
@@ -805,8 +804,7 @@ Be constructive in your feedback. If rejecting, provide clear guidance on what n
         if (this.statePersistence) {
           await this.statePersistence.persistState(
             state.expeditionId,
-            convertFromExpeditionState(assignState),
-            'phase_transition'
+            convertFromExpeditionState(assignState)
           );
         }
 
@@ -835,8 +833,7 @@ Be constructive in your feedback. If rejecting, provide clear guidance on what n
         if (this.statePersistence) {
           await this.statePersistence.persistState(
             state.expeditionId,
-            convertFromExpeditionState(assignState2),
-            'phase_transition'
+            convertFromExpeditionState(assignState2)
           );
         }
 
@@ -1048,8 +1045,7 @@ Be constructive in your feedback. If rejecting, provide clear guidance on what n
       if (this.statePersistence) {
         await this.statePersistence.persistState(
           state.expeditionId,
-          convertFromExpeditionState(qualityState),
-          'phase_transition'
+          convertFromExpeditionState(qualityState)
         );
       }
 
@@ -1141,8 +1137,7 @@ Be constructive in your feedback. If rejecting, provide clear guidance on what n
       if (this.statePersistence) {
         await this.statePersistence.persistState(
           state.expeditionId,
-          convertFromExpeditionState(finalState),
-          'phase_transition'
+          convertFromExpeditionState(finalState)
         );
       }
 

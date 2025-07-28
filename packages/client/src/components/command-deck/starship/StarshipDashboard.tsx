@@ -33,6 +33,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingStarship, setEditingStarship] = useState<string | null>(null);
   const [deletingStarship, setDeletingStarship] = useState<string | null>(null);
@@ -43,12 +44,23 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
     loadUserStarships();
   }, [loadUserStarships]);
 
-  // Filter starships based on search query
-  const filteredStarships = starships.filter(starship =>
-    starship.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    starship.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    starship.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter starships based on search query and active filter
+  const filteredStarships = starships.filter(starship => {
+    // Search filter
+    const matchesSearch = starship.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      starship.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      starship.status.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status/type filter
+    const matchesFilter = 
+      activeFilter === 'all' ||
+      (activeFilter === 'active' && starship.status === 'active') ||
+      (activeFilter === 'inactive' && starship.status === 'inactive') ||
+      (activeFilter === 'scout' && starship.class === 'scout') ||
+      (activeFilter === 'cruiser' && starship.class === 'cruiser');
+    
+    return matchesSearch && matchesFilter;
+  });
 
   const handleStarshipSelect = (starshipId: string) => {
     setActiveStarship(starshipId);
@@ -76,9 +88,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
     active: starships.filter(s => s.status === 'active').length,
     inactive: starships.filter(s => s.status === 'inactive').length,
     scouts: starships.filter(s => s.class === 'scout').length,
-    cruisers: starships.filter(s => s.class === 'cruiser').length,
-    totalAgents: starships.reduce((sum, s) => sum + (s.maxAgents || 0), 0),
-    totalMaxExpeditions: starships.reduce((sum, s) => sum + (s.maxActiveExpeditions || 0), 0)
+    cruisers: starships.filter(s => s.class === 'cruiser').length
   };
 
   if (loadingStarships && starships.length === 0) {
@@ -143,59 +153,60 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
         </Button>
       </motion.div>
 
-      {/* Fleet Overview Stats */}
+
+      {/* Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.2 }}
+        className="flex flex-wrap gap-2"
       >
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Rocket className="w-5 h-5" />
-              Fleet Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{fleetStats.total}</div>
-                <div className="text-sm text-muted-foreground">Total Ships</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">{fleetStats.active}</div>
-                <div className="text-sm text-muted-foreground">Active</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-500">{fleetStats.inactive}</div>
-                <div className="text-sm text-muted-foreground">Inactive</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-500">{fleetStats.scouts}</div>
-                <div className="text-sm text-muted-foreground">Scouts</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">{fleetStats.cruisers}</div>
-                <div className="text-sm text-muted-foreground">Cruisers</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-cyan-500">{fleetStats.totalAgents}</div>
-                <div className="text-sm text-muted-foreground">Agent Slots</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-500">{fleetStats.totalMaxExpeditions}</div>
-                <div className="text-sm text-muted-foreground">Max Expeditions</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Button
+          variant={activeFilter === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('all')}
+        >
+          All
+        </Button>
+        <Button
+          variant={activeFilter === 'active' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('active')}
+          className={activeFilter === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
+        >
+          Active
+        </Button>
+        <Button
+          variant={activeFilter === 'inactive' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('inactive')}
+          className={activeFilter === 'inactive' ? 'bg-gray-500 hover:bg-gray-600' : ''}
+        >
+          Inactive
+        </Button>
+        <Button
+          variant={activeFilter === 'scout' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('scout')}
+          className={activeFilter === 'scout' ? 'bg-purple-500 hover:bg-purple-600' : ''}
+        >
+          Scouts
+        </Button>
+        <Button
+          variant={activeFilter === 'cruiser' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('cruiser')}
+          className={activeFilter === 'cruiser' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+        >
+          Cruisers
+        </Button>
       </motion.div>
 
       {/* Search and View Controls */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.3 }}
         className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
       >
         <div className="flex-1 max-w-md">
@@ -205,7 +216,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
               placeholder="Search starships..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-background/50 backdrop-blur-sm border-border/50"
+              className="pl-10 bg-background/50 border-border/50"
             />
           </div>
         </div>
@@ -231,14 +242,14 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.4 }}
         className="flex-1"
       >
         {filteredStarships.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="h-full flex items-center justify-center"
+            className="min-h-[400px] flex items-center justify-center"
           >
             <div className="text-center space-y-4">
               <Rocket className="w-16 h-16 text-muted-foreground mx-auto" />

@@ -113,15 +113,14 @@ export default function HomePage() {
   const { scrollYProgress } = useScroll();
 
   const dynamicTexts = [
-    "your dream startup",
-    "the next breakthrough SaaS",
+    "your vision into reality",
+    "the next big SaaS",
+    "your strategic consultancy",
     "an AI-powered platform",
     "your creative digital agency",
-    "your strategic consultancy",
-    "your research studio",
     "the future of work",
+    "your research studio",
     "your own intelligent vessel",
-    "your vision into reality"
   ];
 
   useEffect(() => {
@@ -196,9 +195,14 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 pointer-events-none" />
         
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1 }}
+          initial={{ opacity: 0, y: 50, scale: 0.85 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -30, scale: 0.9 }}
+          transition={{ 
+            duration: 0.8,
+            ease: [0.25, 0.1, 0.25, 1]
+          }}
+          viewport={{ once: false, margin: "-10%" }}
           className="relative z-10 max-w-4xl mx-auto"
         >
           <motion.div
@@ -374,35 +378,49 @@ export default function HomePage() {
                 </Button>
               </motion.div>
             ) : (
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <LoginButton 
-                  size="lg" 
-                  data-login-button
-                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+              <div className="relative">
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  animate={{
+                    boxShadow: [
+                      "0 0 30px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.2)",
+                      "0 0 35px hsl(var(--primary) / 0.5), 0 0 70px hsl(var(--primary) / 0.3)",
+                      "0 0 30px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.2)"
+                    ]
+                  }}
+                  transition={{
+                    duration: 3, 
+                    repeat: Infinity, 
+                    ease: "easeInOut"
+                  }}
+                />
+                <motion.div 
+                  whileHover={{ scale: 1.05 }} 
+                  whileTap={{ scale: 0.95 }}
+                  className="relative rounded-full"
                 >
-                  <span className="relative z-10">Launch Your Starship</span>
-                  <ArrowRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    initial={{ x: '-100%' }}
-                    whileHover={{ x: '100%' }}
-                    transition={{ duration: 0.6 }}
-                  />
-                </LoginButton>
-              </motion.div>
+                  <LoginButton 
+                    size="lg" 
+                    data-login-button
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full transition-colors"
+                  >
+                    Launch Your Starship
+                  </LoginButton>
+                </motion.div>
+              </div>
             )}
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button 
                 variant="outline" 
                 size="lg" 
-                onClick={() => window.open('https://github.com/theingenuityco/starships.ai', '_blank')}
                 className="px-8 py-4 text-lg rounded-full backdrop-blur-sm"
               >
-                <GithubIcon className="w-5 h-5 mr-2" />
-                View on GitHub
+                <Book className="w-5 h-5 mr-2" />
+                View Documentation
               </Button>
             </motion.div>
           </motion.div>
+          
         </motion.div>
         
         <motion.div
@@ -411,8 +429,24 @@ export default function HomePage() {
           transition={{ delay: 2, duration: 1 }}
           className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
         >
-          <div className="text-white/50 animate-float will-change-transform">
-            <ChevronDown className="w-6 h-6" />
+          <div className="flex flex-col items-center space-y-1">
+            {[0, 1, 2].map((index) => (
+              <motion.div
+                key={index}
+                animate={{ 
+                  opacity: [0.3, 1, 0.3],
+                  scale: [0.8, 1, 0.8]
+                }}
+                transition={{
+                  duration: 1.5,
+                  delay: index * 0.2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                <ChevronDown className="w-6 h-6 text-white/70" />
+              </motion.div>
+            ))}
           </div>
         </motion.div>
       </motion.section>
@@ -433,23 +467,58 @@ export default function HomePage() {
         />
         <div className="relative z-10 max-w-6xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2 }}
+            initial={{ opacity: 0, y: 20, scale: 0.85 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ 
+              duration: 0.8, 
+              ease: [0.25, 0.1, 0.25, 1]
+            }}
+            viewport={{ once: false, margin: "-10%" }}
             className="text-center mb-36"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">The Starship Journey</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            <motion.h2 
+              className="text-4xl md:text-5xl font-bold mb-6"
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -15, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              The Starship Journey
+            </motion.h2>
+            <motion.p 
+              className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
               Your idea becomes a plan. Your plan becomes focused missions. Your missions become reality.
-            </p>
+            </motion.p>
           </motion.div>
 
           <div className="space-y-16 relative">
             {/* You - Starting Point */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
               className="flex justify-center"
             >
               <div className="flex flex-col items-center space-y-4 max-w-md text-center">
@@ -468,9 +537,15 @@ export default function HomePage() {
             {/* Connector: You → Vision Chamber */}
             <motion.div 
               className="flex justify-center relative"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
+              initial={{ opacity: 0, scale: 0.85 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <div className="flex flex-col items-center relative">
                 <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
@@ -509,9 +584,15 @@ export default function HomePage() {
             </motion.div>
             
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.3,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <SystemCard
                 icon={Brain}
@@ -570,9 +651,15 @@ export default function HomePage() {
             {/* Connector 1: Vision Chamber → Expeditions */}
             <motion.div 
               className="flex justify-center relative"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
+              initial={{ opacity: 0, scale: 0.85 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.3,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <div className="flex flex-col items-center relative">
                 {/* Main connection line */}
@@ -614,9 +701,15 @@ export default function HomePage() {
             </motion.div>
             
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.4,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <SystemCard
                 icon={Compass}
@@ -684,9 +777,15 @@ export default function HomePage() {
             {/* Connector 2: Expeditions → Crew */}
             <motion.div 
               className="flex justify-center relative"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.5 }}
+              initial={{ opacity: 0, scale: 0.85 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.5,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <div className="flex flex-col items-center relative">
                 {/* Main connection line */}
@@ -729,9 +828,15 @@ export default function HomePage() {
             </motion.div>
             
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.6 }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.6,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <SystemCard
                 icon={Users}
@@ -764,23 +869,57 @@ export default function HomePage() {
       <section className="py-48 px-4 relative">
         <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.2 }}
+            initial={{ opacity: 0, y: 20, scale: 0.85 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ 
+              duration: 0.8, 
+              ease: [0.25, 0.1, 0.25, 1]
+            }}
+            viewport={{ once: false, margin: "-10%" }}
             className="text-center mb-36"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Choose Your Starship Class</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            <motion.h2 
+              className="text-4xl md:text-5xl font-bold mb-6"
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -15, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              Choose Your Starship Class
+            </motion.h2>
+            <motion.p 
+              className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
               Each class shapes your strategy and scale. Start small or go big—your Vision determines the path.
-            </p>
+            </motion.p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              viewport={{ once: false, margin: "-50px" }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <StarshipClass
                 name="Scout Class"
@@ -794,10 +933,15 @@ export default function HomePage() {
               />
             </motion.div>
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: false, margin: "-50px" }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <StarshipClass
                 name="Cruiser Class"
@@ -812,10 +956,15 @@ export default function HomePage() {
               />
             </motion.div>
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              viewport={{ once: false, margin: "-50px" }}
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.3,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
             >
               <StarshipClass
                 name="Dreadnought Class"
@@ -893,27 +1042,32 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 relative z-10">
+      <footer className="py-16 px-4 relative z-10">
         {/* Gradient horizontal line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <p className="text-muted-foreground">
+            <div className="mb-6 md:mb-0 text-center md:text-left">
+              <p className="text-muted-foreground mb-2">
                 © 2025 Starships.ai - Where Vision meets Intelligence
+              </p>
+              <p className="text-muted-foreground text-sm">
+                🪐 Manifested by <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline">The Ingenuity Co</a>
               </p>
             </div>
             <div className="flex space-x-6">
+              <Button variant="ghost" size="sm">
+                <Book className="w-4 h-4 mr-2" />
+                Documentation
+              </Button>
               <Button 
                 variant="ghost" 
-                size="sm" 
-                onClick={() => window.open('https://github.com/theingenuityco/starships.ai', '_blank')}
+                size="sm"
+                onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}
               >
-                <GithubIcon className="w-4 h-4 mr-2" />
-                GitHub
+                <Users className="w-4 h-4 mr-2" />
+                Discord
               </Button>
-              <Button variant="ghost" size="sm">Documentation</Button>
-              <Button variant="ghost" size="sm">Community</Button>
             </div>
           </div>
         </div>

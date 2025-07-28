@@ -195,6 +195,50 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     requiresCredentials: false
   },
 
+  // Time MCP Server (HTTP Bridge)
+  'time': {
+    slug: 'time',
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    environment: {
+      MCP_SERVER_CMD: 'npx',
+      MCP_SERVER_ARGS: '-y @modelcontextprotocol/server-time',
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '30000',
+      MAX_CONCURRENT_REQUESTS: '10',
+      INIT_TIMEOUT: '120000'
+    },
+    volumes: [],
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 5,
+      start_period: '60s'
+    },
+    resourceLimits: {
+      cpus: '0.5',
+      memory: '512m'
+    },
+    labels: {
+      'mcp.type': 'time',
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: false,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: 'npx',
+      mcpServerArgs: ['-y', '@modelcontextprotocol/server-time']
+    },
+    requiresFileAccess: false,
+    requiresCredentials: false
+  },
+
   // Filesystem MCP Server (HTTP Bridge)
   'filesystem': {
     slug: 'filesystem',
@@ -243,46 +287,6 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
       mcpServerArgs: ['-y', '@modelcontextprotocol/server-filesystem', '/workspace']
     },
     requiresFileAccess: true
-  },
-
-  // Time MCP Server (HTTP Bridge)
-  'time': {
-    slug: 'time',
-    image: 'starships/mcp-http-bridge:latest',
-    command: ['node', '/app/server.js'],
-    ports: ['8080'],
-    environment: {
-      MCP_SERVER_CMD: 'uvx',
-      MCP_SERVER_ARGS: 'mcp-server-time --local-timezone=America/New_York',
-      HTTP_PORT: '8080',
-      LOG_LEVEL: 'info',
-      HEALTH_CHECK_TIMEOUT: '10000',
-      MAX_CONCURRENT_REQUESTS: '20'
-    },
-    healthcheck: {
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '15s'
-    },
-    resourceLimits: {
-      cpus: '0.1',
-      memory: '128M'
-    },
-    labels: {
-      'mcp.type': 'time',
-      'mcp.protocol': 'http',
-      'mcp.runtime': 'bridge',
-      'mcp.version': '1.0.0'
-    },
-    bridgeConfig: {
-      useHttpBridge: true,
-      apiKeyRequired: false,
-      healthCheckMethod: 'tools_list',
-      mcpServerCmd: 'uvx',
-      mcpServerArgs: ['mcp-server-time', '--local-timezone=America/New_York']
-    }
   }
 };
 

@@ -9,7 +9,7 @@ import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { MCPServerConnector, MCPServerOption } from '@starships/models';
+import { MCPServerConnector, MCPServerOption, MCPServerOptionRepository } from '@starships/models';
 import { 
   MCPDeployer, 
   DeploymentStatus, 
@@ -79,10 +79,22 @@ export class DockerComposeDeployer implements MCPDeployer {
   private static readonly VOLUME_BASE = './data/starships';
   private networkManager: NetworkManager;
   private templateCache: Map<string, MCPServerOption> = new Map();
+  private mcpServerOptionRepo: MCPServerOptionRepository | null = null;
 
   constructor() {
     this.networkManager = new NetworkManager();
+    // Delay repository initialization until first use
     this.ensureDirectories();
+  }
+
+  /**
+   * Get the repository instance (lazy initialization)
+   */
+  private getMCPServerOptionRepo(): MCPServerOptionRepository {
+    if (!this.mcpServerOptionRepo) {
+      this.mcpServerOptionRepo = RepositoryFactory.getMCPServerOptionRepository();
+    }
+    return this.mcpServerOptionRepo;
   }
 
   /**
@@ -106,41 +118,25 @@ export class DockerComposeDeployer implements MCPDeployer {
       return this.templateCache.get(templateId)!;
     }
 
-    // TODO: In a real implementation, this would query the MCPServerOptionRepository
-    // For now, we'll use a simplified approach to resolve template slugs
+    // Query the repository for the actual template
+    const template = await this.getMCPServerOptionRepo().findById(templateId);
     
-    // Try common template ID to slug mappings first
-    const templateIdToSlugMap: Record<string, string> = {
-      '54f39175-4d64-49d1-90b5-d48491ce8cf2': 'brave', // Brave Search template
-      'e054bf0a-5f93-4b0a-bf3e-aaade290118f': 'puppeteer', // Puppeteer template
-      '9e1b6668-d3fa-47fb-9447-b8e1e9dabd9f': 'sequentialthinking', // Sequential Thinking template
-      'edaaba13-d587-406d-b300-59e6b3b8aa9f': 'memory', // Memory template
-      // Add other known mappings here as needed
-    };
-    
-    let slug = templateIdToSlugMap[templateId];
-    
-    // If not in mapping, try the old pattern-based approach as fallback
-    if (!slug) {
-      slug = templateId.replace('-template', '');
-    }
-    
-    // Verify we have a Docker service template for this slug
-    const dockerTemplate = getDockerServiceTemplate(slug);
-    if (!dockerTemplate) {
-      const availableTemplates = Object.keys(getAllDockerServiceTemplates()).join(', ');
-      throw new Error(`No Docker service template found for slug: ${slug}. Available: ${availableTemplates}`);
+    if (!template) {
+      throw new Error(`MCP Server template not found with ID: ${templateId}`);
     }
 
-    // Create a basic MCPServerOption based on the Docker template
-    const template: MCPServerOption = {
-      id: templateId,
-      name: slug.charAt(0).toUpperCase() + slug.slice(1),
-      slug: slug,
-      command: dockerTemplate.command?.[0] || 'npx',
-      args: dockerTemplate.command?.slice(1) || [],
-      env: JSON.stringify({}), // Environment will be provided by connector
-    };
+    // Ensure the template has a valid slug
+    if (!template.slug) {
+      console.warn(`[DockerComposeDeployer] Template ${templateId} (${template.name}) missing slug, using normalized name`);
+      template.slug = template.name.toLowerCase().replace(/\s+/g, '-');
+    }
+
+    // Verify we have a Docker service template for this slug
+    const dockerTemplate = getDockerServiceTemplate(template.slug);
+    if (!dockerTemplate) {
+      const availableTemplates = getAllDockerServiceTemplates().map(t => t.slug).join(', ');
+      throw new Error(`No Docker service template found for slug: ${template.slug}. Available templates: ${availableTemplates}`);
+    }
 
     // Cache for future use
     this.templateCache.set(templateId, template);

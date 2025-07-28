@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Grid, List, Rocket, AlertCircle } from 'lucide-react';
+import { Plus, Search, Rocket, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +32,6 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   } = useStarshipStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingStarship, setEditingStarship] = useState<string | null>(null);
@@ -128,14 +127,14 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   }
 
   return (
-    <div className={cn("h-full p-6 space-y-6", className)}>
+    <div className={cn("h-full p-6 space-y-8", className)}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
+        className="flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between"
       >
-        <div className="space-y-1">
+        <div className="space-y-2">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             Fleet Command
           </h1>
@@ -153,96 +152,105 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
         </Button>
       </motion.div>
 
+      {/* Search */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="flex-1 max-w-md"
+      >
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search starships..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-background/50 border-border/50"
+          />
+        </div>
+      </motion.div>
 
       {/* Filters */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex flex-wrap gap-2"
+        transition={{ delay: 0.25 }}
+        className="flex flex-wrap gap-3"
       >
         <Button
           variant={activeFilter === 'all' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('all')}
+          className="flex items-center gap-2"
         >
-          All
+          <span>All</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.total}
+          </Badge>
         </Button>
         <Button
           variant={activeFilter === 'active' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('active')}
-          className={activeFilter === 'active' ? 'bg-green-500 hover:bg-green-600' : ''}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'active' ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white' : ''
+          )}
         >
-          Active
+          <span>Active</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.active}
+          </Badge>
         </Button>
         <Button
           variant={activeFilter === 'inactive' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('inactive')}
-          className={activeFilter === 'inactive' ? 'bg-gray-500 hover:bg-gray-600' : ''}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'inactive' ? 'bg-slate-600 hover:bg-slate-700 border-slate-600 text-white' : ''
+          )}
         >
-          Inactive
+          <span>Inactive</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.inactive}
+          </Badge>
         </Button>
         <Button
           variant={activeFilter === 'scout' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('scout')}
-          className={activeFilter === 'scout' ? 'bg-purple-500 hover:bg-purple-600' : ''}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'scout' ? 'bg-violet-600 hover:bg-violet-700 border-violet-600 text-white' : ''
+          )}
         >
-          Scouts
+          <span>Scouts</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.scouts}
+          </Badge>
         </Button>
         <Button
           variant={activeFilter === 'cruiser' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setActiveFilter('cruiser')}
-          className={activeFilter === 'cruiser' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'cruiser' ? 'bg-amber-600 hover:bg-amber-700 border-amber-600 text-white' : ''
+          )}
         >
-          Cruisers
+          <span>Cruisers</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.cruisers}
+          </Badge>
         </Button>
       </motion.div>
 
-      {/* Search and View Controls */}
+      {/* Starship Grid */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
-      >
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search starships..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-background/50 border-border/50"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('list')}
-          >
-            <List className="w-4 h-4" />
-          </Button>
-        </div>
-      </motion.div>
-
-      {/* Starship Grid/List */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
         className="flex-1"
       >
         {filteredStarships.length === 0 ? (
@@ -277,12 +285,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
             </div>
           </motion.div>
         ) : (
-          <div className={cn(
-            "grid gap-4",
-            viewMode === 'grid' 
-              ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              : "grid-cols-1"
-          )}>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <AnimatePresence mode="popLayout">
               {filteredStarships.map((starship, index) => (
                 <motion.div
@@ -296,7 +299,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                   <StarshipCard
                     starship={starship}
                     isActive={starship.id === activeStarshipId}
-                    viewMode={viewMode}
+                    viewMode="grid"
                     onSelect={() => handleStarshipSelect(starship.id)}
                     onEdit={() => setEditingStarship(starship.id)}
                     onDelete={() => setDeletingStarship(starship.id)}

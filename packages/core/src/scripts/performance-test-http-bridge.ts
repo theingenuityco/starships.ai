@@ -159,7 +159,7 @@ class HTTPBridgePerformanceTester {
   }
 
   /**
-   * Test tool execution performance with mock Brave search
+   * Test tool execution performance with mock memory store
    */
   async testToolExecution(config: TestConfig): Promise<PerformanceTestResult> {
     console.log(`⚡ Testing Tool Execution Performance...`);
@@ -172,14 +172,16 @@ class HTTPBridgePerformanceTester {
     const makeRequest = async (requestIndex: number): Promise<number> => {
       const requestStart = performance.now();
       try {
-        const response = await fetch(`${this.baseUrl}/tools/brave_search`, {
+        const response = await fetch(`${this.baseUrl}/tools/memory_store`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             arguments: {
-              query: `performance test query ${requestIndex}`
+              action: 'set',
+              key: `test-key-${requestIndex}`,
+              value: `performance test value ${requestIndex}`
             }
           })
         });

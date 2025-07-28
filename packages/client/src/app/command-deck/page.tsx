@@ -14,5 +14,5 @@ export const metadata: Metadata = {
 
 export default function CommandDeckPage() {
   // Redirect to new ships route
-  redirect('/ships');
+  redirect('/fleet');
 }

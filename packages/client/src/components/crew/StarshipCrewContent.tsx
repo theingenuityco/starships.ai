@@ -140,7 +140,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/ships">
+            <Link href="/fleet">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Fleet
             </Link>

@@ -151,7 +151,7 @@ The new backdoor provides:
 ### Routing Issues
 
 1. The backdoor should not interfere with routing anymore
-2. Test all routes: `/`, `/ships`, `/ship/[slug]/command-deck`, `/command-deck`
+2. Test all routes: `/`, `/fleet`, `/ship/[slug]/command-deck`, `/command-deck`
 3. Check that the authentication gate is properly bypassed
 
 ## Future Improvements

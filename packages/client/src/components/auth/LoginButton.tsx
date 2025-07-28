@@ -23,7 +23,7 @@ export function LoginButton({
   children 
 }: LoginButtonProps) {
   return (
-    <LoginLink postLoginRedirectURL="/ships">
+    <LoginLink postLoginRedirectURL="/fleet">
       <Button 
         variant={variant} 
         size={size}

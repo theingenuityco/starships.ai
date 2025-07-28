@@ -27,6 +27,8 @@ import {
   isHttpBridgeTemplate
 } from './DockerServiceTemplate';
 import { serviceRegistry } from './ServiceRegistry';
+import { deploymentConfig } from './DeploymentConfig';
+import { portAllocator } from './PortAllocator';
 
 const execAsync = promisify(exec);
 
@@ -37,6 +39,7 @@ interface DockerComposeService {
   environment?: Record<string, string>;
   volumes?: string[];
   networks: string[];
+  ports?: string[]; // Added ports mapping
   restart: string;
   labels: Record<string, string>;
   healthcheck?: {
@@ -240,11 +243,11 @@ export class DockerComposeDeployer implements MCPDeployer {
   /**
    * Build Docker service configuration using Docker service templates
    */
-  private buildServiceConfig(
+  private async buildServiceConfig(
     starshipId: string,
     connector: MCPServerConnector,
     template: MCPServerOption
-  ): DockerComposeService {
+  ): Promise<DockerComposeService> {
     // Get Docker service template - prefer HTTP bridge version
     const dockerTemplate = getHttpBridgeTemplate(template.slug);
     if (!dockerTemplate) {
@@ -313,6 +316,15 @@ export class DockerComposeDeployer implements MCPDeployer {
       },
     };
 
+    // Add port mapping for development environment
+    if (deploymentConfig.shouldExposePort()) {
+      const allocatedPort = await portAllocator.allocatePort(connector.id);
+      const internalPort = useHttpBridge ? '8080' : (dockerTemplate.ports?.[0] || '3000');
+      service.ports = [`${allocatedPort}:${internalPort}`];
+      
+      console.log(`[DockerComposeDeployer] Exposing port ${allocatedPort} for ${serviceName}`);
+    }
+
     return service;
   }
 
@@ -372,7 +384,7 @@ export class DockerComposeDeployer implements MCPDeployer {
       const compose = await this.loadOrCreateComposeFile(starshipId);
 
       // Build service configuration
-      const serviceConfig = this.buildServiceConfig(starshipId, connector, template);
+      const serviceConfig = await this.buildServiceConfig(starshipId, connector, template);
       
       // Add service to compose file
       compose.services[serviceName] = serviceConfig;

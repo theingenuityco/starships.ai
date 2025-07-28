@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Agent, MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { Agent, MCPServerOption, MCPServerConnector, mcpServerAPI, starshipAPI, Starship } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
@@ -20,6 +20,8 @@ interface StarshipCrewContentProps {
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [starship, setStarship] = useState<Starship | null>(null)
+  const [starshipLoading, setStarshipLoading] = useState(true)
   const { toast } = useToast()
 
   // Connector instance state management
@@ -37,10 +39,17 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     setSessionId(newSessionId)
   }
 
-  // Fetch connector instances on component mount and when starship changes
+  // Fetch starship data on component mount
   useEffect(() => {
-    fetchConnectorInstances()
+    fetchStarship()
   }, [slug])
+
+  // Fetch connector instances when starship is loaded
+  useEffect(() => {
+    if (starship) {
+      fetchConnectorInstances()
+    }
+  }, [starship])
 
   // Auto-refresh connector instances every 30 seconds
   useEffect(() => {
@@ -52,6 +61,23 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
     return () => clearInterval(interval)
   }, [autoRefresh, slug])
+
+  const fetchStarship = async () => {
+    try {
+      setStarshipLoading(true)
+      const data = await starshipAPI.getStarshipBySlug(slug)
+      setStarship(data.starship)
+    } catch (error) {
+      console.error('Failed to fetch starship:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load starship data',
+        variant: 'destructive',
+      })
+    } finally {
+      setStarshipLoading(false)
+    }
+  }
 
   const fetchConnectorInstances = async () => {
     try {
@@ -226,6 +252,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     onAgentSelect={handleAgentSelect}
                     showCreateButton={true}
                     showFilters={true}
+                    starshipId={starship?.id}
                   />
                 </div>
               </TabsContent>

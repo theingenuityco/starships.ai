@@ -59,14 +59,21 @@ export async function* chatWithMCPStream(
     console.warn('⚠️ [AGENT-ENGINE-MCP-STREAM] Could not resolve internal user ID');
   }
 
-  // Get vision context
+  // Get vision context from agent's starship
   try {
-    const userStarships = await starshipRepo.findByOwner(internalUserId);
-    if (userStarships.length > 0) {
-      const starshipId = userStarships[0].id;
-      const vision = await visionRepo.findByStarship(starshipId);
-      if (vision) {
-        visionContext = `\n\n[STARSHIP CONTEXT]\nVision: ${vision.statement || 'None specified'}`;
+    if (agent.starshipId) {
+      const starship = await starshipRepo.findById(agent.starshipId);
+      if (starship) {
+        // Verify ownership
+        const isOwnerMatch = starship.ownerId === internalUserId || starship.ownerId === req.user_id;
+        if (!isOwnerMatch) {
+          throw new Error('Agent\'s starship does not belong to the requesting user');
+        }
+        
+        const vision = await visionRepo.findByStarship(agent.starshipId);
+        if (vision) {
+          visionContext = `\n\n[STARSHIP CONTEXT]\nVision: ${vision.statement || 'None specified'}`;
+        }
       }
     }
   } catch (error) {

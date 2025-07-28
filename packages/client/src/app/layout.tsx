@@ -7,6 +7,7 @@ import { AuthProvider } from '@/providers/auth-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
+import { Toaster } from '@/components/ui/toast'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -38,6 +39,7 @@ export default function RootLayout({
                 <div className="min-h-screen bg-background">
                   <ClientLayout>{children}</ClientLayout>
                 </div>
+                <Toaster />
               </TooltipProvider>
             </QueryProvider>
           </AuthProvider>

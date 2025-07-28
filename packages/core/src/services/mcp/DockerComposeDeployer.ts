@@ -251,7 +251,7 @@ export class DockerComposeDeployer implements MCPDeployer {
     template: MCPServerOption
   ): Promise<DockerComposeService> {
     // Get Docker service template - prefer HTTP bridge version
-    const dockerTemplate = getHttpBridgeTemplate(template.slug);
+    const dockerTemplate = getDockerServiceTemplate(template.slug) || getHttpBridgeTemplate(template.slug, template.command, template.args);
     if (!dockerTemplate) {
       throw new Error(`No Docker service template found for slug: ${template.slug}`);
     }
@@ -280,7 +280,9 @@ export class DockerComposeDeployer implements MCPDeployer {
     const environment = this.buildEnvironmentVariables(dockerTemplate, userEnv, useHttpBridge);
 
     // Build volumes using template configuration
-    const volumes = buildVolumeMapping(dockerTemplate, starshipId);
+    const volumes = dockerTemplate.volumes 
+      ? dockerTemplate.volumes.map(v => buildVolumeMapping(v, starshipId))
+      : [];
 
     // Get resource limits (use template limits or defaults)
     const resourceLimits = dockerTemplate.resourceLimits || getDefaultResourceLimits();
@@ -358,7 +360,7 @@ export class DockerComposeDeployer implements MCPDeployer {
       const template = await this.getTemplate(connector.templateId);
       
       // Determine if we're using HTTP bridge
-      const dockerTemplate = getHttpBridgeTemplate(template.slug);
+      const dockerTemplate = getDockerServiceTemplate(template.slug) || getHttpBridgeTemplate(template.slug, template.command, template.args);
       if (!dockerTemplate) {
         throw new Error(`No Docker service template found for slug: ${template.slug}`);
       }

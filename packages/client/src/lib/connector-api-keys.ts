@@ -47,12 +47,8 @@ export class ConnectorApiKeyManager {
   }
 
   private static readonly HELP_URLS = {
-    GITHUB_TOKEN:
-      'https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
     OPENAI_API_KEY: 'https://platform.openai.com/api-keys',
     ANTHROPIC_API_KEY: 'https://console.anthropic.com/settings/keys',
-    GOOGLE_API_KEY: 'https://console.cloud.google.com/apis/credentials',
-    SLACK_BOT_TOKEN: 'https://api.slack.com/authentication/token-types#bot',
     DISCORD_TOKEN: 'https://discord.com/developers/applications',
   }
 

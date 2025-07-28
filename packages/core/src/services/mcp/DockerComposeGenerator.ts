@@ -491,7 +491,7 @@ export class DockerComposeGenerator {
       return [];
     }
 
-    let volumes = buildVolumeMapping(template, starshipId);
+    let volumes = template.volumes.map(v => buildVolumeMapping(v, starshipId));
 
     // Apply security enforcement
     if (options.enableSecurity !== false) {

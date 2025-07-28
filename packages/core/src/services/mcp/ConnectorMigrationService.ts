@@ -4,7 +4,7 @@
 
 import { MCPServerConnector, MCPServerConnectorRepository } from '@starships/models';
 import { DockerComposeDeployer } from './DockerComposeDeployer';
-import { getTemplateForDeployment, isHttpBridgeTemplate, getLegacyTemplate, getHttpBridgeTemplate } from './DockerServiceTemplate';
+import { getTemplateForDeployment, isHttpBridgeTemplate, getLegacyTemplate, getHttpBridgeTemplate, getDockerServiceTemplate } from './DockerServiceTemplate';
 import { serviceRegistry } from './ServiceRegistry';
 import { bridgeMonitoringService } from './BridgeMonitoringService';
 import { capabilitySyncService } from './CapabilitySyncService';
@@ -91,7 +91,7 @@ export class ConnectorMigrationService {
       }
 
       // Validate that HTTP bridge template exists
-      const httpBridgeTemplate = getHttpBridgeTemplate(templateSlug);
+      const httpBridgeTemplate = getDockerServiceTemplate(templateSlug) || getHttpBridgeTemplate(templateSlug);
       if (!httpBridgeTemplate) {
         throw new Error(`No HTTP bridge template available for ${templateSlug}`);
       }

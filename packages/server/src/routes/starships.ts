@@ -717,6 +717,15 @@ router.post(
         `[STARSHIPS] Successfully created connector instance ${connectorInstance.id} from template ${templateId} for starship ${starship.id}`
       );
 
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after creating connector`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after creating connector:`, error);
+      }
+
       res.status(201).json({
         message: 'Connector instance created successfully',
         starshipId: starship.id,
@@ -857,6 +866,15 @@ router.put(
         `[STARSHIPS] Successfully updated connector instance ${connectorId} for starship ${starship.id}`
       );
 
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after updating connector`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after updating connector:`, error);
+      }
+
       res.json({
         message: 'Connector instance updated successfully',
         starshipId: starship.id,
@@ -967,6 +985,15 @@ router.delete(
         console.error(`[STARSHIPS] Failed to delete connector instance ${connectorInstance.id}`);
         res.status(500).json({ error: 'Failed to remove connector instance' });
         return;
+      }
+
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id}`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache:`, error);
       }
 
       console.log(
@@ -1190,6 +1217,15 @@ router.put(
       console.log(
         `[STARSHIPS] Successfully updated environment variables for connector instance ${connectorId} on starship ${starship.id}`
       );
+
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after updating connector env`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after updating connector env:`, error);
+      }
 
       res.json({
         message: 'Connector environment variables updated successfully',
@@ -2512,6 +2548,16 @@ router.post('/starships/:id/connectors/:connectorId/migrate/http-bridge', authMi
 
     if (migrationResult.success) {
       console.log(`[STARSHIPS] Successfully migrated connector ${connectorId} to HTTP bridge`);
+      
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after migrating connector to HTTP bridge`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after migration:`, error);
+      }
+      
       res.json({
         message: 'Connector successfully migrated to HTTP bridge',
         migrationResult,
@@ -2589,6 +2635,16 @@ router.post('/starships/:id/connectors/:connectorId/migrate/stdio', authMiddlewa
 
     if (migrationResult.success) {
       console.log(`[STARSHIPS] Successfully migrated connector ${connectorId} to stdio`);
+      
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after migrating connector to stdio`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after migration:`, error);
+      }
+      
       res.json({
         message: 'Connector successfully migrated to stdio',
         migrationResult,

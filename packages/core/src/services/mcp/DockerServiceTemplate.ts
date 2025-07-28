@@ -54,99 +54,6 @@ export interface DockerServiceTemplate {
  * These templates use the original stdio protocol with workarounds
  */
 export const LEGACY_DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTemplate> = {
-  // Brave Search MCP Server (NPX-based, stdio)
-  'brave': {
-    slug: 'brave',
-    image: 'starships/mcp-node:latest',
-    command: ['sh', '-c', '(echo \'{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}, "clientInfo": {"name": "starship", "version": "1.0.0"}}}\'; sleep infinity) | npx -y @modelcontextprotocol/server-brave-search'],
-    envPrefix: 'BRAVE_',
-    ports: ['3000'],
-    healthcheck: {
-      test: ['CMD', 'pgrep', '-f', 'server-brave-search'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '30s'
-    },
-    resourceLimits: {
-      cpus: '0.3',
-      memory: '256M'
-    },
-    labels: {
-      'mcp.type': 'brave',
-      'mcp.protocol': 'stdio',
-      'mcp.runtime': 'node'
-    },
-    bridgeConfig: {
-      useHttpBridge: false,
-      apiKeyRequired: true,
-      healthCheckMethod: 'none'
-    }
-  },
-
-  // GitHub MCP Server (stdio)
-  'github': {
-    slug: 'github',
-    image: 'starships/mcp-node:latest',
-    command: ['sh', '-c', '(echo \'{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}, "clientInfo": {"name": "starship", "version": "1.0.0"}}}\'; sleep infinity) | npx -y @modelcontextprotocol/server-github'],
-    envPrefix: 'GITHUB_',
-    ports: ['3000'],
-    healthcheck: {
-      test: ['CMD', 'pgrep', '-f', 'server-github'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '40s'
-    },
-    resourceLimits: {
-      cpus: '0.5',
-      memory: '512M'
-    },
-    labels: {
-      'mcp.type': 'github',
-      'mcp.protocol': 'stdio',
-      'mcp.runtime': 'node'
-    },
-    bridgeConfig: {
-      useHttpBridge: false,
-      apiKeyRequired: true,
-      healthCheckMethod: 'none'
-    }
-  },
-
-  // Puppeteer MCP Server (stdio)
-  'puppeteer': {
-    slug: 'puppeteer',
-    image: 'starships/mcp-puppeteer:latest',
-    command: ['sh', '-c', '(echo \'{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}, "clientInfo": {"name": "starship", "version": "1.0.0"}}}\'; sleep infinity) | npx -y @modelcontextprotocol/server-puppeteer'],
-    ports: ['3000'],
-    environment: {
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true',
-      PUPPETEER_EXECUTABLE_PATH: '/usr/bin/chromium-browser',
-      DISPLAY: ':99'
-    },
-    healthcheck: {
-      test: ['CMD', 'pgrep', '-f', 'server-puppeteer'],
-      interval: '60s',
-      timeout: '15s',
-      retries: 3,
-      start_period: '60s'
-    },
-    resourceLimits: {
-      cpus: '1.0',
-      memory: '1G'
-    },
-    labels: {
-      'mcp.type': 'puppeteer',
-      'mcp.protocol': 'stdio',
-      'mcp.runtime': 'node'
-    },
-    bridgeConfig: {
-      useHttpBridge: false,
-      healthCheckMethod: 'none'
-    }
-  },
-
   // Filesystem MCP Server (stdio with file access)
   'filesystem': {
     slug: 'filesystem',
@@ -237,47 +144,6 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     requiresCredentials: false
   },
 
-  // GitHub MCP Server (HTTP Bridge)  
-  'github': {
-    slug: 'github',
-    image: 'starships/mcp-http-bridge:latest',
-    command: ['node', '/app/server.js'],
-    envPrefix: 'GITHUB_',
-    ports: ['8080'],
-    environment: {
-      MCP_SERVER_CMD: 'npx',
-      MCP_SERVER_ARGS: '-y @modelcontextprotocol/server-github',
-      HTTP_PORT: '8080',
-      LOG_LEVEL: 'info',
-      HEALTH_CHECK_TIMEOUT: '10000',
-      MAX_CONCURRENT_REQUESTS: '10'
-    },
-    healthcheck: {
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '15s'
-    },
-    resourceLimits: {
-      cpus: '0.5',
-      memory: '512M'
-    },
-    labels: {
-      'mcp.type': 'github',
-      'mcp.protocol': 'http',
-      'mcp.runtime': 'bridge',
-      'mcp.version': '1.0.0'
-    },
-    bridgeConfig: {
-      useHttpBridge: true,
-      apiKeyRequired: true,
-      healthCheckMethod: 'tools_list',
-      mcpServerCmd: 'npx',
-      mcpServerArgs: ['-y', '@modelcontextprotocol/server-github']
-    }
-  },
-
   // Memory MCP Server (HTTP Bridge)
   'memory': {
     slug: 'memory',
@@ -297,14 +163,15 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
       HTTP_PORT: '8080',
       LOG_LEVEL: 'info',
       HEALTH_CHECK_TIMEOUT: '15000',
-      MAX_CONCURRENT_REQUESTS: '10'
+      MAX_CONCURRENT_REQUESTS: '20',
+      INIT_TIMEOUT: '60000'
     },
     healthcheck: {
       test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
       interval: '30s',
       timeout: '10s',
-      retries: 3,
-      start_period: '30s'
+      retries: 5,
+      start_period: '60s'
     },
     resourceLimits: {
       cpus: '0.3',
@@ -328,63 +195,19 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     requiresCredentials: false
   },
 
-  // Puppeteer MCP Server (HTTP Bridge)
-  'puppeteer': {
-    slug: 'puppeteer',
-    image: 'starships/mcp-http-bridge:latest',
-    command: ['node', '/app/server.js'],
-    ports: ['8080'],
-    environment: {
-      MCP_SERVER_CMD: 'npx',
-      MCP_SERVER_ARGS: '-y @modelcontextprotocol/server-puppeteer',
-      HTTP_PORT: '8080',
-      LOG_LEVEL: 'info',
-      HEALTH_CHECK_TIMEOUT: '10000',
-      MAX_CONCURRENT_REQUESTS: '10',
-      // Forward Puppeteer environment variables to MCP server
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true',
-      PUPPETEER_EXECUTABLE_PATH: '/usr/bin/chromium-browser',
-      DISPLAY: ':99'
-    },
-    healthcheck: {
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
-      interval: '60s',
-      timeout: '15s',
-      retries: 3,
-      start_period: '30s'
-    },
-    resourceLimits: {
-      cpus: '1.0',
-      memory: '1G'
-    },
-    labels: {
-      'mcp.type': 'puppeteer',
-      'mcp.protocol': 'http',
-      'mcp.runtime': 'bridge',
-      'mcp.version': '1.0.0'
-    },
-    bridgeConfig: {
-      useHttpBridge: true,
-      healthCheckMethod: 'tools_list',
-      mcpServerCmd: 'npx',
-      mcpServerArgs: ['-y', '@modelcontextprotocol/server-puppeteer']
-    }
-  },
-
-  // Filesystem MCP Server (HTTP Bridge with file access)
+  // Filesystem MCP Server (HTTP Bridge)
   'filesystem': {
     slug: 'filesystem',
     image: 'starships/mcp-http-bridge:latest',
     command: ['node', '/app/server.js'],
-    requiresFileAccess: true,
+    ports: ['8080'],
     volumes: [
-      { 
-        source: '/data/starships/{starshipId}/filesystem', 
-        target: '/workspace', 
-        mode: 'rw' 
+      {
+        source: '/data/starships/{starshipId}/filesystem',
+        target: '/workspace',
+        mode: 'rw'
       }
     ],
-    ports: ['8080'],
     environment: {
       MCP_SERVER_CMD: 'npx',
       MCP_SERVER_ARGS: '-y @modelcontextprotocol/server-filesystem /workspace',
@@ -398,7 +221,7 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
       interval: '30s',
       timeout: '10s',
       retries: 3,
-      start_period: '15s'
+      start_period: '30s'
     },
     resourceLimits: {
       cpus: '0.3',
@@ -413,38 +236,260 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     },
     bridgeConfig: {
       useHttpBridge: true,
+      apiKeyRequired: false,
       requiresFileAccess: true,
       healthCheckMethod: 'tools_list',
       mcpServerCmd: 'npx',
       mcpServerArgs: ['-y', '@modelcontextprotocol/server-filesystem', '/workspace']
+    },
+    requiresFileAccess: true
+  },
+
+  // Time MCP Server (HTTP Bridge)
+  'time': {
+    slug: 'time',
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    environment: {
+      MCP_SERVER_CMD: 'uvx',
+      MCP_SERVER_ARGS: 'mcp-server-time --local-timezone=America/New_York',
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '10000',
+      MAX_CONCURRENT_REQUESTS: '20'
+    },
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 3,
+      start_period: '15s'
+    },
+    resourceLimits: {
+      cpus: '0.1',
+      memory: '128M'
+    },
+    labels: {
+      'mcp.type': 'time',
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: false,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: 'uvx',
+      mcpServerArgs: ['mcp-server-time', '--local-timezone=America/New_York']
     }
   }
 };
 
 /**
- * Global feature flag for HTTP bridge (can be overridden via environment)
- * This controls whether new deployments use HTTP bridge or legacy stdio
+ * Default resource limits if not specified in template
  */
-let httpBridgeEnabled = process.env.MCP_HTTP_BRIDGE_ENABLED !== 'false'; // Default to HTTP bridge unless explicitly disabled
+export function getDefaultResourceLimits(): ResourceLimits {
+  return {
+    cpus: '0.5',
+    memory: '512M'
+  };
+}
 
 /**
- * Set HTTP bridge feature flag
+ * Default health check if not specified in template
+ */
+export function getDefaultHealthCheck(): HealthCheck {
+  return {
+    test: ['CMD', 'echo', 'ok'],
+    interval: '30s',
+    timeout: '10s',
+    retries: 3
+  };
+}
+
+/**
+ * HTTP Bridge template for MCP servers
+ * Used when no specific template exists but HTTP bridge is desired
+ */
+export function getHttpBridgeTemplate(slug: string, command?: string, args?: string[]): DockerServiceTemplate {
+  return {
+    slug,
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    environment: {
+      MCP_SERVER_CMD: command || 'npx',
+      MCP_SERVER_ARGS: args?.join(' ') || `-y @modelcontextprotocol/server-${slug}`,
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '30000',
+      MAX_CONCURRENT_REQUESTS: '10',
+      INIT_TIMEOUT: '120000'
+    },
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 5,
+      start_period: '60s'
+    },
+    resourceLimits: getDefaultResourceLimits(),
+    labels: {
+      'mcp.type': slug,
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: false,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: command || 'npx',
+      mcpServerArgs: args || ['-y', `@modelcontextprotocol/server-${slug}`]
+    }
+  };
+}
+
+/**
+ * Legacy stdio template for MCP servers
+ * Used when HTTP bridge is not available or desired
+ */
+export function getLegacyTemplate(slug: string, command?: string, args?: string[]): DockerServiceTemplate {
+  const fullCommand = command || 'npx';
+  const fullArgs = args || ['-y', `@modelcontextprotocol/server-${slug}`];
+  
+  return {
+    slug,
+    image: 'starships/mcp-node:latest',
+    command: ['sh', '-c', `(echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}, "clientInfo": {"name": "starship", "version": "1.0.0"}}}'; sleep infinity) | ${fullCommand} ${fullArgs.join(' ')}`],
+    ports: ['3000'],
+    healthcheck: {
+      test: ['CMD', 'pgrep', '-f', slug],
+      interval: '30s',
+      timeout: '10s',
+      retries: 3,
+      start_period: '30s'
+    },
+    resourceLimits: getDefaultResourceLimits(),
+    labels: {
+      'mcp.type': slug,
+      'mcp.protocol': 'stdio',
+      'mcp.runtime': 'node'
+    },
+    bridgeConfig: {
+      useHttpBridge: false,
+      healthCheckMethod: 'none'
+    }
+  };
+}
+
+/**
+ * Get Docker service template for a given slug
+ */
+export function getDockerServiceTemplate(slug: string): DockerServiceTemplate | null {
+  // Check if HTTP bridge is enabled globally
+  const useHttpBridge = httpBridgeEnabled;
+  
+  if (useHttpBridge && HTTP_BRIDGE_TEMPLATES[slug]) {
+    return HTTP_BRIDGE_TEMPLATES[slug];
+  }
+  
+  if (!useHttpBridge && LEGACY_DOCKER_SERVICE_TEMPLATES[slug]) {
+    return LEGACY_DOCKER_SERVICE_TEMPLATES[slug];
+  }
+  
+  // If specific template not found, check if we have one in the other mode
+  if (HTTP_BRIDGE_TEMPLATES[slug]) {
+    return HTTP_BRIDGE_TEMPLATES[slug];
+  }
+  
+  if (LEGACY_DOCKER_SERVICE_TEMPLATES[slug]) {
+    return LEGACY_DOCKER_SERVICE_TEMPLATES[slug];
+  }
+  
+  return null;
+}
+
+/**
+ * Get all available Docker service templates
+ */
+export function getAllDockerServiceTemplates(): DockerServiceTemplate[] {
+  const httpBridgeTemplates = Object.values(HTTP_BRIDGE_TEMPLATES);
+  const legacyTemplates = Object.values(LEGACY_DOCKER_SERVICE_TEMPLATES);
+  
+  // Deduplicate by slug
+  const seen = new Set<string>();
+  const all: DockerServiceTemplate[] = [];
+  
+  // Prefer HTTP bridge templates
+  for (const template of httpBridgeTemplates) {
+    if (!seen.has(template.slug)) {
+      seen.add(template.slug);
+      all.push(template);
+    }
+  }
+  
+  // Add legacy templates not in HTTP bridge
+  for (const template of legacyTemplates) {
+    if (!seen.has(template.slug)) {
+      seen.add(template.slug);
+      all.push(template);
+    }
+  }
+  
+  return all;
+}
+
+/**
+ * Build volume mapping with starshipId substitution
+ */
+export function buildVolumeMapping(volume: VolumeMapping, starshipId: string): string {
+  const source = volume.source.replace('{starshipId}', starshipId);
+  return `${source}:${volume.target}:${volume.mode}`;
+}
+
+/**
+ * Get template for deployment (with HTTP bridge preference)
+ */
+export function getTemplateForDeployment(
+  slug: string, 
+  preferHttpBridge: boolean = true
+): DockerServiceTemplate | null {
+  if (preferHttpBridge && HTTP_BRIDGE_TEMPLATES[slug]) {
+    return HTTP_BRIDGE_TEMPLATES[slug];
+  }
+  
+  return getDockerServiceTemplate(slug);
+}
+
+/**
+ * Check if a template uses HTTP bridge
+ */
+export function isHttpBridgeTemplate(template: DockerServiceTemplate): boolean {
+  return template.bridgeConfig?.useHttpBridge === true;
+}
+
+// Global flag to control HTTP bridge usage
+let httpBridgeEnabled = true;
+
+/**
+ * Enable or disable HTTP bridge globally
  */
 export function setHttpBridgeEnabled(enabled: boolean): void {
   httpBridgeEnabled = enabled;
+  console.log(`[DockerServiceTemplate] HTTP Bridge ${enabled ? 'enabled' : 'disabled'} globally`);
 }
 
 /**
- * Get current HTTP bridge feature flag status
+ * Check if HTTP bridge is enabled
  */
-export function getHttpBridgeEnabled(): boolean {
+export function isHttpBridgeEnabled(): boolean {
   return httpBridgeEnabled;
 }
 
-
 /**
- * Docker service template mappings for all MCP servers
- * Returns the appropriate template based on HTTP bridge feature flag
+ * Main exported templates collection with dynamic switching
  */
 export const DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTemplate> = new Proxy({}, {
   get(target: any, slug: string) {
@@ -472,8 +517,7 @@ export const DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTemplate> = n
     if (this.has!(target, slug)) {
       return {
         enumerable: true,
-        configurable: true,
-        value: this.get!(target, slug, target)
+        configurable: true
       };
     }
     return undefined;
@@ -481,116 +525,7 @@ export const DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTemplate> = n
 });
 
 /**
- * Get Docker service template by slug
- */
-export function getDockerServiceTemplate(slug: string): DockerServiceTemplate | null {
-  return DOCKER_SERVICE_TEMPLATES[slug] || null;
-}
-
-/**
- * Get all available Docker service templates
- */
-export function getAllDockerServiceTemplates(): Record<string, DockerServiceTemplate> {
-  // Use the proxy to get templates based on current feature flag
-  const templates: Record<string, DockerServiceTemplate> = {};
-  const slugs = Object.keys(DOCKER_SERVICE_TEMPLATES);
-  
-  for (const slug of slugs) {
-    const template = DOCKER_SERVICE_TEMPLATES[slug];
-    if (template) {
-      templates[slug] = template;
-    }
-  }
-  
-  return templates;
-}
-
-/**
- * Get HTTP bridge template version of a service
- */
-export function getHttpBridgeTemplate(slug: string): DockerServiceTemplate | null {
-  return HTTP_BRIDGE_TEMPLATES[slug] || null;
-}
-
-/**
- * Get legacy stdio template version of a service
- */
-export function getLegacyTemplate(slug: string): DockerServiceTemplate | null {
-  return LEGACY_DOCKER_SERVICE_TEMPLATES[slug] || null;
-}
-
-/**
- * Check if template uses HTTP bridge
- */
-export function isHttpBridgeTemplate(template: DockerServiceTemplate): boolean {
-  return template.bridgeConfig?.useHttpBridge !== false;
-}
-
-/**
- * Convert legacy template to HTTP bridge template
- */
-export function convertToHttpBridgeTemplate(template: DockerServiceTemplate): DockerServiceTemplate {
-  // Extract MCP server command from original template
-  const mcpServerCmd = template.command?.[0] || 'npx';
-  const mcpServerArgs = template.command?.slice(1) || [];
-  
-  // Create HTTP bridge template
-  const httpBridgeTemplate: DockerServiceTemplate = {
-    ...template,
-    image: 'starships/mcp-http-bridge:latest',
-    command: ['node', '/app/server.js'],
-    ports: ['8080'],
-    environment: {
-      ...template.environment,
-      // Bridge configuration
-      MCP_SERVER_CMD: mcpServerCmd,
-      MCP_SERVER_ARGS: mcpServerArgs.join(' '),
-      HTTP_PORT: '8080',
-      LOG_LEVEL: 'info',
-      HEALTH_CHECK_TIMEOUT: '10000',
-      MAX_CONCURRENT_REQUESTS: '10'
-    },
-    healthcheck: {
-      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '15s'
-    },
-    labels: {
-      ...template.labels,
-      'mcp.protocol': 'http',
-      'mcp.runtime': 'bridge',
-      'mcp.version': '1.0.0'
-    },
-    bridgeConfig: {
-      ...template.bridgeConfig,
-      useHttpBridge: true,
-      healthCheckMethod: 'tools_list',
-      mcpServerCmd,
-      mcpServerArgs
-    }
-  };
-  
-  return httpBridgeTemplate;
-}
-
-/**
- * Template selection based on feature flag
- */
-export function getTemplateForDeployment(slug: string, forceHttpBridge?: boolean): DockerServiceTemplate | null {
-  // Allow override of global feature flag
-  const useHttpBridge = forceHttpBridge !== undefined ? forceHttpBridge : httpBridgeEnabled;
-  
-  if (useHttpBridge) {
-    return HTTP_BRIDGE_TEMPLATES[slug] || null;
-  } else {
-    return LEGACY_DOCKER_SERVICE_TEMPLATES[slug] || null;
-  }
-}
-
-/**
- * Check if template exists by slug
+ * Check if a template exists for the given slug
  */
 export function hasDockerServiceTemplate(slug: string): boolean {
   return slug in HTTP_BRIDGE_TEMPLATES || slug in LEGACY_DOCKER_SERVICE_TEMPLATES;
@@ -600,89 +535,56 @@ export function hasDockerServiceTemplate(slug: string): boolean {
  * Get templates that require file access
  */
 export function getFileAccessTemplates(): DockerServiceTemplate[] {
-  const templates = getAllDockerServiceTemplates();
-  return Object.values(templates).filter(t => t.requiresFileAccess);
+  const allTemplates = getAllDockerServiceTemplates();
+  return allTemplates.filter(t => t.requiresFileAccess === true);
 }
 
 /**
  * Get templates that require credentials
  */
 export function getCredentialTemplates(): DockerServiceTemplate[] {
-  const templates = getAllDockerServiceTemplates();
-  return Object.values(templates).filter(t => t.requiresCredentials);
+  const allTemplates = getAllDockerServiceTemplates();
+  return allTemplates.filter(t => t.requiresCredentials === true || t.envPrefix);
 }
 
 /**
- * Build volume mappings for a specific starship
+ * Validate a template configuration
  */
-export function buildVolumeMapping(
-  template: DockerServiceTemplate, 
-  starshipId: string
-): string[] {
-  if (!template.volumes) return [];
-  
-  return template.volumes.map(vol => {
-    const source = vol.source.replace('{starshipId}', starshipId);
-    return `${source}:${vol.target}:${vol.mode}`;
-  });
-}
-
-/**
- * Get default resource limits
- */
-export function getDefaultResourceLimits(): ResourceLimits {
-  return {
-    cpus: '0.5',
-    memory: '512M'
-  };
-}
-
-/**
- * Validate template configuration
- */
-export function validateTemplate(template: DockerServiceTemplate): string[] {
+export function validateTemplate(template: DockerServiceTemplate): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
-  if (!template.slug || template.slug.trim() === '') {
-    errors.push('Template slug is required');
+  if (!template.slug) errors.push('Template must have a slug');
+  if (!template.image) errors.push('Template must have an image');
+  if (template.volumes) {
+    template.volumes.forEach((v, i) => {
+      if (!v.source) errors.push(`Volume ${i} must have a source`);
+      if (!v.target) errors.push(`Volume ${i} must have a target`);
+      if (!v.mode) errors.push(`Volume ${i} must have a mode`);
+    });
   }
   
-  if (!template.image || template.image.trim() === '') {
-    errors.push('Template image is required');
-  }
-  
-  if (template.ports && template.ports.length === 0) {
-    errors.push('Template must have at least one port');
-  }
-  
-  if (template.healthcheck && (!template.healthcheck.test || template.healthcheck.test.length === 0)) {
-    errors.push('Health check test is required when healthcheck is specified');
-  }
-  
-  return errors;
+  return { valid: errors.length === 0, errors };
 }
 
 /**
- * Template statistics
+ * Get template statistics
  */
-export function getTemplateStats() {
-  const templates = getAllDockerServiceTemplates();
-  const templateList = Object.values(templates);
+export function getTemplateStats(): {
+  total: number;
+  httpBridge: number;
+  legacy: number;
+  withFileAccess: number;
+  withCredentials: number;
+} {
+  const httpBridgeCount = Object.keys(HTTP_BRIDGE_TEMPLATES).length;
+  const legacyCount = Object.keys(LEGACY_DOCKER_SERVICE_TEMPLATES).length;
+  const allTemplates = getAllDockerServiceTemplates();
   
   return {
-    total: templateList.length,
-    requiresFileAccess: templateList.filter(t => t.requiresFileAccess).length,
-    requiresCredentials: templateList.filter(t => t.requiresCredentials).length,
-    nodeRuntime: templateList.filter(t => t.image.includes('mcp-node')).length,
-    pythonRuntime: templateList.filter(t => t.image.includes('mcp-python')).length,
-    dockerImages: templateList.filter(t => !t.image.includes('starships/')).length,
-    httpBridge: templateList.filter(t => t.bridgeConfig?.useHttpBridge !== false).length,
-    stdio: templateList.filter(t => t.bridgeConfig?.useHttpBridge === false).length,
-    runtimes: {
-      node: templateList.filter(t => t.labels?.['mcp.runtime'] === 'node').length,
-      python: templateList.filter(t => t.labels?.['mcp.runtime'] === 'python').length,
-      docker: templateList.filter(t => !t.labels?.['mcp.runtime']).length,
-      bridge: templateList.filter(t => t.labels?.['mcp.runtime'] === 'bridge').length
-    }
+    total: allTemplates.length,
+    httpBridge: httpBridgeCount,
+    legacy: legacyCount,
+    withFileAccess: getFileAccessTemplates().length,
+    withCredentials: getCredentialTemplates().length
   };
 }

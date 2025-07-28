@@ -24,7 +24,7 @@ import { serviceRegistry, DeploymentWorkflowService, connectorMigrationService }
 import type { MigrationOptions, MigrationResult } from '@starships/core';
 import { bridgeMonitoringService } from '@starships/core/dist/services/mcp/BridgeMonitoringService';
 import { toggleHttpBridge, getFeatureFlags } from '@starships/core/dist/services/mcp/FeatureFlagService';
-import { getHttpBridgeEnabled } from '@starships/core/dist/services/mcp/DockerServiceTemplate';
+import { isHttpBridgeEnabled } from '@starships/core/dist/services/mcp/DockerServiceTemplate';
 
 /**
  * Input validation helpers
@@ -2435,7 +2435,7 @@ router.get('/starships/feature-flags', authMiddleware, async (req: Request, res:
 
     const flags = {
       ...getFeatureFlags(),
-      httpBridgeEnabled: getHttpBridgeEnabled()
+      httpBridgeEnabled: isHttpBridgeEnabled()
     };
 
     res.json({
@@ -2467,7 +2467,7 @@ router.post('/starships/feature-flags/http-bridge', authMiddleware, async (req: 
 
     const flags = {
       ...getFeatureFlags(),
-      httpBridgeEnabled: getHttpBridgeEnabled()
+      httpBridgeEnabled: isHttpBridgeEnabled()
     };
 
     console.log(`[STARSHIPS] HTTP bridge feature flag successfully set to ${enabled}`);

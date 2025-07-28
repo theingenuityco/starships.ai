@@ -22,7 +22,7 @@ export class PortAllocator {
   private allocations: Map<string, PortAllocation> = new Map();
 
   private constructor() {
-    this.loadAllocations();
+    // Delay loading allocations until first use to avoid initialization issues
   }
 
   static getInstance(): PortAllocator {
@@ -58,9 +58,21 @@ export class PortAllocator {
   }
 
   /**
+   * Ensure allocations are loaded (lazy initialization)
+   */
+  private async ensureAllocationsLoaded(): Promise<void> {
+    if (this.allocations.size === 0) {
+      await this.loadAllocations();
+    }
+  }
+
+  /**
    * Allocate a unique port for a connector
    */
   async allocatePort(connectorId: string): Promise<number> {
+    // Ensure allocations are loaded
+    await this.ensureAllocationsLoaded();
+    
     // Check if already allocated
     const existing = this.allocations.get(connectorId);
     if (existing && await this.isPortAvailable(existing.port)) {

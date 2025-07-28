@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Rocket, AlertCircle } from 'lucide-react';
+import { Search, Rocket, AlertCircle, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,10 +145,13 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
         <Button
           onClick={() => setShowCreateModal(true)}
           size="lg"
-          className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+          className="relative bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden group"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Starship
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+          <div className="relative flex items-center">
+            <Zap className="w-5 h-5 mr-2" />
+            Launch New Starship
+          </div>
         </Button>
       </motion.div>
 
@@ -276,10 +279,13 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                 <Button
                   onClick={() => setShowCreateModal(true)}
                   size="lg"
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  className="relative bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden group"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Starship
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                  <div className="relative flex items-center">
+                    <Zap className="w-5 h-5 mr-2" />
+                    Launch Your First Starship
+                  </div>
                 </Button>
               )}
             </div>

@@ -16,7 +16,6 @@ import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -41,8 +40,8 @@ interface StarshipCardProps {
 
 export function StarshipCard({
   starship,
-  isActive,
-  viewMode,
+  isActive: _isActive,
+  viewMode: _viewMode,
   onSelect,
   onEdit,
   onDelete,
@@ -55,7 +54,6 @@ export function StarshipCard({
   // Get agent data for this starship
   const agentData = starshipAgents[starship.id];
   const deployedAgents = agentData?.deployedAgents || [];
-  const availableSlots = agentData?.availableSlots || starship.maxAgents || 0;
 
   // Generate notification status based on starship state
   const getNotificationStatus = () => {
@@ -108,21 +106,6 @@ export function StarshipCard({
       : 'Heavy-duty starship built for extended operations and complex multi-agent deployments.';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'inactive': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <CheckCircle className="w-3 h-3" />;
-      case 'inactive': return <XCircle className="w-3 h-3" />;
-      default: return <XCircle className="w-3 h-3" />;
-    }
-  };
 
   const getClassColor = (starshipClass: 'scout' | 'cruiser') => {
     return starshipClass === 'scout' 
@@ -147,8 +130,9 @@ export function StarshipCard({
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02, y: -2 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: 1.01, y: -1 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
     >
@@ -249,7 +233,7 @@ export function StarshipCard({
                     zIndex: 3 - i,
                   }}
                 >
-                  <AvatarImage src={deployedAgents[i]?.avatar} />
+                  <AvatarImage src={deployedAgents[i]?.id} />
                   <AvatarFallback className="text-xs font-medium text-white">
                     {deployedAgents[i]?.name ? 
                       deployedAgents[i].name.charAt(0).toUpperCase() : 

@@ -2,6 +2,8 @@ import { RepositoryFactory } from '@starships/models';
 import { MCPTool, MCPResource, ToolDiscoveryCache } from './ToolDiscoveryCache';
 import { MCPNetworkClient } from './MCPNetworkClient';
 import { MCPServiceEndpoint } from './ServiceRegistry';
+import { deploymentConfig } from './DeploymentConfig';
+import { portAllocator } from './PortAllocator';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -60,22 +62,30 @@ export class MCPToolGatewayDB {
             console.warn(`[MCPToolGatewayDB] Could not fetch template info for ${connector.templateId}`);
           }
           
-          // Check if we're in development mode and need to connect via exposed ports
-          const isDevelopment = process.env.NODE_ENV !== 'production';
-          let serviceUrl = `http://${connector.dockerServiceName || `mcp-${connector.id}`}:8080`;
+          // Use deployment config to determine the service URL
+          const containerName = connector.dockerServiceName || `mcp-${connector.id}`;
+          let serviceUrl: string;
           
-          if (isDevelopment) {
-            // In development, try to find the exposed port
-            const containerName = connector.dockerServiceName || `mcp-${connector.id}`;
-            const exposedPort = await this.getExposedPort(containerName, '8080/tcp');
-            
-            if (exposedPort) {
-              serviceUrl = `http://localhost:${exposedPort}`;
-              console.log(`[MCPToolGatewayDB] Using exposed port for development: ${serviceUrl}`);
+          if (deploymentConfig.shouldExposePort()) {
+            // In development, use allocated port
+            const allocatedPort = portAllocator.getAllocatedPort(connector.id);
+            if (allocatedPort) {
+              serviceUrl = `http://localhost:${allocatedPort}`;
+              console.log(`[MCPToolGatewayDB] Using allocated port for development: ${serviceUrl}`);
             } else {
-              console.warn(`[MCPToolGatewayDB] No exposed port found for ${containerName}, container may not be accessible`);
-              continue; // Skip this connector
+              // Fallback to dynamic detection
+              const exposedPort = await this.getExposedPort(containerName, '8080/tcp');
+              if (exposedPort) {
+                serviceUrl = `http://localhost:${exposedPort}`;
+                console.log(`[MCPToolGatewayDB] Using detected port for development: ${serviceUrl}`);
+              } else {
+                console.warn(`[MCPToolGatewayDB] No exposed port found for ${containerName}, skipping`);
+                continue;
+              }
             }
+          } else {
+            // Production mode - use deployment config
+            serviceUrl = deploymentConfig.getServiceUrl(containerName, 8080);
           }
           
           const service: MCPServiceEndpoint = {
@@ -163,21 +173,29 @@ export class MCPToolGatewayDB {
       console.warn(`[MCPToolGatewayDB] Could not fetch template info for ${connector.templateId}`);
     }
     
-    // Check if we're in development mode and need to connect via exposed ports
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    let serviceUrl = `http://${connector.dockerServiceName || `mcp-${connector.id}`}:8080`;
+    // Use deployment config to determine the service URL
+    const containerName = connector.dockerServiceName || `mcp-${connector.id}`;
+    let serviceUrl: string;
     
-    if (isDevelopment) {
-      // In development, try to find the exposed port
-      const containerName = connector.dockerServiceName || `mcp-${connector.id}`;
-      const exposedPort = await this.getExposedPort(containerName, '8080/tcp');
-      
-      if (exposedPort) {
-        serviceUrl = `http://localhost:${exposedPort}`;
-        console.log(`[MCPToolGatewayDB] Using exposed port for development: ${serviceUrl}`);
+    if (deploymentConfig.shouldExposePort()) {
+      // In development, use allocated port
+      const allocatedPort = portAllocator.getAllocatedPort(connector.id);
+      if (allocatedPort) {
+        serviceUrl = `http://localhost:${allocatedPort}`;
+        console.log(`[MCPToolGatewayDB] Using allocated port for development: ${serviceUrl}`);
       } else {
-        throw new Error(`No exposed port found for ${containerName}, container may not be accessible`);
+        // Fallback to dynamic detection
+        const exposedPort = await this.getExposedPort(containerName, '8080/tcp');
+        if (exposedPort) {
+          serviceUrl = `http://localhost:${exposedPort}`;
+          console.log(`[MCPToolGatewayDB] Using detected port for development: ${serviceUrl}`);
+        } else {
+          throw new Error(`No exposed port found for ${containerName}, container not accessible`);
+        }
       }
+    } else {
+      // Production mode - use deployment config
+      serviceUrl = deploymentConfig.getServiceUrl(containerName, 8080);
     }
     
     const service: MCPServiceEndpoint = {

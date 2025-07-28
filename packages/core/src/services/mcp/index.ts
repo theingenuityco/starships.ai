@@ -45,3 +45,10 @@ export {
 
 // Re-export for convenience
 export * from './MCPDeployer';
+
+// New sophisticated connection management services
+export * from './MCPToolGatewayDB';
+export * from './DeploymentConfig';
+export * from './PortAllocator';
+export * from './HealthMonitor';
+export * from './ConnectionManager';

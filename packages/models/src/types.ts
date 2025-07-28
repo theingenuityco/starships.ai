@@ -418,6 +418,8 @@ export interface MCPServerConnector {
   dockerImageName?: string;
   /** Docker deployment error message (if dockerStatus is 'error') */
   dockerErrorMessage?: string;
+  /** Allocated port for development environments */
+  dockerPort?: number;
 
   // NEW: HTTP Bridge-specific fields
   /** Whether this connector uses HTTP bridge */

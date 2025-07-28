@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Grid, List, Rocket, AlertCircle } from 'lucide-react';
+import { Search, Rocket, AlertCircle, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +32,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   } = useStarshipStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingStarship, setEditingStarship] = useState<string | null>(null);
   const [deletingStarship, setDeletingStarship] = useState<string | null>(null);
@@ -43,12 +43,23 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
     loadUserStarships();
   }, [loadUserStarships]);
 
-  // Filter starships based on search query
-  const filteredStarships = starships.filter(starship =>
-    starship.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    starship.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    starship.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter starships based on search query and active filter
+  const filteredStarships = starships.filter(starship => {
+    // Search filter
+    const matchesSearch = starship.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      starship.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      starship.status.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status/type filter
+    const matchesFilter = 
+      activeFilter === 'all' ||
+      (activeFilter === 'active' && starship.status === 'active') ||
+      (activeFilter === 'inactive' && starship.status === 'inactive') ||
+      (activeFilter === 'scout' && starship.class === 'scout') ||
+      (activeFilter === 'cruiser' && starship.class === 'cruiser');
+    
+    return matchesSearch && matchesFilter;
+  });
 
   const handleStarshipSelect = (starshipId: string) => {
     setActiveStarship(starshipId);
@@ -76,9 +87,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
     active: starships.filter(s => s.status === 'active').length,
     inactive: starships.filter(s => s.status === 'inactive').length,
     scouts: starships.filter(s => s.class === 'scout').length,
-    cruisers: starships.filter(s => s.class === 'cruiser').length,
-    totalAgents: starships.reduce((sum, s) => sum + (s.maxAgents || 0), 0),
-    totalMaxExpeditions: starships.reduce((sum, s) => sum + (s.maxActiveExpeditions || 0), 0)
+    cruisers: starships.filter(s => s.class === 'cruiser').length
   };
 
   if (loadingStarships && starships.length === 0) {
@@ -118,14 +127,14 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   }
 
   return (
-    <div className={cn("h-full p-6 space-y-6", className)}>
+    <div className={cn("h-full p-6 space-y-8", className)}>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
+        className="flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between"
       >
-        <div className="space-y-1">
+        <div className="space-y-2">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
             Fleet Command
           </h1>
@@ -136,98 +145,111 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
         <Button
           onClick={() => setShowCreateModal(true)}
           size="lg"
-          className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+          className="relative bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden group"
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Starship
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+          <div className="relative flex items-center">
+            <Zap className="w-5 h-5 mr-2" />
+            Launch New Starship
+          </div>
         </Button>
       </motion.div>
 
-      {/* Fleet Overview Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Rocket className="w-5 h-5" />
-              Fleet Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{fleetStats.total}</div>
-                <div className="text-sm text-muted-foreground">Total Ships</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-500">{fleetStats.active}</div>
-                <div className="text-sm text-muted-foreground">Active</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-500">{fleetStats.inactive}</div>
-                <div className="text-sm text-muted-foreground">Inactive</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-500">{fleetStats.scouts}</div>
-                <div className="text-sm text-muted-foreground">Scouts</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-500">{fleetStats.cruisers}</div>
-                <div className="text-sm text-muted-foreground">Cruisers</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-cyan-500">{fleetStats.totalAgents}</div>
-                <div className="text-sm text-muted-foreground">Agent Slots</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-indigo-500">{fleetStats.totalMaxExpeditions}</div>
-                <div className="text-sm text-muted-foreground">Max Expeditions</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Search and View Controls */}
+      {/* Search */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between"
+        className="flex-1 max-w-md"
       >
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search starships..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-background/50 backdrop-blur-sm border-border/50"
-            />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('grid')}
-          >
-            <Grid className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setViewMode('list')}
-          >
-            <List className="w-4 h-4" />
-          </Button>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search starships..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-background/50 border-border/50"
+          />
         </div>
       </motion.div>
 
-      {/* Starship Grid/List */}
+      {/* Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="flex flex-wrap gap-3"
+      >
+        <Button
+          variant={activeFilter === 'all' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('all')}
+          className="flex items-center gap-2"
+        >
+          <span>All</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.total}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeFilter === 'active' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('active')}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'active' ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white' : ''
+          )}
+        >
+          <span>Active</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.active}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeFilter === 'inactive' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('inactive')}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'inactive' ? 'bg-slate-600 hover:bg-slate-700 border-slate-600 text-white' : ''
+          )}
+        >
+          <span>Inactive</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.inactive}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeFilter === 'scout' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('scout')}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'scout' ? 'bg-violet-600 hover:bg-violet-700 border-violet-600 text-white' : ''
+          )}
+        >
+          <span>Scouts</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.scouts}
+          </Badge>
+        </Button>
+        <Button
+          variant={activeFilter === 'cruiser' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setActiveFilter('cruiser')}
+          className={cn(
+            "flex items-center gap-2",
+            activeFilter === 'cruiser' ? 'bg-amber-600 hover:bg-amber-700 border-amber-600 text-white' : ''
+          )}
+        >
+          <span>Cruisers</span>
+          <Badge variant="secondary" className="h-4 px-1.5 text-xs">
+            {fleetStats.cruisers}
+          </Badge>
+        </Button>
+      </motion.div>
+
+      {/* Starship Grid */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -238,7 +260,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="h-full flex items-center justify-center"
+            className="min-h-[400px] flex items-center justify-center"
           >
             <div className="text-center space-y-4">
               <Rocket className="w-16 h-16 text-muted-foreground mx-auto" />
@@ -257,21 +279,19 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                 <Button
                   onClick={() => setShowCreateModal(true)}
                   size="lg"
-                  className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  className="relative bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden group"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Your First Starship
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                  <div className="relative flex items-center">
+                    <Zap className="w-5 h-5 mr-2" />
+                    Launch Your First Starship
+                  </div>
                 </Button>
               )}
             </div>
           </motion.div>
         ) : (
-          <div className={cn(
-            "grid gap-4",
-            viewMode === 'grid' 
-              ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              : "grid-cols-1"
-          )}>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <AnimatePresence mode="popLayout">
               {filteredStarships.map((starship, index) => (
                 <motion.div
@@ -285,7 +305,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                   <StarshipCard
                     starship={starship}
                     isActive={starship.id === activeStarshipId}
-                    viewMode={viewMode}
+                    viewMode="grid"
                     onSelect={() => handleStarshipSelect(starship.id)}
                     onEdit={() => setEditingStarship(starship.id)}
                     onDelete={() => setDeletingStarship(starship.id)}

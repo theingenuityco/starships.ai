@@ -65,7 +65,7 @@ export function IndividualStarshipCommandDeck({ slug, className }: IndividualSta
   }, [slug, starships.length, loadUserStarships, getStarshipBySlug, setActiveStarshipBySlug]);
 
   const handleBackToFleet = () => {
-    router.push('/ships');
+    router.push('/fleet');
   };
 
   const getStatusColor = (status: string) => {

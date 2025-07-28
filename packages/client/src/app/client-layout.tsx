@@ -77,8 +77,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     )
   }
 
-  // Check if this is a route that should not show navigation
-  const shouldHideNavigation = pathname === '/ships'
+  // Hide navigation on all fleet-level routes (only show inside starship context)
+  const shouldHideNavigation = !pathname.startsWith('/ship/')
 
   // Regular pages with conditional navigation sidebar
   return (

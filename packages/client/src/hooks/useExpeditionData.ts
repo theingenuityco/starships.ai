@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { expeditionAPI, ExpeditionAPIError, LoadingState, APIOptions } from '@/lib/expeditionApi';
+import { expeditionSocketAPI } from '@/lib/expedition-socket-api';
+import { useAuth } from '@/hooks/useAuth';
 import type {
   Expedition,
   ExpeditionTask,
@@ -23,6 +25,7 @@ interface UseExpeditionDataProps {
   refreshInterval?: number;
   enableRetry?: boolean;
   maxRetries?: number;
+  enableWebSocket?: boolean;
 }
 
 interface UseExpeditionDataReturn {
@@ -115,8 +118,10 @@ export function useExpeditionData({
   autoRefresh = false,
   refreshInterval = 30000,
   enableRetry = true,
-  maxRetries = 3
+  maxRetries = 3,
+  enableWebSocket = true
 }: UseExpeditionDataProps = {}): UseExpeditionDataReturn {
+  const { user } = useAuth();
   // Expedition list state
   const [expeditions, setExpeditions] = useState<Expedition[]>([]);
   const [expeditionsLoading, setExpeditionsLoading] = useState(false);
@@ -657,6 +662,81 @@ export function useExpeditionData({
       loadExpeditionProgress(expeditionId);
     }
   }, [expeditionId, starshipId, loadExpedition, loadExpeditionStatus, loadExpeditionProgress]);
+
+  // WebSocket setup for real-time updates
+  useEffect(() => {
+    if (!enableWebSocket || !expeditionId || !user?.id) return;
+
+    // Join expedition room
+    expeditionSocketAPI.joinExpeditionRoom(expeditionId, user.id);
+
+    // Subscribe to status changes
+    const unsubscribeStatus = expeditionSocketAPI.subscribeToStatusChanges(expeditionId, (expId, newStatus) => {
+      console.log('[EXPEDITION DATA] Status changed:', { expId, newStatus });
+      // Update local expedition state
+      setExpedition(prev => {
+        if (!prev) return prev;
+        return { ...prev, status: newStatus as any };
+      });
+      // Reload full expedition data
+      if (starshipId) {
+        loadExpedition(expeditionId);
+      }
+    });
+
+    // Subscribe to task updates
+    const unsubscribeTask = expeditionSocketAPI.subscribeToTaskUpdates(expeditionId, (task) => {
+      console.log('[EXPEDITION DATA] Task updated:', task);
+      // Update local tasks state
+      setTasks(prev => {
+        const index = prev.findIndex(t => t.id === task.id);
+        if (index >= 0) {
+          // Update existing task
+          const newTasks = [...prev];
+          newTasks[index] = task;
+          return newTasks;
+        } else {
+          // Add new task
+          return [...prev, task];
+        }
+      });
+    });
+
+    // Subscribe to messages
+    const unsubscribeMessage = expeditionSocketAPI.subscribeToMessages(expeditionId, (message) => {
+      console.log('[EXPEDITION DATA] New message:', message);
+      // Add message to local state if not already present
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === message.id);
+        if (!exists) {
+          return [...prev, message];
+        }
+        return prev;
+      });
+    });
+
+    // Subscribe to progress updates
+    const unsubscribeProgress = expeditionSocketAPI.subscribeToProgressUpdates(expeditionId, (expId, progress) => {
+      console.log('[EXPEDITION DATA] Progress update:', { expId, progress });
+      setExpeditionProgress(progress);
+    });
+
+    // Subscribe to agent activities
+    const unsubscribeActivity = expeditionSocketAPI.subscribeToAgentActivities(expeditionId, (agentId, activity) => {
+      console.log('[EXPEDITION DATA] Agent activity:', { agentId, activity });
+      // Handle agent activity updates as needed
+    });
+
+    // Cleanup
+    return () => {
+      unsubscribeStatus();
+      unsubscribeTask();
+      unsubscribeMessage();
+      unsubscribeProgress();
+      unsubscribeActivity();
+      expeditionSocketAPI.leaveExpeditionRoom(expeditionId, user.id);
+    };
+  }, [enableWebSocket, expeditionId, user?.id, starshipId, loadExpedition]);
 
   // Auto-refresh functionality
   useEffect(() => {

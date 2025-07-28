@@ -14,9 +14,6 @@ export { LLMRepository } from './repositories/LLMRepository';
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
-// export { ConstraintRepository } from './repositories/ConstraintRepository';
-// export { ConceptRepository } from './repositories/ConceptRepository';
-// export { MetaAnchorRepository } from './repositories/MetaAnchorRepository';
 export { MCPServerOptionRepository } from './repositories/MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './repositories/MCPServerConnectorRepository';
 export { ConnectorConfigTemplateRepository } from './repositories/ConnectorConfigTemplateRepository';

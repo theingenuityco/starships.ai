@@ -13,10 +13,11 @@
 
 import { Observable, Subject, BehaviorSubject, merge, timer, from, EMPTY, throwError } from 'rxjs';
 import { map, filter, takeUntil, timeout, catchError, retry, delay, mergeMap, concatMap, switchMap } from 'rxjs/operators';
-import { TaskBreakdown, ChatRequest } from '@starships/protocol';
+import { TaskBreakdown, ChatRequest, AgentActivity, AgentActivityType } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
 import { chat } from '../index';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
+import { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
 import {
   TaskExecution,
   CompletedTask,
@@ -31,6 +32,7 @@ import {
  * Enhanced task execution with resource management
  */
 export interface EnhancedTaskExecution extends TaskExecution {
+  expeditionId: string;
   resourceRequirements?: ResourceRequirement[];
   allocatedResources?: AllocatedResource[];
   priority: TaskPriority;
@@ -42,6 +44,12 @@ export interface EnhancedTaskExecution extends TaskExecution {
   actualStartTime?: string;
   estimatedEndTime?: string;
   actualEndTime?: string;
+  metadata?: {
+    reviewFeedback?: string;
+    reviewStatus?: 'pending' | 'approved' | 'rejected';
+    reviewedBy?: string;
+    reviewedAt?: string;
+  };
 }
 
 /**
@@ -188,10 +196,13 @@ export class TaskExecutor {
   private executionStrategy!: ExecutionStrategy;
   private taskQueue: TaskSchedule[] = [];
   private performanceHistory: Map<string, TaskPerformanceMetrics[]> = new Map();
+  private webSocketEmitter: WebSocketEventEmitter;
+  private agentNames: Map<string, string> = new Map();
 
-  constructor(config: FirstOfficerConfig, memoryStore: LangChainMemoryStore) {
+  constructor(config: FirstOfficerConfig, memoryStore: LangChainMemoryStore, webSocketEmitter?: WebSocketEventEmitter) {
     this.config = config;
     this.memoryStore = memoryStore;
+    this.webSocketEmitter = webSocketEmitter || new WebSocketEventEmitter();
     this.initializeResourcePool();
     this.initializeExecutionStrategy();
   }
@@ -209,8 +220,11 @@ export class TaskExecutor {
     console.log(`🚀 [TASK-EXECUTOR] Starting enhanced execution of ${tasks.length} tasks`);
 
     try {
+      // Load agent details for activity tracking
+      await this.loadAgentDetails(assignments);
+      
       // Create enhanced execution plan with resource allocation
-      const executionPlan = await this.createEnhancedExecutionPlan(tasks, assignments, options);
+      const executionPlan = await this.createEnhancedExecutionPlan(tasks, assignments, expeditionId, options);
       
       // Optimize execution strategy based on task characteristics
       this.optimizeExecutionStrategy(executionPlan, options);
@@ -240,6 +254,7 @@ export class TaskExecutor {
   private async createEnhancedExecutionPlan(
     tasks: TaskBreakdown[],
     assignments: AgentAssignment[],
+    expeditionId: string,
     options: TaskExecutionOptions
   ): Promise<EnhancedTaskExecution[]> {
     const executions: EnhancedTaskExecution[] = [];
@@ -266,6 +281,7 @@ export class TaskExecutor {
             progress: 0,
             intermediateResults: [],
             issues: [],
+            expeditionId,
             resourceRequirements,
             priority,
             retryCount: 0,
@@ -521,6 +537,22 @@ export class TaskExecutor {
     execution.actualStartTime = new Date().toISOString();
     execution.status = 'in-progress';
     
+    // Get task details for activity tracking
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const task = await taskRepo.findById(execution.taskId);
+    const taskTitle = task?.title || 'Unknown Task';
+    
+    // Emit task started activity
+    this.emitAgentActivity(
+      expeditionId,
+      execution.agentId,
+      'task_started',
+      `Started working on "${taskTitle}"`,
+      execution.taskId,
+      taskTitle,
+      { priority: execution.priority }
+    );
+    
     try {
       // Allocate resources
       const allocatedResources = await this.allocateResources(
@@ -559,7 +591,7 @@ export class TaskExecutor {
 
     } catch (error) {
       console.error(`❌ [TASK-EXECUTOR] Enhanced task execution failed:`, error);
-      await this.handleEnhancedTaskError(execution, error, options);
+      await this.handleEnhancedTaskError(execution, error, options, expeditionId, taskTitle);
     } finally {
       // Release allocated resources
       if (execution.allocatedResources) {
@@ -580,6 +612,11 @@ export class TaskExecutor {
     const maxRetries = options.retryLimit || this.config.maxRetries;
     let lastError: Error | null = null;
 
+    // Get task details for activity tracking
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const task = await taskRepo.findById(execution.taskId);
+    const taskTitle = task?.title || 'Unknown Task';
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
@@ -587,10 +624,31 @@ export class TaskExecutor {
           const backoffDelay = this.calculateBackoffDelay(attempt, execution.priority);
           console.log(`🔄 [TASK-EXECUTOR] Retrying task ${execution.taskId} (attempt ${attempt + 1}/${maxRetries + 1}) after ${backoffDelay}ms delay`);
           
+          // Emit retry activity
+          this.emitAgentActivity(
+            expeditionId,
+            execution.agentId,
+            'retry_attempt',
+            `Retrying "${taskTitle}" (attempt ${attempt + 1}/${maxRetries + 1})`,
+            execution.taskId,
+            taskTitle,
+            { retryCount: attempt, delay: backoffDelay }
+          );
+          
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           execution.retryCount = attempt;
           execution.lastRetryAt = new Date().toISOString();
         }
+
+        // Emit thinking activity before execution
+        this.emitAgentActivity(
+          expeditionId,
+          execution.agentId,
+          'agent_thinking',
+          `Processing "${taskTitle}"`,
+          execution.taskId,
+          taskTitle
+        );
 
         // Execute the actual task
         const result = await this.executeTaskWithAgent(execution, expeditionId, userId);
@@ -644,11 +702,59 @@ export class TaskExecutor {
     // Execute task through agent with timeout
     console.log(`💬 [TASK-EXECUTOR] Sending enhanced task to agent: ${execution.agentId}`);
     
+    // Emit typing start
+    if (this.webSocketEmitter) {
+      const agentName = this.agentNames.get(execution.agentId) || 'Agent';
+      this.webSocketEmitter.emitTypingStart(expeditionId, execution.agentId, agentName);
+    }
+    
     const timeoutMs = (this.config.timeoutMinutes || 30) * 60 * 1000;
     const response = await Promise.race([
       chat(chatRequest, this.memoryStore),
       this.createTimeoutPromise(timeoutMs)
     ]);
+    
+    // Parse and emit chain of thought message
+    if (this.webSocketEmitter) {
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      
+      // Extract chain of thought from response
+      const chainOfThought = this.extractChainOfThought(response.reply);
+      
+      // Create a formatted chain of thought message
+      const formattedContent = this.formatChainOfThoughtMessage(task.title, chainOfThought);
+      
+      const chainOfThoughtMessage = await messageRepo.create({
+        expeditionId,
+        role: 'agent' as const,
+        agentId: execution.agentId,
+        content: formattedContent,
+        messageType: 'chain-of-thought' as const,
+        timestamp: new Date().toISOString(),
+        chainOfThought
+      });
+      
+      this.webSocketEmitter.emitExpeditionMessage(expeditionId, chainOfThoughtMessage);
+      
+      // Also emit the actual task result separately
+      const taskResultMessage = await messageRepo.create({
+        expeditionId,
+        role: 'agent' as const,
+        agentId: execution.agentId,
+        content: `📝 **Task Result for "${task.title}"**\n\n${this.extractExecutionResult(response.reply)}`,
+        messageType: 'task-work' as const,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          taskId: execution.taskId,
+          taskTitle: task.title
+        }
+      });
+      
+      this.webSocketEmitter.emitExpeditionMessage(expeditionId, taskResultMessage);
+      
+      // Stop typing indicator
+      this.webSocketEmitter.emitTypingStop(expeditionId, execution.agentId);
+    }
     
     // Update intermediate results
     execution.intermediateResults?.push(response.reply);
@@ -660,12 +766,22 @@ export class TaskExecutor {
    * Build enhanced task instruction with performance context
    */
   private buildEnhancedTaskInstruction(task: any, execution: EnhancedTaskExecution): string {
+    // Check if there's review feedback for this task
+    const reviewFeedback = execution.metadata?.reviewFeedback;
+    const reviewContext = reviewFeedback ? `
+FIRST OFFICER REVIEW FEEDBACK:
+${reviewFeedback}
+
+Please carefully address the feedback above in your revised response.
+` : '';
+    
     const performanceContext = execution.retryCount > 0 ? `
 PERFORMANCE CONTEXT:
 - This is retry attempt #${execution.retryCount}
 - Previous attempts encountered issues: ${execution.issues?.join(', ') || 'Unknown'}
 - Please focus on addressing these specific issues in your response
 - Priority level: ${execution.priority}
+${reviewContext}
 ` : `
 PERFORMANCE CONTEXT:
 - Priority level: ${execution.priority}
@@ -704,6 +820,33 @@ ENHANCED INSTRUCTIONS:
 6. Provide a comprehensive and well-structured result
 7. If you encounter any issues, explain them clearly with suggested solutions
 
+CHAIN OF THOUGHT REQUIREMENTS:
+Please structure your response to include your detailed reasoning process:
+
+**THINKING PROCESS:**
+- What is my understanding of this task?
+- What are the key requirements I need to fulfill?
+- What assumptions am I making?
+- What constraints do I need to consider?
+
+**APPROACH:**
+- What steps will I take to complete this task?
+- What alternatives did I consider and why did I choose this approach?
+- What tools or resources will I utilize?
+- What dependencies exist that could affect my work?
+
+**RISK ANALYSIS:**
+- What potential issues or risks do I foresee?
+- How will I mitigate these risks?
+- What is my confidence level in this approach?
+
+**EXECUTION:**
+[Your actual task implementation goes here]
+
+**REFLECTION:**
+- What insights did I gain during this task?
+- Are there any learnings for future similar tasks?
+
 QUALITY EXPECTATIONS:
 - Accuracy: Ensure all information is correct and reliable
 - Completeness: Address all aspects of the task requirements
@@ -722,17 +865,44 @@ Please complete this task with enhanced focus on quality and performance optimiz
     result: string,
     expeditionId: string
   ): Promise<void> {
-    console.log(`✅ [TASK-EXECUTOR] Enhanced task completed: ${execution.taskId}`);
+    console.log(`📝 [TASK-EXECUTOR] Task ready for review: ${execution.taskId}`);
     
-    execution.status = 'completed';
+    execution.status = 'review';
     execution.actualEndTime = new Date().toISOString();
     const actualDuration = execution.actualStartTime ? 
       (new Date(execution.actualEndTime).getTime() - new Date(execution.actualStartTime).getTime()) / (1000 * 60) : 0;
     
-    // Update task in database
+    // Update task status to review (not completed yet)
     const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
-    await taskRepo.updateStatus(execution.taskId, 'completed');
+    await taskRepo.updateStatus(execution.taskId, 'review');
     await taskRepo.updateResult(execution.taskId, result);
+    
+    // Get task details for activity tracking
+    const task = await taskRepo.findById(execution.taskId);
+    const taskTitle = task?.title || 'Unknown Task';
+    
+    // Emit review request message
+    if (this.webSocketEmitter) {
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      const reviewRequestMessage = await messageRepo.create({
+        expeditionId,
+        role: 'agent' as const,
+        agentId: execution.agentId,
+        content: `📋 **Task Completed - Awaiting Review**\n\n**Task:** ${taskTitle}\n**Agent:** ${this.agentNames.get(execution.agentId) || execution.agentId}\n\n**Result:**\n${result}\n\n*Waiting for First Officer approval...*`,
+        messageType: 'review-request' as const,
+        timestamp: new Date().toISOString(),
+        reviewStatus: 'pending',
+        metadata: {
+          taskId: execution.taskId,
+          agentId: execution.agentId,
+          duration: Math.round(actualDuration),
+          qualityScore: execution.performanceMetrics?.qualityScore,
+          retryCount: execution.retryCount
+        }
+      });
+      
+      this.webSocketEmitter.emitExpeditionMessage(expeditionId, reviewRequestMessage);
+    }
     
     // Store performance metrics
     if (execution.performanceMetrics) {
@@ -741,7 +911,16 @@ Please complete this task with enhanced focus on quality and performance optimiz
       this.performanceHistory.set(execution.agentId, agentHistory);
     }
     
-    // Create enhanced completed task
+    // Wait for review result
+    console.log(`⏳ [TASK-EXECUTOR] Waiting for First Officer review of task ${execution.taskId}`);
+    
+    // Set task to review state and wait for approval
+    execution.status = 'review';
+    
+    // Note: The actual review will be handled by the First Officer service
+    // This method will be called again when the task is rejected and needs to be retried
+    // For now, we'll emit the completion subject with the review status
+    
     const completedTask: CompletedTask = {
       taskId: execution.taskId,
       agentId: execution.agentId,
@@ -751,7 +930,13 @@ Please complete this task with enhanced focus on quality and performance optimiz
       qualityScore: execution.performanceMetrics?.qualityScore
     };
     
-    // Notify completion
+    // Keep the execution active for potential retry
+    if (execution.status === 'review') {
+      // Don't clean up yet - task is under review
+      return;
+    }
+    
+    // Only clean up if task is truly completed
     this.completionSubject.next(completedTask);
     
     // Clean up
@@ -769,7 +954,9 @@ Please complete this task with enhanced focus on quality and performance optimiz
   private async handleEnhancedTaskError(
     execution: EnhancedTaskExecution,
     error: any,
-    options: TaskExecutionOptions
+    options: TaskExecutionOptions,
+    expeditionId: string,
+    taskTitle: string
   ): Promise<void> {
     console.error(`❌ [TASK-EXECUTOR] Enhanced task failed: ${execution.taskId}`, error);
     
@@ -789,7 +976,21 @@ Please complete this task with enhanced focus on quality and performance optimiz
       execution.progress = 0;
       // Retry will be handled by the intelligent retry mechanism
     } else {
-      // Final failure - clean up
+      // Final failure - emit task failed activity
+      this.emitAgentActivity(
+        expeditionId,
+        execution.agentId,
+        'task_failed',
+        `Failed to complete "${taskTitle}"`,
+        execution.taskId,
+        taskTitle,
+        { 
+          error: error instanceof Error ? error.message : 'Unknown error',
+          retryCount: execution.retryCount
+        }
+      );
+      
+      // Clean up
       this.activeExecutions.delete(execution.taskId);
       const subject = this.executionSubjects.get(execution.taskId);
       if (subject) {
@@ -961,6 +1162,157 @@ Please complete this task with enhanced focus on quality and performance optimiz
   // ============================================================================
   // HELPER METHODS
   // ============================================================================
+
+  /**
+   * Load agent details for activity tracking
+   */
+  private async loadAgentDetails(assignments: AgentAssignment[]): Promise<void> {
+    const agentIds = [...new Set(assignments.map(a => a.agentId))];
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    
+    for (const agentId of agentIds) {
+      try {
+        const agent = await agentRepo.findById(agentId);
+        if (agent) {
+          this.agentNames.set(agentId, agent.name);
+        }
+      } catch (error) {
+        console.warn(`Failed to load agent details for ${agentId}:`, error);
+        this.agentNames.set(agentId, agentId.slice(0, 8));
+      }
+    }
+  }
+
+  /**
+   * Emit agent activity event
+   */
+  private emitAgentActivity(
+    expeditionId: string,
+    agentId: string,
+    type: AgentActivityType,
+    message: string,
+    taskId?: string,
+    taskTitle?: string,
+    metadata?: any
+  ): void {
+    const agentName = this.agentNames.get(agentId) || agentId.slice(0, 8);
+    
+    const activity: AgentActivity = {
+      id: `activity-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      expeditionId,
+      agentId,
+      agentName,
+      type,
+      taskId,
+      taskTitle,
+      message,
+      timestamp: new Date().toISOString(),
+      metadata
+    };
+
+    // Emit via WebSocket if available
+    if (this.webSocketEmitter) {
+      this.webSocketEmitter.emitAgentActivity(expeditionId, {
+        agentId: activity.agentId,
+        activity: `${activity.type}: ${activity.message}`,
+        taskId: activity.taskId
+      });
+
+      // Also emit as a specific activity event
+      // Note: The socketServer property is private, so we rely on the emitAgentActivity method
+      // to handle the emission internally
+    }
+  }
+
+  /**
+   * Handle task review feedback
+   */
+  async handleTaskReview(taskId: string, approved: boolean, feedback?: string): Promise<void> {
+    console.log(`[TASK-EXECUTOR] Handling review for task ${taskId}: ${approved ? 'APPROVED' : 'REJECTED'}`);
+    
+    const execution = this.activeExecutions.get(taskId);
+    if (!execution) {
+      console.warn(`[TASK-EXECUTOR] No active execution found for task ${taskId}`);
+      return;
+    }
+    
+    // Update execution metadata with review result
+    execution.metadata = {
+      ...execution.metadata,
+      reviewStatus: approved ? 'approved' : 'rejected',
+      reviewFeedback: feedback,
+      reviewedAt: new Date().toISOString()
+    };
+    
+    if (approved) {
+      // Task approved - mark as completed
+      execution.status = 'completed';
+      
+      const completedTask: CompletedTask = {
+        taskId: execution.taskId,
+        agentId: execution.agentId,
+        result: execution.intermediateResults?.[execution.intermediateResults.length - 1] || '',
+        completionTime: new Date().toISOString(),
+        actualDuration: (Date.now() - new Date(execution.actualStartTime || '').getTime()) / 1000,
+        qualityScore: execution.performanceMetrics?.qualityScore
+      };
+      
+      this.completionSubject.next(completedTask);
+      
+      // Clean up
+      this.activeExecutions.delete(execution.taskId);
+      const subject = this.executionSubjects.get(execution.taskId);
+      if (subject) {
+        subject.complete();
+        this.executionSubjects.delete(execution.taskId);
+      }
+    } else {
+      // Task rejected - retry if within retry limit
+      if (execution.retryCount < this.config.maxRetries) {
+        console.log(`[TASK-EXECUTOR] Retrying task ${taskId} after rejection (attempt ${execution.retryCount + 1}/${this.config.maxRetries})`);
+        
+        // Update retry count and add issue
+        execution.retryCount++;
+        execution.issues = execution.issues || [];
+        execution.issues.push(`Rejected by First Officer: ${feedback || 'No specific feedback'}`);
+        execution.status = 'in-progress'; // Set back to in-progress for retry
+        
+        // Get the task and retry
+        const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+        const task = await taskRepo.findById(taskId);
+        
+        if (task) {
+          // Re-execute the task with feedback context
+          const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+          const expedition = await expeditionRepo.findById(execution.expeditionId);
+          
+          if (expedition && expedition.createdBy) {
+            const result = await this.executeWithIntelligentRetry(
+              execution,
+              execution.expeditionId,
+              expedition.createdBy,
+              { retryLimit: this.config.maxRetries - execution.retryCount }
+            );
+            
+            // After successful retry, send the result back for review
+            await this.handleEnhancedTaskCompletion(execution, result, execution.expeditionId);
+          }
+        }
+      } else {
+        // Max retries exceeded - mark as failed
+        console.error(`[TASK-EXECUTOR] Task ${taskId} failed after ${execution.retryCount} retries`);
+        execution.status = 'failed';
+        
+        // Emit failure
+        this.activeExecutions.delete(execution.taskId);
+        const subject = this.executionSubjects.get(execution.taskId);
+        if (subject) {
+          subject.error(new Error(`Task rejected after ${execution.retryCount} retries: ${feedback}`));
+          this.executionSubjects.delete(execution.taskId);
+        }
+      }
+    }
+  }
 
   /**
    * Initialize resource pool
@@ -1461,5 +1813,194 @@ Please complete this task with enhanced focus on quality and performance optimiz
     // Simple heuristic based on intermediate results
     const intermediateCount = execution.intermediateResults?.length || 0;
     return Math.min(80, intermediateCount * 25);
+  }
+
+  /**
+   * Extract chain of thought from agent response
+   */
+  private extractChainOfThought(response: string): any {
+    const chainOfThought: any = {
+      reasoning: '',
+      steps: [],
+      alternatives: [],
+      confidence: 0.75,
+      assumptions: [],
+      constraints: [],
+      risks: [],
+      mitigations: [],
+      dependencies: [],
+      tools: [],
+      learnings: []
+    };
+
+    // Extract sections using regex patterns
+    const sections = {
+      thinking: /\*\*THINKING PROCESS:\*\*([\s\S]*?)(?=\*\*|$)/i,
+      approach: /\*\*APPROACH:\*\*([\s\S]*?)(?=\*\*|$)/i,
+      risk: /\*\*RISK ANALYSIS:\*\*([\s\S]*?)(?=\*\*|$)/i,
+      execution: /\*\*EXECUTION:\*\*([\s\S]*?)(?=\*\*|$)/i,
+      reflection: /\*\*REFLECTION:\*\*([\s\S]*?)(?=\*\*|$)/i
+    };
+
+    // Parse thinking process
+    const thinkingMatch = response.match(sections.thinking);
+    if (thinkingMatch) {
+      const thinkingText = thinkingMatch[1];
+      const lines = thinkingText.split('\n').filter(line => line.trim().startsWith('-'));
+      
+      lines.forEach(line => {
+        const content = line.replace(/^-\s*/, '').trim();
+        if (content.toLowerCase().includes('understand')) {
+          chainOfThought.reasoning = content;
+        } else if (content.toLowerCase().includes('assumption')) {
+          chainOfThought.assumptions.push(content);
+        } else if (content.toLowerCase().includes('constraint')) {
+          chainOfThought.constraints.push(content);
+        }
+      });
+    }
+
+    // Parse approach
+    const approachMatch = response.match(sections.approach);
+    if (approachMatch) {
+      const approachText = approachMatch[1];
+      const lines = approachText.split('\n').filter(line => line.trim().startsWith('-'));
+      
+      lines.forEach(line => {
+        const content = line.replace(/^-\s*/, '').trim();
+        if (content.toLowerCase().includes('step')) {
+          chainOfThought.steps.push(content);
+        } else if (content.toLowerCase().includes('alternative')) {
+          chainOfThought.alternatives.push(content);
+        } else if (content.toLowerCase().includes('tool') || content.toLowerCase().includes('resource')) {
+          chainOfThought.tools.push(content);
+        } else if (content.toLowerCase().includes('depend')) {
+          chainOfThought.dependencies.push(content);
+        }
+      });
+    }
+
+    // Parse risk analysis
+    const riskMatch = response.match(sections.risk);
+    if (riskMatch) {
+      const riskText = riskMatch[1];
+      const lines = riskText.split('\n').filter(line => line.trim().startsWith('-'));
+      
+      lines.forEach(line => {
+        const content = line.replace(/^-\s*/, '').trim();
+        if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('issue')) {
+          chainOfThought.risks.push(content);
+        } else if (content.toLowerCase().includes('mitigat')) {
+          chainOfThought.mitigations.push(content);
+        } else if (content.toLowerCase().includes('confidence')) {
+          // Try to extract confidence value
+          const confidenceMatch = content.match(/(\d+)%/);
+          if (confidenceMatch) {
+            chainOfThought.confidence = parseInt(confidenceMatch[1]) / 100;
+          }
+        }
+      });
+    }
+
+    // Parse reflection
+    const reflectionMatch = response.match(sections.reflection);
+    if (reflectionMatch) {
+      const reflectionText = reflectionMatch[1];
+      const lines = reflectionText.split('\n').filter(line => line.trim().startsWith('-'));
+      
+      lines.forEach(line => {
+        const content = line.replace(/^-\s*/, '').trim();
+        if (content.toLowerCase().includes('insight') || content.toLowerCase().includes('learn')) {
+          chainOfThought.learnings.push(content);
+        }
+      });
+    }
+
+    // If no structured content found, use simple extraction
+    if (!chainOfThought.reasoning && chainOfThought.steps.length === 0) {
+      chainOfThought.reasoning = 'Analyzing task requirements and applying specialized knowledge';
+      chainOfThought.steps = [
+        'Understanding the task requirements',
+        'Applying domain expertise',
+        'Generating comprehensive solution'
+      ];
+    }
+
+    return chainOfThought;
+  }
+
+  /**
+   * Format chain of thought message for display
+   */
+  private formatChainOfThoughtMessage(taskTitle: string, chainOfThought: any): string {
+    let content = `🧠 **Chain of Thought for "${taskTitle}"**\n\n`;
+    
+    if (chainOfThought.reasoning) {
+      content += `**Understanding:** ${chainOfThought.reasoning}\n\n`;
+    }
+    
+    if (chainOfThought.steps.length > 0) {
+      content += `**Approach:**\n`;
+      chainOfThought.steps.forEach((step: string, index: number) => {
+        content += `${index + 1}. ${step}\n`;
+      });
+      content += '\n';
+    }
+    
+    if (chainOfThought.assumptions.length > 0) {
+      content += `**Assumptions:**\n`;
+      chainOfThought.assumptions.forEach((assumption: string) => {
+        content += `• ${assumption}\n`;
+      });
+      content += '\n';
+    }
+    
+    if (chainOfThought.risks.length > 0) {
+      content += `**Identified Risks:**\n`;
+      chainOfThought.risks.forEach((risk: string) => {
+        content += `⚠️ ${risk}\n`;
+      });
+      content += '\n';
+    }
+    
+    if (chainOfThought.tools.length > 0) {
+      content += `**Tools & Resources:**\n`;
+      chainOfThought.tools.forEach((tool: string) => {
+        content += `🔧 ${tool}\n`;
+      });
+      content += '\n';
+    }
+    
+    content += `**Confidence Level:** ${Math.round(chainOfThought.confidence * 100)}%`;
+    
+    return content;
+  }
+
+  /**
+   * Extract execution result from agent response
+   */
+  private extractExecutionResult(response: string): string {
+    // Look for the EXECUTION section
+    const executionMatch = response.match(/\*\*EXECUTION:\*\*([\s\S]*?)(?=\*\*|$)/i);
+    
+    if (executionMatch) {
+      return executionMatch[1].trim();
+    }
+    
+    // If no execution section found, try to extract the main content
+    // Skip chain of thought sections
+    const sectionsToSkip = [
+      /\*\*THINKING PROCESS:\*\*[\s\S]*?(?=\*\*|$)/gi,
+      /\*\*APPROACH:\*\*[\s\S]*?(?=\*\*|$)/gi,
+      /\*\*RISK ANALYSIS:\*\*[\s\S]*?(?=\*\*|$)/gi,
+      /\*\*REFLECTION:\*\*[\s\S]*?(?=\*\*|$)/gi
+    ];
+    
+    let cleanedResponse = response;
+    for (const pattern of sectionsToSkip) {
+      cleanedResponse = cleanedResponse.replace(pattern, '');
+    }
+    
+    return cleanedResponse.trim() || response;
   }
 }

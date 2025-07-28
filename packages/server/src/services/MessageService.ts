@@ -18,7 +18,8 @@ import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionService } from './ExpeditionService';
 import { VirtualFirstOfficer } from './VirtualFirstOfficer';
 import { ContextBuilder } from './ContextBuilder';
-import { chat as agentChat } from '@starships/agent-engine';
+import { SocketIOService } from './SocketIOService';
+import { chat as agentChat, chatStream } from '@starships/agent-engine';
 import type { ChatRequest } from '@starships/protocol';
 import getStore from '../store';
 import { env } from '../config/environment';
@@ -80,10 +81,12 @@ export class MessageService {
   private static instance: MessageService;
   private firstOfficerService: FirstOfficerService;
   private expeditionService: ExpeditionService;
+  private socketService: SocketIOService | null = null;
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
     this.expeditionService = ExpeditionService.getInstance();
+    // Note: SocketIOService will be accessed lazily when needed
   }
 
 
@@ -92,6 +95,22 @@ export class MessageService {
       MessageService.instance = new MessageService();
     }
     return MessageService.instance;
+  }
+
+  /**
+   * Get SocketIOService instance lazily
+   */
+  private getSocketService(): SocketIOService | null {
+    if (!this.socketService) {
+      try {
+        this.socketService = SocketIOService.getInstance();
+        console.log('[MESSAGE-SERVICE] SocketIOService successfully connected');
+      } catch (error) {
+        console.warn('[MESSAGE-SERVICE] SocketIOService not available:', error instanceof Error ? error.message : error);
+        return null;
+      }
+    }
+    return this.socketService;
   }
 
   /**
@@ -129,6 +148,215 @@ export class MessageService {
   }
 
   /**
+   * Send expedition message via WebSocket
+   * 
+   * This method is called directly from WebSocket handlers with the authenticated user ID.
+   */
+  async sendExpeditionMessage(
+    data: {
+      expeditionId: string;
+      content: string;
+      messageType?: string;
+      participantId?: string;
+      timestamp: string;
+    },
+    userId: string
+  ): Promise<{ userMessage: ExpeditionMessage; participantMessage?: ExpeditionMessage }> {
+    console.log(`[MESSAGE-SERVICE] Sending WebSocket message for user: ${userId}`);
+    
+    const request: SendMessageRequest = {
+      expeditionId: data.expeditionId,
+      content: data.content,
+      participantId: data.participantId
+    };
+    
+    return this.sendMessage(userId, request);
+  }
+
+  /**
+   * Send expedition message with streaming support
+   */
+  async sendExpeditionMessageWithStreaming(
+    data: {
+      expeditionId: string;
+      content: string;
+      messageType?: string;
+      participantId?: string;
+      timestamp: string;
+    },
+    userId: string,
+    socket: any
+  ): Promise<void> {
+    console.log(`[MESSAGE-SERVICE] Sending streaming WebSocket message for user: ${userId}`);
+    
+    // Validate expedition access
+    await this.validateExpeditionAccess(data.expeditionId, userId);
+
+    // Determine participant - default to 'first-officer' if not provided
+    const participantId = data.participantId || 'first-officer';
+
+    // Create user message first
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+    const userMessage = await messageRepo.create({
+      expeditionId: data.expeditionId,
+      role: 'user',
+      userId,
+      content: data.content,
+      messageType: 'user-input',
+      timestamp: new Date().toISOString(),
+      agentId: participantId,
+      metadata: {}
+    });
+
+    // Emit user message immediately
+    const socketService = this.getSocketService();
+    if (socketService) {
+      const expeditionRoom = `expedition:${data.expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: data.expeditionId,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Generate streaming response
+    await this.generateStreamingResponse(data.expeditionId, participantId, data.content, userId, userMessage.id, socket);
+  }
+
+  /**
+   * Generate streaming response for expedition messages
+   */
+  private async generateStreamingResponse(
+    expeditionId: string,
+    participantId: string,
+    userMessage: string,
+    userId: string,
+    parentMessageId: string,
+    socket: any
+  ): Promise<void> {
+    const socketService = this.getSocketService();
+    if (!socketService) {
+      console.error('[MESSAGE-SERVICE] SocketService not available for streaming');
+      return;
+    }
+
+    try {
+      const expeditionRoom = `expedition:${expeditionId}`;
+      const streamId = `expedition-${expeditionId}-${Date.now()}`;
+      
+      // Emit stream start to all users in the room (including sender)
+      console.log(`[MESSAGE-SERVICE] Emitting stream start to room: ${expeditionRoom}`);
+      socketService.getIO().to(expeditionRoom).emit('expedition:stream-start' as any, {
+        expeditionId,
+        streamId,
+        participantId,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`[MESSAGE-SERVICE] Stream start emitted`);
+
+      let fullResponse = '';
+      const typingSpeed = 30; // chars per second (slower for visibility)
+
+      if (participantId === 'first-officer') {
+        // Handle First Officer streaming
+        const response = await this.handleFirstOfficerMessage(expeditionId, userMessage, 'user-input', userId);
+        if (response?.reply) {
+          fullResponse = response.reply;
+          
+          // Stream the response character by character
+          for (let i = 0; i < fullResponse.length; i++) {
+            const char = fullResponse[i];
+            const delay = 1000 / typingSpeed;
+            
+            socketService.getIO().to(expeditionRoom).emit('expedition:stream-chunk' as any, {
+              expeditionId,
+              streamId,
+              type: 'content',
+              content: char,
+              position: i,
+              totalLength: fullResponse.length,
+              timestamp: Date.now()
+            });
+            
+            // Add delay for typewriter effect
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      } else {
+        // Handle agent streaming
+        const chatRequest: ChatRequest = {
+          agent_id: participantId,
+          user_id: userId,
+          message: userMessage,
+          channel_id: `expedition-${expeditionId}`,
+          stream: true
+        };
+
+        const store = getStore();
+        
+        // Use streaming from agent engine
+        for await (const chunk of chatStream(chatRequest, store)) {
+          fullResponse += chunk;
+          
+          // Stream each chunk character by character
+          for (let i = 0; i < chunk.length; i++) {
+            const char = chunk[i];
+            const delay = 1000 / typingSpeed;
+            
+            socketService.getIO().to(expeditionRoom).emit('expedition:stream-chunk' as any, {
+              expeditionId,
+              streamId,
+              type: 'content',
+              content: char,
+              position: fullResponse.length - chunk.length + i,
+              totalLength: null, // We don't know total length yet
+              timestamp: Date.now()
+            });
+            
+            // Add delay for typewriter effect
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      // Create the final message in database
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      const participantMessage = await messageRepo.create({
+        expeditionId,
+        role: participantId === 'first-officer' ? 'first-officer' : 'agent',
+        agentId: participantId,
+        content: fullResponse,
+        messageType: participantId === 'first-officer' ? 'coordination' : 'task-work',
+        timestamp: new Date().toISOString(),
+        parentMessageId,
+        metadata: {}
+      });
+
+      // Emit stream complete with final message
+      socketService.getIO().to(expeditionRoom).emit('expedition:stream-complete' as any, {
+        expeditionId,
+        streamId,
+        message: participantMessage,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`[MESSAGE-SERVICE] Streaming response completed for expedition ${expeditionId}`);
+      
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] Streaming response failed:', error);
+      
+      // Emit stream error
+      const expeditionRoom = `expedition:${expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('expedition:stream-error' as any, {
+        expeditionId,
+        streamId: `expedition-${expeditionId}-${Date.now()}`,
+        error: error instanceof Error ? error.message : 'Stream failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
    * Send a message in an expedition
    *
    * Phase 2.1 - Simplified routing:
@@ -162,6 +390,30 @@ export class MessageService {
       metadata: request.metadata || {}
     });
 
+    // Emit WebSocket event for user message
+    const socketService = this.getSocketService();
+    if (socketService) {
+      const expeditionRoom = `expedition:${request.expeditionId}`;
+      console.log(`[MESSAGE-SERVICE] Emitting user message to room: ${expeditionRoom}`);
+      console.log(`[MESSAGE-SERVICE] Message content:`, userMessage);
+      
+      // Check how many sockets are in the room
+      socketService.getIO().in(expeditionRoom).fetchSockets().then(sockets => {
+        console.log(`[MESSAGE-SERVICE] Room ${expeditionRoom} has ${sockets.length} connected sockets`);
+        sockets.forEach(s => console.log(`[MESSAGE-SERVICE] Socket ${s.id} in room, user: ${s.data.userId}`));
+      });
+      
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: request.expeditionId,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`[MESSAGE-SERVICE] User message emitted successfully`);
+    } else {
+      console.warn(`[MESSAGE-SERVICE] SocketService not available for message emission`);
+    }
+
     // Route to participant
     let participantMessage: ExpeditionMessage | undefined = undefined;
 
@@ -189,6 +441,31 @@ export class MessageService {
           parentMessageId: userMessage.id,
           metadata: { usage: response.usage }
         });
+
+        // Emit WebSocket event for First Officer response
+        const socketService = this.getSocketService();
+        if (socketService && participantMessage) {
+          const expeditionRoom = `expedition:${request.expeditionId}`;
+          console.log(`[MESSAGE-SERVICE] Emitting First Officer response to room: ${expeditionRoom}`);
+          console.log(`[MESSAGE-SERVICE] First Officer message content:`, participantMessage);
+          
+          // Check how many sockets are in the room
+          socketService.getIO().in(expeditionRoom).fetchSockets().then(sockets => {
+            console.log(`[MESSAGE-SERVICE] Room ${expeditionRoom} has ${sockets.length} connected sockets for First Officer message`);
+            sockets.forEach(s => console.log(`[MESSAGE-SERVICE] Socket ${s.id} in room, user: ${s.data.userId}`));
+          });
+          
+          const eventData = {
+            expeditionId: request.expeditionId,
+            message: participantMessage,
+            timestamp: new Date().toISOString()
+          };
+          console.log(`[MESSAGE-SERVICE] About to emit 'message:sent' event with data:`, JSON.stringify(eventData, null, 2));
+          
+          socketService.getIO().to(expeditionRoom).emit('message:sent' as any, eventData);
+          
+          console.log(`[MESSAGE-SERVICE] First Officer message emitted successfully`);
+        }
       }
     } else {
       // Route to specific agent
@@ -211,6 +488,17 @@ export class MessageService {
           parentMessageId: userMessage.id,
           metadata: { usage: response.usage }
         });
+
+        // Emit WebSocket event for agent response
+        const socketService = this.getSocketService();
+        if (socketService && participantMessage) {
+          const expeditionRoom = `expedition:${request.expeditionId}`;
+          socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+            expeditionId: request.expeditionId,
+            message: participantMessage,
+            timestamp: new Date().toISOString()
+          });
+        }
       }
     }
 
@@ -977,6 +1265,83 @@ private async handleAgentMessage(
       message,
       details: undefined
     };
+  }
+
+  /**
+   * Check for and handle review request messages
+   */
+  async checkAndHandleReviewRequests(expeditionId: string): Promise<void> {
+    try {
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      const messages = await messageRepo.findByExpedition(expeditionId);
+      
+      // Find any pending review requests
+      const pendingReviews = messages.filter(msg => 
+        msg.messageType === 'review-request' && 
+        msg.reviewStatus === 'pending' &&
+        msg.metadata?.taskId
+      );
+      
+      console.log(`[MESSAGE-SERVICE] Found ${pendingReviews.length} pending review requests`);
+      
+      // Process each pending review
+      for (const reviewRequest of pendingReviews) {
+        try {
+          const taskId = reviewRequest.metadata?.taskId;
+          const agentId = reviewRequest.agentId || reviewRequest.metadata?.agentId;
+          
+          if (!taskId || !agentId) {
+            console.warn(`[MESSAGE-SERVICE] Skipping review request with missing taskId or agentId`);
+            continue;
+          }
+          
+          // Extract the actual result from the formatted message
+          const resultMatch = reviewRequest.content.match(/\*\*Result:\*\*\n([\s\S]*?)\n\n\*Waiting for First Officer approval/);
+          const actualResult = resultMatch ? resultMatch[1].trim() : reviewRequest.content;
+          
+          console.log(`[MESSAGE-SERVICE] Triggering review for task ${taskId} by agent ${agentId}`);
+          
+          // Trigger First Officer review
+          const firstOfficerService = FirstOfficerService.getInstance();
+          const reviewResult = await firstOfficerService.reviewTaskCompletion(
+            expeditionId,
+            taskId,
+            agentId,
+            actualResult
+          );
+          
+          console.log(`[MESSAGE-SERVICE] Review completed for task ${taskId}:`, reviewResult);
+          
+          // Update the review request message status
+          await messageRepo.update(reviewRequest.id, {
+            reviewStatus: reviewResult.approved ? 'approved' : 'rejected',
+            metadata: {
+              ...reviewRequest.metadata,
+              reviewedAt: new Date().toISOString(),
+              reviewFeedback: reviewResult.feedback
+            }
+          });
+          
+          // Emit the review result via WebSocket
+          const socketService = this.getSocketService();
+          if (socketService) {
+            const expeditionRoom = `expedition:${expeditionId}`;
+            socketService.getIO().to(expeditionRoom).emit('expedition:task-reviewed', {
+              expeditionId,
+              taskId,
+              agentId,
+              approved: reviewResult.approved,
+              feedback: reviewResult.feedback,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (error) {
+          console.error(`[MESSAGE-SERVICE] Failed to process review request:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`[MESSAGE-SERVICE] Failed to check review requests:`, error);
+    }
   }
 
   private handleError(error: any, fallbackCode: string): ExpeditionError {

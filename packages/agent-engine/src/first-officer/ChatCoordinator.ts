@@ -22,17 +22,27 @@ export class ChatCoordinator {
   private userId: string;
   private starshipId: string;
   private messageHistory: CoordinationMessage[] = [];
+  private messageEmitCallback?: (message: any) => Promise<void>;
 
   constructor(
     memoryStore: LangChainMemoryStore,
     expeditionId: string,
     userId: string,
-    starshipId: string
+    starshipId: string,
+    messageEmitCallback?: (message: any) => Promise<void>
   ) {
     this.memoryStore = memoryStore;
     this.expeditionId = expeditionId;
     this.userId = userId;
     this.starshipId = starshipId;
+    this.messageEmitCallback = messageEmitCallback;
+  }
+
+  /**
+   * Get the user ID
+   */
+  getUserId(): string {
+    return this.userId;
   }
 
   /**
@@ -45,6 +55,8 @@ export class ChatCoordinator {
     data?: any
   ): Promise<void> {
     console.log(`📢 [CHAT-COORDINATOR] Sending ${type} message for phase: ${phase}`);
+    console.log(`🐛 [CHAT-COORDINATOR] DEBUG: Modified ChatCoordinator is being used`);
+    console.log(`🐛 [CHAT-COORDINATOR] DEBUG: messageEmitCallback exists: ${!!this.messageEmitCallback}`);
 
     const message: CoordinationMessage = {
       type,
@@ -59,19 +71,46 @@ export class ChatCoordinator {
     this.messageHistory.push(message);
 
     // Send to expedition message repository
+    console.log(`💾 [CHAT-COORDINATOR] About to create message in database for expedition: ${this.expeditionId}`);
     const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-    await messageRepo.create({
-      expeditionId: this.expeditionId,
-      role: 'first-officer',
-      content: this.formatCoordinationMessage(message),
-      messageType: this.mapToMessageType(type),
-      timestamp: message.timestamp,
-      metadata: {
-        coordinationType: type,
-        workflowPhase: phase,
-        data
+    let createdMessage;
+    try {
+      createdMessage = await messageRepo.create({
+        expeditionId: this.expeditionId,
+        role: 'first-officer',
+        content: this.formatCoordinationMessage(message),
+        messageType: this.mapToMessageType(type),
+        timestamp: message.timestamp,
+        metadata: {
+          coordinationType: type,
+          workflowPhase: phase,
+          data
+        }
+      });
+      console.log(`✅ [CHAT-COORDINATOR] Message created successfully in database with ID: ${createdMessage?.id}`);
+    } catch (error) {
+      console.error(`❌ [CHAT-COORDINATOR] Failed to create message in database:`, error);
+      throw error;
+    }
+
+    // Emit WebSocket event if callback is provided
+    if (this.messageEmitCallback && createdMessage) {
+      try {
+        console.log(`🚀 [CHAT-COORDINATOR] Calling WebSocket emission callback for message type: ${type}`);
+        console.log(`🚀 [CHAT-COORDINATOR] Created message:`, JSON.stringify(createdMessage, null, 2));
+        await this.messageEmitCallback(createdMessage);
+        console.log(`📡 [CHAT-COORDINATOR] WebSocket event emitted successfully for message: ${type}`);
+      } catch (error) {
+        console.error(`❌ [CHAT-COORDINATOR] Failed to emit WebSocket event:`, error);
       }
-    });
+    } else {
+      if (!this.messageEmitCallback) {
+        console.warn(`⚠️ [CHAT-COORDINATOR] No WebSocket emission callback provided for message: ${type}`);
+      }
+      if (!createdMessage) {
+        console.warn(`⚠️ [CHAT-COORDINATOR] No created message to emit for message: ${type}`);
+      }
+    }
 
     console.log(`✅ [CHAT-COORDINATOR] Message sent: ${type}`);
   }
@@ -224,10 +263,11 @@ export class ChatCoordinator {
    * Format coordination message for display
    */
   private formatCoordinationMessage(message: CoordinationMessage): string {
-    const timestamp = new Date(message.timestamp).toLocaleTimeString();
+    // Remove timestamp formatting to make it look like a regular chat message
+    // The timestamp will be handled by the UI component
     const phaseEmoji = this.getPhaseEmoji(message.phase);
     
-    return `${phaseEmoji} **First Officer** - ${timestamp}\n\n${message.content}`;
+    return `${phaseEmoji} ${message.content}`;
   }
 
   /**

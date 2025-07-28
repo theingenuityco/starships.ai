@@ -994,7 +994,7 @@ export const mcpServerAPI = {
 
       const data = await api
         .post(`/api/starships/${starshipId}/connectors/${templateId}`, requestBody, {
-          timeout: 60000 // 60 seconds timeout for connector creation
+          timeout: 120000 // 120 seconds (2 minutes) timeout for connector creation
         })
         .then((res: AxiosResponse<any>) => {
           console.log('[API] Successfully created connector instance:', res.data.connectorId)

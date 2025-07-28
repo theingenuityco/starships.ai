@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ArrowLeft, Users, Plug, Bot } from 'lucide-react'
 import Link from 'next/link'
+import { useToast } from '@/hooks/useToast'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -19,6 +20,7 @@ interface StarshipCrewContentProps {
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const { toast } = useToast()
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
@@ -92,6 +94,16 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         toRemove.length
       )
 
+      // Show notification for connector creation
+      if (toCreate.length > 0) {
+        const connectorNames = toCreate.map(t => t.name).join(', ')
+        toast({
+          title: 'Setting up connection',
+          description: `We are setting up your connection with ${connectorNames} and will notify you once done.`,
+          duration: 5000,
+        })
+      }
+
       // Execute connector instance operations
       const operations = [
         ...toCreate.map(template => {
@@ -119,6 +131,26 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
       if (operations.length > 0) {
         await Promise.all(operations)
+        
+        // Show success notification
+        if (toCreate.length > 0) {
+          const connectorNames = toCreate.map(t => t.name).join(', ')
+          toast({
+            title: 'Connection established',
+            description: `Successfully connected to ${connectorNames}`,
+            variant: 'success',
+            duration: 5000,
+          })
+        }
+        
+        if (toRemove.length > 0) {
+          toast({
+            title: 'Disconnected',
+            description: `Connectors removed successfully`,
+            variant: 'default',
+            duration: 3000,
+          })
+        }
       }
 
       // Refresh connector instances to get current state
@@ -126,6 +158,14 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     } catch (error) {
       console.error('Failed to update connector instances:', error)
       setConnectorsError('Failed to update connectors. Please try again.')
+      
+      // Show error notification
+      toast({
+        title: 'Connection failed',
+        description: 'Failed to set up connector. Please try again or check the logs for details.',
+        variant: 'destructive',
+        duration: 5000,
+      })
 
       // Refresh connector instances to get current state
       await fetchConnectorInstances()

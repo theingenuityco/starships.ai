@@ -8,7 +8,9 @@ import {
   Trash2,
   Activity,
   Users,
-  Command
+  Command,
+  CheckCircle2,
+  Bell
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -54,6 +56,47 @@ export function StarshipCard({
   const agentData = starshipAgents[starship.id];
   const deployedAgents = agentData?.deployedAgents || [];
   const availableSlots = agentData?.availableSlots || starship.maxAgents || 0;
+
+  // Generate notification status based on starship state
+  const getNotificationStatus = () => {
+    const activeAgents = deployedAgents.length;
+    // Use starship ID for consistent pseudo-random behavior
+    const seed = starship.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    const hasUnreadEvents = (seed % 10) > 7; // Deterministic based on ID
+    const eventCount = (seed % 3) + 1;
+    
+    if (starship.status === 'inactive') {
+      return {
+        icon: CheckCircle2,
+        text: 'Systems standby',
+        color: 'text-slate-500'
+      };
+    }
+    
+    if (hasUnreadEvents) {
+      return {
+        icon: Bell,
+        text: eventCount === 1 ? '1 new transmission' : `${eventCount} new transmissions`,
+        color: 'text-amber-500'
+      };
+    }
+    
+    if (activeAgents === 0) {
+      return {
+        icon: CheckCircle2,
+        text: 'Ready for deployment',
+        color: 'text-emerald-500'
+      };
+    }
+    
+    return {
+      icon: CheckCircle2,
+      text: 'All systems nominal',
+      color: 'text-emerald-500'
+    };
+  };
+
+  const notificationStatus = getNotificationStatus();
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
     return starshipClass === 'scout' ? '🚀' : '🛸';
@@ -113,7 +156,6 @@ export function StarshipCard({
         className={cn(
           "cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden",
           "h-[240px] flex flex-col", // Fixed height with flex layout
-          isActive && "ring-2 ring-primary/50 bg-primary/5 shadow-lg",
           isHovered && "shadow-xl border-border/80 bg-card/70",
           "hover:shadow-2xl hover:shadow-primary/5"
         )}
@@ -250,15 +292,11 @@ export function StarshipCard({
           </div>
 
 
-          {/* Created Date */}
+          {/* Status Notification */}
           <div className="flex items-center justify-between pt-3 border-t border-border/50">
-            <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40" />
-              <span>Created {new Date(starship.createdAt).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric', 
-                year: 'numeric' 
-              })}</span>
+            <div className="flex items-center space-x-2 text-xs">
+              <notificationStatus.icon className={cn("w-3 h-3", notificationStatus.color)} />
+              <span className={notificationStatus.color}>{notificationStatus.text}</span>
             </div>
             <Badge 
               variant="outline" 

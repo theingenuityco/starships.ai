@@ -157,6 +157,9 @@ export interface FirstOfficerConfig {
   requireUserApproval: boolean;
   enableParallelExecution: boolean;
   autoEscalation: boolean;
+  provider?: string;
+  model?: string;
+  temperature?: number;
 }
 
 /**

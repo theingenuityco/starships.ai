@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { expeditionAPI } from '@/lib/expeditionApi';
+import { expeditionSocketAPI } from '@/lib/expedition-socket-api';
+import { useAuth } from '@/hooks/useAuth';
 
 // Local type definitions
 interface ExpeditionMessage {
@@ -21,6 +23,7 @@ interface UseExpeditionChatProps {
   starshipId: string;
   autoScroll?: boolean;
   maxMessages?: number;
+  enableWebSocket?: boolean;
 }
 
 interface UseExpeditionChatReturn {
@@ -38,16 +41,15 @@ export function useExpeditionChat({
   expeditionId,
   starshipId,
   autoScroll = true,
-  maxMessages = 1000
+  maxMessages = 1000,
+  enableWebSocket = true
 }: UseExpeditionChatProps): UseExpeditionChatReturn {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ExpeditionMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // NOTE: Socket functionality removed - now HTTP-only
-  // Real-time updates are no longer available
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -108,30 +110,43 @@ export function useExpeditionChat({
       // Add optimistic message to UI
       setMessages(prev => [...prev, optimisticMessage]);
 
-      // Send via API with participantId
-      const response = await expeditionAPI.sendMessage(starshipId, {
-        expeditionId,
-        content: content.trim(),
-        participantId
-      });
+      if (enableWebSocket) {
+        // Send via WebSocket
+        await expeditionSocketAPI.sendMessage(
+          expeditionId,
+          content.trim(),
+          messageType,
+          participantId
+        );
 
-      // Replace optimistic message with actual user message
-      setMessages(prev => {
-        const filtered = prev.filter(msg => msg.id !== optimisticMessage.id);
-        const newMessages: ExpeditionMessage[] = [];
-        
-        // Add the actual user message
-        if (response.userMessage) {
-          newMessages.push(response.userMessage);
-        }
-        
-        // Add the participant response if any
-        if (response.participantMessage) {
-          newMessages.push(response.participantMessage);
-        }
-        
-        return [...filtered, ...newMessages];
-      });
+        // Note: Keep optimistic message until real message arrives via WebSocket
+        // The WebSocket subscription will handle replacing the optimistic message
+      } else {
+        // Fallback to API
+        const response = await expeditionAPI.sendMessage(starshipId, {
+          expeditionId,
+          content: content.trim(),
+          participantId
+        });
+
+        // Replace optimistic message with actual user message
+        setMessages(prev => {
+          const filtered = prev.filter(msg => msg.id !== optimisticMessage.id);
+          const newMessages: ExpeditionMessage[] = [];
+          
+          // Add the actual user message
+          if (response.userMessage) {
+            newMessages.push(response.userMessage);
+          }
+          
+          // Add the participant response if any
+          if (response.participantMessage) {
+            newMessages.push(response.participantMessage);
+          }
+          
+          return [...filtered, ...newMessages];
+        });
+      }
 
     } catch (err: any) {
       // Remove optimistic message on error
@@ -166,7 +181,7 @@ export function useExpeditionChat({
     } finally {
       setSending(false);
     }
-  }, [expeditionId, starshipId]);
+  }, [expeditionId, starshipId, enableWebSocket]);
 
   // Clear error
   const clearError = useCallback(() => {
@@ -180,7 +195,132 @@ export function useExpeditionChat({
     }
   }, [expeditionId, refreshMessages]);
 
-  // Socket error handling removed - HTTP-only mode
+  // WebSocket setup for real-time message updates
+  useEffect(() => {
+    console.log('[EXPEDITION CHAT] 🔧 Setting up WebSocket for real-time updates');
+    console.log('[EXPEDITION CHAT] 🔧 enableWebSocket:', enableWebSocket, 'expeditionId:', expeditionId, 'starshipId:', starshipId, 'user.id:', user?.id);
+    
+    if (!enableWebSocket || !expeditionId || !starshipId || !user?.id) {
+      console.log('[EXPEDITION CHAT] ❌ WebSocket setup skipped - missing requirements');
+      return;
+    }
+
+    // Join expedition room
+    console.log('[EXPEDITION CHAT] 🚀 Joining expedition room...');
+    expeditionSocketAPI.joinExpeditionRoom(expeditionId, user.id);
+    
+    // Refresh messages after joining room to ensure we have latest
+    setTimeout(() => {
+      console.log('[EXPEDITION CHAT] 🔄 Refreshing messages after room join');
+      refreshMessages();
+    }, 500);
+
+    // Subscribe to new messages
+    const unsubscribeMessages = expeditionSocketAPI.subscribeToMessages(expeditionId, (newMessage) => {
+      console.log('[EXPEDITION CHAT] New message via WebSocket:', newMessage);
+      
+      // Add message to state, replacing optimistic messages if needed
+      setMessages(prev => {
+        // Check if message already exists (by ID)
+        const exists = prev.some(msg => msg.id === newMessage.id);
+        if (exists) {
+          return prev; // Message already exists, don't duplicate
+        }
+
+        // Check if this is a real message that should replace an optimistic one
+        const optimisticIndex = prev.findIndex(msg => 
+          msg.id.startsWith('temp-') && 
+          msg.content === newMessage.content &&
+          msg.role === newMessage.role &&
+          Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 10000 // Within 10 seconds
+        );
+
+        if (optimisticIndex !== -1) {
+          // Replace optimistic message with real message
+          const updated = [...prev];
+          updated[optimisticIndex] = newMessage;
+          console.log('[EXPEDITION CHAT] Replaced optimistic message with real message');
+          return updated;
+        } else {
+          // Add new message and limit to maxMessages
+          const updated = [...prev, newMessage];
+          return updated.slice(-maxMessages);
+        }
+      });
+    });
+
+    // Subscribe to streaming events
+    const unsubscribeStreaming = expeditionSocketAPI.subscribeToExpedition(expeditionId, (event) => {
+      console.log('[EXPEDITION CHAT] Received streaming event:', event.type);
+      
+      if (event.type === 'expedition:stream-start') {
+        console.log('[EXPEDITION CHAT] 🚀 Stream started for participant:', event.agentId);
+        
+        // Create a placeholder streaming message
+        const streamingMessage: ExpeditionMessage = {
+          id: `streaming-${event.data.streamId}`,
+          expeditionId,
+          role: event.agentId === 'first-officer' ? 'first-officer' : 'agent',
+          agentId: event.agentId,
+          content: '', // Will be filled by chunks
+          messageType: event.agentId === 'first-officer' ? 'coordination' : 'task-work',
+          timestamp: event.timestamp,
+          metadata: { 
+            streaming: true, 
+            streamId: event.data.streamId,
+            isComplete: false 
+          }
+        };
+
+        setMessages(prev => [...prev, streamingMessage]);
+        
+      } else if (event.type === 'expedition:stream-chunk') {
+        console.log('[EXPEDITION CHAT] ⚡ Stream chunk received:', event.data.content);
+        
+        // Update the streaming message with new content
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === `streaming-${event.data.streamId}`) {
+            return {
+              ...msg,
+              content: msg.content + event.data.content
+            };
+          }
+          return msg;
+        }));
+        
+      } else if (event.type === 'expedition:stream-complete') {
+        console.log('[EXPEDITION CHAT] ✅ Stream completed');
+        
+        // Replace streaming message with final message
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === `streaming-${event.data.streamId}`) {
+            return {
+              ...event.data.message,
+              metadata: { ...event.data.message.metadata, streaming: false, isComplete: true }
+            };
+          }
+          return msg;
+        }));
+        
+      } else if (event.type === 'expedition:stream-error') {
+        console.error('[EXPEDITION CHAT] Stream error:', event.data.error);
+        
+        // Remove streaming message on error
+        setMessages(prev => prev.filter(msg => msg.id !== `streaming-${event.data.streamId}`));
+      } else if (event.type === 'expedition:sync-required') {
+        console.log('[EXPEDITION CHAT] Sync required, refreshing messages');
+        // Refresh messages to ensure we have all the latest
+        refreshMessages();
+      }
+    });
+
+    // Cleanup
+    return () => {
+      unsubscribeMessages();
+      unsubscribeStreaming();
+      expeditionSocketAPI.leaveExpeditionRoom(expeditionId, user.id);
+    };
+  }, [enableWebSocket, expeditionId, starshipId, user?.id, maxMessages, refreshMessages]);
 
   return {
     messages,

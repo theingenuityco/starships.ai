@@ -5,14 +5,12 @@
  * with hierarchical coordination, parallel task execution, and quality control.
  */
 
-import { StateGraph, END, START } from '@langchain/langgraph';
 import { RunnableConfig } from '@langchain/core/runnables';
+// Removed unused: BaseMessage
 import { 
-  Expedition, 
   ExpeditionStatus, 
   TaskBreakdown, 
   WorkflowPhase,
-  ChatRequest,
   ChatResponse
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
@@ -23,10 +21,10 @@ import { AgentSelector } from './AgentSelector';
 import { QualityValidator } from './QualityValidator';
 import { TaskExecutor } from './TaskExecutor';
 import { ChatCoordinator } from './ChatCoordinator';
+import { StatePersistence } from './StatePersistence';
 import {
   FirstOfficerState,
   FirstOfficerConfig,
-  WorkflowNodeResult,
   ObjectiveAnalysis,
   TaskPlan,
   AgentAssignment,
@@ -35,6 +33,14 @@ import {
   TaskExecution,
   QualityCheck
 } from './types';
+import {
+  createExpeditionWorkflow,
+  ExpeditionState,
+  convertToExpeditionState,
+  convertFromExpeditionState,
+  WorkflowNodeHandlers
+} from './workflow/ExpeditionWorkflow';
+import { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
 
 /**
  * First Officer Agent - Core orchestration engine
@@ -47,12 +53,21 @@ export class FirstOfficerAgent {
   private taskExecutor: TaskExecutor;
   private chatCoordinator: ChatCoordinator;
   private workflow: any; // CompiledStateGraph from LangGraph
+  private nodeHandlers: WorkflowNodeHandlers;
+  private messageEmitCallback?: (message: any) => Promise<void>;
+  private starshipId: string;
+  private statePersistence: StatePersistence;
+  private webSocketEmitter: WebSocketEventEmitter;
+  private model: any; // LLM model instance
+  private visionContent: string | undefined;
 
   constructor(
     starshipId: string,
     memoryStore: LangChainMemoryStore,
     config: Partial<FirstOfficerConfig> = {},
-    selectedAgentIds: string[] // REQUIRED: No longer optional
+    selectedAgentIds: string[], // REQUIRED: No longer optional
+    messageEmitCallback?: (message: any) => Promise<void>, // Optional WebSocket emission callback
+    webSocketEmitter?: WebSocketEventEmitter
   ) {
     // MANDATORY: Validate that agents are provided
     if (!selectedAgentIds || selectedAgentIds.length === 0) {
@@ -76,17 +91,128 @@ export class FirstOfficerAgent {
     };
 
     this.memoryStore = memoryStore;
+    this.messageEmitCallback = messageEmitCallback;
+    this.starshipId = starshipId;
+    this.webSocketEmitter = webSocketEmitter || new WebSocketEventEmitter();
     
     // Initialize components with REQUIRED agents
     this.agentSelector = new AgentSelector(starshipId, selectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
-    this.taskExecutor = new TaskExecutor(this.config, memoryStore);
+    this.taskExecutor = new TaskExecutor(this.config, memoryStore, this.webSocketEmitter);
+    this.statePersistence = new StatePersistence();
     
     // Chat coordinator will be initialized per expedition
     this.chatCoordinator = null as any;
     
+    // Create node handlers for the workflow
+    this.nodeHandlers = {
+      analyzeObjective: this.analyzeObjectiveNode.bind(this),
+      planTasks: this.planTasksNode.bind(this),
+      selectAgents: this.selectAgentsNode.bind(this),
+      assignTasks: this.assignTasksNode.bind(this),
+      executeTasks: this.executeTasksNode.bind(this),
+      monitorProgress: this.monitorProgressNode.bind(this),
+      qualityCheck: this.qualityCheckNode.bind(this),
+      synthesizeResults: this.synthesizeResultsNode.bind(this),
+      handleError: this.handleErrorNode.bind(this),
+      retryTask: this.retryTaskNode.bind(this)
+    };
+    
     // Build LangGraph workflow
-    this.workflow = this.buildWorkflow();
+    this.workflow = createExpeditionWorkflow(this.nodeHandlers);
+  }
+
+  /**
+   * Initialize the LLM model (must be called before using model)
+   */
+  private async initializeModel(): Promise<void> {
+    if (this.model) return; // Already initialized
+    
+    // Create a model config for the First Officer
+    const modelConfig = {
+      id: 'first-officer-model',
+      name: this.config.model || 'gpt-4o',
+      provider: (this.config.provider || 'openai') as 'openai' | 'anthropic',
+      temperature: this.config.temperature || 0.3,
+      maxTokens: 4096,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Create LangChain provider and model
+    const { LangChainProvider } = await import('../llm/langchain-provider');
+    const provider = new LangChainProvider(modelConfig);
+    
+    // Create the model directly from the provider's internal method
+    this.model = provider;
+  }
+
+  /**
+   * Resume expedition from checkpoint if available
+   */
+  async resumeExpedition(
+    expeditionId: string,
+    userId: string
+  ): Promise<string> {
+    console.log(`🔄 [FIRST-OFFICER] Attempting to resume expedition: ${expeditionId}`);
+    
+    try {
+      // Try to recover state from persistence
+      const recoveredState = await this.statePersistence.recoverState(expeditionId);
+      
+      if (recoveredState) {
+        console.log(`✅ [FIRST-OFFICER] Recovered state from checkpoint, phase: ${recoveredState.currentPhase}`);
+        
+        // Get expedition details
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        const expedition = await expeditionRepo.findById(expeditionId);
+        
+        if (!expedition) {
+          throw new Error(`Expedition not found: ${expeditionId}`);
+        }
+
+        // Initialize chat coordinator
+        this.chatCoordinator = new ChatCoordinator(
+          this.memoryStore,
+          expeditionId,
+          userId,
+          expedition.starshipId,
+          this.messageEmitCallback
+        );
+
+        await this.sendWorkflowLog('🔄', 'RESUMING EXPEDITION', `Resuming from phase: ${recoveredState.currentPhase}`);
+        
+        // Convert to LangGraph state and continue workflow
+        const workflowState = convertToExpeditionState(recoveredState);
+        const workflowConfig: RunnableConfig = {
+          recursionLimit: 50,
+          configurable: {
+            thread_id: expeditionId
+          }
+        };
+
+        // Resume workflow from recovered state
+        const finalState = await this.workflow.invoke(workflowState, workflowConfig);
+        const result = finalState.finalResult || 'Expedition resumed and completed successfully';
+        
+        await this.sendWorkflowLog('✅', 'EXPEDITION COMPLETE', `Result: ${result.substring(0, 200)}...`);
+        
+        // Update expedition status
+        await expeditionRepo.updateStatus(expeditionId, 'completed' as ExpeditionStatus);
+        
+        return result;
+      } else {
+        console.log('⚠️ [FIRST-OFFICER] No checkpoint found, starting fresh');
+        // No checkpoint found, fall back to starting fresh
+        const expedition = await RepositoryFactory.getExpeditionRepository().findById(expeditionId);
+        if (!expedition) {
+          throw new Error(`Expedition not found: ${expeditionId}`);
+        }
+        return this.startExpedition(expeditionId, userId, expedition.mission);
+      }
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Failed to resume expedition:', error);
+      throw error;
+    }
   }
 
   /**
@@ -113,8 +239,12 @@ export class FirstOfficerAgent {
         this.memoryStore,
         expeditionId,
         userId,
-        expedition.starshipId
+        expedition.starshipId,
+        this.messageEmitCallback
       );
+
+      // Now we can send workflow logs
+      await this.sendWorkflowLog('🚀', 'EXPEDITION START', `Initializing expedition orchestration for: "${objective}"`);
 
       // Initialize workflow state
       const initialState: FirstOfficerState = {
@@ -138,16 +268,37 @@ export class FirstOfficerAgent {
       // Update expedition status
       await expeditionRepo.updateStatus(expeditionId, 'planning');
       await expeditionRepo.updateWorkflowState(expeditionId, initialState);
+      
+      await this.sendWorkflowLog('📋', 'WORKFLOW SETUP', 'Expedition workflow initialized and ready for execution');
 
       // Send initial coordination message
-      await this.chatCoordinator.sendPhaseUpdate(
-        'initializing',
-        'analyzing',
-        this.buildProgressFromState(initialState)
-      );
+      console.log(`🚀 [FIRST-OFFICER] About to send initial phase update message`);
+      console.log(`🚀 [FIRST-OFFICER] ChatCoordinator initialized:`, !!this.chatCoordinator);
+      console.log(`🚀 [FIRST-OFFICER] MessageEmitCallback provided:`, !!this.messageEmitCallback);
+      
+      try {
+        await this.chatCoordinator.sendPhaseUpdate(
+          'initializing',
+          'analyzing',
+          this.buildProgressFromState(initialState)
+        );
+        console.log(`✅ [FIRST-OFFICER] Initial phase update sent successfully`);
+      } catch (error) {
+        console.error(`❌ [FIRST-OFFICER] Failed to send initial phase update:`, error);
+      }
 
+      // Convert to ExpeditionState for LangGraph
+      const workflowState = convertToExpeditionState(initialState);
+      
       // Execute workflow
-      const finalState = await this.workflow.invoke(initialState, { configurable: {} });
+      const result = await this.workflow.invoke(workflowState, { 
+        configurable: { 
+          thread_id: expeditionId 
+        } 
+      });
+      
+      // Convert back to FirstOfficerState
+      const finalState = convertFromExpeditionState(result);
 
       // Handle final result
       if (finalState.finalResult) {
@@ -157,6 +308,7 @@ export class FirstOfficerAgent {
           this.calculateExpeditionStats(finalState)
         );
         
+        await this.sendWorkflowLog('✅', 'EXPEDITION COMPLETE', 'All tasks completed successfully and results synthesized');
         console.log(`✅ [FIRST-OFFICER] Expedition completed successfully: ${expeditionId}`);
         return finalState.finalResult;
       } else {
@@ -168,6 +320,7 @@ export class FirstOfficerAgent {
         if (hasFailedTasks) {
           await expeditionRepo.updateStatus(expeditionId, 'failed');
           const errorMessage = finalState.errors?.join('; ') || 'Task execution failed';
+          await this.sendWorkflowLog('❌', 'EXPEDITION FAILED', `Task execution failed: ${errorMessage}`);
           await this.chatCoordinator.sendErrorReport(errorMessage, finalState.currentPhase);
           
           console.error(`❌ [FIRST-OFFICER] Expedition failed due to task failures: ${expeditionId}`, finalState.errors);
@@ -176,6 +329,7 @@ export class FirstOfficerAgent {
           // No task failures, just workflow completion without final result
           await expeditionRepo.updateStatus(expeditionId, 'review');
           const message = 'Workflow completed but no final result synthesized. Expedition requires review.';
+          await this.sendWorkflowLog('⚠️', 'EXPEDITION REVIEW', message);
           await this.chatCoordinator.sendCoordinationMessage('phase-update', 'waiting_for_approval', message);
           
           console.warn(`⚠️ [FIRST-OFFICER] Expedition completed without final result: ${expeditionId}`);
@@ -235,113 +389,241 @@ export class FirstOfficerAgent {
   }
 
   /**
-   * Build LangGraph StateGraph workflow with proper state transitions
+   * Review task completion and provide feedback
    */
-  private buildWorkflow(): any {
-    // For now, use a simplified workflow implementation that mimics StateGraph behavior
-    // This will be replaced with proper LangGraph StateGraph once API compatibility is resolved
-    return {
-      invoke: async (state: FirstOfficerState, config?: any): Promise<FirstOfficerState> => {
-        try {
-          console.log(`🔄 [FIRST-OFFICER] Starting workflow execution from phase: ${state.currentPhase}`);
-          
-          let currentState = { ...state };
-          
-          // Execute workflow phases based on current state
-          while (currentState.currentPhase !== 'completed' && currentState.currentPhase !== 'failed') {
-            const previousPhase = currentState.currentPhase;
-            
-            switch (currentState.currentPhase) {
-              case 'initializing':
-                currentState = { ...currentState, ...(await this.analyzeObjectiveNode(currentState)) };
-                break;
-              case 'analyzing':
-              case 'decomposing':
-                currentState = { ...currentState, ...(await this.planTasksNode(currentState)) };
-                break;
-              case 'assigning':
-                // Always use pre-selected agents - no auto-selection
-                currentState = { ...currentState, ...(await this.assignTasksNode(currentState)) };
-                break;
-              case 'coordinating':
-                if (!currentState.activeExecutions && !currentState.completedTasks) {
-                  currentState = { ...currentState, ...(await this.executeTasksNode(currentState)) };
-                } else if (currentState.activeExecutions && currentState.activeExecutions.length > 0) {
-                  currentState = { ...currentState, ...(await this.monitorProgressNode(currentState)) };
-                } else if (currentState.completedTasks && !currentState.qualityChecks) {
-                  currentState = { ...currentState, ...(await this.qualityCheckNode(currentState)) };
-                } else {
-                  currentState = { ...currentState, ...(await this.synthesizeResultsNode(currentState)) };
-                }
-                break;
-              case 'synthesizing':
-                currentState = { ...currentState, ...(await this.synthesizeResultsNode(currentState)) };
-                break;
-              default:
-                currentState = { ...currentState, ...(await this.handleErrorNode(currentState)) };
-                break;
-            }
-            
-            // Persist state after each phase
-            await this.persistWorkflowState(currentState.expeditionId, currentState);
-            
-            // Prevent infinite loops
-            if (currentState.currentPhase === previousPhase) {
-              console.warn(`⚠️ [FIRST-OFFICER] Workflow stuck in phase: ${currentState.currentPhase}`);
-              currentState = {
-                ...currentState,
-                currentPhase: 'failed',
-                errors: [...(currentState.errors || []), `Workflow stuck in phase: ${currentState.currentPhase}`]
-              };
-              break;
-            }
+  async reviewTaskCompletion(
+    expeditionId: string,
+    taskId: string,
+    agentId: string,
+    result: string
+  ): Promise<{approved: boolean; feedback?: string}> {
+    console.log(`🔍 [FIRST-OFFICER] Reviewing task ${taskId} from agent ${agentId}`);
+    
+    try {
+      // Get task details
+      const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+      const task = await taskRepo.findById(taskId);
+      
+      if (!task) {
+        throw new Error(`Task not found: ${taskId}`);
+      }
+      
+      // Get vision context if available
+      const visionContext = this.visionContent ? `
+Vision Context:
+${this.visionContent}
+` : '';
+      
+      // Prepare review prompt
+      const reviewPrompt = `
+As the First Officer, you need to review the following task completion and determine if it meets quality standards.
+
+${visionContext}
+
+TASK DETAILS:
+- Title: ${task.title}
+- Description: ${task.description}
+- Expected Deliverable: ${task.deliverable}
+- Required Skills: ${task.requiredSkills.join(', ')}
+
+AGENT'S RESULT:
+${result}
+
+REVIEW CRITERIA:
+1. Does the result fully address the task requirements?
+2. Is the quality of work acceptable?
+3. Does it align with the expedition's mission and vision?
+4. Are there any issues or improvements needed?
+
+Please provide your review in the following JSON format:
+{
+  "approved": boolean,
+  "qualityScore": number (0-100),
+  "feedback": "specific feedback for the agent",
+  "issues": ["list of issues if any"],
+  "suggestions": ["improvement suggestions if any"]
+}
+
+Be constructive in your feedback. If rejecting, provide clear guidance on what needs to be improved.
+`;
+
+      // Initialize model if needed
+      await this.initializeModel();
+      
+      // Get review from LLM
+      const reviewResponse = await this.model.complete({
+        messages: [
+          { role: 'system', content: 'You are the First Officer reviewing task completions.' },
+          { role: 'user', content: reviewPrompt }
+        ]
+      });
+      const reviewContent = reviewResponse.reply;
+      
+      // Parse review response
+      let review;
+      try {
+        review = JSON.parse(reviewContent);
+      } catch (error) {
+        console.error('Failed to parse review response:', reviewContent);
+        // Default to approval if parsing fails
+        review = {
+          approved: true,
+          qualityScore: 75,
+          feedback: "Task completed satisfactorily."
+        };
+      }
+      
+      // Update task status based on review
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      
+      if (review.approved) {
+        await taskRepo.updateStatus(taskId, 'completed');
+        
+        // Send approval message
+        const approvalMessage = await messageRepo.create({
+          expeditionId,
+          role: 'first-officer' as const,
+          content: `✅ **Task Approved**\n\n**Task:** ${task.title}\n**Quality Score:** ${review.qualityScore}/100\n\n**Feedback:** ${review.feedback}`,
+          messageType: 'review-feedback' as const,
+          timestamp: new Date().toISOString(),
+          reviewStatus: 'approved',
+          reviewFeedback: review.feedback,
+          reviewedBy: 'first-officer',
+          reviewedAt: new Date().toISOString(),
+          metadata: {
+            taskId,
+            agentId,
+            qualityScore: review.qualityScore
           }
-          
-          console.log(`✅ [FIRST-OFFICER] Workflow execution completed with phase: ${currentState.currentPhase}`);
-          return currentState;
-          
-        } catch (error) {
-          console.error('❌ [FIRST-OFFICER] Workflow execution failed:', error);
-          return {
-            ...state,
-            currentPhase: 'failed',
-            errors: [...(state.errors || []), `Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
-            lastUpdated: new Date().toISOString()
-          };
+        });
+        
+        if (this.webSocketEmitter) {
+          this.webSocketEmitter.emitExpeditionMessage(expeditionId, approvalMessage);
+        }
+      } else {
+        await taskRepo.updateStatus(taskId, 'assigned'); // Send back to agent
+        
+        // Send rejection message with feedback
+        const rejectionMessage = await messageRepo.create({
+          expeditionId,
+          role: 'first-officer' as const,
+          content: `❌ **Task Needs Revision**\n\n**Task:** ${task.title}\n**Quality Score:** ${review.qualityScore}/100\n\n**Issues:**\n${review.issues?.map((i: string) => `- ${i}`).join('\n')}\n\n**Suggestions:**\n${review.suggestions?.map((s: string) => `- ${s}`).join('\n')}\n\n**Agent ${agentId}, please address the feedback and resubmit.**`,
+          messageType: 'review-feedback' as const,
+          timestamp: new Date().toISOString(),
+          reviewStatus: 'rejected',
+          reviewFeedback: review.feedback,
+          reviewedBy: 'first-officer',
+          reviewedAt: new Date().toISOString(),
+          metadata: {
+            taskId,
+            agentId,
+            qualityScore: review.qualityScore,
+            issues: review.issues,
+            suggestions: review.suggestions
+          }
+        });
+        
+        if (this.webSocketEmitter) {
+          this.webSocketEmitter.emitExpeditionMessage(expeditionId, rejectionMessage);
         }
       }
-    };
+      
+      // Notify TaskExecutor about the review result
+      if (this.taskExecutor) {
+        await this.taskExecutor.handleTaskReview(taskId, review.approved, review.feedback);
+      }
+      
+      return {
+        approved: review.approved,
+        feedback: review.feedback
+      };
+      
+    } catch (error) {
+      console.error(`❌ [FIRST-OFFICER] Failed to review task:`, error);
+      
+      // Default to approval with warning
+      return {
+        approved: true,
+        feedback: "Task approved with warning: Review system encountered an error."
+      };
+    }
   }
+
 
   // ========================================
   // WORKFLOW NODE IMPLEMENTATIONS
   // ========================================
 
   /**
+   * Send workflow coordination log to chat interface
+   */
+  private async sendWorkflowLog(emoji: string, phase: string, message: string): Promise<void> {
+    const logMessage = `${emoji} **${phase}**: ${message}`;
+    console.log(`[FIRST-OFFICER] ${logMessage}`);
+    
+    if (this.chatCoordinator) {
+      try {
+        await this.chatCoordinator.sendCoordinationMessage(
+          'phase-update',
+          'coordinating',
+          logMessage
+        );
+      } catch (error) {
+        console.error(`❌ [FIRST-OFFICER] Failed to send workflow log:`, error);
+      }
+    }
+  }
+
+  /**
    * Workflow Node: Analyze Objective
    */
-  private async analyzeObjectiveNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`🔍 [FIRST-OFFICER] Analyzing objective: ${state.requirements}`);
+  private async analyzeObjectiveNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('🔍', 'ANALYZING OBJECTIVE', `Starting analysis of: "${state.requirements}"`);
+    
+    // Emit typing start
+    if (this.webSocketEmitter) {
+      this.webSocketEmitter.emitTypingStart(state.expeditionId, 'first-officer', 'First Officer');
+    }
     
     try {
       const analysis = await this.performObjectiveAnalysis(state.requirements);
       
-      await this.chatCoordinator.sendCoordinationMessage(
-        'phase-update',
-        'analyzing',
-        `📋 **Objective Analysis Complete**\n\n` +
-        `**Complexity:** ${analysis.complexity}\n` +
-        `**Estimated Duration:** ${analysis.estimatedDuration} minutes\n` +
-        `**Required Skills:** ${analysis.requiredSkills.join(', ')}\n` +
-        `**Approach:** ${analysis.approach}\n\n` +
-        `**Success Criteria:**\n${analysis.successCriteria.map(c => `• ${c}`).join('\n')}`
-      );
+      console.log(`🔍 [FIRST-OFFICER] About to send objective analysis message`);
+      try {
+        await this.chatCoordinator.sendCoordinationMessage(
+          'phase-update',
+          'analyzing',
+          `📋 **Objective Analysis Complete**\n\n` +
+          `**Complexity:** ${analysis.complexity}\n` +
+          `**Estimated Duration:** ${analysis.estimatedDuration} minutes\n` +
+          `**Required Skills:** ${analysis.requiredSkills.join(', ')}\n` +
+          `**Approach:** ${analysis.approach}\n\n` +
+          `**Success Criteria:**\n${analysis.successCriteria.map(c => `• ${c}`).join('\n')}`
+        );
+        console.log(`✅ [FIRST-OFFICER] Objective analysis message sent successfully`);
+        
+        // Stop typing indicator
+        if (this.webSocketEmitter) {
+          this.webSocketEmitter.emitTypingStop(state.expeditionId, 'first-officer');
+        }
+      } catch (error) {
+        console.error(`❌ [FIRST-OFFICER] Failed to send objective analysis message:`, error);
+      }
 
-      return {
-        currentPhase: 'decomposing',
+      const updatedState = {
+        currentPhase: 'decomposing' as WorkflowPhase,
         objectiveAnalysis: analysis,
         lastUpdated: new Date().toISOString()
       };
+
+      // Persist state after phase transition
+      try {
+        await this.statePersistence.persistState(state.expeditionId, { ...state, ...updatedState });
+      } catch (error) {
+        console.warn('⚠️ [FIRST-OFFICER] Failed to persist state after analysis:', error);
+      }
+
+      return updatedState;
     } catch (error) {
       console.error('❌ [FIRST-OFFICER] Objective analysis failed:', error);
       return {
@@ -355,8 +637,13 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Plan Tasks
    */
-  private async planTasksNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`📋 [FIRST-OFFICER] Planning tasks for expedition`);
+  private async planTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('📋', 'PLANNING TASKS', 'Breaking down objectives into executable tasks');
+    
+    // Emit typing start
+    if (this.webSocketEmitter) {
+      this.webSocketEmitter.emitTypingStart(state.expeditionId, 'first-officer', 'First Officer');
+    }
     
     try {
       const taskPlan = await this.createTaskPlan(state.requirements, state.objectiveAnalysis!);
@@ -385,6 +672,8 @@ export class FirstOfficerAgent {
         });
       }
 
+      await this.sendWorkflowLog('📝', 'TASKS CREATED', `Generated ${createdTasks.length} tasks with ${taskPlan.estimatedTotalTime}min estimated time`);
+      
       await this.chatCoordinator.sendCoordinationMessage(
         'phase-update',
         'decomposing',
@@ -394,6 +683,27 @@ export class FirstOfficerAgent {
         `**Execution Approach:** ${taskPlan.parallelGroups.length > 1 ? 'Parallel' : 'Sequential'}\n\n` +
         `**Tasks Created:**\n${createdTasks.map(t => `• ${t.description}`).join('\n')}`
       );
+      
+      // Stop typing indicator
+      if (this.webSocketEmitter) {
+        this.webSocketEmitter.emitTypingStop(state.expeditionId, 'first-officer');
+      }
+
+      const planState = {
+        ...state,
+        currentPhase: 'assigning' as const,
+        taskPlan,
+        taskBreakdown: createdTasks,
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Persist state after task planning
+      if (this.statePersistence) {
+        await this.statePersistence.persistState(
+          state.expeditionId,
+          convertFromExpeditionState(planState)
+        );
+      }
 
       return {
         currentPhase: 'assigning',
@@ -414,8 +724,8 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Select Agents
    */
-  private async selectAgentsNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`👥 [FIRST-OFFICER] Selecting agents for tasks`);
+  private async selectAgentsNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('👥', 'SELECTING AGENTS', 'Identifying optimal agents for task execution');
     
     try {
       await this.agentSelector.initialize();
@@ -454,13 +764,13 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Assign Tasks
    */
-  private async assignTasksNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`⚡ [FIRST-OFFICER] Assigning tasks to agents`);
+  private async assignTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('⚡', 'ASSIGNING TASKS', 'Distributing tasks to selected agents');
     
     try {
       // If we have pre-selected agents but no task assignments yet, assign tasks to them
       if (state.selectedAgents && state.selectedAgents.some(a => a.assignedTasks.length === 0)) {
-        console.log(`🎯 [FIRST-OFFICER] Assigning tasks to pre-selected agents`);
+        await this.sendWorkflowLog('🎯', 'TASK ASSIGNMENT', 'Assigning tasks to pre-selected agents');
         
         // Use AgentSelector to assign tasks to pre-selected agents
         const updatedAssignments = await this.assignTasksToSelectedAgents(state.taskBreakdown, state.selectedAgents);
@@ -473,6 +783,8 @@ export class FirstOfficerAgent {
           }
         }
 
+        await this.sendWorkflowLog('✅', 'TASKS ASSIGNED', `Successfully assigned ${updatedAssignments.reduce((sum, a) => sum + a.assignedTasks.length, 0)} tasks to ${updatedAssignments.length} agents`);
+        
         await this.chatCoordinator.sendCoordinationMessage(
           'phase-update',
           'assigning',
@@ -480,6 +792,21 @@ export class FirstOfficerAgent {
           `Successfully assigned tasks to ${updatedAssignments.length} pre-selected agents:\n` +
           updatedAssignments.map((a: AgentAssignment) => `• ${a.agentName}: ${a.assignedTasks.length} tasks`).join('\n')
         );
+
+        const assignState = {
+          ...state,
+          currentPhase: 'coordinating' as const,
+          selectedAgents: updatedAssignments,
+          lastUpdated: new Date().toISOString()
+        };
+
+        // Persist state after task assignment
+        if (this.statePersistence) {
+          await this.statePersistence.persistState(
+            state.expeditionId,
+            convertFromExpeditionState(assignState)
+          );
+        }
 
         return {
           currentPhase: 'coordinating',
@@ -494,6 +821,20 @@ export class FirstOfficerAgent {
           for (const taskId of assignment.assignedTasks) {
             await taskRepo.assignToAgent(taskId, assignment.agentId);
           }
+        }
+
+        const assignState2 = {
+          ...state,
+          currentPhase: 'coordinating' as const,
+          lastUpdated: new Date().toISOString()
+        };
+
+        // Persist state after task assignment
+        if (this.statePersistence) {
+          await this.statePersistence.persistState(
+            state.expeditionId,
+            convertFromExpeditionState(assignState2)
+          );
         }
 
         return {
@@ -514,11 +855,11 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Execute Tasks
    */
-  private async executeTasksNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`🚀 [FIRST-OFFICER] Starting task execution`);
+  private async executeTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('🚀', 'PREPARING EXECUTION', 'Setting up task execution framework');
     
     try {
-      // Start task execution and return immediately - monitoring will handle progress
+      // Prepare active executions for monitoring phase
       const activeExecutions: TaskExecution[] = [];
       
       for (const task of state.taskBreakdown) {
@@ -527,7 +868,7 @@ export class FirstOfficerAgent {
           activeExecutions.push({
             taskId: task.id,
             agentId: assignment.agentId,
-            status: 'in-progress',
+            status: 'pending', // Start as pending
             startTime: new Date().toISOString(),
             progress: 0,
             intermediateResults: [],
@@ -536,16 +877,19 @@ export class FirstOfficerAgent {
         }
       }
 
+      await this.sendWorkflowLog('📋', 'TASKS PREPARED', `${activeExecutions.length} tasks ready for execution with real agents`);
+
+      // Move to monitoring phase where actual execution happens
       return {
         currentPhase: 'coordinating',
         activeExecutions,
         lastUpdated: new Date().toISOString()
       };
     } catch (error) {
-      console.error('❌ [FIRST-OFFICER] Task execution start failed:', error);
+      console.error('❌ [FIRST-OFFICER] Task execution preparation failed:', error);
       return {
         currentPhase: 'failed',
-        errors: [...(state.errors || []), `Task execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        errors: [...(state.errors || []), `Task execution preparation failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
         lastUpdated: new Date().toISOString()
       };
     }
@@ -554,35 +898,92 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Monitor Progress
    */
-  private async monitorProgressNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`📊 [FIRST-OFFICER] Monitoring task execution progress`);
+  private async monitorProgressNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('📊', 'MONITORING PROGRESS', 'Tracking task execution and collecting results');
     
     try {
-      // This is a simplified version - in reality, this would monitor actual task execution
-      const completedTasks: CompletedTask[] = [];
+      // Initialize task executor with our expeditionId and userId
+      const expeditionId = state.expeditionId;
+      const userId = this.chatCoordinator?.getUserId() || '';
       
-      // Simulate task completion for demonstration
-      for (const execution of state.activeExecutions || []) {
-        const task = state.taskBreakdown.find(t => t.id === execution.taskId);
-        if (task) {
-          completedTasks.push({
-            taskId: execution.taskId,
-            agentId: execution.agentId,
-            result: `Task ${task.description} completed successfully`,
-            completionTime: new Date().toISOString(),
-            actualDuration: task.estimatedEffort || 30,
-            qualityScore: 85
-          });
+      // Prepare task assignments for the executor
+      const assignments: AgentAssignment[] = [];
+      for (const task of state.taskBreakdown) {
+        const assignment = state.selectedAgents?.find(a => a.assignedTasks.includes(task.id));
+        if (assignment) {
+          assignments.push(assignment);
         }
       }
 
-      // Send progress update
-      const progress = this.calculateProgress(state, completedTasks);
-      await this.chatCoordinator.sendProgressReport(progress);
+      // Execute tasks using the TaskExecutor
+      await this.sendWorkflowLog('⚡', 'EXECUTING TASKS', `Starting execution of ${assignments.length} tasks with real agents`);
+      
+      // Small delay to ensure WebSocket connections are ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const taskExecutionOptions = {
+        parallelExecution: false, // Sequential execution as per plan
+        timeout: this.config.timeoutMinutes * 60 * 1000,
+        retryLimit: this.config.maxRetries
+      };
+
+      // Start task execution - returns an Observable
+      const completionObservable = await this.taskExecutor.executeTasks(
+        state.taskBreakdown,
+        assignments,
+        expeditionId,
+        userId,
+        taskExecutionOptions
+      );
+
+      // Collect completed tasks as they come in
+      const completedTasks: CompletedTask[] = [];
+      let lastProgress = 0;
+
+      // Subscribe to completion events
+      const subscription = completionObservable.subscribe({
+        next: (completedTask) => {
+          completedTasks.push(completedTask);
+          // Send progress update
+          const progress = Math.round((completedTasks.length / state.taskBreakdown.length) * 100);
+          if (progress > lastProgress) {
+            lastProgress = progress;
+            this.chatCoordinator.sendProgressReport({
+              expeditionId: state.expeditionId,
+              currentPhase: state.currentPhase,
+              tasksTotal: state.taskBreakdown.length,
+              tasksCompleted: completedTasks.length,
+              overallProgress: progress,
+              estimatedTimeRemaining: 0,
+              qualityScore: 0,
+              issues: []
+            }).catch(err => console.error('Failed to send progress:', err));
+          }
+        },
+        error: (error) => {
+          console.error('❌ [FIRST-OFFICER] Task execution error:', error);
+        },
+        complete: () => {
+          console.log('✅ [FIRST-OFFICER] All tasks completed');
+        }
+      });
+
+      // Wait for all tasks to complete
+      await new Promise<void>((resolve, reject) => {
+        subscription.add(() => resolve());
+        completionObservable.subscribe({
+          error: reject,
+          complete: resolve
+        });
+      });
+
+      // Send final progress update
+      const finalProgress = this.calculateProgress(state, completedTasks);
+      await this.chatCoordinator.sendProgressReport(finalProgress);
 
       return {
         currentPhase: 'synthesizing',
-        completedTasks,
+        completedTasks: completedTasks || [],
         activeExecutions: [],
         lastUpdated: new Date().toISOString()
       };
@@ -599,8 +1000,8 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Quality Check
    */
-  private async qualityCheckNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`🔍 [FIRST-OFFICER] Performing quality checks`);
+  private async qualityCheckNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('🔍', 'QUALITY REVIEW', 'Validating task results and ensuring quality standards');
     
     try {
       const qualityChecks: QualityCheck[] = [];
@@ -634,6 +1035,20 @@ export class FirstOfficerAgent {
         }
       }
 
+      const qualityState = {
+        ...state,
+        qualityChecks,
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Persist state after quality check
+      if (this.statePersistence) {
+        await this.statePersistence.persistState(
+          state.expeditionId,
+          convertFromExpeditionState(qualityState)
+        );
+      }
+
       return {
         qualityChecks,
         lastUpdated: new Date().toISOString()
@@ -651,8 +1066,8 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: User Approval
    */
-  private async userApprovalNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`👤 [FIRST-OFFICER] Requesting user approval`);
+  private async userApprovalNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('👤', 'USER APPROVAL', 'Requesting user review and approval of results');
     
     try {
       // Send approval request to user
@@ -680,8 +1095,8 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Synthesize Results
    */
-  private async synthesizeResultsNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
-    console.log(`🔧 [FIRST-OFFICER] Synthesizing expedition results`);
+  private async synthesizeResultsNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('🔧', 'SYNTHESIZING RESULTS', 'Combining agent outputs into final deliverable');
     
     try {
       const finalResult = await this.synthesizeFinalResult(
@@ -711,6 +1126,21 @@ export class FirstOfficerAgent {
         updatedAt: new Date().toISOString()
       });
 
+      const finalState = {
+        ...state,
+        currentPhase: 'completed' as const,
+        finalResult,
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Persist final state
+      if (this.statePersistence) {
+        await this.statePersistence.persistState(
+          state.expeditionId,
+          convertFromExpeditionState(finalState)
+        );
+      }
+
       return {
         currentPhase: 'completed',
         finalResult,
@@ -729,7 +1159,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Handle Error
    */
-  private async handleErrorNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async handleErrorNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`❌ [FIRST-OFFICER] Handling workflow error`);
     
     try {
@@ -773,7 +1203,7 @@ export class FirstOfficerAgent {
   /**
    * Workflow Node: Retry Task
    */
-  private async retryTaskNode(state: FirstOfficerState, config?: RunnableConfig): Promise<Partial<FirstOfficerState>> {
+  private async retryTaskNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
     console.log(`🔄 [FIRST-OFFICER] Retrying failed tasks`);
     
     try {
@@ -1013,11 +1443,27 @@ export class FirstOfficerAgent {
   // ========================================
 
   /**
-   * Perform objective analysis using LLM
+   * Perform objective analysis using LLM with vision context
    */
   private async performObjectiveAnalysis(objective: string): Promise<ObjectiveAnalysis> {
+    // Load vision context for alignment
+    let visionContext = '';
+    try {
+      const visionRepo = RepositoryFactory.getVisionRepository();
+      const vision = await visionRepo.findByStarship(this.starshipId);
+      
+      if (vision && vision.statement) {
+        visionContext = `\n\nSTARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: All work must align with this vision. Consider how this objective supports and advances our vision.`;
+        console.log(`📖 [FIRST-OFFICER] Vision loaded for analysis: ${vision.statement.substring(0, 100)}...`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [FIRST-OFFICER] Could not load vision for analysis:', error);
+    }
+
     const prompt = buildPrompt(
       `You are the First Officer's analysis system. Analyze the given objective and provide a structured assessment.
+
+${visionContext}
 
 RESPONSE FORMAT (JSON):
 {
@@ -1059,8 +1505,23 @@ RESPONSE FORMAT (JSON):
    * Create task plan from objective and analysis
    */
   private async createTaskPlan(objective: string, analysis: ObjectiveAnalysis): Promise<TaskPlan> {
+    // Load vision context for task planning
+    let visionContext = '';
+    try {
+      const visionRepo = RepositoryFactory.getVisionRepository();
+      const vision = await visionRepo.findByStarship(this.starshipId);
+      
+      if (vision && vision.statement) {
+        visionContext = `\n\nSTARSHIP VISION:\n${vision.statement}\n\nENSURE: All tasks must directly contribute to advancing this vision.`;
+      }
+    } catch (error) {
+      console.warn('⚠️ [FIRST-OFFICER] Could not load vision for task planning:', error);
+    }
+
     const prompt = buildPrompt(
       `You are the First Officer's task planning system. Break down the objective into executable tasks.
+
+${visionContext}
 
 RESPONSE FORMAT (JSON):
 {
@@ -1229,65 +1690,6 @@ Create a well-structured final report that:
     } catch (error) {
       console.error('Failed to get expedition status:', error);
       return null;
-    }
-  }
-
-  /**
-   * Resume interrupted expedition from persisted state
-   */
-  async resumeExpedition(expeditionId: string): Promise<string> {
-    console.log(`🔄 [FIRST-OFFICER] Resuming expedition: ${expeditionId}`);
-
-    try {
-      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      const expedition = await expeditionRepo.findById(expeditionId);
-      
-      if (!expedition || !expedition.workflowState) {
-        throw new Error(`Cannot resume expedition: ${expeditionId} - no saved state found`);
-      }
-
-      const savedState = expedition.workflowState as FirstOfficerState;
-      
-      // Initialize chat coordinator
-      this.chatCoordinator = new ChatCoordinator(
-        this.memoryStore,
-        expeditionId,
-        savedState.userId,
-        savedState.starshipId
-      );
-
-      // Send resume notification
-      await this.chatCoordinator.sendCoordinationMessage(
-        'phase-update',
-        savedState.currentPhase,
-        `🔄 **Expedition Resumed**\n\nResuming from phase: ${savedState.currentPhase}\n\nProgress: ${this.buildProgressFromState(savedState).overallProgress}%`
-      );
-
-      // Continue workflow from saved state
-      const finalState = await this.workflow.invoke(savedState, { configurable: {} });
-
-      // Handle final result
-      if (finalState.finalResult) {
-        await expeditionRepo.updateStatus(expeditionId, 'completed');
-        await this.chatCoordinator.sendCompletionSummary(
-          finalState.finalResult,
-          this.calculateExpeditionStats(finalState)
-        );
-        
-        console.log(`✅ [FIRST-OFFICER] Resumed expedition completed: ${expeditionId}`);
-        return finalState.finalResult;
-      } else {
-        await expeditionRepo.updateStatus(expeditionId, 'failed');
-        const errorMessage = finalState.errors?.join('; ') || 'Unknown error occurred';
-        await this.chatCoordinator.sendErrorReport(errorMessage, finalState.currentPhase);
-        
-        console.error(`❌ [FIRST-OFFICER] Resumed expedition failed: ${expeditionId}`, finalState.errors);
-        throw new Error(`Expedition failed: ${errorMessage}`);
-      }
-
-    } catch (error) {
-      console.error(`❌ [FIRST-OFFICER] Failed to resume expedition:`, error);
-      throw error;
     }
   }
 

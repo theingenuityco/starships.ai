@@ -49,6 +49,40 @@ export interface ExpeditionTask {
 }
 
 /**
+ * Agent activity types for real-time tracking
+ */
+export type AgentActivityType = 
+  | 'task_started' 
+  | 'task_completed' 
+  | 'task_failed' 
+  | 'agent_thinking' 
+  | 'agent_blocked'
+  | 'quality_check'
+  | 'retry_attempt';
+
+/**
+ * Agent activity event for real-time updates
+ */
+export interface AgentActivity {
+  id: string;
+  expeditionId: string;
+  agentId: string;
+  agentName: string;
+  type: AgentActivityType;
+  taskId?: string;
+  taskTitle?: string;
+  message: string;
+  timestamp: string;
+  metadata?: {
+    qualityScore?: number;
+    duration?: number;
+    retryCount?: number;
+    blockedReason?: string;
+    error?: string;
+  };
+}
+
+/**
  * Messages within expedition chat system
  */
 export interface ExpeditionMessage {
@@ -63,6 +97,25 @@ export interface ExpeditionMessage {
   threadId?: string; // For message threading
   parentMessageId?: string; // For replies
   metadata?: Record<string, any>; // Additional message data
+  // Chain of thought fields
+  chainOfThought?: {
+    reasoning?: string; // Agent's reasoning process
+    steps?: string[]; // Step-by-step thinking
+    alternatives?: string[]; // Alternative approaches considered
+    confidence?: number; // Confidence level (0-1)
+    assumptions?: string[]; // Key assumptions made
+    constraints?: string[]; // Constraints considered
+    risks?: string[]; // Potential risks identified
+    mitigations?: string[]; // Risk mitigation strategies
+    dependencies?: string[]; // Dependencies identified
+    tools?: string[]; // Tools or resources utilized
+    learnings?: string[]; // Insights gained during process
+  };
+  // Review fields
+  reviewStatus?: 'pending' | 'approved' | 'rejected';
+  reviewFeedback?: string; // First Officer's feedback
+  reviewedBy?: string; // First Officer ID
+  reviewedAt?: string; // Review timestamp
 }
 
 /**
@@ -141,7 +194,10 @@ export type MessageType =
   | 'status-update' // System status updates
   | 'result'        // Task or expedition results
   | 'question'      // Questions requiring user input
-  | 'notification'; // General notifications
+  | 'notification'  // General notifications
+  | 'chain-of-thought' // Agent reasoning process
+  | 'review-request'   // Request for First Officer review
+  | 'review-feedback'; // First Officer feedback on task
 
 /**
  * Types of expedition results

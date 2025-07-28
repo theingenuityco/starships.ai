@@ -1110,5 +1110,11 @@ You should be helpful, professional, and focused on delivering high-quality resu
 
 export { LangChainMemoryStore, chatStream };
 
+// Export LLM Provider Factory
+export { ProviderFactory } from './llm/provider-factory';
+
 // Export First Officer Agent functionality
 export * from './first-officer';
+
+// Export specific types that might be needed
+export { ExpeditionProgress } from './first-officer/types';

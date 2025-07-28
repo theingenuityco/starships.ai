@@ -51,8 +51,58 @@ export interface ChatSocketEvents {
   'agent:typing-stop': (agentId: string) => void;
 }
 
+// Expedition-related events
+export interface ExpeditionSocketEvents {
+  // Expedition lifecycle events
+  'expedition:created': (data: any) => void;
+  'expedition:started': (data: any) => void;
+  'expedition:status-changed': (data: any) => void;
+  'expedition:completed': (data: any) => void;
+  'expedition:failed': (data: any) => void;
+  
+  // Task events
+  'task:created': (data: any) => void;
+  'task:assigned': (data: any) => void;
+  'task:completed': (data: any) => void;
+  
+  // Task review events
+  'expedition:review-task': (data: { expeditionId: string; taskId: string; agentId: string; result: string }, callback?: (response: { success: boolean; reviewResult?: any; error?: string }) => void) => void;
+  'expedition:task-reviewed': (data: { expeditionId: string; taskId: string; agentId: string; approved: boolean; feedback?: string; timestamp: string }) => void;
+  
+  // Message events
+  'message:sent': (data: any) => void;
+  
+  // Agent events
+  'agent:assigned': (data: any) => void;
+  
+  // Progress and activity events
+  'expedition:progress': (data: any) => void;
+  'expedition:agent-activity': (data: any) => void;
+  'expedition:tool-usage': (data: any) => void;
+  
+  // Room management
+  'expedition:join-room': (data: { expeditionId: string; userId: string }) => void;
+  'expedition:leave-room': (data: { expeditionId: string; userId: string }) => void;
+  'expedition:sync-required': (data: { expeditionId: string; reason: string; timestamp: string }) => void;
+  
+  // Message sending
+  'expedition:send-message': (data: { expeditionId: string; content: string; messageType?: string; participantId?: string; timestamp: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  
+  // User presence events
+  'expedition:user-joined': (data: { userId: string; expeditionId: string; timestamp: string }) => void;
+  'expedition:user-left': (data: { userId: string; expeditionId: string; timestamp: string }) => void;
+  
+  // Status and typing events
+  'expedition:request-status': (data: { expeditionId: string }) => void;
+  'expedition:status-update': (data: { expeditionId: string; timestamp: string }) => void;
+  'expedition:error': (data: { expeditionId: string; error: string; timestamp: string }) => void;
+  'expedition:typing-start': (data: { expeditionId: string; userId?: string; agentId?: string }) => void;
+  'expedition:typing-stop': (data: { expeditionId: string; userId?: string; agentId?: string }) => void;
+  'expedition:user-typing': (data: { expeditionId: string; userId?: string; agentId?: string; isTyping: boolean; timestamp: string }) => void;
+}
+
 // Combined socket events interface
-export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents {}
+export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents, ExpeditionSocketEvents {}
 
 // Main SocketIO Events interface
 export interface SocketIOEvents extends SocketEvents {}

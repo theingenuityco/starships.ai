@@ -372,7 +372,10 @@ export class DeploymentWorkflowService {
     const startTime = Date.now();
     const connector = await this.mcpConnectorRepo.findById(connectorId);
     if (!connector || !connector.starshipId) {
-      throw new Error('Connector not found or missing starship ID');
+      // Stop health monitoring if connector no longer exists
+      console.warn(`[DeploymentWorkflow] Connector ${connectorId} not found, stopping health monitoring`);
+      await this.stopHealthMonitoring(connectorId);
+      return;
     }
 
     // Check if this is an HTTP bridge deployment

@@ -248,6 +248,31 @@ export class MCPNetworkClient {
   }
 
   /**
+   * Check health of a service
+   */
+  async checkHealth(service: MCPServiceEndpoint): Promise<{ healthy: boolean; status: string; details?: any }> {
+    try {
+      const baseUrl = await this.getServiceUrl(service);
+      const response = await this.makeRequest('GET', `${baseUrl}/health`, null, {
+        timeout: 3000 // Quick health check
+      });
+
+      return {
+        healthy: response.status === 'healthy',
+        status: response.status || 'unknown',
+        details: response
+      };
+    } catch (error) {
+      console.warn(`[MCPNetworkClient] Health check failed for ${service.containerName}:`, error);
+      return {
+        healthy: false,
+        status: 'error',
+        details: { error: error instanceof Error ? error.message : String(error) }
+      };
+    }
+  }
+
+  /**
    * Check if a service is reachable
    */
   async checkServiceHealth(service: MCPServiceEndpoint): Promise<boolean> {

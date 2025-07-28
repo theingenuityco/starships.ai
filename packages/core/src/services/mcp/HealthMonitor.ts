@@ -36,7 +36,7 @@ export class HealthMonitor extends EventEmitter {
   private checkInterval: number = 30000; // 30 seconds
   private maxConsecutiveFailures: number = 3;
   private healthChecks: Map<string, HealthCheckResult> = new Map();
-  private intervalId: NodeJS.Timer | null = null;
+  private intervalId: NodeJS.Timeout | null = null;
   private networkClient: MCPNetworkClient;
   private isMonitoring: boolean = false;
 
@@ -161,7 +161,7 @@ export class HealthMonitor extends EventEmitter {
         containerName,
         internalUrl: serviceUrl,
         templateSlug: 'unknown',
-        status: 'unknown',
+        status: 'starting',
         availableTools: [],
         availableResources: [],
         lastHealthCheck: new Date().toISOString()

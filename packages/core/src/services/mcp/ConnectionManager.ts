@@ -20,7 +20,7 @@ export interface ConnectionStatus {
   status: 'connected' | 'connecting' | 'disconnected' | 'error';
   serviceUrl?: string;
   allocatedPort?: number;
-  healthStatus?: 'healthy' | 'unhealthy' | 'unknown';
+  healthStatus?: 'healthy' | 'unhealthy' | 'unknown' | 'starting';
   lastUpdate: Date;
   error?: string;
 }

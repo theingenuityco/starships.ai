@@ -118,6 +118,20 @@ export class ToolDiscoveryCache {
     this.resourceCache.clear();
     console.log(`[ToolDiscoveryCache] Cleared all cache entries (${toolSize} tool entries, ${resourceSize} resource entries)`);
   }
+  
+  /**
+   * Clear cache for a specific starship (alias for delete method)
+   */
+  clearForStarship(starshipId: string): void {
+    this.delete(starshipId);
+  }
+  
+  /**
+   * Clear all cache (alias for clear method)
+   */
+  clearAll(): void {
+    this.clear();
+  }
 
   /**
    * Get cache statistics

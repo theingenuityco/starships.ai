@@ -48,18 +48,29 @@ export class MCPToolGatewayDB {
 
       // Fetch tools from each healthy connector
       for (const connector of connectors) {
+        // Check if container is running (dockerHealthStatus might not be set yet)
         if (connector.dockerStatus === 'running' && 
-            connector.dockerHealthStatus === 'healthy') {
+            (!connector.dockerHealthStatus || connector.dockerHealthStatus === 'healthy' || connector.dockerHealthStatus === 'starting')) {
           
           // Get template info
           let templateSlug = 'unknown';
+          let isHttpBridgeEnabled = false;
           try {
             const template = await serverOptionRepo.findById(connector.templateId);
             if (template) {
               templateSlug = template.slug;
+              // Check if this template uses HTTP bridge
+              const dockerTemplate = await import('./DockerServiceTemplate').then(m => m.getDockerServiceTemplate(templateSlug));
+              isHttpBridgeEnabled = dockerTemplate ? await import('./DockerServiceTemplate').then(m => m.isHttpBridgeTemplate(dockerTemplate)) : false;
             }
           } catch (error) {
             console.warn(`[MCPToolGatewayDB] Could not fetch template info for ${connector.templateId}`);
+          }
+          
+          // Skip non-HTTP bridge connectors
+          if (!isHttpBridgeEnabled) {
+            console.log(`[MCPToolGatewayDB] Skipping connector ${connector.id} - not HTTP bridge enabled`);
+            continue;
           }
           
           // Use deployment config to determine the service URL
@@ -216,6 +227,22 @@ export class MCPToolGatewayDB {
     }
     
     return result.result;
+  }
+
+  /**
+   * Clear cache for a specific starship (useful when new containers are deployed)
+   */
+  clearCacheForStarship(starshipId: string): void {
+    console.log(`[MCPToolGatewayDB] Clearing tool cache for starship ${starshipId}`);
+    this.toolCache.clearForStarship(starshipId);
+  }
+
+  /**
+   * Clear all cache
+   */
+  clearAllCache(): void {
+    console.log('[MCPToolGatewayDB] Clearing all tool cache');
+    this.toolCache.clearAll();
   }
 
   /**

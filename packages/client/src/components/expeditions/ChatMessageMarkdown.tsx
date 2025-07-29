@@ -10,15 +10,13 @@ import { useTheme } from 'next-themes'
 interface ChatMessageMarkdownProps {
   content: string
   isUser?: boolean
-  messageType?: 'chain-of-thought' | 'review-request' | 'review-feedback' | 'default'
-  reviewStatus?: 'approved' | 'rejected'
+  messageType?: 'chain-of-thought' | 'default'
 }
 
 export function ChatMessageMarkdown({ 
   content, 
   isUser = false, 
-  messageType = 'default',
-  reviewStatus
+  messageType = 'default'
 }: ChatMessageMarkdownProps) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -30,14 +28,6 @@ export function ChatMessageMarkdown({
     switch (messageType) {
       case 'chain-of-thought':
         return isDark ? 'text-blue-300' : 'text-blue-900'
-      case 'review-request':
-        return isDark ? 'text-amber-300' : 'text-amber-900'
-      case 'review-feedback':
-        if (reviewStatus === 'approved') {
-          return isDark ? 'text-green-300' : 'text-green-900'
-        } else {
-          return isDark ? 'text-red-300' : 'text-red-900'
-        }
       default:
         return 'text-foreground'
     }
@@ -95,12 +85,6 @@ export function ChatMessageMarkdown({
               px-1.5 py-0.5 rounded text-xs font-mono
               ${isUser ? 'bg-primary-foreground/20 text-primary' : 
                 messageType === 'chain-of-thought' ? (isDark ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-900') :
-                messageType === 'review-request' ? (isDark ? 'bg-amber-900/30 text-amber-300' : 'bg-amber-100 text-amber-900') :
-                messageType === 'review-feedback' ? 
-                  (reviewStatus === 'approved' ? 
-                    (isDark ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-900') :
-                    (isDark ? 'bg-red-900/30 text-red-300' : 'bg-red-100 text-red-900')
-                  ) :
                 'bg-muted text-foreground'
               }
             `}>
@@ -131,12 +115,6 @@ export function ChatMessageMarkdown({
             border-l-4 pl-3 my-2 italic text-sm
             ${isUser ? 'border-primary/50 text-primary' : 
               messageType === 'chain-of-thought' ? (isDark ? 'border-blue-500/50 text-blue-300/80' : 'border-blue-300/50 text-blue-700') :
-              messageType === 'review-request' ? (isDark ? 'border-amber-500/50 text-amber-300/80' : 'border-amber-300/50 text-amber-700') :
-              messageType === 'review-feedback' ? 
-                (reviewStatus === 'approved' ? 
-                  (isDark ? 'border-green-500/50 text-green-300/80' : 'border-green-300/50 text-green-700') :
-                  (isDark ? 'border-red-500/50 text-red-300/80' : 'border-red-300/50 text-red-700')
-                ) :
               'border-muted-foreground/30 text-muted-foreground'
             }
           `}>

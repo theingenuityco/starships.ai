@@ -633,8 +633,6 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                           const agent = message.agentId ? agentDetails[message.agentId] : null;
                           const isOptimistic = message.id.startsWith('temp-');
                           const isChainOfThought = message.messageType === 'chain-of-thought';
-                          const isReviewRequest = message.messageType === 'review-request';
-                          const isReviewFeedback = message.messageType === 'review-feedback';
                           
                           // System messages styling
                           if (isSystem) {
@@ -711,12 +709,6 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                                           ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-md shadow-sm'
                                           : isChainOfThought
                                           ? 'bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl rounded-tl-md shadow-sm'
-                                          : isReviewRequest
-                                          ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl rounded-tl-md shadow-sm'
-                                          : isReviewFeedback
-                                          ? message.reviewStatus === 'approved' 
-                                            ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-2xl rounded-tl-md shadow-sm'
-                                            : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-2xl rounded-tl-md shadow-sm'
                                           : 'bg-muted/50 border border-border rounded-2xl rounded-tl-md shadow-sm'
                                       }`}
                                     >
@@ -726,11 +718,8 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                                           isUser={isUser}
                                           messageType={
                                             isChainOfThought ? 'chain-of-thought' :
-                                            isReviewRequest ? 'review-request' :
-                                            isReviewFeedback ? 'review-feedback' :
                                             'default'
                                           }
-                                          reviewStatus={isReviewFeedback ? message.reviewStatus : undefined}
                                         />
                                       </div>
                                       {/* Show chain of thought details */}

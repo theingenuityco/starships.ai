@@ -65,10 +65,6 @@ export interface ExpeditionSocketEvents {
   'task:assigned': (data: any) => void;
   'task:completed': (data: any) => void;
   
-  // Task review events
-  'expedition:review-task': (data: { expeditionId: string; taskId: string; agentId: string; result: string }, callback?: (response: { success: boolean; reviewResult?: any; error?: string }) => void) => void;
-  'expedition:task-reviewed': (data: { expeditionId: string; taskId: string; agentId: string; approved: boolean; feedback?: string; timestamp: string }) => void;
-  
   // Message events
   'message:sent': (data: any) => void;
   

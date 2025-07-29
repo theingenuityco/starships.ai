@@ -111,11 +111,6 @@ export interface ExpeditionMessage {
     tools?: string[]; // Tools or resources utilized
     learnings?: string[]; // Insights gained during process
   };
-  // Review fields
-  reviewStatus?: 'pending' | 'approved' | 'rejected';
-  reviewFeedback?: string; // First Officer's feedback
-  reviewedBy?: string; // First Officer ID
-  reviewedAt?: string; // Review timestamp
 }
 
 /**
@@ -148,7 +143,6 @@ export type ExpeditionStatus =
   | 'draft'        // Created but not started
   | 'planning'     // First Officer analyzing requirements
   | 'in-progress'  // Active execution with agents
-  | 'review'       // Completed, under review
   | 'completed'    // Successfully finished
   | 'failed'       // Failed or abandoned
   | 'cancelled';   // Cancelled by user
@@ -162,7 +156,6 @@ export type TaskStatus =
   | 'assigned'     // Assigned to agent but not started
   | 'in-progress'  // Currently being worked on
   | 'blocked'      // Waiting for dependencies
-  | 'review'       // Completed, under review
   | 'completed'    // Successfully finished
   | 'failed';      // Failed to complete
 
@@ -195,9 +188,7 @@ export type MessageType =
   | 'result'        // Task or expedition results
   | 'question'      // Questions requiring user input
   | 'notification'  // General notifications
-  | 'chain-of-thought' // Agent reasoning process
-  | 'review-request'   // Request for First Officer review
-  | 'review-feedback'; // First Officer feedback on task
+  | 'chain-of-thought'; // Agent reasoning process
 
 /**
  * Types of expedition results

@@ -236,68 +236,6 @@ export class FirstOfficerService {
     }
   }
 
-  /**
-   * Review a task completion
-   */
-  async reviewTaskCompletion(
-    expeditionId: string,
-    taskId: string,
-    agentId: string,
-    result: string
-  ): Promise<{approved: boolean; feedback?: string}> {
-    const context = {
-      service: 'FirstOfficerService',
-      operation: 'reviewTaskCompletion',
-      resource: 'task',
-      resourceId: taskId,
-      metadata: { expeditionId, agentId }
-    };
-
-    this.logger.info('Reviewing task completion', context);
-
-    try {
-      const firstOfficer = this.activeAgents.get(expeditionId);
-      
-      if (!firstOfficer) {
-        throw ErrorFactory.notFound('First Officer', expeditionId, context);
-      }
-
-      // Call the review method on FirstOfficerAgent
-      const reviewResult = await firstOfficer.reviewTaskCompletion(
-        expeditionId,
-        taskId,
-        agentId,
-        result
-      );
-
-      this.logger.info('Task review completed', {
-        ...context,
-        metadata: {
-          ...context.metadata,
-          approved: reviewResult.approved,
-          hasFeedback: !!reviewResult.feedback
-        }
-      });
-
-      return reviewResult;
-
-    } catch (error) {
-      if (error instanceof StandardError) {
-        this.logger.error('Failed to review task', error as StandardError, context);
-        throw error;
-      }
-
-      const standardError = new StandardError(
-        'TASK_CANNOT_COMPLETE',
-        'Failed to review task completion',
-        { originalError: error instanceof Error ? error.message : String(error) },
-        context
-      );
-
-      this.logger.error('Failed to review task', error instanceof Error ? error : undefined, context);
-      throw standardError;
-    }
-  }
 
   /**
    * Resume an interrupted expedition
@@ -448,7 +386,7 @@ export class FirstOfficerService {
 
       // Update expedition status
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      await expeditionRepo.updateStatus(expeditionId, 'review');
+      await expeditionRepo.updateStatus(expeditionId, 'in-progress');
 
       this.logger.info('Expedition orchestration paused successfully', context);
     } catch (error) {

@@ -865,33 +865,32 @@ Please complete this task with enhanced focus on quality and performance optimiz
     result: string,
     expeditionId: string
   ): Promise<void> {
-    console.log(`📝 [TASK-EXECUTOR] Task ready for review: ${execution.taskId}`);
+    console.log(`✅ [TASK-EXECUTOR] Task completed: ${execution.taskId}`);
     
-    execution.status = 'review';
+    execution.status = 'completed';
     execution.actualEndTime = new Date().toISOString();
     const actualDuration = execution.actualStartTime ? 
       (new Date(execution.actualEndTime).getTime() - new Date(execution.actualStartTime).getTime()) / (1000 * 60) : 0;
     
-    // Update task status to review (not completed yet)
+    // Update task status to completed directly (no review needed)
     const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
-    await taskRepo.updateStatus(execution.taskId, 'review');
+    await taskRepo.updateStatus(execution.taskId, 'completed');
     await taskRepo.updateResult(execution.taskId, result);
     
     // Get task details for activity tracking
     const task = await taskRepo.findById(execution.taskId);
     const taskTitle = task?.title || 'Unknown Task';
     
-    // Emit review request message
+    // Emit task completion message
     if (this.webSocketEmitter) {
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      const reviewRequestMessage = await messageRepo.create({
+      const completionMessage = await messageRepo.create({
         expeditionId,
         role: 'agent' as const,
         agentId: execution.agentId,
-        content: `📋 **Task Completed - Awaiting Review**\n\n**Task:** ${taskTitle}\n**Agent:** ${this.agentNames.get(execution.agentId) || execution.agentId}\n\n**Result:**\n${result}\n\n*Waiting for First Officer approval...*`,
-        messageType: 'review-request' as const,
+        content: `✅ **Task Completed**\n\n**Task:** ${taskTitle}\n**Agent:** ${this.agentNames.get(execution.agentId) || execution.agentId}\n\n**Result:**\n${result}`,
+        messageType: 'task-work' as const,
         timestamp: new Date().toISOString(),
-        reviewStatus: 'pending',
         metadata: {
           taskId: execution.taskId,
           agentId: execution.agentId,
@@ -901,7 +900,7 @@ Please complete this task with enhanced focus on quality and performance optimiz
         }
       });
       
-      this.webSocketEmitter.emitExpeditionMessage(expeditionId, reviewRequestMessage);
+      this.webSocketEmitter.emitExpeditionMessage(expeditionId, completionMessage);
     }
     
     // Store performance metrics
@@ -911,15 +910,19 @@ Please complete this task with enhanced focus on quality and performance optimiz
       this.performanceHistory.set(execution.agentId, agentHistory);
     }
     
-    // Wait for review result
-    console.log(`⏳ [TASK-EXECUTOR] Waiting for First Officer review of task ${execution.taskId}`);
-    
-    // Set task to review state and wait for approval
-    execution.status = 'review';
-    
-    // Note: The actual review will be handled by the First Officer service
-    // This method will be called again when the task is rejected and needs to be retried
-    // For now, we'll emit the completion subject with the review status
+    // Emit task completion activity
+    this.emitAgentActivity(
+      expeditionId,
+      execution.agentId,
+      'task_completed',
+      `Completed "${taskTitle}"`,
+      execution.taskId,
+      taskTitle,
+      { 
+        duration: actualDuration,
+        qualityScore: execution.performanceMetrics?.qualityScore 
+      }
+    );
     
     const completedTask: CompletedTask = {
       taskId: execution.taskId,
@@ -930,13 +933,7 @@ Please complete this task with enhanced focus on quality and performance optimiz
       qualityScore: execution.performanceMetrics?.qualityScore
     };
     
-    // Keep the execution active for potential retry
-    if (execution.status === 'review') {
-      // Don't clean up yet - task is under review
-      return;
-    }
-    
-    // Only clean up if task is truly completed
+    // Emit completion and clean up
     this.completionSubject.next(completedTask);
     
     // Clean up
@@ -1224,95 +1221,6 @@ Please complete this task with enhanced focus on quality and performance optimiz
     }
   }
 
-  /**
-   * Handle task review feedback
-   */
-  async handleTaskReview(taskId: string, approved: boolean, feedback?: string): Promise<void> {
-    console.log(`[TASK-EXECUTOR] Handling review for task ${taskId}: ${approved ? 'APPROVED' : 'REJECTED'}`);
-    
-    const execution = this.activeExecutions.get(taskId);
-    if (!execution) {
-      console.warn(`[TASK-EXECUTOR] No active execution found for task ${taskId}`);
-      return;
-    }
-    
-    // Update execution metadata with review result
-    execution.metadata = {
-      ...execution.metadata,
-      reviewStatus: approved ? 'approved' : 'rejected',
-      reviewFeedback: feedback,
-      reviewedAt: new Date().toISOString()
-    };
-    
-    if (approved) {
-      // Task approved - mark as completed
-      execution.status = 'completed';
-      
-      const completedTask: CompletedTask = {
-        taskId: execution.taskId,
-        agentId: execution.agentId,
-        result: execution.intermediateResults?.[execution.intermediateResults.length - 1] || '',
-        completionTime: new Date().toISOString(),
-        actualDuration: (Date.now() - new Date(execution.actualStartTime || '').getTime()) / 1000,
-        qualityScore: execution.performanceMetrics?.qualityScore
-      };
-      
-      this.completionSubject.next(completedTask);
-      
-      // Clean up
-      this.activeExecutions.delete(execution.taskId);
-      const subject = this.executionSubjects.get(execution.taskId);
-      if (subject) {
-        subject.complete();
-        this.executionSubjects.delete(execution.taskId);
-      }
-    } else {
-      // Task rejected - retry if within retry limit
-      if (execution.retryCount < this.config.maxRetries) {
-        console.log(`[TASK-EXECUTOR] Retrying task ${taskId} after rejection (attempt ${execution.retryCount + 1}/${this.config.maxRetries})`);
-        
-        // Update retry count and add issue
-        execution.retryCount++;
-        execution.issues = execution.issues || [];
-        execution.issues.push(`Rejected by First Officer: ${feedback || 'No specific feedback'}`);
-        execution.status = 'in-progress'; // Set back to in-progress for retry
-        
-        // Get the task and retry
-        const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
-        const task = await taskRepo.findById(taskId);
-        
-        if (task) {
-          // Re-execute the task with feedback context
-          const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-          const expedition = await expeditionRepo.findById(execution.expeditionId);
-          
-          if (expedition && expedition.createdBy) {
-            const result = await this.executeWithIntelligentRetry(
-              execution,
-              execution.expeditionId,
-              expedition.createdBy,
-              { retryLimit: this.config.maxRetries - execution.retryCount }
-            );
-            
-            // After successful retry, send the result back for review
-            await this.handleEnhancedTaskCompletion(execution, result, execution.expeditionId);
-          }
-        }
-      } else {
-        // Max retries exceeded - mark as failed
-        console.error(`[TASK-EXECUTOR] Task ${taskId} failed after ${execution.retryCount} retries`);
-        execution.status = 'failed';
-        
-        // Emit failure
-        this.activeExecutions.delete(execution.taskId);
-        const subject = this.executionSubjects.get(execution.taskId);
-        if (subject) {
-          subject.error(new Error(`Task rejected after ${execution.retryCount} retries: ${feedback}`));
-          this.executionSubjects.delete(execution.taskId);
-        }
-      }
-    }
-  }
 
   /**
    * Initialize resource pool

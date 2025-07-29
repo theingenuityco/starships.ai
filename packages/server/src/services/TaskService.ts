@@ -628,10 +628,9 @@ export class TaskService {
     const validTransitions: Record<TaskStatus, TaskStatus[]> = {
       'pending': ['assigned', 'in-progress'],
       'assigned': ['in-progress', 'pending'],
-      'in-progress': ['completed', 'failed', 'review'],
+      'in-progress': ['completed', 'failed'],
       'blocked': ['pending', 'assigned'],
-      'review': ['completed', 'in-progress'],
-      'completed': ['review'],
+      'completed': [],
       'failed': ['pending', 'assigned']
     };
 

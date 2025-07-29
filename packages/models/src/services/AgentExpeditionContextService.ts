@@ -29,7 +29,7 @@ export class AgentExpeditionContextService {
       const allExpeditions = await expeditionRepo.findAll();
       const agentExpeditions = allExpeditions.filter(exp => 
         exp.assignedAgents.includes(agentId) && 
-        (exp.status === 'planning' || exp.status === 'review' || exp.status === 'draft' || exp.status === 'failed')
+        (exp.status === 'planning' || exp.status === 'draft' || exp.status === 'failed')
       );
 
       if (agentExpeditions.length === 0) {

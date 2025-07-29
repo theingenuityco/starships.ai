@@ -327,9 +327,9 @@ export class FirstOfficerAgent {
           throw new Error(`Expedition failed: ${errorMessage}`);
         } else {
           // No task failures, just workflow completion without final result
-          await expeditionRepo.updateStatus(expeditionId, 'review');
-          const message = 'Workflow completed but no final result synthesized. Expedition requires review.';
-          await this.sendWorkflowLog('⚠️', 'EXPEDITION REVIEW', message);
+          await expeditionRepo.updateStatus(expeditionId, 'completed');
+          const message = 'Workflow completed but no final result synthesized.';
+          await this.sendWorkflowLog('⚠️', 'EXPEDITION COMPLETED', message);
           await this.chatCoordinator.sendCoordinationMessage('phase-update', 'waiting_for_approval', message);
           
           console.warn(`⚠️ [FIRST-OFFICER] Expedition completed without final result: ${expeditionId}`);
@@ -351,9 +351,9 @@ export class FirstOfficerAgent {
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       
       if (isInitializationError) {
-        // For workflow initialization errors, put expedition in review state
-        console.log(`⚠️ [FIRST-OFFICER] Workflow initialization error, setting expedition to review state`);
-        await expeditionRepo.updateStatus(expeditionId, 'review');
+        // For workflow initialization errors, mark as failed
+        console.log(`⚠️ [FIRST-OFFICER] Workflow initialization error, marking expedition as failed`);
+        await expeditionRepo.updateStatus(expeditionId, 'failed');
       } else {
         // Only fail expedition for actual execution failures
         console.log(`❌ [FIRST-OFFICER] Actual execution failure, setting expedition to failed state`);
@@ -388,166 +388,6 @@ export class FirstOfficerAgent {
     return await this.chatCoordinator.handleUserResponse(userMessage);
   }
 
-  /**
-   * Review task completion and provide feedback
-   */
-  async reviewTaskCompletion(
-    expeditionId: string,
-    taskId: string,
-    agentId: string,
-    result: string
-  ): Promise<{approved: boolean; feedback?: string}> {
-    console.log(`🔍 [FIRST-OFFICER] Reviewing task ${taskId} from agent ${agentId}`);
-    
-    try {
-      // Get task details
-      const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
-      const task = await taskRepo.findById(taskId);
-      
-      if (!task) {
-        throw new Error(`Task not found: ${taskId}`);
-      }
-      
-      // Get vision context if available
-      const visionContext = this.visionContent ? `
-Vision Context:
-${this.visionContent}
-` : '';
-      
-      // Prepare review prompt
-      const reviewPrompt = `
-As the First Officer, you need to review the following task completion and determine if it meets quality standards.
-
-${visionContext}
-
-TASK DETAILS:
-- Title: ${task.title}
-- Description: ${task.description}
-- Expected Deliverable: ${task.deliverable}
-- Required Skills: ${task.requiredSkills.join(', ')}
-
-AGENT'S RESULT:
-${result}
-
-REVIEW CRITERIA:
-1. Does the result fully address the task requirements?
-2. Is the quality of work acceptable?
-3. Does it align with the expedition's mission and vision?
-4. Are there any issues or improvements needed?
-
-Please provide your review in the following JSON format:
-{
-  "approved": boolean,
-  "qualityScore": number (0-100),
-  "feedback": "specific feedback for the agent",
-  "issues": ["list of issues if any"],
-  "suggestions": ["improvement suggestions if any"]
-}
-
-Be constructive in your feedback. If rejecting, provide clear guidance on what needs to be improved.
-`;
-
-      // Initialize model if needed
-      await this.initializeModel();
-      
-      // Get review from LLM
-      const reviewResponse = await this.model.complete({
-        messages: [
-          { role: 'system', content: 'You are the First Officer reviewing task completions.' },
-          { role: 'user', content: reviewPrompt }
-        ]
-      });
-      const reviewContent = reviewResponse.reply;
-      
-      // Parse review response
-      let review;
-      try {
-        review = JSON.parse(reviewContent);
-      } catch (error) {
-        console.error('Failed to parse review response:', reviewContent);
-        // Default to approval if parsing fails
-        review = {
-          approved: true,
-          qualityScore: 75,
-          feedback: "Task completed satisfactorily."
-        };
-      }
-      
-      // Update task status based on review
-      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      
-      if (review.approved) {
-        await taskRepo.updateStatus(taskId, 'completed');
-        
-        // Send approval message
-        const approvalMessage = await messageRepo.create({
-          expeditionId,
-          role: 'first-officer' as const,
-          content: `✅ **Task Approved**\n\n**Task:** ${task.title}\n**Quality Score:** ${review.qualityScore}/100\n\n**Feedback:** ${review.feedback}`,
-          messageType: 'review-feedback' as const,
-          timestamp: new Date().toISOString(),
-          reviewStatus: 'approved',
-          reviewFeedback: review.feedback,
-          reviewedBy: 'first-officer',
-          reviewedAt: new Date().toISOString(),
-          metadata: {
-            taskId,
-            agentId,
-            qualityScore: review.qualityScore
-          }
-        });
-        
-        if (this.webSocketEmitter) {
-          this.webSocketEmitter.emitExpeditionMessage(expeditionId, approvalMessage);
-        }
-      } else {
-        await taskRepo.updateStatus(taskId, 'assigned'); // Send back to agent
-        
-        // Send rejection message with feedback
-        const rejectionMessage = await messageRepo.create({
-          expeditionId,
-          role: 'first-officer' as const,
-          content: `❌ **Task Needs Revision**\n\n**Task:** ${task.title}\n**Quality Score:** ${review.qualityScore}/100\n\n**Issues:**\n${review.issues?.map((i: string) => `- ${i}`).join('\n')}\n\n**Suggestions:**\n${review.suggestions?.map((s: string) => `- ${s}`).join('\n')}\n\n**Agent ${agentId}, please address the feedback and resubmit.**`,
-          messageType: 'review-feedback' as const,
-          timestamp: new Date().toISOString(),
-          reviewStatus: 'rejected',
-          reviewFeedback: review.feedback,
-          reviewedBy: 'first-officer',
-          reviewedAt: new Date().toISOString(),
-          metadata: {
-            taskId,
-            agentId,
-            qualityScore: review.qualityScore,
-            issues: review.issues,
-            suggestions: review.suggestions
-          }
-        });
-        
-        if (this.webSocketEmitter) {
-          this.webSocketEmitter.emitExpeditionMessage(expeditionId, rejectionMessage);
-        }
-      }
-      
-      // Notify TaskExecutor about the review result
-      if (this.taskExecutor) {
-        await this.taskExecutor.handleTaskReview(taskId, review.approved, review.feedback);
-      }
-      
-      return {
-        approved: review.approved,
-        feedback: review.feedback
-      };
-      
-    } catch (error) {
-      console.error(`❌ [FIRST-OFFICER] Failed to review task:`, error);
-      
-      // Default to approval with warning
-      return {
-        approved: true,
-        feedback: "Task approved with warning: Review system encountered an error."
-      };
-    }
-  }
 
 
   // ========================================
@@ -1182,8 +1022,8 @@ Be constructive in your feedback. If rejecting, provide clear guidance on what n
         console.log(`❌ [FIRST-OFFICER] Task execution failed, updating expedition status to failed`);
         await expeditionRepo.updateStatus(state.expeditionId, 'failed');
       } else {
-        console.log(`⚠️ [FIRST-OFFICER] Workflow error occurred but no task failures, keeping expedition in review state`);
-        await expeditionRepo.updateStatus(state.expeditionId, 'review');
+        console.log(`⚠️ [FIRST-OFFICER] Workflow error occurred but no task failures, marking expedition as completed`);
+        await expeditionRepo.updateStatus(state.expeditionId, 'completed');
       }
 
       return {

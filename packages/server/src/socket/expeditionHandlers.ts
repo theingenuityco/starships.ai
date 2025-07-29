@@ -1,7 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import type { SocketIOEvents } from '@starships/protocol';
 import type { ExpeditionMessageData } from '../types/socket-types';
-import { FirstOfficerService } from '../services/FirstOfficerService';
 
 /**
  * Setup expedition-specific Socket.IO event handlers
@@ -30,51 +29,14 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         timestamp: new Date().toISOString()
       });
       
-      // Check for pending review requests and sync messages when joining
+      // Emit a sync event to notify client they should refresh messages when joining
       setTimeout(async () => {
-        try {
-          const { MessageService } = await import('../services/MessageService');
-          const messageService = MessageService.getInstance();
-          
-          // Check for pending reviews
-          await messageService.checkAndHandleReviewRequests(data.expeditionId);
-          
-          // Emit a sync event to notify client they should refresh messages
-          socket.emit('expedition:sync-required', {
-            expeditionId: data.expeditionId,
-            reason: 'room-joined',
-            timestamp: new Date().toISOString()
-          });
-        } catch (error) {
-          console.error('[SOCKET.IO] Failed to check review requests on join:', error);
-        }
+        socket.emit('expedition:sync-required', {
+          expeditionId: data.expeditionId,
+          reason: 'room-joined',
+          timestamp: new Date().toISOString()
+        });
       }, 500);
-      
-      // Set up periodic check for review requests while in the room
-      const reviewCheckInterval = setInterval(async () => {
-        try {
-          // Check if socket is still connected and in the room
-          if (!socket.rooms.has(roomId)) {
-            clearInterval(reviewCheckInterval);
-            return;
-          }
-          
-          const { MessageService } = await import('../services/MessageService');
-          const messageService = MessageService.getInstance();
-          await messageService.checkAndHandleReviewRequests(data.expeditionId);
-        } catch (error) {
-          console.error('[SOCKET.IO] Failed to check review requests:', error);
-        }
-      }, 5000); // Check every 5 seconds
-      
-      // Clean up interval when socket disconnects or leaves room
-      socket.on('disconnect', () => {
-        clearInterval(reviewCheckInterval);
-      });
-      
-      socket.on('expedition:leave-room', () => {
-        clearInterval(reviewCheckInterval);
-      });
     });
 
     // Handle expedition room leaving
@@ -123,16 +85,6 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
           const result = await messageService.sendExpeditionMessage(data, userId);
         }
         
-        // After sending the message, check for any pending review requests
-        // This handles cases where review requests are created directly by agents
-        setTimeout(async () => {
-          try {
-            await messageService.checkAndHandleReviewRequests(data.expeditionId);
-          } catch (error) {
-            console.error('[SOCKET.IO] Failed to check review requests:', error);
-          }
-        }, 1000); // Small delay to ensure message is stored
-        
         // Acknowledge success to the sender
         if (callback) {
           callback({ success: true });
@@ -154,51 +106,6 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
     });
     
     // Basic connection handling
-    // Handle task review requests
-    socket.on('expedition:review-task', async (data, callback) => {
-      console.log('[SOCKET.IO] Task review requested:', data);
-      
-      try {
-        const { expeditionId, taskId, agentId, result } = data;
-        
-        if (!expeditionId || !taskId || !agentId || !result) {
-          throw new Error('Missing required fields for task review');
-        }
-        
-        // Get First Officer service and review the task
-        const firstOfficerService = FirstOfficerService.getInstance();
-        const reviewResult = await firstOfficerService.reviewTaskCompletion(
-          expeditionId,
-          taskId,
-          agentId,
-          result
-        );
-        
-        // Emit review result to all expedition participants
-        const roomId = `expedition:${expeditionId}`;
-        io.to(roomId).emit('expedition:task-reviewed', {
-          expeditionId,
-          taskId,
-          agentId,
-          approved: reviewResult.approved,
-          feedback: reviewResult.feedback,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Send success response
-        if (callback) {
-          callback({ success: true, reviewResult });
-        }
-      } catch (error) {
-        console.error('[SOCKET.IO] Failed to review task:', error);
-        if (callback) {
-          callback({ 
-            success: false, 
-            error: error instanceof Error ? error.message : 'Failed to review task' 
-          });
-        }
-      }
-    });
 
     socket.on('disconnect', () => {
       console.log('[SOCKET.IO] Client disconnected from expedition handlers');

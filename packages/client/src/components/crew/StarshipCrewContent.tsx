@@ -9,7 +9,7 @@ import { ConnectorTroubleshootingPanel } from '@/components/crew/ConnectorTroubl
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Users, Plug, Bot } from 'lucide-react'
+import { ArrowLeft, Users, Plug, Bot, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
 
@@ -247,13 +247,22 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
               >
                 <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0">
-                  <AgentSelector
-                    selectedAgent={selectedAgent}
-                    onAgentSelect={handleAgentSelect}
-                    showCreateButton={true}
-                    showFilters={true}
-                    starshipId={starship?.id}
-                  />
+                  {starshipLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-sm text-muted-foreground">Loading agents...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <AgentSelector
+                      selectedAgent={selectedAgent}
+                      onAgentSelect={handleAgentSelect}
+                      showCreateButton={true}
+                      showFilters={true}
+                      starshipId={starship?.id}
+                    />
+                  )}
                 </div>
               </TabsContent>
 

@@ -60,6 +60,10 @@ export function AgentSelector({
   })
 
   useEffect(() => {
+    // Fetch agents when:
+    // 1. starshipId is provided (specific starship context)
+    // 2. starshipId is explicitly null/undefined AND not loading (no starship context - backward compatibility)
+    // Don't fetch if starshipId is undefined but expected (loading state)
     fetchAgents()
   }, [starshipId])
 
@@ -91,6 +95,9 @@ export function AgentSelector({
   const fetchAgents = async () => {
     try {
       setLoading(true)
+      // Clear any existing agents to prevent flash of wrong data
+      setAgents([])
+      
       // If starshipId is provided, fetch agents for that specific starship
       // Otherwise, fetch all agents (for backward compatibility)
       const fetchedAgents = starshipId 

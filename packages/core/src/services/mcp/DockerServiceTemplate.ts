@@ -195,6 +195,51 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     requiresCredentials: false
   },
 
+  // Playwright MCP Server (HTTP Bridge)
+  'playwright': {
+    slug: 'playwright',
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    environment: {
+      MCP_SERVER_CMD: 'npx',
+      MCP_SERVER_ARGS: '@playwright/mcp@latest',
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '30000',
+      MAX_CONCURRENT_REQUESTS: '10',
+      INIT_TIMEOUT: '180000'  // Playwright might take longer to initialize
+    },
+    volumes: [],
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 5,
+      start_period: '90s'  // Give more time for Playwright to start
+    },
+    resourceLimits: {
+      cpus: '1.0',  // Playwright needs more CPU
+      memory: '1024m'  // Playwright needs more memory
+    },
+    labels: {
+      'mcp.type': 'playwright',
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: false,
+      requiresFileAccess: false,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: 'npx',
+      mcpServerArgs: ['@playwright/mcp@latest']
+    },
+    requiresFileAccess: false,
+    requiresCredentials: false
+  },
+
   // Time MCP Server (HTTP Bridge)
   'time': {
     slug: 'time',

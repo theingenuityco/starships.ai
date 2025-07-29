@@ -39,6 +39,13 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
     env: JSON.stringify({}),
   },
+  {
+    name: 'Playwright',
+    slug: 'playwright',
+    command: 'npx',
+    args: ['@playwright/mcp@latest'],
+    env: JSON.stringify({}),
+  },
 ];
 
 async function seedMCPServers() {

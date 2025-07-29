@@ -104,12 +104,18 @@ export async function* chatWithMCPStream(
       console.log(`🔧 [AGENT-ENGINE-MCP-STREAM] Loaded ${mcpTools.length} MCP tools`);
       if (mcpTools.length > 0) {
         console.log('📋 [AGENT-ENGINE-MCP-STREAM] Available tools:', mcpTools.map(t => ({ name: t.name, description: t.description })));
+      } else {
+        console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] No MCP tools found for starship. This might mean:');
+        console.log('   - No MCP servers are configured for this starship');
+        console.log('   - MCP servers are not running or not accessible');
+        console.log('   - There was an error connecting to MCP servers');
       }
     } else {
       console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] No starshipId found for agent');
     }
   } catch (error) {
     console.warn('⚠️ [AGENT-ENGINE-MCP-STREAM] Could not load MCP tools:', error);
+    console.warn('   Stack trace:', (error as Error).stack);
   }
 
   // Get conversation history
@@ -117,14 +123,8 @@ export async function* chatWithMCPStream(
   const memories = await store.get(memoryKey);
   const memoryArray = memories.slice(-10); // Get last 10 messages
 
-  // Build system prompt with MCP context
+  // Build system prompt
   let systemPrompt = agent.systemPrompt || "You are a helpful AI assistant.";
-  if (mcpTools.length > 0) {
-    systemPrompt += `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:
-${mcpTools.map(tool => `- ${tool.name}: ${tool.description}`).join('\n')}
-
-When appropriate, mention these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.`;
-  }
   
   systemPrompt += visionContext;
   
@@ -149,18 +149,78 @@ When appropriate, mention these tools to provide better assistance. You are conn
       req.message
     );
 
+    console.log('🤖 [AGENT-ENGINE-MCP-STREAM] Getting LLM provider...');
     // Get LLM provider and execute
     const provider = await ProviderFactory.getProvider(req.agent_id);
     const llmModel = await llmRepo.findById(agent.model);
-    const result = await provider.complete(prompt, { temperature: llmModel?.temperature });
+    console.log('📡 [AGENT-ENGINE-MCP-STREAM] Sending request to LLM with temperature:', llmModel?.temperature);
+    
+    const result = await provider.complete(prompt, { 
+      temperature: llmModel?.temperature,
+      tools: mcpTools 
+    });
+    console.log('📝 [AGENT-ENGINE-MCP-STREAM] Received response, length:', result.reply.length);
+    
+    // Handle tool calls if present
+    if (result.toolCalls && result.toolCalls.length > 0) {
+      console.log('🔧 [AGENT-ENGINE-MCP-STREAM] Tool calls detected:', result.toolCalls.length);
+      
+      // Execute tool calls
+      const toolResults = [];
+      for (const toolCall of result.toolCalls) {
+        console.log(`🔧 [AGENT-ENGINE-MCP-STREAM] Executing tool: ${toolCall.name}`);
+        try {
+          // Find the tool
+          const tool = mcpTools.find(t => t.name === toolCall.name);
+          if (tool && tool.func) {
+            const toolResult = await tool.func(toolCall.arguments);
+            toolResults.push({
+              toolCallId: toolCall.id,
+              result: toolResult
+            });
+          }
+        } catch (error) {
+          console.error(`❌ [AGENT-ENGINE-MCP-STREAM] Tool execution failed:`, error);
+          toolResults.push({
+            toolCallId: toolCall.id,
+            error: error instanceof Error ? error.message : 'Tool execution failed'
+          });
+        }
+      }
+      
+      // Create a new conversation with tool results
+      const assistantMessage = result.reply || 'Let me use the available tools to help you.';
+      const toolResultsMessage = toolResults.map(tr => 
+        `Tool ${tr.toolCallId}: ${JSON.stringify(tr.result || tr.error)}`
+      ).join('\n');
+      
+      // Build new messages for the follow-up
+      const newMessages = [
+        ...formattedMemories,
+        { role: 'user' as const, content: req.message },
+        { role: 'assistant' as const, content: assistantMessage },
+        { role: 'user' as const, content: `Tool results:\n${toolResultsMessage}\n\nPlease provide a response based on these tool results.` }
+      ];
+      
+      const finalPrompt = { messages: newMessages };
+      const finalResult = await provider.complete(finalPrompt, { 
+        temperature: llmModel?.temperature,
+        tools: mcpTools 
+      });
+      
+      result.reply = finalResult.reply;
+    }
     
     // Simulate streaming by yielding chunks
     const chunkSize = 5; // Characters per chunk
+    let totalChunks = 0;
     for (let i = 0; i < result.reply.length; i += chunkSize) {
       yield result.reply.slice(i, i + chunkSize);
+      totalChunks++;
       // Small delay to simulate streaming
       await new Promise(resolve => setTimeout(resolve, 20));
     }
+    console.log('🌊 [AGENT-ENGINE-MCP-STREAM] Streamed', totalChunks, 'chunks');
     
     // Store assistant message
     await store.append(memoryKey, {

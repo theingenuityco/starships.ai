@@ -92,9 +92,8 @@ export class MCPNetworkClient {
       try {
         const response = await this.makeRequest(
           'POST',
-          `${baseUrl}/tools/call`,
+          `${baseUrl}/tools/${toolName}`,
           {
-            name: toolName,
             arguments: args
           },
           { timeout }

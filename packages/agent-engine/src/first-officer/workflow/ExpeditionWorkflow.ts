@@ -5,7 +5,7 @@
  * for proper state machine management with type-safe transitions and error handling.
  */
 
-import { StateGraph, END, START, Annotation } from '@langchain/langgraph';
+import { StateGraph, END, START, Annotation, MemorySaver } from '@langchain/langgraph';
 import { BaseMessage } from '@langchain/core/messages';
 import { 
   FirstOfficerState,
@@ -16,7 +16,7 @@ import {
   QualityCheck,
   TaskExecution
 } from '../types';
-import { WorkflowPhase } from '@starships/protocol';
+import { WorkflowPhase, TaskBreakdown } from '@starships/protocol';
 
 /**
  * Define the state annotation for the workflow
@@ -28,6 +28,9 @@ const ExpeditionStateAnnotation = Annotation.Root({
   userId: Annotation<string>(),
   starshipId: Annotation<string>(),
   
+  // Configuration
+  requireUserApproval: Annotation<boolean>(),
+  
   // Current workflow phase
   currentPhase: Annotation<WorkflowPhase>(),
   
@@ -37,7 +40,7 @@ const ExpeditionStateAnnotation = Annotation.Root({
   
   // Task planning and breakdown
   taskPlan: Annotation<TaskPlan | undefined>(),
-  taskBreakdown: Annotation<any[]>(),
+  taskBreakdown: Annotation<TaskBreakdown[]>(),
   
   // Agent selection and assignment
   selectedAgents: Annotation<AgentAssignment[] | undefined>(),
@@ -51,8 +54,11 @@ const ExpeditionStateAnnotation = Annotation.Root({
   // Quality control
   qualityChecks: Annotation<QualityCheck[] | undefined>(),
   
-  // Error handling and retry logic
-  errors: Annotation<string[]>({ value: (current, update) => update || current || [], default: () => [] }),
+  // Error handling and retry logic - replace instead of accumulate
+  errors: Annotation<string[]>({ 
+    value: (current, update) => update || current || [],
+    default: () => [] 
+  }),
   retryCount: Annotation<number>(),
   retryAttempts: Annotation<Record<string, number> | undefined>(),
   
@@ -67,6 +73,12 @@ const ExpeditionStateAnnotation = Annotation.Root({
     default: () => [],
     reducer: (current, update) => current.concat(update),
   }),
+  
+  // Chat-specific fields for Virtual First Officer integration
+  userMessage: Annotation<string | undefined>(),
+  context: Annotation<any>(),
+  agentResponse: Annotation<string | undefined>(),
+  semanticSearchResults: Annotation<any[] | undefined>(),
 });
 
 /**
@@ -86,14 +98,31 @@ export interface WorkflowNodeHandlers {
   monitorProgress: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   qualityCheck: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   synthesizeResults: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+  userApproval: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   handleError: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   retryTask: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+  
+  // Chat-oriented node handlers for Virtual First Officer integration
+  refreshContext: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+  semanticSearch: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+  processMessage: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+}
+
+/**
+ * Configuration options for the expedition workflow
+ */
+export interface ExpeditionWorkflowConfig {
+  usePersistentCheckpointer?: boolean;
+  requireUserApproval?: boolean;
 }
 
 /**
  * Create the expedition workflow graph
  */
-export function createExpeditionWorkflow(handlers: WorkflowNodeHandlers) {
+export function createExpeditionWorkflow(
+  handlers: WorkflowNodeHandlers, 
+  config: ExpeditionWorkflowConfig = {}
+) {
   // Create the state graph with our annotation
   const workflow = new StateGraph(ExpeditionStateAnnotation)
     // Define all nodes
@@ -105,13 +134,31 @@ export function createExpeditionWorkflow(handlers: WorkflowNodeHandlers) {
     .addNode('monitor_progress', handlers.monitorProgress)
     .addNode('quality_check', handlers.qualityCheck)
     .addNode('synthesize_results', handlers.synthesizeResults)
+    .addNode('user_approval', handlers.userApproval)
     .addNode('handle_error', handlers.handleError)
-    .addNode('retry_task', handlers.retryTask);
+    .addNode('retry_task', handlers.retryTask)
+    
+    // Chat-oriented nodes for Virtual First Officer integration
+    .addNode('refresh_context', handlers.refreshContext)
+    .addNode('semantic_search', handlers.semanticSearch)
+    .addNode('process_message', handlers.processMessage);
 
   // Define edges based on workflow logic
   workflow
-    // Start -> Analyze Objective
-    .addEdge(START, 'analyze_objective')
+    // Start -> Route based on workflow type (task execution vs chat)
+    .addConditionalEdges(
+      START,
+      (state) => {
+        // If userMessage exists, this is a chat interaction
+        if (state.userMessage) return 'refresh_context';
+        // Otherwise, it's task execution
+        return 'analyze_objective';
+      },
+      {
+        'refresh_context': 'refresh_context',
+        'analyze_objective': 'analyze_objective'
+      }
+    )
     
     // Analyze -> Plan Tasks
     .addConditionalEdges(
@@ -263,13 +310,74 @@ export function createExpeditionWorkflow(handlers: WorkflowNodeHandlers) {
       }
     )
     
-    // Synthesize Results -> End or Error
+    // Synthesize Results -> User Approval or End
     .addConditionalEdges(
       'synthesize_results',
       (state) => {
         if (state.currentPhase === 'failed') return 'handle_error';
-        if (state.finalResult) return END;
-        return 'handle_error';
+        if (!state.finalResult) return 'handle_error';
+        
+        // Check if user approval is required
+        if (state.requireUserApproval) {
+          return 'user_approval';
+        }
+        
+        return END;
+      },
+      {
+        'user_approval': 'user_approval',
+        [END]: END,
+        'handle_error': 'handle_error'
+      }
+    )
+    
+    // User Approval -> End or Error
+    .addConditionalEdges(
+      'user_approval',
+      (state) => {
+        if (state.currentPhase === 'failed') return 'handle_error';
+        return END;
+      },
+      {
+        [END]: END,
+        'handle_error': 'handle_error'
+      }
+    )
+    
+    // Chat workflow edges for Virtual First Officer integration
+    // Refresh Context -> Semantic Search or Process Message
+    .addConditionalEdges(
+      'refresh_context',
+      (state) => {
+        if (state.currentPhase === 'failed') return 'handle_error';
+        // Enable semantic search if available
+        return 'semantic_search';
+      },
+      {
+        'semantic_search': 'semantic_search',
+        'handle_error': 'handle_error'
+      }
+    )
+    
+    // Semantic Search -> Process Message
+    .addConditionalEdges(
+      'semantic_search',
+      (state) => {
+        if (state.currentPhase === 'failed') return 'handle_error';
+        return 'process_message';
+      },
+      {
+        'process_message': 'process_message',
+        'handle_error': 'handle_error'
+      }
+    )
+    
+    // Process Message -> End
+    .addConditionalEdges(
+      'process_message',
+      (state) => {
+        if (state.currentPhase === 'failed') return 'handle_error';
+        return END;
       },
       {
         [END]: END,
@@ -280,17 +388,30 @@ export function createExpeditionWorkflow(handlers: WorkflowNodeHandlers) {
     // Error Handler -> End
     .addEdge('handle_error', END);
 
-  return workflow.compile();
+  // Choose checkpointer based on configuration
+  // Note: Neo4jCheckpointer implementation pending BaseCheckpointSaver interface updates
+  const checkpointer = config.usePersistentCheckpointer 
+    ? new MemorySaver() // Fallback to MemorySaver for now
+    : new MemorySaver();
+  
+  // Configure interrupts based on settings  
+  const interruptBefore = config.requireUserApproval ? ['user_approval'] : undefined;
+
+  return workflow.compile({
+    checkpointer,
+    ...(config.requireUserApproval && { interruptBefore: ['user_approval'] })
+  });
 }
 
 /**
  * Helper function to convert between state formats
  */
-export function convertToExpeditionState(state: FirstOfficerState): ExpeditionState {
+export function convertToExpeditionState(state: FirstOfficerState, requireUserApproval: boolean = false): ExpeditionState {
   return {
     expeditionId: state.expeditionId,
     userId: state.userId,
     starshipId: state.starshipId,
+    requireUserApproval,
     currentPhase: state.currentPhase,
     requirements: state.requirements,
     objectiveAnalysis: state.objectiveAnalysis,
@@ -307,7 +428,13 @@ export function convertToExpeditionState(state: FirstOfficerState): ExpeditionSt
     retryAttempts: state.retryAttempts,
     finalResult: state.finalResult,
     lastUpdated: state.lastUpdated,
-    messages: []
+    messages: [],
+    
+    // Chat-specific fields
+    userMessage: undefined,
+    context: undefined,
+    agentResponse: undefined,
+    semanticSearchResults: undefined
   };
 }
 

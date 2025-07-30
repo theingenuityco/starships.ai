@@ -16,7 +16,6 @@ import {
   MessageType,
   ExpeditionMessage
 } from '@starships/protocol';
-import { VirtualFirstOfficer } from './VirtualFirstOfficer';
 import { FirstOfficerService } from './FirstOfficerService';
 import { MessageService } from './MessageService';
 import { SocketIOService } from './SocketIOService';
@@ -305,10 +304,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
    */
   private async handleClarificationRequest(request: ClarificationRequest): Promise<void> {
     try {
-      // Get Virtual First Officer for this expedition
-      const vfo = await this.getVirtualFirstOfficer(request.expeditionId);
-      
-      // Prepare context for the VFO
+      // Prepare context for the First Officer
       const clarificationPrompt = `
 An agent named "${request.agentName}" working on task "${request.taskTitle || 'unspecified'}" needs clarification.
 
@@ -321,8 +317,8 @@ ${request.clarificationNeeded.proposedApproach ? `Their proposed approach: ${req
 Please provide a clear, helpful clarification that addresses their specific question.
 `;
 
-      // Get response from VFO
-      const response = await vfo.processMessage(clarificationPrompt, 'system');
+      // Get response from First Officer
+      const response = await this.processFirstOfficerMessage(request.expeditionId, clarificationPrompt, 'system');
 
       // Send clarification response
       const clarificationResponse: ClarificationResponse = {
@@ -356,8 +352,6 @@ Please provide a clear, helpful clarification that addresses their specific ques
    */
   private async handleBlockerReport(report: BlockerReport): Promise<void> {
     try {
-      const vfo = await this.getVirtualFirstOfficer(report.expeditionId);
-      
       const blockerPrompt = `
 Agent "${report.agentName}" is blocked and needs help.
 
@@ -374,7 +368,7 @@ ${report.blocker.suggestedResolution ? `Agent's suggested resolution: ${report.b
 Please provide guidance to help unblock the agent. Consider workarounds, alternative approaches, or resource allocation.
 `;
 
-      const response = await vfo.processMessage(blockerPrompt, 'system');
+      const response = await this.processFirstOfficerMessage(report.expeditionId, blockerPrompt, 'system');
 
       // Send guidance
       const guidanceMessage: GuidanceMessage = {
@@ -437,8 +431,6 @@ Please provide guidance to help unblock the agent. Consider workarounds, alterna
 
       // If low confidence or insights, provide encouragement or guidance
       if (update.progress.confidence === 'low' || update.progress.insights) {
-        const vfo = await this.getVirtualFirstOfficer(update.expeditionId);
-        
         const progressPrompt = `
 Agent "${update.agentName}" provided a progress update:
 - ${update.progress.percentComplete}% complete
@@ -450,7 +442,7 @@ ${update.progress.confidence === 'low' ? 'The agent has low confidence. Please p
   'Please acknowledge the progress and provide any relevant guidance based on their insights.'}
 `;
 
-        const response = await vfo.processMessage(progressPrompt, 'system');
+        const response = await this.processFirstOfficerMessage(update.expeditionId, progressPrompt, 'system');
 
         await this.sendToAgent(update.agentId, {
           id: uuidv4(),
@@ -478,8 +470,6 @@ ${update.progress.confidence === 'low' ? 'The agent has low confidence. Please p
    */
   private async handleAssistanceRequest(request: AssistanceRequest): Promise<void> {
     try {
-      const vfo = await this.getVirtualFirstOfficer(request.expeditionId);
-      
       // Check available agents
       const agentRepo = RepositoryFactory.getAgentRepository();
       const expeditionRepo = RepositoryFactory.getExpeditionRepository();
@@ -511,7 +501,7 @@ ${availableAgents.map(a => `- ${a.name} (${a.category})`).join('\n') || 'No matc
 Please decide whether to approve this assistance request and coordinate accordingly.
 `;
 
-      const response = await vfo.processMessage(assistancePrompt, 'system');
+      const response = await this.processFirstOfficerMessage(request.expeditionId, assistancePrompt, 'system');
 
       // Send assistance approval or alternative suggestion
       await this.sendToAgent(request.agentId, {
@@ -542,8 +532,8 @@ Please decide whether to approve this assistance request and coordinate accordin
    */
   private async handleGenericAgentMessage(message: AgentToOfficerMessage): Promise<void> {
     try {
-      const vfo = await this.getVirtualFirstOfficer(message.expeditionId);
-      const response = await vfo.processMessage(
+      const response = await this.processFirstOfficerMessage(
+        message.expeditionId,
         `Agent "${message.agentName}" says: ${message.content}`,
         'system'
       );
@@ -575,21 +565,15 @@ Please decide whether to approve this assistance request and coordinate accordin
   // ============================================================================
 
   /**
-   * Get Virtual First Officer for expedition
+   * Process message using First Officer Service
    */
-  private async getVirtualFirstOfficer(expeditionId: string): Promise<VirtualFirstOfficer> {
-    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-    const expedition = await expeditionRepo.findById(expeditionId);
-    
-    if (!expedition) {
-      throw new Error(`Expedition ${expeditionId} not found`);
-    }
-
-    return this.firstOfficerService.getOrCreateVirtualFirstOfficerForExpedition(
+  private async processFirstOfficerMessage(expeditionId: string, message: string, userId: string): Promise<string> {
+    const response = await this.firstOfficerService.handleUserMessage(
       expeditionId,
-      expedition.starshipId,
-      expedition
+      userId,
+      message
     );
+    return response.reply;
   }
 
   /**

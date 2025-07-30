@@ -2,7 +2,7 @@ import { getLogger, Logger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import { ExpeditionMessage } from '@starships/protocol';
 
-// Import interfaces from VirtualFirstOfficer.ts
+// Context interfaces for expedition details
 interface ExpeditionDetails {
   id: string;
   name: string;

@@ -16,7 +16,6 @@ import {
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionService } from './ExpeditionService';
-import { VirtualFirstOfficer } from './VirtualFirstOfficer';
 import { ContextBuilder } from './ContextBuilder';
 import { SocketIOService } from './SocketIOService';
 import { chat as agentChat, chatStream } from '@starships/agent-engine';
@@ -935,79 +934,22 @@ private async checkActiveFirstOfficer(expeditionId: string): Promise<boolean> {
 }
 
 /**
- * Get response from Virtual First Officer
+ * Get response from First Officer Service
  */
-private async getVirtualFirstOfficerResponse(
+private async getFirstOfficerResponse(
   expeditionId: string,
-  starshipId: string,
   message: string,
   userId: string
 ): Promise<string> {
   try {
-    // Get or create a Virtual First Officer instance
-    const virtualFirstOfficer = await this.firstOfficerService.getOrCreateVirtualFirstOfficer(
-      starshipId
+    const response = await this.firstOfficerService.handleUserMessage(
+      expeditionId,
+      userId,
+      message
     );
-
-    // Build context using ContextBuilder
-    const contextBuilder = new ContextBuilder();
-    const expeditionContext = await contextBuilder.buildContext(expeditionId, starshipId);
-
-    // Convert to the format expected by VirtualFirstOfficer
-    const context = {
-      expeditionId: expeditionContext.expeditionDetails.id,
-      starshipId: starshipId,
-      state: expeditionContext.expeditionDetails.status as any,
-      title: expeditionContext.expeditionDetails.name,
-      objective: expeditionContext.expeditionDetails.mission,
-      createdAt: expeditionContext.expeditionDetails.createdAt,
-      assignedAgents: expeditionContext.agents.map(agent => ({
-        id: agent.id,
-        name: agent.name,
-        role: agent.role,
-        status: agent.status === 'active' ? 'online' as const : 'offline' as const
-      })),
-      tasks: expeditionContext.taskSummaries.map(task => ({
-        id: task.id,
-        title: task.title,
-        status: task.status,
-        assignedTo: task.assignedAgent,
-        createdAt: task.createdAt,
-        completedAt: task.completedAt
-      })),
-      results: expeditionContext.recentResults.map(result => ({
-        id: result.id,
-        taskId: result.taskId || '',
-        content: JSON.stringify(result.data || {}),
-        createdAt: result.createdAt,
-        createdBy: result.agentId || 'system'
-      })),
-      recentMessages: expeditionContext.recentMessages.map(msg => ({
-        id: msg.id,
-        sender: msg.userId || msg.agentId || 'system',
-        content: msg.content,
-        timestamp: msg.timestamp,
-        type: msg.role === 'user' ? 'user' as const : msg.role === 'agent' ? 'agent' as const : 'system' as const
-      })),
-      statistics: {
-        totalTasks: expeditionContext.statistics.totalTasks,
-        completedTasks: expeditionContext.statistics.completedTasks,
-        activeTasks: expeditionContext.statistics.inProgressTasks,
-        failedTasks: expeditionContext.statistics.failedTasks,
-        totalMessages: expeditionContext.statistics.totalMessages,
-        averageCompletionTime: expeditionContext.statistics.averageCompletionTime
-      }
-    };
-
-    // Update the Virtual First Officer's context
-    virtualFirstOfficer.updateContext(context);
-
-    // Process the message and get response
-    const response = await virtualFirstOfficer.processMessage(message, userId);
-
-    return response;
+    return response.reply;
   } catch (error) {
-    console.error('[MESSAGE-SERVICE] Error getting Virtual First Officer response:', error);
+    console.error('[MESSAGE-SERVICE] Failed to get First Officer response:', error);
     throw error;
   }
 }
@@ -1103,21 +1045,20 @@ private async handleAgentMessage(
         const hasActiveFirstOfficer = await this.checkActiveFirstOfficer(expeditionId);
 
         if (!hasActiveFirstOfficer) {
-          // Use Virtual First Officer as fallback
-          console.log(`[MESSAGE-SERVICE] Using Virtual First Officer for expedition ${expeditionId}`);
+          // Use First Officer Service for chat
+          console.log(`[MESSAGE-SERVICE] Using First Officer Service for expedition ${expeditionId}`);
           
-          const virtualResponse = await this.getVirtualFirstOfficerResponse(
+          const response = await this.getFirstOfficerResponse(
             expeditionId,
-            expedition.starshipId,
             message,
             userId
           );
 
-          console.log(`[MESSAGE-SERVICE] Virtual First Officer response generated`);
-          console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY (Virtual) =====`);
+          console.log(`[MESSAGE-SERVICE] First Officer response generated`);
+          console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY =====`);
 
           return {
-            reply: virtualResponse,
+            reply: response,
             usage: undefined
           };
         }

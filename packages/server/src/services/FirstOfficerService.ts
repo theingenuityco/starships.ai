@@ -26,8 +26,6 @@ import {
   StandardError
 } from '@starships/protocol/src/types/error-classes';
 import { Logger } from '../utils/logger';
-import { VirtualFirstOfficer } from './VirtualFirstOfficer';
-import { VirtualFirstOfficerWorkflow } from './VirtualFirstOfficerWorkflow';
 import { ContextBuilder } from './ContextBuilder';
 import { SocketIOService } from './SocketIOService';
 
@@ -35,8 +33,6 @@ export class FirstOfficerService {
   private static instance: FirstOfficerService;
   private activeAgents: Map<string, FirstOfficerAgent> = new Map();
   private memoryStores: Map<string, LangChainMemoryStore> = new Map();
-  private virtualFirstOfficers: Map<string, VirtualFirstOfficer> = new Map();
-  private virtualFirstOfficerWorkflows: Map<string, VirtualFirstOfficerWorkflow> = new Map();
   private contextBuilder: ContextBuilder;
   private logger: Logger;
   private socketService: SocketIOService | null = null;
@@ -521,99 +517,91 @@ export class FirstOfficerService {
         );
       }
 
-      const firstOfficer = this.activeAgents.get(expeditionId);
+      let firstOfficer = this.activeAgents.get(expeditionId);
       if (!firstOfficer) {
-        // Try to get or create a Virtual First Officer for this expedition
+        // Create a FirstOfficerAgent for this expedition to handle chat
         const expeditionRepo = RepositoryFactory.getExpeditionRepository();
         const expedition = await expeditionRepo.findById(expeditionId);
         
-        if (expedition) {
-          const virtualFirstOfficer = await this.getOrCreateVirtualFirstOfficerForExpedition(
+        if (!expedition) {
+          throw ErrorFactory.notFound(
+            'Expedition',
             expeditionId,
-            expedition.starshipId,
-            expedition
+            context
           );
-          
-          // Get or create workflow for LangGraph orchestration
-          const workflow = await this.getOrCreateVirtualFirstOfficerWorkflow(
-            expeditionId,
-            virtualFirstOfficer
-          );
-          
-          // Process message with LangGraph workflow
-          const workflowResult = await workflow.executeWorkflow({
-            expeditionId,
-            starshipId: expedition.starshipId,
-            userId,
-            userMessage: message
-          });
-          
-          const response = workflowResult.response || "I encountered an error processing your message.";
-          
-          this.logger.info('Message handled by Virtual First Officer', {
-            ...context,
-            metadata: { ...context.metadata, responseLength: response.length }
-          });
-          
-          return {
-            reply: response,
-            usage: undefined
-          };
+        }
+
+        // Create FirstOfficerAgent for chat handling
+        const memoryStore = this.memoryStores.get(expeditionId) || new LangChainMemoryStore();
+        this.memoryStores.set(expeditionId, memoryStore);
+        
+        // Create WebSocket message emission callback
+        const messageEmitCallback = async (message: any) => {
+          const socketSvc = this.getSocketService();
+          if (socketSvc) {
+            const expeditionRoom = `expedition:${expeditionId}`;
+            const eventData = {
+              expeditionId,
+              message,
+              timestamp: new Date().toISOString()
+            };
+            socketSvc.getIO().to(expeditionRoom).emit('message:sent', eventData);
+          }
+        };
+
+        // Create WebSocketEventEmitter
+        const webSocketEmitter = new WebSocketEventEmitter();
+        const socketSvc = this.getSocketService();
+        if (socketSvc) {
+          webSocketEmitter.setSocketServer(socketSvc.getIO());
         }
         
-        // Return a graceful response if no expedition found
-        this.logger.warn('No active expedition found for user message', context);
-        return {
-          reply: "No active expedition found. Please start an expedition first.",
-          usage: undefined
-        };
+        firstOfficer = new FirstOfficerAgent(
+          expedition.starshipId,
+          memoryStore,
+          {
+            maxRetries: 3,
+            qualityThreshold: 70,
+            timeoutMinutes: 60,
+            requireUserApproval: false,
+            enableParallelExecution: false,
+            autoEscalation: true
+          },
+          expedition.assignedAgents || [],
+          messageEmitCallback,
+          webSocketEmitter
+        );
+        
+        // Store the agent for reuse
+        this.activeAgents.set(expeditionId, firstOfficer);
       }
 
-      // The FirstOfficerService should not create messages directly
-      // Messages are already created by the MessageService that calls this method
-      // Just handle the First Officer logic and return a response
-      
-      console.log('[FIRST-OFFICER-SERVICE] Processing First Officer message (messages handled by MessageService)');
+      // Use FirstOfficerAgent to handle chat message
+      try {
+        // Get expedition to get starshipId
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        const expedition = await expeditionRepo.findById(expeditionId);
+        
+        // Process message using the consolidated workflow's chat capabilities
+        const response = await firstOfficer.handleUserMessage(expeditionId, message);
 
-      // For now, just return a simple response since the actual logic is complex
-      // The message handling and WebSocket emission is done by MessageService
-      console.log(`[FIRST-OFFICER-SERVICE] Generating First Officer response for expedition ${expeditionId}`);
+        this.logger.info('Successfully processed user message', context, {
+          responseLength: response.reply.length
+        });
 
-      // Return a First Officer response
-      const reply = `Thank you for your message. I'm coordinating the expedition and will provide updates as tasks progress. If you need immediate assistance, please let me know.`;
-
-      this.logger.info('User message handled successfully', {
-        ...context,
-        metadata: { 
-          ...context.metadata, 
-          responseLength: reply.length
-        }
-      });
-
-      return {
-        reply,
-        usage: undefined
-      };
+        return response;
+      } catch (chatError) {
+        this.logger.error('Chat processing failed, falling back to simple response', chatError instanceof Error ? chatError : undefined, context);
+        
+        return {
+          reply: 'I apologize, but I encountered an issue processing your message. Please try again.'
+        };
+      }
     } catch (error) {
-      if (error instanceof StandardError) {
-        this.logger.error('Failed to handle user message', error as StandardError, context);
-        return {
-          reply: "I encountered an error processing your message. Please try again.",
-          usage: undefined
-        };
-      }
-
-      const standardError = new StandardError(
-        'MESSAGE_SEND_FAILED',
-        'Failed to handle user message',
-        { originalError: error instanceof Error ? error.message : String(error) },
-        context
-      );
-
       this.logger.error('Failed to handle user message', error instanceof Error ? error : undefined, context);
+      
       return {
-        reply: "I encountered an error processing your message. Please try again.",
-        usage: undefined
+        reply: 'I encountered an error processing your message. Please try again.'
       };
     }
   }
@@ -914,186 +902,4 @@ export class FirstOfficerService {
     };
   }
 
-  /**
-   * Get or create a Virtual First Officer workflow instance
-   */
-  async getOrCreateVirtualFirstOfficerWorkflow(
-    expeditionId: string,
-    virtualFirstOfficer: VirtualFirstOfficer
-  ): Promise<VirtualFirstOfficerWorkflow> {
-    const context = {
-      service: 'FirstOfficerService',
-      operation: 'getOrCreateVirtualFirstOfficerWorkflow',
-      resource: 'virtualFirstOfficerWorkflow',
-      resourceId: expeditionId
-    };
-
-    try {
-      // Check if we already have a workflow for this expedition
-      if (this.virtualFirstOfficerWorkflows.has(expeditionId)) {
-        return this.virtualFirstOfficerWorkflows.get(expeditionId)!;
-      }
-
-      // Create a new workflow
-      const workflow = new VirtualFirstOfficerWorkflow(
-        virtualFirstOfficer,
-        this.contextBuilder,
-        {
-          maxRetries: 3,
-          enableSemanticSearch: true,
-          contextRefreshInterval: 60000
-        }
-      );
-      
-      // Store it in our map
-      this.virtualFirstOfficerWorkflows.set(expeditionId, workflow);
-      
-      this.logger.info('Created Virtual First Officer workflow for expedition', {
-        ...context,
-        metadata: { expeditionId }
-      });
-      
-      return workflow;
-    } catch (error) {
-      this.logger.error(
-        'Failed to create Virtual First Officer workflow',
-        error instanceof Error ? error : undefined,
-        context
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Get or create a Virtual First Officer instance for a starship
-   */
-  async getOrCreateVirtualFirstOfficer(starshipId: string): Promise<VirtualFirstOfficer> {
-    const context = {
-      service: 'FirstOfficerService',
-      operation: 'getOrCreateVirtualFirstOfficer',
-      resource: 'virtualFirstOfficer',
-      resourceId: starshipId
-    };
-
-    try {
-      // Check if we already have a Virtual First Officer for this starship
-      if (this.virtualFirstOfficers.has(starshipId)) {
-        return this.virtualFirstOfficers.get(starshipId)!;
-      }
-
-      // Get message repository for persistence
-      const messageRepository = RepositoryFactory.getExpeditionMessageRepository();
-
-      // Create a new Virtual First Officer with default config and repository injection
-      // Note: In a real implementation, we'd fetch expedition details
-      const config = {
-        expeditionId: 'virtual', // Placeholder expedition ID
-        starshipId: starshipId,
-        context: {
-          expeditionId: 'virtual',
-          starshipId: starshipId,
-          state: 'active' as const,
-          title: 'Virtual First Officer Session',
-          objective: 'Assist with expedition coordination',
-          createdAt: new Date().toISOString(),
-          assignedAgents: [],
-          tasks: [],
-          results: [],
-          recentMessages: [],
-          statistics: {
-            totalTasks: 0,
-            completedTasks: 0,
-            activeTasks: 0,
-            failedTasks: 0,
-            totalMessages: 0,
-            averageCompletionTime: 0
-          }
-        },
-        conversationMemory: {
-          messages: [],
-          maxMessages: 50
-        },
-        messageRepository: messageRepository // Inject repository for persistence
-      };
-      
-      const virtualFirstOfficer = new VirtualFirstOfficer(config);
-      
-      // Store it in our map
-      this.virtualFirstOfficers.set(starshipId, virtualFirstOfficer);
-      
-      this.logger.info('Created Virtual First Officer for starship', {
-        ...context,
-        metadata: { starshipId }
-      });
-      
-      return virtualFirstOfficer;
-    } catch (error) {
-      this.logger.error(
-        'Failed to create Virtual First Officer',
-        error instanceof Error ? error : undefined,
-        context
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Get or create a Virtual First Officer instance for a specific expedition
-   * Phase 1.2: Enhanced version that loads conversation history for real expeditions
-   */
-  async getOrCreateVirtualFirstOfficerForExpedition(
-    expeditionId: string,
-    starshipId: string,
-    expedition: any
-  ): Promise<VirtualFirstOfficer> {
-    const context = {
-      service: 'FirstOfficerService',
-      operation: 'getOrCreateVirtualFirstOfficerForExpedition',
-      resource: 'virtualFirstOfficer',
-      resourceId: expeditionId
-    };
-
-    try {
-      // Check if we already have a Virtual First Officer for this expedition
-      if (this.virtualFirstOfficers.has(expeditionId)) {
-        return this.virtualFirstOfficers.get(expeditionId)!;
-      }
-
-      // Get message repository for persistence
-      const messageRepository = RepositoryFactory.getExpeditionMessageRepository();
-
-      // Build complete expedition context with agent details
-      const expeditionContext = await this.buildCompleteExpeditionContext(expedition);
-
-      const config = {
-        expeditionId: expedition.id,
-        starshipId: expedition.starshipId,
-        context: expeditionContext,
-        conversationMemory: {
-          messages: [],
-          maxMessages: 50
-        },
-        messageRepository: messageRepository // Inject repository for persistence
-      };
-      
-      const virtualFirstOfficer = new VirtualFirstOfficer(config);
-      
-      // Store it in our map using expedition ID as key
-      this.virtualFirstOfficers.set(expeditionId, virtualFirstOfficer);
-      
-      this.logger.info('Created Virtual First Officer for expedition', {
-        ...context,
-        metadata: { expeditionId, starshipId }
-      });
-      
-      return virtualFirstOfficer;
-    } catch (error) {
-      this.logger.error(
-        'Failed to create Virtual First Officer for expedition',
-        error instanceof Error ? error : undefined,
-        context
-      );
-      throw error;
-    }
-  }
 }

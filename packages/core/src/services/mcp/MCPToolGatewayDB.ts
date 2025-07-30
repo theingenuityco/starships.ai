@@ -138,6 +138,11 @@ export class MCPToolGatewayDB {
     try {
       const rawTools = await this.networkClient.fetchTools(service);
       
+      // Log the raw tools for debugging
+      if (service.templateSlug === 'sequentialthinking') {
+        console.log('[MCPToolGatewayDB] Sequential thinking raw tools:', JSON.stringify(rawTools, null, 2));
+      }
+      
       // Transform raw tools to MCPTool format
       return rawTools.map(tool => ({
         id: `${service.connectorId}:${tool.name}`,

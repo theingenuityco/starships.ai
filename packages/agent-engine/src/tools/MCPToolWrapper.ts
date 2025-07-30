@@ -49,21 +49,43 @@ export class MCPToolWrapper {
           // Track usage statistics
           this.trackUsage(namespacedName);
           
+          // Log input for sequential thinking debugging
+          if (mcpTool.templateSlug === 'sequentialthinking') {
+            console.log(`[MCPToolWrapper] Sequential thinking input:`, JSON.stringify(input, null, 2));
+            console.log(`[MCPToolWrapper] Sequential thinking schema:`, JSON.stringify(mcpTool.inputSchema, null, 2));
+          }
+          
+          // Handle special case for sequential thinking tool
+          let processedInput = input;
+          if (mcpTool.templateSlug === 'sequentialthinking') {
+            // If the LLM sends a simple format, transform it
+            if (typeof input === 'string' || (input && typeof input.input === 'string' && !input.thought)) {
+              const query = typeof input === 'string' ? input : input.input;
+              processedInput = {
+                thought: `I need to analyze this request: "${query}". Let me break this down systematically to provide a comprehensive response.`,
+                nextThoughtNeeded: true,
+                thoughtNumber: 1,
+                totalThoughts: 5
+              };
+              console.log(`[MCPToolWrapper] Transformed simple input to sequential thinking format:`, JSON.stringify(processedInput, null, 2));
+            }
+          }
+          
           // Validate input
-          const validatedInput = schema.parse(input);
+          const validatedInput = schema.parse(processedInput);
           
           // Execute the tool via gateway
+          // Tool ID must be in format "connectorId:toolName"
+          const fullToolId = `${mcpTool.connectorId}:${mcpTool.name}`;
           const result = await this.config.gateway.invokeTool(
             this.config.starshipId,
-            mcpTool.name,
+            fullToolId,
             validatedInput
           );
           
-          // Handle execution results
-          if (!result.success) {
-            const errorMsg = `Tool execution failed: ${result.error}`;
-            console.error(`[MCPToolWrapper] ${errorMsg}`);
-            return errorMsg;
+          // Log the full result for debugging
+          if (this.config.enableLogging) {
+            console.log(`[MCPToolWrapper] Tool invocation result:`, JSON.stringify(result, null, 2));
           }
           
           // Log execution time
@@ -73,7 +95,8 @@ export class MCPToolWrapper {
           }
           
           // Format and return the result
-          return this.formatToolResponse(result.result, mcpTool);
+          // Note: invokeTool returns the result directly, not wrapped in a success/error object
+          return this.formatToolResponse(result, mcpTool);
           
         } catch (error) {
           console.error(`[MCPToolWrapper] Error in ${mcpTool.name}:`, error);
@@ -142,7 +165,18 @@ export class MCPToolWrapper {
     const hint = categoryHints[tool.templateSlug] || '';
     const provider = `\nProvider: ${tool.templateSlug}`;
     
-    return `${tool.description}${hint}${provider}`;
+    // Add parameter hints for sequential thinking
+    let parameterHints = '';
+    if (tool.templateSlug === 'sequentialthinking' && tool.inputSchema?.properties) {
+      parameterHints = '\n\nIMPORTANT: This tool requires the following parameters:\n';
+      parameterHints += '- thought (string): Your current thinking step\n';
+      parameterHints += '- nextThoughtNeeded (boolean): Whether another thought step is needed\n';
+      parameterHints += '- thoughtNumber (integer): Current thought number (start with 1)\n';
+      parameterHints += '- totalThoughts (integer): Estimated total thoughts needed\n';
+      parameterHints += '\nExample usage: {"thought": "First, I need to understand...", "nextThoughtNeeded": true, "thoughtNumber": 1, "totalThoughts": 5}';
+    }
+    
+    return `${tool.description}${hint}${parameterHints}${provider}`;
   }
 
   /**

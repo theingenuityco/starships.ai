@@ -271,6 +271,23 @@ export class MCPToolWrapper {
    * Format tool response for agent consumption
    */
   private formatToolResponse(result: any, tool: MCPTool): string {
+    // Handle wrapped responses from MCP HTTP bridge
+    if (Array.isArray(result) && result.length > 0 && result[0].type === 'text') {
+      // Extract the text content and try to parse it
+      const textContent = result[0].text;
+      try {
+        const parsedContent = JSON.parse(textContent);
+        // For sequential thinking, we want to continue the process
+        if (tool.templateSlug === 'sequentialthinking') {
+          // Return a message indicating the thought was processed
+          return `Thought ${parsedContent.thoughtNumber} of ${parsedContent.totalThoughts} processed. Continue thinking needed: ${parsedContent.nextThoughtNeeded}`;
+        }
+        return JSON.stringify(parsedContent, null, 2);
+      } catch {
+        return textContent;
+      }
+    }
+    
     // Special formatting for known tool types
     if (tool.templateSlug === 'sequentialthinking') {
       // Sequential thinking returns structured reasoning

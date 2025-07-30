@@ -159,7 +159,7 @@ export async function* chatWithMCPStream(
       temperature: llmModel?.temperature,
       tools: mcpTools 
     });
-    console.log('📝 [AGENT-ENGINE-MCP-STREAM] Received response, length:', result.reply.length);
+    console.log('📝 [AGENT-ENGINE-MCP-STREAM] Received response, length:', result.reply?.length || 0);
     
     // Handle tool calls if present
     if (result.toolCalls && result.toolCalls.length > 0) {
@@ -212,20 +212,29 @@ export async function* chatWithMCPStream(
     }
     
     // Simulate streaming by yielding chunks
+    const replyText = result.reply || '';
     const chunkSize = 5; // Characters per chunk
     let totalChunks = 0;
-    for (let i = 0; i < result.reply.length; i += chunkSize) {
-      yield result.reply.slice(i, i + chunkSize);
-      totalChunks++;
-      // Small delay to simulate streaming
-      await new Promise(resolve => setTimeout(resolve, 20));
+    
+    if (replyText.length > 0) {
+      for (let i = 0; i < replyText.length; i += chunkSize) {
+        yield replyText.slice(i, i + chunkSize);
+        totalChunks++;
+        // Small delay to simulate streaming
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    } else {
+      // If no reply, yield a default message
+      yield 'Processing your request...';
+      totalChunks = 1;
     }
+    
     console.log('🌊 [AGENT-ENGINE-MCP-STREAM] Streamed', totalChunks, 'chunks');
     
     // Store assistant message
     await store.append(memoryKey, {
       role: 'assistant',
-      content: result.reply,
+      content: replyText || 'Processing your request...',
       timestamp: Date.now()
     } as MemoryEntry);
     

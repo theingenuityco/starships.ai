@@ -8,7 +8,7 @@ import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol
 import { AgentExecutor } from "langchain/agents";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { createOpenAIFunctionsAgent } from "langchain/agents";
+import { createOpenAIFunctionsAgent, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
@@ -165,12 +165,18 @@ When appropriate, use these tools to provide better assistance. You are connecte
       new MessagesPlaceholder("agent_scratchpad"),
     ]);
     
-    // Create the agent
-    const agentExecutor = await createOpenAIFunctionsAgent({
-      llm,
-      tools: mcpTools,
-      prompt,
-    });
+    // Create the agent - use appropriate type based on provider
+    const agentExecutor = llmModel.provider === 'openai' 
+      ? await createOpenAIFunctionsAgent({
+          llm,
+          tools: mcpTools,
+          prompt,
+        })
+      : createToolCallingAgent({
+          llm,
+          tools: mcpTools,
+          prompt,
+        });
     
     // Create the executor
     const executor = new AgentExecutor({

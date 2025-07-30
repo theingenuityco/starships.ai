@@ -44,7 +44,7 @@ export class LangChainProvider implements LLMProvider {
       const toolCalls = (response as any).tool_calls ? (response as any).tool_calls.map((tc: any) => ({
         id: tc.id || '',
         name: tc.name,
-        arguments: tc.args,
+        arguments: tc.args || {},
       })) : undefined;
 
       return {

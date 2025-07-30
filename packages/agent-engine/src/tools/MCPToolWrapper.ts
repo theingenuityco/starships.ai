@@ -25,6 +25,59 @@ export class MCPToolWrapper {
   }
 
   /**
+   * Map input parameters intelligently when LLM sends generic format
+   */
+  private mapInputParameters(input: any, mcpTool: MCPTool): any {
+    // If input is already correctly formatted, return as-is
+    if (typeof input === 'object' && !input.hasOwnProperty('input')) {
+      return input;
+    }
+    
+    // Handle common single-parameter tools
+    const properties = mcpTool.inputSchema?.properties || {};
+    const propertyNames = Object.keys(properties);
+    
+    // Single parameter tool with generic input
+    if (propertyNames.length === 1 && (typeof input === 'string' || input.input !== undefined)) {
+      const paramName = propertyNames[0];
+      const value = typeof input === 'string' ? input : input.input;
+      return { [paramName]: value };
+    }
+    
+    // Try to map 'input' to the most likely parameter
+    if (input.input !== undefined && propertyNames.length > 0) {
+      // Common parameter name mappings
+      const mappings: Record<string, string[]> = {
+        'url': ['url', 'uri', 'link', 'href', 'website', 'address'],
+        'text': ['text', 'content', 'message', 'query', 'prompt', 'input'],
+        'selector': ['selector', 'element', 'target', 'locator'],
+        'thought': ['thought', 'reasoning', 'analysis'],
+        'key': ['key', 'name', 'identifier'],
+        'value': ['value', 'data', 'content']
+      };
+      
+      // Find best match
+      for (const [_, aliases] of Object.entries(mappings)) {
+        const matchedParam = propertyNames.find(name => 
+          aliases.includes(name.toLowerCase())
+        );
+        if (matchedParam) {
+          return { [matchedParam]: input.input };
+        }
+      }
+      
+      // If no match found but there's only one required parameter, use it
+      const requiredParams = mcpTool.inputSchema?.required || [];
+      if (requiredParams.length === 1) {
+        return { [requiredParams[0]]: input.input };
+      }
+    }
+    
+    // Return original if no mapping found
+    return input;
+  }
+
+  /**
    * Create a LangChain-compatible tool from an MCP tool
    */
   createLangChainTool(mcpTool: MCPTool): DynamicTool {
@@ -55,12 +108,14 @@ export class MCPToolWrapper {
             console.log(`[MCPToolWrapper] Sequential thinking schema:`, JSON.stringify(mcpTool.inputSchema, null, 2));
           }
           
-          // Handle special case for sequential thinking tool
-          let processedInput = input;
+          // Map input parameters if needed
+          let processedInput = this.mapInputParameters(input, mcpTool);
+          
+          // Special handling for sequential thinking tool
           if (mcpTool.templateSlug === 'sequentialthinking') {
             // If the LLM sends a simple format, transform it
-            if (typeof input === 'string' || (input && typeof input.input === 'string' && !input.thought)) {
-              const query = typeof input === 'string' ? input : input.input;
+            if (typeof processedInput === 'string' || (processedInput && typeof processedInput.input === 'string' && !processedInput.thought)) {
+              const query = typeof processedInput === 'string' ? processedInput : processedInput.input;
               processedInput = {
                 thought: `I need to analyze this request: "${query}". Let me break this down systematically to provide a comprehensive response.`,
                 nextThoughtNeeded: true,
@@ -69,6 +124,10 @@ export class MCPToolWrapper {
               };
               console.log(`[MCPToolWrapper] Transformed simple input to sequential thinking format:`, JSON.stringify(processedInput, null, 2));
             }
+          }
+          
+          if (this.config.enableLogging) {
+            console.log(`[MCPToolWrapper] Processed input after mapping:`, processedInput);
           }
           
           // Validate input
@@ -157,6 +216,7 @@ export class MCPToolWrapper {
       'sequentialthinking': '\nUse for: Complex reasoning, breaking down problems, systematic analysis',
       'memory': '\nUse for: Storing/retrieving context, maintaining state across conversations',
       'puppeteer': '\nUse for: Web automation, screenshots, data extraction from websites',
+      'playwright': '\nUse for: Web browser automation, navigation, and interaction',
       'filesystem': '\nUse for: Reading/writing files, directory operations',
       'postgres': '\nUse for: Database queries, data persistence',
       'github': '\nUse for: GitHub API operations, repository management'
@@ -165,15 +225,30 @@ export class MCPToolWrapper {
     const hint = categoryHints[tool.templateSlug] || '';
     const provider = `\nProvider: ${tool.templateSlug}`;
     
-    // Add parameter hints for sequential thinking
+    // Add parameter hints based on tool schema
     let parameterHints = '';
-    if (tool.templateSlug === 'sequentialthinking' && tool.inputSchema?.properties) {
-      parameterHints = '\n\nIMPORTANT: This tool requires the following parameters:\n';
-      parameterHints += '- thought (string): Your current thinking step\n';
-      parameterHints += '- nextThoughtNeeded (boolean): Whether another thought step is needed\n';
-      parameterHints += '- thoughtNumber (integer): Current thought number (start with 1)\n';
-      parameterHints += '- totalThoughts (integer): Estimated total thoughts needed\n';
-      parameterHints += '\nExample usage: {"thought": "First, I need to understand...", "nextThoughtNeeded": true, "thoughtNumber": 1, "totalThoughts": 5}';
+    if (tool.inputSchema?.properties) {
+      const properties = tool.inputSchema.properties;
+      const required = tool.inputSchema.required || [];
+      
+      const params = Object.entries(properties).map(([name, schema]: [string, any]) => {
+        const isRequired = required.includes(name) ? ' (required)' : ' (optional)';
+        const description = schema.description || schema.type || 'any';
+        return `- ${name}: ${description}${isRequired}`;
+      }).join('\n');
+      
+      if (params) {
+        parameterHints = `\n\nParameters:\n${params}`;
+        
+        // Add specific examples for common tools
+        if (tool.name === 'browser_navigate' || tool.name === 'navigate') {
+          parameterHints += '\n\nExample: {"url": "https://example.com"}';
+        } else if (tool.templateSlug === 'sequentialthinking') {
+          parameterHints += '\n\nExample: {"thought": "First, I need to understand...", "nextThoughtNeeded": true, "thoughtNumber": 1, "totalThoughts": 5}';
+        } else if (tool.templateSlug === 'memory' && tool.name === 'store_memory') {
+          parameterHints += '\n\nExample: {"key": "user_preference", "value": "likes Python"}';
+        }
+      }
     }
     
     return `${tool.description}${hint}${parameterHints}${provider}`;

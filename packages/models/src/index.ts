@@ -30,8 +30,6 @@ export { AgentTemplateService } from './services/AgentTemplateService';
 // NEW: Export VisionFileService
 export { VisionFileService } from './services/VisionFileService';
 
-// NEW: Export AgentExpeditionContextService
-export { AgentExpeditionContextService } from './services/AgentExpeditionContextService';
 
 // NEW: Export comprehensive error handling system
 export {

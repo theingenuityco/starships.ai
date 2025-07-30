@@ -1,50 +1,9 @@
 // Import Agent from protocol to avoid circular dependency
 import { Agent } from '@starships/protocol';
 
-// Import expedition types from protocol
-import {
-  Expedition,
-  ExpeditionTask,
-  ExpeditionMessage,
-  ExpeditionResult,
-  ExpeditionStatus,
-  TaskStatus,
-  TaskPriority,
-  MessageRole,
-  MessageType,
-  ResultType,
-  ResultFormat,
-  QualityScore,
-  ExpeditionFilters,
-  ExpeditionSort,
-  PaginationOptions,
-  ExpeditionWorkflowState,
-  WorkflowPhase,
-  TaskBreakdown,
-} from '@starships/protocol';
 
-// Re-export Agent and expedition types for backward compatibility
+// Re-export Agent for backward compatibility
 export { Agent };
-export {
-  Expedition,
-  ExpeditionTask,
-  ExpeditionMessage,
-  ExpeditionResult,
-  ExpeditionStatus,
-  TaskStatus,
-  TaskPriority,
-  MessageRole,
-  MessageType,
-  ResultType,
-  ResultFormat,
-  QualityScore,
-  ExpeditionFilters,
-  ExpeditionSort,
-  PaginationOptions,
-  ExpeditionWorkflowState,
-  WorkflowPhase,
-  TaskBreakdown,
-};
 
 export interface LLM {
   id: string;
@@ -84,7 +43,6 @@ export interface Starship {
   ownerId: string; // Foreign key to User
   class: 'scout' | 'cruiser';
   name: string;
-  maxActiveExpeditions: number;
   maxAgents: number; // Based on class: Scout=3, Cruiser=6
   status: 'active' | 'inactive';
   createdAt: string;
@@ -128,49 +86,7 @@ export interface DeployedOnRelationship {
   };
 }
 
-// NEW: Expedition Relationships
-export interface HasExpeditionRelationship {
-  type: 'HAS_EXPEDITION';
-  properties?: {
-    createdAt?: string;
-  };
-}
 
-export interface AssignedToRelationship {
-  type: 'ASSIGNED_TO';
-  properties?: {
-    assignedAt?: string;
-    role?: string;
-  };
-}
-
-export interface HasTaskRelationship {
-  type: 'HAS_TASK';
-  properties?: {
-    createdAt?: string;
-  };
-}
-
-export interface HasMessageRelationship {
-  type: 'HAS_MESSAGE';
-  properties?: {
-    timestamp?: string;
-  };
-}
-
-export interface HasResultRelationship {
-  type: 'HAS_RESULT';
-  properties?: {
-    createdAt?: string;
-  };
-}
-
-export interface DependsOnRelationship {
-  type: 'DEPENDS_ON';
-  properties?: {
-    dependencyType?: string;
-  };
-}
 
 // Repository interfaces
 export interface Repository<T> {
@@ -651,63 +567,6 @@ export interface StarshipRepository {
   //   getVersionHistory(starshipId: string): Promise<Codex[]>;
   //   createVersion(starshipId: string, author: string, changeSummary: string): Promise<Codex>;
   //   deactivateCurrentVersion(starshipId: string): Promise<void>;
-
-  // Expedition integration methods
-  updateActiveExpeditionsCount(starshipId: string, increment?: boolean): Promise<void>;
-  getExpeditionCapacity(starshipId: string): Promise<{
-    maxConcurrentExpeditions: number;
-    currentActiveExpeditions: number;
-    availableExpeditionSlots: number;
-    maxAgentsPerExpedition: number;
-    totalDeployedAgents: number;
-    availableAgents: number;
-  }>;
-  canStartNewExpedition(starshipId: string): Promise<{
-    canStart: boolean;
-    reason?: string;
-    capacity: {
-      maxConcurrentExpeditions: number;
-      currentActiveExpeditions: number;
-      availableExpeditionSlots: number;
-    };
-  }>;
-  getAgentAvailabilityForExpeditions(starshipId: string): Promise<
-    Array<{
-      agentId: string;
-      agentName: string;
-      category: string;
-      tags: string[];
-      availability: 'available' | 'busy' | 'offline';
-      currentExpeditions: string[];
-      workload: 'light' | 'moderate' | 'heavy';
-    }>
-  >;
-  getExpeditionStats(
-    starshipId: string,
-    days?: number
-  ): Promise<{
-    expeditions: {
-      total: number;
-      completed: number;
-      failed: number;
-      cancelled: number;
-      averageDuration: number;
-      successRate: number;
-    };
-    tasks: {
-      total: number;
-      completed: number;
-      failed: number;
-      averageDuration: number;
-      successRate: number;
-    };
-    topPerformingAgents: Array<{
-      agentId: string;
-      agentName: string;
-      tasksCompleted: number;
-      successRate: number;
-    }>;
-  }>;
 }
 
 export interface VisionRepository {
@@ -1036,79 +895,3 @@ export const BUILTIN_CONFIG_TEMPLATES: Omit<
     },
   },
 ];
-// NEW: Expedition Repository Interfaces
-export interface ExpeditionRepository extends Repository<Expedition> {
-  findByStarship(starshipId: string): Promise<Expedition[]>;
-  findByStatus(starshipId: string, status: ExpeditionStatus): Promise<Expedition[]>;
-  findWithFilters(
-    starshipId: string,
-    filters: ExpeditionFilters,
-    sort?: ExpeditionSort,
-    pagination?: PaginationOptions
-  ): Promise<{
-    expeditions: Expedition[];
-    total: number;
-  }>;
-  updateStatus(id: string, status: ExpeditionStatus): Promise<Expedition | null>;
-  updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null>;
-  assignAgent(expeditionId: string, agentId: string): Promise<boolean>;
-  removeAgent(expeditionId: string, agentId: string): Promise<boolean>;
-  getAssignedAgents(expeditionId: string): Promise<Agent[]>;
-  getExpeditionStats(starshipId: string): Promise<{
-    total: number;
-    active: number;
-    completed: number;
-    failed: number;
-    averageDuration: number;
-    successRate: number;
-  }>;
-}
-
-export interface ExpeditionTaskRepository extends Repository<ExpeditionTask> {
-  findByExpedition(expeditionId: string): Promise<ExpeditionTask[]>;
-  findByStatus(expeditionId: string, status: TaskStatus): Promise<ExpeditionTask[]>;
-  findByAgent(agentId: string): Promise<ExpeditionTask[]>;
-  findByPriority(expeditionId: string, priority: TaskPriority): Promise<ExpeditionTask[]>;
-  assignToAgent(taskId: string, agentId: string): Promise<ExpeditionTask | null>;
-  updateStatus(taskId: string, status: TaskStatus): Promise<ExpeditionTask | null>;
-  updateResult(taskId: string, result: string): Promise<ExpeditionTask | null>;
-  getDependencies(taskId: string): Promise<ExpeditionTask[]>;
-  getDependents(taskId: string): Promise<ExpeditionTask[]>;
-  getTasksReadyForExecution(expeditionId: string): Promise<ExpeditionTask[]>;
-  getTaskStats(expeditionId: string): Promise<{
-    total: number;
-    pending: number;
-    inProgress: number;
-    completed: number;
-    failed: number;
-  }>;
-}
-
-export interface ExpeditionMessageRepository extends Repository<ExpeditionMessage> {
-  findByExpedition(
-    expeditionId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<ExpeditionMessage[]>;
-  findByRole(expeditionId: string, role: MessageRole): Promise<ExpeditionMessage[]>;
-  findByType(expeditionId: string, messageType: MessageType): Promise<ExpeditionMessage[]>;
-  findByThread(threadId: string): Promise<ExpeditionMessage[]>;
-  findByAgent(expeditionId: string, agentId: string): Promise<ExpeditionMessage[]>;
-  getMessageCount(expeditionId: string): Promise<number>;
-  getLatestMessages(expeditionId: string, limit: number): Promise<ExpeditionMessage[]>;
-  searchMessages(expeditionId: string, query: string): Promise<ExpeditionMessage[]>;
-}
-
-export interface ExpeditionResultRepository extends Repository<ExpeditionResult> {
-  findByExpedition(expeditionId: string): Promise<ExpeditionResult[]>;
-  findByType(expeditionId: string, resultType: ResultType): Promise<ExpeditionResult[]>;
-  findByFormat(expeditionId: string, format: ResultFormat): Promise<ExpeditionResult[]>;
-  findByCreator(createdBy: string): Promise<ExpeditionResult[]>;
-  updateQuality(resultId: string, quality: QualityScore): Promise<ExpeditionResult | null>;
-  getResultStats(expeditionId: string): Promise<{
-    total: number;
-    byType: Record<ResultType, number>;
-    byFormat: Record<ResultFormat, number>;
-    averageQuality: number;
-  }>;
-}

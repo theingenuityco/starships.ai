@@ -17,11 +17,6 @@ export { VisionRepository } from './VisionRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
-// Export expedition repositories
-export { ExpeditionRepository } from './ExpeditionRepository';
-export { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
-export { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
-export { ExpeditionResultRepository } from './ExpeditionResultRepository';
 
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
@@ -29,11 +24,6 @@ import { VisionRepository } from './VisionRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
-// Import expedition repositories
-import { ExpeditionRepository } from './ExpeditionRepository';
-import { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
-import { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
-import { ExpeditionResultRepository } from './ExpeditionResultRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -59,11 +49,6 @@ export class RepositoryFactory {
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
-  // Expedition repository instances
-  private static expeditionRepo: ExpeditionRepository | null = null;
-  private static expeditionTaskRepo: ExpeditionTaskRepository | null = null;
-  private static expeditionMessageRepo: ExpeditionMessageRepository | null = null;
-  private static expeditionResultRepo: ExpeditionResultRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -120,11 +105,6 @@ export class RepositoryFactory {
       this.visionRepo = new VisionRepository();
       this.mcpServerOptionRepo = new MCPServerOptionRepository();
 
-      // Initialize expedition repositories (no dependencies)
-      this.expeditionRepo = new ExpeditionRepository();
-      this.expeditionTaskRepo = new ExpeditionTaskRepository();
-      this.expeditionMessageRepo = new ExpeditionMessageRepository();
-      this.expeditionResultRepo = new ExpeditionResultRepository();
 
       // Initialize repositories with dependencies
       this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
@@ -183,10 +163,6 @@ export class RepositoryFactory {
         mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
         mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
-        expeditionRepo: this.expeditionRepo !== null,
-        expeditionTaskRepo: this.expeditionTaskRepo !== null,
-        expeditionMessageRepo: this.expeditionMessageRepo !== null,
-        expeditionResultRepo: this.expeditionResultRepo !== null,
       }
     };
   }
@@ -305,49 +281,6 @@ export class RepositoryFactory {
     return this.agentTemplateService;
   }
 
-  /**
-   * Get ExpeditionRepository instance (synchronous)
-   */
-  static getExpeditionRepository(): ExpeditionRepository {
-    this.ensureInitialized();
-    if (!this.expeditionRepo) {
-      throw new Error('ExpeditionRepository not initialized');
-    }
-    return this.expeditionRepo;
-  }
-
-  /**
-   * Get ExpeditionTaskRepository instance (synchronous)
-   */
-  static getExpeditionTaskRepository(): ExpeditionTaskRepository {
-    this.ensureInitialized();
-    if (!this.expeditionTaskRepo) {
-      throw new Error('ExpeditionTaskRepository not initialized');
-    }
-    return this.expeditionTaskRepo;
-  }
-
-  /**
-   * Get ExpeditionMessageRepository instance (synchronous)
-   */
-  static getExpeditionMessageRepository(): ExpeditionMessageRepository {
-    this.ensureInitialized();
-    if (!this.expeditionMessageRepo) {
-      throw new Error('ExpeditionMessageRepository not initialized');
-    }
-    return this.expeditionMessageRepo;
-  }
-
-  /**
-   * Get ExpeditionResultRepository instance (synchronous)
-   */
-  static getExpeditionResultRepository(): ExpeditionResultRepository {
-    this.ensureInitialized();
-    if (!this.expeditionResultRepo) {
-      throw new Error('ExpeditionResultRepository not initialized');
-    }
-    return this.expeditionResultRepo;
-  }
 
   // ========================================================================
   // UTILITY METHODS
@@ -369,10 +302,6 @@ export class RepositoryFactory {
     this.mcpServerOptionRepo = null;
     this.mcpServerConnectorRepo = null;
     this.agentTemplateService = null;
-    this.expeditionRepo = null;
-    this.expeditionTaskRepo = null;
-    this.expeditionMessageRepo = null;
-    this.expeditionResultRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;
@@ -392,9 +321,6 @@ export class RepositoryFactory {
     
     const critical = [
       { name: 'starshipRepo', instance: this.starshipRepo },
-      { name: 'expeditionRepo', instance: this.expeditionRepo },
-      { name: 'expeditionTaskRepo', instance: this.expeditionTaskRepo },
-      { name: 'expeditionMessageRepo', instance: this.expeditionMessageRepo },
       { name: 'mcpServerConnectorRepo', instance: this.mcpServerConnectorRepo }
     ];
 

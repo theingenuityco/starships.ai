@@ -5,7 +5,6 @@ export interface UpdateStarshipRequest {
   slug?: string; // Optional - will be auto-generated from name if not provided
   status?: 'active' | 'inactive';
   class?: 'scout' | 'cruiser';
-  maxActiveExpeditions?: number;
 }
 
 export interface UpdateStarshipStatusRequest {
@@ -19,7 +18,6 @@ export interface StarshipResponse {
     ownerId: string;
     class: 'scout' | 'cruiser';
     name: string;
-    maxActiveExpeditions: number;
     maxAgents: number;
     status: 'active' | 'inactive';
     createdAt: string;
@@ -90,48 +88,7 @@ export interface ApiError {
 // ============================================================================
 
 /**
- * Extended starship response with expedition summary
- */
-export interface StarshipWithExpeditionsResponse extends StarshipResponse {
-  expeditionSummary: {
-    total: number;
-    active: number;
-    completed: number;
-    failed: number;
-    successRate: number;
-    averageDuration: number; // in minutes
-    recentExpeditions: Array<{
-      id: string;
-      title: string;
-      status: 'draft' | 'planning' | 'in-progress' | 'review' | 'completed' | 'failed' | 'cancelled';
-      priority: 'low' | 'medium' | 'high' | 'urgent';
-      createdAt: string;
-      updatedAt: string;
-    }>;
-  };
-}
-
-/**
- * Starship expedition capacity and limits
- */
-export interface StarshipExpeditionCapacity {
-  starshipId: string;
-  starshipClass: 'scout' | 'cruiser';
-  maxConcurrentExpeditions: number; // Based on class: Scout=2, Cruiser=5
-  currentActiveExpeditions: number;
-  availableExpeditionSlots: number;
-  maxAgentsPerExpedition: number; // Based on class: Scout=2, Cruiser=4
-  totalDeployedAgents: number;
-  availableAgents: number;
-  expeditionLimits: {
-    maxTasksPerExpedition: number; // Scout=10, Cruiser=25
-    maxDurationHours: number; // Scout=24, Cruiser=168 (1 week)
-    allowedPriorities: ('low' | 'medium' | 'high' | 'urgent')[];
-  };
-}
-
-/**
- * Starship agent availability for expeditions
+ * Starship agent availability
  */
 export interface StarshipAgentAvailability {
   agentId: string;
@@ -139,7 +96,6 @@ export interface StarshipAgentAvailability {
   category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
   tags: string[];
   availability: 'available' | 'busy' | 'offline';
-  currentExpeditions: string[]; // Expedition IDs
   completedTasks: number;
   averageTaskDuration: number; // in minutes
   successRate: number; // percentage
@@ -148,31 +104,13 @@ export interface StarshipAgentAvailability {
 }
 
 /**
- * Request to update starship expedition settings
+ * Starship statistics
  */
-export interface UpdateStarshipExpeditionSettingsRequest {
-  maxConcurrentExpeditions?: number;
-  expeditionNotifications?: boolean;
-  autoAssignAgents?: boolean;
-  expeditionTimeoutHours?: number;
-}
-
-/**
- * Starship expedition statistics
- */
-export interface StarshipExpeditionStats {
+export interface StarshipStats {
   starshipId: string;
   timeRange: {
     start: string;
     end: string;
-  };
-  expeditions: {
-    total: number;
-    completed: number;
-    failed: number;
-    cancelled: number;
-    averageDuration: number;
-    successRate: number;
   };
   tasks: {
     total: number;

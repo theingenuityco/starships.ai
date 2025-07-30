@@ -302,7 +302,6 @@ export interface Starship {
   ownerId: string
   status: 'active' | 'inactive'
   maxAgents: number
-  maxActiveExpeditions: number
   createdAt: string
   updatedAt: string
 }
@@ -617,7 +616,6 @@ interface UpdateStarshipRequest {
   name?: string
   status?: 'active' | 'inactive'
   class?: 'scout' | 'cruiser'
-  maxActiveExpeditions?: number
 }
 
 interface UpdateStarshipStatusRequest {
@@ -686,8 +684,7 @@ export const starshipAPI = {
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser'
-    maxActiveExpeditions?: number
-  }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
+    }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
 
   // Get starship details with caching (supports both ID and slug)
   getStarship: async (

@@ -110,7 +110,7 @@ export interface LLMProvider {
       maxTokens?: number;
     }
   ): Promise<LLMResult>;
-  
+
   completeStream(
     prompt: LLMChatPrompt,
     opts?: {
@@ -197,7 +197,7 @@ export interface SibilStreamResponse {
   status: 'started' | 'streaming' | 'completed' | 'error';
 }
 
-// Legacy Socket.IO Event Definitions for non-expedition events
+// Legacy Socket.IO Event Definitions
 export interface LegacySocketIOEvents {
   // Sibil Client to Server events
   'sibil:start-stream': (request: SibilSocketRequest) => void;
@@ -318,12 +318,6 @@ export interface AgentStreamError {
 // Export starship-related types
 export * from './types/starship';
 
-// Export expedition-related types
-export * from './types/expedition';
-
-// Export agent communication types
-export * from './types/agent-communication';
-
 // Export enhanced Socket.IO event types
 export * from './types/socket-events';
 
@@ -345,16 +339,10 @@ export {
   isStandardError
 } from './types/error-classes';
 
-// Re-export specific types to resolve naming conflicts
-export type {
-  ExpeditionError as LegacyExpeditionError,
-  ExpeditionErrorCode as LegacyExpeditionErrorCode
-} from './types/expedition';
 
 // Re-export specific types to avoid conflicts
 export type {
   EnhancedSocketIOEvents,
   EventEmissionOptions,
   EventEmissionResult,
-  SocketExpeditionEventType
 } from './types/socket-events';

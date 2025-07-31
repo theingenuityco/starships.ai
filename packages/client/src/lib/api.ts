@@ -302,6 +302,7 @@ export interface Starship {
   ownerId: string
   status: 'active' | 'inactive'
   maxAgents: number
+  maxActiveExpeditions: number
   createdAt: string
   updatedAt: string
 }
@@ -377,8 +378,8 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/starships/${starshipId}/agents`)
-      .then((res: AxiosResponse<StarshipAgentsResponse>) => res.data.deployedAgents)
+      .get(`/api/agents/starship/${starshipId}`)
+      .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
   },
@@ -616,6 +617,7 @@ interface UpdateStarshipRequest {
   name?: string
   status?: 'active' | 'inactive'
   class?: 'scout' | 'cruiser'
+  maxActiveExpeditions?: number
 }
 
 interface UpdateStarshipStatusRequest {
@@ -684,7 +686,8 @@ export const starshipAPI = {
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser'
-    }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
+    maxActiveExpeditions?: number
+  }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
 
   // Get starship details with caching (supports both ID and slug)
   getStarship: async (

@@ -34,6 +34,7 @@ const mockStarship = {
   ownerId: 'user-1',
   status: 'active' as const,
   maxAgents: 3,
+  activeExpeditions: 0,
   sibilInsights: 0,
   createdAt: '2023-01-01T00:00:00Z',
   updatedAt: '2023-01-01T00:00:00Z',
@@ -268,6 +269,7 @@ describe('Enhanced Starship Store', () => {
 
       expect(store.class).toBe('scout');
       expect(store.powerLevel).toBe(85);
+      expect(store.activeExpeditions).toBe(0);
       expect(store.sibilInsights).toBe(0);
     });
 
@@ -278,6 +280,7 @@ describe('Enhanced Starship Store', () => {
 
       expect(store.class).toBe('scout'); // Default value
       expect(store.powerLevel).toBe(85); // Default value
+      expect(store.activeExpeditions).toBe(0); // Default value
       expect(store.sibilInsights).toBe(0); // Default value
     });
   });

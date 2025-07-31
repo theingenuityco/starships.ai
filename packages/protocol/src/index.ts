@@ -110,7 +110,7 @@ export interface LLMProvider {
       maxTokens?: number;
     }
   ): Promise<LLMResult>;
-
+  
   completeStream(
     prompt: LLMChatPrompt,
     opts?: {
@@ -197,7 +197,7 @@ export interface SibilStreamResponse {
   status: 'started' | 'streaming' | 'completed' | 'error';
 }
 
-// Legacy Socket.IO Event Definitions
+// Legacy Socket.IO Event Definitions for non-expedition events
 export interface LegacySocketIOEvents {
   // Sibil Client to Server events
   'sibil:start-stream': (request: SibilSocketRequest) => void;
@@ -317,69 +317,12 @@ export interface AgentStreamError {
 
 // Export starship-related types
 export * from './types/starship';
-import { Starship } from './types/starship';
 
-// Expedition types
-export interface Expedition {
-  id: string;
-  name: string;
-  description?: string;
-  starshipId: string;
-  status: 'active' | 'inactive' | 'completed';
-  createdAt: string;
-  updatedAt: string;
-}
+// Export expedition-related types
+export * from './types/expedition';
 
-export interface CreateExpeditionRequest {
-  name: string;
-  description?: string;
-  agentIds: string[];
-}
-
-export interface ExpeditionResponse {
-  expedition: Expedition;
-  agents: Agent[];
-  starship: Starship;
-}
-
-export interface ExpeditionListResponse {
-  expeditions: Expedition[];
-  total: number;
-}
-
-// Message types
-export interface ChatMessage {
-  id: string;
-  expeditionId: string;
-  content: string;
-  sender: 'user' | 'agent';
-  senderName?: string;
-  timestamp: string;
-  metadata?: {
-    agentId?: string;
-    workflowId?: string;
-    status?: 'pending' | 'sent' | 'failed';
-    agentReady?: boolean;
-    missionStatus?: string;
-    shouldTerminateChat?: boolean;
-    isExecuting?: boolean;
-    originalMessage?: string;
-    isInitialGreeting?: boolean;
-  };
-}
-
-export interface CreateMessageRequest {
-  content: string;
-}
-
-export interface MessageResponse {
-  userMessage: ChatMessage;
-  agentMessage: ChatMessage;
-}
-
-export interface MessageListResponse {
-  messages: ChatMessage[];
-}
+// Export agent communication types
+export * from './types/agent-communication';
 
 // Export enhanced Socket.IO event types
 export * from './types/socket-events';
@@ -402,10 +345,16 @@ export {
   isStandardError
 } from './types/error-classes';
 
+// Re-export specific types to resolve naming conflicts
+export type {
+  ExpeditionError as LegacyExpeditionError,
+  ExpeditionErrorCode as LegacyExpeditionErrorCode
+} from './types/expedition';
 
 // Re-export specific types to avoid conflicts
 export type {
   EnhancedSocketIOEvents,
   EventEmissionOptions,
   EventEmissionResult,
+  SocketExpeditionEventType
 } from './types/socket-events';

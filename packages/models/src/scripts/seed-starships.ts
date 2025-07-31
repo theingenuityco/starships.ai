@@ -41,6 +41,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     ownerId: '', // Will be populated from user
     class: 'scout',
     name: 'USS Discovery',
+    maxActiveExpeditions: 2,
     status: 'active',
   },
   {
@@ -48,6 +49,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     ownerId: '', // Will be populated from user
     class: 'cruiser',
     name: 'USS Enterprise',
+    maxActiveExpeditions: 4,
     status: 'active',
   },
   {
@@ -55,6 +57,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     ownerId: '', // Will be populated from user
     class: 'scout',
     name: 'USS Voyager',
+    maxActiveExpeditions: 2,
     status: 'active',
   },
   {
@@ -62,6 +65,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     ownerId: '', // Will be populated from user
     class: 'cruiser',
     name: 'USS Defiant',
+    maxActiveExpeditions: 5,
     status: 'inactive',
   },
   {
@@ -69,6 +73,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     ownerId: '', // Will be populated from user
     class: 'scout',
     name: 'USS Prometheus',
+    maxActiveExpeditions: 3,
     status: 'active',
   },
   {
@@ -76,6 +81,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     ownerId: '', // Will be populated from user
     class: 'cruiser',
     name: 'API Test Ship',
+    maxActiveExpeditions: 4,
     status: 'active',
   },
 ];
@@ -174,6 +180,7 @@ async function seedStarships() {
           console.log(`     Owner: ${owner.displayName} (${owner.username})`);
           console.log(`     Slug: ${created.slug}`);
           console.log(`     Max Agents: ${created.maxAgents}`);
+          console.log(`     Max Active Expeditions: ${created.maxActiveExpeditions}`);
         } catch (error) {
           console.error(`  ❌ Failed to create starship ${starshipData.name}:`, error);
         }
@@ -204,7 +211,7 @@ async function seedStarships() {
       const classIcon = starship.class === 'scout' ? '🔍' : '🚢';
       console.log(`${index + 1}. ${statusIcon} ${classIcon} ${starship.name} (${starship.slug})`);
       console.log(`   Owner ID: ${starship.ownerId}`);
-      console.log(`   Max Agents: ${starship.maxAgents}`);
+      console.log(`   Max Expeditions: ${starship.maxActiveExpeditions}, Max Agents: ${starship.maxAgents}`);
     });
 
     // Step 5: Display test information for API testing

@@ -18,8 +18,6 @@ export { MCPServerOptionRepository } from './repositories/MCPServerOptionReposit
 export { MCPServerConnectorRepository } from './repositories/MCPServerConnectorRepository';
 export { ConnectorConfigTemplateRepository } from './repositories/ConnectorConfigTemplateRepository';
 export { ConnectorConfigHistoryRepository } from './repositories/ConnectorConfigHistoryRepository';
-export { ExpeditionRepository } from './repositories/ExpeditionRepository';
-export { MessageRepository } from './repositories/MessageRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';
@@ -32,6 +30,8 @@ export { AgentTemplateService } from './services/AgentTemplateService';
 // NEW: Export VisionFileService
 export { VisionFileService } from './services/VisionFileService';
 
+// NEW: Export AgentExpeditionContextService
+export { AgentExpeditionContextService } from './services/AgentExpeditionContextService';
 
 // NEW: Export comprehensive error handling system
 export {

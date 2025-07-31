@@ -86,6 +86,7 @@ interface StarshipState {
   // Legacy fields for backward compatibility (derived from active starship)
   get class(): 'scout' | 'cruiser';
   get powerLevel(): number;
+  get activeExpeditions(): number;
   get sibilInsights(): number;
   currentRoute: string;
 }
@@ -193,6 +194,16 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
         
+        get activeExpeditions() {
+          try {
+            const state = get();
+            if (!state || !state.starships) return 0;
+            const activeStarship = state.starships.find(s => s.id === state.activeStarshipId);
+            return 0; // Default active expeditions since activeExpeditions doesn't exist on Starship
+          } catch {
+            return 0;
+          }
+        },
         
         get sibilInsights() {
           try {

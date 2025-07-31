@@ -422,7 +422,8 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
           'status-update': 0,
           result: 0,
           question: 0,
-          notification: 0
+          notification: 0,
+          'chain-of-thought': 0
         },
         threaded: 0,
         replies: 0
@@ -460,7 +461,8 @@ export class ExpeditionMessageRepository implements ExpeditionMessageRepositoryI
         'status-update': statusUpdateMessagesNum,
         result: resultMessagesNum,
         question: questionMessagesNum,
-        notification: notificationMessagesNum
+        notification: notificationMessagesNum,
+        'chain-of-thought': 0 // TODO: Add query for chain-of-thought messages
       },
       threaded: threadedMessagesNum,
       replies: replyMessagesNum

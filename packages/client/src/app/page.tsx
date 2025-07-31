@@ -1,14 +1,14 @@
 'use client';
 
-import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { motion, useScroll, useTransform } from 'motion/react';
+import { useEffect, useState, useRef, memo, useCallback, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { LoginButton } from '@/components/auth/LoginButton';
+import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
-import Link from 'next/link';
+const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import { 
   Sparkles, 
   Rocket, 
@@ -17,85 +17,72 @@ import {
   Compass, 
   Zap, 
   Users, 
+  User,
   Book, 
   ArrowRight,
-  Github,
   ChevronDown,
   Star,
-  Orbit,
-  Target,
   Layers,
-  Navigation
+  Navigation,
+  GithubIcon,
+  Lightbulb,
+  Minus
 } from 'lucide-react';
 
-// Floating particles component for cosmic effect
-const FloatingParticles = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {[...Array(20)].map((_, i) => (
-      <motion.div
-        key={i}
-        className="absolute w-1 h-1 bg-primary/20 rounded-full"
-        style={{
-          left: `${Math.random() * 100}%`,
-          top: `${Math.random() * 100}%`,
-        }}
-        animate={{
-          y: [0, -100, 0],
-          opacity: [0, 1, 0],
-          scale: [0, 1, 0],
-        }}
-        transition={{
-          duration: 3 + Math.random() * 2,
-          repeat: Infinity,
-          delay: Math.random() * 2,
-        }}
-      />
-    ))}
-  </div>
-);
 
 // System component cards
-const SystemCard = ({ icon: Icon, title, description, accent = false }: {
+const SystemCard = memo(({ icon: Icon, title, description, accent = false, imageContent }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   accent?: boolean;
+  imageContent?: React.ReactNode;
 }) => (
   <motion.div
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
     whileHover={{ y: -5, transition: { duration: 0.2 } }}
-    className="group"
+    className="group max-w-2xl mx-auto"
   >
-    <Card className={`p-6 h-full bg-card/50 backdrop-blur-sm border-border/50 transition-all duration-300 hover:bg-card/80 hover:border-primary/30 ${accent ? 'ring-1 ring-primary/20' : ''}`}>
-      <div className="flex items-start space-x-4">
-        <div className={`p-3 rounded-lg ${accent ? 'bg-primary/10' : 'bg-secondary/50'} group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className={`w-6 h-6 ${accent ? 'text-primary' : 'text-muted-foreground'} group-hover:text-primary transition-colors`} />
+    <Card className={`p-8 bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:bg-white/10 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/10 relative overflow-hidden ${accent ? 'ring-1 ring-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent' : 'bg-gradient-to-br from-white/5 via-white/3 to-transparent'}`}>
+      <div className="grid md:grid-cols-2 gap-8 items-center">
+        <div>
+          <div className="flex items-center space-x-3 mb-4">
+            <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
+              <Icon className={`w-7 h-7 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
+            </div>
+            <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">{title}</h3>
+          </div>
+          <p className="text-muted-foreground leading-relaxed">{description}</p>
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold text-lg mb-2 group-hover:text-primary transition-colors">{title}</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
-        </div>
+        {imageContent && (
+          <div className="flex justify-center">
+            {imageContent}
+          </div>
+        )}
       </div>
     </Card>
   </motion.div>
-);
+));
+
+SystemCard.displayName = 'SystemCard';
 
 // Starship class showcase
-const StarshipClass = ({ name, description, features, highlight = false }: {
+const StarshipClass = memo(({ name, description, features, highlight = false }: {
   name: string;
   description: string;
   features: string[];
   highlight?: boolean;
 }) => (
   <motion.div
-    initial={{ opacity: 0, scale: 0.9 }}
-    whileInView={{ opacity: 1, scale: 1 }}
-    transition={{ duration: 0.6 }}
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-50px" }}
+    transition={{ duration: 0.3 }}
     className="group"
   >
-    <Card className={`p-6 h-full transition-all duration-300 hover:shadow-xl ${highlight ? 'ring-2 ring-primary bg-primary/5' : 'hover:ring-1 hover:ring-primary/30'}`}>
+    <Card className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:bg-white/10 ${highlight ? 'ring-2 ring-primary bg-primary/10 scale-105' : 'hover:ring-1 hover:ring-primary/50'}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-bold">{name}</h3>
         {highlight && <Badge className="bg-primary/10 text-primary">Recommended</Badge>}
@@ -111,55 +98,241 @@ const StarshipClass = ({ name, description, features, highlight = false }: {
       </ul>
     </Card>
   </motion.div>
-);
+));
+
+StarshipClass.displayName = 'StarshipClass';
 
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
+  const [launching, setLaunching] = useState(false);
+  const [currentTextIndex, setCurrentTextIndex] = useState(0);
+  const [displayedText, setDisplayedText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { isAuthenticated, isLoading } = useAuth();
+  const { scrollYProgress } = useScroll();
+
+  const dynamicTexts = [
+    "your vision into reality",
+    "the next big SaaS",
+    "your strategic consultancy",
+    "an AI-powered platform",
+    "your creative digital agency",
+    "the future of work",
+    "your research studio",
+    "your own intelligent vessel",
+  ];
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const typewriterEffect = useCallback(() => {
+    const currentText = dynamicTexts[currentTextIndex];
+    
+    if (isDeleting) {
+      if (displayedText.length > 0) {
+        timeoutRef.current = setTimeout(() => {
+          setDisplayedText(prev => prev.slice(0, -1));
+        }, 50);
+      } else {
+        setIsDeleting(false);
+        setCurrentTextIndex((prev) => (prev + 1) % dynamicTexts.length);
+      }
+    } else {
+      if (displayedText.length < currentText.length) {
+        timeoutRef.current = setTimeout(() => {
+          setDisplayedText(currentText.slice(0, displayedText.length + 1));
+        }, 100);
+      } else {
+        timeoutRef.current = setTimeout(() => {
+          setIsDeleting(true);
+        }, 2000);
+      }
+    }
+  }, [displayedText, isDeleting, currentTextIndex, dynamicTexts]);
+
+  useEffect(() => {
+    typewriterEffect();
+    
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [typewriterEffect]);
+
   if (!mounted || isLoading) return null;
 
+  const handleLaunch = () => {
+    setLaunching(true);
+    // Don't reset launching state - let it continue until page unloads
+    setTimeout(() => {
+      if (isAuthenticated) {
+        window.location.href = '/fleet';
+      } else {
+        // Trigger login
+        const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement;
+        if (loginButton) loginButton.click();
+        // Reset launching state after login trigger
+        setTimeout(() => setLaunching(false), 3000);
+      }
+    }, 1000);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/80 relative overflow-hidden">
-      <FloatingParticles />
+    <StarTheme theme="dark">
+      <div className="min-h-screen bg-background relative overflow-hidden">
+        <Suspense fallback={<div className="absolute inset-0 bg-background" />}>
+        <StarfieldBackground launching={launching} density={600} speed={1.5} />
+      </Suspense>
       
       {/* Hero Section */}
       <motion.section 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8 }}
-        className="relative h-screen flex flex-col items-center justify-center text-center px-4"
+        className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pb-20"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 pointer-events-none" />
         
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1 }}
+          initial={{ opacity: 0, y: 50, scale: 0.85 }}
+          whileInView={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -30, scale: 0.9 }}
+          transition={{ 
+            duration: 0.8,
+            ease: [0.25, 0.1, 0.25, 1]
+          }}
+          viewport={{ once: false, margin: "-10%" }}
           className="relative z-10 max-w-4xl mx-auto"
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.5, type: "spring", stiffness: 100 }}
-            className="mb-8"
+            transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
+            className="mb-6 relative"
           >
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-primary/10 rounded-full mb-6">
-              <Rocket className="w-12 h-12 text-primary" />
-            </div>
+            <motion.svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="128"
+              height="128"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="url(#gradient)"
+              strokeWidth="1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mx-auto"
+            >
+              <defs>
+                <motion.linearGradient
+                  id="gradient"
+                  x1="0%"
+                  y1="75%"
+                  x2="100%"
+                  y2="0%"
+                  animate={{
+                    x1: ["-150%", "150%"],
+                    x2: ["-50%", "250%"],
+                    y1: ["150%", "-50%"],
+                    y2: ["100%", "-100%"]
+                  }}
+                  transition={{ 
+                    duration: 2, 
+                    repeat: Infinity, 
+                    ease: "easeInOut",
+                    repeatDelay: 10,
+                    delay: 2
+                  }}
+                >
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.9)" />
+                  <stop offset="12%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="15%" stopColor="white" />
+                  <stop offset="18%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="20%" stopColor="rgba(255,255,255,0.5)" />
+                  <stop offset="22%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="25%" stopColor="rgba(0,0,0,0.01)" />
+                  <stop offset="30%" stopColor="rgba(0,0,0,0.05)" />
+                  <stop offset="35%" stopColor="rgba(0,0,0,0.08)" />
+                  <stop offset="50%" stopColor="rgba(0,0,0,0.1)" />
+                  <stop offset="65%" stopColor="rgba(0,0,0,0.08)" />
+                  <stop offset="70%" stopColor="rgba(0,0,0,0.05)" />
+                  <stop offset="75%" stopColor="rgba(0,0,0,0.01)" />
+                  <stop offset="78%" stopColor="rgba(255,255,255,0.2)" />
+                  <stop offset="80%" stopColor="rgba(255,255,255,0.5)" />
+                  <stop offset="82%" stopColor="rgba(255,255,255,0.8)" />
+                  <stop offset="85%" stopColor="white" />
+                  <stop offset="88%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.9)" />
+                </motion.linearGradient>
+              </defs>
+              <motion.path
+                d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+              />
+              <motion.path
+                d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.7 }}
+              />
+              <motion.path
+                d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.8 }}
+              />
+              <motion.circle
+                cx="14.5"
+                cy="9"
+                r="1.5"
+                fill="none"
+                strokeLinecap="butt"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1.2 }}
+                transition={{ duration: 0.2, delay: 0.9 }}
+              />
+              {/* Three parallel flame lines representing thrust with varied lengths */}
+              <motion.line
+                x1="6"
+                y1="15"
+                x2="2.5"
+                y2="18.5"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.0 }}
+              />
+              <motion.line
+                x1="7.5"
+                y1="16.5"
+                x2="5.4"
+                y2="18.6"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.1 }}
+              />
+              <motion.line
+                x1="9"
+                y1="18"
+                x2="7.6"
+                y2="19.4"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.2, delay: 1.2 }}
+              />
+            </motion.svg>
           </motion.div>
           
           <motion.h1 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8, duration: 1 }}
-            className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 1, type: "spring" }}
+            className="text-5xl md:text-7xl font-bold mb-6"
           >
-            Starships.ai
+            <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
+              Starships.ai
+            </span>
           </motion.h1>
           
           <motion.p 
@@ -168,8 +341,17 @@ export default function HomePage() {
             transition={{ delay: 1, duration: 1 }}
             className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed"
           >
-            Build and pilot your own <strong className="text-primary">intelligent vessel</strong> 
-            <br />powered by your Vision
+            Build and pilot{" "}
+            <span className="text-primary font-semibold">
+              {displayedText}
+              <motion.span
+                animate={{ opacity: [0, 1, 0] }}
+                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                className="text-primary ml-1"
+              >
+                |
+              </motion.span>
+            </span>
           </motion.p>
           
           <motion.div
@@ -179,23 +361,66 @@ export default function HomePage() {
             className="flex flex-col sm:flex-row gap-4 justify-center items-center"
           >
             {isAuthenticated ? (
-              <Link href="/ships">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                  Enter Command Deck
-                  <ArrowRight className="w-5 h-5 ml-2" />
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  size="lg" 
+                  onClick={handleLaunch}
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">Enter Command Deck</span>
+                  <ArrowRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
                 </Button>
-              </Link>
+              </motion.div>
             ) : (
-              <LoginButton size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                Launch Your Starship
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </LoginButton>
+              <div className="relative">
+                <motion.div
+                  className="absolute inset-0 rounded-full"
+                  animate={{
+                    boxShadow: [
+                      "0 0 30px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.2)",
+                      "0 0 35px hsl(var(--primary) / 0.5), 0 0 70px hsl(var(--primary) / 0.3)",
+                      "0 0 30px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.2)"
+                    ]
+                  }}
+                  transition={{
+                    duration: 3, 
+                    repeat: Infinity, 
+                    ease: "easeInOut"
+                  }}
+                />
+                <motion.div 
+                  whileHover={{ scale: 1.05 }} 
+                  whileTap={{ scale: 0.95 }}
+                  className="relative rounded-full"
+                >
+                  <LoginButton 
+                    size="lg" 
+                    data-login-button
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full transition-colors"
+                  >
+                    Launch Your Starship
+                  </LoginButton>
+                </motion.div>
+              </div>
             )}
-            <Button variant="outline" size="lg" className="px-8 py-4 text-lg rounded-full">
-              <Github className="w-5 h-5 mr-2" />
-              View on GitHub
-            </Button>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="px-8 py-4 text-lg rounded-full backdrop-blur-sm"
+              >
+                <Book className="w-5 h-5 mr-2" />
+                View Documentation
+              </Button>
+            </motion.div>
           </motion.div>
+          
         </motion.div>
         
         <motion.div
@@ -204,143 +429,569 @@ export default function HomePage() {
           transition={{ delay: 2, duration: 1 }}
           className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
         >
-          <motion.div
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-muted-foreground"
-          >
-            <ChevronDown className="w-6 h-6" />
-          </motion.div>
+          <div className="flex flex-col items-center space-y-1">
+            {[0, 1, 2].map((index) => (
+              <motion.div
+                key={index}
+                animate={{ 
+                  opacity: [0.3, 1, 0.3],
+                  scale: [0.8, 1, 0.8]
+                }}
+                transition={{
+                  duration: 1.5,
+                  delay: index * 0.2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                <ChevronDown className="w-6 h-6 text-white/70" />
+              </motion.div>
+            ))}
+          </div>
         </motion.div>
       </motion.section>
 
       {/* System Flow Section */}
       <section className="py-20 px-4 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-background/50 to-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900/20 to-black" />
+        {/* Subtle ambient glow */}
+        <motion.div 
+          className="absolute inset-0 opacity-10"
+          style={{
+            background: 'radial-gradient(circle at 30% 40%, rgba(var(--primary-rgb), 0.15) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(var(--primary-rgb), 0.1) 0%, transparent 50%)'
+          }}
+          animate={{
+            opacity: [0.05, 0.15, 0.05]
+          }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
         <div className="relative z-10 max-w-6xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20, scale: 0.85 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ 
+              duration: 0.8, 
+              ease: [0.25, 0.1, 0.25, 1]
+            }}
+            viewport={{ once: false, margin: "-10%" }}
+            className="text-center mb-36"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">The Starship Journey</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              You arrive with a <strong className="text-primary">Vision</strong>, inscribe it into <strong className="text-primary">The Codex</strong>, 
-              guided by <strong className="text-primary">The Echo</strong>, launch <strong className="text-primary">Expeditions</strong> powered by the <strong className="text-primary">Aether Drive</strong>
-            </p>
+            <motion.h2 
+              className="text-4xl md:text-5xl font-bold mb-6"
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -15, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              The Starship Journey
+            </motion.h2>
+            <motion.p 
+              className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              Your idea becomes a plan. Your plan becomes focused missions. Your missions become reality.
+            </motion.p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <SystemCard
-              icon={Eye}
-              title="Vision"
-              description="The foundational intent behind your Starship. Not just a goal, but a long-term dream that drives everything else."
-              accent
-            />
-            <SystemCard
-              icon={Book}
-              title="The Codex"
-              description="A living, persistent artifact that reflects your Vision's current state. Where purpose becomes programmable."
-            />
-            <SystemCard
-              icon={Brain}
-              title="Aether Cortex"
-              description="The synthetic mind of your Starship. Orchestrates your Crew, maintains mission state, and translates Vision into action."
-            />
-            <SystemCard
-              icon={Sparkles}
-              title="The Echo"
-              description="Your reflective companion. A semi-sentient entity that helps refine your Vision and monitor alignment."
-            />
-            <SystemCard
-              icon={Compass}
-              title="Expeditions"
-              description="Scoped, executable ventures that fulfill pieces of your Vision. Each has a goal, context, timeline, and output."
-            />
-            <SystemCard
-              icon={Zap}
-              title="Aether Drive"
-              description="The engine that converts time, compute, and tokens into meaningful progress. Powers your Starship's operations."
-            />
-            <SystemCard
-              icon={Navigation}
-              title="Command Deck"
-              description="Your control center. Launch Expeditions, monitor agent activity, and command your living vessel."
-            />
-            <SystemCard
-              icon={Users}
-              title="Crew"
-              description="Intelligent agents specialized for different tasks. Your Crew carries out the work of your Expeditions."
-            />
-            <SystemCard
-              icon={Layers}
-              title="Starship Class"
-              description="Determines your vessel's capabilities: max Crew slots, concurrent Expeditions, and burn rate ceiling."
-            />
+          <div className="space-y-16 relative">
+            {/* You - Starting Point */}
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+              className="flex justify-center"
+            >
+              <div className="flex flex-col items-center space-y-4 max-w-md text-center">
+                <div className="w-16 h-16 bg-gradient-to-br from-white/20 to-white/10 rounded-full border border-white/30 backdrop-blur-sm flex items-center justify-center animate-pulse-glow will-change-transform">
+                  <User className="w-8 h-8 text-white/80" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">You</h3>
+                  <p className="text-muted-foreground leading-relaxed">
+                    You arrive with an idea, a vision of what could be. The journey begins here.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Connector: You → Vision Chamber */}
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0, scale: 0.85 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <div className="flex flex-col items-center relative">
+                <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
+                  {[...Array(1)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white/80 rounded-full left-1/2 transform -translate-x-1/2"
+                      initial={{ top: 0, opacity: 0 }}
+                      animate={{
+                        top: ["0%", "100%"],
+                        opacity: [0, 1, 0],
+                      }}
+                      transition={{
+                        duration: 2,
+                        delay: i * 0.4,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent"
+                    animate={{
+                      opacity: [0, 0.7, 0],
+                      scaleX: [0.5, 1, 0.5]
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.3,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <SystemCard
+                icon={Brain}
+                title="Vision Chamber"
+                description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
+                imageContent={
+                  <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <div className="absolute inset-0 bg-grid-white/10 bg-[size:20px_20px] opacity-30" />
+                    <div className="relative flex items-center space-x-4">
+                      <motion.div
+                        animate={{ 
+                          scale: [0, 1.1, 1.1, 0],
+                          rotate: [0, 180, 180, 360]
+                        }}
+                        transition={{ 
+                          duration: 6, 
+                          repeat: Infinity, 
+                          ease: "easeInOut",
+                          delay: 0,
+                          times: [0, 0.05, 0.55, 0.65]
+                        }}
+                      >
+                        <Sparkles className="w-7 h-7 text-white/50" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ 
+                          opacity: [0.1, 0.1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 1, 1, 0.1, 1, 0.1, 1, 0.1]
+                        }}
+                        transition={{ 
+                          duration: 9,
+                          repeat: Infinity, 
+                          ease: "linear",
+                          delay: 3,
+                          times: [0, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.70, 0.90, 0.91, 0.92, 0.93, 0.94, 1]
+                        }}
+                      >
+                        <Lightbulb className="w-8 h-8 text-white/60" />
+                      </motion.div>
+                      <motion.div
+                        animate={{ opacity: [0.2, 1, 0.2] }}
+                        transition={{ 
+                          duration: 6, 
+                          repeat: Infinity, 
+                          ease: "easeInOut"
+                        }}
+                        className="relative"
+                      >
+                        <Brain className="w-8 h-8 text-white/80" />
+                      </motion.div>
+                    </div>
+                  </div>
+                }
+              />
+            </motion.div>
+            
+            {/* Connector 1: Vision Chamber → Expeditions */}
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0, scale: 0.85 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.3,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <div className="flex flex-col items-center relative">
+                {/* Main connection line */}
+                <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
+                  {/* Flowing particles */}
+                  {[...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white/80 rounded-full left-1/2 transform -translate-x-1/2"
+                      initial={{ top: 0, opacity: 0 }}
+                      animate={{
+                        top: ["0%", "100%"],
+                        opacity: [0, 1, 0],
+                      }}
+                      transition={{
+                        duration: 2,
+                        delay: i * 0.4,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Energy pulse */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent"
+                    animate={{
+                      opacity: [0, 0.7, 0],
+                      scaleX: [0.5, 1, 0.5]
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.4,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <SystemCard
+                icon={Compass}
+                title="Expeditions"
+                description="Your idea becomes reality through focused missions. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
+                imageContent={
+                  <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm overflow-hidden">
+                    {/* Strategic Line Icons around rocket */}
+                    {[
+                      { x: "50px", y: "15px" },   // Top left
+                      { x: "140px", y: "20px" },  // Top right
+                      { x: "30px", y: "50px" },   // Mid left
+                      { x: "160px", y: "55px" },  // Mid right
+                      { x: "70px", y: "85px" },   // Bottom left
+                      { x: "120px", y: "90px" }   // Bottom right
+                    ].map((pos, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute"
+                        style={{
+                          left: pos.x,
+                          top: pos.y,
+                        }}
+                        animate={{ 
+                          opacity: [0, 0.6, 0],
+                          scale: [0.8, 1, 0.8],
+                        }}
+                        transition={{ 
+                          duration: 1.5,
+                          repeat: Infinity,
+                          delay: i * 0.4,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        <Minus className="w-8 h-8 text-white/40 rotate-90" />
+                      </motion.div>
+                    ))}
+                    
+                    {/* Stationary Rocket in Center */}
+                    <div className="absolute inset-0 flex items-center justify-center -mt-6">
+                      {/* Rocket Icon - Vigorously Vibrating */}
+                      <motion.div
+                        animate={{ 
+                          rotate: [-45, -44, -46, -44.5, -45.5, -44.8, -45.2, -45],
+                          x: [0, 1, -0.8, 0.4, -1, 0.6, -0.4, 0.8, -0.2, 0],
+                          y: [0, -0.6, 1, -0.4, 0.8, -1, 0.2, -0.8, 0.6, 0]
+                        }}
+                        transition={{ 
+                          duration: 0.1,
+                          repeat: Infinity,
+                          ease: "linear"
+                        }}
+                      >
+                        <Rocket className="w-8 h-8 text-white/60" />
+                      </motion.div>
+                    </div>
+
+                    {/* Background Gradient Effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+                  </div>
+                }
+              />
+            </motion.div>
+            
+            {/* Connector 2: Expeditions → Crew */}
+            <motion.div 
+              className="flex justify-center relative"
+              initial={{ opacity: 0, scale: 0.85 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ 
+                duration: 0.8, 
+                delay: 0.5,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <div className="flex flex-col items-center relative">
+                {/* Main connection line */}
+                <div className="w-px h-20 bg-gradient-to-b from-white/20 via-white/40 to-white/20 relative">
+                  {/* Flowing particles with different timing */}
+                  {[...Array(5)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white/80 rounded-full left-1/2 transform -translate-x-1/2"
+                      initial={{ top: 0, opacity: 0 }}
+                      animate={{
+                        top: ["0%", "100%"],
+                        opacity: [0, 1, 0],
+                      }}
+                      transition={{
+                        duration: 2.5,
+                        delay: (i * 0.3) + 0.5,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  {/* Energy pulse with different timing */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-white/30 to-transparent"
+                    animate={{
+                      opacity: [0, 0.7, 0],
+                      scaleX: [0.5, 1, 0.5]
+                    }}
+                    transition={{
+                      duration: 3.5,
+                      delay: 0.7,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.6,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <SystemCard
+                icon={Users}
+                title="Crew"
+                description="The specialists your project needs, available when you need them. Development, design, strategy, growth. Not someday when you can afford them. Today."
+                imageContent={
+                  <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm flex items-center justify-center">
+                    <div className="grid grid-cols-3 gap-2">
+                      {[...Array(6)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0.3 }}
+                          animate={{ opacity: [0.3, 1, 0.3] }}
+                          transition={{ duration: 2, delay: i * 0.3, repeat: Infinity }}
+                          className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center"
+                        >
+                          <div className="w-3 h-3 bg-white/40 rounded-full" />
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+                }
+              />
+            </motion.div>
           </div>
         </div>
       </section>
 
       {/* Starship Classes Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-secondary/20 via-background to-secondary/20">
-        <div className="max-w-6xl mx-auto">
+      <section className="py-48 px-4 relative">
+        <div className="max-w-6xl mx-auto relative z-10">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="text-center mb-16"
+            initial={{ opacity: 0, y: 20, scale: 0.85 }}
+            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            transition={{ 
+              duration: 0.8, 
+              ease: [0.25, 0.1, 0.25, 1]
+            }}
+            viewport={{ once: false, margin: "-10%" }}
+            className="text-center mb-36"
           >
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Choose Your Starship Class</h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            <motion.h2 
+              className="text-4xl md:text-5xl font-bold mb-6"
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -15, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              Choose Your Starship Class
+            </motion.h2>
+            <motion.p 
+              className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 20, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.9 }}
+              transition={{ 
+                duration: 0.7, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
               Each class shapes your strategy and scale. Start small or go big—your Vision determines the path.
-            </p>
+            </motion.p>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <StarshipClass
-              name="Scout Class"
-              description="Perfect for focused exploration and individual missions. Efficient and nimble."
-              features={[
-                "3 Crew Members",
-                "1 Concurrent Expedition",
-                "Minimal Burn Rate",
-                "Quick Deployment"
-              ]}
-            />
-            <StarshipClass
-              name="Cruiser Class"
-              description="Balanced power and capability. Ideal for ambitious projects and sustained operations."
-              features={[
-                "6-8 Crew Members",
-                "Up to 3 Expeditions",
-                "Moderate Burn Rate",
-                "Advanced Coordination"
-              ]}
-              highlight
-            />
-            <StarshipClass
-              name="Dreadnought Class"
-              description="Maximum capability for complex, multi-faceted Visions. Built for large-scale operations."
-              features={[
-                "12+ Crew Members",
-                "Unlimited Expeditions",
-                "High Burn Rate",
-                "Epic Scale Missions"
-              ]}
-            />
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.1,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <StarshipClass
+                name="Scout Class"
+                description="Perfect for focused exploration and individual missions. Efficient and nimble."
+                features={[
+                  "3 Crew Members",
+                  "1 Concurrent Expedition",
+                  "Minimal Burn Rate",
+                  "Quick Deployment"
+                ]}
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.2,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <StarshipClass
+                name="Cruiser Class"
+                description="Balanced power and capability. Ideal for ambitious projects and sustained operations."
+                features={[
+                  "6-8 Crew Members",
+                  "Up to 3 Expeditions",
+                  "Moderate Burn Rate",
+                  "Advanced Coordination"
+                ]}
+                highlight
+              />
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 30, scale: 0.85 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ 
+                duration: 0.6, 
+                delay: 0.3,
+                ease: [0.25, 0.1, 0.25, 1]
+              }}
+              viewport={{ once: false, margin: "-10%" }}
+            >
+              <StarshipClass
+                name="Dreadnought Class"
+                description="Maximum capability for complex, multi-faceted Visions. Built for large-scale operations."
+                features={[
+                  "12+ Crew Members",
+                  "Unlimited Expeditions",
+                  "High Burn Rate",
+                  "Epic Scale Missions"
+                ]}
+              />
+            </motion.div>
           </div>
         </div>
       </section>
 
+      
+      {/* Single overlay covering Ready to Launch and Footer sections */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-md z-0" style={{ height: '85vh' }} />
+      
       {/* CTA Section */}
-      <section className="py-20 px-4 relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5" />
+      <section className="py-72 px-4 relative">
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{ duration: 1.2 }}
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Launch?</h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
@@ -348,42 +999,80 @@ export default function HomePage() {
               that transforms intention into reality.
             </p>
             {isAuthenticated ? (
-              <Link href="/ships">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                  <Rocket className="w-5 h-5 mr-2" />
-                  Enter Command Deck
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  size="lg" 
+                  onClick={handleLaunch}
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">
+                    <Rocket className="w-5 h-5 mr-2 inline" />
+                    Enter Command Deck
+                  </span>
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
                 </Button>
-              </Link>
+              </motion.div>
             ) : (
-              <LoginButton size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full">
-                <Rocket className="w-5 h-5 mr-2" />
-                Begin Your Journey
-              </LoginButton>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button 
+                  onClick={handleLaunch}
+                  size="lg" 
+                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+                >
+                  <span className="relative z-10">
+                    <Rocket className="w-5 h-5 mr-2 inline" />
+                    Begin Your Journey
+                  </span>
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                    initial={{ x: '-100%' }}
+                    whileHover={{ x: '100%' }}
+                    transition={{ duration: 0.6 }}
+                  />
+                </Button>
+              </motion.div>
             )}
           </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 border-t border-border/50 bg-card/20 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto">
+      <footer className="py-16 px-4 relative z-10">
+        {/* Gradient horizontal line */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <p className="text-muted-foreground">
-                © 2024 Starships.ai - Where Vision meets Intelligence
+            <div className="mb-6 md:mb-0 text-center md:text-left">
+              <p className="text-muted-foreground mb-2">
+                © 2025 Starships.ai - Where Vision meets Intelligence
+              </p>
+              <p className="text-muted-foreground text-sm">
+                🪐 Manifested by <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline">The Ingenuity Co</a>
               </p>
             </div>
             <div className="flex space-x-6">
               <Button variant="ghost" size="sm">
-                <Github className="w-4 h-4 mr-2" />
-                GitHub
+                <Book className="w-4 h-4 mr-2" />
+                Documentation
               </Button>
-              <Button variant="ghost" size="sm">Documentation</Button>
-              <Button variant="ghost" size="sm">Community</Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Discord
+              </Button>
             </div>
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </StarTheme>
   );
 } 

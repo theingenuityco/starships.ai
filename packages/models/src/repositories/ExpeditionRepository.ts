@@ -3,7 +3,6 @@ import {
   Expedition,
   ExpeditionRepository as ExpeditionRepositoryInterface,
   ExpeditionStatus,
-  ExpeditionPriority,
   ExpeditionFilters,
   ExpeditionSort,
   PaginationOptions,
@@ -25,6 +24,21 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
   constructor() {
     super('ExpeditionRepository');
   }
+
+  /**
+   * Helper method to parse workflow state from string
+   */
+  private parseWorkflowState(expedition: Expedition): Expedition {
+    if (expedition && expedition.workflowState && typeof expedition.workflowState === 'string') {
+      try {
+        expedition.workflowState = JSON.parse(expedition.workflowState);
+      } catch (error) {
+        console.error('Failed to parse workflow state:', error);
+        expedition.workflowState = null;
+      }
+    }
+    return expedition;
+  }
   
   /**
    * Find all expeditions (admin use only)
@@ -34,7 +48,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
     const result = await connection.executeQuery<{ e: Expedition }>(
       'MATCH (e:Expedition) RETURN e ORDER BY e.createdAt DESC'
     );
-    return result.map(record => record.e);
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
   /**
@@ -55,7 +69,20 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
         id
       );
       
-      return result[0]?.e || null;
+      // Parse workflow state if it's a string
+      if (result[0]?.e) {
+        const expedition = result[0].e;
+        if (expedition.workflowState && typeof expedition.workflowState === 'string') {
+          try {
+            expedition.workflowState = JSON.parse(expedition.workflowState);
+          } catch (error) {
+            console.error('Failed to parse workflow state:', error);
+          }
+        }
+        return expedition;
+      }
+      
+      return null;
     } catch (error) {
       throw this.handleDatabaseError(error, 'findById', 'expedition', id);
     }
@@ -71,7 +98,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
        RETURN e ORDER BY e.createdAt DESC`,
       { starshipId }
     );
-    return result.map(record => record.e);
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
   /**
@@ -85,22 +112,9 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
        RETURN e ORDER BY e.createdAt DESC`,
       { starshipId, status }
     );
-    return result.map(record => record.e);
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
-  /**
-   * Find expeditions by priority for a starship
-   */
-  async findByPriority(starshipId: string, priority: ExpeditionPriority): Promise<Expedition[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ e: Expedition }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_EXPEDITION]->(e:Expedition)
-       WHERE e.priority = $priority
-       RETURN e ORDER BY e.createdAt DESC`,
-      { starshipId, priority }
-    );
-    return result.map(record => record.e);
-  }
 
   /**
    * Advanced filtering with pagination and sorting
@@ -133,15 +147,6 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
       params.statuses = filters.status;
     }
     
-    if (filters.priority && filters.priority.length > 0) {
-      whereClause += ' AND e.priority IN $priorities';
-      params.priorities = filters.priority;
-    }
-    
-    if (filters.tags && filters.tags.length > 0) {
-      whereClause += ' AND ANY(tag IN $tags WHERE tag IN e.tags)';
-      params.tags = filters.tags;
-    }
     
     if (filters.createdBy) {
       whereClause += ' AND e.createdBy = $createdBy';
@@ -160,7 +165,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
     }
     
     if (filters.search) {
-      whereClause += ' AND (toLower(e.title) CONTAINS toLower($search) OR toLower(e.description) CONTAINS toLower($search))';
+      whereClause += ' AND (toLower(e.name) CONTAINS toLower($search) OR toLower(e.mission) CONTAINS toLower($search))';
       params.search = filters.search;
     }
     
@@ -226,19 +231,19 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
   async create(entity: Omit<Expedition, 'id' | 'createdAt'>): Promise<Expedition> {
     try {
       // Validate required fields
-      this.validateRequired(entity, ['title', 'starshipId', 'createdBy'], 'create');
+      this.validateRequired(entity, ['name', 'starshipId', 'createdBy'], 'create');
       
       // Validate field types
       this.validateTypes(entity, {
-        title: 'string',
+        name: 'string',
         starshipId: 'string',
         createdBy: 'string'
       }, 'create');
 
       // Validate string lengths
       this.validateStringLengths(entity, {
-        title: { min: 1, max: 200 },
-        description: { max: 2000 }
+        name: { min: 1, max: 200 },
+        mission: { max: 2000 }
       }, 'create');
 
       const connection = getConnection();
@@ -250,7 +255,6 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
         createdAt: now,
         updatedAt: entity.updatedAt || now,
         assignedAgents: entity.assignedAgents || [],
-        tags: entity.tags || [],
         status: entity.status || 'draft'
       };
 
@@ -331,18 +335,34 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
    */
   async updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null> {
     const connection = getConnection();
+    // Serialize the workflow state to JSON string for Neo4j storage
+    const serializedState = JSON.stringify(state);
+    
     const result = await connection.executeWrite<{ e: Expedition }>(
       `MATCH (e:Expedition) WHERE e.id = $id 
        SET e.workflowState = $state, e.updatedAt = $timestamp 
        RETURN e`,
       { 
         id, 
-        state, 
+        state: serializedState, 
         timestamp: new Date().toISOString() 
       }
     );
 
-    return result[0]?.e || null;
+    // Parse the workflow state back when returning
+    if (result[0]?.e) {
+      const expedition = result[0].e;
+      if (expedition.workflowState && typeof expedition.workflowState === 'string') {
+        try {
+          expedition.workflowState = JSON.parse(expedition.workflowState);
+        } catch (error) {
+          console.error('Failed to parse workflow state:', error);
+        }
+      }
+      return expedition;
+    }
+    
+    return null;
   }
 
   /**

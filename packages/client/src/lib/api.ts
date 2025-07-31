@@ -13,7 +13,7 @@ const API_BASE_URL = getApiBaseUrl()
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 120000, // Increased to 120s (2 minutes) for long-running operations
   headers: {
     'Content-Type': 'application/json',
   },
@@ -50,7 +50,7 @@ const waitForTokenProvider = (): Promise<void> => {
         tokenProviderPromises.splice(index, 1)
         reject(new Error('Token provider setup timeout'))
       }
-    }, 10000) // 10 second timeout
+    }, 15000) // 15 second timeout
   })
 }
 

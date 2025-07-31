@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
+    "@langchain/core": "^0.3.66",
+    "@langchain/langgraph": "^0.3.11",
     "@starships/agent-engine": "workspace:*",
     "@starships/core": "workspace:*",
     "@starships/env-config": "workspace:*",
@@ -28,7 +30,8 @@
     "express": "^5.1.0",
     "jose": "^6.0.11",
     "openai": "^5.8.4",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@testcontainers/neo4j": "^11.2.1",
@@ -36,8 +39,9 @@
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.6",
-    "@types/supertest": "^6.0.3",
     "@types/socket.io-client": "^3.0.0",
+    "@types/supertest": "^6.0.3",
+    "@types/uuid": "^10.0.0",
     "jest": "^30.0.4",
     "jest-environment-node": "^30.0.4",
     "socket.io-client": "^4.8.1",

@@ -40,17 +40,17 @@ import {
   BarChart3,
   Shield,
   Loader2,
-  RotateCcw
+  RotateCcw,
+  Sparkles,
+  Rocket
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 // Socket import removed - using HTTP-only implementation
-import { expeditionAPI } from '@/lib/expeditionApi';
 // ConnectionStatus removed - not needed in HTTP mode
 import type {
   Expedition,
   ExpeditionTask,
   ExpeditionStatus,
-  ExpeditionPriority,
   QualityScore
 } from '@starships/protocol';
 
@@ -139,7 +139,6 @@ export function ExpeditionCard({
   expedition,
   onClick,
   showActions = false,
-  enableRealTimeUpdates = false,
   enableContextMenu = true,
   showAgentAvatars = true,
   showQualityScore = true,
@@ -169,8 +168,6 @@ export function ExpeditionCard({
 
   // HTTP-only implementation: Real-time updates disabled
   // Socket integration removed to use HTTP API only
-  const isConnected = false; // Always false in HTTP mode
-  const connectionState = { circuitBreakerState: 'closed' }; // Default state for HTTP mode
   const displayError = error; // Only local errors in HTTP mode
 
   // Update local state when expedition prop changes
@@ -206,86 +203,71 @@ export function ExpeditionCard({
     switch (status) {
       case 'draft':
         return {
-          color: 'bg-gray-500',
           icon: FileText,
           label: 'Draft',
-          variant: 'secondary' as const,
+          className: 'text-slate-600 bg-slate-50 dark:bg-slate-900/50 dark:text-slate-400',
+          dotColor: 'bg-slate-400',
           pulse: false
         };
       case 'planning':
         return {
-          color: 'bg-blue-500',
           icon: Target,
           label: 'Planning',
-          variant: 'default' as const,
+          className: 'text-blue-600 bg-blue-50 dark:bg-blue-900/50 dark:text-blue-400',
+          dotColor: 'bg-blue-500',
           pulse: true
         };
       case 'in-progress':
         return {
-          color: 'bg-yellow-500',
           icon: Activity,
           label: 'In Progress',
-          variant: 'default' as const,
+          className: 'text-amber-600 bg-amber-50 dark:bg-amber-900/50 dark:text-amber-400',
+          dotColor: 'bg-amber-500',
           pulse: true
         };
       case 'review':
         return {
-          color: 'bg-purple-500',
           icon: AlertCircle,
           label: 'Review',
-          variant: 'secondary' as const,
+          className: 'text-purple-600 bg-purple-50 dark:bg-purple-900/50 dark:text-purple-400',
+          dotColor: 'bg-purple-500',
           pulse: false
         };
       case 'completed':
         return {
-          color: 'bg-green-500',
           icon: CheckCircle,
           label: 'Completed',
-          variant: 'default' as const,
+          className: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/50 dark:text-emerald-400',
+          dotColor: 'bg-emerald-500',
           pulse: false
         };
       case 'failed':
         return {
-          color: 'bg-red-500',
           icon: XCircle,
           label: 'Failed',
-          variant: 'destructive' as const,
+          className: 'text-red-600 bg-red-50 dark:bg-red-900/50 dark:text-red-400',
+          dotColor: 'bg-red-500',
           pulse: false
         };
       case 'cancelled':
         return {
-          color: 'bg-gray-500',
           icon: XCircle,
           label: 'Cancelled',
-          variant: 'secondary' as const,
+          className: 'text-gray-600 bg-gray-50 dark:bg-gray-900/50 dark:text-gray-400',
+          dotColor: 'bg-gray-400',
           pulse: false
         };
       default:
         return {
-          color: 'bg-gray-500',
           icon: FileText,
           label: status,
-          variant: 'secondary' as const,
+          className: 'text-gray-600 bg-gray-50 dark:bg-gray-900/50 dark:text-gray-400',
+          dotColor: 'bg-gray-400',
           pulse: false
         };
     }
   };
 
-  // Get priority styling
-  const getPriorityConfig = (priority: ExpeditionPriority) => {
-    switch (priority) {
-      case 'low':
-        return { color: 'text-green-600', bg: 'bg-green-100', label: 'Low', icon: Shield };
-      case 'medium':
-        return { color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Medium', icon: TrendingUp };
-      case 'high':
-        return { color: 'text-orange-600', bg: 'bg-orange-100', label: 'High', icon: Zap };
-      case 'urgent':
-        return { color: 'text-red-600', bg: 'bg-red-100', label: 'Urgent', icon: AlertCircle };
-      default:
-        return { color: 'text-gray-600', bg: 'bg-gray-100', label: priority, icon: Shield };
-    }
-  };
 
   // Calculate enhanced progress
   const getProgress = () => {
@@ -332,12 +314,33 @@ export function ExpeditionCard({
     return { score, color, bgColor };
   };
 
+  // Derive expedition type from mission
+  const getExpeditionType = () => {
+    const mission = localExpedition.mission.toLowerCase();
+    if (mission.includes('research') || mission.includes('analyze') || mission.includes('study')) {
+      return { label: 'Research', icon: Sparkles, className: 'text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-400' };
+    }
+    if (mission.includes('develop') || mission.includes('build') || mission.includes('create')) {
+      return { label: 'Development', icon: Zap, className: 'text-purple-600 bg-purple-50 dark:bg-purple-900/30 dark:text-purple-400' };
+    }
+    if (mission.includes('explore') || mission.includes('discover') || mission.includes('investigate')) {
+      return { label: 'Exploration', icon: Target, className: 'text-green-600 bg-green-50 dark:bg-green-900/30 dark:text-green-400' };
+    }
+    if (mission.includes('fix') || mission.includes('repair') || mission.includes('debug')) {
+      return { label: 'Maintenance', icon: Shield, className: 'text-orange-600 bg-orange-50 dark:bg-orange-900/30 dark:text-orange-400' };
+    }
+    if (mission.includes('deploy') || mission.includes('release') || mission.includes('launch')) {
+      return { label: 'Deployment', icon: Activity, className: 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400' };
+    }
+    return { label: 'Mission', icon: Rocket, className: 'text-gray-600 bg-gray-50 dark:bg-gray-900/30 dark:text-gray-400' };
+  };
+
   const statusConfig = getStatusConfig(localExpedition.status);
-  const priorityConfig = getPriorityConfig(localExpedition.priority);
   const progress = getProgress();
   const qualityDisplay = getQualityDisplay();
+  const expeditionType = getExpeditionType();
   const StatusIcon = statusConfig.icon;
-  const PriorityIcon = priorityConfig.icon;
+  const TypeIcon = expeditionType.icon;
 
   // Get assigned agents for display
   const assignedAgents = agents.filter(agent =>
@@ -357,14 +360,17 @@ export function ExpeditionCard({
     >
       <Card
         className={`
-          relative cursor-pointer transition-all duration-200 group
-          hover:shadow-lg hover:border-primary/50
+          relative cursor-pointer transition-all duration-300 group
+          bg-gradient-to-br from-background via-background to-muted/5
+          hover:shadow-xl hover:shadow-primary/10 hover:border-primary/40
+          hover:bg-gradient-to-br hover:from-background hover:via-background hover:to-primary/5
+          border-muted-foreground/10
           ${error ? 'border-red-200 bg-red-50/50' : ''}
         `}
         onClick={onClick}
         role="button"
         tabIndex={0}
-        aria-label={`Expedition: ${localExpedition.title}`}
+        aria-label={`Expedition: ${localExpedition.name}`}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -394,9 +400,9 @@ export function ExpeditionCard({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-1">
-                <CardTitle className="text-lg font-semibold truncate">
-                  {localExpedition.title}
+              <div className="flex items-center space-x-2 mb-2">
+                <CardTitle className="text-lg font-semibold truncate group-hover:text-primary transition-colors">
+                  {localExpedition.name}
                 </CardTitle>
                 {qualityDisplay && (
                   <TooltipProvider>
@@ -421,27 +427,25 @@ export function ExpeditionCard({
                   </TooltipProvider>
                 )}
               </div>
-              <CardDescription className="mt-1 line-clamp-2">
-                {localExpedition.description}
+              <CardDescription className="mt-1 line-clamp-2 text-sm">
+                {localExpedition.mission}
               </CardDescription>
             </div>
 
             <div className="flex items-start space-x-2 ml-4">
               <div className="flex flex-col items-end space-y-2">
-                <Badge
-                  variant={statusConfig.variant}
-                  className={`flex items-center space-x-1 ${statusConfig.pulse ? 'animate-pulse' : ''}`}
+                <div
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${statusConfig.className}`}
                 >
-                  <StatusIcon className="h-3 w-3" />
+                  <div className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotColor} ${statusConfig.pulse ? 'animate-pulse' : ''}`} />
                   <span>{statusConfig.label}</span>
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className={`${priorityConfig.color} ${priorityConfig.bg} border-current flex items-center space-x-1`}
+                </div>
+                <div
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${expeditionType.className}`}
                 >
-                  <PriorityIcon className="h-3 w-3" />
-                  <span>{priorityConfig.label}</span>
-                </Badge>
+                  <TypeIcon className="h-3 w-3" />
+                  <span>{expeditionType.label}</span>
+                </div>
               </div>
 
               {/* Context Menu */}
@@ -451,54 +455,40 @@ export function ExpeditionCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="h-8 w-8 p-0 opacity-60 group-hover:opacity-100 transition-opacity hover:bg-muted"
                       onClick={(e) => e.stopPropagation()}
                       aria-label="More actions"
                     >
-                      <MoreVertical className="h-4 w-4" />
+                      <MoreVertical className="h-4 w-4 text-foreground" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    {onViewDetails && (
-                      <DropdownMenuItem onClick={() => onViewDetails(localExpedition.id)}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </DropdownMenuItem>
-                    )}
+                  <DropdownMenuContent align="end" className="w-48 bg-background border shadow-lg">
                     {onViewChat && (
-                      <DropdownMenuItem onClick={() => onViewChat(localExpedition.id)}>
+                      <DropdownMenuItem 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewChat(localExpedition.id);
+                        }}
+                        className="cursor-pointer"
+                      >
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Open Chat
                       </DropdownMenuItem>
                     )}
-                    {onViewAnalytics && (
-                      <DropdownMenuItem onClick={() => onViewAnalytics(localExpedition.id)}>
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        Analytics
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    {onEdit && (
-                      <DropdownMenuItem onClick={() => onEdit(localExpedition.id)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                    )}
-                    {onDuplicate && (
-                      <DropdownMenuItem onClick={() => onDuplicate(localExpedition.id)}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Duplicate
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
                     {onDelete && (
-                      <DropdownMenuItem
-                        onClick={() => onDelete(localExpedition.id)}
-                        className="text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
+                      <>
+                        {onViewChat && <DropdownMenuSeparator />}
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(localExpedition.id);
+                          }}
+                          className="text-red-600 focus:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </>
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -508,103 +498,92 @@ export function ExpeditionCard({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Objective */}
-          <div className="flex items-start space-x-2">
-            <Target className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-muted-foreground line-clamp-2">
-              {localExpedition.objective}
-            </p>
-          </div>
 
           {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
+              <span className="text-muted-foreground font-medium">Progress</span>
               <div className="flex items-center space-x-2">
                 {showTaskProgress && tasks.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
                     {tasks.filter(t => t.status === 'completed').length}/{tasks.length} tasks
                   </span>
                 )}
-                <span className="font-medium">{progress}%</span>
+                <span className="font-bold text-primary">{progress}%</span>
               </div>
             </div>
-            <Progress value={progress} className="h-2" />
+            <div className="relative">
+              <Progress value={progress} className="h-2 bg-muted/30" />
+              {progress > 0 && progress < 100 && statusConfig.pulse && (
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary animate-pulse" />
+              )}
+            </div>
           </div>
 
           {/* Agent Avatars */}
           {showAgentAvatars && assignedAgents.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <div className="flex -space-x-2">
-                {assignedAgents.slice(0, 3).map((agent) => (
-                  <TooltipProvider key={agent.id}>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Avatar className="h-6 w-6 border-2 border-background">
-                          <AvatarImage src={agent.avatar} alt={agent.name} />
-                          <AvatarFallback className="text-xs">
-                            {agent.name.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-xs">
-                          <p className="font-medium">{agent.name}</p>
-                          <p className="text-muted-foreground">{agent.category}</p>
-                          <p className={`text-xs ${agent.status === 'available' ? 'text-green-600' :
-                              agent.status === 'busy' ? 'text-yellow-600' : 'text-gray-600'
-                            }`}>
-                            {agent.status}
-                          </p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                ))}
-                {assignedAgents.length > 3 && (
-                  <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center">
-                    <span className="text-xs font-medium">+{assignedAgents.length - 3}</span>
-                  </div>
-                )}
+            <div className="flex items-center justify-between bg-muted/10 rounded-lg p-3">
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Crew</span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                {assignedAgents.length} agent{assignedAgents.length !== 1 ? 's' : ''}
-              </span>
+              <div className="flex items-center space-x-2">
+                <div className="flex -space-x-2">
+                  {assignedAgents.slice(0, 3).map((agent) => (
+                    <TooltipProvider key={agent.id}>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Avatar className="h-7 w-7 border-2 border-background shadow-sm hover:scale-110 transition-transform">
+                            <AvatarImage src={agent.avatar} alt={agent.name} />
+                            <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/30">
+                              {agent.name.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            <p className="font-semibold">{agent.name}</p>
+                            <p className="text-muted-foreground">{agent.category}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <div className={`h-2 w-2 rounded-full ${agent.status === 'available' ? 'bg-green-500' :
+                                  agent.status === 'busy' ? 'bg-yellow-500' : 'bg-gray-500'
+                                }`} />
+                              <p className="capitalize">{agent.status}</p>
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ))}
+                  {assignedAgents.length > 3 && (
+                    <div className="h-7 w-7 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center shadow-sm">
+                      <span className="text-xs font-semibold">+{assignedAgents.length - 3}</span>
+                    </div>
+                  )}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {assignedAgents.length} agent{assignedAgents.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
           )}
 
           {/* Metadata */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="flex items-center space-x-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">
-                {localExpedition.estimatedDuration ? `${localExpedition.estimatedDuration}m` : 'No estimate'}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">
                 {formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}
               </span>
             </div>
+            {localExpedition.updatedAt !== localExpedition.createdAt && (
+              <Badge variant="outline" className="text-xs px-2 py-0 h-5">
+                <Clock className="h-3 w-3 mr-1" />
+                Updated
+              </Badge>
+            )}
           </div>
 
-          {/* Tags */}
-          {localExpedition.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {localExpedition.tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {localExpedition.tags.length > 3 && (
-                <Badge variant="outline" className="text-xs">
-                  +{localExpedition.tags.length - 3} more
-                </Badge>
-              )}
-            </div>
-          )}
 
           {/* Enhanced Action Buttons with offline support */}
           <AnimatePresence>
@@ -677,16 +656,6 @@ export function ExpeditionCard({
                       onClick={(e) => {
                         e.stopPropagation();
                         onViewChat(localExpedition.id);
-                      }}
-                    />
-                  )}
-                  {onViewAnalytics && (
-                    <ActionButton
-                      icon={BarChart3}
-                      label="View Analytics"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewAnalytics(localExpedition.id);
                       }}
                     />
                   )}

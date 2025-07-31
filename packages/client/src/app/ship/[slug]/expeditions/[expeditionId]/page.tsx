@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { AuthGate } from '@/components/auth/AuthGate';
-import { ExpeditionChat } from '@/components/expeditions/ExpeditionChat';
+import { ExpeditionDetails } from '@/components/expeditions/ExpeditionDetails';
 
 interface PageProps {
   params: Promise<{
@@ -22,7 +22,7 @@ export default async function ExpeditionDetailPage({ params }: PageProps) {
   
   return (
     <AuthGate>
-      <ExpeditionChat 
+      <ExpeditionDetails 
         starshipSlug={slug} 
         expeditionId={expeditionId} 
       />

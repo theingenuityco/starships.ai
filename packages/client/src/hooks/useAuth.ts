@@ -142,7 +142,7 @@ export function useAuth() {
         return null
       })
     }
-  }, [isAuthenticated, kindeLoading, getToken, getAccessTokenRaw, accessTokenRaw])
+  }, [isAuthenticated, kindeLoading])
 
   const isLoading = kindeLoading || syncLoading
 

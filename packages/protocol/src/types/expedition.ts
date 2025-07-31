@@ -15,20 +15,15 @@
 export interface Expedition {
   id: string;
   starshipId: string; // Foreign key to Starship
-  title: string;
-  description: string;
-  objective: string; // Clear mission objective
-  status: ExpeditionStatus;
-  priority: ExpeditionPriority;
+  name: string; // Expedition name
+  mission: string; // Mission description
   assignedAgents: string[]; // Agent IDs from starship's deployed crew
+  status: ExpeditionStatus;
   workflowState?: any; // LangGraph state persistence
   result?: string; // Final expedition outcome
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID who created the expedition
-  estimatedDuration?: number; // In minutes
-  actualDuration?: number; // In minutes
-  tags: string[]; // For categorization and filtering
 }
 
 /**
@@ -54,6 +49,40 @@ export interface ExpeditionTask {
 }
 
 /**
+ * Agent activity types for real-time tracking
+ */
+export type AgentActivityType = 
+  | 'task_started' 
+  | 'task_completed' 
+  | 'task_failed' 
+  | 'agent_thinking' 
+  | 'agent_blocked'
+  | 'quality_check'
+  | 'retry_attempt';
+
+/**
+ * Agent activity event for real-time updates
+ */
+export interface AgentActivity {
+  id: string;
+  expeditionId: string;
+  agentId: string;
+  agentName: string;
+  type: AgentActivityType;
+  taskId?: string;
+  taskTitle?: string;
+  message: string;
+  timestamp: string;
+  metadata?: {
+    qualityScore?: number;
+    duration?: number;
+    retryCount?: number;
+    blockedReason?: string;
+    error?: string;
+  };
+}
+
+/**
  * Messages within expedition chat system
  */
 export interface ExpeditionMessage {
@@ -68,6 +97,20 @@ export interface ExpeditionMessage {
   threadId?: string; // For message threading
   parentMessageId?: string; // For replies
   metadata?: Record<string, any>; // Additional message data
+  // Chain of thought fields
+  chainOfThought?: {
+    reasoning?: string; // Agent's reasoning process
+    steps?: string[]; // Step-by-step thinking
+    alternatives?: string[]; // Alternative approaches considered
+    confidence?: number; // Confidence level (0-1)
+    assumptions?: string[]; // Key assumptions made
+    constraints?: string[]; // Constraints considered
+    risks?: string[]; // Potential risks identified
+    mitigations?: string[]; // Risk mitigation strategies
+    dependencies?: string[]; // Dependencies identified
+    tools?: string[]; // Tools or resources utilized
+    learnings?: string[]; // Insights gained during process
+  };
 }
 
 /**
@@ -100,19 +143,10 @@ export type ExpeditionStatus =
   | 'draft'        // Created but not started
   | 'planning'     // First Officer analyzing requirements
   | 'in-progress'  // Active execution with agents
-  | 'review'       // Completed, under review
   | 'completed'    // Successfully finished
   | 'failed'       // Failed or abandoned
   | 'cancelled';   // Cancelled by user
 
-/**
- * Expedition priority levels
- */
-export type ExpeditionPriority = 
-  | 'low'
-  | 'medium' 
-  | 'high'
-  | 'urgent';
 
 /**
  * Task status within expeditions
@@ -122,7 +156,6 @@ export type TaskStatus =
   | 'assigned'     // Assigned to agent but not started
   | 'in-progress'  // Currently being worked on
   | 'blocked'      // Waiting for dependencies
-  | 'review'       // Completed, under review
   | 'completed'    // Successfully finished
   | 'failed';      // Failed to complete
 
@@ -154,7 +187,8 @@ export type MessageType =
   | 'status-update' // System status updates
   | 'result'        // Task or expedition results
   | 'question'      // Questions requiring user input
-  | 'notification'; // General notifications
+  | 'notification'  // General notifications
+  | 'chain-of-thought'; // Agent reasoning process
 
 /**
  * Types of expedition results
@@ -207,13 +241,8 @@ export interface QualityScore {
  */
 export interface CreateExpeditionRequest {
   starshipId: string;
-  title: string;
-  description: string;
-  objective: string;
-  priority?: ExpeditionPriority;
-  estimatedDuration?: number;
-  tags?: string[];
-  dueDate?: string;
+  name: string;
+  mission: string;
   selectedAgents: string[]; // REQUIRED: At least one agent must be selected
 }
 
@@ -221,14 +250,10 @@ export interface CreateExpeditionRequest {
  * Request to update an expedition
  */
 export interface UpdateExpeditionRequest {
-  title?: string;
-  description?: string;
-  objective?: string;
-  priority?: ExpeditionPriority;
+  name?: string;
+  mission?: string;
   status?: ExpeditionStatus;
-  estimatedDuration?: number;
-  tags?: string[];
-  dueDate?: string;
+  assignedAgents?: string[];
 }
 
 /**
@@ -252,10 +277,10 @@ export interface CreateTaskRequest {
 export interface SendMessageRequest {
   expeditionId: string;
   content: string;
-  messageType: MessageType;
-  agentId?: string; // For directing message to specific agent
-  threadId?: string; // For threaded conversations
-  parentMessageId?: string; // For replies
+  participantId?: string;    // Defaults to 'first-officer'
+  threadId?: string;
+  parentMessageId?: string;
+  metadata?: Record<string, any>;
 }
 
 /**
@@ -302,8 +327,6 @@ export interface ExpeditionListResponse {
   limit: number;
   filters?: {
     status?: ExpeditionStatus[];
-    priority?: ExpeditionPriority[];
-    tags?: string[];
   };
 }
 
@@ -334,22 +357,20 @@ export interface ExpeditionStatsResponse {
  */
 export interface ExpeditionFilters {
   status?: ExpeditionStatus[];
-  priority?: ExpeditionPriority[];
-  tags?: string[];
   createdBy?: string;
   assignedAgent?: string;
   dateRange?: {
     start: string;
     end: string;
   };
-  search?: string; // Text search in title/description
+  search?: string; // Text search in name/mission
 }
 
 /**
  * Sorting options for expeditions
  */
 export interface ExpeditionSort {
-  field: 'createdAt' | 'updatedAt' | 'priority' | 'status' | 'title';
+  field: 'createdAt' | 'updatedAt' | 'status' | 'name';
   direction: 'asc' | 'desc';
 }
 

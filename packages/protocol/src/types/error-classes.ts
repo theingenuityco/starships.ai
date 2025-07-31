@@ -2,7 +2,7 @@
  * Standardized Error Classes
  * 
  * Provides comprehensive error classes for consistent error handling
- * across the entire expedition system.
+ * across the entire system.
  */
 
 import {
@@ -27,7 +27,7 @@ import {
 // ============================================================================
 
 /**
- * Base standardized error class for the expedition system
+ * Base standardized error class for the system
  */
 export class StandardError extends Error {
   public readonly code: StandardErrorCode;
@@ -463,37 +463,6 @@ export class BusinessLogicError extends StandardError {
 // ============================================================================
 
 /**
- * Expedition-specific error
- */
-export class ExpeditionError extends StandardError {
-  public readonly expeditionId?: string;
-
-  constructor(
-    code: StandardErrorCode,
-    message?: string,
-    expeditionId?: string,
-    details?: Record<string, any>,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ) {
-    super(
-      code,
-      message,
-      { ...details, expeditionId },
-      context,
-      undefined,
-      userId,
-      requestId
-    );
-    
-    this.name = 'ExpeditionError';
-    this.expeditionId = expeditionId;
-    Object.setPrototypeOf(this, ExpeditionError.prototype);
-  }
-}
-
-/**
  * Starship-specific error
  */
 export class StarshipError extends StandardError {
@@ -529,13 +498,11 @@ export class StarshipError extends StandardError {
  */
 export class TaskError extends StandardError {
   public readonly taskId?: string;
-  public readonly expeditionId?: string;
 
   constructor(
     code: StandardErrorCode,
     message?: string,
     taskId?: string,
-    expeditionId?: string,
     details?: Record<string, any>,
     context?: ErrorContext,
     userId?: string,
@@ -544,7 +511,7 @@ export class TaskError extends StandardError {
     super(
       code,
       message,
-      { ...details, taskId, expeditionId },
+      { ...details, taskId },
       context,
       undefined,
       userId,
@@ -553,7 +520,6 @@ export class TaskError extends StandardError {
     
     this.name = 'TaskError';
     this.taskId = taskId;
-    this.expeditionId = expeditionId;
     Object.setPrototypeOf(this, TaskError.prototype);
   }
 }
@@ -673,19 +639,6 @@ export const ErrorFactory = {
     return new BusinessLogicError(code, businessRule, message, undefined, context, userId, requestId);
   },
 
-  /**
-   * Create an expedition error
-   */
-  expedition: (
-    code: StandardErrorCode,
-    message?: string,
-    expeditionId?: string,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ): ExpeditionError => {
-    return new ExpeditionError(code, message, expeditionId, undefined, context, userId, requestId);
-  },
 
   /**
    * Create a starship error
@@ -708,12 +661,11 @@ export const ErrorFactory = {
     code: StandardErrorCode,
     message?: string,
     taskId?: string,
-    expeditionId?: string,
     context?: ErrorContext,
     userId?: string,
     requestId?: string
   ): TaskError => {
-    return new TaskError(code, message, taskId, expeditionId, undefined, context, userId, requestId);
+    return new TaskError(code, message, taskId, undefined, context, userId, requestId);
   },
 
   /**

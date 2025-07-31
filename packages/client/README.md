@@ -47,7 +47,6 @@ src/
 │   ├── vision-chamber/page.tsx  # Vision Chamber full-screen page
 │   ├── crew/page.tsx            # Crew management page
 │   ├── drive/page.tsx           # Starship drive systems page
-│   ├── expeditions/page.tsx     # Expeditions management page
 │   ├── logbook/page.tsx         # Mission logbook page
 │   └── sibil/page.tsx           # AI assistant page
 ├── components/
@@ -137,7 +136,7 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - **Command Deck**: `/command-deck` - Mission control dashboard
 - **Vision Chamber**: `/vision-chamber` - Consciousness planning (replaces `/core`)
 - **Core Systems**: `/crew`, `/drive` - Starship management
-- **Operations**: `/expeditions`, `/logbook`, `/sibil` - Mission operations
+- **Operations**: `/logbook`, `/sibil` - Mission operations
 
 ## 🧠 Vision Chamber Integration
 
@@ -164,7 +163,6 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 ### Starship Management
 - **Starship Selection**: Multi-starship support with status tracking
 - **Power Management**: Real-time power level monitoring
-- **Expedition Tracking**: Active expedition counting
 - **Insights**: AI-generated insights and recommendations
 
 ## 🧪 Testing

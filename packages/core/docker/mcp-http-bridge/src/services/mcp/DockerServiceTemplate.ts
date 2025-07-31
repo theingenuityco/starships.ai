@@ -97,39 +97,6 @@ export const DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     }
   },
 
-  // Filesystem MCP Server (NPX-based with file access)
-  'filesystem': {
-    slug: 'filesystem',
-    image: 'starships/mcp-node:latest',
-    command: ['npx', '-y', '@modelcontextprotocol/server-filesystem', '/workspace'],
-    requiresFileAccess: true,
-    volumes: [
-      { 
-        source: '/data/starships/{starshipId}/filesystem', 
-        target: '/workspace', 
-        mode: 'rw' 
-      }
-    ],
-    ports: ['3000'],
-    healthcheck: {
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '30s'
-    },
-    resourceLimits: {
-      cpus: '0.3',
-      memory: '256M'
-    },
-    labels: {
-      'mcp.type': 'filesystem',
-      'mcp.protocol': 'stdio',
-      'mcp.runtime': 'node',
-      'mcp.capabilities': 'file-access'
-    }
-  },
-
   // Notion MCP Server (NPX-based)
   'notion': {
     slug: 'notion',
@@ -272,39 +239,6 @@ export const DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTemplate> = {
       'mcp.protocol': 'stdio',
       'mcp.runtime': 'node',
       'mcp.api': 'slack'
-    }
-  },
-
-  // Memory MCP Server (NPX-based)
-  'memory': {
-    slug: 'memory',
-    image: 'starships/mcp-node:latest',
-    command: ['npx', '-y', '@modelcontextprotocol/server-memory'],
-    requiresFileAccess: true,
-    volumes: [
-      { 
-        source: '/data/starships/{starshipId}/memory', 
-        target: '/data', 
-        mode: 'rw' 
-      }
-    ],
-    ports: ['3000'],
-    healthcheck: {
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/health'],
-      interval: '30s',
-      timeout: '10s',
-      retries: 3,
-      start_period: '30s'
-    },
-    resourceLimits: {
-      cpus: '0.2',
-      memory: '256M'
-    },
-    labels: {
-      'mcp.type': 'memory',
-      'mcp.protocol': 'stdio',
-      'mcp.runtime': 'node',
-      'mcp.capabilities': 'persistence'
     }
   },
 

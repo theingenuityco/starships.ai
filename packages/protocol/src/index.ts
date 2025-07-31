@@ -317,6 +317,35 @@ export interface AgentStreamError {
 
 // Export starship-related types
 export * from './types/starship';
+import { Starship } from './types/starship';
+
+// Expedition types
+export interface Expedition {
+  id: string;
+  name: string;
+  description?: string;
+  starshipId: string;
+  status: 'active' | 'inactive' | 'completed';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateExpeditionRequest {
+  name: string;
+  description?: string;
+  agentIds: string[];
+}
+
+export interface ExpeditionResponse {
+  expedition: Expedition;
+  agents: Agent[];
+  starship: Starship;
+}
+
+export interface ExpeditionListResponse {
+  expeditions: Expedition[];
+  total: number;
+}
 
 // Export enhanced Socket.IO event types
 export * from './types/socket-events';

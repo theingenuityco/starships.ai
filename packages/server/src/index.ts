@@ -33,6 +33,7 @@ import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
+import expeditionRoutes, { initializeExpeditionRoutes } from './routes/expeditions';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // Removed agent-communication routes (expedition-related)
@@ -165,6 +166,7 @@ app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
+app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 // Removed agent-communication route (expedition-related)
 
@@ -192,6 +194,9 @@ httpServer.listen(PORT, async () => {
     console.log('🔧 Initializing RepositoryFactory...');
     await RepositoryFactory.initialize();
     console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
+
+    // Initialize expedition routes after RepositoryFactory is ready
+    initializeExpeditionRoutes(RepositoryFactory);
 
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();

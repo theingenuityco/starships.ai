@@ -377,8 +377,8 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/agents/starship/${starshipId}`)
-      .then((res: AxiosResponse<Agent[]>) => res.data)
+      .get(`/api/starships/${starshipId}/agents`)
+      .then((res: AxiosResponse<StarshipAgentsResponse>) => res.data.deployedAgents)
     apiCache.set(cacheKey, data)
     return data
   },

@@ -1,9 +1,8 @@
-// Import Agent from protocol to avoid circular dependency
-import { Agent } from '@starships/protocol';
+// Import from protocol to avoid circular dependency
+import { Agent, Expedition } from '@starships/protocol';
 
-
-// Re-export Agent for backward compatibility
-export { Agent };
+// Re-export for backward compatibility
+export { Agent, Expedition };
 
 export interface LLM {
   id: string;
@@ -771,6 +770,18 @@ export const DEFAULT_CONNECTOR_CONFIG: Required<ConnectorInstanceConfig> = {
   },
   customConfig: {},
 };
+
+// Expedition Repository Interface
+export interface ExpeditionRepository {
+  findAll(): Promise<Expedition[]>;
+  findById(id: string): Promise<Expedition | null>;
+  findByStarship(starshipId: string): Promise<Expedition[]>;
+  create(entity: Omit<Expedition, 'id' | 'createdAt' | 'updatedAt'>): Promise<Expedition>;
+  update(id: string, updates: Partial<Expedition>): Promise<Expedition | null>;
+  delete(id: string): Promise<boolean>;
+  assignAgents(expeditionId: string, agentIds: string[]): Promise<void>;
+  getAssignedAgents(expeditionId: string): Promise<Agent[]>;
+}
 
 /**
  * Configuration Validation Schema

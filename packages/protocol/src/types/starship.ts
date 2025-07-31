@@ -1,5 +1,18 @@
 // Starship-related types for API requests and responses
 
+// Core Starship interface
+export interface Starship {
+  id: string;
+  slug: string;
+  ownerId: string;
+  class: 'scout' | 'cruiser';
+  name: string;
+  maxAgents: number;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UpdateStarshipRequest {
   name?: string;
   slug?: string; // Optional - will be auto-generated from name if not provided

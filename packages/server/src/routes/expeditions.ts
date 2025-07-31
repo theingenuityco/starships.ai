@@ -94,7 +94,7 @@ router.post(
 
       console.log(`[EXPEDITION-API] [${requestId}] Step 4: Expedition created successfully`, {
         expeditionId: expeditionResponse.expedition.id,
-        expeditionTitle: expeditionResponse.expedition.title,
+        expeditionTitle: expeditionResponse.expedition.name,
         assignedAgentsCount: expeditionResponse.assignedAgents?.length || 0,
         timestamp: new Date().toISOString()
       });
@@ -171,15 +171,8 @@ router.get(
           ? (req.query.status as any[])
           : [req.query.status as any];
       }
-      if (req.query.priority) {
-        filters.priority = Array.isArray(req.query.priority)
-          ? (req.query.priority as any[])
-          : [req.query.priority as any];
-      }
-      if (req.query.tags) {
-        filters.tags = Array.isArray(req.query.tags)
-          ? (req.query.tags as string[])
-          : [req.query.tags as string];
+      if (req.query.assignedAgent) {
+        filters.assignedAgent = req.query.assignedAgent as string;
       }
       if (req.query.search) {
         filters.search = req.query.search as string;
@@ -1127,50 +1120,58 @@ router.post(
   '/starships/:starshipId/expeditions/:expeditionId/messages',
   authMiddleware,
   validateSendMessage,
-  async (req: Request, res: Response) => {
+  async (req: Request, res: Response): Promise<void> => {
     const requestId = Math.random().toString(36).substring(7);
     console.log(`[EXPEDITION-API] [${requestId}] ===== SEND MESSAGE REQUEST START =====`);
     
     try {
       const { expeditionId } = req.params;
       const userId = req.user!.id;
-      const sendMessageRequest: SendMessageRequest = {
-        expeditionId,
-        ...req.body,
-      };
+      const { content, participantId } = req.body;
 
       console.log(`[EXPEDITION-API] [${requestId}] Request details:`, {
         expeditionId,
         userId,
-        messageType: sendMessageRequest.messageType,
-        agentId: sendMessageRequest.agentId,
-        contentLength: sendMessageRequest.content?.length
+        participantId: participantId || 'first-officer (default)',
+        contentLength: content?.length
       });
 
-      // Use MessageService for message handling - now returns both user and First Officer messages
+      // Create the send message request with simplified structure
+      const sendMessageRequest: SendMessageRequest = {
+        expeditionId,
+        content,
+        participantId  // This will be undefined if not provided, which is handled by MessageService
+      };
+
+      // Use MessageService for message handling - now returns both user and participant messages
       console.log(`[EXPEDITION-API] [${requestId}] Calling messageService.sendMessage...`);
       const messageResponse = await messageService.sendMessage(userId, sendMessageRequest);
 
+      if (!messageResponse) {
+        res.status(500).json({
+          error: 'Failed to get response from agent. Please check your configuration and try again.'
+        });
+        return;
+      }
+
       console.log(`[EXPEDITION-API] [${requestId}] Message response received:`, {
         hasUserMessage: !!messageResponse.userMessage,
-        hasFirstOfficerMessage: !!messageResponse.firstOfficerMessage,
+        hasParticipantMessage: !!messageResponse.participantMessage,
         userMessageId: messageResponse.userMessage?.id,
-        firstOfficerMessageId: messageResponse.firstOfficerMessage?.id
+        participantMessageId: messageResponse.participantMessage?.id,
+        participantId: messageResponse.participantMessage?.agentId
       });
 
-      // Prepare response data
+      // Prepare response data with both userMessage and optional participantMessage
       const responseData: any = {
         userMessage: messageResponse.userMessage
       };
 
-      if (messageResponse.firstOfficerMessage) {
-        responseData.firstOfficerMessage = messageResponse.firstOfficerMessage;
-        responseData.messages = [messageResponse.userMessage, messageResponse.firstOfficerMessage];
-      } else {
-        responseData.messages = [messageResponse.userMessage];
+      if (messageResponse.participantMessage) {
+        responseData.participantMessage = messageResponse.participantMessage;
       }
 
-      console.log(`[EXPEDITION-API] [${requestId}] Sending HTTP response with ${responseData.messages.length} message(s)`);
+      console.log(`[EXPEDITION-API] [${requestId}] Sending HTTP response with userMessage and ${messageResponse.participantMessage ? 'participantMessage' : 'no participantMessage'}`);
 
       res.json({
         success: true,

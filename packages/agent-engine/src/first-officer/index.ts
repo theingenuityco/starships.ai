@@ -1,16 +1,17 @@
 /**
  * First Officer Agent Module
- * 
+ *
  * Exports the main First Officer Agent and related components
  * for expedition orchestration and workflow management.
- * 
+ *
  * Includes both original and enhanced implementations with
  * advanced LangGraph integration features.
  */
 
-// Core agents (original and enhanced)
+// Core agents
 export { FirstOfficerAgent } from './FirstOfficerAgent';
-export { EnhancedFirstOfficerAgent } from './EnhancedFirstOfficerAgent';
+// COMMENTED OUT: EnhancedFirstOfficerAgent file is missing
+// export { EnhancedFirstOfficerAgent } from './EnhancedFirstOfficerAgent';
 export { createMCPEnabledFirstOfficerAgent } from './MCPEnabledFirstOfficerAgent';
 
 // Core components
@@ -20,23 +21,14 @@ export { TaskExecutor } from './TaskExecutor';
 export { MCPEnhancedTaskExecutor } from './MCPEnhancedTaskExecutor';
 export { ChatCoordinator } from './ChatCoordinator';
 
-// Enhanced workflow components
-export {
-  TaskDependencyResolver,
-  ConditionalWorkflowManager,
-  UserApprovalManager,
-  WorkflowStatePersistence
-} from './WorkflowEnhancements';
+// State persistence utility
+export { StatePersistence } from './StatePersistence';
 
-// LangGraph workflow (for future API compatibility)
-export { LangGraphWorkflow } from './LangGraphWorkflow';
+// LangGraph workflow components
+export * from './workflow';
 
-// Testing utilities
-export {
-  testEnhancedIntegration,
-  testErrorScenarios,
-  runAllTests
-} from './test-integration';
+// WebSocket event emitter for real-time updates
+export { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
 
 // Export types
 export type {
@@ -55,16 +47,16 @@ export type {
   CoordinationMessageType,
   CoordinationMessage,
   AgentWorkload,
-  
-  // Enhanced types
+
+  // Workflow types
   UserApprovalResponse,
   EnhancedWorkflowOptions,
   WorkflowCheckpoint,
   TaskDependency,
-  ParallelExecutionGroup
+  ParallelExecutionGroup,
 } from './types';
 
-export type { 
+export type {
   MCPEnabledFirstOfficerConfig,
-  MCPEnabledFirstOfficerAgent 
+  MCPEnabledFirstOfficerAgent,
 } from './MCPEnabledFirstOfficerAgent';

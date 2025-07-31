@@ -30,7 +30,7 @@ export default async function StarshipLogbookPage({ params }: PageProps) {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/ships">
+                <Link href="/fleet">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back to Fleet
                 </Link>

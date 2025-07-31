@@ -79,8 +79,8 @@ export function ExpeditionProgress({ expedition, showDetails = true, enableRealT
     return {
       elapsed: elapsedMinutes,
       sinceUpdate: timeSinceUpdate,
-      estimated: expedition.estimatedDuration || 0,
-      actual: expedition.actualDuration || elapsedMinutes
+      estimated: 0,
+      actual: elapsedMinutes
     };
   };
 
@@ -274,15 +274,15 @@ export function ExpeditionProgress({ expedition, showDetails = true, enableRealT
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h4 className="text-sm font-medium mb-2">Objective</h4>
-              <p className="text-sm text-muted-foreground">{expedition.objective}</p>
+              <h4 className="text-sm font-medium mb-2">Mission</h4>
+              <p className="text-sm text-muted-foreground">{expedition.mission}</p>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h4 className="text-sm font-medium mb-2">Priority</h4>
+                <h4 className="text-sm font-medium mb-2">Status</h4>
                 <Badge variant="outline" className="capitalize">
-                  {expedition.priority}
+                  {expedition.status}
                 </Badge>
               </div>
               
@@ -295,18 +295,6 @@ export function ExpeditionProgress({ expedition, showDetails = true, enableRealT
               </div>
             </div>
 
-            {expedition.tags.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">Tags</h4>
-                <div className="flex flex-wrap gap-1">
-                  {expedition.tags.map((tag: string) => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4 pt-4 border-t">
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">

@@ -8,21 +8,15 @@ import {
   Trash2,
   Activity,
   Users,
-  Zap,
-  Navigation,
-  Settings,
-  Rocket,
-  Circle,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Command
+  Command,
+  CheckCircle2,
+  Bell
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,8 +40,8 @@ interface StarshipCardProps {
 
 export function StarshipCard({
   starship,
-  isActive,
-  viewMode,
+  isActive: _isActive,
+  viewMode: _viewMode,
   onSelect,
   onEdit,
   onDelete,
@@ -60,32 +54,63 @@ export function StarshipCard({
   // Get agent data for this starship
   const agentData = starshipAgents[starship.id];
   const deployedAgents = agentData?.deployedAgents || [];
-  const availableSlots = agentData?.availableSlots || starship.maxAgents || 0;
+
+  // Generate notification status based on starship state
+  const getNotificationStatus = () => {
+    const activeAgents = deployedAgents.length;
+    // Use starship ID for consistent pseudo-random behavior
+    const seed = starship.id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    const hasUnreadEvents = (seed % 10) > 7; // Deterministic based on ID
+    const eventCount = (seed % 3) + 1;
+    
+    if (starship.status === 'inactive') {
+      return {
+        icon: CheckCircle2,
+        text: 'Systems standby',
+        color: 'text-slate-500'
+      };
+    }
+    
+    if (hasUnreadEvents) {
+      return {
+        icon: Bell,
+        text: eventCount === 1 ? '1 new transmission' : `${eventCount} new transmissions`,
+        color: 'text-amber-500'
+      };
+    }
+    
+    if (activeAgents === 0) {
+      return {
+        icon: CheckCircle2,
+        text: 'Ready for deployment',
+        color: 'text-emerald-500'
+      };
+    }
+    
+    return {
+      icon: CheckCircle2,
+      text: 'All systems nominal',
+      color: 'text-emerald-500'
+    };
+  };
+
+  const notificationStatus = getNotificationStatus();
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
     return starshipClass === 'scout' ? '🚀' : '🛸';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'inactive': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    }
+  const getStarshipDescription = (starshipClass: 'scout' | 'cruiser') => {
+    return starshipClass === 'scout' 
+      ? 'Fast and agile vessel designed for exploration and reconnaissance missions.'
+      : 'Heavy-duty starship built for extended operations and complex multi-agent deployments.';
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <CheckCircle className="w-3 h-3" />;
-      case 'inactive': return <XCircle className="w-3 h-3" />;
-      default: return <XCircle className="w-3 h-3" />;
-    }
-  };
 
   const getClassColor = (starshipClass: 'scout' | 'cruiser') => {
     return starshipClass === 'scout' 
-      ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-      : 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
+      : 'bg-amber-500/20 text-amber-400 border-amber-500/30';
   };
 
   const handleCardClick = () => {
@@ -102,138 +127,58 @@ export function StarshipCard({
     router.push(`/ship/${starship.slug}/command-deck`);
   };
 
-  if (viewMode === 'list') {
-    return (
-      <motion.div
-        whileHover={{ scale: 1.01 }}
-        onHoverStart={() => setIsHovered(true)}
-        onHoverEnd={() => setIsHovered(false)}
-      >
-        <Card 
-          className={cn(
-            "cursor-pointer transition-all duration-200 bg-card/50 backdrop-blur-sm border-border/50",
-            isActive && "ring-2 ring-primary/50 bg-primary/5",
-            isHovered && "shadow-lg border-border/80"
-          )}
-          onClick={handleCardClick}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="text-2xl">{getStarshipIcon(starship.class)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-semibold truncate">{starship.name}</h3>
-                    {isActive && (
-                      <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
-                        Active
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center space-x-2 mt-1">
-                    <Badge variant="outline" className={getStatusColor(starship.status)}>
-                      {getStatusIcon(starship.status)}
-                      {starship.status}
-                    </Badge>
-                    <Badge variant="outline" className={getClassColor(starship.class)}>
-                      {starship.class}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-6">
-                <div className="text-center">
-                  <div className="text-sm font-medium">{deployedAgents.length}/{starship.maxAgents}</div>
-                  <div className="text-xs text-muted-foreground">Agents</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-sm font-medium">{starship.maxActiveExpeditions}</div>
-                  <div className="text-xs text-muted-foreground">Max Expeditions</div>
-                </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCommandDeckClick(); }}>
-                      <Command className="w-4 h-4 mr-2" />
-                      Command Deck
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange(); }}>
-                      <Activity className="w-4 h-4 mr-2" />
-                      Change Status
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    );
-  }
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: 1.01, y: -1 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
     >
       <Card 
         className={cn(
-          "cursor-pointer transition-all duration-200 bg-card/50 backdrop-blur-sm border-border/50",
-          isActive && "ring-2 ring-primary/50 bg-primary/5",
-          isHovered && "shadow-lg border-border/80"
+          "cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden",
+          "h-[240px] flex flex-col", // Fixed height with flex layout
+          isHovered && "shadow-xl border-border/80 bg-card/70",
+          "hover:shadow-2xl hover:shadow-primary/5"
         )}
         onClick={handleCardClick}
       >
-        <CardHeader className="pb-3">
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        
+        <CardHeader className="pb-0 relative space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="text-2xl">{getStarshipIcon(starship.class)}</div>
+              <Avatar className="w-14 h-14">
+                <AvatarFallback className="text-3xl bg-muted border border-border/30">
+                  {getStarshipIcon(starship.class)}
+                </AvatarFallback>
+              </Avatar>
               <div>
-                <CardTitle className="text-lg">{starship.name}</CardTitle>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge variant="outline" className={getStatusColor(starship.status)}>
-                    {getStatusIcon(starship.status)}
-                    {starship.status}
-                  </Badge>
-                  <Badge variant="outline" className={getClassColor(starship.class)}>
-                    {starship.class}
-                  </Badge>
-                </div>
+                <CardTitle className="text-lg font-bold">{starship.name}</CardTitle>
+                <Badge 
+                  variant="outline"
+                  className={cn(
+                    "mt-1 text-[10px] px-1.5 py-0.5 h-5",
+                    starship.status === 'active' 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                      : 'bg-slate-50 text-slate-700 border-slate-200'
+                  )}
+                >
+                  {starship.status === 'active' ? 'Active' : 'Inactive'}
+                </Badge>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {isActive && (
-                <Badge variant="outline" className="bg-primary/20 text-primary border-primary/30">
-                  Active
-                </Badge>
-              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
                     <MoreHorizontal className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-sm border-border/50">
                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCommandDeckClick(); }}>
                     <Command className="w-4 h-4 mr-2" />
                     Command Deck
@@ -259,53 +204,93 @@ export function StarshipCard({
               </DropdownMenu>
             </div>
           </div>
+          
+          {/* Description with ellipsis */}
+          <div>
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {getStarshipDescription(starship.class)}
+            </p>
+          </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className="pt-3 relative flex-1 flex flex-col justify-between">
           {/* Agent Deployment */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4 text-blue-500" />
-                <span className="text-sm font-medium">Agent Deployment</span>
-              </div>
-              <span className="text-sm font-mono">
-                {deployedAgents.length}/{starship.maxAgents}
-              </span>
-            </div>
-            <Progress
-              value={(deployedAgents.length / (starship.maxAgents || 1)) * 100}
-              className="h-2"
-            />
-            <div className="flex space-x-1">
-              {Array.from({ length: starship.maxAgents || 0 }).map((_, i) => (
-                <div
+          <div className="flex items-center">
+            <div className="relative flex items-center">
+              {/* Stacked avatars */}
+              {Array.from({ length: Math.min(3, deployedAgents.length) }).map((_, i) => (
+                <Avatar
                   key={i}
                   className={cn(
-                    "w-2 h-2 rounded-full",
-                    i < deployedAgents.length
-                      ? "bg-blue-500"
-                      : "bg-muted border border-border"
+                    "w-7 h-7 border-2 border-background shadow-sm transition-all duration-200 absolute",
+                    // Different background colors for variety
+                    i === 0 && "[&>span]:bg-blue-500",
+                    i === 1 && "[&>span]:bg-purple-500", 
+                    i === 2 && "[&>span]:bg-green-500"
                   )}
-                />
+                  style={{
+                    transform: `translateX(${i * -8}px)`,
+                    zIndex: 3 - i,
+                  }}
+                >
+                  <AvatarImage src={deployedAgents[i]?.id} />
+                  <AvatarFallback className="text-xs font-medium text-white">
+                    {deployedAgents[i]?.name ? 
+                      deployedAgents[i].name.charAt(0).toUpperCase() : 
+                      <Users className="w-3 h-3" />
+                    }
+                  </AvatarFallback>
+                </Avatar>
               ))}
+              
+              {/* "+X more" indicator */}
+              {deployedAgents.length > 3 && (
+                <Avatar
+                  className="w-7 h-7 border-2 border-background shadow-sm"
+                  style={{
+                    transform: `translateX(${3 * -8}px)`,
+                    zIndex: 0,
+                  }}
+                >
+                  <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+                    +{deployedAgents.length - 3}
+                  </AvatarFallback>
+                </Avatar>
+              )}
+              
+              {/* Empty state */}
+              {deployedAgents.length === 0 && (
+                <div className="flex items-center space-x-2 text-muted-foreground">
+                  <Avatar className="w-7 h-7 border-2 border-dashed border-muted-foreground/30">
+                    <AvatarFallback className="bg-transparent">
+                      <Users className="w-3 h-3" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs">Ready for deployment</span>
+                </div>
+              )}
+              
+              {/* Spacing for overlapped avatars */}
+              <div style={{ width: `${Math.max(0, Math.min(3, deployedAgents.length) * 8 + (deployedAgents.length > 3 ? 8 : 0))}px` }} />
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 gap-4 pt-2">
-            <div className="text-center">
-              <div className="flex items-center justify-center space-x-1 text-muted-foreground">
-                <Navigation className="w-3 h-3" />
-                <span className="text-xs">Max Expeditions</span>
-              </div>
-              <div className="text-lg font-semibold">{starship.maxActiveExpeditions}</div>
-            </div>
-          </div>
 
-          {/* Created Date */}
-          <div className="text-xs text-muted-foreground text-center pt-2 border-t border-border/50">
-            Created {new Date(starship.createdAt).toLocaleDateString()}
+          {/* Status Notification */}
+          <div className="flex items-center justify-between pt-3 border-t border-border/50">
+            <div className="flex items-center space-x-2 text-xs">
+              <notificationStatus.icon className={cn("w-3 h-3", notificationStatus.color)} />
+              <span className={notificationStatus.color}>{notificationStatus.text}</span>
+            </div>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "text-xs px-2 py-0.5 capitalize",
+                getClassColor(starship.class)
+              )}
+            >
+              {starship.class}
+            </Badge>
           </div>
         </CardContent>
       </Card>

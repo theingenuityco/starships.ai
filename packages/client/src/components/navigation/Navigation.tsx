@@ -18,31 +18,6 @@ interface NavigationProps {
   isMobile?: boolean;
 }
 
-// Fleet-level navigation structure
-const fleetNavigationSections = [
-  {
-    title: "Fleet Command",
-    items: [
-      { href: "/ships", label: "Fleet Command", icon: Command, status: "optimal" }
-    ]
-  },
-  {
-    title: "Core Systems",
-    items: [
-      { href: "/vision-chamber", label: "Vision Chamber", icon: Eye, status: "optimal" },
-      { href: "/crew", label: "Crew", icon: Users, status: "optimal" },
-      { href: "/drive", label: "Drive", icon: Zap, status: "warning" }
-    ]
-  },
-  {
-    title: "Operations",
-    items: [
-      { href: "/expeditions", label: "Expeditions", icon: Rocket, status: "active" },
-      { href: "/logbook", label: "Logbook", icon: BookOpen, status: "optimal" },
-      { href: "/sibil", label: "Sibil AI", icon: Brain, status: "optimal" }
-    ]
-  }
-];
 
 // Starship-internal navigation structure - function to generate paths based on current starship
 const getStarshipNavigationSections = (starshipSlug: string) => [
@@ -93,7 +68,7 @@ export function Navigation({
 
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {
-    // Inside starship context (/ship/<slug>/*)
+    // Only show navigation inside starship context (/ship/<slug>/*)
     if (pathname.startsWith('/ship/')) {
       // Extract starship slug from path
       const pathParts = pathname.split('/');
@@ -101,8 +76,8 @@ export function Navigation({
       return getStarshipNavigationSections(starshipSlug);
     }
     
-    // Fleet context or other routes
-    return fleetNavigationSections;
+    // No navigation for fleet-level routes
+    return [];
   };
 
   const navigationSections = getNavigationSections();

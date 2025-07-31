@@ -8,7 +8,6 @@
 import {
   Expedition,
   ExpeditionStatus,
-  ExpeditionPriority,
   CreateExpeditionRequest,
   UpdateExpeditionRequest,
   ExpeditionFilters,
@@ -32,16 +31,35 @@ import {
 import { getLogger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
+import { SocketIOService } from './SocketIOService';
 
 export class ExpeditionService {
   private static instance: ExpeditionService;
   private firstOfficerService: FirstOfficerService;
+  private socketService: SocketIOService | null = null;
   private logger = getLogger({
     service: 'expedition-service',
   });
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
+    // Note: SocketIOService will be accessed lazily when needed
+  }
+
+  /**
+   * Get SocketIOService instance lazily
+   */
+  private getSocketService(): SocketIOService | null {
+    if (!this.socketService) {
+      try {
+        this.socketService = SocketIOService.getInstance();
+        this.logger.info('SocketIOService successfully connected');
+      } catch (error) {
+        this.logger.warn('SocketIOService not available', undefined, { error: error instanceof Error ? error.message : String(error) });
+        return null;
+      }
+    }
+    return this.socketService;
   }
 
 
@@ -99,15 +117,11 @@ export class ExpeditionService {
       console.log(`[EXPEDITION-SERVICE] Step 6: Creating expedition in database`);
       const expeditionData = {
         starshipId: request.starshipId,
-        title: request.title,
-        description: request.description,
-        objective: request.objective,
+        name: request.name,
+        mission: request.mission,
         status: 'draft' as const,
-        priority: request.priority || 'medium',
         assignedAgents: [], // Will be populated in next step
         createdBy: userId,
-        estimatedDuration: request.estimatedDuration,
-        tags: request.tags || [],
         updatedAt: new Date().toISOString(),
       };
       console.log(`[EXPEDITION-SERVICE] Step 6: Expedition data prepared:`, expeditionData);
@@ -134,6 +148,16 @@ export class ExpeditionService {
       const assignedAgents = await this.getAssignedAgentsInfo(finalExpedition.assignedAgents);
       console.log(`[EXPEDITION-SERVICE] Step 8: Assigned agents info retrieved:`, assignedAgents);
 
+      // Emit expedition created event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        const expeditionRoom = `expedition:${finalExpedition.id}`;
+        socketService.getIO().to(expeditionRoom).emit('expedition:created' as any, {
+          expedition: finalExpedition,
+          assignedAgents,
+          timestamp: new Date().toISOString()
+        });
+      }
 
       console.log(`[EXPEDITION-SERVICE] Expedition created successfully: ${finalExpedition.id}`);
 
@@ -334,8 +358,20 @@ export class ExpeditionService {
         throw this.createError('STATUS_UPDATE_FAILED', 'Failed to update expedition status');
       }
 
+      // Emit status change event
+      const socketService = this.getSocketService();
+      if (socketService) {
+        const expeditionRoom = `expedition:${expeditionId}`;
+        socketService.getIO().to(expeditionRoom).emit('expedition:status-changed' as any, {
+          expeditionId,
+          status: 'planning',
+          userId,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // Start First Officer orchestration
-      await this.firstOfficerService.startExpedition(expeditionId, userId, expedition.objective);
+      await this.firstOfficerService.startExpedition(expeditionId, userId, expedition.mission);
 
       // Get updated data
       const [tasks, messages, results, assignedAgents] = await Promise.all([
@@ -422,7 +458,7 @@ export class ExpeditionService {
       this.validateExpeditionResume(expedition);
 
       // Resume First Officer orchestration
-      await this.firstOfficerService.resumeExpedition(expeditionId);
+      await this.firstOfficerService.resumeExpedition(expeditionId, userId);
 
       // Get updated expedition
       const updatedExpedition = await expeditionRepo.findById(expeditionId);

@@ -99,6 +99,11 @@ export interface LLMChatPrompt {
 export interface LLMResult {
   reply: string;
   usage?: UsageStats;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, any>;
+  }>;
 }
 
 export interface LLMProvider {
@@ -108,6 +113,7 @@ export interface LLMProvider {
       stream?: boolean;
       temperature?: number;
       maxTokens?: number;
+      tools?: any[];
     }
   ): Promise<LLMResult>;
   
@@ -116,6 +122,7 @@ export interface LLMProvider {
     opts?: {
       temperature?: number;
       maxTokens?: number;
+      tools?: any[];
     }
   ): AsyncGenerator<string, void, unknown>;
 }

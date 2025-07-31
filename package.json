@@ -43,8 +43,7 @@
   "pnpm": {
     "overrides": {
       "prismjs": ">=1.30.0",
-      "form-data": ">=4.0.4",
-      "@eslint/plugin-kit@<0.3.4": ">=0.3.4"
+      "form-data": ">=4.0.4"
     }
   }
 }

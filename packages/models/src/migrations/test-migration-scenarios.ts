@@ -156,6 +156,7 @@ export class MigrationTestDataSetup {
           ownerId,
           class: i % 2 === 0 ? 'scout' : 'cruiser',
           name: `Test Starship ${i + 1}`,
+          maxActiveExpeditions: i % 2 === 0 ? 3 : 6, // Scout=3, Cruiser=6
           status: 'active',
         });
 

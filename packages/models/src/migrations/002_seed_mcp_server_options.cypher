@@ -15,13 +15,6 @@ SET m.id = 'puppeteer-' + randomUUID(),
     m.args = ['-y', '@modelcontextprotocol/server-puppeteer'],
     m.env = '{}';
 
-// Filesystem MCP Server
-MERGE (m:MCPServerOption {name: 'Filesystem'})
-SET m.id = 'filesystem-' + randomUUID(),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/allowed/directory'],
-    m.env = '{}';
-
 // SQLite MCP Server
 MERGE (m:MCPServerOption {name: 'SQLite'})
 SET m.id = 'sqlite-' + randomUUID(),
@@ -56,13 +49,6 @@ SET m.id = 'slack-' + randomUUID(),
     m.command = 'npx',
     m.args = ['-y', '@modelcontextprotocol/server-slack'],
     m.env = '{"SLACK_BOT_TOKEN":"Your Slack Bot Token"}';
-
-// Memory MCP Server
-MERGE (m:MCPServerOption {name: 'Memory'})
-SET m.id = 'memory-' + randomUUID(),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-memory'],
-    m.env = '{}';
 
 // Everything MCP Server
 MERGE (m:MCPServerOption {name: 'Everything'})

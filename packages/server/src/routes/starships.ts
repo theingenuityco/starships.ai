@@ -20,6 +20,11 @@ import {
   EnhancedNotFoundError as NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
+import { serviceRegistry, DeploymentWorkflowService, connectorMigrationService } from '@starships/core';
+import type { MigrationOptions, MigrationResult } from '@starships/core';
+import { bridgeMonitoringService } from '@starships/core/dist/services/mcp/BridgeMonitoringService';
+import { toggleHttpBridge, getFeatureFlags } from '@starships/core/dist/services/mcp/FeatureFlagService';
+import { isHttpBridgeEnabled } from '@starships/core/dist/services/mcp/DockerServiceTemplate';
 
 /**
  * Input validation helpers
@@ -712,6 +717,15 @@ router.post(
         `[STARSHIPS] Successfully created connector instance ${connectorInstance.id} from template ${templateId} for starship ${starship.id}`
       );
 
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after creating connector`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after creating connector:`, error);
+      }
+
       res.status(201).json({
         message: 'Connector instance created successfully',
         starshipId: starship.id,
@@ -852,6 +866,15 @@ router.put(
         `[STARSHIPS] Successfully updated connector instance ${connectorId} for starship ${starship.id}`
       );
 
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after updating connector`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after updating connector:`, error);
+      }
+
       res.json({
         message: 'Connector instance updated successfully',
         starshipId: starship.id,
@@ -940,13 +963,37 @@ router.delete(
         return;
       }
 
-      // Delete the connector instance
+      // First, stop and remove the Docker container if it's deployed
+      if (connectorInstance.dockerStatus === 'running' || connectorInstance.dockerStatus === 'building') {
+        console.log(`[STARSHIPS] Removing Docker deployment for connector ${connectorInstance.id}`);
+        try {
+          const deploymentService = new DeploymentWorkflowService(mcpConnectorRepo, mcpServerRepo);
+          const removed = await deploymentService.removeDeployment(starship.id, connectorInstance.id);
+          if (!removed) {
+            console.warn(`[STARSHIPS] Failed to remove Docker deployment for connector ${connectorInstance.id}`);
+          }
+        } catch (error) {
+          console.error(`[STARSHIPS] Error removing Docker deployment:`, error);
+          // Continue with deletion even if Docker removal fails
+        }
+      }
+
+      // Delete the connector instance from database
       const deleted = await mcpConnectorRepo.delete(connectorInstance.id);
 
       if (!deleted) {
         console.error(`[STARSHIPS] Failed to delete connector instance ${connectorInstance.id}`);
         res.status(500).json({ error: 'Failed to remove connector instance' });
         return;
+      }
+
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id}`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache:`, error);
       }
 
       console.log(
@@ -1170,6 +1217,15 @@ router.put(
       console.log(
         `[STARSHIPS] Successfully updated environment variables for connector instance ${connectorId} on starship ${starship.id}`
       );
+
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after updating connector env`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after updating connector env:`, error);
+      }
 
       res.json({
         message: 'Connector environment variables updated successfully',
@@ -1661,5 +1717,1051 @@ router.post(
     }
   }
 );
+
+// ========== NEW HTTP BRIDGE SERVICE DISCOVERY ENDPOINTS ==========
+
+// GET /starships/:id/connectors/:connectorId/status - Enhanced status via HTTP bridge
+router.get(
+  '/starships/:id/connectors/:connectorId/status',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, connectorId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting enhanced status for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!connectorId || connectorId.trim().length === 0) {
+        res.status(400).json({ error: 'Connector ID is required' });
+        return;
+      }
+
+      // Validate UUID format for connectorId
+      try {
+        validateUUID(connectorId, 'connectorId');
+      } catch (error) {
+        return handleError(error, res, 'Invalid connector ID format');
+      }
+
+      // Find starship by ID or slug
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      // Verify ownership
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get enhanced status using DeploymentWorkflowService
+      const deploymentService = new DeploymentWorkflowService(mcpConnectorRepo, mcpServerRepo);
+      const status = await deploymentService.getDeploymentStatus(connectorId);
+
+      if (!status) {
+        res.status(404).json({ error: 'Connector status not found' });
+        return;
+      }
+
+      console.log(`[STARSHIPS] Retrieved enhanced status for connector ${connectorId}`);
+
+      res.json({
+        starshipId: starship.id,
+        connectorId,
+        status,
+      });
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error getting enhanced status for connector ${req.params.connectorId} on starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// GET /starships/:id/mcp-services - List all MCP service endpoints for service discovery
+router.get(
+  '/starships/:id/mcp-services',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting MCP services for starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      // Find starship by ID or slug
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      // Verify ownership
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get service discovery data from ServiceRegistry
+      const discoveryData = serviceRegistry.getServiceDiscoveryData(starship.id);
+
+      console.log(`[STARSHIPS] Found ${discoveryData.services.length} MCP services for starship ${starship.id}`);
+
+      res.json({
+        starshipId: starship.id,
+        ...discoveryData,
+      });
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error getting MCP services for starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// GET /starships/:id/connectors/:connectorId/tools - List available tools from HTTP bridge
+router.get(
+  '/starships/:id/connectors/:connectorId/tools',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, connectorId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting tools for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!connectorId || connectorId.trim().length === 0) {
+        res.status(400).json({ error: 'Connector ID is required' });
+        return;
+      }
+
+      // Validate UUID format for connectorId
+      try {
+        validateUUID(connectorId, 'connectorId');
+      } catch (error) {
+        return handleError(error, res, 'Invalid connector ID format');
+      }
+
+      // Find starship and verify ownership
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get service endpoint from registry
+      const serviceEndpoint = serviceRegistry.getService(starship.id, connectorId);
+      if (!serviceEndpoint) {
+        res.status(404).json({ error: 'Service endpoint not found or not HTTP bridge enabled' });
+        return;
+      }
+
+      // Try to fetch tools from HTTP bridge
+      try {
+        const response = await fetch(`${serviceEndpoint.internalUrl}/tools`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const toolsData = await response.json() as any;
+        console.log(`[STARSHIPS] Retrieved ${toolsData.tools?.length || 0} tools for connector ${connectorId}`);
+
+        res.json({
+          starshipId: starship.id,
+          connectorId,
+          tools: toolsData.tools || [],
+          executionTime: toolsData.execution_time_ms,
+        });
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to fetch tools from HTTP bridge:`, error);
+        res.status(503).json({ 
+          error: 'Service unavailable',
+          message: 'Failed to communicate with HTTP bridge',
+          serviceUrl: serviceEndpoint.internalUrl,
+        });
+      }
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error getting tools for connector ${req.params.connectorId} on starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// GET /starships/:id/connectors/:connectorId/resources - List available resources from HTTP bridge
+router.get(
+  '/starships/:id/connectors/:connectorId/resources',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, connectorId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting resources for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!connectorId || connectorId.trim().length === 0) {
+        res.status(400).json({ error: 'Connector ID is required' });
+        return;
+      }
+
+      // Validate UUID format for connectorId
+      try {
+        validateUUID(connectorId, 'connectorId');
+      } catch (error) {
+        return handleError(error, res, 'Invalid connector ID format');
+      }
+
+      // Find starship and verify ownership
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get service endpoint from registry
+      const serviceEndpoint = serviceRegistry.getService(starship.id, connectorId);
+      if (!serviceEndpoint) {
+        res.status(404).json({ error: 'Service endpoint not found or not HTTP bridge enabled' });
+        return;
+      }
+
+      // Try to fetch resources from HTTP bridge
+      try {
+        const response = await fetch(`${serviceEndpoint.internalUrl}/resources`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const resourcesData = await response.json() as any;
+        console.log(`[STARSHIPS] Retrieved ${resourcesData.resources?.length || 0} resources for connector ${connectorId}`);
+
+        res.json({
+          starshipId: starship.id,
+          connectorId,
+          resources: resourcesData.resources || [],
+          executionTime: resourcesData.execution_time_ms,
+        });
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to fetch resources from HTTP bridge:`, error);
+        res.status(503).json({ 
+          error: 'Service unavailable',
+          message: 'Failed to communicate with HTTP bridge',
+          serviceUrl: serviceEndpoint.internalUrl,
+        });
+      }
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error getting resources for connector ${req.params.connectorId} on starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// POST /starships/:id/connectors/:connectorId/tools/:toolName - Execute specific tool via HTTP bridge
+router.post(
+  '/starships/:id/connectors/:connectorId/tools/:toolName',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, connectorId, toolName } = req.params;
+      const { arguments: toolArguments } = req.body;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Executing tool ${toolName} for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!connectorId || connectorId.trim().length === 0) {
+        res.status(400).json({ error: 'Connector ID is required' });
+        return;
+      }
+
+      if (!toolName || toolName.trim().length === 0) {
+        res.status(400).json({ error: 'Tool name is required' });
+        return;
+      }
+
+      // Validate UUID format for connectorId
+      try {
+        validateUUID(connectorId, 'connectorId');
+      } catch (error) {
+        return handleError(error, res, 'Invalid connector ID format');
+      }
+
+      // Find starship and verify ownership
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get service endpoint from registry
+      const serviceEndpoint = serviceRegistry.getService(starship.id, connectorId);
+      if (!serviceEndpoint) {
+        res.status(404).json({ error: 'Service endpoint not found or not HTTP bridge enabled' });
+        return;
+      }
+
+      // Execute tool via HTTP bridge
+      try {
+        const response = await fetch(`${serviceEndpoint.internalUrl}/tools/${toolName}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ arguments: toolArguments || {} }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json() as any;
+        console.log(`[STARSHIPS] Successfully executed tool ${toolName} for connector ${connectorId}`);
+
+        res.json({
+          starshipId: starship.id,
+          connectorId,
+          toolName,
+          result: result.result,
+          executionTime: result.execution_time_ms,
+        });
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to execute tool via HTTP bridge:`, error);
+        res.status(503).json({ 
+          error: 'Service unavailable',
+          message: 'Failed to communicate with HTTP bridge',
+          serviceUrl: serviceEndpoint.internalUrl,
+          toolName,
+        });
+      }
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error executing tool ${req.params.toolName} for connector ${req.params.connectorId} on starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// POST /starships/:id/connectors/:connectorId/test - Test connector functionality
+router.post(
+  '/starships/:id/connectors/:connectorId/test',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, connectorId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Testing connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!connectorId || connectorId.trim().length === 0) {
+        res.status(400).json({ error: 'Connector ID is required' });
+        return;
+      }
+
+      // Validate UUID format for connectorId
+      try {
+        validateUUID(connectorId, 'connectorId');
+      } catch (error) {
+        return handleError(error, res, 'Invalid connector ID format');
+      }
+
+      // Find starship and verify ownership
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get service endpoint from registry
+      const serviceEndpoint = serviceRegistry.getService(starship.id, connectorId);
+      if (!serviceEndpoint) {
+        res.status(404).json({ error: 'Service endpoint not found or not HTTP bridge enabled' });
+        return;
+      }
+
+      // Test connector via HTTP bridge health endpoint
+      try {
+        const response = await fetch(`${serviceEndpoint.internalUrl}/health`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const healthData = await response.json() as any;
+        console.log(`[STARSHIPS] Successfully tested connector ${connectorId} - status: ${healthData.status}`);
+
+        res.json({
+          starshipId: starship.id,
+          connectorId,
+          testResult: {
+            healthy: healthData.status === 'healthy',
+            status: healthData.status,
+            timestamp: healthData.timestamp,
+            checks: healthData.checks,
+            tools: healthData.tools,
+            resources: healthData.resources,
+            lastError: healthData.last_error,
+            uptime: healthData.uptime_ms,
+          },
+        });
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to test connector via HTTP bridge:`, error);
+        res.status(503).json({ 
+          error: 'Service unavailable',
+          message: 'Failed to communicate with HTTP bridge',
+          serviceUrl: serviceEndpoint.internalUrl,
+          testResult: {
+            healthy: false,
+            status: 'unreachable',
+            timestamp: new Date().toISOString(),
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+      }
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error testing connector ${req.params.connectorId} on starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// GET /starships/:id/mcp-services/:slug/health - Direct health check for specific service
+router.get(
+  '/starships/:id/mcp-services/:slug/health',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, slug } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting health for MCP service ${slug} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!slug || slug.trim().length === 0) {
+        res.status(400).json({ error: 'Service slug is required' });
+        return;
+      }
+
+      // Find starship and verify ownership
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Find service by slug in the registry
+      const services = serviceRegistry.getStarshipServices(starship.id);
+      const service = services.find((s: any) => s.templateSlug === slug);
+
+      if (!service) {
+        res.status(404).json({ error: `MCP service with slug '${slug}' not found` });
+        return;
+      }
+
+      // Get health from HTTP bridge
+      try {
+        const response = await fetch(`${service.internalUrl}/health`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const healthData = await response.json() as any;
+        console.log(`[STARSHIPS] Retrieved health for service ${slug} - status: ${healthData.status}`);
+
+        res.json({
+          starshipId: starship.id,
+          serviceSlug: slug,
+          health: healthData,
+        });
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to get health for service ${slug}:`, error);
+        res.status(503).json({ 
+          error: 'Service unavailable',
+          message: 'Failed to communicate with HTTP bridge',
+          serviceUrl: service.internalUrl,
+          serviceSlug: slug,
+        });
+      }
+    } catch (error) {
+      handleError(
+        error,
+        res,
+        `Error getting health for MCP service ${req.params.slug} on starship ${req.params.id}`
+      );
+    }
+  }
+);
+
+// GET /starships/:id/connectors/:connectorId/monitoring - Get monitoring metrics and logs
+router.get(
+  '/starships/:id/connectors/:connectorId/monitoring',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug, connectorId } = req.params;
+      const { limit = '100' } = req.query;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting monitoring data for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      if (!connectorId || connectorId.trim().length === 0) {
+        res.status(400).json({ error: 'Connector ID is required' });
+        return;
+      }
+
+      // Try to find starship by ID first, then by slug
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get monitoring data
+      const metrics = bridgeMonitoringService.getMetrics(connectorId);
+      const logs = bridgeMonitoringService.getLogs(connectorId, parseInt(limit as string));
+      const alerts = bridgeMonitoringService.getAlerts(connectorId);
+
+      console.log(`[STARSHIPS] Retrieved monitoring data for connector ${connectorId}: ${logs.length} logs, ${alerts.length} alerts`);
+
+      res.json({
+        starshipId: starship.id,
+        connectorId,
+        metrics,
+        logs,
+        alerts,
+        monitoringStatus: bridgeMonitoringService.getMonitoringStatus()
+      });
+
+    } catch (error) {
+      console.error(`[STARSHIPS] Error getting monitoring data for connector ${req.params.connectorId}:`, error);
+      res.status(500).json({ error: 'Failed to get monitoring data' });
+    }
+  }
+);
+
+// GET /starships/:id/monitoring - Get monitoring overview for all connectors
+router.get(
+  '/starships/:id/monitoring',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { id: starshipIdOrSlug } = req.params;
+      const { limit = '1000' } = req.query;
+      const userId = req.user!.id;
+
+      console.log(`[STARSHIPS] Getting monitoring overview for starship ${starshipIdOrSlug}, user: ${userId}`);
+
+      // Validate parameters
+      if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+        res.status(400).json({ error: 'Starship ID or slug is required' });
+        return;
+      }
+
+      // Try to find starship by ID first, then by slug
+      let starship = await starshipRepo.findById(starshipIdOrSlug);
+      if (!starship) {
+        starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+      }
+
+      if (!starship) {
+        res.status(404).json({ error: 'Starship not found' });
+        return;
+      }
+
+      if (starship.ownerId !== userId) {
+        res.status(403).json({ error: 'Access denied: You do not own this starship' });
+        return;
+      }
+
+      // Get all metrics and logs
+      const allMetrics = bridgeMonitoringService.getAllMetrics();
+      const allLogs = bridgeMonitoringService.getAllLogs(parseInt(limit as string));
+      const allAlerts = bridgeMonitoringService.getAllActiveAlerts();
+      const monitoringStatus = bridgeMonitoringService.getMonitoringStatus();
+
+      // Filter to only this starship's connectors
+      const starshipConnectors = await mcpConnectorRepo.findByStarship(starship.id);
+      const connectorIds = starshipConnectors.map((c: any) => c.id);
+
+      const starshipMetrics = allMetrics.filter(m => connectorIds.includes(m.connectorId));
+      const starshipLogs = allLogs.filter(l => connectorIds.includes(l.connectorId));
+      const starshipAlerts = allAlerts.filter(a => connectorIds.includes(a.connectorId));
+
+      console.log(`[STARSHIPS] Retrieved monitoring overview for starship ${starship.id}: ${starshipMetrics.length} connectors, ${starshipLogs.length} logs, ${starshipAlerts.length} alerts`);
+
+      res.json({
+        starshipId: starship.id,
+        connectorCount: starshipMetrics.length,
+        metrics: starshipMetrics,
+        logs: starshipLogs,
+        alerts: starshipAlerts,
+        monitoringStatus
+      });
+
+    } catch (error) {
+      console.error(`[STARSHIPS] Error getting monitoring overview for starship ${req.params.id}:`, error);
+      res.status(500).json({ error: 'Failed to get monitoring overview' });
+    }
+  }
+);
+
+// GET /starships/feature-flags - Get current feature flag status
+router.get('/starships/feature-flags', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    console.log(`[STARSHIPS] Getting feature flags status, user: ${userId}`);
+
+    const flags = {
+      ...getFeatureFlags(),
+      httpBridgeEnabled: isHttpBridgeEnabled()
+    };
+
+    res.json({
+      featureFlags: flags,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[STARSHIPS] Error getting feature flags:', error);
+    res.status(500).json({ error: 'Failed to get feature flags' });
+  }
+});
+
+// POST /starships/feature-flags/http-bridge - Toggle HTTP bridge feature flag
+router.post('/starships/feature-flags/http-bridge', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    const userId = req.user!.id;
+
+    console.log(`[STARSHIPS] Toggling HTTP bridge feature flag to ${enabled}, user: ${userId}`);
+
+    if (typeof enabled !== 'boolean') {
+      res.status(400).json({ error: 'enabled field must be a boolean' });
+      return;
+    }
+
+    // Toggle the feature flag
+    toggleHttpBridge(enabled);
+
+    const flags = {
+      ...getFeatureFlags(),
+      httpBridgeEnabled: isHttpBridgeEnabled()
+    };
+
+    console.log(`[STARSHIPS] HTTP bridge feature flag successfully set to ${enabled}`);
+
+    res.json({
+      message: `HTTP bridge feature flag ${enabled ? 'enabled' : 'disabled'}`,
+      featureFlags: flags,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[STARSHIPS] Error toggling HTTP bridge feature flag:', error);
+    res.status(500).json({ error: 'Failed to toggle HTTP bridge feature flag' });
+  }
+});
+
+// POST /starships/:id/connectors/:connectorId/migrate/http-bridge - Migrate connector to HTTP bridge
+router.post('/starships/:id/connectors/:connectorId/migrate/http-bridge', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id: starshipIdOrSlug, connectorId } = req.params;
+    const userId = req.user!.id;
+    const { backupBeforeMigration = true, rollbackOnFailure = true, testBeforeSwitch = true } = req.body;
+
+    console.log(`[STARSHIPS] Starting HTTP bridge migration for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+    // Validate parameters
+    if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+      res.status(400).json({ error: 'Starship ID or slug is required' });
+      return;
+    }
+
+    if (!connectorId || connectorId.trim().length === 0) {
+      res.status(400).json({ error: 'Connector ID is required' });
+      return;
+    }
+
+    // Try to find starship by ID first, then by slug
+    let starship = await starshipRepo.findById(starshipIdOrSlug);
+    if (!starship) {
+      starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+    }
+
+    if (!starship) {
+      console.log(`[STARSHIPS] Starship not found: ${starshipIdOrSlug}`);
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      console.log(`[STARSHIPS] Access denied for starship ${starshipIdOrSlug}, user ${userId} is not owner`);
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Verify connector instance exists and belongs to this starship
+    const connectorInstance = await mcpConnectorRepo.findById(connectorId);
+    if (!connectorInstance) {
+      console.log(`[STARSHIPS] Connector instance not found: ${connectorId}`);
+      res.status(404).json({ error: 'Connector instance not found' });
+      return;
+    }
+
+    if (connectorInstance.starshipId !== starship.id) {
+      console.log(`[STARSHIPS] Connector instance ${connectorId} does not belong to starship ${starship.id}`);
+      res.status(403).json({ error: 'Connector does not belong to this starship' });
+      return;
+    }
+
+    // Perform migration
+    const migrationOptions: MigrationOptions = {
+      connectorId,
+      backupBeforeMigration,
+      rollbackOnFailure,
+      testBeforeSwitch
+    };
+
+    const migrationResult: MigrationResult = await connectorMigrationService.migrateToHttpBridge(migrationOptions);
+
+    if (migrationResult.success) {
+      console.log(`[STARSHIPS] Successfully migrated connector ${connectorId} to HTTP bridge`);
+      
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after migrating connector to HTTP bridge`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after migration:`, error);
+      }
+      
+      res.json({
+        message: 'Connector successfully migrated to HTTP bridge',
+        migrationResult,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.error(`[STARSHIPS] Migration failed for connector ${connectorId}:`, migrationResult.errorMessage);
+      res.status(500).json({
+        error: 'Migration failed',
+        migrationResult,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+  } catch (error) {
+    console.error('[STARSHIPS] Error migrating connector to HTTP bridge:', error);
+    res.status(500).json({ error: 'Failed to migrate connector to HTTP bridge' });
+  }
+});
+
+// POST /starships/:id/connectors/:connectorId/migrate/stdio - Migrate connector back to stdio
+router.post('/starships/:id/connectors/:connectorId/migrate/stdio', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id: starshipIdOrSlug, connectorId } = req.params;
+    const userId = req.user!.id;
+
+    console.log(`[STARSHIPS] Starting stdio migration for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+    // Validate parameters
+    if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+      res.status(400).json({ error: 'Starship ID or slug is required' });
+      return;
+    }
+
+    if (!connectorId || connectorId.trim().length === 0) {
+      res.status(400).json({ error: 'Connector ID is required' });
+      return;
+    }
+
+    // Try to find starship by ID first, then by slug
+    let starship = await starshipRepo.findById(starshipIdOrSlug);
+    if (!starship) {
+      starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+    }
+
+    if (!starship) {
+      console.log(`[STARSHIPS] Starship not found: ${starshipIdOrSlug}`);
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      console.log(`[STARSHIPS] Access denied for starship ${starshipIdOrSlug}, user ${userId} is not owner`);
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Verify connector instance exists and belongs to this starship
+    const connectorInstance = await mcpConnectorRepo.findById(connectorId);
+    if (!connectorInstance) {
+      console.log(`[STARSHIPS] Connector instance not found: ${connectorId}`);
+      res.status(404).json({ error: 'Connector instance not found' });
+      return;
+    }
+
+    if (connectorInstance.starshipId !== starship.id) {
+      console.log(`[STARSHIPS] Connector instance ${connectorId} does not belong to starship ${starship.id}`);
+      res.status(403).json({ error: 'Connector does not belong to this starship' });
+      return;
+    }
+
+    // Perform migration
+    const migrationOptions: MigrationOptions = { connectorId };
+    const migrationResult: MigrationResult = await connectorMigrationService.migrateToStdio(migrationOptions);
+
+    if (migrationResult.success) {
+      console.log(`[STARSHIPS] Successfully migrated connector ${connectorId} to stdio`);
+      
+      // Clear the tool discovery cache for this starship
+      try {
+        const { mcpToolGatewayDB } = await import('@starships/core');
+        mcpToolGatewayDB.clearCacheForStarship(starship.id);
+        console.log(`[STARSHIPS] Cleared tool cache for starship ${starship.id} after migrating connector to stdio`);
+      } catch (error) {
+        console.error(`[STARSHIPS] Failed to clear tool cache after migration:`, error);
+      }
+      
+      res.json({
+        message: 'Connector successfully migrated to stdio',
+        migrationResult,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.error(`[STARSHIPS] Migration failed for connector ${connectorId}:`, migrationResult.errorMessage);
+      res.status(500).json({
+        error: 'Migration failed',
+        migrationResult,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+  } catch (error) {
+    console.error('[STARSHIPS] Error migrating connector to stdio:', error);
+    res.status(500).json({ error: 'Failed to migrate connector to stdio' });
+  }
+});
+
+// GET /starships/:id/connectors/:connectorId/migration/status - Get migration status
+router.get('/starships/:id/connectors/:connectorId/migration/status', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id: starshipIdOrSlug, connectorId } = req.params;
+    const userId = req.user!.id;
+
+    console.log(`[STARSHIPS] Getting migration status for connector ${connectorId} on starship ${starshipIdOrSlug}, user: ${userId}`);
+
+    // Validate parameters
+    if (!starshipIdOrSlug || starshipIdOrSlug.trim().length === 0) {
+      res.status(400).json({ error: 'Starship ID or slug is required' });
+      return;
+    }
+
+    if (!connectorId || connectorId.trim().length === 0) {
+      res.status(400).json({ error: 'Connector ID is required' });
+      return;
+    }
+
+    // Try to find starship by ID first, then by slug
+    let starship = await starshipRepo.findById(starshipIdOrSlug);
+    if (!starship) {
+      starship = await starshipRepo.findBySlug(starshipIdOrSlug, userId);
+    }
+
+    if (!starship) {
+      console.log(`[STARSHIPS] Starship not found: ${starshipIdOrSlug}`);
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      console.log(`[STARSHIPS] Access denied for starship ${starshipIdOrSlug}, user ${userId} is not owner`);
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Get migration status
+    const migrationStatus = connectorMigrationService.getMigrationStatus(connectorId);
+
+    res.json({
+      connectorId,
+      migrationStatus,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[STARSHIPS] Error getting migration status:', error);
+    res.status(500).json({ error: 'Failed to get migration status' });
+  }
+});
+
+// POST /starships/migrate/template/:templateSlug - Migrate all connectors of a template
+router.post('/starships/migrate/template/:templateSlug', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { templateSlug } = req.params;
+    const userId = req.user!.id;
+    const { backupBeforeMigration = true, rollbackOnFailure = true, testBeforeSwitch = true } = req.body;
+
+    console.log(`[STARSHIPS] Starting batch migration for template ${templateSlug}, user: ${userId}`);
+
+    // Validate template slug
+    if (!templateSlug || templateSlug.trim().length === 0) {
+      res.status(400).json({ error: 'Template slug is required' });
+      return;
+    }
+
+    // Perform batch migration
+    const migrationOptions = {
+      backupBeforeMigration,
+      rollbackOnFailure,
+      testBeforeSwitch
+    };
+
+    const migrationResults: MigrationResult[] = await connectorMigrationService.migrateAllConnectorsByTemplate(templateSlug, migrationOptions);
+
+    const successfulMigrations = migrationResults.filter(r => r.success);
+    const failedMigrations = migrationResults.filter(r => !r.success);
+
+    console.log(`[STARSHIPS] Batch migration completed for template ${templateSlug}: ${successfulMigrations.length} successful, ${failedMigrations.length} failed`);
+
+    res.json({
+      message: `Batch migration completed for template ${templateSlug}`,
+      templateSlug,
+      summary: {
+        total: migrationResults.length,
+        successful: successfulMigrations.length,
+        failed: failedMigrations.length
+      },
+      results: migrationResults,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[STARSHIPS] Error performing batch migration:', error);
+    res.status(500).json({ error: 'Failed to perform batch migration' });
+  }
+});
 
 export default router;

@@ -20,6 +20,7 @@
     "@langchain/core": "^0.3.66",
     "@langchain/langgraph": "^0.3.11",
     "@starships/agent-engine": "workspace:*",
+    "@starships/core": "workspace:*",
     "@starships/env-config": "workspace:*",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",

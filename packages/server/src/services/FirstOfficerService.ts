@@ -9,6 +9,7 @@ import {
   FirstOfficerAgent, 
   LangChainMemoryStore, 
   ProviderFactory,
+  createMCPEnabledFirstOfficerAgent,
   WebSocketEventEmitter
 } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
@@ -122,6 +123,8 @@ export class FirstOfficerService {
       const memoryStore = new LangChainMemoryStore();
       this.memoryStores.set(expeditionId, memoryStore);
 
+      // Create MCP-enabled First Officer Agent instance
+      // const firstOfficer = createMCPEnabledFirstOfficerAgent(
       // Create WebSocket message emission callback
       const messageEmitCallback = async (message: any) => {
         const socketSvc = this.getSocketService();
@@ -165,8 +168,11 @@ export class FirstOfficerService {
           qualityThreshold: 70,
           timeoutMinutes: 60,
           requireUserApproval: false,
-          enableParallelExecution: false, // Disable parallel execution as per plan
+          enableParallelExecution: true,
           autoEscalation: true
+          // COMMENTED OUT: MCP-related properties removed
+          // mcpEnabled: true,
+          // mcpStarshipId: expedition.starshipId
         },
         expedition.assignedAgents, // Pass selected agents from expedition
         messageEmitCallback, // Pass WebSocket emission callback

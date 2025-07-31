@@ -1,20 +1,24 @@
 /**
  * First Officer Agent Module
- * 
+ *
  * Exports the main First Officer Agent and related components
  * for expedition orchestration and workflow management.
- * 
+ *
  * Includes both original and enhanced implementations with
  * advanced LangGraph integration features.
  */
 
 // Core agents
 export { FirstOfficerAgent } from './FirstOfficerAgent';
+// COMMENTED OUT: EnhancedFirstOfficerAgent file is missing
+// export { EnhancedFirstOfficerAgent } from './EnhancedFirstOfficerAgent';
+export { createMCPEnabledFirstOfficerAgent } from './MCPEnabledFirstOfficerAgent';
 
 // Core components
 export { AgentSelector } from './AgentSelector';
 export { QualityValidator } from './QualityValidator';
 export { TaskExecutor } from './TaskExecutor';
+export { MCPEnhancedTaskExecutor } from './MCPEnhancedTaskExecutor';
 export { ChatCoordinator } from './ChatCoordinator';
 
 // State persistence utility
@@ -43,8 +47,16 @@ export type {
   CoordinationMessageType,
   CoordinationMessage,
   AgentWorkload,
-  
-  // Workflow types  
+
+  // Workflow types
   UserApprovalResponse,
-  WorkflowCheckpoint
+  EnhancedWorkflowOptions,
+  WorkflowCheckpoint,
+  TaskDependency,
+  ParallelExecutionGroup,
 } from './types';
+
+export type {
+  MCPEnabledFirstOfficerConfig,
+  MCPEnabledFirstOfficerAgent,
+} from './MCPEnabledFirstOfficerAgent';

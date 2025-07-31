@@ -15,8 +15,8 @@ export class LangChainProvider implements LLMProvider {
     this.modelConfig = model;
   }
 
-  async complete(prompt: LLMChatPrompt, opts?: { stream?: boolean; temperature?: number; maxTokens?: number }): Promise<LLMResult> {
-    const model = this.createModel(opts);
+  async complete(prompt: LLMChatPrompt, opts?: { stream?: boolean; temperature?: number; maxTokens?: number; tools?: any[] }): Promise<LLMResult> {
+    const baseModel = this.createModel(opts);
     const messages = this.convertToLangChainMessages(prompt.messages);
 
     try {
@@ -26,6 +26,13 @@ export class LangChainProvider implements LLMProvider {
         throw new Error('Use completeStream for streaming responses');
       }
 
+      // Bind tools if provided
+      let model: any = baseModel;
+      if (opts?.tools && opts.tools.length > 0 && 'bindTools' in baseModel) {
+        // Tools are already LangChain DynamicTool instances from MCPToolWrapper
+        model = (baseModel as any).bindTools(opts.tools);
+      }
+
       const response = await model.invoke(messages);
       
       const usage = (response.response_metadata?.tokenUsage || response.usage_metadata) ? {
@@ -33,20 +40,35 @@ export class LangChainProvider implements LLMProvider {
         completion_tokens: response.response_metadata?.tokenUsage?.completionTokens || response.usage_metadata?.output_tokens || 0,
       } : undefined;
 
+      // Extract tool calls if present
+      const toolCalls = (response as any).tool_calls ? (response as any).tool_calls.map((tc: any) => ({
+        id: tc.id || '',
+        name: tc.name,
+        arguments: tc.args || {},
+      })) : undefined;
+
       return {
         reply: response.content as string,
         usage,
+        toolCalls,
       };
     } catch (error) {
       throw new Error(`LLM completion failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  async *completeStream(prompt: LLMChatPrompt, opts?: { temperature?: number; maxTokens?: number }): AsyncGenerator<string, void, unknown> {
-    const model = this.createModel(opts);
+  async *completeStream(prompt: LLMChatPrompt, opts?: { temperature?: number; maxTokens?: number; tools?: any[] }): AsyncGenerator<string, void, unknown> {
+    const baseModel = this.createModel(opts);
     const messages = this.convertToLangChainMessages(prompt.messages);
 
     try {
+      // Bind tools if provided
+      let model: any = baseModel;
+      if (opts?.tools && opts.tools.length > 0 && 'bindTools' in baseModel) {
+        // Tools are already LangChain DynamicTool instances from MCPToolWrapper
+        model = (baseModel as any).bindTools(opts.tools);
+      }
+
       const stream = await model.stream(messages);
       
       for await (const chunk of stream) {
@@ -100,4 +122,5 @@ export class LangChainProvider implements LLMProvider {
       }
     });
   }
+
 } 

@@ -8,6 +8,7 @@ import { SocketProvider } from '@/providers/socket-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
+import { Toaster } from '@/components/ui/toast'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,11 +20,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
@@ -48,4 +45,4 @@ export default function RootLayout({
       </body>
     </html>
   )
-} 
+}

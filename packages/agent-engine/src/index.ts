@@ -37,6 +37,7 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
     id: agent.id,
     name: agent.name,
     model: agent.model,
+    starshipId: agent.starshipId,
     systemPrompt: agent.systemPrompt?.substring(0, 100) + '...',
   });
 
@@ -177,92 +178,91 @@ You should be helpful, professional, and focused on delivering high-quality resu
     // Continue without expedition context
   }
   
-  // Step 2: Enhanced starship lookup with multiple strategies
+  // Step 2: Load the agent's assigned starship for proper isolation
   try {
-    console.log('🚢 [AGENT-ENGINE] Starting enhanced starship lookup...');
+    console.log('🚢 [AGENT-ENGINE] Loading agent\'s assigned starship...');
     
-    // Strategy 1: Use resolved internal user ID
-    if (userResolutionSuccess) {
-      starshipLookupStrategies.push(`internal-user-id:${internalUserId}`);
+    // CRITICAL FIX: Use the agent's starshipId to ensure proper isolation
+    if (!agent.starshipId) {
+      console.error('❌ [AGENT-ENGINE] Agent has no starshipId assigned:', agent.id);
+      throw new Error(`Agent ${agent.id} has no starship assigned`);
     }
     
-    // Strategy 2: Use Kinde ID as fallback (in case starships were created with Kinde IDs)
-    if (fallbackToKindeId || !userResolutionSuccess) {
-      starshipLookupStrategies.push(`kinde-id-fallback:${req.user_id}`);
+    console.log('🔍 [AGENT-ENGINE] Fetching starship with ID:', agent.starshipId);
+    const activeStarship = await starshipRepo.findById(agent.starshipId);
+    
+    if (!activeStarship) {
+      console.error('❌ [AGENT-ENGINE] Starship not found for agent:', {
+        agentId: agent.id,
+        starshipId: agent.starshipId
+      });
+      throw new Error(`Starship ${agent.starshipId} not found for agent ${agent.id}`);
     }
     
-    console.log('🎯 [AGENT-ENGINE] Starship lookup strategies:', starshipLookupStrategies);
-    
-    let userStarships: any[] = [];
-    let successfulStrategy = '';
-    
-    // Try each strategy until we find starships
-    for (const strategy of starshipLookupStrategies) {
-      const [strategyType, userId] = strategy.split(':');
-      console.log(`🔍 [AGENT-ENGINE] Trying strategy "${strategyType}" with user ID: ${userId}`);
-      
-      try {
-        const starshipsForStrategy = await starshipRepo.findByOwner(userId);
-        console.log(`📊 [AGENT-ENGINE] Strategy "${strategyType}" found ${starshipsForStrategy.length} starships`);
-        
-        if (starshipsForStrategy.length > 0) {
-          userStarships = starshipsForStrategy;
-          successfulStrategy = strategyType;
-          console.log(`✅ [AGENT-ENGINE] Using starships from strategy: ${strategyType}`);
-          break;
-        }
-      } catch (strategyError) {
-        console.error(`❌ [AGENT-ENGINE] Strategy "${strategyType}" failed:`, (strategyError as Error).message);
-        continue;
-      }
-    }
-    
-    console.log('📊 [AGENT-ENGINE] Final starship lookup result:', {
-      starshipsFound: userStarships.length,
-      successfulStrategy: successfulStrategy,
-      starshipDetails: userStarships.map(s => ({
-        id: s.id,
-        name: s.name,
-        class: s.class,
-        ownerId: s.ownerId,
-        status: s.status
-      }))
+    console.log('✅ [AGENT-ENGINE] Agent\'s starship loaded:', {
+      starshipId: activeStarship.id,
+      starshipName: activeStarship.name,
+      starshipClass: activeStarship.class,
+      starshipStatus: activeStarship.status,
+      ownerId: activeStarship.ownerId
     });
     
-    if (userStarships.length > 0) {
-      // Check if we have a specific starship ID from the expedition context
-      let activeStarship = null;
-      const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
+    // Verify the starship belongs to the user for security
+    const isOwnerMatch = activeStarship.ownerId === internalUserId || 
+                        activeStarship.ownerId === req.user_id;
+    
+    if (!isOwnerMatch) {
+      console.error('❌ [AGENT-ENGINE] Starship ownership mismatch:', {
+        starshipOwnerId: activeStarship.ownerId,
+        internalUserId: internalUserId,
+        kindeUserId: req.user_id
+      });
+      throw new Error('Agent\'s starship does not belong to the requesting user');
+    }
+    
+    if (activeStarship) {
+      console.log('🎯 [AGENT-ENGINE] Active starship selected:', {
+        id: activeStarship.id,
+        name: activeStarship.name,
+        class: activeStarship.class,
+        ownerId: activeStarship.ownerId,
+        status: activeStarship.status,
+        selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
+      });
+    // if (userStarships.length > 0) {
+    //   // Check if we have a specific starship ID from the expedition context
+    //   let activeStarship = null;
+    //   const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
       
-      if (directStarshipStrategy) {
-        // For expedition agents, use the specific starship from the expedition
-        const expeditionStarshipId = directStarshipStrategy.split(':')[1];
-        activeStarship = userStarships.find(s => s.id === expeditionStarshipId);
+    //   if (directStarshipStrategy) {
+    //     // For expedition agents, use the specific starship from the expedition
+    //     const expeditionStarshipId = directStarshipStrategy.split(':')[1];
+    //     activeStarship = userStarships.find(s => s.id === expeditionStarshipId);
         
-        if (activeStarship) {
-          console.log('🎯 [AGENT-ENGINE] Using expedition-specific starship:', {
-            id: activeStarship.id,
-            name: activeStarship.name,
-            expeditionStarshipId: expeditionStarshipId,
-            selectionReason: 'expedition-context'
-          });
-        } else {
-          console.log('⚠️ [AGENT-ENGINE] Expedition starship not found in user starships:', expeditionStarshipId);
-        }
-      }
+    //     if (activeStarship) {
+    //       console.log('🎯 [AGENT-ENGINE] Using expedition-specific starship:', {
+    //         id: activeStarship.id,
+    //         name: activeStarship.name,
+    //         expeditionStarshipId: expeditionStarshipId,
+    //         selectionReason: 'expedition-context'
+    //       });
+    //     } else {
+    //       console.log('⚠️ [AGENT-ENGINE] Expedition starship not found in user starships:', expeditionStarshipId);
+    //     }
+    //   }
       
-      // Fall back to selecting the first active starship, or first starship if none are active
-      if (!activeStarship) {
-        activeStarship = userStarships.find(s => s.status === 'active') || userStarships[0];
-        console.log('🎯 [AGENT-ENGINE] Active starship selected (fallback):', {
-          id: activeStarship.id,
-          name: activeStarship.name,
-          class: activeStarship.class,
-          ownerId: activeStarship.ownerId,
-          status: activeStarship.status,
-          selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
-        });
-      }
+    //   // Fall back to selecting the first active starship, or first starship if none are active
+    //   if (!activeStarship) {
+    //     activeStarship = userStarships.find(s => s.status === 'active') || userStarships[0];
+    //     console.log('🎯 [AGENT-ENGINE] Active starship selected (fallback):', {
+    //       id: activeStarship.id,
+    //       name: activeStarship.name,
+    //       class: activeStarship.class,
+    //       ownerId: activeStarship.ownerId,
+    //       status: activeStarship.status,
+    //       selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
+    //     });
+    //   }
       
       // Step 3: Enhanced vision loading with validation
       console.log('🔍 [AGENT-ENGINE] Querying vision for starship ID:', activeStarship.id);
@@ -306,130 +306,130 @@ You should be helpful, professional, and focused on delivering high-quality resu
         console.log('⚠️ [AGENT-ENGINE] Proceeding without vision context - empty/null statement for starship:', activeStarship.id);
       }
     } else {
-      console.error('❌ [AGENT-ENGINE] CRITICAL: No starships found for user with any strategy');
+      console.error('❌ [AGENT-ENGINE] CRITICAL: Agent\'s starship could not be loaded');
       console.error('🔍 [AGENT-ENGINE] Debug information:', {
+        agentId: agent.id,
+        starshipId: agent.starshipId,
         originalKindeId: req.user_id,
-        resolvedInternalId: internalUserId,
-        userResolutionSuccess: userResolutionSuccess,
-        strategiesAttempted: starshipLookupStrategies,
-        fallbackToKindeId: fallbackToKindeId
+        resolvedInternalId: internalUserId
       });
       
+      console.log('⚠️ [AGENT-ENGINE] Proceeding without vision context - starship not accessible');
       // Try to load starship from agent's perspective (for crew agents)
-      console.log('🔍 [AGENT-ENGINE] Attempting to find starship from agent assignments...');
-      try {
-        let agentStarship = null;
+      // console.log('🔍 [AGENT-ENGINE] Attempting to find starship from agent assignments...');
+      // try {
+      //   let agentStarship = null;
         
-        // First, try to use starship slug from channel if available
-        if (starshipSlugFromChannel) {
-          console.log('🎯 [AGENT-ENGINE] Looking up starship by slug:', starshipSlugFromChannel);
-          // For crew agents, we don't have the owner ID, so we need to find the starship differently
-          // We can use findAll and filter by slug
-          const allStarships = await starshipRepo.findAll();
-          const starshipBySlug = allStarships.find(s => s.slug === starshipSlugFromChannel);
-          if (starshipBySlug) {
-            agentStarship = starshipBySlug;
-            console.log('✅ [AGENT-ENGINE] Found starship by slug:', {
-              id: starshipBySlug.id,
-              name: starshipBySlug.name,
-              slug: starshipSlugFromChannel
-            });
-          }
-        }
+      //   // First, try to use starship slug from channel if available
+      //   if (starshipSlugFromChannel) {
+      //     console.log('🎯 [AGENT-ENGINE] Looking up starship by slug:', starshipSlugFromChannel);
+      //     // For crew agents, we don't have the owner ID, so we need to find the starship differently
+      //     // We can use findAll and filter by slug
+      //     const allStarships = await starshipRepo.findAll();
+      //     const starshipBySlug = allStarships.find(s => s.slug === starshipSlugFromChannel);
+      //     if (starshipBySlug) {
+      //       agentStarship = starshipBySlug;
+      //       console.log('✅ [AGENT-ENGINE] Found starship by slug:', {
+      //         id: starshipBySlug.id,
+      //         name: starshipBySlug.name,
+      //         slug: starshipSlugFromChannel
+      //       });
+      //     }
+      //   }
         
-        // Second, check if we have a starship ID from direct strategy or expedition
-        if (!agentStarship) {
-          console.log('🔍 [AGENT-ENGINE] Checking for starship strategies...');
-          console.log('🔍 [AGENT-ENGINE] Available strategies:', starshipLookupStrategies);
+      //   // Second, check if we have a starship ID from direct strategy or expedition
+      //   if (!agentStarship) {
+      //     console.log('🔍 [AGENT-ENGINE] Checking for starship strategies...');
+      //     console.log('🔍 [AGENT-ENGINE] Available strategies:', starshipLookupStrategies);
           
-          // Try direct starship ID first (from enhanced channel_id)
-          const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
-          if (directStarshipStrategy) {
-            const starshipId = directStarshipStrategy.split(':')[1];
-            console.log('🎯 [AGENT-ENGINE] Looking up starship from direct ID:', starshipId);
-            const starshipById = await starshipRepo.findById(starshipId);
-            if (starshipById) {
-              agentStarship = starshipById;
-              console.log('✅ [AGENT-ENGINE] Found starship from direct ID:', {
-                id: starshipById.id,
-                name: starshipById.name,
-                fromDirect: true
-              });
-            } else {
-              console.log('❌ [AGENT-ENGINE] Could not find starship with ID:', starshipId);
-            }
-          } else {
-            console.log('⚠️ [AGENT-ENGINE] No direct-starship strategy found in:', starshipLookupStrategies);
-          }
+      //     // Try direct starship ID first (from enhanced channel_id)
+      //     const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
+      //     if (directStarshipStrategy) {
+      //       const starshipId = directStarshipStrategy.split(':')[1];
+      //       console.log('🎯 [AGENT-ENGINE] Looking up starship from direct ID:', starshipId);
+      //       const starshipById = await starshipRepo.findById(starshipId);
+      //       if (starshipById) {
+      //         agentStarship = starshipById;
+      //         console.log('✅ [AGENT-ENGINE] Found starship from direct ID:', {
+      //           id: starshipById.id,
+      //           name: starshipById.name,
+      //           fromDirect: true
+      //         });
+      //       } else {
+      //         console.log('❌ [AGENT-ENGINE] Could not find starship with ID:', starshipId);
+      //       }
+      //     } else {
+      //       console.log('⚠️ [AGENT-ENGINE] No direct-starship strategy found in:', starshipLookupStrategies);
+      //     }
           
-          // If not found, try expedition starship strategy
-          if (!agentStarship) {
-            const expeditionStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('expedition-starship:'));
-            console.log('🔍 [AGENT-ENGINE] Expedition starship strategy:', expeditionStarshipStrategy);
-            if (expeditionStarshipStrategy) {
-            const starshipId = expeditionStarshipStrategy.split(':')[1];
-            console.log('🎯 [AGENT-ENGINE] Looking up starship from expedition:', starshipId);
-            const starshipById = await starshipRepo.findById(starshipId);
-            if (starshipById) {
-              agentStarship = starshipById;
-              console.log('✅ [AGENT-ENGINE] Found starship from expedition:', {
-                id: starshipById.id,
-                name: starshipById.name,
-                fromExpedition: true
-              });
-            }
-          }
-          }
-        }
+      //     // If not found, try expedition starship strategy
+      //     if (!agentStarship) {
+      //       const expeditionStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('expedition-starship:'));
+      //       console.log('🔍 [AGENT-ENGINE] Expedition starship strategy:', expeditionStarshipStrategy);
+      //       if (expeditionStarshipStrategy) {
+      //       const starshipId = expeditionStarshipStrategy.split(':')[1];
+      //       console.log('🎯 [AGENT-ENGINE] Looking up starship from expedition:', starshipId);
+      //       const starshipById = await starshipRepo.findById(starshipId);
+      //       if (starshipById) {
+      //         agentStarship = starshipById;
+      //         console.log('✅ [AGENT-ENGINE] Found starship from expedition:', {
+      //           id: starshipById.id,
+      //           name: starshipById.name,
+      //           fromExpedition: true
+      //         });
+      //       }
+      //     }
+      //     }
+      //   }
         
-        // If no starship found by slug, try to find any active starship from remaining list
-        if (!agentStarship && !starshipSlugFromChannel) {
-          // We didn't look up by slug, so need to get all starships
-          const allStarships = await starshipRepo.findAll();
+      //   // If no starship found by slug, try to find any active starship from remaining list
+      //   if (!agentStarship && !starshipSlugFromChannel) {
+      //     // We didn't look up by slug, so need to get all starships
+      //     const allStarships = await starshipRepo.findAll();
           
-          for (const starship of allStarships) {
-            // Check if agent is part of this starship's crew
-            // This would need to check the agent assignments
-            // For now, we'll use the first starship if available
-            if (starship.status === 'active') {
-              agentStarship = starship;
-              break;
-            }
-          }
+      //     for (const starship of allStarships) {
+      //       // Check if agent is part of this starship's crew
+      //       // This would need to check the agent assignments
+      //       // For now, we'll use the first starship if available
+      //       if (starship.status === 'active') {
+      //         agentStarship = starship;
+      //         break;
+      //       }
+      //     }
           
-          if (!agentStarship && allStarships.length > 0) {
-            agentStarship = allStarships[0];
-          }
-        }
+      //     if (!agentStarship && allStarships.length > 0) {
+      //       agentStarship = allStarships[0];
+      //     }
+      //   }
         
-        if (agentStarship) {
-          console.log('🎯 [AGENT-ENGINE] Found starship from agent perspective:', {
-            id: agentStarship.id,
-            name: agentStarship.name,
-            status: agentStarship.status
-          });
+      //   if (agentStarship) {
+      //     console.log('🎯 [AGENT-ENGINE] Found starship from agent perspective:', {
+      //       id: agentStarship.id,
+      //       name: agentStarship.name,
+      //       status: agentStarship.status
+      //     });
           
-          // Load vision for this starship
-          const vision = await visionRepo.findByStarship(agentStarship.id);
+      //     // Load vision for this starship
+      //     const vision = await visionRepo.findByStarship(agentStarship.id);
           
-          if (vision?.statement && vision.statement.trim().length > 0) {
-            console.log('📖 [AGENT-ENGINE] Vision loaded from agent starship:', {
-              length: vision.statement.length,
-              preview: vision.statement.substring(0, 150) + '...'
-            });
+      //     if (vision?.statement && vision.statement.trim().length > 0) {
+      //       console.log('📖 [AGENT-ENGINE] Vision loaded from agent starship:', {
+      //         length: vision.statement.length,
+      //         preview: vision.statement.substring(0, 150) + '...'
+      //       });
             
-            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
-            console.log('✅ [AGENT-ENGINE] Vision context prepared from agent starship');
-          }
-        } else {
-          console.log('⚠️ [AGENT-ENGINE] No starships found even from agent perspective');
-        }
-      } catch (fallbackError) {
-        console.error('❌ [AGENT-ENGINE] Failed to load starship from agent perspective:', fallbackError);
-      }
+      //       visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
+      //       console.log('✅ [AGENT-ENGINE] Vision context prepared from agent starship');
+      //     }
+      //   } else {
+      //     console.log('⚠️ [AGENT-ENGINE] No starships found even from agent perspective');
+      //   }
+      // } catch (fallbackError) {
+      //   console.error('❌ [AGENT-ENGINE] Failed to load starship from agent perspective:', fallbackError);
+      // }
       
-      // This could indicate a data inconsistency issue that needs to be addressed
-      console.log('⚠️ [AGENT-ENGINE] Proceeding without vision context - no starships found');
+      // // This could indicate a data inconsistency issue that needs to be addressed
+      // console.log('⚠️ [AGENT-ENGINE] Proceeding without vision context - no starships found');
     }
   } catch (error) {
     console.error('❌ [AGENT-ENGINE] Vision loading failed with critical error:', {
@@ -588,6 +588,7 @@ async function* chatStream(
     id: agent.id,
     name: agent.name,
     model: agent.model,
+    starshipId: agent.starshipId,
     systemPrompt: agent.systemPrompt?.substring(0, 100) + '...',
   });
 
@@ -728,92 +729,91 @@ You should be helpful, professional, and focused on delivering high-quality resu
     // Continue without expedition context
   }
   
-  // Step 2: Enhanced starship lookup with multiple strategies
+  // Step 2: Load the agent's assigned starship for proper isolation
   try {
-    console.log('🚢 [AGENT-ENGINE-STREAM] Starting enhanced starship lookup...');
+    console.log('🚢 [AGENT-ENGINE-STREAM] Loading agent\'s assigned starship...');
     
-    // Strategy 1: Use resolved internal user ID
-    if (userResolutionSuccess) {
-      starshipLookupStrategies.push(`internal-user-id:${internalUserId}`);
+    // CRITICAL FIX: Use the agent's starshipId to ensure proper isolation
+    if (!agent.starshipId) {
+      console.error('❌ [AGENT-ENGINE-STREAM] Agent has no starshipId assigned:', agent.id);
+      throw new Error(`Agent ${agent.id} has no starship assigned`);
     }
     
-    // Strategy 2: Use Kinde ID as fallback (in case starships were created with Kinde IDs)
-    if (fallbackToKindeId || !userResolutionSuccess) {
-      starshipLookupStrategies.push(`kinde-id-fallback:${req.user_id}`);
+    console.log('🔍 [AGENT-ENGINE-STREAM] Fetching starship with ID:', agent.starshipId);
+    const activeStarship = await starshipRepo.findById(agent.starshipId);
+    
+    if (!activeStarship) {
+      console.error('❌ [AGENT-ENGINE-STREAM] Starship not found for agent:', {
+        agentId: agent.id,
+        starshipId: agent.starshipId
+      });
+      throw new Error(`Starship ${agent.starshipId} not found for agent ${agent.id}`);
     }
     
-    console.log('🎯 [AGENT-ENGINE-STREAM] Starship lookup strategies:', starshipLookupStrategies);
-    
-    let userStarships: any[] = [];
-    let successfulStrategy = '';
-    
-    // Try each strategy until we find starships
-    for (const strategy of starshipLookupStrategies) {
-      const [strategyType, userId] = strategy.split(':');
-      console.log(`🔍 [AGENT-ENGINE-STREAM] Trying strategy "${strategyType}" with user ID: ${userId}`);
-      
-      try {
-        const starshipsForStrategy = await starshipRepo.findByOwner(userId);
-        console.log(`📊 [AGENT-ENGINE-STREAM] Strategy "${strategyType}" found ${starshipsForStrategy.length} starships`);
-        
-        if (starshipsForStrategy.length > 0) {
-          userStarships = starshipsForStrategy;
-          successfulStrategy = strategyType;
-          console.log(`✅ [AGENT-ENGINE-STREAM] Using starships from strategy: ${strategyType}`);
-          break;
-        }
-      } catch (strategyError) {
-        console.error(`❌ [AGENT-ENGINE-STREAM] Strategy "${strategyType}" failed:`, (strategyError as Error).message);
-        continue;
-      }
-    }
-    
-    console.log('📊 [AGENT-ENGINE-STREAM] Final starship lookup result:', {
-      starshipsFound: userStarships.length,
-      successfulStrategy: successfulStrategy,
-      starshipDetails: userStarships.map(s => ({
-        id: s.id,
-        name: s.name,
-        class: s.class,
-        ownerId: s.ownerId,
-        status: s.status
-      }))
+    console.log('✅ [AGENT-ENGINE-STREAM] Agent\'s starship loaded:', {
+      starshipId: activeStarship.id,
+      starshipName: activeStarship.name,
+      starshipClass: activeStarship.class,
+      starshipStatus: activeStarship.status,
+      ownerId: activeStarship.ownerId
     });
     
-    if (userStarships.length > 0) {
-      // Check if we have a specific starship ID from the expedition context
-      let activeStarship = null;
-      const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
+    // Verify the starship belongs to the user for security
+    const isOwnerMatch = activeStarship.ownerId === internalUserId || 
+                        activeStarship.ownerId === req.user_id;
+    
+    if (!isOwnerMatch) {
+      console.error('❌ [AGENT-ENGINE-STREAM] Starship ownership mismatch:', {
+        starshipOwnerId: activeStarship.ownerId,
+        internalUserId: internalUserId,
+        kindeUserId: req.user_id
+      });
+      throw new Error('Agent\'s starship does not belong to the requesting user');
+    }
+    
+    if (activeStarship) {
+      console.log('🎯 [AGENT-ENGINE-STREAM] Active starship selected:', {
+        id: activeStarship.id,
+        name: activeStarship.name,
+        class: activeStarship.class,
+        ownerId: activeStarship.ownerId,
+        status: activeStarship.status,
+        selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
+      });
+    // if (userStarships.length > 0) {
+    //   // Check if we have a specific starship ID from the expedition context
+    //   let activeStarship = null;
+    //   const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
       
-      if (directStarshipStrategy) {
-        // For expedition agents, use the specific starship from the expedition
-        const expeditionStarshipId = directStarshipStrategy.split(':')[1];
-        activeStarship = userStarships.find(s => s.id === expeditionStarshipId);
+    //   if (directStarshipStrategy) {
+    //     // For expedition agents, use the specific starship from the expedition
+    //     const expeditionStarshipId = directStarshipStrategy.split(':')[1];
+    //     activeStarship = userStarships.find(s => s.id === expeditionStarshipId);
         
-        if (activeStarship) {
-          console.log('🎯 [AGENT-ENGINE-STREAM] Using expedition-specific starship:', {
-            id: activeStarship.id,
-            name: activeStarship.name,
-            expeditionStarshipId: expeditionStarshipId,
-            selectionReason: 'expedition-context'
-          });
-        } else {
-          console.log('⚠️ [AGENT-ENGINE-STREAM] Expedition starship not found in user starships:', expeditionStarshipId);
-        }
-      }
+    //     if (activeStarship) {
+    //       console.log('🎯 [AGENT-ENGINE-STREAM] Using expedition-specific starship:', {
+    //         id: activeStarship.id,
+    //         name: activeStarship.name,
+    //         expeditionStarshipId: expeditionStarshipId,
+    //         selectionReason: 'expedition-context'
+    //       });
+    //     } else {
+    //       console.log('⚠️ [AGENT-ENGINE-STREAM] Expedition starship not found in user starships:', expeditionStarshipId);
+    //     }
+    //   }
       
-      // Fall back to selecting the first active starship, or first starship if none are active
-      if (!activeStarship) {
-        activeStarship = userStarships.find(s => s.status === 'active') || userStarships[0];
-        console.log('🎯 [AGENT-ENGINE-STREAM] Active starship selected (fallback):', {
-          id: activeStarship.id,
-          name: activeStarship.name,
-          class: activeStarship.class,
-          ownerId: activeStarship.ownerId,
-          status: activeStarship.status,
-          selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
-        });
-      }
+    //   // Fall back to selecting the first active starship, or first starship if none are active
+    //   if (!activeStarship) {
+    //     activeStarship = userStarships.find(s => s.status === 'active') || userStarships[0];
+    //     console.log('🎯 [AGENT-ENGINE-STREAM] Active starship selected (fallback):', {
+    //       id: activeStarship.id,
+    //       name: activeStarship.name,
+    //       class: activeStarship.class,
+    //       ownerId: activeStarship.ownerId,
+    //       status: activeStarship.status,
+    //       selectionReason: activeStarship.status === 'active' ? 'first-active' : 'first-available'
+    //     });
+    //   }
       
       // Step 3: Enhanced vision loading with validation
       console.log('🔍 [AGENT-ENGINE-STREAM] Querying vision for starship ID:', activeStarship.id);
@@ -855,15 +855,19 @@ You should be helpful, professional, and focused on delivering high-quality resu
         console.log('⚠️ [AGENT-ENGINE-STREAM] Proceeding without vision context - empty/null statement');
       }
     } else {
-      console.error('❌ [AGENT-ENGINE-STREAM] CRITICAL: No starships found for user with any strategy');
+      console.error('❌ [AGENT-ENGINE-STREAM] CRITICAL: Agent\'s starship could not be loaded');
       console.error('🔍 [AGENT-ENGINE-STREAM] Debug information:', {
+        agentId: agent.id,
+        starshipId: agent.starshipId,
         originalKindeId: req.user_id,
-        resolvedInternalId: internalUserId,
-        userResolutionSuccess: userResolutionSuccess,
-        strategiesAttempted: starshipLookupStrategies,
-        fallbackToKindeId: fallbackToKindeId
+        resolvedInternalId: internalUserId
       });
       
+      console.log('⚠️ [AGENT-ENGINE-STREAM] Proceeding without vision context - starship not accessible');
+      
+      /* COMMENTED OUT: Complex fallback logic for loading starship from agent's perspective
+       * This was causing issues and is being kept for reference if needed later
+       * 
       // Try to load starship from agent's perspective (for crew agents)
       console.log('🔍 [AGENT-ENGINE-STREAM] Attempting to find starship from agent assignments...');
       try {
@@ -978,6 +982,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
       }
       
       console.log('⚠️ [AGENT-ENGINE-STREAM] Proceeding without vision context - no starships found');
+      */
     }
   } catch (error) {
     console.error('❌ [AGENT-ENGINE-STREAM] Vision loading failed with critical error:', {
@@ -1109,6 +1114,8 @@ You should be helpful, professional, and focused on delivering high-quality resu
 
 
 export { LangChainMemoryStore, chatStream };
+export { chatWithMCP } from './chat-with-mcp';
+export { chatWithMCPStream } from './chat-with-mcp-stream';
 
 // Export LLM Provider Factory
 export { ProviderFactory } from './llm/provider-factory';

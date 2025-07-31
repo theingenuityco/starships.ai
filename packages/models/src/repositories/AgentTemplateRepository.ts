@@ -219,11 +219,13 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     };
 
     const query = `
+      MATCH (s:Starship {id: $starshipId})
       CREATE (a:Agent $agent)
+      CREATE (a)-[:DEPLOYED_ON]->(s)
       RETURN a
     `;
 
-    const results = await this.connection.executeWrite<{ a: Agent }>(query, { agent });
+    const results = await this.connection.executeWrite<{ a: Agent }>(query, { agent, starshipId });
     return convertNeo4jIntsInObject(results[0].a);
   }
 

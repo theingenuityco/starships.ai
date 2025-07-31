@@ -44,6 +44,10 @@ import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware
 import healthRoutes from './routes/health';
 import { logger } from '@starships/models/src/logging';
 
+// Import Docker deployment routes
+import { createDeploymentApiRoutes } from '@starships/core';
+import { authMiddleware } from './middleware/auth';
+
 /**
  * Validate required environment variables
  */
@@ -156,6 +160,15 @@ initializeMCPServerRoutes({
   mcpServerOptionRepository,
 });
 
+// Create Docker deployment routes with enhanced MCP connector management
+const deploymentRoutes = createDeploymentApiRoutes({
+  starshipRepo: starshipRepository,
+  mcpConnectorRepo: mcpServerConnectorRepository,
+  mcpServerOptionRepo: mcpServerOptionRepository,
+  enableDockerDeployment: true,
+  authMiddleware
+});
+
 // API Routes
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
@@ -163,6 +176,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/sibil', sibilRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api', deploymentRoutes); // Enhanced MCP connector routes with Docker deployment (PRIORITY)
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);

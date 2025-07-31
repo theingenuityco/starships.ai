@@ -1,0 +1,21 @@
+FROM n8nio/n8n:latest
+
+USER root
+
+# Create a directory for custom packages
+RUN mkdir -p /home/node/custom-packages
+
+# Create package.json for LangChain dependencies
+RUN echo '{"name": "n8n-custom", "dependencies": {"@langchain/openai": "^0.3.0", "@langchain/core": "^0.3.0", "langchain": "^0.3.0", "@langchain/langgraph": "^0.4.0", "@langchain/langgraph-swarm": "^0.0.5"}}' > /home/node/custom-packages/package.json
+
+# Install packages
+WORKDIR /home/node/custom-packages
+RUN npm install
+
+# Set NODE_PATH to include custom packages
+ENV NODE_PATH=/home/node/custom-packages/node_modules:$NODE_PATH
+ENV NODE_FUNCTION_ALLOW_EXTERNAL=*
+
+WORKDIR /home/node
+
+USER node

@@ -38,7 +38,7 @@ export default async function ExpeditionDetailsPage({ params }: PageProps) {
           <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-280px)]">
             {/* Chat Interface - Left side */}
             <div className="flex-1 lg:flex-[1.5] bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800/50 p-6 shadow-2xl">
-              <ExpeditionChat />
+              <ExpeditionChat expeditionId={expeditionId} />
             </div>
             
             {/* Activity Log - Right side */}

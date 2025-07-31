@@ -19,6 +19,7 @@ export { MCPServerConnectorRepository } from './repositories/MCPServerConnectorR
 export { ConnectorConfigTemplateRepository } from './repositories/ConnectorConfigTemplateRepository';
 export { ConnectorConfigHistoryRepository } from './repositories/ConnectorConfigHistoryRepository';
 export { ExpeditionRepository } from './repositories/ExpeditionRepository';
+export { MessageRepository } from './repositories/MessageRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';

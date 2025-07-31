@@ -17,6 +17,7 @@ export { VisionRepository } from './VisionRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 export { ExpeditionRepository } from './ExpeditionRepository';
+export { MessageRepository } from './MessageRepository';
 
 
 // Import the new repositories for the factory
@@ -25,6 +26,7 @@ import { VisionRepository } from './VisionRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 import { ExpeditionRepository } from './ExpeditionRepository';
+import { MessageRepository } from './MessageRepository';
 
 
 /**
@@ -50,6 +52,7 @@ export class RepositoryFactory {
   private static mcpServerOptionRepo: MCPServerOptionRepository | null = null;
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static expeditionRepo: ExpeditionRepository | null = null;
+  private static messageRepo: MessageRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
 
@@ -113,6 +116,7 @@ export class RepositoryFactory {
       this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
       this.starshipRepo = new StarshipRepository();
       this.expeditionRepo = new ExpeditionRepository();
+      this.messageRepo = new MessageRepository();
 
       // Initialize services that require database connections
       try {
@@ -167,6 +171,7 @@ export class RepositoryFactory {
         mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
         mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
         expeditionRepo: this.expeditionRepo !== null,
+        messageRepo: this.messageRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
       }
     };
@@ -276,6 +281,17 @@ export class RepositoryFactory {
   }
 
   /**
+   * Get MessageRepository instance (synchronous)
+   */
+  static getMessageRepository(): MessageRepository {
+    this.ensureInitialized();
+    if (!this.messageRepo) {
+      throw new Error('MessageRepository not initialized');
+    }
+    return this.messageRepo;
+  }
+
+  /**
    * Get AgentTemplateService instance (synchronous)
    * Note: May return null if database connection was not available during initialization
    */
@@ -318,6 +334,7 @@ export class RepositoryFactory {
     this.mcpServerOptionRepo = null;
     this.mcpServerConnectorRepo = null;
     this.expeditionRepo = null;
+    this.messageRepo = null;
     this.agentTemplateService = null;
 
     // Reset initialization state

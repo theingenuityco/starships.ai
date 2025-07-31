@@ -1,42 +1,23 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import api from '@/lib/api';
+import { useToast } from '@/hooks/useToast';
+import type { ChatMessage } from '@starships/protocol';
 
-interface Message {
-  id: string;
-  content: string;
-  timestamp: Date;
-  sender: 'user' | 'agent';
-  senderName?: string;
+interface ExpeditionChatProps {
+  expeditionId: string;
 }
 
-export function ExpeditionChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Welcome to Expedition Alpha Mission. All systems are operational and ready for deployment.',
-      timestamp: new Date(Date.now() - 3600000),
-      sender: 'agent',
-      senderName: 'Mission Control'
-    },
-    {
-      id: '2',
-      content: 'Acknowledged. Beginning preliminary scans of the sector.',
-      timestamp: new Date(Date.now() - 3000000),
-      sender: 'user',
-      senderName: 'Commander'
-    },
-    {
-      id: '3',
-      content: 'Scan complete. Detecting unusual energy signatures in quadrant 7-G. Recommend further investigation.',
-      timestamp: new Date(Date.now() - 2400000),
-      sender: 'agent',
-      senderName: 'Science Officer AI'
-    }
-  ]);
+export function ExpeditionChat({ expeditionId }: ExpeditionChatProps) {
+  const { toast } = useToast();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatTerminated, setChatTerminated] = useState(false);
 
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,33 +28,81 @@ export function ExpeditionChat() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue,
-      timestamp: new Date(),
-      sender: 'user',
-      senderName: 'Commander'
+  // Load chat history on mount
+  useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get(`/api/expeditions/${expeditionId}/messages`);
+        setMessages(response.data.messages);
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load chat history',
+          variant: 'destructive'
+        });
+      } finally {
+        setIsLoading(false);
+      }
     };
+    
+    loadMessages();
+  }, [expeditionId, toast]);
 
-    setMessages(prev => [...prev, newMessage]);
+  const handleSend = async () => {
+    if (!inputValue.trim() || isTyping) return;
+
+    const messageContent = inputValue;
     setInputValue('');
-
-    // Simulate agent response
+    
+    // Add user message immediately (temporary)
+    const tempUserMessage = {
+      id: `temp-${Date.now()}`,
+      content: messageContent,
+      sender: 'user',
+      senderName: 'Commander',
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, tempUserMessage]);
     setIsTyping(true);
-    setTimeout(() => {
-      const agentResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: 'Message received. Analyzing data and preparing response...',
-        timestamp: new Date(),
-        sender: 'agent',
-        senderName: 'Mission Control'
-      };
-      setMessages(prev => [...prev, agentResponse]);
+
+    try {
+      const response = await api.post(`/api/expeditions/${expeditionId}/messages`, {
+        content: messageContent
+      });
+      
+      // Replace temp message with real messages from server
+      setMessages(prev => {
+        // Remove the temporary message
+        const filtered = prev.filter(msg => msg.id !== tempUserMessage.id);
+        // Add the real messages
+        return [...filtered, response.data.userMessage, response.data.agentMessage];
+      });
+      
+      // Check if chat should be terminated (mission executing)
+      if (response.data.agentMessage.metadata?.shouldTerminateChat) {
+        setChatTerminated(true);
+        toast({
+          title: 'Mission Initiated!',
+          description: 'The expedition is now executing.',
+          variant: 'success'
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to send message:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to send message',
+        variant: 'destructive'
+      });
+      // Remove the temporary message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempUserMessage.id));
+      // Restore the input
+      setInputValue(messageContent);
+    } finally {
       setIsTyping(false);
-    }, 2000);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -93,7 +122,11 @@ export function ExpeditionChat() {
       </h2>
       
       <div className="flex-1 bg-slate-950/30 rounded-xl p-4 mb-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-        {messages.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-slate-500 text-center">
               <svg className="w-12 h-12 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,14 +150,43 @@ export function ExpeditionChat() {
                   }`}
                 >
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-xs font-medium opacity-80">
-                      {message.senderName}
-                    </span>
                     <span className="text-xs opacity-60">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-sm">{message.content}</p>
+                  <div className="text-sm prose prose-invert prose-sm max-w-none">
+                    <ReactMarkdown
+                      components={{
+                        // Custom styles for markdown elements
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+                        em: ({ children }) => <em className="italic">{children}</em>,
+                        code: ({ inline, children }) => 
+                          inline ? (
+                            <code className="px-1 py-0.5 bg-slate-800 rounded text-xs">{children}</code>
+                          ) : (
+                            <code className="block p-3 bg-slate-800 rounded-lg text-xs overflow-x-auto">{children}</code>
+                          ),
+                        pre: ({ children }) => <pre className="mb-2">{children}</pre>,
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-slate-600 pl-4 italic mb-2">{children}</blockquote>
+                        ),
+                        a: ({ href, children }) => (
+                          <a href={href} className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer">
+                            {children}
+                          </a>
+                        ),
+                        h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-sm font-bold mb-2">{children}</h3>,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 </div>
               </div>
             ))}
@@ -148,6 +210,7 @@ export function ExpeditionChat() {
         <textarea
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
+          disabled={chatTerminated}
           onKeyPress={handleKeyPress}
           placeholder="Type your message..."
           className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:bg-slate-800/70 transition-all resize-none"
@@ -156,14 +219,14 @@ export function ExpeditionChat() {
         />
         <button
           onClick={handleSend}
-          disabled={!inputValue.trim()}
+          disabled={!inputValue.trim() || isTyping || chatTerminated}
           className={`px-6 py-3 font-medium rounded-xl transition-all transform shadow-lg ${
-            inputValue.trim()
+            inputValue.trim() && !isTyping
               ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white hover:scale-105 active:scale-95 shadow-blue-600/20'
               : 'bg-slate-800/50 text-slate-500 cursor-not-allowed'
           }`}
         >
-          Send
+          {isTyping ? 'Sending...' : 'Send'}
         </button>
       </div>
     </div>

@@ -347,6 +347,36 @@ export interface ExpeditionListResponse {
   total: number;
 }
 
+// Message types
+export interface ChatMessage {
+  id: string;
+  expeditionId: string;
+  content: string;
+  sender: 'user' | 'agent';
+  senderName?: string;
+  timestamp: string;
+  metadata?: {
+    agentId?: string;
+    workflowId?: string;
+    status?: 'pending' | 'sent' | 'failed';
+    agentReady?: boolean;
+    missionStatus?: string;
+  };
+}
+
+export interface CreateMessageRequest {
+  content: string;
+}
+
+export interface MessageResponse {
+  userMessage: ChatMessage;
+  agentMessage: ChatMessage;
+}
+
+export interface MessageListResponse {
+  messages: ChatMessage[];
+}
+
 // Export enhanced Socket.IO event types
 export * from './types/socket-events';
 

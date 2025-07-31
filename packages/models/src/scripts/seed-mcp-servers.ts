@@ -10,22 +10,6 @@ import { MCPServerOption } from '../types';
  */
 const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   {
-    name: 'Filesystem',
-    slug: 'filesystem',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem', 'FILESYSTEM_PATH'],
-    env: JSON.stringify({
-      FILESYSTEM_PATH: '${FILESYSTEM_PATH}',
-    }),
-  },
-  {
-    name: 'Memory',
-    slug: 'memory',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-memory'],
-    env: JSON.stringify({}),
-  },
-  {
     name: 'Time',
     slug: 'time',
     command: 'uvx',
@@ -37,20 +21,6 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     slug: 'sequentialthinking',
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
-    env: JSON.stringify({}),
-  },
-  {
-    name: 'Playwright',
-    slug: 'playwright',
-    command: 'npx',
-    args: ['@playwright/mcp@latest', '--isolated'],
-    env: JSON.stringify({}),
-  },
-  {
-    name: 'Searxng',
-    slug: 'searxng',
-    command: 'npx',
-    args: ['-y', 'mcp-searxng', 'https://searx.stream/'],
     env: JSON.stringify({}),
   },
   {

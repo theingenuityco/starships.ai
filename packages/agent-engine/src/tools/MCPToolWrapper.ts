@@ -28,6 +28,12 @@ export class MCPToolWrapper {
    * Map input parameters intelligently when LLM sends generic format
    */
   private mapInputParameters(input: any, mcpTool: MCPTool): any {
+    // Guard against undefined or null inputs
+    if (input === undefined || input === null) {
+      console.warn(`[MCPToolWrapper] Received undefined/null input for tool ${mcpTool.name}, using empty object`);
+      return {};
+    }
+    
     // If input is already correctly formatted, return as-is
     if (typeof input === 'object' && !input.hasOwnProperty('input')) {
       return input;
@@ -36,6 +42,12 @@ export class MCPToolWrapper {
     // Handle common single-parameter tools
     const properties = mcpTool.inputSchema?.properties || {};
     const propertyNames = Object.keys(properties);
+    const requiredParams = mcpTool.inputSchema?.required || [];
+    
+    // If input is a string and there's exactly one required parameter, map to it
+    if (typeof input === 'string' && requiredParams.length === 1) {
+      return { [requiredParams[0]]: input };
+    }
     
     // Single parameter tool with generic input
     if (propertyNames.length === 1 && (typeof input === 'string' || input.input !== undefined)) {
@@ -111,12 +123,25 @@ export class MCPToolWrapper {
           }
           
           // Map input parameters if needed
+          console.log(`[MCPToolWrapper] Raw input before mapping:`, typeof input, input);
           let processedInput = this.mapInputParameters(input, mcpTool);
+          console.log(`[MCPToolWrapper] Processed input after mapInputParameters:`, processedInput);
           
           // Special handling for sequential thinking tool
           if (mcpTool.templateSlug === 'sequentialthinking') {
+            // Handle undefined or empty input for continuation requests
+            if (!processedInput || Object.keys(processedInput).length === 0 || 
+                (processedInput.input === undefined && !processedInput.thought)) {
+              processedInput = {
+                thought: `I need to continue my analysis. Let me build upon my previous thoughts and provide additional insights.`,
+                nextThoughtNeeded: true,
+                thoughtNumber: 2,
+                totalThoughts: 5
+              };
+              console.log(`[MCPToolWrapper] Generated continuation input for sequential thinking:`, JSON.stringify(processedInput, null, 2));
+            }
             // If the LLM sends a simple format, transform it
-            if (typeof processedInput === 'string' || (processedInput && typeof processedInput.input === 'string' && !processedInput.thought)) {
+            else if (typeof processedInput === 'string' || (processedInput && typeof processedInput.input === 'string' && !processedInput.thought)) {
               const query = typeof processedInput === 'string' ? processedInput : processedInput.input;
               processedInput = {
                 thought: `I need to analyze this request: "${query}". Let me break this down systematically to provide a comprehensive response.`,
@@ -128,7 +153,8 @@ export class MCPToolWrapper {
             }
           }
           
-          if (this.config.enableLogging) {
+          if (this.config.enableLogging || mcpTool.templateSlug === 'searxng') {
+            console.log(`[MCPToolWrapper] Tool ${mcpTool.name} - Input schema:`, JSON.stringify(mcpTool.inputSchema, null, 2));
             console.log(`[MCPToolWrapper] Processed input after mapping:`, processedInput);
           }
           

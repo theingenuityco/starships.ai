@@ -177,6 +177,7 @@ export class Neo4jConnection {
         // Expedition system indexes
         'CREATE INDEX expedition_starship_index IF NOT EXISTS FOR (e:Expedition) ON (e.starshipId)',
         'CREATE INDEX expedition_status_index IF NOT EXISTS FOR (e:Expedition) ON (e.status)',
+        'CREATE INDEX expedition_name_index IF NOT EXISTS FOR (e:Expedition) ON (e.name)',
         'CREATE INDEX expedition_priority_index IF NOT EXISTS FOR (e:Expedition) ON (e.priority)',
         'CREATE INDEX expedition_created_by_index IF NOT EXISTS FOR (e:Expedition) ON (e.createdBy)',
         'CREATE INDEX expedition_created_at_index IF NOT EXISTS FOR (e:Expedition) ON (e.createdAt)',

@@ -39,7 +39,6 @@ export interface LogContext {
   ruleId?: string;
   target?: string;
   cleanedCount?: number;
-  expeditionId?: string;
   taskId?: string;
   sessionId?: string;
   correlationId?: string;

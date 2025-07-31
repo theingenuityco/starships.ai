@@ -1,0 +1,53 @@
+{
+  "name": "Expedition Chat - LangGraph Swarm Final Proper",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "expedition-chat",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "expedition-chat-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LangGraph Swarm Proper Implementation\n// Following the official documentation pattern\n\nconst { ChatOpenAI } = require('@langchain/openai');\nconst { HumanMessage, AIMessage } = require('@langchain/core/messages');\n\n// Get input data\nconst inputData = $input.first().json.body;\nconst { expedition, chatHistory, message } = inputData;\nconst agents = expedition.agents || [];\n\n// Validate API key\nconst OPENAI_API_KEY = $env.OPENAI_API_KEY || 'sk-YOUR-API-KEY';\nif (!OPENAI_API_KEY || OPENAI_API_KEY === 'sk-YOUR-API-KEY') {\n  return [{\n    json: {\n      message: \"Please configure your OpenAI API key in the workflow.\",\n      agentReady: false,\n      missionStatus: 'error',\n      workflowId: $workflow.id\n    }\n  }];\n}\n\nif (agents.length === 0) {\n  return [{\n    json: {\n      message: \"⚠️ No agents assigned to this expedition.\",\n      agentReady: false,\n      missionStatus: 'no_agents',\n      shouldTerminateChat: true,\n      workflowId: $workflow.id\n    }\n  }];\n}\n\n// Check conversation state\nlet isAgentReady = chatHistory?.some(msg => \n  msg.role === 'assistant' && \n  msg.content.toLowerCase().includes('i am ready to execute the mission')\n) || false;\n\nconst userWantsToExecute = message.toLowerCase().match(/\\b(execute|start|begin|launch|go)\\b/);\n\nif (isAgentReady && userWantsToExecute) {\n  return [{\n    json: {\n      message: \"🚀 MISSION EXECUTION INITIATED!\\n\\nAll systems are go! The expedition is now underway.\",\n      agentReady: true,\n      missionStatus: 'executing',\n      isExecuting: true,\n      shouldTerminateChat: true,\n      workflowId: $workflow.id\n    }\n  }];\n}\n\n// Initialize LLM\nconst llm = new ChatOpenAI({\n  apiKey: OPENAI_API_KEY,\n  model: 'gpt-4-turbo-preview',\n  temperature: 0.7\n});\n\n// Implement Swarm Pattern\n// Step 1: Create agent definitions following swarm pattern\nconst agentDefinitions = agents.map(agent => ({\n  name: agent.name,\n  description: agent.description,\n  instructions: `You are ${agent.name}, specializing in ${agent.description}.\n\nExpedition: ${expedition.name} - ${expedition.description}\n\nYour team:\n${agents.map(a => `- ${a.name}: ${a.description}`).join('\\n')}\n\nInstructions:\n1. Focus ONLY on your area of expertise (${agent.description})\n2. Ask 2-3 specific questions related to your specialty\n3. If a topic is outside your expertise, say: \"Let me transfer you to [agent name] who specializes in [topic].\"\n4. Be concise and professional\n5. When the team has gathered all necessary information, say: \"I am ready to execute the mission.\"\n\nAvailable transfers:\n${agents.filter(a => a.id !== agent.id).map(a => `- transfer_to_${a.name.toLowerCase().replace(/\\s+/g, '_')}: Transfer to ${a.name} for ${a.description}`).join('\\n')}`,\n  transferFunctions: agents.filter(a => a.id !== agent.id).map(targetAgent => ({\n    name: `transfer_to_${targetAgent.name.toLowerCase().replace(/\\s+/g, '_')}`,\n    targetAgent: targetAgent.name\n  }))\n}));\n\n// Step 2: Determine which agent should handle the message\nlet currentAgent = agentDefinitions[0];\nconst messageLC = message.toLowerCase();\n\n// Smart routing based on expertise\nfor (const agentDef of agentDefinitions) {\n  const keywords = agentDef.description.toLowerCase().split(' ');\n  if (keywords.some(keyword => messageLC.includes(keyword))) {\n    currentAgent = agentDef;\n    break;\n  }\n}\n\n// Step 3: Build conversation context\nconst messages = [];\n\n// Add agent instructions as system message\nmessages.push({\n  role: 'system',\n  content: currentAgent.instructions\n});\n\n// Add chat history\nif (chatHistory && chatHistory.length > 0) {\n  chatHistory.forEach(msg => {\n    messages.push({\n      role: msg.role === 'user' ? 'user' : 'assistant',\n      content: msg.content\n    });\n  });\n}\n\n// Add current message\nmessages.push({\n  role: 'user',\n  content: message\n});\n\n// Step 4: Get agent response\nconst response = await llm.invoke(messages.map(m => \n  m.role === 'system' ? new AIMessage(m.content) :\n  m.role === 'user' ? new HumanMessage(m.content) :\n  new AIMessage(m.content)\n));\n\nconst responseContent = response.content;\n\n// Step 5: Check for transfer requests\nlet transferTo = null;\nconst transferMatch = responseContent.match(/transfer you to ([^\\s]+)/i);\nif (transferMatch) {\n  const requestedAgent = transferMatch[1].toLowerCase();\n  const targetAgentDef = agentDefinitions.find(a => \n    a.name.toLowerCase() === requestedAgent ||\n    a.name.toLowerCase().includes(requestedAgent)\n  );\n  if (targetAgentDef) {\n    transferTo = targetAgentDef.name;\n  }\n}\n\n// Step 6: Check if ready to execute\nconst declaringReady = responseContent.toLowerCase().includes('i am ready to execute the mission');\n\n// Step 7: Format response with agent name\nlet finalMessage = responseContent;\nif (transferTo) {\n  finalMessage = `[Transferring from ${currentAgent.name} to ${transferTo}]\\n\\n${responseContent}`;\n}\n\nreturn [{\n  json: {\n    message: `[${currentAgent.name}]: ${finalMessage}`,\n    agentReady: declaringReady || isAgentReady,\n    missionStatus: declaringReady || isAgentReady ? 'ready_to_execute' : 'gathering_requirements',\n    isExecuting: false,\n    shouldTerminateChat: false,\n    workflowId: $workflow.id,\n    timestamp: new Date().toISOString(),\n    metadata: {\n      respondingAgent: currentAgent.name,\n      transferTo: transferTo,\n      availableAgents: agents.map(a => a.name),\n      swarmPattern: true\n    }\n  }\n}];"
+      },
+      "id": "swarm-final-proper",
+      "name": "LangGraph Swarm Final Proper",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "LangGraph Swarm Final Proper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC"
+  },
+  "versionId": "final-proper-v1",
+  "id": "expedition-swarm-final-proper",
+  "meta": {
+    "instanceId": "swarm-final-proper"
+  },
+  "tags": ["expedition", "chat", "langgraph", "swarm", "final", "proper"]
+}

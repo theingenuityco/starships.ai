@@ -243,46 +243,25 @@ export class MCPToolWrapper {
    * Enhance tool description with usage hints and metadata
    */
   private enhanceDescription(tool: MCPTool): string {
-    const categoryHints: Record<string, string> = {
-      'sequentialthinking': '\nUse for: Complex reasoning, breaking down problems, systematic analysis',
-      'memory': '\nUse for: Storing/retrieving context, maintaining state across conversations',
-      'puppeteer': '\nUse for: Web automation, screenshots, data extraction from websites',
-      'playwright': '\nUse for: Web browser automation, navigation, and interaction',
-      'filesystem': '\nUse for: Reading/writing files, directory operations',
-      'postgres': '\nUse for: Database queries, data persistence',
-      'github': '\nUse for: GitHub API operations, repository management'
-    };
+    // QUICK FIX: Truncate tool descriptions to avoid token limit issues
+    const MAX_DESCRIPTION_LENGTH = 200;
     
-    const hint = categoryHints[tool.templateSlug] || '';
-    const provider = `\nProvider: ${tool.templateSlug}`;
-    
-    // Add parameter hints based on tool schema
-    let parameterHints = '';
-    if (tool.inputSchema?.properties) {
-      const properties = tool.inputSchema.properties;
-      const required = tool.inputSchema.required || [];
-      
-      const params = Object.entries(properties).map(([name, schema]: [string, any]) => {
-        const isRequired = required.includes(name) ? ' (required)' : ' (optional)';
-        const description = schema.description || schema.type || 'any';
-        return `- ${name}: ${description}${isRequired}`;
-      }).join('\n');
-      
-      if (params) {
-        parameterHints = `\n\nParameters:\n${params}`;
-        
-        // Add specific examples for common tools
-        if (tool.name === 'browser_navigate' || tool.name === 'navigate') {
-          parameterHints += '\n\nExample usage: url="https://example.com"';
-        } else if (tool.templateSlug === 'sequentialthinking') {
-          parameterHints += '\n\nExample usage: thought="First, I need to understand...", nextThoughtNeeded=true, thoughtNumber=1, totalThoughts=5';
-        } else if (tool.templateSlug === 'memory' && tool.name === 'store_memory') {
-          parameterHints += '\n\nExample usage: key="user_preference", value="likes Python"';
-        }
-      }
+    // Get the base description and truncate if needed
+    let baseDescription = tool.description || '';
+    if (baseDescription.length > MAX_DESCRIPTION_LENGTH) {
+      baseDescription = baseDescription.substring(0, MAX_DESCRIPTION_LENGTH) + '...';
     }
     
-    return `${tool.description}${hint}${parameterHints}${provider}`;
+    // Only add minimal metadata
+    const provider = ` [${tool.templateSlug}]`;
+    
+    // For critical tools, add very brief parameter info
+    if (tool.inputSchema?.required && tool.inputSchema.required.length > 0) {
+      const requiredParams = tool.inputSchema.required.slice(0, 3).join(', ');
+      return `${baseDescription} Required: ${requiredParams}${provider}`;
+    }
+    
+    return `${baseDescription}${provider}`;
   }
 
   /**

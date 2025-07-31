@@ -90,6 +90,42 @@ export const LEGACY_DOCKER_SERVICE_TEMPLATES: Record<string, DockerServiceTempla
       requiresFileAccess: true,
       healthCheckMethod: 'none'
     }
+  },
+
+  // Firecrawl MCP Server (legacy stdio)
+  'firecrawl': {
+    slug: 'firecrawl',
+    image: 'node:20',
+    command: ['sh', '-c', 'npm install -g firecrawl-mcp && (echo \'{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"capabilities": {}, "clientInfo": {"name": "starship", "version": "1.0.0"}}}\'; sleep infinity) | firecrawl-mcp'],
+    ports: ['3000'],
+    envPrefix: 'FIRECRAWL_',
+    environment: {
+      FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}',
+    },
+    healthcheck: {
+      test: ['CMD', 'pgrep', '-f', 'firecrawl-mcp'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 5,
+      start_period: '90s'
+    },
+    resourceLimits: {
+      cpus: '0.5',
+      memory: '512m'
+    },
+    labels: {
+      'mcp.type': 'firecrawl',
+      'mcp.protocol': 'stdio',
+      'mcp.runtime': 'node',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: false,
+      apiKeyRequired: true,
+      healthCheckMethod: 'none'
+    },
+    requiresFileAccess: false,
+    requiresCredentials: true
   }
 };
 
@@ -376,6 +412,51 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
       mcpServerArgs: ['-y', '@modelcontextprotocol/server-filesystem', '/workspace']
     },
     requiresFileAccess: true
+  },
+
+  // Firecrawl MCP Server (HTTP Bridge)
+  'firecrawl': {
+    slug: 'firecrawl',
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    envPrefix: 'FIRECRAWL_',
+    environment: {
+      MCP_SERVER_CMD: 'npx',
+      MCP_SERVER_ARGS: '-y firecrawl-mcp',
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '30000',
+      MAX_CONCURRENT_REQUESTS: '10',
+      INIT_TIMEOUT: '120000',
+      FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}',
+    },
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 5,
+      start_period: '90s'
+    },
+    resourceLimits: {
+      cpus: '0.5',
+      memory: '512m'
+    },
+    labels: {
+      'mcp.type': 'firecrawl',
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: true,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: 'npx',
+      mcpServerArgs: ['-y', 'firecrawl-mcp']
+    },
+    requiresFileAccess: false,
+    requiresCredentials: true
   }
 };
 

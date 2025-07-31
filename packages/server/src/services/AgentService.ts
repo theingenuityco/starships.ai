@@ -6,7 +6,15 @@ import { env } from '../config/environment';
  * Service for managing AI agents with Neo4j persistence
  */
 export class AgentService {
+  private static instance: AgentService;
   private static isInitialized = false;
+
+  static getInstance(): AgentService {
+    if (!AgentService.instance) {
+      AgentService.instance = new AgentService();
+    }
+    return AgentService.instance;
+  }
 
   static async initialize(): Promise<void> {
     if (this.isInitialized) {

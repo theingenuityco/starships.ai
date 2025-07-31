@@ -193,7 +193,7 @@ export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
             {sortedTasks.map((task, index) => {
               const statusConfig = getStatusConfig(task.status);
               const priorityConfig = getPriorityConfig(task.priority);

@@ -26,8 +26,6 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
-  Volume2,
-  VolumeX
 } from 'lucide-react';
 import Link from 'next/link';
 import { MessageBubble } from './MessageBubble';
@@ -77,7 +75,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   
   // Enhanced state for new features
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [replyingTo, setReplyingTo] = useState<any | null>(null);
   const [messageThreads, setMessageThreads] = useState<Record<string, any[]>>({});
   const [retryAttempts, setRetryAttempts] = useState<Record<string, number>>({});
@@ -85,7 +82,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   // Refs for accessibility and performance
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const lastMessageRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get starship ID from the slug first
   const [starshipId, setStarshipId] = useState<string>('');
@@ -123,7 +119,8 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   } = useExpeditionData({
     starshipId,
     expeditionId,
-    autoRefresh: true
+    autoRefresh: true,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
   // Chat hook
@@ -137,11 +134,12 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   } = useExpeditionChat({
     expeditionId,
     starshipId,
-    autoScroll: true
+    autoScroll: true,
+    enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
-  // HTTP-only implementation - socket integration removed
-  // Expedition control functions now use HTTP API calls
+  // WebSocket integration enabled for real-time updates
+  // Expedition control functions use HTTP API calls with real-time WebSocket updates
 
   // Fetch agent details when expedition loads
   useEffect(() => {
@@ -174,19 +172,12 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   }, [expedition?.assignedAgents]);
 
   // Enhanced utility functions
-  const playNotificationSound = useCallback(() => {
-    if (soundEnabled && audioRef.current) {
-      audioRef.current.play().catch(() => {
-        // Ignore audio play errors (user interaction required)
-      });
-    }
-  }, [soundEnabled]);
 
   const exportMessages = useCallback(() => {
     const exportData = {
       expedition: {
         id: expeditionId,
-        title: expedition?.title,
+        title: expedition?.name,
         starship: starshipSlug,
         exportedAt: new Date().toISOString()
       },
@@ -194,7 +185,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
         timestamp: msg.timestamp,
         role: msg.role,
         content: msg.content,
-        messageType: msg.messageType,
         agentId: msg.agentId
       }))
     };
@@ -208,7 +198,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [expeditionId, expedition?.title, starshipSlug, messages]);
+  }, [expeditionId, expedition?.name, starshipSlug, messages]);
 
   const handleRetry = useCallback(async (action: string, params: any) => {
     const retryKey = `${action}-${JSON.stringify(params)}`;
@@ -353,20 +343,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Play notification sound for new messages
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.role !== 'user' && lastMessage.timestamp) {
-        const messageTime = new Date(lastMessage.timestamp).getTime();
-        const now = Date.now();
-        // Only play sound for messages received in the last 5 seconds
-        if (now - messageTime < 5000) {
-          playNotificationSound();
-        }
-      }
-    }
-  }, [messages, playNotificationSound]);
 
   // Performance optimizations - memoize expensive computations
   const memoizedMessages = useMemo(() => {
@@ -468,15 +444,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   return (
     <TooltipProvider>
       <div className={`h-full flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''}`}>
-        {/* Hidden audio element for notifications */}
-        <audio
-          ref={audioRef}
-          preload="auto"
-          aria-hidden="true"
-        >
-          <source src="/sounds/notification.mp3" type="audio/mpeg" />
-          <source src="/sounds/notification.ogg" type="audio/ogg" />
-        </audio>
 
         {/* Header */}
         <header
@@ -501,7 +468,7 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
             </Tooltip>
             <div>
               <h1 className="text-xl font-semibold" id="expedition-title">
-                {expedition.title}
+                {expedition.name}
               </h1>
               <p className="text-sm text-muted-foreground" id="expedition-details">
                 Starship: {starshipSlug} • Expedition ID: {expeditionId.slice(0, 8)}
@@ -511,21 +478,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           
           <div className="flex items-center space-x-2">
             {/* Enhanced Controls */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSoundEnabled(!soundEnabled)}
-                  aria-label={soundEnabled ? 'Disable sound notifications' : 'Enable sound notifications'}
-                >
-                  {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {soundEnabled ? 'Disable' : 'Enable'} sound notifications
-              </TooltipContent>
-            </Tooltip>
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -769,12 +721,17 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                 </ScrollArea>
 
                 {/* Message Input */}
-                <div className="border-t">
+                <div className="border-t p-4">
                   <MessageInput
-                    onSendMessage={async (content, messageType, agentId) => {
-                      await sendMessage(content, messageType, agentId);
+                    onSendMessage={async (content, participantId) => {
+                      // Pass participantId directly (undefined for First Officer)
+                      await sendMessage(content, 'user-input', participantId);
                     }}
-                    disabled={sending || expedition.status === 'completed' || expedition.status === 'cancelled'}
+                    agents={memoizedAvailableAgents.map(agent => ({
+                      id: agent.id,
+                      name: agent.name
+                    }))}
+                    disabled={sending || ['completed', 'cancelled'].includes(expedition.status)}
                     placeholder={
                       expedition.status === 'completed'
                         ? 'Expedition completed'
@@ -782,15 +739,6 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                         ? 'Expedition cancelled'
                         : 'Type your message...'
                     }
-                    showMessageType={true}
-                    showAgentSelector={expedition.assignedAgents.length > 0}
-                    showFormatting={true}
-                    showAttachments={true}
-                    availableAgents={memoizedAvailableAgents}
-                    replyingTo={replyingTo}
-                    data-testid="message-input"
-                    className="p-4"
-                    // Typing indicators removed - not available in HTTP mode
                   />
                 </div>
 
@@ -838,40 +786,24 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
               </CardHeader>
               <CardContent className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Objective</p>
-                  <p className="text-sm">{expedition.objective}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Description</p>
-                  <p className="text-sm">{expedition.description}</p>
+                  <p className="text-xs text-muted-foreground mb-1">Mission</p>
+                  <p className="text-sm">{expedition.mission}</p>
                 </div>
                 <Separator />
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground">Priority</p>
-                    <Badge variant="outline" className="text-xs">
-                      {expedition.priority}
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <Badge variant="outline" className="text-xs capitalize">
+                      {expedition.status}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="text-xs text-muted-foreground">Agents</p>
                     <p className="text-xs">
-                      {expedition.estimatedDuration ? `${expedition.estimatedDuration}m` : 'No estimate'}
+                      {expedition.assignedAgents.length} assigned
                     </p>
                   </div>
                 </div>
-                {expedition.tags.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">Tags</p>
-                    <div className="flex flex-wrap gap-1">
-                      {expedition.tags.map((tag: string) => (
-                        <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>

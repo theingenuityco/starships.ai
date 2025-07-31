@@ -1,6 +1,6 @@
 /**
  * Message Service - Messaging and Communication Layer
- * 
+ *
  * Handles all business logic for expedition messaging including message creation,
  * thread management, real-time broadcasting, and integration with First Officer.
  */
@@ -16,6 +16,12 @@ import {
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionService } from './ExpeditionService';
+import { ContextBuilder } from './ContextBuilder';
+import { SocketIOService } from './SocketIOService';
+import { chat as agentChat, chatStream } from '@starships/agent-engine';
+import type { ChatRequest } from '@starships/protocol';
+import getStore from '../store';
+import { env } from '../config/environment';
 
 export interface UpdateMessageRequest {
   content?: string;
@@ -74,10 +80,12 @@ export class MessageService {
   private static instance: MessageService;
   private firstOfficerService: FirstOfficerService;
   private expeditionService: ExpeditionService;
+  private socketService: SocketIOService | null = null;
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
     this.expeditionService = ExpeditionService.getInstance();
+    // Note: SocketIOService will be accessed lazily when needed
   }
 
 
@@ -89,86 +97,411 @@ export class MessageService {
   }
 
   /**
+   * Get SocketIOService instance lazily
+   */
+  private getSocketService(): SocketIOService | null {
+    if (!this.socketService) {
+      try {
+        this.socketService = SocketIOService.getInstance();
+        console.log('[MESSAGE-SERVICE] SocketIOService successfully connected');
+      } catch (error) {
+        console.warn('[MESSAGE-SERVICE] SocketIOService not available:', error instanceof Error ? error.message : error);
+        return null;
+      }
+    }
+    return this.socketService;
+  }
+
+  /**
+   * Send message to a specific agent
+   */
+  async sendMessageToAgent(
+    expeditionId: string,
+    agentId: string,
+    content: string,
+    metadata?: any
+  ): Promise<ExpeditionMessage> {
+    try {
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      
+      // Create a message from the system to the agent
+      const message = await messageRepo.create({
+        expeditionId,
+        role: metadata?.fromRole || 'system',
+        agentId,
+        content,
+        messageType: metadata?.messageType || 'task-work',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          targetAgent: agentId,
+          sourceType: 'workflow'
+        }
+      });
+
+      console.log(`[MESSAGE-SERVICE] Message sent to agent ${agentId} in expedition ${expeditionId}`);
+      return message;
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] Failed to send message to agent:', error);
+      throw this.handleError(error, 'SEND_MESSAGE_FAILED');
+    }
+  }
+
+  /**
+   * Send expedition message via WebSocket
+   * 
+   * This method is called directly from WebSocket handlers with the authenticated user ID.
+   */
+  async sendExpeditionMessage(
+    data: {
+      expeditionId: string;
+      content: string;
+      messageType?: string;
+      participantId?: string;
+      timestamp: string;
+    },
+    userId: string
+  ): Promise<{ userMessage: ExpeditionMessage; participantMessage?: ExpeditionMessage }> {
+    console.log(`[MESSAGE-SERVICE] Sending WebSocket message for user: ${userId}`);
+    
+    const request: SendMessageRequest = {
+      expeditionId: data.expeditionId,
+      content: data.content,
+      participantId: data.participantId
+    };
+    
+    return this.sendMessage(userId, request);
+  }
+
+  /**
+   * Send expedition message with streaming support
+   */
+  async sendExpeditionMessageWithStreaming(
+    data: {
+      expeditionId: string;
+      content: string;
+      messageType?: string;
+      participantId?: string;
+      timestamp: string;
+    },
+    userId: string,
+    socket: any
+  ): Promise<void> {
+    console.log(`[MESSAGE-SERVICE] Sending streaming WebSocket message for user: ${userId}`);
+    
+    // Validate expedition access
+    await this.validateExpeditionAccess(data.expeditionId, userId);
+
+    // Determine participant - default to 'first-officer' if not provided
+    const participantId = data.participantId || 'first-officer';
+
+    // Create user message first
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+    const userMessage = await messageRepo.create({
+      expeditionId: data.expeditionId,
+      role: 'user',
+      userId,
+      content: data.content,
+      messageType: 'user-input',
+      timestamp: new Date().toISOString(),
+      agentId: participantId,
+      metadata: {}
+    });
+
+    // Emit user message immediately
+    const socketService = this.getSocketService();
+    if (socketService) {
+      const expeditionRoom = `expedition:${data.expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: data.expeditionId,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Generate streaming response
+    await this.generateStreamingResponse(data.expeditionId, participantId, data.content, userId, userMessage.id, socket);
+  }
+
+  /**
+   * Generate streaming response for expedition messages
+   */
+  private async generateStreamingResponse(
+    expeditionId: string,
+    participantId: string,
+    userMessage: string,
+    userId: string,
+    parentMessageId: string,
+    socket: any
+  ): Promise<void> {
+    const socketService = this.getSocketService();
+    if (!socketService) {
+      console.error('[MESSAGE-SERVICE] SocketService not available for streaming');
+      return;
+    }
+
+    try {
+      const expeditionRoom = `expedition:${expeditionId}`;
+      const streamId = `expedition-${expeditionId}-${Date.now()}`;
+      
+      // Emit stream start to all users in the room (including sender)
+      console.log(`[MESSAGE-SERVICE] Emitting stream start to room: ${expeditionRoom}`);
+      socketService.getIO().to(expeditionRoom).emit('expedition:stream-start' as any, {
+        expeditionId,
+        streamId,
+        participantId,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`[MESSAGE-SERVICE] Stream start emitted`);
+
+      let fullResponse = '';
+      const typingSpeed = 30; // chars per second (slower for visibility)
+
+      if (participantId === 'first-officer') {
+        // Handle First Officer streaming
+        const response = await this.handleFirstOfficerMessage(expeditionId, userMessage, 'user-input', userId);
+        if (response?.reply) {
+          fullResponse = response.reply;
+          
+          // Stream the response character by character
+          for (let i = 0; i < fullResponse.length; i++) {
+            const char = fullResponse[i];
+            const delay = 1000 / typingSpeed;
+            
+            socketService.getIO().to(expeditionRoom).emit('expedition:stream-chunk' as any, {
+              expeditionId,
+              streamId,
+              type: 'content',
+              content: char,
+              position: i,
+              totalLength: fullResponse.length,
+              timestamp: Date.now()
+            });
+            
+            // Add delay for typewriter effect
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      } else {
+        // Handle agent streaming
+        const chatRequest: ChatRequest = {
+          agent_id: participantId,
+          user_id: userId,
+          message: userMessage,
+          channel_id: `expedition-${expeditionId}`,
+          stream: true
+        };
+
+        const store = getStore();
+        
+        // Use streaming from agent engine
+        for await (const chunk of chatStream(chatRequest, store)) {
+          fullResponse += chunk;
+          
+          // Stream each chunk character by character
+          for (let i = 0; i < chunk.length; i++) {
+            const char = chunk[i];
+            const delay = 1000 / typingSpeed;
+            
+            socketService.getIO().to(expeditionRoom).emit('expedition:stream-chunk' as any, {
+              expeditionId,
+              streamId,
+              type: 'content',
+              content: char,
+              position: fullResponse.length - chunk.length + i,
+              totalLength: null, // We don't know total length yet
+              timestamp: Date.now()
+            });
+            
+            // Add delay for typewriter effect
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      // Create the final message in database
+      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+      const participantMessage = await messageRepo.create({
+        expeditionId,
+        role: participantId === 'first-officer' ? 'first-officer' : 'agent',
+        agentId: participantId,
+        content: fullResponse,
+        messageType: participantId === 'first-officer' ? 'coordination' : 'task-work',
+        timestamp: new Date().toISOString(),
+        parentMessageId,
+        metadata: {}
+      });
+
+      // Emit stream complete with final message
+      socketService.getIO().to(expeditionRoom).emit('expedition:stream-complete' as any, {
+        expeditionId,
+        streamId,
+        message: participantMessage,
+        timestamp: new Date().toISOString()
+      });
+
+      console.log(`[MESSAGE-SERVICE] Streaming response completed for expedition ${expeditionId}`);
+      
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] Streaming response failed:', error);
+      
+      // Emit stream error
+      const expeditionRoom = `expedition:${expeditionId}`;
+      socketService.getIO().to(expeditionRoom).emit('expedition:stream-error' as any, {
+        expeditionId,
+        streamId: `expedition-${expeditionId}-${Date.now()}`,
+        error: error instanceof Error ? error.message : 'Stream failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
    * Send a message in an expedition
+   *
+   * Phase 2.1 - Simplified routing:
+   * - Routes based on participantId only (no messageType routing)
+   * - Defaults to 'first-officer' if no participant specified
+   * - Stores participantId as agentId in database
    */
   async sendMessage(
     userId: string,
     request: SendMessageRequest
-  ): Promise<{ userMessage: ExpeditionMessage; firstOfficerMessage?: ExpeditionMessage }> {
-    console.log(`[MESSAGE-SERVICE] ===== SENDING MESSAGE =====`);
-    console.log(`[MESSAGE-SERVICE] Expedition: ${request.expeditionId}`);
-    console.log(`[MESSAGE-SERVICE] Message Type: ${request.messageType}`);
-    console.log(`[MESSAGE-SERVICE] Agent ID: ${request.agentId}`);
-    console.log(`[MESSAGE-SERVICE] Content Length: ${request.content?.length}`);
+  ): Promise<{ userMessage: ExpeditionMessage; participantMessage?: ExpeditionMessage }> {
+    
+    // Validate expedition access
+    await this.validateExpeditionAccess(request.expeditionId, userId);
 
-    try {
-      // Validate expedition access
-      await this.validateExpeditionAccess(request.expeditionId, userId);
+    // Determine participant - default to 'first-officer' if not provided
+    const participantId = request.participantId || 'first-officer';
 
-      // Validate thread if specified
-      if (request.threadId) {
-        await this.validateThreadAccess(request.threadId, request.expeditionId);
-      }
+    // Create user message
+    const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
+    const userMessage = await messageRepo.create({
+      expeditionId: request.expeditionId,
+      role: 'user',
+      userId,
+      content: request.content,
+      messageType: 'user-input',
+      timestamp: new Date().toISOString(),
+      threadId: request.threadId,
+      parentMessageId: request.parentMessageId,
+      agentId: participantId, // Store participantId as agentId in database
+      metadata: request.metadata || {}
+    });
 
-      // Create user message
-      console.log(`[MESSAGE-SERVICE] Creating user message in database...`);
-      const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      const userMessage = await messageRepo.create({
-        expeditionId: request.expeditionId,
-        role: 'user',
-        userId,
-        content: request.content,
-        messageType: request.messageType,
-        timestamp: new Date().toISOString(),
-        threadId: request.threadId,
-        parentMessageId: request.parentMessageId,
-        metadata: {}
+    // Emit WebSocket event for user message
+    const socketService = this.getSocketService();
+    if (socketService) {
+      const expeditionRoom = `expedition:${request.expeditionId}`;
+      console.log(`[MESSAGE-SERVICE] Emitting user message to room: ${expeditionRoom}`);
+      console.log(`[MESSAGE-SERVICE] Message content:`, userMessage);
+      
+      // Check how many sockets are in the room
+      socketService.getIO().in(expeditionRoom).fetchSockets().then(sockets => {
+        console.log(`[MESSAGE-SERVICE] Room ${expeditionRoom} has ${sockets.length} connected sockets`);
+        sockets.forEach(s => console.log(`[MESSAGE-SERVICE] Socket ${s.id} in room, user: ${s.data.userId}`));
       });
-      console.log(`[MESSAGE-SERVICE] User message created: ${userMessage.id}`);
+      
+      socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+        expeditionId: request.expeditionId,
+        message: userMessage,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`[MESSAGE-SERVICE] User message emitted successfully`);
+    } else {
+      console.warn(`[MESSAGE-SERVICE] SocketService not available for message emission`);
+    }
 
-      let firstOfficerMessage: ExpeditionMessage | undefined = undefined;
+    // Route to participant
+    let participantMessage: ExpeditionMessage | undefined = undefined;
 
-      // Handle First Officer integration for coordination messages
-      if (request.messageType === 'user-input' || request.agentId === 'first-officer') {
-        console.log(`[MESSAGE-SERVICE] Handling First Officer integration...`);
-        const firstOfficerResponse = await this.handleFirstOfficerMessage(
-          request.expeditionId,
-          request.content,
-          request.messageType,
-          userId
-        );
+    // Check if participantId is a valid UUID (specific agent) or 'first-officer'
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(participantId);
+    
+    if (participantId === 'first-officer' || !isValidUUID) {
+      // Route to First Officer
+      const response = await this.handleFirstOfficerMessage(
+        request.expeditionId,
+        request.content,
+        'user-input',
+        userId
+      );
 
-        if (firstOfficerResponse && firstOfficerResponse.reply) {
-          console.log(`[MESSAGE-SERVICE] Creating First Officer message in database...`);
-          firstOfficerMessage = await messageRepo.create({
-            expeditionId: request.expeditionId,
-            role: 'first-officer',
-            content: firstOfficerResponse.reply,
-            messageType: 'coordination',
-            timestamp: new Date().toISOString(),
-            threadId: request.threadId,
-            parentMessageId: userMessage.id,
-            metadata: { usage: firstOfficerResponse.usage }
+      if (response?.reply) {
+        participantMessage = await messageRepo.create({
+          expeditionId: request.expeditionId,
+          role: 'first-officer',
+          agentId: 'first-officer',
+          content: response.reply,
+          messageType: 'coordination',
+          timestamp: new Date().toISOString(),
+          threadId: request.threadId,
+          parentMessageId: userMessage.id,
+          metadata: { usage: response.usage }
+        });
+
+        // Emit WebSocket event for First Officer response
+        const socketService = this.getSocketService();
+        if (socketService && participantMessage) {
+          const expeditionRoom = `expedition:${request.expeditionId}`;
+          console.log(`[MESSAGE-SERVICE] Emitting First Officer response to room: ${expeditionRoom}`);
+          console.log(`[MESSAGE-SERVICE] First Officer message content:`, participantMessage);
+          
+          // Check how many sockets are in the room
+          socketService.getIO().in(expeditionRoom).fetchSockets().then(sockets => {
+            console.log(`[MESSAGE-SERVICE] Room ${expeditionRoom} has ${sockets.length} connected sockets for First Officer message`);
+            sockets.forEach(s => console.log(`[MESSAGE-SERVICE] Socket ${s.id} in room, user: ${s.data.userId}`));
           });
-          console.log(`[MESSAGE-SERVICE] First Officer message created: ${firstOfficerMessage.id}`);
-        } else {
-          console.log(`[MESSAGE-SERVICE] No First Officer response received`);
+          
+          const eventData = {
+            expeditionId: request.expeditionId,
+            message: participantMessage,
+            timestamp: new Date().toISOString()
+          };
+          console.log(`[MESSAGE-SERVICE] About to emit 'message:sent' event with data:`, JSON.stringify(eventData, null, 2));
+          
+          socketService.getIO().to(expeditionRoom).emit('message:sent' as any, eventData);
+          
+          console.log(`[MESSAGE-SERVICE] First Officer message emitted successfully`);
         }
       }
+    } else {
+      // Route to specific agent
+      const response = await this.handleAgentMessage(
+        request.expeditionId,
+        participantId,
+        request.content,
+        userId
+      );
 
-      console.log(`[MESSAGE-SERVICE] ===== MESSAGE SENDING COMPLETED =====`);
-      console.log(`[MESSAGE-SERVICE] User message: ${userMessage.id}`);
-      console.log(`[MESSAGE-SERVICE] First Officer message: ${firstOfficerMessage?.id || 'none'}`);
-      
-      return {
-        userMessage,
-        firstOfficerMessage
-      };
-    } catch (error) {
-      console.error('[MESSAGE-SERVICE] ===== MESSAGE SENDING FAILED =====');
-      console.error('[MESSAGE-SERVICE] Error details:', error);
-      throw this.handleError(error, 'SEND_MESSAGE_FAILED');
+      if (response?.reply) {
+        participantMessage = await messageRepo.create({
+          expeditionId: request.expeditionId,
+          role: 'agent',
+          agentId: participantId,
+          content: response.reply,
+          messageType: 'task-work',
+          timestamp: new Date().toISOString(),
+          threadId: request.threadId,
+          parentMessageId: userMessage.id,
+          metadata: { usage: response.usage }
+        });
+
+        // Emit WebSocket event for agent response
+        const socketService = this.getSocketService();
+        if (socketService && participantMessage) {
+          const expeditionRoom = `expedition:${request.expeditionId}`;
+          socketService.getIO().to(expeditionRoom).emit('message:sent' as any, {
+            expeditionId: request.expeditionId,
+            message: participantMessage,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
     }
+
+    return { userMessage, participantMessage };
   }
 
   /**
@@ -572,6 +905,113 @@ export class MessageService {
       throw this.createError('VALIDATION_ERROR', `Thread not found: ${threadId}`);
     }
   }
+/**
+ * Check if any active First Officer agents exist
+ */
+private async checkActiveFirstOfficer(expeditionId: string): Promise<boolean> {
+  try {
+    const expedition = await RepositoryFactory.getExpeditionRepository().findById(expeditionId);
+    if (!expedition) {
+      return false;
+    }
+
+    // Get available first officer agents
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const starshipAgents = await agentRepo.findByStarship(expedition.starshipId);
+    
+    // Look for a First Officer agent
+    const firstOfficerAgent = starshipAgents.find(agent =>
+      agent.tags.includes('first-officer') ||
+      agent.name.toLowerCase().includes('first officer') ||
+      agent.category === 'support'
+    );
+    
+    return !!firstOfficerAgent;
+  } catch (error) {
+    console.error('[MESSAGE-SERVICE] Error checking active First Officer:', error);
+    return false;
+  }
+}
+
+/**
+ * Get response from First Officer Service
+ */
+private async getFirstOfficerResponse(
+  expeditionId: string,
+  message: string,
+  userId: string
+): Promise<string> {
+  try {
+    const response = await this.firstOfficerService.handleUserMessage(
+      expeditionId,
+      userId,
+      message
+    );
+    return response.reply;
+  } catch (error) {
+    console.error('[MESSAGE-SERVICE] Failed to get First Officer response:', error);
+    throw error;
+  }
+}
+
+private async handleAgentMessage(
+  expeditionId: string,
+  agentId: string,
+  content: string,
+  userId: string
+): Promise<{ reply: string; usage?: any }> {
+    try {
+      console.log(`[MESSAGE-SERVICE] ===== HANDLING AGENT MESSAGE =====`);
+      console.log(`[MESSAGE-SERVICE] Expedition: ${expeditionId}`);
+      console.log(`[MESSAGE-SERVICE] Agent ID: ${agentId}`);
+      console.log(`[MESSAGE-SERVICE] User ID: ${userId}`);
+      console.log(`[MESSAGE-SERVICE] Message Length: ${content?.length}`);
+      
+      // Look up the expedition to get the starshipId
+      let channelId = `expedition-${expeditionId}`;
+      try {
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        const expedition = await expeditionRepo.findById(expeditionId);
+        if (expedition && expedition.starshipId) {
+          // Include both expedition and starship info for better context
+          // Use a delimiter that won't appear in UUIDs
+          channelId = `expedition:${expeditionId}:starship:${expedition.starshipId}`;
+          console.log(`[MESSAGE-SERVICE] Enhanced channel_id with starship:`, channelId);
+        }
+      } catch (error) {
+        console.log(`[MESSAGE-SERVICE] Could not enhance channel_id with starship:`, error);
+      }
+
+      // Use the agent engine's chat function (same as crew chat)
+      const chatRequest: ChatRequest = {
+        agent_id: agentId,
+        user_id: userId,
+        message: content,
+        channel_id: channelId,
+        stream: false
+      };
+
+      console.log(`[MESSAGE-SERVICE] Sending request to agent engine...`);
+      const store = getStore();
+      const result = await agentChat(chatRequest, store);
+
+      console.log(`[MESSAGE-SERVICE] Agent response generated:`, {
+        replyLength: result.reply?.length,
+        usage: result.usage
+      });
+      console.log(`[MESSAGE-SERVICE] Agent reply preview: ${result.reply?.substring(0, 100)}...`);
+      console.log(`[MESSAGE-SERVICE] ===== AGENT MESSAGE HANDLED SUCCESSFULLY =====`);
+
+      return {
+        reply: result.reply || 'I apologize, I was unable to generate a response.',
+        usage: result.usage
+      };
+    } catch (error) {
+      console.error('[MESSAGE-SERVICE] ===== AGENT MESSAGE HANDLING FAILED =====');
+      console.error('[MESSAGE-SERVICE] Error details:', error);
+      throw error;
+    }
+  }
 
   private async handleFirstOfficerMessage(
     expeditionId: string,
@@ -597,41 +1037,77 @@ export class MessageService {
 
       console.log(`[MESSAGE-SERVICE] Expedition found - Status: ${expedition.status}`);
 
-      // Auto-start expedition if it's not started and this is a user message
-      if (messageType === 'user-input' && expedition.status === 'draft' && userId) {
-        console.log(`[MESSAGE-SERVICE] Auto-starting expedition ${expeditionId} for user message`);
-        try {
-          await this.expeditionService.startExpedition(expeditionId, userId);
-          console.log(`[MESSAGE-SERVICE] Expedition ${expeditionId} auto-started successfully`);
-        } catch (startError) {
-          console.error(`[MESSAGE-SERVICE] Failed to auto-start expedition ${expeditionId}:`, startError);
-          // Continue with message handling even if auto-start fails
-        }
-      }
-
-      // Check if First Officer is active for this expedition and handle user messages
+      // Handle user messages to First Officer
       if (messageType === 'user-input' && userId) {
-        console.log(`[MESSAGE-SERVICE] Checking if First Officer is active for expedition ${expeditionId}`);
+        console.log(`[MESSAGE-SERVICE] Handling First Officer message for expedition`);
         
-        const isActive = this.firstOfficerService.isExpeditionActive(expeditionId);
-        console.log(`[MESSAGE-SERVICE] First Officer active status: ${isActive}`);
-        
-        if (isActive) {
-          console.log(`[MESSAGE-SERVICE] Sending message to First Officer Service...`);
-          const response = await this.firstOfficerService.handleUserMessage(expeditionId, userId, message);
-          console.log(`[MESSAGE-SERVICE] First Officer response received:`, {
-            hasReply: !!response?.reply,
-            replyLength: response?.reply?.length,
-            hasUsage: !!response?.usage
-          });
-          console.log(`[MESSAGE-SERVICE] First Officer reply preview: ${response?.reply?.substring(0, 100)}...`);
+        // Check for active First Officer agents
+        const hasActiveFirstOfficer = await this.checkActiveFirstOfficer(expeditionId);
+
+        if (!hasActiveFirstOfficer) {
+          // Use First Officer Service for chat
+          console.log(`[MESSAGE-SERVICE] Using First Officer Service for expedition ${expeditionId}`);
+          
+          const response = await this.getFirstOfficerResponse(
+            expeditionId,
+            message,
+            userId
+          );
+
+          console.log(`[MESSAGE-SERVICE] First Officer response generated`);
           console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY =====`);
-          return response;
-        } else {
-          console.log(`[MESSAGE-SERVICE] First Officer not active for expedition ${expeditionId}`);
-          console.log(`[MESSAGE-SERVICE] ===== NO FIRST OFFICER RESPONSE =====`);
-          return null;
+
+          return {
+            reply: response,
+            usage: undefined
+          };
         }
+
+        // Traditional agent handling
+        const agentRepo = RepositoryFactory.getAgentRepository();
+        const starshipAgents = await agentRepo.findByStarship(expedition.starshipId);
+        
+        // Look for a First Officer agent
+        const firstOfficerAgent = starshipAgents.find(agent =>
+          agent.tags.includes('first-officer') ||
+          agent.name.toLowerCase().includes('first officer') ||
+          agent.category === 'support'
+        );
+        
+        if (!firstOfficerAgent) {
+          console.error(`[MESSAGE-SERVICE] No First Officer agent found for starship ${expedition.starshipId}`);
+          return {
+            reply: 'I apologize, but there is no First Officer assigned to this starship. Please assign a First Officer agent to handle expedition coordination.',
+            usage: undefined
+          };
+        }
+        
+        console.log(`[MESSAGE-SERVICE] Using First Officer agent: ${firstOfficerAgent.name} (${firstOfficerAgent.id})`);
+        
+        // Use the agent engine's chat function with the First Officer agent ID
+        const chatRequest: ChatRequest = {
+          agent_id: firstOfficerAgent.id,
+          user_id: userId,
+          message: message,
+          channel_id: `expedition-${expeditionId}`,
+          stream: false
+        };
+
+        console.log(`[MESSAGE-SERVICE] Sending request to agent engine for First Officer...`);
+        const store = getStore();
+        const result = await agentChat(chatRequest, store);
+
+        console.log(`[MESSAGE-SERVICE] First Officer response generated:`, {
+          replyLength: result.reply?.length,
+          usage: result.usage
+        });
+        console.log(`[MESSAGE-SERVICE] First Officer reply preview: ${result.reply?.substring(0, 100)}...`);
+        console.log(`[MESSAGE-SERVICE] ===== FIRST OFFICER MESSAGE HANDLED SUCCESSFULLY =====`);
+
+        return {
+          reply: result.reply || 'I apologize, I was unable to generate a response.',
+          usage: result.usage
+        };
       }
       
       console.log(`[MESSAGE-SERVICE] No First Officer handling needed for messageType: ${messageType}`);
@@ -717,11 +1193,11 @@ export class MessageService {
   }
 
   private generateThreadId(): string {
-    return `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `thread_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
   private generateFileId(): string {
-    return `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `file_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
   private createError(code: ExpeditionErrorCode, message: string): ExpeditionError {
@@ -731,6 +1207,7 @@ export class MessageService {
       details: undefined
     };
   }
+
 
   private handleError(error: any, fallbackCode: string): ExpeditionError {
     if (error.code) {

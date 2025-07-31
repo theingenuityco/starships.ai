@@ -12,7 +12,6 @@ import {
   SendMessageRequest,
   CreateResultRequest,
   ExpeditionStatus,
-  ExpeditionPriority,
   TaskStatus,
   TaskPriority,
   MessageType,
@@ -201,22 +200,14 @@ export function validateCreateExpedition(req: Request, res: Response, next: Next
   let errors: ValidationError[] = [];
   
   // Required fields
-  errors = errors.concat(validateRequired(body, ['title', 'description', 'objective', 'selectedAgents']));
+  errors = errors.concat(validateRequired(body, ['name', 'mission', 'selectedAgents']));
   
   // String length validations
-  errors = errors.concat(validateStringLength(body, 'title', 1, 200));
-  errors = errors.concat(validateStringLength(body, 'description', 1, 1000));
-  errors = errors.concat(validateStringLength(body, 'objective', 1, 500));
-  
-  // Enum validations
-  errors = errors.concat(validateEnum(body, 'priority', ['low', 'medium', 'high', 'urgent'] as ExpeditionPriority[]));
+  errors = errors.concat(validateStringLength(body, 'name', 1, 200));
+  errors = errors.concat(validateStringLength(body, 'mission', 1, 1000));
   
   // Array validations
-  errors = errors.concat(validateArray(body, 'tags', false, 10));
   errors = errors.concat(validateArray(body, 'selectedAgents', true, 10)); // Required array with max 10 agents
-  
-  // Number validations
-  errors = errors.concat(validateNumberRange(body, 'estimatedDuration', 1, 10080)); // Max 1 week in minutes
   
   if (errors.length > 0) {
     sendValidationError(res, errors);
@@ -234,25 +225,20 @@ export function validateUpdateExpedition(req: Request, res: Response, next: Next
   let errors: ValidationError[] = [];
   
   // String length validations (optional fields)
-  if (body.title !== undefined) {
-    errors = errors.concat(validateStringLength(body, 'title', 1, 200));
+  if (body.name !== undefined) {
+    errors = errors.concat(validateStringLength(body, 'name', 1, 200));
   }
-  if (body.description !== undefined) {
-    errors = errors.concat(validateStringLength(body, 'description', 1, 1000));
-  }
-  if (body.objective !== undefined) {
-    errors = errors.concat(validateStringLength(body, 'objective', 1, 500));
+  if (body.mission !== undefined) {
+    errors = errors.concat(validateStringLength(body, 'mission', 1, 1000));
   }
   
   // Enum validations
-  errors = errors.concat(validateEnum(body, 'priority', ['low', 'medium', 'high', 'urgent'] as ExpeditionPriority[]));
   errors = errors.concat(validateEnum(body, 'status', ['draft', 'planning', 'in-progress', 'review', 'completed', 'failed', 'cancelled'] as ExpeditionStatus[]));
   
   // Array validations
-  errors = errors.concat(validateArray(body, 'tags', false, 10));
-  
-  // Number validations
-  errors = errors.concat(validateNumberRange(body, 'estimatedDuration', 1, 10080));
+  if (body.assignedAgents !== undefined) {
+    errors = errors.concat(validateArray(body, 'assignedAgents', false, 20));
+  }
   
   if (errors.length > 0) {
     sendValidationError(res, errors);
@@ -302,17 +288,26 @@ export function validateSendMessage(req: Request, res: Response, next: NextFunct
   const body = req.body as SendMessageRequest;
   let errors: ValidationError[] = [];
   
-  // Required fields
+  // Only require content
   errors = errors.concat(validateRequired(body, ['content']));
-  
-  // String length validations
   errors = errors.concat(validateStringLength(body, 'content', 1, 5000));
   
-  // Enum validations
-  errors = errors.concat(validateEnum(body, 'messageType', ['coordination', 'task-work', 'user-input', 'status-update', 'result', 'question', 'notification'] as MessageType[]));
+  // Optional participant validation - allow 'first-officer' or valid UUID
+  if (body.participantId !== undefined && body.participantId !== null) {
+    if (body.participantId !== 'first-officer') {
+      // Only validate UUID if it's not 'first-officer'
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(body.participantId)) {
+        errors.push({
+          field: 'participantId',
+          message: 'participantId must be either "first-officer" or a valid UUID',
+          value: body.participantId
+        });
+      }
+    }
+  }
   
-  // UUID validations
-  errors = errors.concat(validateUUID(body, 'agentId'));
+  // Optional thread/parent validation
   errors = errors.concat(validateUUID(body, 'threadId'));
   errors = errors.concat(validateUUID(body, 'parentMessageId'));
   

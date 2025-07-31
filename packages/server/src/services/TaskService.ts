@@ -259,6 +259,25 @@ export class TaskService {
   /**
    * Assign task to agent
    */
+  async updateTaskStatus(taskId: string, status: TaskStatus): Promise<ExpeditionTask> {
+    const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
+    const task = await taskRepo.findById(taskId);
+    
+    if (!task) {
+      throw ErrorFactory.notFound('Task', taskId);
+    }
+    
+    const updated = await taskRepo.update(taskId, { status });
+    if (!updated) {
+      throw new StandardError(
+        'UPDATE_FAILED',
+        'Failed to update task status'
+      );
+    }
+    
+    return updated;
+  }
+
   async assignTask(
     userId: string,
     assignment: TaskAssignmentRequest
@@ -609,10 +628,9 @@ export class TaskService {
     const validTransitions: Record<TaskStatus, TaskStatus[]> = {
       'pending': ['assigned', 'in-progress'],
       'assigned': ['in-progress', 'pending'],
-      'in-progress': ['completed', 'failed', 'review'],
+      'in-progress': ['completed', 'failed'],
       'blocked': ['pending', 'assigned'],
-      'review': ['completed', 'in-progress'],
-      'completed': ['review'],
+      'completed': [],
       'failed': ['pending', 'assigned']
     };
 

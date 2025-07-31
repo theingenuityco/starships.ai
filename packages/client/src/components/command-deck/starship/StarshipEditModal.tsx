@@ -44,7 +44,6 @@ interface StarshipEditFormData {
   name: string;
   status: 'active' | 'inactive';
   class: 'scout' | 'cruiser';
-  maxActiveExpeditions: number;
 }
 
 const STARSHIP_CLASSES = {
@@ -92,8 +91,7 @@ export function StarshipEditModal({
   const [formData, setFormData] = useState<StarshipEditFormData>({
     name: '',
     status: 'inactive',
-    class: 'scout',
-    maxActiveExpeditions: 3
+    class: 'scout'
   });
   const [errors, setErrors] = useState<Partial<StarshipEditFormData>>({});
   const [hasChanges, setHasChanges] = useState(false);
@@ -106,8 +104,7 @@ export function StarshipEditModal({
       const initialData = {
         name: starship.name,
         status: starship.status,
-        class: starship.class,
-        maxActiveExpeditions: starship.maxActiveExpeditions
+        class: starship.class
       };
       setFormData(initialData);
       setHasChanges(false);
@@ -128,8 +125,7 @@ export function StarshipEditModal({
       const hasNameChange = formData.name !== starship.name;
       const hasStatusChange = formData.status !== starship.status;
       const hasClassChange = formData.class !== starship.class;
-      const hasExpeditionsChange = formData.maxActiveExpeditions !== starship.maxActiveExpeditions;
-      setHasChanges(hasNameChange || hasStatusChange || hasClassChange || hasExpeditionsChange);
+      setHasChanges(hasNameChange || hasStatusChange || hasClassChange);
     }
   }, [formData, starship]);
 
@@ -144,11 +140,6 @@ export function StarshipEditModal({
       newErrors.name = 'Name must be less than 50 characters';
     }
 
-    if (formData.maxActiveExpeditions < 1) {
-      newErrors.maxActiveExpeditions = 'Must be at least 1';
-    } else if (formData.maxActiveExpeditions > 50) {
-      newErrors.maxActiveExpeditions = 'Must be 50 or less';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -169,9 +160,6 @@ export function StarshipEditModal({
       if (formData.class !== starship.class) {
         updates.class = formData.class;
       }
-      if (formData.maxActiveExpeditions !== starship.maxActiveExpeditions) {
-        updates.maxActiveExpeditions = formData.maxActiveExpeditions;
-      }
 
       await updateStarship(starshipId, updates);
       onSuccess();
@@ -186,8 +174,7 @@ export function StarshipEditModal({
       setFormData({
         name: starship.name,
         status: starship.status,
-        class: starship.class,
-        maxActiveExpeditions: starship.maxActiveExpeditions
+        class: starship.class
       });
     }
     setErrors({});
@@ -331,24 +318,6 @@ export function StarshipEditModal({
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="max-expeditions">Max Active Expeditions</Label>
-              <Input
-                id="max-expeditions"
-                type="number"
-                min="1"
-                max="50"
-                value={formData.maxActiveExpeditions}
-                onChange={(e) => setFormData({ ...formData, maxActiveExpeditions: parseInt(e.target.value) || 1 })}
-                className="bg-background/50 backdrop-blur-sm border-border/50"
-              />
-              {errors.maxActiveExpeditions && (
-                <p className="text-sm text-destructive">{errors.maxActiveExpeditions}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Maximum number of active expeditions this starship can run simultaneously
-              </p>
-            </div>
           </div>
 
           {/* Preview Changes */}
@@ -372,9 +341,6 @@ export function StarshipEditModal({
                         </Badge>
                         <Badge variant="outline" className="capitalize">
                           {formData.class}
-                        </Badge>
-                        <Badge variant="outline" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                          Max {formData.maxActiveExpeditions} Expeditions
                         </Badge>
                       </div>
                     </div>

@@ -55,6 +55,9 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     KINDE_POST_LOGIN_REDIRECT_URL: process.env.KINDE_POST_LOGIN_REDIRECT_URL || 'http://localhost:3000',
     KINDE_POST_LOGOUT_REDIRECT_URL: process.env.KINDE_POST_LOGOUT_REDIRECT_URL || 'http://localhost:3000',
     KINDE_DEBUG_MODE: process.env.KINDE_DEBUG_MODE === 'true',
+    
+    // MCP HTTP Bridge Feature Flag
+    MCP_HTTP_BRIDGE_ENABLED: process.env.MCP_HTTP_BRIDGE_ENABLED !== 'false', // Default: true
   };
 
   // Skip validation during linting or when NODE_ENV is not set

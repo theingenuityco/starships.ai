@@ -19,12 +19,16 @@
     "@langchain/core": "^0.3.66",
     "@langchain/langgraph": "^0.3.11",
     "@langchain/openai": "^0.6.2",
+    "@starships/core": "workspace:*",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",
     "faiss-node": "^0.5.1",
     "langchain": "^0.3.30",
+    "lru-cache": "^11.1.0",
+    "prom-client": "^15.1.3",
     "rxjs": "^7.8.2",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Agent, MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { Agent, MCPServerOption, MCPServerConnector, mcpServerAPI, starshipAPI, Starship } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
@@ -9,8 +9,9 @@ import { ConnectorTroubleshootingPanel } from '@/components/crew/ConnectorTroubl
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Users, Plug, Bot } from 'lucide-react'
+import { ArrowLeft, Users, Plug, Bot, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useToast } from '@/hooks/useToast'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -19,6 +20,9 @@ interface StarshipCrewContentProps {
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [starship, setStarship] = useState<Starship | null>(null)
+  const [starshipLoading, setStarshipLoading] = useState(true)
+  const { toast } = useToast()
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
@@ -35,10 +39,17 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     setSessionId(newSessionId)
   }
 
-  // Fetch connector instances on component mount and when starship changes
+  // Fetch starship data on component mount
   useEffect(() => {
-    fetchConnectorInstances()
+    fetchStarship()
   }, [slug])
+
+  // Fetch connector instances when starship is loaded
+  useEffect(() => {
+    if (starship) {
+      fetchConnectorInstances()
+    }
+  }, [starship])
 
   // Auto-refresh connector instances every 30 seconds
   useEffect(() => {
@@ -50,6 +61,23 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
     return () => clearInterval(interval)
   }, [autoRefresh, slug])
+
+  const fetchStarship = async () => {
+    try {
+      setStarshipLoading(true)
+      const data = await starshipAPI.getStarshipBySlug(slug)
+      setStarship(data.starship)
+    } catch (error) {
+      console.error('Failed to fetch starship:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load starship data',
+        variant: 'destructive',
+      })
+    } finally {
+      setStarshipLoading(false)
+    }
+  }
 
   const fetchConnectorInstances = async () => {
     try {
@@ -92,6 +120,16 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         toRemove.length
       )
 
+      // Show notification for connector creation
+      if (toCreate.length > 0) {
+        const connectorNames = toCreate.map(t => t.name).join(', ')
+        toast({
+          title: 'Setting up connection',
+          description: `We are setting up your connection with ${connectorNames} and will notify you once done.`,
+          duration: 5000,
+        })
+      }
+
       // Execute connector instance operations
       const operations = [
         ...toCreate.map(template => {
@@ -119,6 +157,26 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
       if (operations.length > 0) {
         await Promise.all(operations)
+        
+        // Show success notification
+        if (toCreate.length > 0) {
+          const connectorNames = toCreate.map(t => t.name).join(', ')
+          toast({
+            title: 'Connection established',
+            description: `Successfully connected to ${connectorNames}`,
+            variant: 'success',
+            duration: 5000,
+          })
+        }
+        
+        if (toRemove.length > 0) {
+          toast({
+            title: 'Disconnected',
+            description: `Connectors removed successfully`,
+            variant: 'default',
+            duration: 3000,
+          })
+        }
       }
 
       // Refresh connector instances to get current state
@@ -126,6 +184,14 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     } catch (error) {
       console.error('Failed to update connector instances:', error)
       setConnectorsError('Failed to update connectors. Please try again.')
+      
+      // Show error notification
+      toast({
+        title: 'Connection failed',
+        description: 'Failed to set up connector. Please try again or check the logs for details.',
+        variant: 'destructive',
+        duration: 5000,
+      })
 
       // Refresh connector instances to get current state
       await fetchConnectorInstances()
@@ -181,12 +247,22 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
               >
                 <div className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0">
-                  <AgentSelector
-                    selectedAgent={selectedAgent}
-                    onAgentSelect={handleAgentSelect}
-                    showCreateButton={true}
-                    showFilters={true}
-                  />
+                  {starshipLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-sm text-muted-foreground">Loading agents...</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <AgentSelector
+                      selectedAgent={selectedAgent}
+                      onAgentSelect={handleAgentSelect}
+                      showCreateButton={true}
+                      showFilters={true}
+                      starshipId={starship?.id}
+                    />
+                  )}
                 </div>
               </TabsContent>
 

@@ -10,98 +10,26 @@ import { MCPServerOption } from '../types';
  */
 const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
   {
-    name: 'GitHub',
-    command: 'docker',
-    args: [
-      'run',
-      '-i',
-      '--rm',
-      '-e',
-      'GITHUB_PERSONAL_ACCESS_TOKEN',
-      '-e',
-      'GITHUB_TOOLSETS',
-      '-e',
-      'GITHUB_READ_ONLY',
-      'ghcr.io/github/github-mcp-server',
-    ],
-    env: JSON.stringify({
-      GITHUB_PERSONAL_ACCESS_TOKEN: '${GITHUB_PERSONAL_ACCESS_TOKEN}',
-      GITHUB_TOOLSETS: '${GITHUB_TOOLSETS}',
-      GITHUB_READ_ONLY: '${GITHUB_READ_ONLY}',
-    }),
-  },
-  {
-    name: 'Puppeteer',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-puppeteer'],
-    env: JSON.stringify({}),
-  },
-  {
-    name: 'Filesystem',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem', 'FILESYSTEM_PATH'],
-    env: JSON.stringify({
-      FILESYSTEM_PATH: '${FILESYSTEM_PATH}',
-    }),
-  },
-  {
-    name: 'Notion',
-    command: 'npx',
-    args: ['-y', '@notionhq/notion-mcp-server'],
-    env: JSON.stringify({
-      OPENAPI_MCP_HEADERS: '{"Authorization": "${NOTION_API_KEY}", "Notion-Version": "2022-06-28"}',
-    }),
-  },
-  {
-    name: 'PostgreSQL',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-postgres'],
-    env: JSON.stringify({
-      POSTGRES_CONNECTION_STRING: '${POSTGRES_CONNECTION_STRING}',
-    }),
-  },
-  {
-    name: 'Brave Search',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-brave-search'],
-    env: JSON.stringify({
-      BRAVE_API_KEY: '${BRAVE_API_KEY}',
-    }),
-  },
-  {
-    name: 'Google Drive',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-gdrive'],
-    env: JSON.stringify({
-      GDRIVE_CREDENTIALS_PATH: '${GDRIVE_CREDENTIALS_PATH}',
-    }),
-  },
-  {
-    name: 'Slack',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-slack'],
-    env: JSON.stringify({
-      SLACK_BOT_TOKEN: '${SLACK_BOT_TOKEN}',
-    }),
-  },
-  {
-    name: 'Memory',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-memory'],
-    env: JSON.stringify({}),
-  },
-  {
     name: 'Time',
+    slug: 'time',
     command: 'uvx',
     args: ['mcp-server-time', '--local-timezone=America/New_York'],
     env: JSON.stringify({}),
   },
   {
-    name: 'Stripe',
+    name: 'Sequential Thinking',
+    slug: 'sequentialthinking',
     command: 'npx',
-    args: ['-y', '@stripe/mcp', '--tools=all', '--api-key=Stripe_API_Key'],
+    args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
+    env: JSON.stringify({}),
+  },
+  {
+    name: 'Firecrawl',
+    slug: 'firecrawl',
+    command: 'node',
+    args: ['firecrawl-mcp'],
     env: JSON.stringify({
-      STRIPE_API_KEY: '${STRIPE_API_KEY}',
+      FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}',
     }),
   },
 ];

@@ -1,6 +1,6 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketIOEvents, AgentSocketRequest, AgentSocketStreamChunk, ChatRequest } from '@starships/protocol';
-import { chat, chatStream } from '@starships/agent-engine';
+import { chat, chatStream, chatWithMCP, chatWithMCPStream } from '@starships/agent-engine';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import getStore from '../store';
@@ -72,7 +72,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
         const typewriterEnabled = request.typewriter_enabled !== false;
         
         try {
-          for await (const chunk of chatStream(chatRequest, store)) {
+          for await (const chunk of chatWithMCPStream(chatRequest, store)) {
             fullResponse += chunk;
             
             // Create typewriter chunks if enabled

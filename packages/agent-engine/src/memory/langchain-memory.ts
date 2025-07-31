@@ -284,7 +284,8 @@ export class LangChainMemoryStore {
     }
     
     try {
-      const results = await this.vectorStore.similaritySearch("", 1000);
+      // Use a generic query to retrieve all documents
+      const results = await this.vectorStore.similaritySearch("document", 1000);
       return results;
     } catch (error) {
       console.error("Failed to retrieve documents from vector store:", error);

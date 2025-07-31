@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 import type { Expedition, Agent } from '@starships/protocol';
 
 interface ExpeditionCardProps {
   expedition: Expedition;
   agents: Agent[];
   onDelete: (id: string) => void;
+  starshipSlug: string;
   className?: string;
 }
 
@@ -21,8 +23,11 @@ export function ExpeditionCard({
   expedition,
   agents,
   onDelete,
+  starshipSlug,
   className
 }: ExpeditionCardProps) {
+  const router = useRouter();
+  
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -50,11 +55,16 @@ export function ExpeditionCard({
     }
   };
 
+  const handleClick = () => {
+    router.push(`/ship/${starshipSlug}/expeditions/${expedition.id}`);
+  };
+
   return (
     <motion.div
       whileHover={{ scale: 1.01, y: -1 }}
       whileTap={{ scale: 0.99 }}
       transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
+      onClick={handleClick}
     >
       <Card className={cn(
         "cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50",

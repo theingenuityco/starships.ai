@@ -173,6 +173,7 @@ export function ExpeditionDashboard({ starshipSlug }: ExpeditionDashboardProps) 
               expedition={expedition}
               agents={expeditionAgents[expedition.id] || []}
               onDelete={handleDelete}
+              starshipSlug={starshipSlug}
             />
           ))}
         </div>

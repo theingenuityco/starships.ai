@@ -1,217 +1,526 @@
-import { BaseRepository } from './BaseRepository';
 import { getConnection } from '../connection';
-import { Expedition, ExpeditionRepository as ExpeditionRepositoryInterface, Agent } from '../types';
+import {
+  Expedition,
+  ExpeditionRepository as ExpeditionRepositoryInterface,
+  ExpeditionStatus,
+  ExpeditionFilters,
+  ExpeditionSort,
+  PaginationOptions,
+  ExpeditionWorkflowState,
+  Agent
+} from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4j-helpers';
+import { int } from 'neo4j-driver';
+import { BaseRepository } from './BaseRepository';
 
 /**
  * Neo4j-based expedition repository
+ *
+ * Handles all database operations for expeditions including CRUD operations,
+ * agent assignments, workflow state management, and advanced querying.
  */
 export class ExpeditionRepository extends BaseRepository implements ExpeditionRepositoryInterface {
+  
   constructor() {
-    super('expedition');
+    super('ExpeditionRepository');
   }
 
+  /**
+   * Helper method to parse workflow state from string
+   */
+  private parseWorkflowState(expedition: Expedition): Expedition {
+    if (expedition && expedition.workflowState && typeof expedition.workflowState === 'string') {
+      try {
+        expedition.workflowState = JSON.parse(expedition.workflowState);
+      } catch (error) {
+        console.error('Failed to parse workflow state:', error);
+        expedition.workflowState = null;
+      }
+    }
+    return expedition;
+  }
+  
+  /**
+   * Find all expeditions (admin use only)
+   */
   async findAll(): Promise<Expedition[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const result = await connection.executeQuery<{ e: Expedition }>(
-          'MATCH (e:Expedition) RETURN e ORDER BY e.createdAt DESC'
-        );
-        return convertNeo4jIntsInArray(result.map((record) => record.e));
-      },
-      'findAll',
-      'Expedition'
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ e: Expedition }>(
+      'MATCH (e:Expedition) RETURN e ORDER BY e.createdAt DESC'
     );
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
+  /**
+   * Find expedition by ID
+   */
   async findById(id: string): Promise<Expedition | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const result = await connection.executeQuery<{ e: Expedition }>(
+    try {
+      this.validateRequired({ id }, ['id'], 'findById');
+      
+      const connection = getConnection();
+      const result = await this.executeWithErrorHandling(
+        () => connection.executeQuery<{ e: Expedition }>(
           'MATCH (e:Expedition) WHERE e.id = $id RETURN e',
           { id }
-        );
-        const expedition = result[0]?.e || null;
-        return expedition ? convertNeo4jIntsInObject(expedition) : null;
-      },
-      'findById',
-      'Expedition',
-      id
-    );
+        ),
+        'findById',
+        'expedition',
+        id
+      );
+      
+      // Parse workflow state if it's a string
+      if (result[0]?.e) {
+        const expedition = result[0].e;
+        if (expedition.workflowState && typeof expedition.workflowState === 'string') {
+          try {
+            expedition.workflowState = JSON.parse(expedition.workflowState);
+          } catch (error) {
+            console.error('Failed to parse workflow state:', error);
+          }
+        }
+        return expedition;
+      }
+      
+      return null;
+    } catch (error) {
+      throw this.handleDatabaseError(error, 'findById', 'expedition', id);
+    }
   }
 
+  /**
+   * Find all expeditions for a specific starship
+   */
   async findByStarship(starshipId: string): Promise<Expedition[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const result = await connection.executeQuery<{ e: Expedition }>(
-          'MATCH (e:Expedition) WHERE e.starshipId = $starshipId RETURN e ORDER BY e.createdAt DESC',
-          { starshipId }
-        );
-        return convertNeo4jIntsInArray(result.map((record) => record.e));
-      },
-      'findByStarship',
-      'Expedition'
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ e: Expedition }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_EXPEDITION]->(e:Expedition)
+       RETURN e ORDER BY e.createdAt DESC`,
+      { starshipId }
     );
+    return result.map(record => this.parseWorkflowState(record.e));
   }
 
-  async create(
-    entity: Omit<Expedition, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<Expedition> {
-    // Validation
-    this.validateRequired(entity, ['name', 'starshipId']);
-    this.validateStringLengths(entity, {
-      name: { min: 3, max: 50 },
-      description: { max: 500 }
-    });
-    this.validateEnums(entity, {
-      status: ['active', 'inactive', 'completed']
-    });
+  /**
+   * Find expeditions by status for a starship
+   */
+  async findByStatus(starshipId: string, status: ExpeditionStatus): Promise<Expedition[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ e: Expedition }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_EXPEDITION]->(e:Expedition)
+       WHERE e.status = $status
+       RETURN e ORDER BY e.createdAt DESC`,
+      { starshipId, status }
+    );
+    return result.map(record => this.parseWorkflowState(record.e));
+  }
 
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const now = new Date().toISOString();
-        const expedition: Expedition = {
-          ...entity,
-          id: uuidv4(),
-          status: entity.status || 'active',
-          createdAt: now,
-          updatedAt: now,
-        };
 
-        await connection.executeWrite(
+  /**
+   * Advanced filtering with pagination and sorting
+   */
+  async findWithFilters(
+    starshipId: string,
+    filters: ExpeditionFilters,
+    sort?: ExpeditionSort,
+    pagination?: PaginationOptions
+  ): Promise<{ expeditions: Expedition[]; total: number }> {
+    const connection = getConnection();
+    
+    // Debug logging
+    console.log('[DEBUG] findWithFilters called with:', {
+      starshipId,
+      filters,
+      sort,
+      pagination,
+      paginationType: typeof pagination,
+      paginationLimit: pagination?.limit,
+      paginationLimitType: typeof pagination?.limit
+    });
+    
+    // Build dynamic query
+    let whereClause = 'WHERE 1=1';
+    const params: any = { starshipId };
+    
+    if (filters.status && filters.status.length > 0) {
+      whereClause += ' AND e.status IN $statuses';
+      params.statuses = filters.status;
+    }
+    
+    
+    if (filters.createdBy) {
+      whereClause += ' AND e.createdBy = $createdBy';
+      params.createdBy = filters.createdBy;
+    }
+    
+    if (filters.assignedAgent) {
+      whereClause += ' AND $assignedAgent IN e.assignedAgents';
+      params.assignedAgent = filters.assignedAgent;
+    }
+    
+    if (filters.dateRange) {
+      whereClause += ' AND e.createdAt >= $startDate AND e.createdAt <= $endDate';
+      params.startDate = filters.dateRange.start;
+      params.endDate = filters.dateRange.end;
+    }
+    
+    if (filters.search) {
+      whereClause += ' AND (toLower(e.name) CONTAINS toLower($search) OR toLower(e.mission) CONTAINS toLower($search))';
+      params.search = filters.search;
+    }
+    
+    // Build sort clause
+    let orderClause = 'ORDER BY e.createdAt DESC';
+    if (sort) {
+      const direction = sort.direction.toUpperCase();
+      orderClause = `ORDER BY e.${sort.field} ${direction}`;
+    }
+    
+    // Build pagination clause
+    let limitClause = '';
+    if (pagination) {
+      const skip = (pagination.page - 1) * pagination.limit;
+      limitClause = `SKIP $skip LIMIT $limit`;
+      params.skip = int(skip);
+      params.limit = int(pagination.limit);
+      
+      // Debug logging
+      console.log('[DEBUG] Pagination values:', {
+        originalPage: pagination.page,
+        originalLimit: pagination.limit,
+        skip: params.skip,
+        limit: params.limit,
+        skipType: typeof params.skip,
+        limitType: typeof params.limit
+      });
+    }
+    
+    // Get total count (without pagination parameters)
+    const { skip, limit, ...countParams } = params;
+    
+    const countQuery = `
+      MATCH (s:Starship {id: $starshipId})-[:HAS_EXPEDITION]->(e:Expedition)
+      ${whereClause}
+      RETURN count(e) as total
+    `;
+    
+    // Debug logging for count query
+    console.log('[DEBUG] Count query params:', JSON.stringify(countParams, null, 2));
+    
+    const countResult = await connection.executeQuery<{ total: number }>(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+    
+    // Get filtered expeditions
+    const expeditionsQuery = `
+      MATCH (s:Starship {id: $starshipId})-[:HAS_EXPEDITION]->(e:Expedition)
+      ${whereClause}
+      RETURN e
+      ${orderClause}
+      ${limitClause}
+    `;
+    
+    const expeditionsResult = await connection.executeQuery<{ e: Expedition }>(expeditionsQuery, params);
+    const expeditions = expeditionsResult.map(record => record.e);
+    
+    return { expeditions, total };
+  }
+
+  /**
+   * Create a new expedition
+   */
+  async create(entity: Omit<Expedition, 'id' | 'createdAt'>): Promise<Expedition> {
+    try {
+      // Validate required fields
+      this.validateRequired(entity, ['name', 'starshipId', 'createdBy'], 'create');
+      
+      // Validate field types
+      this.validateTypes(entity, {
+        name: 'string',
+        starshipId: 'string',
+        createdBy: 'string'
+      }, 'create');
+
+      // Validate string lengths
+      this.validateStringLengths(entity, {
+        name: { min: 1, max: 200 },
+        mission: { max: 2000 }
+      }, 'create');
+
+      const connection = getConnection();
+      const now = new Date().toISOString();
+      
+      const expedition: Expedition = {
+        ...entity,
+        id: uuidv4(),
+        createdAt: now,
+        updatedAt: entity.updatedAt || now,
+        assignedAgents: entity.assignedAgents || [],
+        status: entity.status || 'draft'
+      };
+
+      // Create expedition node with error handling
+      await this.executeWithErrorHandling(
+        () => connection.executeWrite(
           'CREATE (e:Expedition $props) RETURN e',
           { props: expedition }
-        );
+        ),
+        'create',
+        'expedition',
+        expedition.id
+      );
 
-        // Create relationship to starship
-        await connection.executeWrite(
+      // Create relationship with starship with error handling
+      await this.executeWithErrorHandling(
+        () => connection.executeWrite(
           `MATCH (s:Starship {id: $starshipId}), (e:Expedition {id: $expeditionId})
-           CREATE (e)-[:BELONGS_TO]->(s)`,
+           CREATE (s)-[:HAS_EXPEDITION {createdAt: $timestamp}]->(e)`,
           {
             starshipId: expedition.starshipId,
-            expeditionId: expedition.id
+            expeditionId: expedition.id,
+            timestamp: expedition.createdAt
           }
-        );
+        ),
+        'create',
+        'expedition',
+        expedition.id
+      );
 
-        return convertNeo4jIntsInObject(expedition);
-      },
-      'create',
-      'Expedition'
-    );
+      this.log('info', `Expedition created successfully: ${expedition.id}`);
+      return expedition;
+    } catch (error) {
+      this.log('error', 'Failed to create expedition', { error: error instanceof Error ? error.message : String(error) });
+      throw this.handleDatabaseError(error, 'create', 'expedition');
+    }
   }
 
+  /**
+   * Update an expedition
+   */
   async update(id: string, updates: Partial<Expedition>): Promise<Expedition | null> {
-    // Validation for updates
-    if (updates.name !== undefined) {
-      this.validateStringLengths({ name: updates.name }, {
-        name: { min: 3, max: 50 }
-      });
-    }
-    if (updates.description !== undefined) {
-      this.validateStringLengths({ description: updates.description }, {
-        description: { max: 500 }
-      });
-    }
-    if (updates.status !== undefined) {
-      this.validateEnums({ status: updates.status }, {
-        status: ['active', 'inactive', 'completed']
-      });
-    }
+    const connection = getConnection();
+    const updateProps = {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
 
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const updateProps = {
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        };
-
-        // Remove fields that shouldn't be updated
-        delete updateProps.id;
-        delete updateProps.createdAt;
-        delete updateProps.starshipId; // Don't allow changing starship
-
-        const result = await connection.executeWrite<{ e: Expedition }>(
-          'MATCH (e:Expedition) WHERE e.id = $id SET e += $updates RETURN e',
-          { id, updates: updateProps }
-        );
-
-        const expedition = result[0]?.e || null;
-        return expedition ? convertNeo4jIntsInObject(expedition) : null;
-      },
-      'update',
-      'Expedition',
-      id
+    const result = await connection.executeWrite<{ e: Expedition }>(
+      'MATCH (e:Expedition) WHERE e.id = $id SET e += $updates RETURN e',
+      { id, updates: updateProps }
     );
+
+    return result[0]?.e || null;
   }
 
-  async delete(id: string): Promise<boolean> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (e:Expedition) WHERE e.id = $id DETACH DELETE e RETURN count(e) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
-      },
-      'delete',
-      'Expedition',
-      id
+  /**
+   * Update expedition status
+   */
+  async updateStatus(id: string, status: ExpeditionStatus): Promise<Expedition | null> {
+    const connection = getConnection();
+    const result = await connection.executeWrite<{ e: Expedition }>(
+      `MATCH (e:Expedition) WHERE e.id = $id 
+       SET e.status = $status, e.updatedAt = $timestamp 
+       RETURN e`,
+      { 
+        id, 
+        status, 
+        timestamp: new Date().toISOString() 
+      }
     );
+
+    return result[0]?.e || null;
   }
 
-  async assignAgents(expeditionId: string, agentIds: string[]): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        
-        // First, remove all existing agent assignments
-        await connection.executeWrite(
-          'MATCH (a:Agent)-[r:ASSIGNED_TO]->(e:Expedition {id: $expeditionId}) DELETE r',
-          { expeditionId }
-        );
+  /**
+   * Update expedition workflow state
+   */
+  async updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null> {
+    const connection = getConnection();
+    // Serialize the workflow state to JSON string for Neo4j storage
+    const serializedState = JSON.stringify(state);
+    
+    const result = await connection.executeWrite<{ e: Expedition }>(
+      `MATCH (e:Expedition) WHERE e.id = $id 
+       SET e.workflowState = $state, e.updatedAt = $timestamp 
+       RETURN e`,
+      { 
+        id, 
+        state: serializedState, 
+        timestamp: new Date().toISOString() 
+      }
+    );
 
-        // Then, create new assignments
-        if (agentIds.length > 0) {
-          await connection.executeWrite(
-            `MATCH (e:Expedition {id: $expeditionId})
-             MATCH (a:Agent) WHERE a.id IN $agentIds
-             CREATE (a)-[:ASSIGNED_TO {assignedAt: $timestamp}]->(e)`,
-            {
-              expeditionId,
-              agentIds,
-              timestamp: new Date().toISOString()
-            }
-          );
+    // Parse the workflow state back when returning
+    if (result[0]?.e) {
+      const expedition = result[0].e;
+      if (expedition.workflowState && typeof expedition.workflowState === 'string') {
+        try {
+          expedition.workflowState = JSON.parse(expedition.workflowState);
+        } catch (error) {
+          console.error('Failed to parse workflow state:', error);
         }
-      },
-      'assignAgents',
-      'Expedition',
-      expeditionId
-    );
+      }
+      return expedition;
+    }
+    
+    return null;
   }
 
-  async getAssignedAgents(expeditionId: string): Promise<Agent[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = getConnection();
-        const result = await connection.executeQuery<{ a: Agent }>(
-          `MATCH (a:Agent)-[:ASSIGNED_TO]->(e:Expedition {id: $expeditionId})
-           RETURN a ORDER BY a.name`,
-          { expeditionId }
-        );
-        return convertNeo4jIntsInArray(result.map((record) => record.a));
-      },
-      'getAssignedAgents',
-      'Expedition',
-      expeditionId
+  /**
+   * Delete an expedition
+   */
+  async delete(id: string): Promise<boolean> {
+    const connection = getConnection();
+    const result = await connection.executeWrite<{ deletedCount: number }>(
+      `MATCH (e:Expedition) WHERE e.id = $id 
+       DETACH DELETE e 
+       RETURN count(e) as deletedCount`,
+      { id }
     );
+
+    return result[0]?.deletedCount > 0;
+  }
+
+  /**
+   * Assign an agent to an expedition
+   */
+  async assignAgent(expeditionId: string, agentId: string): Promise<boolean> {
+    const connection = getConnection();
+    
+    // Check if agent is already assigned
+    const expedition = await this.findById(expeditionId);
+    if (!expedition) {
+      throw new Error('Expedition not found');
+    }
+    
+    if (expedition.assignedAgents.includes(agentId)) {
+      return true; // Already assigned
+    }
+    
+    // Add agent to assignedAgents array
+    const updatedAgents = [...expedition.assignedAgents, agentId];
+    
+    await connection.executeWrite(
+      `MATCH (e:Expedition {id: $expeditionId}), (a:Agent {id: $agentId})
+       SET e.assignedAgents = $assignedAgents, e.updatedAt = $timestamp
+       CREATE (a)-[:ASSIGNED_TO {
+         assignedAt: $timestamp,
+         role: 'crew_member'
+       }]->(e)`,
+      {
+        expeditionId,
+        agentId,
+        assignedAgents: updatedAgents,
+        timestamp: new Date().toISOString()
+      }
+    );
+
+    return true;
+  }
+
+  /**
+   * Remove an agent from an expedition
+   */
+  async removeAgent(expeditionId: string, agentId: string): Promise<boolean> {
+    const connection = getConnection();
+    
+    // Get current expedition
+    const expedition = await this.findById(expeditionId);
+    if (!expedition) {
+      throw new Error('Expedition not found');
+    }
+    
+    // Remove agent from assignedAgents array
+    const updatedAgents = expedition.assignedAgents.filter(id => id !== agentId);
+    
+    const result = await connection.executeWrite<{ deletedCount: number }>(
+      `MATCH (e:Expedition {id: $expeditionId})<-[r:ASSIGNED_TO]-(a:Agent {id: $agentId})
+       SET e.assignedAgents = $assignedAgents, e.updatedAt = $timestamp
+       DELETE r
+       RETURN count(r) as deletedCount`,
+      {
+        expeditionId,
+        agentId,
+        assignedAgents: updatedAgents,
+        timestamp: new Date().toISOString()
+      }
+    );
+
+    return result[0]?.deletedCount > 0;
+  }
+
+  /**
+   * Get all agents assigned to an expedition
+   */
+  async getAssignedAgents(expeditionId: string): Promise<Agent[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ a: Agent }>(
+      `MATCH (e:Expedition {id: $expeditionId})<-[:ASSIGNED_TO]-(a:Agent)
+       RETURN a ORDER BY a.name`,
+      { expeditionId }
+    );
+    return result.map(record => record.a);
+  }
+
+  /**
+   * Get expedition statistics for a starship
+   */
+  async getExpeditionStats(starshipId: string): Promise<{
+    total: number;
+    active: number;
+    completed: number;
+    failed: number;
+    averageDuration: number;
+    successRate: number;
+  }> {
+    const connection = getConnection();
+    
+    const result = await connection.executeQuery<{
+      total: number;
+      active: number;
+      completed: number;
+      failed: number;
+      avgDuration: number;
+    }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_EXPEDITION]->(e:Expedition)
+       WITH count(e) as total,
+            count(CASE WHEN e.status IN ['planning', 'in-progress', 'review'] THEN 1 END) as active,
+            count(CASE WHEN e.status = 'completed' THEN 1 END) as completed,
+            count(CASE WHEN e.status IN ['failed', 'cancelled'] THEN 1 END) as failed,
+            avg(CASE WHEN e.actualDuration IS NOT NULL THEN e.actualDuration ELSE 0 END) as avgDuration
+       RETURN total, active, completed, failed, avgDuration`,
+      { starshipId }
+    );
+
+    const rawStats = result[0];
+    
+    // Handle case where no results are returned
+    if (!rawStats) {
+      return {
+        total: 0,
+        active: 0,
+        completed: 0,
+        failed: 0,
+        averageDuration: 0,
+        successRate: 0
+      };
+    }
+    
+    // Convert BigInt values to numbers for calculations
+    const totalNum = Number(rawStats.total);
+    const activeNum = Number(rawStats.active);
+    const completedNum = Number(rawStats.completed);
+    const failedNum = Number(rawStats.failed);
+    const avgDurationNum = Number(rawStats.avgDuration || 0);
+    
+    const successRate = totalNum > 0 ? (completedNum / totalNum) * 100 : 0;
+
+    return {
+      total: totalNum,
+      active: activeNum,
+      completed: completedNum,
+      failed: failedNum,
+      averageDuration: Math.round(avgDurationNum || 0),
+      successRate: Math.round(successRate * 100) / 100
+    };
   }
 }

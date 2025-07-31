@@ -64,9 +64,8 @@ export function Navigation({
   isMobile: _isMobile = false
 }: NavigationProps) {
   const pathname = usePathname();
-  const { powerLevel, sibilInsights } = useStarshipStore();
+  const { powerLevel, activeExpeditions, sibilInsights } = useStarshipStore();
 
-  const activeExpeditions = 0;
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {
     // Only show navigation inside starship context (/ship/<slug>/*)
@@ -76,7 +75,7 @@ export function Navigation({
       const starshipSlug = pathParts[2]; // /ship/<slug>/...
       return getStarshipNavigationSections(starshipSlug);
     }
-
+    
     // No navigation for fleet-level routes
     return [];
   };

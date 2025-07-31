@@ -33,12 +33,10 @@ import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
-import expeditionRoutes, { initializeExpeditionRoutes } from './routes/expeditions';
-import messageRoutes from './routes/messages';
-import activityRoutes from './routes/activities';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
-// Removed agent-communication routes (expedition-related)
+import expeditionRoutes from './routes/expeditions';
+import agentCommunicationRoutes from './routes/agent-communication';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
@@ -54,9 +52,9 @@ function validateEnvironmentVariables() {
     'CLIENT_URL',
     'NEXT_PUBLIC_API_URL'
   ];
-
+  
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
-
+  
   if (missingVars.length > 0) {
     console.error('❌ Missing required environment variables:');
     missingVars.forEach(varName => {
@@ -67,7 +65,7 @@ function validateEnvironmentVariables() {
     console.error('You can copy .env.example to .env and fill in the values.');
     process.exit(1);
   }
-
+  
   // Validate CLIENT_URL format
   const clientUrl = process.env.CLIENT_URL;
   if (clientUrl && !clientUrl.match(/^https?:\/\/.+/)) {
@@ -75,7 +73,7 @@ function validateEnvironmentVariables() {
     console.error(`   Current value: ${clientUrl}`);
     process.exit(1);
   }
-
+  
   // Validate NEXT_PUBLIC_API_URL format
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   if (apiUrl && !apiUrl.match(/^https?:\/\/.+/)) {
@@ -83,7 +81,7 @@ function validateEnvironmentVariables() {
     console.error(`   Current value: ${apiUrl}`);
     process.exit(1);
   }
-
+  
   console.log('✅ Environment variables validated successfully');
   console.log(`   CLIENT_URL: ${clientUrl}`);
   console.log(`   NEXT_PUBLIC_API_URL: ${apiUrl}`);
@@ -169,10 +167,8 @@ app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);
-app.use('', messageRoutes);
-app.use('', activityRoutes);
 app.use('/api', redeployRoutes);
-// Removed agent-communication route (expedition-related)
+app.use('/api/agent-communication', agentCommunicationRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);
@@ -193,15 +189,12 @@ httpServer.listen(PORT, async () => {
     await dbConnection.connect();
     await dbConnection.initializeSchema();
     console.log('✅ Neo4j database connected and schema initialized');
-
+    
     // Initialize RepositoryFactory BEFORE any socket connections
     console.log('🔧 Initializing RepositoryFactory...');
     await RepositoryFactory.initialize();
     console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
-
-    // Initialize expedition routes after RepositoryFactory is ready
-    initializeExpeditionRoutes(RepositoryFactory);
-
+    
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();
     console.log('✅ AgentService initialized with default agents');

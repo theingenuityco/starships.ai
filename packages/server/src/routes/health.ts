@@ -85,10 +85,10 @@ router.get('/', async (req, res) => {
     // Check repository health
     try {
       const repoStart = Date.now();
-      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
       
       // Test basic repository functionality
-      await starshipRepo.findAll();
+      await expeditionRepo.findAll();
       
       healthCheck.services.repositories = {
         status: 'healthy',
@@ -344,8 +344,8 @@ router.get('/ready', async (req, res) => {
     await connection.executeQuery('RETURN 1 as readiness_check');
     
     // Check if essential repositories are available
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
-    await starshipRepo.findAll();
+    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+    await expeditionRepo.findAll();
 
     res.status(200).json({
       status: 'ready',

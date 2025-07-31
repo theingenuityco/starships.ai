@@ -8,7 +8,8 @@ export function buildPrompt(
   memory: MemoryEntry[], 
   currentMessage: string,
   relevantContext?: string,
-  visionContext?: string
+  visionContext?: string,
+  expeditionContext?: string
 ): LLMChatPrompt {
   const messages: LLMChatPrompt['messages'] = [];
 
@@ -27,6 +28,11 @@ export function buildPrompt(
     combinedSystemPrompt += systemPrompt + '\n\n';
   }
   
+  // Add expedition context if available
+  if (expeditionContext) {
+    console.log('[PROMPT-BUILDER] Adding expedition context, length:', expeditionContext.length);
+    combinedSystemPrompt += expeditionContext + '\n\n';
+  }
   
   // Add relevant context from history
   if (relevantContext) {

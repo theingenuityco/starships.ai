@@ -181,6 +181,7 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       name,
       class: starshipClass,
       slug,
+      maxActiveExpeditions: starshipClass === 'scout' ? 2 : 5,
       status: 'active',
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
@@ -375,6 +376,15 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
       allowedUpdates.maxAgents = starshipClass === 'scout' ? 3 : 6;
     }
 
+    // NEW: Handle maxActiveExpeditions updates
+    const { maxActiveExpeditions } = req.body;
+    if (maxActiveExpeditions !== undefined) {
+      if (typeof maxActiveExpeditions !== 'number' || maxActiveExpeditions < 0) {
+        res.status(400).json({ error: 'maxActiveExpeditions must be a non-negative number' });
+        return;
+      }
+      allowedUpdates.maxActiveExpeditions = maxActiveExpeditions;
+    }
 
     if (Object.keys(allowedUpdates).length === 0) {
       res.status(400).json({ error: 'No valid updates provided' });

@@ -35,7 +35,6 @@ import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import expeditionRoutes, { initializeExpeditionRoutes } from './routes/expeditions';
 import messageRoutes from './routes/messages';
-import activityRoutes from './routes/activities';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // Removed agent-communication routes (expedition-related)
@@ -170,7 +169,6 @@ app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);
 app.use('', messageRoutes);
-app.use('', activityRoutes);
 app.use('/api', redeployRoutes);
 // Removed agent-communication route (expedition-related)
 

@@ -18,7 +18,6 @@ export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 export { ExpeditionRepository } from './ExpeditionRepository';
 export { MessageRepository } from './MessageRepository';
-export { ActivityRepository } from './ActivityRepository';
 
 
 // Import the new repositories for the factory
@@ -28,7 +27,6 @@ import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 import { ExpeditionRepository } from './ExpeditionRepository';
 import { MessageRepository } from './MessageRepository';
-import { ActivityRepository } from './ActivityRepository';
 
 
 /**
@@ -55,7 +53,6 @@ export class RepositoryFactory {
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static expeditionRepo: ExpeditionRepository | null = null;
   private static messageRepo: MessageRepository | null = null;
-  private static activityRepo: ActivityRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
 
@@ -120,7 +117,6 @@ export class RepositoryFactory {
       this.starshipRepo = new StarshipRepository();
       this.expeditionRepo = new ExpeditionRepository();
       this.messageRepo = new MessageRepository();
-      this.activityRepo = new ActivityRepository();
 
       // Initialize services that require database connections
       try {
@@ -176,7 +172,6 @@ export class RepositoryFactory {
         mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
         expeditionRepo: this.expeditionRepo !== null,
         messageRepo: this.messageRepo !== null,
-        activityRepo: this.activityRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
       }
     };
@@ -297,17 +292,6 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ActivityRepository instance (synchronous)
-   */
-  static getActivityRepository(): ActivityRepository {
-    this.ensureInitialized();
-    if (!this.activityRepo) {
-      throw new Error('ActivityRepository not initialized');
-    }
-    return this.activityRepo;
-  }
-
-  /**
    * Get AgentTemplateService instance (synchronous)
    * Note: May return null if database connection was not available during initialization
    */
@@ -351,7 +335,6 @@ export class RepositoryFactory {
     this.mcpServerConnectorRepo = null;
     this.expeditionRepo = null;
     this.messageRepo = null;
-    this.activityRepo = null;
     this.agentTemplateService = null;
 
     // Reset initialization state

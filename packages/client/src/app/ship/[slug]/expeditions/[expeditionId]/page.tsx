@@ -1,95 +1,36 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { Metadata } from 'next';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ExpeditionDetailsHeader } from '@/components/expedition/details/ExpeditionDetailsHeader';
 import { ExpeditionChat } from '@/components/expedition/details/ExpeditionChat';
 import { ExpeditionActivityLog } from '@/components/expedition/details/ExpeditionActivityLog';
-import { expeditionAPI } from '@/lib/expedition-api';
-import type { Expedition } from '@starships/protocol';
 
-export default function ExpeditionDetailsPage() {
-  const params = useParams();
-  const router = useRouter();
-  const slug = params.slug as string;
-  const expeditionId = params.expeditionId as string;
-  
-  const [expedition, setExpedition] = useState<Expedition | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface PageProps {
+  params: Promise<{
+    slug: string;
+    expeditionId: string;
+  }>;
+}
 
-  useEffect(() => {
-    const fetchExpedition = async () => {
-      try {
-        const response = await expeditionAPI.get(expeditionId);
-        setExpedition(response.expedition);
-      } catch (err) {
-        console.error('Failed to fetch expedition:', err);
-        setError('Failed to load expedition details');
-      } finally {
-        setLoading(false);
-      }
-    };
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { slug, expeditionId } = await params;
+  return {
+    title: `Expedition Details | ${slug} | Starships AI`,
+    description: `View expedition details for starship ${slug}`,
+  };
+}
 
-    fetchExpedition();
-  }, [expeditionId]);
-
-  if (loading) {
-    return (
-      <AuthGate>
-        <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-black flex items-center justify-center">
-          <div className="text-white">Loading expedition details...</div>
-        </div>
-      </AuthGate>
-    );
-  }
-
-  if (error || !expedition) {
-    return (
-      <AuthGate>
-        <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-black">
-          <div className="container mx-auto px-4 py-6 max-w-7xl">
-            <div className="mb-6">
-              <Link 
-                href={`/ship/${slug}/expeditions`}
-                className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Expeditions
-              </Link>
-            </div>
-            <div className="text-center py-12">
-              <p className="text-red-400 text-lg">{error || 'Expedition not found'}</p>
-            </div>
-          </div>
-        </div>
-      </AuthGate>
-    );
-  }
+export default async function ExpeditionDetailsPage({ params }: PageProps) {
+  const { slug, expeditionId } = await params;
   
   return (
     <AuthGate>
       <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-950 to-black">
         <div className="container mx-auto px-4 py-6 max-w-7xl">
-          {/* Back button */}
-          <div className="mb-6">
-            <Link 
-              href={`/ship/${slug}/expeditions`}
-              className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Expeditions
-            </Link>
-          </div>
-          
           {/* Header */}
           <div className="mb-8">
             <ExpeditionDetailsHeader 
-              name={expedition.name}
-              description={expedition.description}
+              name="Expedition Alpha Mission"
+              description="Exploring uncharted territories of the Andromeda sector with advanced AI agents"
             />
           </div>
           
@@ -102,7 +43,7 @@ export default function ExpeditionDetailsPage() {
             
             {/* Activity Log - Right side */}
             <div className="lg:flex-1 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800/50 p-6 shadow-2xl">
-              <ExpeditionActivityLog expeditionId={expeditionId} />
+              <ExpeditionActivityLog />
             </div>
           </div>
         </div>

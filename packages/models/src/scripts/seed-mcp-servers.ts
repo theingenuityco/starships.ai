@@ -43,7 +43,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     name: 'Playwright',
     slug: 'playwright',
     command: 'npx',
-    args: ['@playwright/mcp@latest'],
+    args: ['@playwright/mcp@latest', '--isolated'],
     env: JSON.stringify({}),
   },
 ];

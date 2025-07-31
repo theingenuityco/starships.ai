@@ -165,18 +165,13 @@ When appropriate, use these tools to provide better assistance. You are connecte
       new MessagesPlaceholder("agent_scratchpad"),
     ]);
     
-    // Create the agent - use appropriate type based on provider
-    const agentExecutor = llmModel.provider === 'openai' 
-      ? await createOpenAIFunctionsAgent({
-          llm,
-          tools: mcpTools,
-          prompt,
-        })
-      : createToolCallingAgent({
-          llm,
-          tools: mcpTools,
-          prompt,
-        });
+    // Create the agent - use tool calling agent for all providers
+    // The OpenAIFunctionsAgent seems to have issues with returning empty output
+    const agentExecutor = await createToolCallingAgent({
+      llm,
+      tools: mcpTools,
+      prompt,
+    });
     
     // Create the executor
     const executor = new AgentExecutor({

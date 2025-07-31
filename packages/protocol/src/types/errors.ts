@@ -2,7 +2,7 @@
  * Standardized Error Handling System
  * 
  * Provides comprehensive error types, classes, and utilities for consistent
- * error management across the entire expedition system.
+ * error management across the entire system.
  */
 
 // ============================================================================
@@ -36,7 +36,7 @@ export type ErrorCategory =
   | 'unknown';      // Unclassified errors
 
 /**
- * Comprehensive error codes for the expedition system
+ * Comprehensive error codes for the system
  */
 export type StandardErrorCode =
   // General System Errors
@@ -90,14 +90,6 @@ export type StandardErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'CONCURRENT_LIMIT_EXCEEDED'
   
-  // Expedition-Specific Errors
-  | 'EXPEDITION_NOT_FOUND'
-  | 'EXPEDITION_ACCESS_DENIED'
-  | 'EXPEDITION_ALREADY_STARTED'
-  | 'EXPEDITION_CANNOT_MODIFY'
-  | 'EXPEDITION_CANNOT_DELETE'
-  | 'EXPEDITION_INVALID_STATUS'
-  | 'EXPEDITION_WORKFLOW_FAILED'
   
   // Starship-Specific Errors
   | 'STARSHIP_NOT_FOUND'
@@ -244,9 +236,6 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   'INVALID_FORMAT': 400,
   'INVALID_RANGE': 400,
   'INVALID_TYPE': 400,
-  'EXPEDITION_CANNOT_MODIFY': 400,
-  'EXPEDITION_CANNOT_DELETE': 400,
-  'EXPEDITION_INVALID_STATUS': 400,
   'TASK_CANNOT_ASSIGN': 400,
   'TASK_CANNOT_COMPLETE': 400,
   'TASK_CANNOT_DELETE': 400,
@@ -266,12 +255,10 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   'ACCESS_DENIED': 403,
   'INSUFFICIENT_PERMISSIONS': 403,
   'FORBIDDEN_OPERATION': 403,
-  'EXPEDITION_ACCESS_DENIED': 403,
   'STARSHIP_ACCESS_DENIED': 403,
   
   // 404 Not Found
   'RESOURCE_NOT_FOUND': 404,
-  'EXPEDITION_NOT_FOUND': 404,
   'STARSHIP_NOT_FOUND': 404,
   'TASK_NOT_FOUND': 404,
   'AGENT_NOT_FOUND': 404,
@@ -281,7 +268,6 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   // 409 Conflict
   'RESOURCE_ALREADY_EXISTS': 409,
   'RESOURCE_CONFLICT': 409,
-  'EXPEDITION_ALREADY_STARTED': 409,
   'TASK_ALREADY_ASSIGNED': 409,
   'AGENT_ALREADY_DEPLOYED': 409,
   
@@ -302,7 +288,6 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   'DATABASE_QUERY_FAILED': 500,
   'DATABASE_CONSTRAINT_VIOLATION': 500,
   'DATABASE_TRANSACTION_FAILED': 500,
-  'EXPEDITION_WORKFLOW_FAILED': 500,
   'STARSHIP_VALIDATION_FAILED': 500,
   'AGENT_DEPLOYMENT_FAILED': 500,
   'MESSAGE_SEND_FAILED': 500,
@@ -363,12 +348,10 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'ACCESS_DENIED': 'authorization',
   'INSUFFICIENT_PERMISSIONS': 'authorization',
   'FORBIDDEN_OPERATION': 'authorization',
-  'EXPEDITION_ACCESS_DENIED': 'authorization',
   'STARSHIP_ACCESS_DENIED': 'authorization',
   
   // Not found errors
   'RESOURCE_NOT_FOUND': 'not_found',
-  'EXPEDITION_NOT_FOUND': 'not_found',
   'STARSHIP_NOT_FOUND': 'not_found',
   'TASK_NOT_FOUND': 'not_found',
   'AGENT_NOT_FOUND': 'not_found',
@@ -378,7 +361,6 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   // Conflict errors
   'RESOURCE_ALREADY_EXISTS': 'conflict',
   'RESOURCE_CONFLICT': 'conflict',
-  'EXPEDITION_ALREADY_STARTED': 'conflict',
   'TASK_ALREADY_ASSIGNED': 'conflict',
   'AGENT_ALREADY_DEPLOYED': 'conflict',
   'RESOURCE_LOCKED': 'conflict',
@@ -412,10 +394,6 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'CONFIGURATION_ERROR': 'system',
   
   // Business logic errors
-  'EXPEDITION_CANNOT_MODIFY': 'business',
-  'EXPEDITION_CANNOT_DELETE': 'business',
-  'EXPEDITION_INVALID_STATUS': 'business',
-  'EXPEDITION_WORKFLOW_FAILED': 'business',
   'TASK_CANNOT_ASSIGN': 'business',
   'TASK_CANNOT_COMPLETE': 'business',
   'TASK_CANNOT_DELETE': 'business',
@@ -450,7 +428,6 @@ export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
   'INVALID_TYPE': 'low',
   'MESSAGE_INVALID_TYPE': 'low',
   'RESOURCE_NOT_FOUND': 'low',
-  'EXPEDITION_NOT_FOUND': 'low',
   'STARSHIP_NOT_FOUND': 'low',
   'TASK_NOT_FOUND': 'low',
   'AGENT_NOT_FOUND': 'low',
@@ -463,15 +440,11 @@ export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
   'ACCESS_DENIED': 'medium',
   'INSUFFICIENT_PERMISSIONS': 'medium',
   'FORBIDDEN_OPERATION': 'medium',
-  'EXPEDITION_ACCESS_DENIED': 'medium',
   'STARSHIP_ACCESS_DENIED': 'medium',
   'RESOURCE_ALREADY_EXISTS': 'medium',
   'RESOURCE_CONFLICT': 'medium',
-  'EXPEDITION_ALREADY_STARTED': 'medium',
   'TASK_ALREADY_ASSIGNED': 'medium',
   'AGENT_ALREADY_DEPLOYED': 'medium',
-  'EXPEDITION_CANNOT_MODIFY': 'medium',
-  'EXPEDITION_CANNOT_DELETE': 'medium',
   'TASK_CANNOT_ASSIGN': 'medium',
   'TASK_CANNOT_COMPLETE': 'medium',
   'TASK_CANNOT_DELETE': 'medium',
@@ -490,7 +463,6 @@ export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
   'QUOTA_EXCEEDED': 'high',
   'CONCURRENT_LIMIT_EXCEEDED': 'high',
   'TASK_DEPENDENCY_NOT_MET': 'high',
-  'EXPEDITION_INVALID_STATUS': 'high',
   'RESOURCE_LIMIT_EXCEEDED': 'high',
   'STARSHIP_CAPACITY_EXCEEDED': 'high',
   'NETWORK_ERROR': 'high',
@@ -511,7 +483,6 @@ export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
   'DATABASE_CONSTRAINT_VIOLATION': 'critical',
   'DATABASE_TRANSACTION_FAILED': 'critical',
   'DATABASE_TIMEOUT': 'critical',
-  'EXPEDITION_WORKFLOW_FAILED': 'critical',
   'STARSHIP_VALIDATION_FAILED': 'critical',
   'AGENT_DEPLOYMENT_FAILED': 'critical',
   'MESSAGE_SEND_FAILED': 'critical',

@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 // Import route-specific quick action modules
 import { CrewQuickModule } from './quick-actions/CrewQuickModule';
 import { DriveQuickModule } from './quick-actions/DriveQuickModule';
-import { ExpeditionQuickModule } from './quick-actions/ExpeditionQuickModule';
 import { LogbookQuickModule } from './quick-actions/LogbookQuickModule';
 import { SibilQuickModule } from './quick-actions/SibilQuickModule';
 import { SystemQuickModule } from './quick-actions/SystemQuickModule';
@@ -19,7 +18,7 @@ interface QuickActionModuleProps {
 export function QuickActionModule({ moduleId, className = '' }: QuickActionModuleProps) {
   const pathname = usePathname();
   const starshipData = useStarshipStore();
-  
+
   // Dynamic state for evolving data
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [isProcessing, setIsProcessing] = useState(false);
@@ -29,13 +28,13 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
   useEffect(() => {
     const interval = setInterval(() => {
       setLastUpdate(new Date());
-      
+
       // Simulate processing states
       if (Math.random() > 0.7) {
         setIsProcessing(true);
         setTimeout(() => setIsProcessing(false), 2000);
       }
-      
+
       // Add dynamic insights based on route
       if (Math.random() > 0.8) {
         const routeInsights = {
@@ -45,7 +44,7 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
           '/drive': ['Engine efficiency improved', 'Navigation recalibrated', 'Fuel optimization active'],
           '/logbook': ['New entries archived', 'Search index updated', 'Data integrity verified']
         };
-        
+
         const currentInsights = routeInsights[pathname as keyof typeof routeInsights] || ['System status updated'];
         const newInsightText = currentInsights[Math.floor(Math.random() * currentInsights.length)];
         const newInsight = {
@@ -53,7 +52,7 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
           text: newInsightText,
           timestamp: Date.now()
         };
-        
+
         setInsights(prev => [newInsight, ...prev].slice(0, 3));
       }
     }, 5000); // Update every 5 seconds
@@ -68,7 +67,7 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
       onAction: (action: string, data?: any) => {
         // Handle quick actions - could trigger navigation or state updates
         console.log('Quick action triggered:', action, data);
-        
+
         // Simulate action feedback
         setIsProcessing(true);
         setTimeout(() => setIsProcessing(false), 1500);
@@ -80,8 +79,6 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
         return <CrewQuickModule {...moduleProps} />;
       case '/drive':
         return <DriveQuickModule {...moduleProps} />;
-      case '/expeditions':
-        return <ExpeditionQuickModule {...moduleProps} />;
       case '/logbook':
         return <LogbookQuickModule {...moduleProps} />;
       case '/sibil':
@@ -132,7 +129,7 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
             {getModuleTitle()}
           </h3>
         </div>
-        
+
         {/* Real-time Processing Indicator */}
         <div className="flex items-center gap-2">
           {isProcessing && (
@@ -182,4 +179,4 @@ export function QuickActionModule({ moduleId, className = '' }: QuickActionModul
       </AnimatePresence>
     </motion.div>
   );
-} 
+}

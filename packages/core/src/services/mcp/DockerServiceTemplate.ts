@@ -284,6 +284,50 @@ export const HTTP_BRIDGE_TEMPLATES: Record<string, DockerServiceTemplate> = {
     requiresCredentials: false
   },
 
+  // Searxng MCP Server (HTTP Bridge)
+  'searxng': {
+    slug: 'searxng',
+    image: 'starships/mcp-http-bridge:latest',
+    command: ['node', '/app/server.js'],
+    ports: ['8080'],
+    environment: {
+      MCP_SERVER_CMD: 'npx',
+      MCP_SERVER_ARGS: '-y mcp-searxng',
+      HTTP_PORT: '8080',
+      LOG_LEVEL: 'info',
+      HEALTH_CHECK_TIMEOUT: '30000',
+      MAX_CONCURRENT_REQUESTS: '10',
+      INIT_TIMEOUT: '120000',
+      NPX_DOWNLOAD_TIMEOUT: '60000'
+    },
+    healthcheck: {
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080/health'],
+      interval: '30s',
+      timeout: '10s',
+      retries: 5,
+      start_period: '90s'
+    },
+    resourceLimits: {
+      cpus: '0.5',
+      memory: '512m'
+    },
+    labels: {
+      'mcp.type': 'searxng',
+      'mcp.protocol': 'http',
+      'mcp.runtime': 'bridge',
+      'mcp.version': '1.0.0'
+    },
+    bridgeConfig: {
+      useHttpBridge: true,
+      apiKeyRequired: false,
+      healthCheckMethod: 'tools_list',
+      mcpServerCmd: 'npx',
+      mcpServerArgs: ['-y', 'mcp-searxng']
+    },
+    requiresFileAccess: false,
+    requiresCredentials: false
+  },
+
   // Filesystem MCP Server (HTTP Bridge)
   'filesystem': {
     slug: 'filesystem',

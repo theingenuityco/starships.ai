@@ -46,6 +46,13 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     args: ['@playwright/mcp@latest', '--isolated'],
     env: JSON.stringify({}),
   },
+  {
+    name: 'Searxng',
+    slug: 'searxng',
+    command: 'npx',
+    args: ['-y', 'mcp-searxng', 'https://searx.stream/'],
+    env: JSON.stringify({}),
+  },
 ];
 
 async function seedMCPServers() {

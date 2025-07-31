@@ -46,13 +46,6 @@ const mockMCPServerOptions: Record<string, MCPServerOption> = {
     args: ['-y', '@modelcontextprotocol/server-postgres'],
     env: '{"POSTGRES_CONNECTION_STRING": "${DATABASE_URL}"}',
   },
-  filesystem: {
-    id: 'filesystem-connector',
-    name: 'Filesystem',
-    command: 'npx',
-    args: ['-y', '@modelcontextprotocol/server-filesystem'],
-    env: '{"FILESYSTEM_PATH": "${FILESYSTEM_PATH}"}',
-  },
   multipleKeys: {
     id: 'multiple-keys',
     name: 'Multiple Keys',

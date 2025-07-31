@@ -5,6 +5,181 @@ import { RepositoryFactory } from "@starships/models";
 import { MCPToolWrapper } from "./tools/MCPToolWrapper";
 import { mcpToolGatewayDB } from "@starships/core";
 import type { ChatRequest, MemoryEntry } from "@starships/protocol";
+import { AgentExecutor } from "langchain/agents";
+import { createOpenAIFunctionsAgent, createToolCallingAgent } from "langchain/agents";
+import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
+import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { DEFAULT_AGENT_EXECUTOR_CONFIG } from "./config/agent-executor-config";
+import { loadAgentExecutorConfig, mergeConfig } from "./config/environment";
+import { fixLLMModel } from "./utils/neo4j-helpers";
+
+/**
+ * Execute agent with MCP tools and return the final response
+ */
+/**
+ * Sanitize tool descriptions to prevent prompt template injection
+ */
+function sanitizeToolDescription(description: string): string {
+  // Replace curly braces that could be interpreted as template variables
+  return description
+    .replace(/\{/g, '{{')
+    .replace(/\}/g, '}}');
+}
+
+async function* executeWithAgent(
+  mcpTools: any[],
+  memoryArray: any[],
+  message: string,
+  systemPrompt: string,
+  llmModel: any,
+  llm: any,
+  config = DEFAULT_AGENT_EXECUTOR_CONFIG
+): AsyncGenerator<string, void, unknown> {
+  try {
+    // Enhance system prompt with tool descriptions (sanitized to prevent template injection)
+    const toolDescriptions = mcpTools.map(tool => 
+      `- ${tool.name}: ${sanitizeToolDescription(tool.description)}`
+    ).join('\n');
+    
+    const enhancedSystemPrompt = systemPrompt + (mcpTools.length > 0 
+      ? `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:\n${toolDescriptions}\n\nWhen appropriate, use these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.` 
+      : '');
+    
+    // Create prompt template
+    const prompt = ChatPromptTemplate.fromMessages([
+      ["system", enhancedSystemPrompt],
+      new MessagesPlaceholder("chat_history"),
+      ["human", "{input}"],
+      new MessagesPlaceholder("agent_scratchpad"),
+    ]);
+    
+    // Create appropriate agent - use tool calling agent for all providers
+    // The OpenAIFunctionsAgent seems to have issues with returning empty output
+    const agent = await createToolCallingAgent({
+      llm,
+      tools: mcpTools,
+      prompt,
+    });
+    
+    // Determine max iterations based on tools
+    const maxIterations = getMaxIterations(mcpTools, config);
+    
+    // Debug: Log tools being passed to executor
+    console.log('[MCP-EXECUTOR] Tools passed to executor:', mcpTools.map(t => ({ 
+      name: t.name, 
+      description: t.description.substring(0, 100) + '...' 
+    })));
+    
+    // Create executor with proper settings
+    const executor = new AgentExecutor({
+      agent,
+      tools: mcpTools,
+      verbose: config.debug.verbose,
+      maxIterations,
+      returnIntermediateSteps: true,
+      handleParsingErrors: true,
+      // Add early stopping to prevent infinite loops
+      earlyStoppingMethod: "force",
+    });
+    
+    // Format chat history
+    const chatHistory = memoryArray.map((m: any) => 
+      m.role === 'user' 
+        ? new HumanMessage(m.content)
+        : new AIMessage(m.content)
+    );
+    
+    // Track execution progress
+    let lastProgressUpdate = Date.now();
+    let toolCallCount = 0;
+    const progressUpdates: string[] = [];
+    
+    // Set up progress tracking
+    if (config.streaming.progressUpdates) {
+      executor.callbacks = [{
+        handleToolStart: async (tool, input) => {
+          toolCallCount++;
+          const now = Date.now();
+          if (now - lastProgressUpdate > 1000) { // Update every second
+            progressUpdates.push(`[Processing with ${tool.name}... (step ${toolCallCount})]`);
+            lastProgressUpdate = now;
+          }
+        }
+      }];
+    }
+    
+    // Execute with timeout
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Agent execution timeout')), config.timeouts.overall)
+    );
+    
+    const result = await Promise.race([
+      executor.invoke({
+        input: message,
+        chat_history: chatHistory,
+      }),
+      timeoutPromise
+    ]) as any;
+    
+    console.log('[MCP-EXECUTOR] Agent executor result:', {
+      hasOutput: !!result.output,
+      outputLength: result.output?.length,
+      output: result.output,
+      intermediateSteps: result.intermediateSteps?.length,
+      keys: Object.keys(result),
+      fullResult: JSON.stringify(result, null, 2)
+    });
+    
+    // Yield any progress updates that were collected
+    for (const update of progressUpdates) {
+      yield update;
+    }
+    
+    // Return the final output
+    if (!result.output) {
+      console.error('[MCP-EXECUTOR] Agent returned no output!');
+      yield 'I apologize, but I encountered an issue processing your request. Please try again.';
+    } else {
+      yield result.output;
+    }
+  } catch (error) {
+    console.error('[MCP-EXECUTOR] Agent execution failed:', error);
+    
+    // Format error message based on environment
+    if (config.debug.verbose) {
+      throw error;
+    } else {
+      throw new Error(formatUserFriendlyError(error));
+    }
+  }
+}
+
+function getMaxIterations(tools: any[], config: any): number {
+  // Find the highest requirement among tools
+  let maxNeeded = config.maxIterations.default;
+  
+  for (const tool of tools) {
+    const toolType = tool.name.split('_')[0]; // Extract tool type
+    const toolMax = config.maxIterations.byToolType[toolType];
+    if (toolMax && toolMax > maxNeeded) {
+      maxNeeded = toolMax;
+    }
+  }
+  
+  return maxNeeded;
+}
+
+function formatUserFriendlyError(error: any): string {
+  if (error.message.includes('timeout')) {
+    return 'The operation took too long to complete. Please try again with a simpler request.';
+  }
+  if (error.message.includes('tool')) {
+    return 'There was an issue processing your request. Please try rephrasing it.';
+  }
+  return 'An unexpected error occurred. Please try again.';
+}
 
 /**
  * Enhanced streaming chat function with MCP tool integration
@@ -128,117 +303,137 @@ export async function* chatWithMCPStream(
   
   systemPrompt += visionContext;
   
-  // Store user message before streaming
-  console.log('💾 [AGENT-ENGINE-MCP-STREAM] Storing user message in memory...');
-  await store.append(memoryKey, {
-    role: 'user',
-    content: req.message,
-    timestamp: Date.now()
-  } as MemoryEntry);
+  // Load environment config and merge with defaults
+  const envConfig = loadAgentExecutorConfig();
+  const config = mergeConfig(DEFAULT_AGENT_EXECUTOR_CONFIG, envConfig);
 
   // For now, if MCP tools are available, we need to handle them differently
   // since streaming with tool execution is complex
   if (mcpTools.length > 0) {
-    console.log('🎯 [AGENT-ENGINE-MCP-STREAM] MCP tools available - using non-streaming execution with simulated streaming');
+    console.log('🎯 [AGENT-ENGINE-MCP-STREAM] MCP tools available - using agent executor');
     
-    // Build the prompt
-    const formattedMemories = memoryArray;
-    const prompt = buildPrompt(
-      systemPrompt,
-      formattedMemories,
-      req.message
-    );
-
-    console.log('🤖 [AGENT-ENGINE-MCP-STREAM] Getting LLM provider...');
-    // Get LLM provider and execute
-    const provider = await ProviderFactory.getProvider(req.agent_id);
-    const llmModel = await llmRepo.findById(agent.model);
-    console.log('📡 [AGENT-ENGINE-MCP-STREAM] Sending request to LLM with temperature:', llmModel?.temperature);
-    
-    const result = await provider.complete(prompt, { 
-      temperature: llmModel?.temperature,
-      tools: mcpTools 
-    });
-    console.log('📝 [AGENT-ENGINE-MCP-STREAM] Received response, length:', result.reply?.length || 0);
-    
-    // Handle tool calls if present
-    if (result.toolCalls && result.toolCalls.length > 0) {
-      console.log('🔧 [AGENT-ENGINE-MCP-STREAM] Tool calls detected:', result.toolCalls.length);
+    try {
+      // Check if streaming is enabled
+      if (!config.streaming.enabled) {
+        console.log('🔄 [AGENT-ENGINE-MCP-STREAM] Streaming disabled, falling back to non-streaming');
+        // Import and use non-streaming version
+        const { chatWithMCP } = await import('./chat-with-mcp');
+        const result = await chatWithMCP(req, store);
+        yield result.reply;
+        return;
+      }
       
-      // Execute tool calls
-      const toolResults = [];
-      for (const toolCall of result.toolCalls) {
-        console.log(`🔧 [AGENT-ENGINE-MCP-STREAM] Executing tool: ${toolCall.name}`);
-        try {
-          // Find the tool
-          const tool = mcpTools.find(t => t.name === toolCall.name);
-          if (tool && tool.func) {
-            const toolResult = await tool.func(toolCall.arguments);
-            toolResults.push({
-              toolCallId: toolCall.id,
-              result: toolResult
-            });
-          }
-        } catch (error) {
-          console.error(`❌ [AGENT-ENGINE-MCP-STREAM] Tool execution failed:`, error);
-          toolResults.push({
-            toolCallId: toolCall.id,
-            error: error instanceof Error ? error.message : 'Tool execution failed'
+      // Get LLM model configuration
+      const rawLLMModel = await llmRepo.findById(agent.model);
+      if (!rawLLMModel) {
+        console.error(`❌ [AGENT-ENGINE-MCP-STREAM] LLM model "${agent.model}" not found in database`);
+        console.error('   This usually means the LLM models haven\'t been seeded.');
+        console.error('   Run: cd packages/models && npm run seed');
+        throw new Error(`LLM model ${agent.model} not found. Please ensure LLM models are properly seeded in the database.`);
+      }
+      
+      // Fix Neo4j integer conversion issues
+      const llmModel = fixLLMModel(rawLLMModel);
+      
+      // Create LLM instance
+      const llm = llmModel.provider === 'openai' 
+        ? new ChatOpenAI({
+            model: llmModel.name,
+            temperature: llmModel.temperature,
+            maxTokens: llmModel.maxTokens,
+            apiKey: process.env.OPENAI_API_KEY,
+          })
+        : new ChatAnthropic({
+            model: llmModel.name,
+            temperature: llmModel.temperature,
+            maxTokens: llmModel.maxTokens,
+            apiKey: process.env.ANTHROPIC_API_KEY,
           });
+      
+      // Execute using agent executor with streaming
+      console.log('🤖 [AGENT-ENGINE-MCP-STREAM] Executing with agent executor...');
+      
+      let fullResponse = '';
+      const responseChunks: string[] = [];
+      let executionStartTime = Date.now();
+      
+      // Execute and collect progress updates
+      for await (const chunk of executeWithAgent(
+        mcpTools,
+        memoryArray,
+        req.message,
+        systemPrompt,
+        llmModel,
+        llm,
+        config
+      )) {
+        if (chunk.startsWith('[Processing')) {
+          // Yield progress updates immediately
+          yield chunk + '\n';
+        } else {
+          // Collect the final response
+          fullResponse = chunk;
         }
       }
       
-      // Create a new conversation with tool results
-      const assistantMessage = result.reply || 'Let me use the available tools to help you.';
-      const toolResultsMessage = toolResults.map(tr => 
-        `Tool ${tr.toolCallId}: ${JSON.stringify(tr.result || tr.error)}`
-      ).join('\n');
+      const executionTime = Date.now() - executionStartTime;
+      console.log(`📝 [AGENT-ENGINE-MCP-STREAM] Agent execution complete in ${executionTime}ms, streaming response...`);
       
-      // Build new messages for the follow-up
-      const newMessages = [
-        ...formattedMemories,
-        { role: 'user' as const, content: req.message },
-        { role: 'assistant' as const, content: assistantMessage },
-        { role: 'user' as const, content: `Tool results:\n${toolResultsMessage}\n\nPlease provide a response based on these tool results.` }
-      ];
-      
-      const finalPrompt = { messages: newMessages };
-      const finalResult = await provider.complete(finalPrompt, { 
-        temperature: llmModel?.temperature,
-        tools: mcpTools 
-      });
-      
-      result.reply = finalResult.reply;
-    }
-    
-    // Simulate streaming by yielding chunks
-    const replyText = result.reply || '';
-    const chunkSize = 5; // Characters per chunk
-    let totalChunks = 0;
-    
-    if (replyText.length > 0) {
-      for (let i = 0; i < replyText.length; i += chunkSize) {
-        yield replyText.slice(i, i + chunkSize);
-        totalChunks++;
-        // Small delay to simulate streaming
-        await new Promise(resolve => setTimeout(resolve, 20));
+      // Only stream if we have a response
+      if (fullResponse && fullResponse.length > 0) {
+        // Stream the final response in chunks
+        for (let i = 0; i < fullResponse.length; i += config.streaming.chunkSize) {
+          yield fullResponse.slice(i, i + config.streaming.chunkSize);
+          // Small delay to simulate streaming
+          await new Promise(resolve => setTimeout(resolve, config.streaming.delayMs));
+        }
       }
-    } else {
-      // If no reply, yield a default message
-      yield 'Processing your request...';
-      totalChunks = 1;
+      
+      // Only store messages if we have a valid response
+      if (fullResponse && fullResponse.length > 0) {
+        // Store both user and assistant messages after successful completion
+        await store.append(memoryKey, {
+          role: 'user',
+          content: req.message,
+          timestamp: Date.now() - executionTime // Backdate to start
+        } as MemoryEntry);
+        
+        await store.append(memoryKey, {
+          role: 'assistant',
+          content: fullResponse,
+          timestamp: Date.now()
+        } as MemoryEntry);
+      } else {
+        console.warn('[AGENT-ENGINE-MCP-STREAM] Skipping memory storage due to empty response');
+      }
+      
+      console.log('✅ [AGENT-ENGINE-MCP-STREAM] Streaming completed successfully');
+      
+    } catch (error) {
+      console.error('❌ [AGENT-ENGINE-MCP-STREAM] Error during agent execution:', error);
+      
+      // Fallback to non-streaming on error
+      if (config.fallback.enabled) {
+        console.log('🔄 [AGENT-ENGINE-MCP-STREAM] Falling back to non-streaming due to error');
+        try {
+          const { chatWithMCP } = await import('./chat-with-mcp');
+          const result = await chatWithMCP(req, store);
+          yield result.reply;
+        } catch (fallbackError) {
+          console.error('❌ [AGENT-ENGINE-MCP-STREAM] Fallback also failed:', fallbackError);
+          
+          // Provide more helpful error message based on the error
+          if (fallbackError instanceof Error && fallbackError.message.includes('LLM model')) {
+            yield 'I\'m having trouble connecting to my language model. Please contact support to resolve this configuration issue.';
+          } else {
+            yield 'I encountered an error while processing your request. Please try again.';
+          }
+        }
+      } else {
+        // Re-throw if fallback is disabled
+        throw error;
+      }
     }
-    
-    console.log('🌊 [AGENT-ENGINE-MCP-STREAM] Streamed', totalChunks, 'chunks');
-    
-    // Store assistant message
-    await store.append(memoryKey, {
-      role: 'assistant',
-      content: replyText || 'Processing your request...',
-      timestamp: Date.now()
-    } as MemoryEntry);
-    
-    console.log('✅ [AGENT-ENGINE-MCP-STREAM] MCP-enhanced chat completed successfully');
   } else {
     // No MCP tools - use regular streaming
     console.log('📝 [AGENT-ENGINE-MCP-STREAM] No MCP tools available, using regular streaming');
@@ -251,7 +446,11 @@ export async function* chatWithMCPStream(
     );
 
     const provider = await ProviderFactory.getProvider(req.agent_id);
-    const llmModel = await llmRepo.findById(agent.model);
+    const rawLLMModel = await llmRepo.findById(agent.model);
+    
+    // Fix Neo4j integer conversion issues
+    const llmModel = fixLLMModel(rawLLMModel);
+    
     const opts = {
       temperature: llmModel?.temperature,
       maxTokens: llmModel?.maxTokens,

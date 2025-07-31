@@ -361,6 +361,10 @@ export interface ChatMessage {
     status?: 'pending' | 'sent' | 'failed';
     agentReady?: boolean;
     missionStatus?: string;
+    shouldTerminateChat?: boolean;
+    isExecuting?: boolean;
+    originalMessage?: string;
+    isInitialGreeting?: boolean;
   };
 }
 

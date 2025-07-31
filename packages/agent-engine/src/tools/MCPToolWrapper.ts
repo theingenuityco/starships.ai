@@ -93,6 +93,8 @@ export class MCPToolWrapper {
       func: async (input: any) => {
         const startTime = Date.now();
         
+        console.log(`[MCPToolWrapper] *** TOOL EXECUTION START: ${namespacedName} ***`);
+        
         try {
           // Log tool usage if enabled
           if (this.config.enableLogging) {
@@ -155,9 +157,12 @@ export class MCPToolWrapper {
           
           // Format and return the result
           // Note: invokeTool returns the result directly, not wrapped in a success/error object
-          return this.formatToolResponse(result, mcpTool);
+          const formattedResponse = this.formatToolResponse(result, mcpTool);
+          console.log(`[MCPToolWrapper] *** TOOL EXECUTION END: ${namespacedName} - Response: ${formattedResponse.substring(0, 200)}... ***`);
+          return formattedResponse;
           
         } catch (error) {
+          console.error(`[MCPToolWrapper] *** TOOL EXECUTION ERROR: ${namespacedName} ***`);
           console.error(`[MCPToolWrapper] Error in ${mcpTool.name}:`, error);
           
           if (error instanceof z.ZodError) {
@@ -242,11 +247,11 @@ export class MCPToolWrapper {
         
         // Add specific examples for common tools
         if (tool.name === 'browser_navigate' || tool.name === 'navigate') {
-          parameterHints += '\n\nExample: {"url": "https://example.com"}';
+          parameterHints += '\n\nExample usage: url="https://example.com"';
         } else if (tool.templateSlug === 'sequentialthinking') {
-          parameterHints += '\n\nExample: {"thought": "First, I need to understand...", "nextThoughtNeeded": true, "thoughtNumber": 1, "totalThoughts": 5}';
+          parameterHints += '\n\nExample usage: thought="First, I need to understand...", nextThoughtNeeded=true, thoughtNumber=1, totalThoughts=5';
         } else if (tool.templateSlug === 'memory' && tool.name === 'store_memory') {
-          parameterHints += '\n\nExample: {"key": "user_preference", "value": "likes Python"}';
+          parameterHints += '\n\nExample usage: key="user_preference", value="likes Python"';
         }
       }
     }
@@ -352,10 +357,18 @@ export class MCPToolWrapper {
       const textContent = result[0].text;
       try {
         const parsedContent = JSON.parse(textContent);
-        // For sequential thinking, we want to continue the process
+        // For sequential thinking, format to encourage continuation
         if (tool.templateSlug === 'sequentialthinking') {
-          // Return a message indicating the thought was processed
-          return `Thought ${parsedContent.thoughtNumber} of ${parsedContent.totalThoughts} processed. Continue thinking needed: ${parsedContent.nextThoughtNeeded}`;
+          const thought = parsedContent.thought || parsedContent.text || parsedContent.reasoning;
+          const thoughtNum = parsedContent.thoughtNumber || 1;
+          const totalThoughts = parsedContent.totalThoughts || 5;
+          const needsMore = parsedContent.nextThoughtNeeded !== false;
+          
+          if (needsMore) {
+            return `[Thought ${thoughtNum}/${totalThoughts}] ${thought}\n[Status: Continuing analysis...]`;
+          } else {
+            return `[Final Thought ${thoughtNum}/${totalThoughts}] ${thought}\n[Status: Analysis complete]`;
+          }
         }
         return JSON.stringify(parsedContent, null, 2);
       } catch {
@@ -367,9 +380,16 @@ export class MCPToolWrapper {
     if (tool.templateSlug === 'sequentialthinking') {
       // Sequential thinking returns structured reasoning
       if (result && typeof result === 'object') {
-        if (result.thought) return result.thought;
-        if (result.text) return result.text;
-        if (result.reasoning) return result.reasoning;
+        const thought = result.thought || result.text || result.reasoning || '';
+        const thoughtNum = result.thoughtNumber || 1;
+        const totalThoughts = result.totalThoughts || 5;
+        const needsMore = result.nextThoughtNeeded !== false;
+        
+        if (needsMore) {
+          return `[Thought ${thoughtNum}/${totalThoughts}] ${thought}\n[Status: Continuing analysis...]`;
+        } else {
+          return `[Final Thought ${thoughtNum}/${totalThoughts}] ${thought}\n[Status: Analysis complete]`;
+        }
       }
     }
     

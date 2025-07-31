@@ -22,6 +22,7 @@
     "validate-migration:report": "tsx src/scripts/validate-migration.ts --report",
     "validate-migration:full": "tsx src/scripts/validate-migration.ts --report --save --verbose",
     "seed:mcp": "tsx src/scripts/seed-mcp-servers.ts",
+    "seed:llm": "tsx src/scripts/seed-llm-models.ts",
     "query:mcp": "tsx src/scripts/query-mcp-servers.ts",
     "test:mcp-seeding": "tsx src/scripts/test-mcp-seeding.ts",
     "test:migration": "tsx src/scripts/run-migration-tests.ts",

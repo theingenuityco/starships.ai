@@ -102,7 +102,7 @@ export default function ExpeditionDetailsPage() {
             
             {/* Activity Log - Right side */}
             <div className="lg:flex-1 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800/50 p-6 shadow-2xl">
-              <ExpeditionActivityLog />
+              <ExpeditionActivityLog expeditionId={expeditionId} />
             </div>
           </div>
         </div>

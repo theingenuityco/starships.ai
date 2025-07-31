@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/useToast';
 import type { ChatMessage } from '@starships/protocol';
@@ -156,12 +157,13 @@ export function ExpeditionChat({ expeditionId }: ExpeditionChatProps) {
                   </div>
                   <div className="text-sm prose prose-invert prose-sm max-w-none">
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       components={{
                         // Custom styles for markdown elements
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
-                        li: ({ children }) => <li className="mb-1">{children}</li>,
+                        p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1 ml-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1 ml-2">{children}</ol>,
+                        li: ({ children }) => <li className="mb-1 leading-relaxed">{children}</li>,
                         strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
                         em: ({ children }) => <em className="italic">{children}</em>,
                         code: ({ inline, children }) => 

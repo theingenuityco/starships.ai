@@ -365,6 +365,27 @@ export interface ChatMessage {
     isExecuting?: boolean;
     originalMessage?: string;
     isInitialGreeting?: boolean;
+    isFallback?: boolean;
+  };
+}
+
+// Activity types
+export interface Activity {
+  id: string;
+  expeditionId: string;
+  type: 'mission_started' | 'web_search' | 'page_visit' | 'data_extraction' | 'analysis' | 'report_generation' | 'mission_completed' | 'error';
+  description: string;
+  timestamp: string;
+  agentId?: string;
+  status?: 'pending' | 'in_progress' | 'completed' | 'failed';
+  metadata?: {
+    url?: string;
+    query?: string;
+    pageTitle?: string;
+    extractedData?: any;
+    progress?: number;
+    error?: string;
+    duration?: number;
   };
 }
 
@@ -379,6 +400,17 @@ export interface MessageResponse {
 
 export interface MessageListResponse {
   messages: ChatMessage[];
+}
+
+export interface CreateActivityRequest {
+  type: Activity['type'];
+  description: string;
+  agentId?: string;
+  metadata?: Activity['metadata'];
+}
+
+export interface ActivityListResponse {
+  activities: Activity[];
 }
 
 // Export enhanced Socket.IO event types

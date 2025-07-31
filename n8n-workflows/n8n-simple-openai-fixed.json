@@ -1,0 +1,378 @@
+{
+  "name": "Simple OpenAI Chat & Deep Search",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "expedition-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process the incoming request\nconst body = $input.first().json.body;\nconst { message, agent, expedition, chatHistory } = body;\n\n// Ensure message exists and is a string\nconst safeMessage = message || '';\nconst safeChatHistory = chatHistory || [];\n\n// Debug logging\nconsole.log('N8N DEBUG - Processing request:', {\n  message: safeMessage,\n  chatHistoryLength: safeChatHistory.length,\n  isSystemGreeting: safeMessage === '[SYSTEM_INITIAL_GREETING]'\n});\n\n// Determine what type of request this is\nlet requestType = 'chat';\n\n// Only greeting if it's the special system message AND no chat history exists\nif (safeMessage === \"[SYSTEM_INITIAL_GREETING]\" && safeChatHistory.length === 0) {\n  requestType = 'greeting';\n  console.log('N8N DEBUG - Routing to GREETING');\n} else if (safeMessage.toLowerCase().includes('execute') || \n           safeMessage.toLowerCase().includes('start mission') ||\n           safeMessage.toLowerCase().includes('begin mission') ||\n           safeMessage.toLowerCase().includes('deep search')) {\n  requestType = 'execute';\n  console.log('N8N DEBUG - Routing to EXECUTE');\n} else {\n  // Default to chat for all other messages\n  requestType = 'chat';\n  console.log('N8N DEBUG - Routing to CHAT');\n}\n\nreturn {\n  requestType,\n  message: safeMessage,\n  agent,\n  expedition,\n  chatHistory: safeChatHistory\n};"
+      },
+      "id": "process_request",
+      "name": "Process Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.requestType}}",
+              "operation": "equal",
+              "value2": "greeting"
+            }
+          ]
+        }
+      },
+      "id": "check_greeting",
+      "name": "Is Greeting?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate simple greeting\nconst data = $input.first().json;\nconst { agent, expedition } = data;\n\nconst greetings = [\n  `Hello! I'm ${agent.name}, ready to assist with ${expedition.name}. What would you like me to help you with?`,\n  `Hi there! I'm ${agent.name}, here to help with ${expedition.name}. What specific aspects should we focus on?`,\n  `Welcome! I'm ${agent.name}, assigned to ${expedition.name}. How can I assist you today?`\n];\n\nconst greeting = greetings[Math.floor(Math.random() * greetings.length)];\n\nreturn {\n  message: greeting,\n  agentReady: false,\n  missionStatus: 'greeting'\n};"
+      },
+      "id": "simple_greeting",
+      "name": "Simple Greeting",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.requestType}}",
+              "operation": "equal",
+              "value2": "execute"
+            }
+          ]
+        }
+      },
+      "id": "check_execute",
+      "name": "Is Execute?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Deep Search Execution\nconst data = $input.first().json;\nconst { agent, expedition, message, chatHistory } = data;\nconst expeditionId = expedition.id || 'unknown';\n\n// Extract search topics from conversation\nfunction extractSearchTopics() {\n  const topics = [];\n  \n  // From current message\n  const words = (message || '').split(' ').filter(w => w.length > 4);\n  if (words.length > 0) {\n    topics.push(words.slice(0, 3).join(' '));\n  }\n  \n  // From expedition name/description\n  if (expedition.name) {\n    topics.push(expedition.name);\n  }\n  \n  // From chat history\n  if (chatHistory && chatHistory.length > 0) {\n    const userMessages = chatHistory.filter(m => m.role === 'user');\n    userMessages.forEach(msg => {\n      const msgWords = (msg.content || '').split(' ').filter(w => w.length > 5);\n      if (msgWords.length > 0) {\n        topics.push(msgWords.slice(0, 2).join(' '));\n      }\n    });\n  }\n  \n  // Remove duplicates and limit\n  return [...new Set(topics)].slice(0, 3);\n}\n\nconst searchTopics = extractSearchTopics();\n\n// Log mission start\ntry {\n  await $http.request({\n    method: 'POST',\n    url: `${$vars.API_URL || 'http://localhost:3001'}/api/expeditions/${expeditionId}/activities`,\n    headers: {\n      'x-webhook-key': $vars.WEBHOOK_KEY || 'default-webhook-key',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      type: 'mission_started',\n      description: '🚀 DEEP SEARCH MISSION INITIATED!',\n      metadata: {\n        searchTopics,\n        totalTopics: searchTopics.length\n      }\n    }\n  });\n} catch (error) {\n  console.error('Failed to log mission start:', error);\n}\n\n// Perform searches for each topic\nconst searchResults = [];\n\nfor (let i = 0; i < searchTopics.length; i++) {\n  const topic = searchTopics[i];\n  \n  // Log web search activity\n  try {\n    await $http.request({\n      method: 'POST',\n      url: `${$vars.API_URL || 'http://localhost:3001'}/api/expeditions/${expeditionId}/activities`,\n      headers: {\n        'x-webhook-key': $vars.WEBHOOK_KEY || 'default-webhook-key',\n        'Content-Type': 'application/json'\n      },\n      body: {\n        type: 'web_search',\n        description: `Searching: ${topic}`,\n        metadata: {\n          query: topic,\n          progress: Math.round(((i + 1) / searchTopics.length) * 50)\n        }\n      }\n    });\n  } catch (error) {\n    console.error('Failed to log search activity:', error);\n  }\n  \n  // Simulate web search results\n  const results = {\n    topic,\n    findings: [\n      {\n        title: `${topic} - Market Analysis Report`,\n        url: `https://research.example.com/${encodeURIComponent(topic)}`,\n        snippet: `Comprehensive analysis of ${topic} with latest trends and insights.`,\n        relevance: 0.9\n      },\n      {\n        title: `Latest Developments in ${topic}`,\n        url: `https://news.example.com/${encodeURIComponent(topic)}`,\n        snippet: `Recent news and developments related to ${topic}.`,\n        relevance: 0.8\n      },\n      {\n        title: `${topic} Industry Overview`,\n        url: `https://industry.example.com/${encodeURIComponent(topic)}`,\n        snippet: `Industry overview and market dynamics for ${topic}.`,\n        relevance: 0.7\n      }\n    ]\n  };\n  \n  searchResults.push(results);\n  \n  // Log data extraction\n  try {\n    await $http.request({\n      method: 'POST',\n      url: `${$vars.API_URL || 'http://localhost:3001'}/api/expeditions/${expeditionId}/activities`,\n      headers: {\n        'x-webhook-key': $vars.WEBHOOK_KEY || 'default-webhook-key',\n        'Content-Type': 'application/json'\n      },\n      body: {\n        type: 'data_extraction',\n        description: `Extracted ${results.findings.length} sources for ${topic}`,\n        metadata: {\n          topic,\n          sourceCount: results.findings.length\n        }\n      }\n    });\n  } catch (error) {\n    console.error('Failed to log extraction activity:', error);\n  }\n}\n\n// Log analysis phase\ntry {\n  await $http.request({\n    method: 'POST',\n    url: `${$vars.API_URL || 'http://localhost:3001'}/api/expeditions/${expeditionId}/activities`,\n    headers: {\n      'x-webhook-key': $vars.WEBHOOK_KEY || 'default-webhook-key',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      type: 'analysis',\n      description: 'Analyzing collected data with AI',\n      metadata: {\n        totalSources: searchResults.reduce((acc, r) => acc + r.findings.length, 0),\n        progress: 80\n      }\n    }\n  });\n} catch (error) {\n  console.error('Failed to log analysis activity:', error);\n}\n\n// Prepare comprehensive summary for OpenAI\nconst searchSummary = searchResults.map(r => \n  `Topic: ${r.topic}\\n` +\n  r.findings.map(f => `- ${f.title}: ${f.snippet}`).join('\\n')\n).join('\\n\\n');\n\nreturn {\n  searchResults,\n  searchSummary,\n  searchTopics,\n  agent,\n  expedition,\n  expeditionId\n};"
+      },
+      "id": "deep_search",
+      "name": "Deep Search Engine",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare OpenAI Analysis Request\nconst data = $input.first().json;\nconst { agent, expedition, searchSummary } = data;\n\nconst systemMessage = `You are ${agent.name}, an expert in ${agent.description}. You are working on expedition: ${expedition.name}.\n\nBased on the deep search results below, provide a comprehensive analysis and actionable insights:\n\n${searchSummary}\n\nProvide:\n1. Key findings summary\n2. Important insights and trends\n3. Actionable recommendations\n4. Next steps for the mission\n\nBe thorough but concise.`;\n\nreturn {\n  messages: [\n    {\n      role: 'system',\n      content: systemMessage\n    },\n    {\n      role: 'user',\n      content: 'Please analyze the search results and provide comprehensive insights for this expedition.'\n    }\n  ],\n  model: 'gpt-4',\n  temperature: 0.7,\n  max_tokens: 1000,\n  ...data\n};"
+      },
+      "id": "prepare_analysis",
+      "name": "Prepare Analysis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare OpenAI Chat Request\nconst data = $input.first().json;\nconst { agent, expedition, message, chatHistory } = data;\n\nconst historyText = (chatHistory || []).map(msg => `${msg.role}: ${msg.content || ''}`).join('\\n');\n\nconst systemMessage = `You are ${agent.name}, an expert in ${agent.description}. You are having a conversation about expedition: ${expedition.name}.\n\nConversation history:\n${historyText}\n\nRespond helpfully and ask clarifying questions to better understand the mission objectives.`;\n\nreturn {\n  messages: [\n    {\n      role: 'system',\n      content: systemMessage\n    },\n    {\n      role: 'user',\n      content: message || ''\n    }\n  ],\n  model: 'gpt-4',\n  temperature: 0.7,\n  max_tokens: 500,\n  ...data\n};"
+      },
+      "id": "prepare_chat",
+      "name": "Prepare Chat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "={{$json.model}}"
+            },
+            {
+              "name": "messages",
+              "value": "={{$json.messages}}"
+            },
+            {
+              "name": "temperature",
+              "value": "={{$json.temperature}}"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{$json.max_tokens}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "openai_analysis",
+      "name": "OpenAI Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "={{$json.model}}"
+            },
+            {
+              "name": "messages",
+              "value": "={{$json.messages}}"
+            },
+            {
+              "name": "temperature",
+              "value": "={{$json.temperature}}"
+            },
+            {
+              "name": "max_tokens",
+              "value": "={{$json.max_tokens}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "openai_chat",
+      "name": "OpenAI Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finalize deep search mission\nconst analysisData = $input.first().json;\nconst searchData = $input.all()[0].json; // Get data from deep search node\n\nconst openaiResponse = analysisData.choices[0].message.content;\nconst { expeditionId, searchResults } = searchData;\n\n// Log report generation\ntry {\n  await $http.request({\n    method: 'POST',\n    url: `${$vars.API_URL || 'http://localhost:3001'}/api/expeditions/${expeditionId}/activities`,\n    headers: {\n      'x-webhook-key': $vars.WEBHOOK_KEY || 'default-webhook-key',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      type: 'report_generation',\n      description: 'Generating comprehensive mission report',\n      metadata: {\n        progress: 95\n      }\n    }\n  });\n} catch (error) {\n  console.error('Failed to log report activity:', error);\n}\n\n// Log mission completion\ntry {\n  await $http.request({\n    method: 'POST',\n    url: `${$vars.API_URL || 'http://localhost:3001'}/api/expeditions/${expeditionId}/activities`,\n    headers: {\n      'x-webhook-key': $vars.WEBHOOK_KEY || 'default-webhook-key',\n      'Content-Type': 'application/json'\n    },\n    body: {\n      type: 'mission_completed',\n      description: '✅ Deep search mission completed successfully!',\n      metadata: {\n        totalSources: searchResults.reduce((acc, r) => acc + r.findings.length, 0),\n        progress: 100,\n        reportGenerated: true\n      }\n    }\n  });\n} catch (error) {\n  console.error('Failed to log completion activity:', error);\n}\n\nreturn {\n  message: `🚀 DEEP SEARCH COMPLETED!\\n\\n${openaiResponse}\\n\\n📊 Mission Summary:\\n- Searched ${searchResults.length} topics\\n- Analyzed ${searchResults.reduce((acc, r) => acc + r.findings.length, 0)} sources\\n- Generated comprehensive insights\\n\\nCheck the activity log for detailed progress!`,\n  shouldTerminateChat: true,\n  agentReady: true,\n  missionStatus: 'completed',\n  shouldExecute: true\n};"
+      },
+      "id": "finalize_search",
+      "name": "Finalize Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format OpenAI chat response\nconst data = $input.first().json;\nconst openaiResponse = data.choices[0].message.content;\n\nreturn {\n  message: openaiResponse,\n  agentReady: false,\n  missionStatus: 'planning'\n};"
+      },
+      "id": "format_chat",
+      "name": "Format Chat Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "webhook_response",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2000, 350]
+    }
+  ],
+  "connections": {
+    "webhook": {
+      "main": [
+        [
+          {
+            "node": "process_request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process_request": {
+      "main": [
+        [
+          {
+            "node": "check_greeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_greeting": {
+      "main": [
+        [
+          {
+            "node": "simple_greeting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "check_execute",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "simple_greeting": {
+      "main": [
+        [
+          {
+            "node": "webhook_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_execute": {
+      "main": [
+        [
+          {
+            "node": "deep_search",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "prepare_chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deep_search": {
+      "main": [
+        [
+          {
+            "node": "prepare_analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_analysis": {
+      "main": [
+        [
+          {
+            "node": "openai_analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare_chat": {
+      "main": [
+        [
+          {
+            "node": "openai_chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "openai_analysis": {
+      "main": [
+        [
+          {
+            "node": "finalize_search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "openai_chat": {
+      "main": [
+        [
+          {
+            "node": "format_chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "finalize_search": {
+      "main": [
+        [
+          {
+            "node": "webhook_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "format_chat": {
+      "main": [
+        [
+          {
+            "node": "webhook_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateId": "simple-openai-deepsearch-fixed"
+  },
+  "tags": []
+}

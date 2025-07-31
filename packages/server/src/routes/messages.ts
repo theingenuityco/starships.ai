@@ -27,7 +27,19 @@ async function sendToN8nWebhook(payload: any): Promise<any> {
     throw new Error(`N8N webhook failed: ${response.statusText}`);
   }
 
-  return response.json();
+  const responseText = await response.text();
+  
+  if (!responseText) {
+    console.error('N8N webhook returned empty response');
+    throw new Error('N8N webhook returned empty response');
+  }
+
+  try {
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('Failed to parse N8N response:', responseText);
+    throw new Error(`Invalid JSON response from N8N: ${responseText.substring(0, 100)}`);
+  }
 }
 
 // Send a message to an expedition
@@ -79,6 +91,18 @@ router.post('/api/expeditions/:expeditionId/messages', authMiddleware, async (re
       return;
     }
 
+    // Format chat history properly for n8n - exclude the just-created user message
+    const formattedChatHistory = chatHistory.slice(0, -1).map(msg => ({
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    }));
+
+    console.log('DEBUG: Sending to n8n:', {
+      message: content,
+      chatHistoryLength: formattedChatHistory.length,
+      isGreeting: content === "[SYSTEM_INITIAL_GREETING]"
+    });
+
     // Prepare webhook payload with ALL agents
     const webhookPayload = {
       expeditionId,
@@ -98,10 +122,7 @@ router.post('/api/expeditions/:expeditionId/messages', authMiddleware, async (re
           description: a.description
         }))
       },
-      chatHistory: chatHistory.slice(0, -1).map(msg => ({ // Exclude the just-created message
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      }))
+      chatHistory: formattedChatHistory
     };
 
     // Send to n8n webhook
@@ -135,6 +156,29 @@ router.post('/api/expeditions/:expeditionId/messages', authMiddleware, async (re
         originalMessage: n8nResponse.message // Keep original for debugging
       }
     });
+
+    // If mission should execute, trigger the execution workflow
+    if (n8nResponse.shouldExecute && n8nResponse.executionPlan) {
+      try {
+        const executionWebhookUrl = process.env.N8N_EXECUTION_WEBHOOK_URL || 'http://localhost:5678/webhook/expedition-execution';
+        
+        await fetch(executionWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            expeditionId,
+            plan: n8nResponse.executionPlan,
+            agents: agents.map(a => ({
+              id: a.id,
+              name: a.name,
+              description: a.description
+            }))
+          })
+        });
+      } catch (error) {
+        console.error('Failed to trigger execution workflow:', error);
+      }
+    }
 
     res.json({ userMessage, agentMessage });
   } catch (error) {
@@ -231,8 +275,10 @@ router.get('/api/expeditions/:expeditionId/messages', authMiddleware, async (req
           return;
         } catch (error) {
           console.error('Failed to get initial greeting:', error);
-          // If greeting fails, just return empty messages
-          res.json({ messages: [] });
+          res.status(500).json({ 
+            error: 'Failed to generate initial greeting',
+            details: error instanceof Error ? error.message : 'Unknown error'
+          });
           return;
         }
       }

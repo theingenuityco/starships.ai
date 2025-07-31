@@ -53,6 +53,15 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     args: ['-y', 'mcp-searxng', 'https://searx.stream/'],
     env: JSON.stringify({}),
   },
+  {
+    name: 'Firecrawl',
+    slug: 'firecrawl',
+    command: 'node',
+    args: ['firecrawl-mcp'],
+    env: JSON.stringify({
+      FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}',
+    }),
+  },
 ];
 
 async function seedMCPServers() {

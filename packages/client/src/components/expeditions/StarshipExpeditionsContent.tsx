@@ -364,7 +364,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
       <div className="px-8 py-6 border-b bg-card/50">
         <div className="flex flex-col gap-4">
           {/* Search and Filter Row */}
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
             <div className="relative max-w-md">
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -441,11 +441,10 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   </SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Status Badges */}
-          {Object.keys(statusCounts).length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            
+            {/* Status Badges */}
+            {Object.keys(statusCounts).length > 0 && (
+              <div className="flex flex-1 flex-wrap gap-2 justify-start md:justify-end">
               {Object.entries(statusCounts).map(([status, count]) => {
                 const statusConfig = {
                   draft: {
@@ -495,8 +494,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   </button>
                 )
               })}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

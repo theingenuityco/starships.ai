@@ -13,7 +13,6 @@ import {
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
-import { ConnectorTroubleshootingPanel } from '@/components/crew/ConnectorTroubleshootingPanel'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -411,14 +410,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                       </div>
                     )}
 
-                    {/* Enhanced Troubleshooting Panel */}
-                    {connectorInstances.some(c => c.status === 'error' || c.errorMessage) && (
-                      <div
-                        className="mt-3"
-                      >
-                        <ConnectorTroubleshootingPanel connectorInstances={connectorInstances} />
-                      </div>
-                    )}
                   </div>
                 {/* </AnimatePresence> */}
               </TabsContent>

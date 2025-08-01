@@ -137,7 +137,7 @@ export function DriveContent({ slug }: DriveContentProps) {
 
       {/* Main Content */}
       <div className="flex-1 p-4 overflow-hidden bg-gradient-to-b from-background to-background/95 flex items-center justify-center">
-        <div className="w-full max-w-3xl">
+        <div className="w-full max-w-xl">
           <div className="relative">
             {/* Decorative background elements */}
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-orange-500/5 rounded-3xl" />
@@ -238,21 +238,18 @@ export function DriveContent({ slug }: DriveContentProps) {
                         <Gauge className="h-5 w-5 text-yellow-500" />
                       </div>
                       <h4 className="font-semibold">Propulsion Control</h4>
-                      <p className="text-sm text-muted-foreground">Advanced thrust management systems</p>
                     </div>
                     <div className="text-center space-y-2">
                       <div className="inline-flex items-center justify-center w-10 h-10 bg-orange-500/10 rounded-xl mb-1">
                         <Activity className="h-5 w-5 text-orange-500" />
                       </div>
                       <h4 className="font-semibold">Navigation Systems</h4>
-                      <p className="text-sm text-muted-foreground">Quantum navigation algorithms</p>
                     </div>
                     <div className="text-center space-y-2">
                       <div className="inline-flex items-center justify-center w-10 h-10 bg-red-500/10 rounded-xl mb-1">
                         <Battery className="h-5 w-5 text-red-500" />
                       </div>
                       <h4 className="font-semibold">Energy Management</h4>
-                      <p className="text-sm text-muted-foreground">Efficient power distribution</p>
                     </div>
                   </div>
                   

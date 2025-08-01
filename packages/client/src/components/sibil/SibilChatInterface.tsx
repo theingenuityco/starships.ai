@@ -187,51 +187,24 @@ export function SibilChatInterface() {
   }
 
   return (
-    <motion.div
-      className="flex flex-col h-full bg-gradient-to-br from-background via-background to-muted/20"
-      variants={pageVariants}
-      initial="initial"
-      animate="in"
-      exit="out"
-    >
-      {/* Compact Header */}
-      <motion.div
-        className="border-b border-white/10 sibil-glass backdrop-blur-md px-4 py-3 relative overflow-hidden"
-        variants={headerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Background gradient overlay */}
-        <div
-          className="absolute inset-0 opacity-20"
-          style={{
-            background: 'var(--sibil-gradient-neural)'
-          }}
-        />
-        
-        <div className="relative flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {/* Compact Avatar */}
-            <motion.div
-              className="w-8 h-8 rounded-full flex items-center justify-center shadow-lg relative overflow-hidden"
-              style={{
-                background: 'var(--sibil-gradient-primary)'
-              }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Bot className="h-4 w-4 text-white" />
-            </motion.div>
+    <div className="flex flex-col h-full bg-gradient-to-br from-background to-muted/5">
+      {/* Standard Header */}
+      <div className="border-b border-border/40 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Standard Avatar */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-emerald-500/5 blur-sm" />
+              <div className="relative bg-gradient-to-br from-emerald-500/15 to-emerald-500/10 p-2.5 rounded-xl shadow-sm border border-emerald-500/15">
+                <Bot className="h-5 w-5 text-emerald-500" />
+              </div>
+            </div>
             
             <div>
-              <motion.h2
-                className="font-bold text-lg sibil-gradient-text"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2 }}
-              >
+              <h2 className="font-semibold text-lg text-foreground">
                 Sibil AI
-              </motion.h2>
+              </h2>
+              <p className="text-xs text-muted-foreground">AI Assistant</p>
             </div>
           </div>
           
@@ -251,29 +224,12 @@ export function SibilChatInterface() {
               connectionStatus === 'reconnecting' ? 'bg-yellow-500' :
               'bg-red-500'
             }`} />
-            
-            {/* <ModernProviderSelector
-              provider={provider}
-              model={model}
-              onProviderChange={handleProviderChange}
-              onModelChange={setModel}
-              disabled={streaming || !isConnected}
-            /> */}
           </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Messages with enhanced background */}
-      <div className="flex-1 overflow-hidden relative">
-        {/* Subtle background pattern */}
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, var(--sibil-accent) 0%, transparent 50%),
-                             radial-gradient(circle at 75% 75%, var(--sibil-accent-light) 0%, transparent 50%)`
-          }}
-        />
-        
+      {/* Messages Area */}
+      <div className="flex-1 overflow-hidden bg-background">
         <MessageList
           messages={messages}
           loading={loading}
@@ -282,28 +238,13 @@ export function SibilChatInterface() {
         />
       </div>
 
-      {/* Enhanced Input with Glassmorphism */}
-      <motion.div
-        className="border-t border-white/10 sibil-glass backdrop-blur-md p-4 relative"
-        variants={inputVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        {/* Background gradient overlay */}
-        <div
-          className="absolute inset-0 opacity-10"
-          style={{
-            background: 'var(--sibil-gradient-accent)'
-          }}
+      {/* Standard Input */}
+      <div className="border-t border-border/40 p-4 bg-card/50">
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          disabled={!sessionId.current || loading || !userId || streaming}
         />
-        
-        <div className="relative">
-          <MessageInput
-            onSendMessage={handleSendMessage}
-            disabled={!sessionId.current || loading || !userId || streaming}
-          />
-        </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }

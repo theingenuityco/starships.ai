@@ -123,6 +123,32 @@
   }
 }
 
+/* Custom Scrollbar Styles */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary) / 0.3) hsl(var(--muted) / 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--muted) / 0.1);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
 /* 
  * COMMAND DECK UTILITY CLASSES
  * ============================
@@ -380,5 +406,20 @@
     transform: translateZ(0);
     backface-visibility: hidden;
     perspective: 1000px;
+  }
+
+  /* Scale X animation for agent card */
+  @keyframes scale-x {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  .animate-scale-x {
+    animation: scale-x 0.5s ease-out forwards;
+    transform-origin: left;
   }
 }

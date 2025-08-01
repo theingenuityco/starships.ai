@@ -86,12 +86,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <div className="h-screen flex relative overflow-hidden">
         {/* Navigation Sidebar with gutter (16px) - conditionally rendered */}
         {!shouldHideNavigation && (
-          <div className="fixed top-4 left-4 bottom-4 w-[300px] z-50">
+          <div className="fixed top-0 left-0 bottom-0 w-[300px] z-50">
             <motion.aside
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
-              className="w-full h-full bg-background/70 backdrop-blur-lg border border-border/40 shadow-xl rounded-xl overflow-hidden"
+              className="w-full h-full bg-background/70 backdrop-blur-lg border-r border-border/40 shadow-xl overflow-hidden"
               onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
               onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
             >
@@ -124,10 +124,10 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             className={cn(
               'flex-1 min-h-full w-full transition-all duration-300 overflow-auto',
               // Position content next to navigation with fixed margin when navigation is shown
-              !shouldHideNavigation ? 'ml-[320px]' : ''
+              !shouldHideNavigation ? 'ml-[300px]' : ''
             )}
             style={{
-              width: !shouldHideNavigation ? 'calc(100% - 320px)' : '100%',
+              width: !shouldHideNavigation ? 'calc(100% - 300px)' : '100%',
             }}
           >
             {children}

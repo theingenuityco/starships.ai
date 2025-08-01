@@ -249,7 +249,7 @@ export function ApiKeyInputModal({
             onChange={e => handleInputChange(requirement.envKey, e.target.value)}
             placeholder={requirement.placeholder}
             className={cn(
-              'pr-10',
+              'pr-10 border border-input',
               hasError && 'border-red-500 focus:border-red-500 focus:ring-red-500'
             )}
             disabled={state.isSubmitting}

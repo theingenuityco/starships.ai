@@ -513,7 +513,10 @@ export function EnhancedConnectorSelector({
 
               <div className="flex items-center gap-2">
                 {selectedConnectors.length > 0 && (
-                  <Badge variant="default" className="text-sm px-3 py-1">
+                  <Badge
+                    variant="default"
+                    className="text-sm px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  >
                     {selectedConnectors.length} Active
                   </Badge>
                 )}

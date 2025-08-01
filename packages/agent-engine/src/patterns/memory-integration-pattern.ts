@@ -136,7 +136,7 @@ export class MCPMemoryPattern implements MemoryPattern {
 
       if (result.success && Array.isArray(result.result)) {
         // Strip namespace from returned keys
-        return result.result.map(key => 
+        return result.result.map((key: string) => 
           key.replace(`${this.namespace}:`, '')
         );
       }

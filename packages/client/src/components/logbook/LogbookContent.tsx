@@ -75,33 +75,6 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                 </div>
               </div>
 
-              <div className="h-10 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
-
-              {/* Stats Cards */}
-              <div className="flex items-center gap-3">
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5 text-amber-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Total Entries</p>
-                        <p className="text-sm font-bold">{totalEntries}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <Archive className="h-3.5 w-3.5 text-amber-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Recent</p>
-                        <p className="text-sm font-bold">{recentEntries}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </div>
 

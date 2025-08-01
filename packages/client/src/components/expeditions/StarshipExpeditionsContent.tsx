@@ -31,6 +31,9 @@ import {
   Loader2,
   Activity,
   RotateCcw,
+  Sparkles,
+  Star,
+  ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -554,60 +557,136 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             </Card>
           </div>
         ) : filteredExpeditions.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <Card className="p-10 text-center max-w-lg bg-gradient-to-br from-card via-card/95 to-primary/5 border-primary/20 shadow-lg">
-              <div className="mb-6">
-                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
-                  <Rocket className="h-10 w-10 text-primary" />
+          <div className="flex items-center justify-center h-full p-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="relative w-full max-w-xl"
+            >
+              {/* Background decoration - reduced opacity */}
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5 blur-2xl -z-10" />
+              
+              <Card className="relative overflow-hidden p-8 text-center bg-gradient-to-br from-card via-card/98 to-primary/5 border-2 border-primary/20 shadow-xl">
+                {/* Decorative elements - reduced size and opacity */}
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-xl" />
+                <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full blur-xl" />
+                
+                {/* Icon section - more compact */}
+                <div className="relative mb-6">
+                  <div className="inline-flex items-center justify-center">
+                    <div className="relative">
+                      {/* Animated rings - reduced blur */}
+                      <motion.div
+                        className="absolute inset-0 bg-primary/10 rounded-full blur-lg"
+                        animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.1, 0.3] }}
+                        transition={{ duration: 3, repeat: Infinity }}
+                      />
+                      
+                      {/* Main icon container - smaller */}
+                      <div className="relative w-16 h-16 bg-gradient-to-br from-primary/20 to-cyan-500/20 rounded-xl flex items-center justify-center shadow-lg border border-primary/20">
+                        <Rocket className="h-8 w-8 text-primary" />
+                        {/* Sparkle decorations */}
+                        <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-cyan-500/70" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                {(expeditions || []).length === 0 ? 'Launch Your First Expedition' : 'No Matching Expeditions'}
-              </h3>
-              
-              <p className="text-muted-foreground mb-6 text-base leading-relaxed">
-                {(expeditions || []).length === 0
-                  ? 'Begin your journey by creating an expedition. Set missions, assign agents, and explore new frontiers.'
-                  : searchQuery || statusFilter !== 'all'
-                  ? 'Try adjusting your search criteria or filters to find expeditions.'
-                  : 'No expeditions match your current filters.'}
-              </p>
-              
-              {(expeditions || []).length === 0 ? (
-                <div>
-                  <Button 
-                    onClick={handleCreateExpedition}
-                    size="lg"
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-sm hover:shadow-md transition-all duration-300"
-                  >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Create Your First Expedition
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-3 justify-center">
-                  {searchQuery && (
-                    <Button 
-                      onClick={() => setSearchQuery('')}
-                      variant="outline"
-                      className="hover:bg-primary/10"
-                    >
-                      Clear Search
-                    </Button>
+                
+                {/* Content section - more compact */}
+                <div className="relative z-10 space-y-4">
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2 bg-gradient-to-r from-foreground via-foreground/90 to-primary bg-clip-text text-transparent">
+                      {(expeditions || []).length === 0 ? 'Launch Your First Expedition' : 'No Matching Expeditions'}
+                    </h3>
+                    
+                    <p className="text-muted-foreground mb-4 text-base leading-relaxed max-w-md mx-auto">
+                      {(expeditions || []).length === 0
+                        ? 'Begin your journey by creating an expedition. Set missions, assign agents, and explore new frontiers.'
+                        : searchQuery || statusFilter !== 'all'
+                        ? 'Try adjusting your search criteria or filters to find expeditions.'
+                        : 'No expeditions match your current filters.'}
+                    </p>
+                  </div>
+                  
+                  {/* Feature highlights for first expedition - more compact */}
+                  {(expeditions || []).length === 0 && (
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="flex flex-col items-center gap-1 p-3 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20"
+                      >
+                        <Target className="h-4 w-4 text-primary" />
+                        <span className="text-xs font-medium text-foreground">Set Goals</span>
+                      </motion.div>
+                      
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="flex flex-col items-center gap-1 p-3 bg-gradient-to-br from-cyan-500/5 to-cyan-500/10 rounded-lg border border-cyan-500/20"
+                      >
+                        <Users className="h-4 w-4 text-cyan-500" />
+                        <span className="text-xs font-medium text-foreground">Deploy Agents</span>
+                      </motion.div>
+                      
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="flex flex-col items-center gap-1 p-3 bg-gradient-to-br from-green-500/5 to-green-500/10 rounded-lg border border-green-500/20"
+                      >
+                        <Activity className="h-4 w-4 text-green-500" />
+                        <span className="text-xs font-medium text-foreground">Track Progress</span>
+                      </motion.div>
+                    </div>
                   )}
-                  {statusFilter !== 'all' && (
-                    <Button 
-                      onClick={() => setStatusFilter('all')}
-                      variant="outline"
-                      className="hover:bg-primary/10"
+                  
+                  {(expeditions || []).length === 0 ? (
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
-                      Clear Filter
-                    </Button>
+                      <Button 
+                        onClick={handleCreateExpedition}
+                        size="lg"
+                        className="relative group bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 text-white shadow-md hover:shadow-lg transition-all duration-300 px-6 py-3 text-base font-semibold"
+                      >
+                        <span className="absolute inset-0 bg-primary/10 blur-md group-hover:blur-lg transition-all opacity-50" />
+                        <span className="relative flex items-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          Create Your First Expedition
+                          <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                        </span>
+                      </Button>
+                    </motion.div>
+                  ) : (
+                    <div className="flex gap-3 justify-center">
+                      {searchQuery && (
+                        <Button 
+                          onClick={() => setSearchQuery('')}
+                          variant="outline"
+                          className="hover:bg-primary/10"
+                        >
+                          Clear Search
+                        </Button>
+                      )}
+                      {statusFilter !== 'all' && (
+                        <Button 
+                          onClick={() => setStatusFilter('all')}
+                          variant="outline"
+                          className="hover:bg-primary/10"
+                        >
+                          Clear Filter
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </Card>
+              </Card>
+            </motion.div>
           </div>
         ) : (
           <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -630,6 +709,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   showAgentAvatars={true}
                   showQualityScore={true}
                   showTaskProgress={true}
+                  agents={starship?.agents || []}
                   onStart={async expeditionId => {
                     try {
                       await expeditionAPI.startExpedition(starshipId, expeditionId)

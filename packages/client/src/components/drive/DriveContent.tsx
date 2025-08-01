@@ -151,7 +151,7 @@ export function DriveContent({ slug }: DriveContentProps) {
                     <Zap className="h-10 w-10 text-yellow-500" />
                   </div>
                   <CardTitle className="text-3xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
-                    Drive Systems Under Construction
+                    🚧 Drive Systems Under Construction
                   </CardTitle>
                   <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                     Our engineering team is working on advanced propulsion and navigation systems
@@ -229,7 +229,7 @@ export function DriveContent({ slug }: DriveContentProps) {
                     <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm p-4">
                       <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
                         <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                        <span>Systems under maintenance</span>
+                        <span>System under maintenance</span>
                       </div>
                     </div>
                   </div>
@@ -260,9 +260,6 @@ export function DriveContent({ slug }: DriveContentProps) {
                   </div>
                   
                   <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 rounded-2xl p-6 text-center border border-yellow-500/20">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      🚧 Currently under development
-                    </p>
                     <p className="text-lg font-semibold text-foreground">
                       Drive Systems will be operational soon
                     </p>

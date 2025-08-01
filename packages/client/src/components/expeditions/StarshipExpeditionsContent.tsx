@@ -235,10 +235,10 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
         </div>
       </div>
 
-      {/* Enhanced Stats Overview with Animations */}
+      {/* Enhanced Stats Overview with Animations and Integrated Search/Filter */}
       {stats && (
         <div className="p-6 border-b bg-gradient-to-br from-background via-muted/3 to-primary/3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {/* Total Missions Card */}
             <div className="group transition-transform">
               <Card className="relative overflow-hidden border-primary/20 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card via-card/98 to-primary/3">
@@ -360,148 +360,147 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               </Card>
             </div>
           </div>
+          
+          {/* Integrated Search and Filter Section */}
+          <div className="flex flex-col gap-4">
+            {/* Search and Filter Row */}
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+              <div className="relative max-w-md">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search expeditions..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="pl-11 pr-11 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors text-sm"
+                />
+                {searchQuery && (
+                  <button
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              
+              <Select
+                value={statusFilter}
+                onValueChange={value => setStatusFilter(value as ExpeditionStatus | 'all')}
+              >
+                <SelectTrigger className="w-full md:w-48 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+                        <span>All Status</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="draft">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-slate-500" />
+                        <span>Draft</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="planning">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                        <span>Planning</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="in-progress">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-amber-500" />
+                        <span>In Progress</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="review">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-purple-500" />
+                        <span>Review</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="completed">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                        <span>Completed</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="failed">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-red-500" />
+                        <span>Failed</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="cancelled">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-gray-500" />
+                        <span>Cancelled</span>
+                      </div>
+                    </SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Status Badges */}
+              {Object.keys(statusCounts).length > 0 && (
+                <div className="flex flex-1 flex-wrap gap-2 justify-start md:justify-end">
+                {Object.entries(statusCounts).map(([status, count]) => {
+                  const statusConfig = {
+                    draft: {
+                      className: 'bg-slate-50 text-slate-700 dark:bg-slate-900/50 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+                      dotColor: 'bg-slate-500',
+                    },
+                    planning: {
+                      className: 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700',
+                      dotColor: 'bg-blue-500',
+                    },
+                    'in-progress': {
+                      className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-700',
+                      dotColor: 'bg-amber-500',
+                    },
+                    review: {
+                      className: 'bg-purple-50 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-700',
+                      dotColor: 'bg-purple-500',
+                    },
+                    completed: {
+                      className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700',
+                      dotColor: 'bg-emerald-500',
+                    },
+                    failed: {
+                      className: 'bg-red-50 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-700',
+                      dotColor: 'bg-red-500',
+                    },
+                    cancelled: {
+                      className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+                      dotColor: 'bg-gray-500',
+                    },
+                  }[status] || {
+                    className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+                    dotColor: 'bg-gray-500',
+                  }
+
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => setStatusFilter(status as ExpeditionStatus)}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${statusConfig.className} border hover:opacity-80 transition-opacity`}
+                    >
+                      <div className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotColor}`} />
+                      <span>{status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}</span>
+                      <span className="font-semibold">
+                        {count as number}
+                      </span>
+                    </button>
+                  )
+                })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Enhanced Filters and Search Section */}
-      <div className="px-8 py-6 border-b bg-card/50">
-        <div className="flex flex-col gap-4">
-          {/* Search and Filter Row */}
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                placeholder="Search expeditions..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-11 pr-11 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors text-sm"
-              />
-              {searchQuery && (
-                <button
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                  onClick={() => setSearchQuery('')}
-                >
-                  <XCircle className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            
-            <Select
-              value={statusFilter}
-              onValueChange={value => setStatusFilter(value as ExpeditionStatus | 'all')}
-            >
-              <SelectTrigger className="w-full md:w-48 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors">
-                <SelectValue placeholder="All Status" />
-              </SelectTrigger>
-              <SelectContent>
-                  <SelectItem value="all">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-                      <span>All Status</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="draft">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-slate-500" />
-                      <span>Draft</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="planning">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-blue-500" />
-                      <span>Planning</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="in-progress">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-amber-500" />
-                      <span>In Progress</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="review">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-purple-500" />
-                      <span>Review</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="completed">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                      <span>Completed</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="failed">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-red-500" />
-                      <span>Failed</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="cancelled">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-gray-500" />
-                      <span>Cancelled</span>
-                    </div>
-                  </SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {/* Status Badges */}
-            {Object.keys(statusCounts).length > 0 && (
-              <div className="flex flex-1 flex-wrap gap-2 justify-start md:justify-end">
-              {Object.entries(statusCounts).map(([status, count]) => {
-                const statusConfig = {
-                  draft: {
-                    className: 'bg-slate-50 text-slate-700 dark:bg-slate-900/50 dark:text-slate-300 border-slate-200 dark:border-slate-700',
-                    dotColor: 'bg-slate-500',
-                  },
-                  planning: {
-                    className: 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700',
-                    dotColor: 'bg-blue-500',
-                  },
-                  'in-progress': {
-                    className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-700',
-                    dotColor: 'bg-amber-500',
-                  },
-                  review: {
-                    className: 'bg-purple-50 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-700',
-                    dotColor: 'bg-purple-500',
-                  },
-                  completed: {
-                    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700',
-                    dotColor: 'bg-emerald-500',
-                  },
-                  failed: {
-                    className: 'bg-red-50 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-700',
-                    dotColor: 'bg-red-500',
-                  },
-                  cancelled: {
-                    className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-700',
-                    dotColor: 'bg-gray-500',
-                  },
-                }[status] || {
-                  className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-700',
-                  dotColor: 'bg-gray-500',
-                }
-
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status as ExpeditionStatus)}
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${statusConfig.className} border hover:opacity-80 transition-opacity`}
-                  >
-                    <div className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotColor}`} />
-                    <span>{status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}</span>
-                    <span className="font-semibold">
-                      {count as number}
-                    </span>
-                  </button>
-                )
-              })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Expeditions List with Enhanced States */}
       <div className="flex-1 p-8 overflow-auto bg-background">

@@ -148,7 +148,7 @@ export function DriveContent({ slug }: DriveContentProps) {
               <CardHeader className="pb-4 pt-4">
                 <div className="text-center space-y-4">
                   <CardTitle className="text-2xl font-bold">
-                    <span>🚧</span> <span className="bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">Drive Systems Under Construction</span>
+                    <span className="text-4xl mr-3">🚧</span> <span className="bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">Drive Systems</span>
                   </CardTitle>
                   <p className="text-base text-muted-foreground max-w-2xl mx-auto">
                     Our engineering team is working on advanced propulsion and navigation systems
@@ -258,7 +258,7 @@ export function DriveContent({ slug }: DriveContentProps) {
                   
                   <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 rounded-2xl p-4 text-center border border-yellow-500/20">
                     <p className="text-lg font-semibold text-foreground">
-                      Drive Systems will be operational soon
+                      Coming soon!
                     </p>
                   </div>
                 </div>

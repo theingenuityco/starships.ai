@@ -148,7 +148,7 @@ export function LogbookContent({ slug }: LogbookContentProps) {
               <CardHeader className="pb-4 pt-4">
                 <div className="text-center space-y-4">
                   <CardTitle className="text-2xl font-bold">
-                    <span>🚧</span> <span className="bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">Logbook Archives Under Construction</span>
+                    <span className="text-4xl mr-3">🚧</span> <span className="bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">Logbook Archives</span>
                   </CardTitle>
                   <p className="text-base text-muted-foreground max-w-2xl mx-auto">
                     Our archivists are digitizing mission logs and historical records
@@ -281,7 +281,7 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                   
                   <div className="bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-amber-700/10 rounded-2xl p-4 text-center border border-amber-500/20">
                     <p className="text-lg font-semibold text-foreground">
-                      Logbook system will be available soon
+                      Coming soon!
                     </p>
                   </div>
                 </div>

@@ -32,14 +32,14 @@ export function NavigationItem({
         whileTap={{ scale: 0.98 }}
       >
         
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative flex-shrink-0">
-            <div className={`p-2 rounded-lg transition-all duration-300 ${
+            <div className={`p-1.5 rounded-md transition-all duration-300 ${
               isActive 
                 ? 'bg-primary/20' 
                 : 'bg-muted/30 group-hover:bg-muted/50'
             }`}>
-              <Icon className={`${compact ? 'w-4 h-4' : 'w-4 h-4'} ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
             </div>
             {status === 'warning' && (
               <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full animate-pulse shadow-lg shadow-yellow-500/50" />

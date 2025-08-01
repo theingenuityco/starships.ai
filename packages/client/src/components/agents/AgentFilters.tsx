@@ -93,12 +93,6 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               Clear All
             </Button>
           )}
-          <ChevronDown
-            className={cn(
-              'w-4 h-4 transition-transform duration-200',
-              isExpanded && 'transform rotate-180'
-            )}
-          />
         </div>
       </div>
 

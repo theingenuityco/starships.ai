@@ -24,7 +24,7 @@ export function NavigationSection({
 }: NavigationSectionProps) {
   return (
     <motion.div 
-      className="space-y-3"
+      className="space-y-2"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
@@ -35,7 +35,7 @@ export function NavigationSection({
           {title}
         </h4>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {items.map((item, index) => (
           <motion.div
             key={item.href}

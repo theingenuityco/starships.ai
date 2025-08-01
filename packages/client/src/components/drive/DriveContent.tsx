@@ -136,8 +136,8 @@ export function DriveContent({ slug }: DriveContentProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-6 overflow-auto bg-gradient-to-b from-background to-background/95">
-        <div className="max-w-5xl mx-auto">
+      <div className="flex-1 p-4 overflow-hidden bg-gradient-to-b from-background to-background/95 flex items-center justify-center">
+        <div className="w-full max-w-3xl">
           <div className="relative">
             {/* Decorative background elements */}
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-orange-500/5 rounded-3xl" />
@@ -145,23 +145,20 @@ export function DriveContent({ slug }: DriveContentProps) {
             <div className="absolute bottom-10 right-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
             
             <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm border-border/50 shadow-2xl">
-              <CardHeader className="pb-8 pt-8">
+              <CardHeader className="pb-4 pt-4">
                 <div className="text-center space-y-4">
-                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl mb-4">
-                    <Zap className="h-10 w-10 text-yellow-500" />
-                  </div>
-                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
-                    🚧 Drive Systems Under Construction
+                  <CardTitle className="text-2xl font-bold">
+                    <span>🚧</span> <span className="bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">Drive Systems Under Construction</span>
                   </CardTitle>
-                  <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  <p className="text-base text-muted-foreground max-w-2xl mx-auto">
                     Our engineering team is working on advanced propulsion and navigation systems
                   </p>
                 </div>
               </CardHeader>
-              <CardContent className="pb-12">
+              <CardContent className="pb-6">
                 <div className="relative">
                   {/* Animated illustration placeholder */}
-                  <div className="relative h-64 mb-8 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+                  <div className="relative h-48 mb-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
                     {/* Stars background */}
                     <div className="absolute inset-0 opacity-50">
                       <div className="absolute top-10 left-20 w-1 h-1 bg-white rounded-full animate-pulse" />
@@ -181,8 +178,8 @@ export function DriveContent({ slug }: DriveContentProps) {
                         </div>
                         
                         {/* Astronaut working on ship */}
-                        <div className="absolute -top-16 left-8 transform animate-float-delayed">
-                          <svg width="60" height="80" viewBox="0 0 60 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <div className="absolute -top-12 left-8 transform animate-float-delayed">
+                          <svg width="45" height="60" viewBox="0 0 60 80" fill="none" xmlns="http://www.w3.org/2000/svg">
                             {/* Astronaut body */}
                             <g>
                               {/* Backpack */}
@@ -235,31 +232,31 @@ export function DriveContent({ slug }: DriveContentProps) {
                   </div>
                   
                   {/* Feature list */}
-                  <div className="grid md:grid-cols-3 gap-6 mb-8">
+                  <div className="grid md:grid-cols-3 gap-4 mb-4">
                     <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-yellow-500/10 rounded-xl mb-2">
-                        <Gauge className="h-6 w-6 text-yellow-500" />
+                      <div className="inline-flex items-center justify-center w-10 h-10 bg-yellow-500/10 rounded-xl mb-1">
+                        <Gauge className="h-5 w-5 text-yellow-500" />
                       </div>
                       <h4 className="font-semibold">Propulsion Control</h4>
                       <p className="text-sm text-muted-foreground">Advanced thrust management systems</p>
                     </div>
                     <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-500/10 rounded-xl mb-2">
-                        <Activity className="h-6 w-6 text-orange-500" />
+                      <div className="inline-flex items-center justify-center w-10 h-10 bg-orange-500/10 rounded-xl mb-1">
+                        <Activity className="h-5 w-5 text-orange-500" />
                       </div>
                       <h4 className="font-semibold">Navigation Systems</h4>
                       <p className="text-sm text-muted-foreground">Quantum navigation algorithms</p>
                     </div>
                     <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-red-500/10 rounded-xl mb-2">
-                        <Battery className="h-6 w-6 text-red-500" />
+                      <div className="inline-flex items-center justify-center w-10 h-10 bg-red-500/10 rounded-xl mb-1">
+                        <Battery className="h-5 w-5 text-red-500" />
                       </div>
                       <h4 className="font-semibold">Energy Management</h4>
                       <p className="text-sm text-muted-foreground">Efficient power distribution</p>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 rounded-2xl p-6 text-center border border-yellow-500/20">
+                  <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 rounded-2xl p-4 text-center border border-yellow-500/20">
                     <p className="text-lg font-semibold text-foreground">
                       Drive Systems will be operational soon
                     </p>

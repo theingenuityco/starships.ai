@@ -709,6 +709,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
         onExpeditionCreated={handleExpeditionCreated}
         starshipId={starshipId}
         starshipSlug={slug}
+        starshipName={starship?.name}
       />
     </div>
   )

@@ -30,6 +30,7 @@ interface CreateExpeditionModalProps {
   onExpeditionCreated: (expeditionId: string) => void
   starshipId: string
   starshipSlug: string
+  starshipName?: string
 }
 
 interface FormData {
@@ -66,6 +67,7 @@ export function CreateExpeditionModal({
   onExpeditionCreated,
   starshipId,
   starshipSlug,
+  starshipName,
 }: CreateExpeditionModalProps) {
   // State Management
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -210,44 +212,36 @@ export function CreateExpeditionModal({
     <AnimatePresence>
       {open && (
         <Dialog open={open} onOpenChange={onClose}>
-          <DialogContent className="max-w-4xl max-h-[85vh] p-0 flex flex-col bg-gradient-to-br from-background via-background to-primary/5 [&>button]:hidden">
+          <DialogContent className="max-w-3xl max-h-[85vh] p-0 flex flex-col bg-background/95 backdrop-blur-sm [&>button]:hidden">
             {/* Accessibility: Hidden dialog title for screen readers */}
             <DialogHeader className="sr-only">
               <DialogTitle>Launch New Expedition</DialogTitle>
             </DialogHeader>
             
-            {/* Enhanced Header */}
-            <div className="relative flex-shrink-0 overflow-hidden border-b bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
-              <div className="absolute inset-0 bg-grid-white/[0.02]" />
+            {/* Simplified Header */}
+            <div className="flex-shrink-0 border-b bg-card/50">
               <motion.div 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative px-6 py-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="px-6 py-5"
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <motion.div 
-                      className="relative"
-                      animate={{ rotate: [0, 10, -10, 0] }}
-                      transition={{ duration: 4, repeat: Infinity }}
-                    >
-                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-                      <div className="relative p-2.5 bg-gradient-to-br from-primary to-primary/80 rounded-xl shadow-lg">
-                        <Rocket className="h-6 w-6 text-primary-foreground" />
-                      </div>
-                    </motion.div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <Rocket className="h-5 w-5 text-primary" />
+                    </div>
                     <div>
-                      <h2 className="text-xl font-semibold tracking-tight">Launch New Expedition</h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">Coordinate your AI agents on {starshipSlug}</p>
+                      <h2 className="text-lg font-semibold">Launch New Expedition</h2>
+                      <p className="text-sm text-muted-foreground">Coordinate your AI agents on {starshipName || starshipSlug}</p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={onClose}
-                    className="rounded-full hover:bg-background/80"
+                    className="hover:bg-muted"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               </motion.div>
@@ -262,18 +256,12 @@ export function CreateExpeditionModal({
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl">
-                      <Target className="h-4 w-4 text-primary" />
-                    </div>
-                    <h3 className="text-base font-semibold">Mission Details</h3>
-                  </div>
+                  <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Mission Details</h3>
                   
                   <div className="space-y-4">
                     {/* Name Field */}
                     <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
+                      <Label htmlFor="name" className="text-sm font-medium">
                         Expedition Name
                       </Label>
                       <div className="relative">
@@ -287,7 +275,7 @@ export function CreateExpeditionModal({
                               setValidationErrors({ ...validationErrors, name: undefined })
                             }
                           }}
-                          className="h-10 px-3 bg-background/50 backdrop-blur-sm border-border/50 focus:border-primary/50 transition-all"
+                          className="h-10 px-3 bg-background border-border/50 focus:border-primary/50 transition-colors"
                           maxLength={100}
                         />
                         <AnimatePresence>
@@ -320,8 +308,7 @@ export function CreateExpeditionModal({
 
                     {/* Mission Field */}
                     <div className="space-y-2">
-                      <Label htmlFor="mission" className="text-sm font-medium flex items-center gap-2">
-                        <Wand2 className="h-4 w-4 text-primary" />
+                      <Label htmlFor="mission" className="text-sm font-medium">
                         Mission Objectives
                       </Label>
                       <div className="relative">
@@ -336,7 +323,7 @@ export function CreateExpeditionModal({
                             }
                           }}
                           rows={3}
-                          className="resize-none text-sm p-3 bg-background/50 backdrop-blur-sm border-border/50 focus:border-primary/50 transition-all"
+                          className="resize-none text-sm p-3 bg-background border-border/50 focus:border-primary/50 transition-colors"
                           maxLength={500}
                         />
                         <div className="absolute bottom-3 right-3 text-xs text-muted-foreground">
@@ -364,22 +351,12 @@ export function CreateExpeditionModal({
                   transition={{ delay: 0.2 }}
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                      <h3 className="text-base font-semibold">Assign AI Agents</h3>
-                    </div>
+                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Assign AI Agents</h3>
                     <div className="flex items-center gap-3">
                       {formData.selectedAgents.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full"
-                        >
-                          <Star className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium">{formData.selectedAgents.length} selected</span>
-                        </motion.div>
+                        <Badge variant="secondary" className="text-xs">
+                          {formData.selectedAgents.length} selected
+                        </Badge>
                       )}
                       {availableAgents.length > 0 && (
                         <Button 
@@ -478,8 +455,8 @@ export function CreateExpeditionModal({
                                   className={`
                                     group relative cursor-pointer transition-all duration-200
                                     ${isSelected
-                                      ? 'border-primary shadow-lg shadow-primary/10 bg-primary/5'
-                                      : 'hover:border-primary/30 hover:shadow-md'
+                                      ? 'border-primary bg-primary/5'
+                                      : 'hover:border-border'
                                     }
                                   `}
                                 >
@@ -533,20 +510,9 @@ export function CreateExpeditionModal({
                                   </div>
 
                                   {/* Selection Indicator */}
-                                  <AnimatePresence>
-                                    {isSelected && (
-                                      <motion.div
-                                        initial={{ scale: 0, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0, opacity: 0 }}
-                                        className="shrink-0"
-                                      >
-                                        <div className="p-2 bg-primary rounded-lg">
-                                          <Check className="h-4 w-4 text-primary-foreground" />
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
+                                  {isSelected && (
+                                    <Check className="h-4 w-4 text-primary shrink-0" />
+                                  )}
                                 </div>
                               </Card>
                             </label>
@@ -578,11 +544,7 @@ export function CreateExpeditionModal({
             </div>
 
             {/* Footer Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-            >
+            <div className="flex-shrink-0 border-t bg-card/50">
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-2">
@@ -622,24 +584,20 @@ export function CreateExpeditionModal({
                   <Button
                     onClick={handleSubmit}
                     disabled={isSubmitting || availableAgents.length === 0}
-                    className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                    className="min-w-[140px]"
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Launching...
                       </>
                     ) : (
-                      <>
-                        <Rocket className="h-4 w-4" />
-                        Launch Expedition
-                        <ArrowRight className="h-4 w-4" />
-                      </>
+                      'Launch Expedition'
                     )}
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </DialogContent>
         </Dialog>
       )}

@@ -29,7 +29,9 @@ import {
   MessageSquare,
   Shield,
   Sparkles,
-  Rocket
+  Rocket,
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 // Socket import removed - using HTTP-only implementation
@@ -265,7 +267,7 @@ export function ExpeditionCard({
       <Card
         className={`
           cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/40 overflow-hidden
-          min-h-[280px] flex flex-col
+          h-[260px] flex flex-col
           ${isHovered ? 'shadow-lg border-border/60 bg-card/60' : ''}
           hover:shadow-xl hover:shadow-primary/3
           ${error ? 'border-red-200 bg-red-50/50' : ''}
@@ -301,8 +303,18 @@ export function ExpeditionCard({
         <CardHeader className="pb-0 relative space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
+              {/* Status Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 blur-sm" />
+                <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-background to-muted border border-border/50">
+                  <StatusIcon className="h-5 w-5 text-primary" />
+                </div>
+              </div>
               <div className="flex-1">
-                <CardTitle className="text-lg font-bold">{localExpedition.name}</CardTitle>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  {localExpedition.name}
+                  {expeditionType && <TypeIcon className="h-4 w-4 text-muted-foreground" />}
+                </CardTitle>
                 <Badge 
                   variant="outline"
                   className={`mt-1 text-[10px] px-1.5 py-0.5 h-5 ${statusConfig.className}`}
@@ -380,30 +392,50 @@ export function ExpeditionCard({
         <CardContent className="pt-3 pb-3 relative flex-1 flex flex-col justify-between gap-3">
           {/* Key Information */}
           <div className="space-y-3">
-            {/* Expedition Info */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Created</p>
-                <p className="font-medium">{formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}</p>
+            {/* Expedition Stats */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted/20 border border-border/20">
+                <Calendar className="w-3 h-3 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-muted-foreground">Started</span>
+                  <span className="text-[10px] font-medium truncate">{formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}</span>
+                </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">ID</p>
-                <p className="font-mono text-xs">{localExpedition.id.slice(0, 8)}...</p>
+              
+              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted/20 border border-border/20">
+                <Target className="w-3 h-3 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-muted-foreground">Tasks</span>
+                  <span className="text-[10px] font-medium">{tasks.length || 0}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted/20 border border-border/20">
+                <Activity className="w-3 h-3 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-muted-foreground">Status</span>
+                  <span className="text-[10px] font-medium capitalize truncate">{localExpedition.status.replace('-', ' ')}</span>
+                </div>
               </div>
             </div>
             
             {/* Progress Bar */}
-            {showTaskProgress && progress > 0 && (
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Progress</span>
-                  <span className="font-medium">{progress}%</span>
+            {showTaskProgress && (
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/15">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="w-3 h-3 text-primary" />
+                    <span className="text-[10px] font-medium">Progress</span>
+                  </div>
+                  <span className="text-xs font-bold text-primary">{progress}%</span>
                 </div>
-                <div className="w-full bg-secondary/20 rounded-full h-1.5">
+                <div className="w-full bg-primary/10 rounded-full h-1.5 overflow-hidden">
                   <div 
-                    className="bg-gradient-to-r from-primary to-primary/80 h-1.5 rounded-full transition-all duration-500"
+                    className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 h-1.5 rounded-full transition-all duration-700 relative"
                     style={{ width: `${progress}%` }}
-                  />
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                  </div>
                 </div>
               </div>
             )}
@@ -421,14 +453,22 @@ export function ExpeditionCard({
                   </div>
                 )}
               </div>
-              {expeditionType && (
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs px-2 py-0.5 capitalize ${expeditionType.className}`}
-                >
-                  {expeditionType.label}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {localExpedition.result && (
+                  <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Has Results
+                  </Badge>
+                )}
+                {expeditionType && (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs px-2 py-0.5 capitalize ${expeditionType.className}`}
+                  >
+                    {expeditionType.label}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 

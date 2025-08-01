@@ -41,12 +41,7 @@ export function NavigationItem({
             }`}>
               <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
             </div>
-            {status === 'warning' && (
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-500 rounded-full animate-pulse shadow-lg shadow-yellow-500/50" />
-            )}
-            {status === 'active' && (
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50" />
-            )}
+            {/* Status indicators removed for cleaner look */}
           </div>
           <div className="flex-1 min-w-0">
             <span className={`font-semibold ${compact ? 'text-sm' : 'text-sm'} truncate block ${

@@ -97,10 +97,10 @@ export function AgentSelector({
       setLoading(true)
       // Clear any existing agents to prevent flash of wrong data
       setAgents([])
-      
+
       // If starshipId is provided, fetch agents for that specific starship
       // Otherwise, fetch all agents (for backward compatibility)
-      const fetchedAgents = starshipId 
+      const fetchedAgents = starshipId
         ? await agentAPI.getByStarshipId(starshipId)
         : await agentAPI.getAll()
       setAgents(fetchedAgents)
@@ -250,12 +250,12 @@ export function AgentSelector({
   return (
     <div className="space-y-6">
       {/* Enhanced Header with better visual hierarchy */}
-      <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-4">
+      <div className="p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-6">
         <div className="flex items-center gap-4">
           <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
             <Bot className="h-6 w-6 text-primary" />
           </span>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
             <p className="text-sm text-muted-foreground">Manage your starship's AI crew members</p>
           </div>
@@ -294,34 +294,40 @@ export function AgentSelector({
 
       {showFilters && (
         <div className="space-y-4">
-          {/* Enhanced Search Section */}
+          {/* Enhanced Search & Filter Section */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 px-1">
               <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
               <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                Search & Filter
+                ACTIVE AGENTS
               </h4>
               <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
             </div>
 
-            <div className="relative">
-              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
-                <Search className="w-4 h-4" />
-              </div>
-              <Input
-                placeholder="Search agents..."
-                value={filters.searchQuery}
-                onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                className="pl-12 pr-4 h-12 bg-background border-2 border-dashed border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
-              />
-            </div>
+            {/* Search and Filters Side by Side - COMMENTED OUT FOR NOW */}
+            {/* <div className="flex flex-col lg:flex-row gap-4">
+              {/* Search Input */}
+              {/* <div className="flex-1 relative">
+                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
+                  <Search className="w-4 h-4" />
+                </div>
+                <Input
+                  placeholder="Search agents..."
+                  value={filters.searchQuery}
+                  onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+                  className="pl-12 pr-4 h-12 bg-background border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                />
+              </div> */}
 
-            {/* Filters */}
-            <AgentFilters
-              filters={filters}
-              onFiltersChange={setFilters}
-              availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
-            />
+              {/* Filters */}
+              {/* <div className="lg:flex-shrink-0">
+                <AgentFilters
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
+                />
+              </div> */}
+            {/* </div> */}
           </div>
         </div>
       )}

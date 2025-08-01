@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,26 +21,17 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Pause,
-  Play,
   FileText,
   MoreVertical,
-  Star,
-  TrendingUp,
   Activity,
   Zap,
-  Eye,
-  Edit,
   Trash2,
-  Copy,
-  ExternalLink,
   MessageSquare,
-  BarChart3,
   Shield,
-  Loader2,
-  RotateCcw,
   Sparkles,
-  Rocket
+  Rocket,
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 // Socket import removed - using HTTP-only implementation
@@ -89,56 +78,10 @@ interface ExpeditionCardProps {
   className?: string;
 }
 
-interface ActionButtonProps {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  onClick: (e: React.MouseEvent) => void;
-  variant?: 'default' | 'outline' | 'destructive' | 'secondary';
-  disabled?: boolean;
-  loading?: boolean;
-  size?: 'sm' | 'default';
-}
-
-// Action Button Component
-const ActionButton: React.FC<ActionButtonProps> = ({
-  icon: Icon,
-  label,
-  onClick,
-  variant = 'outline',
-  disabled = false,
-  loading = false,
-  size = 'sm'
-}) => (
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant={variant}
-          size={size}
-          onClick={onClick}
-          disabled={disabled || loading}
-          className="h-8 w-8 p-0"
-          aria-label={label}
-        >
-          {loading ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Icon className="h-3 w-3" />
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{label}</p>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-);
-
 // Main ExpeditionCard Component
 export function ExpeditionCard({
   expedition,
   onClick,
-  showActions = false,
   enableContextMenu = true,
   showAgentAvatars = true,
   showQualityScore = true,
@@ -147,12 +90,8 @@ export function ExpeditionCard({
   onPause,
   onResume,
   onCancel,
-  onEdit,
   onDelete,
-  onDuplicate,
-  onViewDetails,
   onViewChat,
-  onViewAnalytics,
   agents = [],
   tasks = [],
   qualityScore,
@@ -161,9 +100,9 @@ export function ExpeditionCard({
 
   // State management
   const [isHovered, setIsHovered] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [localExpedition, setLocalExpedition] = useState(expedition);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // HTTP-only implementation: Real-time updates disabled
@@ -174,29 +113,6 @@ export function ExpeditionCard({
   useEffect(() => {
     setLocalExpedition(expedition);
   }, [expedition]);
-
-  // Enhanced action handlers with offline support and better error handling
-  const handleAction = useCallback(async (
-    action: string,
-    handler?: (expeditionId: string) => Promise<boolean>
-  ) => {
-    if (!handler) return;
-
-    setActionLoading(action);
-    setError(null);
-
-    try {
-      const success = await handler(localExpedition.id);
-      if (!success) {
-        setError(`Failed to ${action} expedition`);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : `Failed to ${action} expedition`;
-      setError(errorMessage);
-    } finally {
-      setActionLoading(null);
-    }
-  }, [localExpedition.id]);
 
   // Get status styling
   const getStatusConfig = (status: ExpeditionStatus) => {
@@ -224,14 +140,6 @@ export function ExpeditionCard({
           className: 'text-amber-600 bg-amber-50 dark:bg-amber-900/50 dark:text-amber-400',
           dotColor: 'bg-amber-500',
           pulse: true
-        };
-      case 'review':
-        return {
-          icon: AlertCircle,
-          label: 'Review',
-          className: 'text-purple-600 bg-purple-50 dark:bg-purple-900/50 dark:text-purple-400',
-          dotColor: 'bg-purple-500',
-          pulse: false
         };
       case 'completed':
         return {
@@ -281,7 +189,6 @@ export function ExpeditionCard({
       case 'draft': return 0;
       case 'planning': return 20;
       case 'in-progress': return 60;
-      case 'review': return 90;
       case 'completed': return 100;
       case 'failed': return 0;
       case 'cancelled': return 0;
@@ -332,7 +239,7 @@ export function ExpeditionCard({
     if (mission.includes('deploy') || mission.includes('release') || mission.includes('launch')) {
       return { label: 'Deployment', icon: Activity, className: 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400' };
     }
-    return { label: 'Mission', icon: Rocket, className: 'text-gray-600 bg-gray-50 dark:bg-gray-900/30 dark:text-gray-400' };
+    return null; // Don't show generic 'Mission' type
   };
 
   const statusConfig = getStatusConfig(localExpedition.status);
@@ -340,7 +247,7 @@ export function ExpeditionCard({
   const qualityDisplay = getQualityDisplay();
   const expeditionType = getExpeditionType();
   const StatusIcon = statusConfig.icon;
-  const TypeIcon = expeditionType.icon;
+  const TypeIcon = expeditionType?.icon || Rocket;
 
   // Get assigned agents for display
   const assignedAgents = agents.filter(agent =>
@@ -350,22 +257,20 @@ export function ExpeditionCard({
   return (
     <motion.div
       ref={cardRef}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
+      whileHover={{ scale: 1.01, y: -1 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       className={className}
     >
       <Card
         className={`
-          relative cursor-pointer transition-all duration-300 group
-          bg-gradient-to-br from-background via-background to-muted/5
-          hover:shadow-xl hover:shadow-primary/10 hover:border-primary/40
-          hover:bg-gradient-to-br hover:from-background hover:via-background hover:to-primary/5
-          border-muted-foreground/10
-          ${error ? 'border-red-200 bg-red-50/50' : ''}
+          cursor-pointer transition-all duration-300 relative overflow-hidden
+          bg-card/50 backdrop-blur-sm border-border/50 shadow-sm
+          hover:shadow-xl hover:border-primary/30
+          min-h-[280px] flex flex-col
+          ${error ? 'border-red-500/20 bg-red-500/5' : ''}
         `}
         onClick={onClick}
         role="button"
@@ -378,75 +283,55 @@ export function ExpeditionCard({
           }
         }}
       >
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/3 via-transparent to-secondary/3 pointer-events-none" />
+        
         {/* Connection status removed - HTTP mode only */}
 
         {/* Enhanced error banner */}
-        <AnimatePresence>
-          {displayError && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="border-b px-4 py-2 bg-red-100 border-red-200"
-            >
-              <div className="flex items-center space-x-2 text-sm text-red-700">
-                <AlertCircle className="h-4 w-4" />
-                <span>{displayError}</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-2">
-                <CardTitle className="text-lg font-semibold truncate group-hover:text-primary transition-colors">
-                  {localExpedition.name}
-                </CardTitle>
-                {qualityDisplay && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Badge
-                          variant="outline"
-                          className={`${qualityDisplay.color} ${qualityDisplay.bgColor} border-current text-xs`}
-                        >
-                          <Star className="h-3 w-3 mr-1" />
-                          {qualityDisplay.score}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-xs">
-                          <p>Quality Score: {qualityDisplay.score}/100</p>
-                          <p>Completeness: {qualityScore?.completeness || 0}/100</p>
-                          <p>Accuracy: {qualityScore?.accuracy || 0}/100</p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-              </div>
-              <CardDescription className="mt-1 line-clamp-2 text-sm">
-                {localExpedition.mission}
-              </CardDescription>
+        {displayError && (
+          <div
+            className="border-b px-4 py-2 bg-red-100 border-red-200"
+          >
+            <div className="flex items-center space-x-2 text-sm text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              <span>{displayError}</span>
             </div>
+          </div>
+        )}
 
-            <div className="flex items-start space-x-2 ml-4">
-              <div className="flex flex-col items-end space-y-2">
-                <div
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${statusConfig.className}`}
-                >
-                  <div className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotColor} ${statusConfig.pulse ? 'animate-pulse' : ''}`} />
-                  <span>{statusConfig.label}</span>
-                </div>
-                <div
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${expeditionType.className}`}
-                >
-                  <TypeIcon className="h-3 w-3" />
-                  <span>{expeditionType.label}</span>
+        <CardHeader className="pb-3 border-b border-border/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {/* Status Icon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                <div className="relative bg-gradient-to-br from-primary/15 to-primary/10 p-2.5 rounded-xl shadow-sm border border-primary/15">
+                  <StatusIcon className="h-5 w-5 text-primary" />
                 </div>
               </div>
+              <div className="flex-1">
+                <CardTitle className="text-lg font-bold flex items-center gap-2 group-hover:text-primary transition-colors">
+                  {localExpedition.name}
+                  {expeditionType && <TypeIcon className="h-4 w-4 text-muted-foreground" />}
+                </CardTitle>
+                <Badge 
+                  variant="outline"
+                  className={`mt-1 text-[10px] px-1.5 py-0.5 h-5 ${statusConfig.className}`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor} ${statusConfig.pulse ? 'animate-pulse' : ''} mr-1`} />
+                  {statusConfig.label}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              {/* Quality Score */}
+              {qualityDisplay && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${qualityDisplay.bgColor}`}>
+                  <Star className={`w-3 h-3 fill-current ${qualityDisplay.color}`} />
+                  <span className={`text-xs font-bold ${qualityDisplay.color}`}>{qualityDisplay.score}%</span>
+                </div>
+              )}
 
               {/* Context Menu */}
               {enableContextMenu && (
@@ -495,175 +380,103 @@ export function ExpeditionCard({
               )}
             </div>
           </div>
+          
+          {/* Description with ellipsis */}
+          <div>
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {localExpedition.mission}
+            </p>
+          </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className="p-4 relative flex-1 flex flex-col justify-between gap-3">
+          {/* Key Information */}
+          <div className="space-y-3">
+            {/* Expedition Stats */}
+            <div className="grid grid-cols-3 gap-1.5">
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
+                <Calendar className="w-3 h-3 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-muted-foreground">Started</span>
+                  <span className="text-[10px] font-medium truncate">{formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
+                <Target className="w-3 h-3 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-muted-foreground">Tasks</span>
+                  <span className="text-[10px] font-medium">{tasks.length || 0}</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
+                <Activity className="w-3 h-3 text-muted-foreground" />
+                <div className="flex flex-col">
+                  <span className="text-[9px] text-muted-foreground">Status</span>
+                  <span className="text-[10px] font-medium capitalize truncate">{localExpedition.status.replace('-', ' ')}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Progress Bar */}
+            {showTaskProgress && (
+              <div className="p-2 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/15">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <TrendingUp className="w-3 h-3 text-primary" />
+                    <span className="text-[10px] font-medium">Progress</span>
+                  </div>
+                  <span className="text-xs font-bold text-primary">{progress}%</span>
+                </div>
+                <div className="w-full bg-primary/10 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-primary via-primary/80 to-primary/60 h-1.5 rounded-full transition-all duration-700 relative"
+                    style={{ width: `${progress}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Progress</span>
-              <div className="flex items-center space-x-2">
-                {showTaskProgress && tasks.length > 0 && (
-                  <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                    {tasks.filter(t => t.status === 'completed').length}/{tasks.length} tasks
-                  </span>
+          {/* Bottom Section */}
+          <div className="space-y-3">
+            {/* Additional Info */}
+            <div className="flex items-center justify-between pt-3 border-t border-border/50">
+              <div className="flex items-center gap-3">
+                {localExpedition.updatedAt && localExpedition.updatedAt !== localExpedition.createdAt && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    <span>Updated {formatDistanceToNow(new Date(localExpedition.updatedAt), { addSuffix: true })}</span>
+                  </div>
                 )}
-                <span className="font-bold text-primary">{progress}%</span>
               </div>
-            </div>
-            <div className="relative">
-              <Progress value={progress} className="h-2 bg-muted/30" />
-              {progress > 0 && progress < 100 && statusConfig.pulse && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary animate-pulse" />
-              )}
+              <div className="flex items-center gap-2">
+                {localExpedition.result && (
+                  <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Has Results
+                  </Badge>
+                )}
+                {expeditionType && (
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs px-2 py-0.5 capitalize ${expeditionType.className}`}
+                  >
+                    {expeditionType.label}
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Agent Avatars */}
-          {showAgentAvatars && assignedAgents.length > 0 && (
-            <div className="flex items-center justify-between bg-muted/10 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-muted-foreground">Crew</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="flex -space-x-2">
-                  {assignedAgents.slice(0, 3).map((agent) => (
-                    <TooltipProvider key={agent.id}>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Avatar className="h-7 w-7 border-2 border-background shadow-sm hover:scale-110 transition-transform">
-                            <AvatarImage src={agent.avatar} alt={agent.name} />
-                            <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/30">
-                              {agent.name.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <div className="text-xs">
-                            <p className="font-semibold">{agent.name}</p>
-                            <p className="text-muted-foreground">{agent.category}</p>
-                            <div className="flex items-center gap-1 mt-1">
-                              <div className={`h-2 w-2 rounded-full ${agent.status === 'available' ? 'bg-green-500' :
-                                  agent.status === 'busy' ? 'bg-yellow-500' : 'bg-gray-500'
-                                }`} />
-                              <p className="capitalize">{agent.status}</p>
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ))}
-                  {assignedAgents.length > 3 && (
-                    <div className="h-7 w-7 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center shadow-sm">
-                      <span className="text-xs font-semibold">+{assignedAgents.length - 3}</span>
-                    </div>
-                  )}
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {assignedAgents.length} agent{assignedAgents.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-            </div>
-          )}
 
-          {/* Metadata */}
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="truncate">
-                {formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}
-              </span>
-            </div>
-            {localExpedition.updatedAt !== localExpedition.createdAt && (
-              <Badge variant="outline" className="text-xs px-2 py-0 h-5">
-                <Clock className="h-3 w-3 mr-1" />
-                Updated
-              </Badge>
-            )}
-          </div>
-
-
-          {/* Enhanced Action Buttons with offline support */}
-          <AnimatePresence>
-            {showActions && (isHovered || ['in-progress', 'planning'].includes(localExpedition.status)) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex items-center justify-between pt-2 border-t"
-              >
-                <div className="flex space-x-2">
-                  {localExpedition.status === 'draft' && onStart && (
-                    <ActionButton
-                      icon={Play}
-                      label="Start Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('start', onStart);
-                      }}
-                      loading={actionLoading === 'start'}
-                      variant="default"
-                    />
-                  )}
-
-                  {localExpedition.status === 'in-progress' && onPause && (
-                    <ActionButton
-                      icon={Pause}
-                      label="Pause Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('pause', onPause);
-                      }}
-                      loading={actionLoading === 'pause'}
-                    />
-                  )}
-
-                  {['paused', 'failed'].includes(localExpedition.status) && onResume && (
-                    <ActionButton
-                      icon={RotateCcw}
-                      label="Resume Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('resume', onResume);
-                      }}
-                      loading={actionLoading === 'resume'}
-                      variant="default"
-                    />
-                  )}
-
-                  {['draft', 'planning', 'in-progress'].includes(localExpedition.status) && onCancel && (
-                    <ActionButton
-                      icon={XCircle}
-                      label="Cancel Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('cancel', onCancel);
-                      }}
-                      loading={actionLoading === 'cancel'}
-                      variant="destructive"
-                    />
-                  )}
-                </div>
-
-                {/* Quick access buttons */}
-                <div className="flex space-x-1">
-                  {onViewChat && (
-                    <ActionButton
-                      icon={MessageSquare}
-                      label="Open Chat"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewChat(localExpedition.id);
-                      }}
-                    />
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </CardContent>
+        
+        {/* Hover effect overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </Card>
     </motion.div>
   );

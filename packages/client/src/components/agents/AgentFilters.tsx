@@ -71,7 +71,10 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
           <Filter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Filters</span>
           {hasActiveFilters && (
-            <Badge variant="secondary" className="ml-2 text-xs">
+            <Badge
+              variant="secondary"
+              className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+            >
               {(filters.category ? 1 : 0) +
                 (filters.isPublic !== undefined ? 1 : 0) +
                 filters.tags.length}{' '}
@@ -93,12 +96,6 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               Clear All
             </Button>
           )}
-          <ChevronDown
-            className={cn(
-              'w-4 h-4 transition-transform duration-200',
-              isExpanded && 'transform rotate-180'
-            )}
-          />
         </div>
       </div>
 

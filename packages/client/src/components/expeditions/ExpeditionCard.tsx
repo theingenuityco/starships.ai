@@ -267,7 +267,7 @@ export function ExpeditionCard({
       <Card
         className={`
           cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/40 overflow-hidden
-          h-[260px] flex flex-col
+          min-h-[300px] flex flex-col
           ${isHovered ? 'shadow-lg border-border/60 bg-card/60' : ''}
           hover:shadow-xl hover:shadow-primary/3
           ${error ? 'border-red-200 bg-red-50/50' : ''}
@@ -389,7 +389,7 @@ export function ExpeditionCard({
           </div>
         </CardHeader>
 
-        <CardContent className="pt-3 pb-3 relative flex-1 flex flex-col justify-between gap-3">
+        <CardContent className="pt-3 pb-4 relative flex-1 flex flex-col justify-between gap-2">
           {/* Key Information */}
           <div className="space-y-3">
             {/* Expedition Stats */}

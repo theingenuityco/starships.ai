@@ -151,7 +151,7 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                     <BookOpen className="h-10 w-10 text-amber-500" />
                   </div>
                   <CardTitle className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">
-                    Logbook Archives Under Construction
+                    🚧 Logbook Archives Under Construction
                   </CardTitle>
                   <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                     Our archivists are digitizing mission logs and historical records
@@ -252,7 +252,7 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                     <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm p-4">
                       <div className="flex items-center justify-center gap-2 text-xs text-amber-400">
                         <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-                        <span>Archives being digitized</span>
+                        <span>System under maintenance</span>
                       </div>
                     </div>
                   </div>
@@ -283,9 +283,6 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                   </div>
                   
                   <div className="bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-amber-700/10 rounded-2xl p-6 text-center border border-amber-500/20">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      📚 Currently being archived
-                    </p>
                     <p className="text-lg font-semibold text-foreground">
                       Logbook system will be available soon
                     </p>

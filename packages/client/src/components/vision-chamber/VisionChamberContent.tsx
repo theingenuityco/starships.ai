@@ -75,33 +75,6 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
                 </div>
               </div>
 
-              <div className="h-10 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
-
-              {/* Stats Cards */}
-              <div className="flex items-center gap-3">
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Active Visions</p>
-                        <p className="text-sm font-bold">{activeVisions}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-3.5 w-3.5 text-purple-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Insights</p>
-                        <p className="text-sm font-bold">{totalInsights}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </div>
 

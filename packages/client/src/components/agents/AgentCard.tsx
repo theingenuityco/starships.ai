@@ -226,10 +226,6 @@ export function AgentCard({
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
             </div>
 
-            {/* Version badge */}
-            <Badge variant="secondary" className="text-xs px-2 py-0 h-5 bg-muted/50">
-              v{agent.version || '1.0.0'}
-            </Badge>
           </div>
 
           {/* Center Column: Main content */}

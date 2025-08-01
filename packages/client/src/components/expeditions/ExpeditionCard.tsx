@@ -268,10 +268,10 @@ export function ExpeditionCard({
     >
       <Card
         className={`
-          cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden
+          cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/40 overflow-hidden
           h-[240px] flex flex-col
-          ${isHovered ? 'shadow-xl border-border/80 bg-card/70' : ''}
-          hover:shadow-2xl hover:shadow-primary/5
+          ${isHovered ? 'shadow-lg border-border/60 bg-card/60' : ''}
+          hover:shadow-xl hover:shadow-primary/3
           ${error ? 'border-red-200 bg-red-50/50' : ''}
         `}
         onClick={onClick}
@@ -286,7 +286,7 @@ export function ExpeditionCard({
         }}
       >
         {/* Subtle gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/3 via-transparent to-secondary/3 pointer-events-none" />
         
         {/* Connection status removed - HTTP mode only */}
 

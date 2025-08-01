@@ -23,6 +23,7 @@ import {
   Clock,
   Users,
   Target,
+  Calendar,
   TrendingUp,
   CheckCircle2,
   XCircle,
@@ -133,7 +134,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   }
 
   // Get status counts for badges
-  const statusCounts: Record<string, number> = (expeditions || []).reduce(
+  const statusCounts: Record<string, number> = (expeditions || []).reduce<Record<string, number>>(
     (acc, expedition) => {
       acc[expedition.status] = (acc[expedition.status] || 0) + 1
       return acc
@@ -239,10 +240,8 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {/* Total Missions Card */}
             <div className="group transition-transform">
-              <Card className="relative overflow-hidden border-primary/20 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card via-card/98 to-primary/3">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent opacity-50" />
-                <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-primary/3 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
-                <div className="relative p-3">
+              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
@@ -259,16 +258,14 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       </div>
                     </div>
                   </div>
-                </div>
+                </CardContent>
               </Card>
             </div>
 
             {/* Active Now Card */}
             <div className="group transition-transform">
-              <Card className="relative overflow-hidden border-blue-500/20 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card via-card/98 to-blue-500/3">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-blue-500/2 to-transparent opacity-50" />
-                <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/3 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
-                <div className="relative p-3">
+              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
@@ -291,16 +288,14 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       <span className="text-[10px] text-blue-600 dark:text-blue-400">In Progress</span>
                     </div>
                   )}
-                </div>
+                </CardContent>
               </Card>
             </div>
 
             {/* Completed Card */}
             <div className="group transition-transform">
-              <Card className="relative overflow-hidden border-green-500/20 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card via-card/98 to-green-500/3">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 via-green-500/2 to-transparent opacity-50" />
-                <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-green-500/3 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
-                <div className="relative p-3">
+              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
@@ -317,16 +312,14 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       </div>
                     </div>
                   </div>
-                </div>
+                </CardContent>
               </Card>
             </div>
 
             {/* Success Rate Card */}
             <div className="group transition-transform">
-              <Card className="relative overflow-hidden border-purple-500/20 shadow-sm hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card via-card/98 to-purple-500/3">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-purple-500/2 to-transparent opacity-50" />
-                <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-500/3 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
-                <div className="relative p-3">
+              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
@@ -354,7 +347,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       />
                     </div>
                   </div>
-                </div>
+                </CardContent>
               </Card>
             </div>
           </div>

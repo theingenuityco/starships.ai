@@ -220,9 +220,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       <div className="relative overflow-hidden">
         {/* Background gradient effect - reduced opacity */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-cyan-500/5" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5" />
         
-        <div className="relative flex items-center justify-between px-8 py-8 backdrop-blur-sm border-b border-border/40">
+        <div className="relative flex items-center justify-between px-8 py-6 backdrop-blur-sm border-b border-border/40">
           <div className="flex items-center gap-6">
             <div>
               <Button
@@ -232,8 +232,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 asChild
               >
                 <Link href="/fleet">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Fleet
+                  <ArrowLeft className="h-4 w-4" />
                 </Link>
               </Button>
             </div>
@@ -256,58 +255,59 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
               <div className="h-10 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
 
+              {/* Stats Cards moved here */}
               <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-green-500/5" />
-                  <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/10 p-2 rounded-lg">
-                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
-                  </div>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-base font-semibold text-foreground">
-                    {starshipLoading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Loading...
-                      </span>
-                    ) : (
-                      starship?.name || 'Unknown Starship'
-                    )}
-                  </span>
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Activity className="h-3 w-3" />
-                    Active Starship
-                  </span>
-                </div>
+                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                  <CardContent className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-3.5 w-3.5 text-primary" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Active Agents</p>
+                        <p className="text-sm font-bold">{selectedAgent ? 1 : 0}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                  <CardContent className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Plug className="h-3.5 w-3.5 text-cyan-500" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Connectors</p>
+                        <p className="text-sm font-bold">{connectorInstances.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Stats Cards */}
+            {/* Starship info moved here */}
             <div className="flex items-center gap-3">
-              <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3">
-                    <Bot className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Active Agents</p>
-                      <p className="text-lg font-bold">{selectedAgent ? 1 : 0}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3">
-                    <Plug className="h-4 w-4 text-cyan-500" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Connectors</p>
-                      <p className="text-lg font-bold">{connectorInstances.length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="relative">
+                <div className="absolute inset-0 bg-green-500/5" />
+                <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/10 p-2 rounded-lg">
+                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-semibold text-foreground">
+                  {starshipLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    starship?.name || 'Unknown Starship'
+                  )}
+                </span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  Active Starship
+                </span>
+              </div>
             </div>
           </div>
         </div>

@@ -407,4 +407,19 @@
     backface-visibility: hidden;
     perspective: 1000px;
   }
+
+  /* Scale X animation for agent card */
+  @keyframes scale-x {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  .animate-scale-x {
+    animation: scale-x 0.5s ease-out forwards;
+    transform-origin: left;
+  }
 }

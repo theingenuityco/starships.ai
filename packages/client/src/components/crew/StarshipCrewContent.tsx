@@ -241,14 +241,14 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-cyan-500/20 blur-lg" />
-                  <div className="relative bg-gradient-to-br from-cyan-500/30 to-cyan-500/20 p-3 rounded-xl shadow-lg border border-cyan-500/30">
+                  <div className="absolute inset-0 bg-cyan-500/10 blur-sm" />
+                  <div className="relative bg-gradient-to-br from-cyan-500/20 to-cyan-500/10 p-3 rounded-xl shadow-md border border-cyan-500/20">
                     <Users className="h-6 w-6 text-cyan-500" />
                   </div>
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Crew Management
+                    Crew Console
                   </h1>
                   <p className="text-sm text-muted-foreground">Manage your AI agents and connectors</p>
                 </div>
@@ -258,7 +258,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-green-500/10 blur-sm" />
+                  <div className="absolute inset-0 bg-green-500/5" />
                   <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/10 p-2 rounded-lg">
                     <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
                   </div>
@@ -317,9 +317,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       <div className="grid grid-cols-[450px_1fr] flex-1 min-h-0">
         {/* Enhanced Left Sidebar */}
         <div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
           className="border-r border-border/40 bg-gradient-to-br from-card/60 to-card/40 backdrop-blur-sm shadow-lg flex flex-col min-h-0"
         >
           <div className="p-6 pb-0 flex flex-col h-full min-h-0">
@@ -348,60 +345,28 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 {/* <AnimatePresence mode="wait"> */}
                   <div
                     key="agents-content"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
                     className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar"
                   >
                     {starshipLoading ? (
                       <div className="flex items-center justify-center h-full">
                         <div
-                          initial={{ scale: 0.8, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
                           className="text-center"
                         >
                           <div className="relative">
-                            <div className="absolute inset-0 bg-primary/20 blur-2xl" />
+                            <div className="absolute inset-0 bg-primary/5 blur-sm" />
                             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4 relative" />
                           </div>
                           <p className="text-sm text-muted-foreground font-medium">Discovering available agents...</p>
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {/* Agent Stats Header */}
-                        <div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 }}
-                          className="bg-gradient-to-r from-primary/10 to-cyan-500/10 rounded-lg p-4 border border-border/40"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-primary/20 rounded-lg">
-                                <Brain className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <h3 className="font-semibold text-sm">AI Crew Members</h3>
-                                <p className="text-xs text-muted-foreground">Specialized agents for your starship</p>
-                              </div>
-                            </div>
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                              <Sparkles className="h-3 w-3 mr-1" />
-                              Ready
-                            </Badge>
-                          </div>
-                        </div>
-                        
-                        <AgentSelector
-                          selectedAgent={selectedAgent}
-                          onAgentSelect={handleAgentSelect}
-                          showCreateButton={true}
-                          showFilters={true}
-                          starshipId={starship?.id}
-                        />
-                      </div>
+                      <AgentSelector
+                        selectedAgent={selectedAgent}
+                        onAgentSelect={handleAgentSelect}
+                        showCreateButton={true}
+                        showFilters={true}
+                        starshipId={starship?.id}
+                      />
                     )}
                   </div>
                 {/* </AnimatePresence> */}
@@ -414,35 +379,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 {/* <AnimatePresence mode="wait"> */}
                   <div
                     key="connectors-content"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
                     className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-4 min-h-0 custom-scrollbar"
                   >
-                    {/* Connector Stats Header */}
-                    <div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="bg-gradient-to-r from-cyan-500/10 to-primary/10 rounded-lg p-4 border border-border/40"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-cyan-500/20 rounded-lg">
-                            <Network className="h-5 w-5 text-cyan-500" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-sm">System Connectors</h3>
-                            <p className="text-xs text-muted-foreground">External integrations and tools</p>
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20">
-                          {connectorInstances.filter(c => c.status === 'running').length} Active
-                        </Badge>
-                      </div>
-                    </div>
-
                     <ConnectorSelector
                       starshipId={slug}
                       selectedConnectors={connectorInstances
@@ -456,8 +394,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     
                     {connectorsError && (
                       <div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
                         className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-red-600 dark:text-red-400"
                       >
                         {connectorsError}
@@ -467,9 +403,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     {/* Enhanced Status Dashboard */}
                     {connectorInstances.length > 0 && (
                       <div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
                         className="mt-3"
                       >
                         <ConnectorStatusDashboard
@@ -483,9 +416,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     {/* Enhanced Troubleshooting Panel */}
                     {connectorInstances.some(c => c.status === 'error' || c.errorMessage) && (
                       <div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ type: 'spring', delay: 0.3 }}
                         className="mt-3"
                       >
                         <ConnectorTroubleshootingPanel connectorInstances={connectorInstances} />
@@ -500,9 +430,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
         {/* Enhanced Right Content Area */}
         <div
-          initial={{ x: 20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
           className="bg-gradient-to-br from-background via-background to-muted/5 overflow-hidden h-full"
         >
           {selectedAgent ? (
@@ -515,63 +442,32 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
               <div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', duration: 0.5 }}
                 className="bg-gradient-to-br from-card via-card/95 to-primary/5 p-10 rounded-2xl text-center max-w-lg shadow-xl border border-primary/20"
               >
                 <div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', delay: 0.2, duration: 0.5 }}
                   className="relative mb-8"
                 >
-                  <div className="absolute inset-0 bg-primary/20 blur-2xl" />
+                  <div className="absolute inset-0 bg-primary/5 blur-sm" />
                   <div className="relative bg-gradient-to-br from-primary/20 to-primary/30 p-4 rounded-2xl w-24 h-24 flex items-center justify-center mx-auto shadow-lg">
                     <MessageSquare className="h-12 w-12 text-primary" />
                   </div>
                 </div>
                 
                 <h3
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
                   className="text-2xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent"
                 >
                   Ready to Chat
                 </h3>
                 
                 <p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 }}
                   className="text-muted-foreground mb-8 leading-relaxed"
                 >
                   Select an AI agent from the sidebar to begin your conversation. Each agent has unique capabilities and specializations.
                 </p>
                 
                 <div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
                   className="space-y-4"
                 >
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card className="bg-muted/10 border-border/40 hover:border-primary/40 transition-colors">
-                      <CardContent className="p-4">
-                        <UserCheck className="h-8 w-8 text-primary mb-2" />
-                        <h4 className="font-semibold text-sm mb-1">Specialized Skills</h4>
-                        <p className="text-xs text-muted-foreground">Each agent has unique expertise</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-muted/10 border-border/40 hover:border-primary/40 transition-colors">
-                      <CardContent className="p-4">
-                        <Zap className="h-8 w-8 text-yellow-500 mb-2" />
-                        <h4 className="font-semibold text-sm mb-1">Instant Response</h4>
-                        <p className="text-xs text-muted-foreground">Real-time AI assistance</p>
-                      </CardContent>
-                    </Card>
-                  </div>
                   
                   <div className="bg-gradient-to-r from-primary/10 to-cyan-500/10 rounded-lg p-4 text-sm text-muted-foreground flex items-center justify-center gap-2 border border-border/40">
                     <Shield className="h-4 w-4 text-primary flex-shrink-0" />

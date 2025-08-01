@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentTemplate } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 
 interface AgentTemplateSelectorProps {
   onSelectTemplate: (template: AgentTemplate) => void
@@ -69,6 +70,7 @@ export function AgentTemplateSelector({
   onCreateFromTemplate,
   trigger,
 }: AgentTemplateSelectorProps) {
+  const { userName } = useAuth()
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [filteredTemplates, setFilteredTemplates] = useState<AgentTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -122,7 +124,8 @@ export function AgentTemplateSelector({
 
   const handleSelectTemplate = (template: AgentTemplate) => {
     setSelectedTemplate(template)
-    setAgentName(`${template.name} Copy`)
+    const firstName = userName ? userName.split(' ')[0] : 'Your'
+    setAgentName(`${firstName}'s ${template.name}`)
     setShowCreateDialog(true)
   }
 

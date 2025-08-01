@@ -54,9 +54,6 @@ export function NavigationItem({
             } transition-colors`}>
               {label}
             </span>
-            {isActive && (
-              <span className="text-xs text-primary/80">Active</span>
-            )}
           </div>
         </div>
       </motion.div>

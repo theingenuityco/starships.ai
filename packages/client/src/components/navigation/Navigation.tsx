@@ -132,15 +132,18 @@ export function Navigation({
         </motion.div>
       </motion.div>
 
+      {/* Separator */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+      
       {/* Enhanced Quick Status */}
-      <motion.div variants={itemVariants} className="p-3 border-b border-border/40 bg-gradient-to-br from-card/30 to-muted/20 flex-shrink-0">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+      <motion.div variants={itemVariants} className="px-8 py-6 border-b border-border/40 bg-gradient-to-br from-card/30 to-muted/20 flex-shrink-0">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
           <Gauge className="w-3 h-3" />
           System Status
         </h3>
-        <div className="space-y-2">
+        <div className="space-y-4">
           {/* Power Status */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex justify-between items-center text-sm min-w-0">
               <span className="text-muted-foreground flex items-center gap-2">
                 <Power className="w-3 h-3" />
@@ -169,7 +172,7 @@ export function Navigation({
           </div>
           
           {/* Expeditions Status */}
-          <div className="flex justify-between items-center text-sm min-w-0 group hover:bg-primary/5 rounded-lg p-2 -m-2 transition-colors">
+          <div className="flex justify-between items-center text-sm min-w-0">
             <span className="text-muted-foreground flex items-center gap-2">
               <Activity className="w-3 h-3" />
               Active Expeditions
@@ -183,7 +186,7 @@ export function Navigation({
 
       {/* Enhanced Navigation Sections */}
       <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
-        <div className="space-y-4">
+        <div className="space-y-4 mt-4">
           {navigationSections.map((section, index) => (
             <motion.div
               key={section.title}
@@ -191,6 +194,11 @@ export function Navigation({
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: 0.1 * index }}
             >
+              {index > 0 && (
+                <div className="my-3 px-3">
+                  <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+                </div>
+              )}
               <NavigationSection
                 title={section.title}
                 items={section.items}
@@ -202,6 +210,9 @@ export function Navigation({
         </div>
       </motion.div>
 
+      {/* Separator */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+      
       {/* Enhanced User Profile Section */}
       <motion.div 
         variants={itemVariants} 

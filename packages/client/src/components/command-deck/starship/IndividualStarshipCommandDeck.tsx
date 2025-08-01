@@ -206,79 +206,101 @@ export function IndividualStarshipCommandDeck({ slug, className }: IndividualSta
   }
 
   return (
-    <div className={cn("h-full bg-gradient-to-br from-background via-background to-primary/5", className)}>
+    <div className={cn("h-full flex flex-col overflow-hidden bg-gradient-to-br from-background to-muted/5", className)}>
+      {/* Enhanced Professional Header - Matching Crew Console Style */}
+      <div className="relative overflow-hidden">
+        {/* Background gradient effect - reduced opacity */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5" />
+        
+        <div className="relative flex items-center justify-between px-8 py-6 backdrop-blur-sm border-b border-border/40">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all -ml-2 px-2"
+              onClick={handleBackToFleet}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                  <div className="relative bg-gradient-to-br from-primary/15 to-primary/10 p-3 rounded-xl shadow-sm border border-primary/15">
+                    <Terminal className="h-6 w-6 text-primary" />
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                    Command Deck
+                  </h1>
+                  <p className="text-sm text-muted-foreground">Starship control and monitoring center</p>
+                </div>
+              </div>
+
+              <div className="h-10 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
+
+              {/* Stats Cards */}
+              <div className="flex items-center gap-3">
+                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                  <CardContent className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Power className="h-3.5 w-3.5 text-primary" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Power</p>
+                        <p className="text-sm font-bold">{systemData.power.current}%</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                  <CardContent className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3.5 w-3.5 text-primary" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Shields</p>
+                        <p className="text-sm font-bold">{systemData.shields.current}%</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Starship info */}
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 bg-green-500/5" />
+                <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/10 p-2 rounded-lg">
+                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-base font-semibold text-foreground">
+                  {starship.name}
+                </span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Activity className="h-3 w-3" />
+                  Active Starship
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Ambient background effects */}
-      <div className="fixed inset-0 pointer-events-none">
+      <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-gradient-to-t from-primary/5 via-transparent to-transparent" />
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative z-10 h-full flex flex-col p-6 space-y-6">
-        {/* Enhanced Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBackToFleet}
-              className="hover:bg-primary/10 hover:text-primary transition-all"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Fleet
-            </Button>
-            <div className="h-8 w-px bg-gradient-to-b from-transparent via-border to-transparent" />
-            <div className="space-y-1">
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary/20 blur-sm" />
-                  <div className="relative p-2 bg-gradient-to-br from-primary/30 to-primary/20 rounded-lg">
-                    {getClassIcon(starship.class)}
-                  </div>
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    {starship.name}
-                  </h1>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        "text-xs border-current",
-                        starship.status === 'active' 
-                          ? 'text-green-500 bg-green-500/10' 
-                          : 'text-amber-500 bg-amber-500/10'
-                      )}
-                    >
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full mr-1.5",
-                        starship.status === 'active' ? 'bg-green-500' : 'bg-amber-500',
-                        starship.status === 'active' && 'animate-pulse'
-                      )} />
-                      {starship.status}
-                    </Badge>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-muted-foreground capitalize">{starship.class} Class</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" className="border-border/50 hover:border-primary/50">
-              <Activity className="w-4 h-4 mr-2" />
-              Diagnostics
-            </Button>
-            <Button variant="outline" size="sm" className="border-border/50 hover:border-primary/50">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </Button>
-          </div>
-        </motion.div>
+      <div className="relative z-10 flex-1 p-6 overflow-auto">{/* removed space-y-6 from original */}
 
         {/* Main Command Deck Interface */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0 overflow-auto">

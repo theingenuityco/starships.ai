@@ -444,13 +444,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               <div
                 className="bg-gradient-to-br from-card via-card/95 to-primary/5 p-10 rounded-2xl text-center max-w-lg shadow-xl border border-primary/20"
               >
-                <div
-                  className="relative mb-8"
-                >
-                  <div className="absolute inset-0 bg-primary/5 blur-sm" />
-                  <div className="relative bg-gradient-to-br from-primary/20 to-primary/30 p-4 rounded-2xl w-24 h-24 flex items-center justify-center mx-auto shadow-lg">
-                    <MessageSquare className="h-12 w-12 text-primary" />
-                  </div>
+                <div className="mb-8">
+                  <MessageSquare className="h-16 w-16 text-primary mx-auto" />
                 </div>
                 
                 <h3

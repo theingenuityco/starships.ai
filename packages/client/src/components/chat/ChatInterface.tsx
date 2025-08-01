@@ -288,7 +288,7 @@ export function ChatInterface({
                 )}
               </div>
               <p className="text-sm text-zinc-400 flex items-center">
-                {agent.systemPrompt || 'AI Assistant'}
+                {agent.description || 'AI Assistant'}
               </p>
             </div>
           </div>

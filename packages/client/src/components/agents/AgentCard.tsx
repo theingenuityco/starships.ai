@@ -192,7 +192,7 @@ export function AgentCard({
   }
 
   return (
-    <div className="transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5">
+    <div className="transition-all duration-200">
       <Card
         className={`
           cursor-pointer transition-all duration-300 hover:shadow-xl relative rounded-xl overflow-hidden group

@@ -26,18 +26,18 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: "Starship Systems",
     items: [
-      { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
+      { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" },
+      { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
-      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "warning" }
+      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "active" }
     ]
   },
   {
-    title: "Operations",
+    title: "Coming Soon",
     items: [
-      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "active" },
-      { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" },
-      { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
-      { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" }
+      { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
+      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "warning" },
+      { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" }
     ]
   }
 ];
@@ -132,57 +132,6 @@ export function Navigation({
         </motion.div>
       </motion.div>
 
-      {/* Separator */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-      
-      {/* Enhanced Quick Status */}
-      <motion.div variants={itemVariants} className="px-8 py-6 border-b border-border/40 bg-gradient-to-br from-card/30 to-muted/20 flex-shrink-0">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Gauge className="w-3 h-3" />
-          System Status
-        </h3>
-        <div className="space-y-4">
-          {/* Power Status */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-sm min-w-0">
-              <span className="text-muted-foreground flex items-center gap-2">
-                <Power className="w-3 h-3" />
-                Power
-              </span>
-              <span className={`font-mono flex-shrink-0 ml-2 font-semibold ${
-                powerLevel > 70 ? 'text-green-600 dark:text-green-400' : 
-                powerLevel > 30 ? 'text-yellow-600 dark:text-yellow-400' : 
-                'text-red-600 dark:text-red-400'
-              }`}>
-                {powerLevel}%
-              </span>
-            </div>
-            <div className="w-full bg-muted/30 rounded-full h-1.5">
-              <motion.div 
-                className={`h-1.5 rounded-full ${
-                  powerLevel > 70 ? 'bg-gradient-to-r from-green-500 to-green-600' : 
-                  powerLevel > 30 ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' : 
-                  'bg-gradient-to-r from-red-500 to-red-600'
-                }`}
-                initial={{ width: 0 }}
-                animate={{ width: `${powerLevel}%` }}
-                transition={{ duration: 1, delay: 0.5 }}
-              />
-            </div>
-          </div>
-          
-          {/* Expeditions Status */}
-          <div className="flex justify-between items-center text-sm min-w-0">
-            <span className="text-muted-foreground flex items-center gap-2">
-              <Activity className="w-3 h-3" />
-              Active Expeditions
-            </span>
-            <span className="font-mono flex-shrink-0 ml-2 font-semibold bg-primary/10 px-2 py-0.5 rounded text-primary">
-              {activeExpeditions}
-            </span>
-          </div>
-        </div>
-      </motion.div>
 
       {/* Enhanced Navigation Sections */}
       <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">

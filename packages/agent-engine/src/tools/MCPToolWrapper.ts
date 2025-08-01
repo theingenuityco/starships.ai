@@ -192,7 +192,7 @@ export class MCPToolWrapper {
           console.error(`[MCPToolWrapper] Error in ${mcpTool.name}:`, error);
           
           if (error instanceof z.ZodError) {
-            return `Input validation failed: ${error.errors.map((e: any) => e.message).join(', ')}`;
+            return `Input validation failed: ${(error as z.ZodError).errors.map((e: any) => e.message).join(', ')}`;
           }
           
           return `Error: ${error instanceof Error ? error.message : String(error)}`;

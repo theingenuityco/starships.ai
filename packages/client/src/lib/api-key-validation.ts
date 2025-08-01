@@ -1,17 +1,6 @@
 import { ApiKeyRequirement, ApiKeyValidationResult } from '../types/connector-api-keys'
 
-export type ServiceType =
-  | 'github'
-  | 'slack'
-  | 'notion'
-  | 'brave'
-  | 'stripe'
-  | 'openai'
-  | 'anthropic'
-  | 'google'
-  | 'azure'
-  | 'aws'
-  | 'generic'
+export type ServiceType = 'openai' | 'anthropic' | 'google' | 'azure' | 'aws' | 'generic'
 
 export interface ValidationContext {
   service: ServiceType
@@ -85,16 +74,6 @@ export class ApiKeyValidator {
     const { service, value } = context
 
     switch (service) {
-      case 'github':
-        return this.validateGitHub(value, context.requirement)
-      case 'slack':
-        return this.validateSlack(value, context.requirement)
-      case 'notion':
-        return this.validateNotion(value, context.requirement)
-      case 'brave':
-        return this.validateBrave(value, context.requirement)
-      case 'stripe':
-        return this.validateStripe(value, context.requirement)
       case 'openai':
         return this.validateOpenAI(value, context.requirement)
       case 'anthropic':
@@ -111,108 +90,6 @@ export class ApiKeyValidator {
   }
 
   // Service-specific validation methods
-  private static validateGitHub(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
-    // GitHub Personal Access Tokens start with 'ghp_', 'gho_', 'ghu_', 'ghs_', or 'ghr_'
-    if (requirement.envKey.includes('TOKEN')) {
-      const githubTokenPattern = /^gh[pous]_[A-Za-z0-9]{36}$/
-      if (!githubTokenPattern.test(value)) {
-        return {
-          isValid: false,
-          error:
-            'GitHub token must start with ghp_, gho_, ghu_, ghs_, or ghr_ followed by 36 characters',
-        }
-      }
-    }
-    return { isValid: true }
-  }
-
-  private static validateSlack(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
-    // Slack Bot Token starts with 'xoxb-'
-    if (requirement.envKey.includes('BOT_TOKEN')) {
-      if (!value.startsWith('xoxb-')) {
-        return {
-          isValid: false,
-          error: 'Slack Bot Token must start with "xoxb-"',
-        }
-      }
-    }
-    // Slack App Token starts with 'xapp-'
-    else if (requirement.envKey.includes('APP_TOKEN')) {
-      if (!value.startsWith('xapp-')) {
-        return {
-          isValid: false,
-          error: 'Slack App Token must start with "xapp-"',
-        }
-      }
-    }
-    return { isValid: true }
-  }
-
-  private static validateNotion(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
-    // Notion API keys are typically 50 characters long and start with 'secret_'
-    if (requirement.type === 'api_key') {
-      if (!value.startsWith('secret_')) {
-        return {
-          isValid: false,
-          error: 'Notion API key must start with "secret_"',
-        }
-      }
-      if (value.length !== 50) {
-        return {
-          isValid: false,
-          error: 'Notion API key must be exactly 50 characters long',
-        }
-      }
-    }
-    return { isValid: true }
-  }
-
-  private static validateBrave(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
-    // Brave Search API keys are typically 40 characters long
-    if (requirement.type === 'api_key' && value.length !== 40) {
-      return {
-        isValid: false,
-        error: 'Brave Search API key must be exactly 40 characters long',
-      }
-    }
-    return { isValid: true }
-  }
-
-  private static validateStripe(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
-    // Stripe keys have specific prefixes
-    if (requirement.envKey.includes('PUBLISHABLE')) {
-      if (!value.startsWith('pk_')) {
-        return {
-          isValid: false,
-          error: 'Stripe publishable key must start with "pk_"',
-        }
-      }
-    } else if (requirement.envKey.includes('SECRET')) {
-      if (!value.startsWith('sk_')) {
-        return {
-          isValid: false,
-          error: 'Stripe secret key must start with "sk_"',
-        }
-      }
-    }
-    return { isValid: true }
-  }
-
   private static validateOpenAI(
     value: string,
     requirement: ApiKeyRequirement
@@ -298,16 +175,6 @@ export class ApiKeyValidator {
   // Helper methods for error messages
   private static getApiKeyErrorMessage(service: ServiceType, displayName: string): string {
     switch (service) {
-      case 'github':
-        return `${displayName} must be a valid GitHub token (starts with ghp_, gho_, ghu_, ghs_, or ghr_)`
-      case 'slack':
-        return `${displayName} must be a valid Slack token (starts with xoxb- or xapp-)`
-      case 'notion':
-        return `${displayName} must be a valid Notion API key (starts with secret_ and is 50 characters)`
-      case 'brave':
-        return `${displayName} must be a valid Brave Search API key (40 characters)`
-      case 'stripe':
-        return `${displayName} must be a valid Stripe key (starts with pk_ or sk_)`
       case 'openai':
         return `${displayName} must be a valid OpenAI API key (starts with sk-)`
       case 'anthropic':
@@ -325,10 +192,6 @@ export class ApiKeyValidator {
 
   private static getTokenErrorMessage(service: ServiceType, displayName: string): string {
     switch (service) {
-      case 'github':
-        return `${displayName} must be a valid GitHub token`
-      case 'slack':
-        return `${displayName} must be a valid Slack token`
       default:
         return `${displayName} must be a valid token`
     }

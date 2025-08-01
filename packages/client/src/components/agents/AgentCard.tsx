@@ -209,123 +209,66 @@ export function AgentCard({
             <div className="flex-1 min-w-0 pr-16">
               {' '}
               {/* Added right padding to prevent content overlap with action buttons */}
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <h3
-                  className={`
-                  font-medium text-sm truncate
-                  ${isSelected ? 'text-primary' : 'text-foreground'}
-                `}
-                >
-                  {agent.name}
-                </h3>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <h3
+                    className={`
+                    font-semibold text-base
+                    ${isSelected ? 'text-primary' : 'text-foreground'}
+                  `}
+                  >
+                    {agent.name}
+                  </h3>
+                  {!agent.isPublic && <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                </div>
 
+                {agent.rating && (
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                    <span className="text-sm font-medium">{agent.rating.toFixed(1)}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mb-3">
                 <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center`}>
                   {getCategoryIcon(agent.category)}
                   {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
                 </Badge>
-
-                {!agent.isPublic && (
-                  <span className="inline-flex items-center">
-                    <EyeOff className="w-3 h-3 text-muted-foreground mr-1" />
-                    <span className="text-xs text-muted-foreground">Private</span>
-                  </span>
-                )}
-
-                {agent.rating && (
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                    <span className="text-xs text-muted-foreground">{agent.rating.toFixed(1)}</span>
-                  </div>
-                )}
+                <span className="text-xs text-muted-foreground font-mono bg-secondary/30 px-2 py-0.5 rounded">
+                  {agent.model}
+                </span>
               </div>
               {agent.description && (
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed">
                   {agent.description}
                 </p>
               )}
+              {/* Tags display */}
               {agent.tags && agent.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {agent.tags.slice(0, 3).map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5 rounded-md">
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {agent.tags.slice(0, 4).map(tag => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className="text-xs px-1.5 py-0 h-5 rounded bg-secondary/30 border-secondary/50"
+                    >
                       {tag.charAt(0).toUpperCase() + tag.slice(1)}
                     </Badge>
                   ))}
-                  {agent.tags.length > 3 && (
-                    <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-md">
-                      +{agent.tags.length - 3}
+                  {agent.tags.length > 4 && (
+                    <Badge
+                      variant="outline"
+                      className="text-xs px-1.5 py-0 h-5 rounded bg-secondary/30 border-secondary/50"
+                    >
+                      +{agent.tags.length - 4}
                     </Badge>
                   )}
                 </div>
               )}
-              {/* Starship Information */}
-              {(agent as any)?.starshipId && (
-                <div className="mb-3">
-                  {loadingStarship ? (
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>Loading starship...</span>
-                    </div>
-                  ) : starship ? (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm">{getStarshipIcon(starship.class)}</span>
-                      <span className="text-xs font-medium">{starship.name}</span>
-                      <Badge
-                        variant="outline"
-                        className={`${getStarshipStatusColor(starship.status)} text-xs`}
-                      >
-                        {starship.status}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {starship.class}
-                      </Badge>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <Rocket className="w-3 h-3" />
-                      <span>Starship unavailable</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="bg-secondary/50 px-2.5 py-1 rounded-md font-mono">
-                  {agent.model}
-                </span>
-
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center">
-                    <svg
-                      className="w-3 h-3 mr-1 text-muted-foreground/70"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    {agent.usageCount || 0} uses
-                  </span>
-                  <span className="flex items-center">
-                    <svg
-                      className="w-3 h-3 mr-1 text-muted-foreground/70"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 002 2z"
-                      />
-                    </svg>
-                    v{agent.version || '1.0.0'}
-                  </span>
-                </div>
+              {/* Simplified bottom info */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/20">
+                <span>{agent.usageCount || 0} uses</span>
+                <span>v{agent.version || '1.0.0'}</span>
               </div>
             </div>
           </div>

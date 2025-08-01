@@ -348,7 +348,7 @@ describe('MCP Integration Tests', () => {
         'Finally, design the architecture with proper invalidation strategies'
       ];
 
-      mockGateway.invokeTool.mockImplementation(async (starshipId, toolName, params) => {
+      mockGateway.invokeTool.mockImplementation(async (starshipId: string, toolName: string, params: any) => {
         const thoughtNumber = params.thoughtNumber || 1;
         return {
           success: true,
@@ -394,7 +394,7 @@ describe('MCP Integration Tests', () => {
       };
 
       // Mock memory storage
-      mockGateway.invokeTool.mockImplementation(async (starshipId, toolName, params) => {
+      mockGateway.invokeTool.mockImplementation(async (starshipId: string, toolName: string, params: any) => {
         if (toolName === 'store_memory') {
           return {
             success: true,

@@ -10,24 +10,28 @@ import { MCPServerConnectorRepository } from '../repositories/MCPServerConnector
 
 const REMOVED_SLUGS = [
   'brave',
-  'github', 
+  'filesystem',
   'gdrive',
-  'puppeteer',
+  'github',
+  'memory',
   'notion',
   'postgresql',
+  'puppeteer',
   'slack',
-  'stripe'
+  'stripe',
 ];
 
 const REMOVED_NAMES = [
-  'google drive',
   'brave search',
+  'filesystem',
   'github',
-  'puppeteer', 
+  'google drive',
+  'memory',
   'notion',
   'postgresql',
+  'puppeteer',
   'slack',
-  'stripe'
+  'stripe',
 ];
 
 async function cleanupRemovedConnectors() {
@@ -40,16 +44,19 @@ async function cleanupRemovedConnectors() {
     // First, find and remove any MCP server options for removed connectors
     console.log('\n📋 Checking for removed MCP server options...');
     const allOptions = await serverOptionRepo.findAll();
-    
+
     for (const option of allOptions) {
       // Check by slug, name, or if command is undefined
-      const shouldRemove = REMOVED_SLUGS.includes(option.slug) || 
-                          REMOVED_NAMES.some(name => option.name.toLowerCase().includes(name)) ||
-                          !option.command;
-                          
+      const shouldRemove =
+        REMOVED_SLUGS.includes(option.slug) ||
+        REMOVED_NAMES.some((name) => option.name.toLowerCase().includes(name)) ||
+        !option.command;
+
       if (shouldRemove) {
-        console.log(`  🗑️  Removing MCP server option: ${option.name} (${option.slug || 'no-slug'})`);
-        
+        console.log(
+          `  🗑️  Removing MCP server option: ${option.name} (${option.slug || 'no-slug'})`
+        );
+
         // First, find and remove any connector instances
         const connectorInstances = await connectorRepo.findByTemplate(option.id);
         if (connectorInstances.length > 0) {
@@ -59,7 +66,7 @@ async function cleanupRemovedConnectors() {
             console.log(`    ✅ Removed connector instance: ${connector.id}`);
           }
         }
-        
+
         // Then remove the server option
         await serverOptionRepo.delete(option.id);
         console.log(`  ✅ Removed MCP server option: ${option.name}`);
@@ -69,12 +76,11 @@ async function cleanupRemovedConnectors() {
     // Verify final state
     const remainingOptions = await serverOptionRepo.findAll();
     console.log(`\n📊 Cleanup complete! Remaining MCP server options: ${remainingOptions.length}`);
-    
+
     console.log('\n📋 Remaining MCP servers:');
     remainingOptions.forEach((option, index) => {
       console.log(`${index + 1}. ${option.name} (${option.slug})`);
     });
-
   } catch (error) {
     console.error('❌ Cleanup failed:', error);
     throw error;

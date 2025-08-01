@@ -718,14 +718,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       return false
                     }
                   }}
-<<<<<<< HEAD
                   onViewChat={(expeditionId) => {
                     // Force hard refresh when navigating to expedition chat
                     window.location.href = `/ship/${slug}/expeditions/${expeditionId}?tab=chat`;
-=======
-                  onViewChat={expeditionId => {
-                    router.push(`/ship/${slug}/expeditions/${expeditionId}?tab=chat`)
->>>>>>> b4d8315a2dacfcdb1cda7ea734650d06fdaeab9e
                   }}
                   onDelete={async expeditionId => {
                     if (

@@ -189,7 +189,7 @@ export function AgentCard({
     <Card
       className={`
         cursor-pointer transition-all duration-200 hover:shadow-md relative rounded-lg
-        ${isSelected ? 'ring-2 ring-primary bg-primary/5 border-l-4 border-l-primary' : 'hover:bg-accent/50'}
+        ${isSelected ? 'ring-2 ring-primary bg-primary/5' : 'hover:bg-accent/50'}
       `}
       onClick={onClick}
     >

@@ -250,11 +250,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-muted-foreground">
-            {connectorInstances.length} connector{connectorInstances.length !== 1 ? 's' : ''} active
-          </div>
-        </div>
+        <div className="flex items-center gap-3"></div>
       </div>
 
       {/* Main Content - Two Column Layout */}

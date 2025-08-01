@@ -314,7 +314,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       </div>
 
       {/* Enhanced Main Content Layout */}
-      <div className="grid grid-cols-[450px_1fr] flex-1 min-h-0">
+      <div className="grid grid-cols-[380px_1fr] flex-1 min-h-0">
         {/* Enhanced Left Sidebar */}
         <div
           className="border-r border-border/40 bg-gradient-to-br from-card/60 to-card/40 backdrop-blur-sm shadow-lg flex flex-col min-h-0"

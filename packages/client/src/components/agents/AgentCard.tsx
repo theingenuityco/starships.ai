@@ -203,12 +203,6 @@ export function AgentCard({
         `}
         onClick={onClick}
       >
-        {/* Status indicator */}
-        {isSelected && (
-          <div
-            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-cyan-500 to-primary animate-scale-x"
-          />
-        )}
         
         <div className="px-4 py-5">
           <div className="grid grid-cols-[auto_1fr_auto] gap-4 items-start">

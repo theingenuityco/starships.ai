@@ -2,6 +2,7 @@
 
 import { Agent, starshipAPI, Starship } from '@/lib/api'
 import { useState, useEffect } from 'react'
+// import { motion } from 'motion/react'
 import {
   Bot,
   Edit,
@@ -21,6 +22,11 @@ import {
   MoreVertical,
   Rocket,
   Loader2,
+  Sparkles,
+  Shield,
+  Brain,
+  Zap,
+  Activity,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -105,22 +111,22 @@ export function AgentCard({
 
   const getCategoryColor = (category: Agent['category']) => {
     const colors = {
-      general: 'bg-gray-100 text-gray-800',
-      coding: 'bg-blue-100 text-blue-800',
-      creative: 'bg-purple-100 text-purple-800',
-      analysis: 'bg-green-100 text-green-800',
-      support: 'bg-orange-100 text-orange-800',
+      general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
+      coding: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
+      creative: 'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
+      analysis: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
+      support: 'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
     }
     return colors[category] || colors.general
   }
 
   const getAvatarBackgroundColor = (category: Agent['category']) => {
     const colors = {
-      general: 'bg-gray-200',
-      coding: 'bg-gray-200',
-      creative: 'bg-gray-200',
-      analysis: 'bg-gray-200',
-      support: 'bg-gray-200',
+      general: 'bg-gradient-to-br from-gray-500/20 to-gray-500/30',
+      coding: 'bg-gradient-to-br from-blue-500/20 to-blue-500/30',
+      creative: 'bg-gradient-to-br from-purple-500/20 to-purple-500/30',
+      analysis: 'bg-gradient-to-br from-green-500/20 to-green-500/30',
+      support: 'bg-gradient-to-br from-orange-500/20 to-orange-500/30',
     }
     return colors[category] || colors.general
   }
@@ -186,153 +192,117 @@ export function AgentCard({
   }
 
   return (
-    <Card
-      className={`
-        cursor-pointer transition-all duration-200 hover:shadow-md relative rounded-lg
-        ${isSelected ? 'ring-2 ring-primary bg-primary/5 border-l-4 border-l-primary' : 'hover:bg-accent/50'}
-      `}
-      onClick={onClick}
-    >
-      <div className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-4 flex-1">
-            <Avatar className="h-12 w-12 ring-2 ring-background shadow-sm">
-              <AvatarFallback
-                className={`
-                ${isSelected ? 'bg-primary text-primary-foreground' : `${getAvatarBackgroundColor(agent.category)} text-foreground`}
-              `}
-              >
-                <span className="text-xl">{getAgentAvatarContent(agent)}</span>
-              </AvatarFallback>
-            </Avatar>
+    <div className="transition-all duration-200">
+      <Card
+        className={`
+          cursor-pointer transition-all duration-300 hover:shadow-xl relative rounded-xl overflow-hidden group border-2
+          ${isSelected 
+            ? 'ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 border-primary/70 shadow-lg shadow-primary/20' 
+            : 'hover:bg-gradient-to-br hover:from-card hover:to-primary/5 border-border hover:border-primary/70'
+          }
+        `}
+        onClick={onClick}
+      >
+        
+        <div className="px-3 py-3">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-start">
+          {/* Left Column: Enhanced Avatar */}
+          <div className="flex flex-col items-center space-y-2">
+            <div className="relative">
+              <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
+              <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
+                <AvatarFallback
+                  className={`
+                  ${isSelected 
+                    ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' 
+                    : `${getAvatarBackgroundColor(agent.category)} text-foreground`
+                  }
+                `}
+                >
+                  <span className="text-base">{getAgentAvatarContent(agent)}</span>
+                </AvatarFallback>
+              </Avatar>
+              {/* Online indicator */}
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+            </div>
 
-            <div className="flex-1 min-w-0 pr-16">
-              {' '}
-              {/* Added right padding to prevent content overlap with action buttons */}
-              <div className="flex flex-wrap items-center gap-2 mb-2">
+          </div>
+
+          {/* Center Column: Main content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
                 <h3
                   className={`
-                  font-medium text-sm truncate
+                  font-bold text-base
                   ${isSelected ? 'text-primary' : 'text-foreground'}
+                  group-hover:text-primary transition-colors
                 `}
                 >
                   {agent.name}
                 </h3>
-
-                <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center`}>
-                  {getCategoryIcon(agent.category)}
-                  {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
-                </Badge>
-
                 {!agent.isPublic && (
-                  <span className="inline-flex items-center">
-                    <EyeOff className="w-3 h-3 text-muted-foreground mr-1" />
-                    <span className="text-xs text-muted-foreground">Private</span>
-                  </span>
-                )}
-
-                {agent.rating && (
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                    <span className="text-xs text-muted-foreground">{agent.rating.toFixed(1)}</span>
+                  <div className="p-1 bg-muted/50 rounded">
+                    <EyeOff className="w-3 h-3 text-muted-foreground" />
                   </div>
                 )}
               </div>
-              {agent.description && (
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-                  {agent.description}
-                </p>
-              )}
-              {agent.tags && agent.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {agent.tags.slice(0, 3).map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs px-2 py-0.5 rounded-md">
-                      {tag.charAt(0).toUpperCase() + tag.slice(1)}
-                    </Badge>
-                  ))}
-                  {agent.tags.length > 3 && (
-                    <Badge variant="outline" className="text-xs px-2 py-0.5 rounded-md">
-                      +{agent.tags.length - 3}
-                    </Badge>
-                  )}
+
+              {agent.rating && (
+                <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
+                  <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
+                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{agent.rating.toFixed(1)}</span>
                 </div>
               )}
-              {/* Starship Information */}
-              {(agent as any)?.starshipId && (
-                <div className="mb-3">
-                  {loadingStarship ? (
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span>Loading starship...</span>
-                    </div>
-                  ) : starship ? (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm">{getStarshipIcon(starship.class)}</span>
-                      <span className="text-xs font-medium">{starship.name}</span>
-                      <Badge
-                        variant="outline"
-                        className={`${getStarshipStatusColor(starship.status)} text-xs`}
-                      >
-                        {starship.status}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs capitalize">
-                        {starship.class}
-                      </Badge>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <Rocket className="w-3 h-3" />
-                      <span>Starship unavailable</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="bg-secondary/50 px-2.5 py-1 rounded-md font-mono">
+            </div>
+
+            <div className="flex items-center gap-2 mb-2">
+              <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center border font-semibold`}>
+                {getCategoryIcon(agent.category)}
+                {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
+              </Badge>
+              <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
+                <Brain className="w-3 h-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground font-mono">
                   {agent.model}
                 </span>
-
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center">
-                    <svg
-                      className="w-3 h-3 mr-1 text-muted-foreground/70"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    {agent.usageCount || 0} uses
-                  </span>
-                  <span className="flex items-center">
-                    <svg
-                      className="w-3 h-3 mr-1 text-muted-foreground/70"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 002 2z"
-                      />
-                    </svg>
-                    v{agent.version || '1.0.0'}
-                  </span>
-                </div>
               </div>
             </div>
+
+            {agent.description && (
+              <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed group-hover:text-foreground/80 transition-colors">
+                {agent.description}
+              </p>
+            )}
+
+            {/* Enhanced Tags display */}
+            {agent.tags && agent.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {agent.tags.slice(0, 3).map(tag => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors"
+                  >
+                    <Sparkles className="w-2.5 h-2.5 mr-1" />
+                    {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                  </Badge>
+                ))}
+                {agent.tags.length > 3 && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold"
+                  >
+                    +{agent.tags.length - 3} more
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Action dropdown menu positioned on the right side */}
+          {/* Right Column: Action menu */}
           {showActions && (onEdit || onDelete || onTest || onAnalytics) && (
-            <div className="absolute top-4 right-4 z-10">
+            <div className="flex flex-col items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -411,6 +381,10 @@ export function AgentCard({
           )}
         </div>
       </div>
+      
+      {/* Hover effect overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
     </Card>
+    </div>
   )
 }

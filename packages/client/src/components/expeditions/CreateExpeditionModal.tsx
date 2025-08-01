@@ -15,7 +15,8 @@ import {
   Rocket, X, Check, AlertCircle, Sparkles, 
   Target, Bot, Search, Zap, Star, CircleCheck, 
   Wand2, ArrowRight, Shield, Brain, Code, Palette,
-  ChevronRight, Loader2
+  ChevronRight, Loader2, Database, Headphones, PenTool,
+  Lightbulb, BarChart2, HeartPulse, Hash
 } from 'lucide-react'
 import { expeditionAPI } from '@/lib/expeditionApi'
 import type { CreateExpeditionRequest } from '@starships/protocol'
@@ -30,6 +31,7 @@ interface CreateExpeditionModalProps {
   onExpeditionCreated: (expeditionId: string) => void
   starshipId: string
   starshipSlug: string
+  starshipName?: string
 }
 
 interface FormData {
@@ -66,6 +68,7 @@ export function CreateExpeditionModal({
   onExpeditionCreated,
   starshipId,
   starshipSlug,
+  starshipName,
 }: CreateExpeditionModalProps) {
   // State Management
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -198,56 +201,71 @@ export function CreateExpeditionModal({
     const styles: Record<string, { color: string; icon: any }> = {
       research: { color: 'bg-blue-500', icon: Brain },
       engineering: { color: 'bg-purple-500', icon: Code },
-      analysis: { color: 'bg-green-500', icon: Shield },
-      creative: { color: 'bg-pink-500', icon: Palette },
-      operations: { color: 'bg-orange-500', icon: Zap },
+      analysis: { color: 'bg-green-500', icon: BarChart2 },
+      creative: { color: 'bg-pink-500', icon: Lightbulb },
+      coding: { color: 'bg-violet-500', icon: Code },
+      support: { color: 'bg-orange-500', icon: HeartPulse },
+      operations: { color: 'bg-amber-500', icon: Zap },
       default: { color: 'bg-gray-500', icon: Bot },
     }
     return styles[category.toLowerCase()] || styles.default
+  }
+
+  // Get agent avatar icon based on name or category (matching Crew Console logic)
+  const getAgentAvatarIcon = (agent: Agent) => {
+    const name = agent.name.toLowerCase()
+    const category = agent.category.toLowerCase()
+    
+    if (name.includes('support') || category === 'support') {
+      return <Headphones className="h-6 w-6" />
+    } else if (name.includes('data') || name.includes('analyst') || category === 'analysis') {
+      return <Database className="h-6 w-6" />
+    } else if (name.includes('creative') || category === 'creative') {
+      return <PenTool className="h-6 w-6" />
+    } else if (name.includes('code') || name.includes('coding') || category === 'coding') {
+      return <Code className="h-6 w-6" />
+    } else {
+      return <Bot className="h-6 w-6" />
+    }
   }
 
   return (
     <AnimatePresence>
       {open && (
         <Dialog open={open} onOpenChange={onClose}>
-          <DialogContent className="max-w-4xl max-h-[85vh] p-0 flex flex-col bg-gradient-to-br from-background via-background to-primary/5 [&>button]:hidden">
+          <DialogContent className="max-w-3xl max-h-[85vh] p-0 flex flex-col bg-background/95 backdrop-blur-sm [&>button]:hidden">
             {/* Accessibility: Hidden dialog title for screen readers */}
             <DialogHeader className="sr-only">
               <DialogTitle>Launch New Expedition</DialogTitle>
             </DialogHeader>
             
             {/* Enhanced Header */}
-            <div className="relative flex-shrink-0 overflow-hidden border-b bg-gradient-to-r from-primary/10 via-primary/5 to-transparent">
-              <div className="absolute inset-0 bg-grid-white/[0.02]" />
+            <div className="flex-shrink-0 border-b bg-gradient-to-r from-card via-card/95 to-primary/5">
               <motion.div 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative px-6 py-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="px-6 py-5"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <motion.div 
-                      className="relative"
-                      animate={{ rotate: [0, 10, -10, 0] }}
-                      transition={{ duration: 4, repeat: Infinity }}
-                    >
-                      <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-                      <div className="relative p-2.5 bg-gradient-to-br from-primary to-primary/80 rounded-xl shadow-lg">
-                        <Rocket className="h-6 w-6 text-primary-foreground" />
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-primary/20 blur-sm" />
+                      <div className="relative p-2.5 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl border border-primary/20">
+                        <Rocket className="h-5 w-5 text-primary" />
                       </div>
-                    </motion.div>
+                    </div>
                     <div>
-                      <h2 className="text-xl font-semibold tracking-tight">Launch New Expedition</h2>
-                      <p className="text-xs text-muted-foreground mt-0.5">Coordinate your AI agents on {starshipSlug}</p>
+                      <h2 className="text-xl font-semibold">Launch New Expedition</h2>
+                      <p className="text-sm text-muted-foreground">Coordinate your AI agents on {starshipName || starshipSlug}</p>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={onClose}
-                    className="rounded-full hover:bg-background/80"
+                    className="hover:bg-muted rounded-full"
                   >
-                    <X className="h-5 w-5" />
+                    <X className="h-4 w-4" />
                   </Button>
                 </div>
               </motion.div>
@@ -261,19 +279,17 @@ export function CreateExpeditionModal({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
+                  className="bg-card/50 backdrop-blur-sm rounded-lg p-6 border border-border/50"
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl">
-                      <Target className="h-4 w-4 text-primary" />
-                    </div>
-                    <h3 className="text-base font-semibold">Mission Details</h3>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Target className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-medium text-foreground">Mission Details</h3>
                   </div>
                   
                   <div className="space-y-4">
                     {/* Name Field */}
                     <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
+                      <Label htmlFor="name" className="text-sm font-medium">
                         Expedition Name
                       </Label>
                       <div className="relative">
@@ -287,21 +303,23 @@ export function CreateExpeditionModal({
                               setValidationErrors({ ...validationErrors, name: undefined })
                             }
                           }}
-                          className="h-10 px-3 bg-background/50 backdrop-blur-sm border-border/50 focus:border-primary/50 transition-all"
+                          className="h-10 px-3 pr-24 bg-background border-border/50 focus:border-primary/50 transition-colors"
                           maxLength={100}
                         />
-                        <AnimatePresence>
-                          {formData.name && !validationErrors.name && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0 }}
-                              className="absolute right-4 top-1/2 -translate-y-1/2"
-                            >
-                              <CircleCheck className="h-5 w-5 text-green-500" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">{formData.name.length}/100</span>
+                          <AnimatePresence>
+                            {formData.name && !validationErrors.name && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0 }}
+                              >
+                                <CircleCheck className="h-4 w-4 text-green-500" />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       </div>
                       {validationErrors.name && (
                         <motion.p 
@@ -313,15 +331,11 @@ export function CreateExpeditionModal({
                           {validationErrors.name}
                         </motion.p>
                       )}
-                      <p className="text-xs text-muted-foreground">
-                        {formData.name.length}/100 characters
-                      </p>
                     </div>
 
                     {/* Mission Field */}
                     <div className="space-y-2">
-                      <Label htmlFor="mission" className="text-sm font-medium flex items-center gap-2">
-                        <Wand2 className="h-4 w-4 text-primary" />
+                      <Label htmlFor="mission" className="text-sm font-medium">
                         Mission Objectives
                       </Label>
                       <div className="relative">
@@ -336,7 +350,7 @@ export function CreateExpeditionModal({
                             }
                           }}
                           rows={3}
-                          className="resize-none text-sm p-3 bg-background/50 backdrop-blur-sm border-border/50 focus:border-primary/50 transition-all"
+                          className="resize-none text-sm p-3 bg-background border-border/50 focus:border-primary/50 transition-colors"
                           maxLength={500}
                         />
                         <div className="absolute bottom-3 right-3 text-xs text-muted-foreground">
@@ -362,24 +376,18 @@ export function CreateExpeditionModal({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
+                  className="bg-card/50 backdrop-blur-sm rounded-lg p-6 border border-border/50"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl">
-                        <Bot className="h-4 w-4 text-primary" />
-                      </div>
-                      <h3 className="text-base font-semibold">Assign AI Agents</h3>
+                    <div className="flex items-center gap-2">
+                      <Bot className="h-4 w-4 text-primary" />
+                      <h3 className="text-sm font-medium text-foreground">Assign AI Agents</h3>
                     </div>
                     <div className="flex items-center gap-3">
                       {formData.selectedAgents.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full"
-                        >
-                          <Star className="h-4 w-4 text-primary" />
-                          <span className="text-sm font-medium">{formData.selectedAgents.length} selected</span>
-                        </motion.div>
+                        <Badge variant="secondary" className="text-xs">
+                          {formData.selectedAgents.length} selected
+                        </Badge>
                       )}
                       {availableAgents.length > 0 && (
                         <Button 
@@ -457,11 +465,10 @@ export function CreateExpeditionModal({
                         </div>
                       </Card>
                     ) : (
-                      <div className="grid gap-3">
+                      <div className="space-y-3">
                         {filteredAgents.map((agent, index) => {
                           const isSelected = formData.selectedAgents.includes(agent.id)
                           const categoryStyle = getCategoryStyle(agent.category)
-                          const IconComponent = categoryStyle.icon
 
                           return (
                             <motion.div
@@ -476,79 +483,144 @@ export function CreateExpeditionModal({
                               >
                                 <Card 
                                   className={`
-                                    group relative cursor-pointer transition-all duration-200
+                                    group relative cursor-pointer transition-all duration-200 overflow-hidden
                                     ${isSelected
-                                      ? 'border-primary shadow-lg shadow-primary/10 bg-primary/5'
-                                      : 'hover:border-primary/30 hover:shadow-md'
+                                      ? 'border-primary bg-gradient-to-br from-primary/10 via-primary/5 to-transparent shadow-lg'
+                                      : 'hover:border-primary/50 hover:shadow-md bg-gradient-to-br from-card to-card/80'
                                     }
                                   `}
                                 >
-                                  <div className="flex items-center gap-4 p-4">
-                                    {/* Checkbox */}
-                                    <Checkbox
-                                      id={`agent-checkbox-${agent.id}`}
-                                      checked={isSelected}
-                                      onCheckedChange={() => handleToggleAgent(agent.id)}
-                                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                    />
+                                  {/* Selection glow effect */}
+                                  {isSelected && (
+                                    <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/10 opacity-50" />
+                                  )}
                                   
-                                  {/* Agent Avatar */}
-                                  <div className="relative">
-                                    <Avatar className="h-10 w-10 border-2 border-background">
-                                      <AvatarImage src={agent.avatar} alt={agent.name} />
-                                      <AvatarFallback className={`${categoryStyle.color} text-white`}>
-                                        <IconComponent className="h-5 w-5" />
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    {agent.status === 'active' && (
-                                      <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background" />
-                                    )}
-                                  </div>
+                                  <div className="relative p-5">
+                                    <div className="flex items-start gap-4">
+                                      {/* Enhanced Avatar Section */}
+                                      <div className="relative shrink-0">
+                                        <div className="relative">
+                                          <Avatar className="h-12 w-12 border-2 border-background shadow-md">
+                                            <AvatarImage src={agent.avatar} alt={agent.name} />
+                                            <AvatarFallback className={`${categoryStyle.color} text-white font-semibold`}>
+                                              {getAgentAvatarIcon(agent)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          {agent.status === 'active' && (
+                                            <div className="absolute -bottom-1 -right-1 h-3.5 w-3.5 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+                                          )}
+                                        </div>
+                                        {/* Checkbox below avatar */}
+                                        <div className="flex justify-center mt-3">
+                                          <Checkbox
+                                            id={`agent-checkbox-${agent.id}`}
+                                            checked={isSelected}
+                                            onCheckedChange={() => handleToggleAgent(agent.id)}
+                                            className="data-[state=checked]:bg-primary data-[state=checked]:border-primary h-5 w-5"
+                                          />
+                                        </div>
+                                      </div>
 
-                                  {/* Agent Info */}
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <p className="font-semibold">{agent.name}</p>
-                                      <Badge variant="outline" className="text-xs">
-                                        {agent.category}
-                                      </Badge>
-                                    </div>
-                                    {agent.role && (
-                                      <p className="text-sm text-muted-foreground mt-0.5">{agent.role}</p>
-                                    )}
-                                    {agent.skills && agent.skills.length > 0 && (
-                                      <div className="flex flex-wrap gap-1 mt-2">
-                                        {agent.skills.slice(0, 4).map((skill, i) => (
-                                          <Badge key={i} variant="secondary" className="text-xs">
-                                            {skill}
-                                          </Badge>
-                                        ))}
-                                        {agent.skills.length > 4 && (
-                                          <Badge variant="secondary" className="text-xs">
-                                            +{agent.skills.length - 4}
-                                          </Badge>
+                                      {/* Enhanced Agent Info */}
+                                      <div className="flex-1 min-w-0 space-y-3">
+                                        {/* Header */}
+                                        <div>
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                              <div className="flex items-center gap-2">
+                                                <h4 className="font-semibold text-base">{agent.name}</h4>
+                                                <Badge 
+                                                  variant="outline" 
+                                                  className={`text-xs ${
+                                                    agent.category === 'research' ? 'border-blue-500/50 text-blue-600' :
+                                                    agent.category === 'engineering' ? 'border-purple-500/50 text-purple-600' :
+                                                    agent.category === 'analysis' ? 'border-green-500/50 text-green-600' :
+                                                    agent.category === 'creative' ? 'border-pink-500/50 text-pink-600' :
+                                                    'border-border'
+                                                  }`}
+                                                >
+                                                  {agent.category}
+                                                </Badge>
+                                              </div>
+                                              {agent.role && (
+                                                <p className="text-sm text-muted-foreground mt-0.5">{agent.role}</p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Description */}
+                                        <p className="text-sm text-muted-foreground line-clamp-2">
+                                          {agent.description || `A specialized ${agent.category} agent with expertise in ${agent.skills?.slice(0, 2).join(' and ') || 'various tasks'}.`}
+                                        </p>
+
+                                        {/* Skills */}
+                                        {agent.skills && agent.skills.length > 0 && (
+                                          <div className="space-y-2">
+                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                              <Sparkles className="h-3 w-3" />
+                                              <span>Specializations</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {agent.skills.slice(0, 4).map((skill, i) => (
+                                                <Badge 
+                                                  key={i} 
+                                                  variant="secondary" 
+                                                  className="text-xs px-2 py-0.5 bg-secondary/50"
+                                                >
+                                                  {skill}
+                                                </Badge>
+                                              ))}
+                                              {agent.skills.length > 4 && (
+                                                <Badge 
+                                                  variant="secondary" 
+                                                  className="text-xs px-2 py-0.5 bg-secondary/50"
+                                                >
+                                                  +{agent.skills.length - 4} more
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* Tags */}
+                                        {agent.tags && agent.tags.length > 0 && (
+                                          <div className="flex flex-wrap gap-1.5">
+                                              {agent.tags.slice(0, 3).map((tag, i) => (
+                                                <Badge 
+                                                  key={i} 
+                                                  variant="outline" 
+                                                  className="text-xs px-2 py-0.5 border-primary/30 text-primary/80"
+                                                >
+                                                  {tag}
+                                                </Badge>
+                                              ))}
+                                              {agent.tags.length > 3 && (
+                                                <Badge 
+                                                  variant="outline" 
+                                                  className="text-xs px-2 py-0.5 border-primary/30 text-primary/80"
+                                                >
+                                                  +{agent.tags.length - 3} more
+                                                </Badge>
+                                              )}
+                                          </div>
+                                        )}
+
+                                        {/* Selected indicator */}
+                                        {isSelected && (
+                                          <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="flex items-center gap-1 text-xs text-primary pt-2"
+                                          >
+                                            <Check className="h-3 w-3" />
+                                            <span>Selected</span>
+                                          </motion.div>
                                         )}
                                       </div>
-                                    )}
+                                    </div>
                                   </div>
-
-                                  {/* Selection Indicator */}
-                                  <AnimatePresence>
-                                    {isSelected && (
-                                      <motion.div
-                                        initial={{ scale: 0, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        exit={{ scale: 0, opacity: 0 }}
-                                        className="shrink-0"
-                                      >
-                                        <div className="p-2 bg-primary rounded-lg">
-                                          <Check className="h-4 w-4 text-primary-foreground" />
-                                        </div>
-                                      </motion.div>
-                                    )}
-                                  </AnimatePresence>
-                                </div>
-                              </Card>
+                                </Card>
                             </label>
                             </motion.div>
                           )
@@ -578,11 +650,7 @@ export function CreateExpeditionModal({
             </div>
 
             {/* Footer Actions */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex-shrink-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-            >
+            <div className="flex-shrink-0 border-t bg-card/50">
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-2">
@@ -591,8 +659,15 @@ export function CreateExpeditionModal({
                       const categoryStyle = agent ? getCategoryStyle(agent.category) : { color: 'bg-gray-500' }
                       return (
                         <Avatar key={agentId} className="h-8 w-8 border-2 border-background">
-                          <AvatarFallback className={`${categoryStyle.color} text-white text-xs`}>
-                            {agent?.name.charAt(0).toUpperCase()}
+                          <AvatarImage src={agent?.avatar} alt={agent?.name} />
+                          <AvatarFallback className={`${categoryStyle.color} text-white text-xs flex items-center justify-center`}>
+                            {agent ? (
+                              <div className="h-4 w-4">
+                                {getAgentAvatarIcon(agent)}
+                              </div>
+                            ) : (
+                              'A'
+                            )}
                           </AvatarFallback>
                         </Avatar>
                       )
@@ -622,24 +697,20 @@ export function CreateExpeditionModal({
                   <Button
                     onClick={handleSubmit}
                     disabled={isSubmitting || availableAgents.length === 0}
-                    className="gap-2 min-w-[160px] bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                    className="min-w-[140px]"
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Launching...
                       </>
                     ) : (
-                      <>
-                        <Rocket className="h-4 w-4" />
-                        Launch Expedition
-                        <ArrowRight className="h-4 w-4" />
-                      </>
+                      'Launch Expedition'
                     )}
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </DialogContent>
         </Dialog>
       )}

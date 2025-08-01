@@ -180,8 +180,8 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             >
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-primary/20 blur-xl" />
-                  <div className="relative bg-gradient-to-br from-primary/30 to-primary/20 p-3 rounded-xl shadow-lg border border-primary/30">
+                  <div className="absolute inset-0 bg-primary/10 blur-lg" />
+                  <div className="relative bg-gradient-to-br from-primary/20 to-primary/10 p-3 rounded-xl shadow-md border border-primary/20">
                     <Compass className="h-6 w-6 text-primary" />
                   </div>
                 </div>
@@ -197,9 +197,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-green-500/20 blur-lg" />
-                  <div className="relative bg-gradient-to-br from-green-500/20 to-green-500/10 p-2 rounded-lg">
-                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50" />
+                  <div className="absolute inset-0 bg-green-500/10 blur-sm" />
+                  <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/10 p-2 rounded-lg">
+                    <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
                   </div>
                 </div>
                 <div className="flex flex-col">
@@ -237,14 +237,6 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 expedition{(expeditions || []).length !== 1 ? 's' : ''}
               </span>
             </div>
-            
-            <Button
-              onClick={handleCreateExpedition}
-              className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25 transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Expedition
-            </Button>
           </motion.div>
         </div>
       </div>
@@ -268,7 +260,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             >
               <Card className="relative overflow-hidden border-primary/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-primary/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -285,7 +277,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       </motion.p>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-primary/20 blur-xl scale-150" />
+                      <div className="absolute inset-0 bg-primary/10 blur-lg scale-125" />
                       <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center shadow-lg group-hover:shadow-primary/30 transition-all duration-300">
                         <Rocket className="h-7 w-7 text-primary" />
                       </div>
@@ -305,7 +297,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             >
               <Card className="relative overflow-hidden border-blue-500/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-blue-500/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-blue-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -322,7 +314,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       </motion.p>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-blue-500/20 blur-xl scale-150" />
+                      <div className="absolute inset-0 bg-blue-500/10 blur-lg scale-125" />
                       <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/30 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/30 transition-all duration-300">
                         <Clock className="h-7 w-7 text-blue-500" />
                       </div>
@@ -348,7 +340,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             >
               <Card className="relative overflow-hidden border-green-500/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-green-500/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-green-500/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-green-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-green-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -365,7 +357,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       </motion.p>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-green-500/20 blur-xl scale-150" />
+                      <div className="absolute inset-0 bg-green-500/10 blur-lg scale-125" />
                       <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/30 flex items-center justify-center shadow-lg group-hover:shadow-green-500/30 transition-all duration-300">
                         <CheckCircle2 className="h-7 w-7 text-green-500" />
                       </div>
@@ -385,7 +377,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             >
               <Card className="relative overflow-hidden border-purple-500/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-purple-500/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-purple-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -405,7 +397,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       </div>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-purple-500/20 blur-xl scale-150" />
+                      <div className="absolute inset-0 bg-purple-500/10 blur-lg scale-125" />
                       <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/30 flex items-center justify-center shadow-lg group-hover:shadow-purple-500/30 transition-all duration-300">
                         <TrendingUp className="h-7 w-7 text-purple-500" />
                       </div>
@@ -442,7 +434,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               whileHover={{ scale: 1.02 }}
               className="flex-1 relative group"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/10 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5 blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
                 <Input
@@ -696,7 +688,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 transition={{ type: 'spring', delay: 0.2, duration: 0.5 }}
                 className="relative mb-6"
               >
-                <div className="absolute inset-0 bg-primary/20 blur-3xl" />
+                <div className="absolute inset-0 bg-primary/10 blur-xl" />
                 <div className="relative w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
                   <Rocket className="h-12 w-12 text-primary" />
                 </div>
@@ -886,14 +878,14 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             whileTap={{ scale: 0.9 }}
             className="relative group"
           >
-            {/* Glow effect */}
-            <div className="absolute inset-0 bg-primary/40 rounded-full blur-xl group-hover:bg-primary/60 transition-all duration-300" />
+            {/* Subtle glow effect */}
+            <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg group-hover:bg-primary/30 transition-all duration-300" />
             
             {/* Main button */}
             <Button
               onClick={handleCreateExpedition}
               size="lg"
-              className="relative h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-2xl shadow-primary/30 hover:shadow-primary/40 transition-all duration-300 p-0"
+              className="relative h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 p-0"
               aria-label="Create new expedition"
             >
               <Plus className="h-6 w-6" />

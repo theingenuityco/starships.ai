@@ -136,8 +136,8 @@ export function LogbookContent({ slug }: LogbookContentProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-6 overflow-auto bg-gradient-to-b from-background to-background/95">
-        <div className="max-w-5xl mx-auto">
+      <div className="flex-1 p-4 overflow-hidden bg-gradient-to-b from-background to-background/95 flex items-center justify-center">
+        <div className="w-full max-w-3xl">
           <div className="relative">
             {/* Decorative background elements */}
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-brown-500/5 rounded-3xl" />
@@ -145,23 +145,20 @@ export function LogbookContent({ slug }: LogbookContentProps) {
             <div className="absolute bottom-10 right-10 w-32 h-32 bg-brown-500/10 rounded-full blur-3xl" />
             
             <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm border-border/50 shadow-2xl">
-              <CardHeader className="pb-8 pt-8">
+              <CardHeader className="pb-4 pt-4">
                 <div className="text-center space-y-4">
-                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-amber-500/20 to-brown-500/20 rounded-2xl mb-4">
-                    <BookOpen className="h-10 w-10 text-amber-500" />
-                  </div>
-                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">
-                    🚧 Logbook Archives Under Construction
+                  <CardTitle className="text-2xl font-bold">
+                    <span>🚧</span> <span className="bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent">Logbook Archives Under Construction</span>
                   </CardTitle>
-                  <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                  <p className="text-base text-muted-foreground max-w-2xl mx-auto">
                     Our archivists are digitizing mission logs and historical records
                   </p>
                 </div>
               </CardHeader>
-              <CardContent className="pb-12">
+              <CardContent className="pb-6">
                 <div className="relative">
                   {/* Animated illustration placeholder */}
-                  <div className="relative h-64 mb-8 rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 overflow-hidden">
+                  <div className="relative h-48 mb-4 rounded-2xl bg-gradient-to-br from-amber-950 via-amber-900 to-amber-950 overflow-hidden">
                     {/* Background elements */}
                     <div className="absolute inset-0 opacity-20">
                       <div className="absolute top-5 left-10 w-32 h-1 bg-amber-700 transform rotate-12" />
@@ -185,8 +182,8 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                         </div>
                         
                         {/* Astronaut writing */}
-                        <div className="absolute -top-10 right-0 transform animate-float-delayed">
-                          <svg width="70" height="90" viewBox="0 0 70 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <div className="absolute -top-8 right-0 transform animate-float-delayed">
+                          <svg width="50" height="65" viewBox="0 0 70 90" fill="none" xmlns="http://www.w3.org/2000/svg">
                             {/* Astronaut body */}
                             <g transform="rotate(-10 35 45)">
                               {/* Backpack */}
@@ -258,31 +255,31 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                   </div>
                   
                   {/* Feature list */}
-                  <div className="grid md:grid-cols-3 gap-6 mb-8">
+                  <div className="grid md:grid-cols-3 gap-4 mb-4">
                     <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-amber-500/10 rounded-xl mb-2">
-                        <ScrollText className="h-6 w-6 text-amber-500" />
+                      <div className="inline-flex items-center justify-center w-10 h-10 bg-amber-500/10 rounded-xl mb-1">
+                        <ScrollText className="h-5 w-5 text-amber-500" />
                       </div>
                       <h4 className="font-semibold">Mission Logs</h4>
                       <p className="text-sm text-muted-foreground">Detailed expedition records</p>
                     </div>
                     <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-amber-600/10 rounded-xl mb-2">
-                        <History className="h-6 w-6 text-amber-600" />
+                      <div className="inline-flex items-center justify-center w-10 h-10 bg-amber-600/10 rounded-xl mb-1">
+                        <History className="h-5 w-5 text-amber-600" />
                       </div>
                       <h4 className="font-semibold">Historical Records</h4>
                       <p className="text-sm text-muted-foreground">Complete starship history</p>
                     </div>
                     <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center w-12 h-12 bg-amber-700/10 rounded-xl mb-2">
-                        <PenTool className="h-6 w-6 text-amber-700" />
+                      <div className="inline-flex items-center justify-center w-10 h-10 bg-amber-700/10 rounded-xl mb-1">
+                        <PenTool className="h-5 w-5 text-amber-700" />
                       </div>
                       <h4 className="font-semibold">Auto Generation</h4>
                       <p className="text-sm text-muted-foreground">AI-powered log entries</p>
                     </div>
                   </div>
                   
-                  <div className="bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-amber-700/10 rounded-2xl p-6 text-center border border-amber-500/20">
+                  <div className="bg-gradient-to-r from-amber-500/10 via-amber-600/10 to-amber-700/10 rounded-2xl p-4 text-center border border-amber-500/20">
                     <p className="text-lg font-semibold text-foreground">
                       Logbook system will be available soon
                     </p>

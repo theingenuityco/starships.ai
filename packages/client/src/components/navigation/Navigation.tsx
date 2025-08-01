@@ -29,14 +29,14 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
       { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" },
       { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
-      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "active" }
+      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "optimal" }
     ]
   },
   {
     title: "Coming Soon",
     items: [
       { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
-      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "warning" },
+      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "optimal" },
       { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" }
     ]
   }

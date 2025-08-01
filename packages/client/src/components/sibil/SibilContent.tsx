@@ -71,37 +71,10 @@ export function SibilContent({ slug }: SibilContentProps) {
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                     Sibil AI
                   </h1>
-                  <p className="text-sm text-muted-foreground">Advanced AI intelligence assistant</p>
+                  <p className="text-sm text-muted-foreground">Advanced AI intelligence assistant for strategic analysis and decision support</p>
                 </div>
               </div>
 
-              <div className="h-10 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
-
-              {/* Stats Cards */}
-              <div className="flex items-center gap-3">
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-3.5 w-3.5 text-emerald-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Conversations</p>
-                        <p className="text-sm font-bold">{activeConversations}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <Lightbulb className="h-3.5 w-3.5 text-emerald-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Insights</p>
-                        <p className="text-sm font-bold">{insights}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </div>
 

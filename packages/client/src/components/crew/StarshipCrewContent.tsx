@@ -1,7 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Agent, MCPServerOption, MCPServerConnector, mcpServerAPI, starshipAPI, Starship } from '@/lib/api'
+import {
+  Agent,
+  MCPServerOption,
+  MCPServerConnector,
+  mcpServerAPI,
+  starshipAPI,
+  Starship,
+} from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
@@ -157,7 +164,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
       if (operations.length > 0) {
         await Promise.all(operations)
-        
+
         // Show success notification
         if (toCreate.length > 0) {
           const connectorNames = toCreate.map(t => t.name).join(', ')
@@ -168,7 +175,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
             duration: 5000,
           })
         }
-        
+
         if (toRemove.length > 0) {
           toast({
             title: 'Disconnected',
@@ -184,7 +191,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     } catch (error) {
       console.error('Failed to update connector instances:', error)
       setConnectorsError('Failed to update connectors. Please try again.')
-      
+
       // Show error notification
       toast({
         title: 'Connection failed',
@@ -202,25 +209,50 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Header with Back Navigation */}
-      <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" asChild>
+      {/* Professional Header */}
+      <div className="flex items-center justify-between px-8 py-6 bg-gradient-to-r from-card/50 to-muted/30 border-b border-border/50 backdrop-blur-sm">
+        <div className="flex items-center gap-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground hover:text-foreground"
+            asChild
+          >
             <Link href="/fleet">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Fleet
+              Fleet
             </Link>
           </Button>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="bg-primary/10 p-1.5 rounded-md">
-                <Users className="h-4 w-4 text-primary" />
-              </span>
-              <span className="text-lg font-semibold">Crew Console</span>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-gradient-to-br from-primary/20 to-primary/10 p-2.5 rounded-lg shadow-sm border border-primary/20">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-foreground">Crew Console</h1>
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Starship: <span className="font-medium">{slug}</span>
+
+            <div className="h-8 w-px bg-border/60" />
+
+            <div className="flex items-center gap-2">
+              <div className="bg-muted/50 p-1.5 rounded-md">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">
+                  {starshipLoading ? 'Loading...' : starship?.name || 'Unknown Starship'}
+                </span>
+                <span className="text-xs text-muted-foreground">Active Mission</span>
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-muted-foreground">
+            {connectorInstances.length} connector{connectorInstances.length !== 1 ? 's' : ''} active
           </div>
         </div>
       </div>

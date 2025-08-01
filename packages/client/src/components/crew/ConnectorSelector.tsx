@@ -37,6 +37,7 @@ import {
   Settings,
   Key,
   Minus,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -183,6 +184,32 @@ export function ConnectorSelector({
   // Get API key requirements for a connector
   const getApiKeyRequirements = (connector: MCPServerOption): ApiKeyRequirement[] => {
     return ConnectorApiKeyManager.detectRequirements(connector)
+  }
+
+  // Helper function to get connector icon
+  const getConnectorIcon = (connector: MCPServerOption) => {
+    const name = connector.name.toLowerCase()
+    if (name.includes('firecrawl')) return '🔥'
+    if (name.includes('searx')) return '🔍'
+    if (name.includes('sequential') || name.includes('thinking')) return '🧠'
+    return '🔗'
+  }
+
+  // Helper function to get connector description
+  const getConnectorDescription = (connector: MCPServerOption) => {
+    const name = connector.name.toLowerCase()
+    if (name.includes('firecrawl')) return 'Web scraping and data extraction'
+    if (name.includes('searx')) return 'Privacy-focused web search engine'
+    if (name.includes('sequential') || name.includes('thinking'))
+      return 'Advanced reasoning and problem solving'
+    return 'External service integration'
+  }
+
+  // Helper function to check if connector needs configuration display
+  const needsConfigurationDisplay = (connector: MCPServerOption) => {
+    // Sequential thinking doesn't need configuration display
+    const name = connector.name.toLowerCase()
+    return !(name.includes('sequential') || name.includes('thinking'))
   }
 
   // Fetch available connector templates
@@ -387,30 +414,29 @@ export function ConnectorSelector({
 
       {/* Browse Connectors Section */}
       <div className="space-y-3">
-        {/* Multi-select Dropdown with enhanced styling */}
+        {/* Multi-select Dropdown with professional styling */}
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
-              className="w-full justify-between h-auto min-h-[3rem] p-4 bg-gradient-to-r from-primary/10 to-primary/5 hover:from-primary/20 hover:to-primary/10 transition-all duration-200 border-2 border-primary/40 hover:border-primary/60 shadow-md hover:shadow-lg"
+              className="w-full justify-between h-11 px-4 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors border-0 shadow-sm"
               disabled={disabled}
               aria-label="Select connectors"
               aria-expanded={isDropdownOpen}
               aria-haspopup="listbox"
             >
-              <div className="flex flex-1 mr-2 items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
                 {selectedConnectors.length === 0 ? (
-                  <span className="text-primary font-semibold">Browse Connectors...</span>
+                  <span className="font-medium">Browse Connectors</span>
                 ) : (
-                  <span className="text-primary font-semibold">Browse Connectors</span>
+                  <span className="font-medium">Browse More Connectors</span>
                 )}
               </div>
-              <ChevronDown className="w-5 h-5 flex-shrink-0 text-primary" />
+              <ChevronDown className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[400px] overflow-y-auto bg-card/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl"
+            className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[450px] overflow-y-auto bg-card border-2 border-primary/30 shadow-2xl rounded-xl"
             align="start"
           >
             {filteredConnectors.length === 0 ? (
@@ -418,7 +444,7 @@ export function ConnectorSelector({
                 No connectors available
               </DropdownMenuItem>
             ) : (
-              filteredConnectors.map(connector => {
+              filteredConnectors.map((connector, index) => {
                 const isSelected = isConnectorSelected(connector)
                 const isConnecting = connectingIds.has(connector.id)
                 const connectorInstance = getConnectorInstance(connector)
@@ -449,7 +475,7 @@ export function ConnectorSelector({
 
                   switch (status) {
                     case 'active':
-                      return <Wifi className="w-3 h-3 text-green-500" />
+                      return <CheckCircle className="w-3 h-3 text-green-500" />
                     case 'connecting':
                       return <Clock className="w-3 h-3 text-blue-500" />
                     case 'error':
@@ -485,100 +511,107 @@ export function ConnectorSelector({
                 }
 
                 return (
-                  <DropdownMenuItem
-                    key={connector.id}
-                    onClick={() => handleConnectorToggle(connector)}
-                    disabled={disabled || isConnecting}
-                    className={cn(
-                      'flex items-start gap-3 p-4 cursor-pointer transition-all duration-200 border-l-4 border-transparent hover:border-primary/50 hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent min-h-[80px]',
-                      isSelected && 'border-primary bg-gradient-to-r from-primary/10 to-primary/5'
-                    )}
-                    role="option"
-                    aria-selected={isSelected}
-                  >
-                    <div className="flex items-center justify-center w-5 h-5 mt-1 flex-shrink-0">
-                      {isConnecting ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                      ) : isSelected ? (
-                        <div className="w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-primary-foreground" />
-                        </div>
-                      ) : (
-                        <div className="w-4 h-4 border-2 border-muted-foreground/40 rounded-full hover:border-primary/60 transition-colors" />
+                  <div key={connector.id}>
+                    <DropdownMenuItem
+                      onClick={() => handleConnectorToggle(connector)}
+                      disabled={disabled || isConnecting}
+                      className={cn(
+                        'flex items-start gap-4 p-4 cursor-pointer transition-all duration-300 hover:bg-gradient-to-r hover:from-primary/8 hover:to-primary/3 hover:shadow-sm min-h-[90px] rounded-lg group',
+                        isSelected &&
+                          'bg-gradient-to-r from-green-50 to-green-25 dark:from-green-900/20 dark:to-green-900/10 shadow-md'
                       )}
-                    </div>
-
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-foreground truncate">
-                            {connector.name}
-                          </h4>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Badge
-                            variant={getCommandBadgeVariant(connector.command)}
-                            className="text-xs font-medium"
-                          >
-                            {connector.command.toUpperCase()}
-                          </Badge>
-                        </div>
+                      role="option"
+                      aria-selected={isSelected}
+                    >
+                      <div className="flex items-center justify-center w-6 h-6 mt-1 flex-shrink-0">
+                        {isConnecting ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                        ) : isSelected ? (
+                          <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-sm border border-green-600/50">
+                            <Check className="w-3 h-3 text-white font-bold" />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 border-2 border-muted-foreground/30 rounded-full hover:border-primary/70 hover:bg-primary/5 transition-all duration-200 group-hover:scale-110" />
+                        )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        {connectorRequiresApiKeys(connector) && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs font-medium bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300"
-                                >
-                                  <Key className="w-3 h-3 mr-1" />
-                                  API Keys Required
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="text-xs">
-                                  This connector requires API keys to function
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1.5 cursor-help px-2 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors">
-                                {getStatusIcon()}
-                                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                                  {getStatusText()}
+                      <div className="flex-1 min-w-0 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{getConnectorIcon(connector)}</span>
+                              <div className="flex flex-col">
+                                <h4 className="font-bold text-base text-foreground truncate group-hover:text-primary transition-colors">
+                                  {connector.name}
+                                </h4>
+                                <span className="text-xs text-muted-foreground">
+                                  {getConnectorDescription(connector)}
                                 </span>
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-xs whitespace-pre-line max-w-xs">
-                                {getHealthTooltip()}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center justify-center w-5 h-5 cursor-help rounded-full transition-all duration-200">
+                                      {getStatusIcon()}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs whitespace-pre-line max-w-xs">
+                                      {getHealthTooltip()}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                        </div>
+
+                        {connectorRequiresApiKeys(connector) &&
+                          needsConfigurationDisplay(connector) && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant="secondary"
+                                      className="text-xs font-semibold bg-gradient-to-r from-amber-100 to-amber-50 text-amber-800 hover:from-amber-200 hover:to-amber-100 dark:from-amber-900/40 dark:to-amber-900/20 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shadow-sm"
+                                    >
+                                      <Key className="w-3 h-3 mr-1.5" />
+                                      Configuration Required
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      This connector requires configuration to function
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          )}
+
+                        {connector.env && (
+                          <div className="text-xs text-muted-foreground bg-gradient-to-r from-muted/40 to-muted/20 px-3 py-2 rounded-lg border border-muted-foreground/10 shadow-sm">
+                            {formatEnvForDisplay(connector.env)}
+                          </div>
+                        )}
+
+                        {connectorInstance?.errorMessage && status === 'error' && (
+                          <div className="text-xs text-red-700 bg-gradient-to-r from-red-50 to-red-25 dark:from-red-900/30 dark:to-red-900/10 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800 shadow-sm line-clamp-2">
+                            <span className="font-semibold">Error:</span>{' '}
+                            {connectorInstance.errorMessage}
+                          </div>
+                        )}
                       </div>
+                    </DropdownMenuItem>
 
-                      {connector.env && (
-                        <p className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded truncate">
-                          {formatEnvForDisplay(connector.env)}
-                        </p>
-                      )}
-
-                      {connectorInstance?.errorMessage && status === 'error' && (
-                        <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800 line-clamp-2">
-                          {connectorInstance.errorMessage}
-                        </p>
-                      )}
-                    </div>
-                  </DropdownMenuItem>
+                    {/* Add separator between connector options */}
+                    {index < filteredConnectors.length - 1 && (
+                      <div className="mx-3 my-2">
+                        <div className="h-0.5 bg-gradient-to-r from-transparent via-border to-transparent"></div>
+                      </div>
+                    )}
+                  </div>
                 )
               })
             )}
@@ -587,14 +620,14 @@ export function ConnectorSelector({
       </div>
 
       {/* Enhanced Selected Connectors Display */}
-      {selectedConnectors.length > 0 && (
+      {selectedConnectors.length > 0 ? (
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-1">
-            <div className="h-px bg-gradient-to-r from-green-500/50 to-transparent flex-1"></div>
-            <h4 className="text-sm font-semibold text-green-600 uppercase tracking-wide">
+            <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
+            <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
               Active Connectors
             </h4>
-            <div className="h-px bg-gradient-to-l from-green-500/50 to-transparent flex-1"></div>
+            <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
           </div>
           <div className="space-y-3">
             {selectedConnectors.map(connector => {
@@ -632,18 +665,7 @@ export function ConnectorSelector({
                   )
 
                   return {
-                    icon:
-                      status === 'active' ? (
-                        healthMetrics.healthStatus === 'healthy' ? (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                        ) : healthMetrics.healthStatus === 'warning' ? (
-                          <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-red-500" />
-                        )
-                      ) : (
-                        <WifiOff className="w-4 h-4 text-gray-500" />
-                      ),
+                    icon: <CheckCircle className="w-4 h-4 text-green-500" />,
                     badge: (
                       <Badge
                         variant={
@@ -657,7 +679,7 @@ export function ConnectorSelector({
                         }
                         className="text-xs"
                       >
-                        {status} ({healthMetrics.healthStatus})
+                        {healthMetrics.healthStatus === 'healthy' ? 'Connected' : status}
                       </Badge>
                     ),
                     borderColor:
@@ -675,10 +697,10 @@ export function ConnectorSelector({
                 switch (status) {
                   case 'active':
                     return {
-                      icon: <Wifi className="w-4 h-4 text-green-500" />,
+                      icon: <CheckCircle className="w-4 h-4 text-green-500" />,
                       badge: (
                         <Badge variant="default" className="text-xs">
-                          Active
+                          Connected
                         </Badge>
                       ),
                       borderColor: 'border-green-300 dark:border-green-700',
@@ -743,12 +765,6 @@ export function ConnectorSelector({
                           {connector.name}
                         </h4>
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant={getCommandBadgeVariant(connector.command)}
-                            className="text-xs font-semibold px-2 py-1"
-                          >
-                            {connector.command.toUpperCase()}
-                          </Badge>
                           {statusDisplay.badge}
                         </div>
                       </div>
@@ -775,9 +791,9 @@ export function ConnectorSelector({
                         <Button
                           onClick={() => handleConnectorToggle(connector)}
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
                           disabled={disabled || isConnecting}
-                          className="h-9 w-9 p-0 border-destructive/30 hover:border-destructive hover:bg-destructive/10 text-destructive hover:text-destructive"
+                          className="h-9 w-9 p-0 text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors"
                           aria-label={`Remove ${connector.name}`}
                         >
                           <X className="w-4 h-4" />
@@ -832,12 +848,6 @@ export function ConnectorSelector({
                       </div>
                     )}
 
-                    {connector.env && (
-                      <div className="text-xs text-muted-foreground bg-muted/40 px-3 py-2 rounded-lg">
-                        {formatEnvForDisplay(connector.env)}
-                      </div>
-                    )}
-
                     {connectorInstance?.errorMessage && status === 'error' && (
                       <div className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg border border-red-200 dark:border-red-800">
                         <strong>Error:</strong> {connectorInstance.errorMessage}
@@ -854,6 +864,16 @@ export function ConnectorSelector({
               )
             })}
           </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="bg-muted/20 rounded-full p-4 mb-4">
+            <Plug className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-2">No connectors available</h3>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Browse and select connectors to enhance your starship's capabilities
+          </p>
         </div>
       )}
 

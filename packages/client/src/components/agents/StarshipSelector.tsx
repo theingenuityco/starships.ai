@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { Loader2, AlertCircle, Rocket } from 'lucide-react'
 
 interface StarshipSelectorProps {
@@ -24,10 +23,10 @@ interface StarshipSelectorProps {
 export function StarshipSelector({
   value,
   onValueChange,
-  placeholder = "Select a starship",
+  placeholder = 'Select a starship',
   required = false,
   disabled = false,
-  className
+  className,
 }: StarshipSelectorProps) {
   const [starships, setStarships] = useState<Starship[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,12 +52,6 @@ export function StarshipSelector({
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
     return starshipClass === 'scout' ? '🚀' : '🛸'
-  }
-
-  const getStatusColor = (status: 'active' | 'inactive') => {
-    return status === 'active' 
-      ? 'bg-green-500/20 text-green-400 border-green-500/30'
-      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
   }
 
   if (loading) {
@@ -101,30 +94,11 @@ export function StarshipSelector({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {starships.map((starship) => (
+        {starships.map(starship => (
           <SelectItem key={starship.id} value={starship.id}>
             <div className="flex items-center space-x-3 py-1">
               <span className="text-lg">{getStarshipIcon(starship.class)}</span>
-              <div className="flex-1">
-                <div className="font-medium">{starship.name}</div>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge 
-                    variant="outline" 
-                    className={`${getStatusColor(starship.status)} text-xs`}
-                  >
-                    {starship.status}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {starship.class}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {starship.maxAgents} agents
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    {starship.maxActiveExpeditions} expeditions
-                  </Badge>
-                </div>
-              </div>
+              <div className="font-medium">{starship.name}</div>
             </div>
           </SelectItem>
         ))}

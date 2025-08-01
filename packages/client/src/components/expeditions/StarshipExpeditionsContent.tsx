@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion } from 'motion/react'
+import React, { useState, useEffect } from 'react'
+// import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -130,23 +130,16 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   }
 
   // Get status counts for badges
-  const statusCounts = (expeditions || []).reduce(
+  const statusCounts: Record<string, number> = (expeditions || []).reduce(
     (acc, expedition) => {
       acc[expedition.status] = (acc[expedition.status] || 0) + 1
       return acc
     },
-    {} as Record<string, number>
+    {}
   )
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      className="h-full flex flex-col"
-    >
-      {/* Professional Header with Enhanced Design */}
+    <div className="h-full flex flex-col">
       <div className="relative overflow-hidden">
         {/* Background gradient effect */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
@@ -154,11 +147,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
         
         <div className="relative flex items-center justify-between px-8 py-8 backdrop-blur-sm border-b border-border/40">
           <div className="flex items-center gap-6">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-            >
+            <div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -170,18 +159,13 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   Fleet
                 </Link>
               </Button>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="flex items-center gap-4"
-            >
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-primary/10 blur-lg" />
-                  <div className="relative bg-gradient-to-br from-primary/20 to-primary/10 p-3 rounded-xl shadow-md border border-primary/20">
+                  <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                  <div className="relative bg-gradient-to-br from-primary/20 to-primary/10 p-3 rounded-xl shadow-sm border border-primary/20">
                     <Compass className="h-6 w-6 text-primary" />
                   </div>
                 </div>
@@ -197,7 +181,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-green-500/10 blur-sm" />
+                  <div className="absolute inset-0 bg-green-500/5" />
                   <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/10 p-2 rounded-lg">
                     <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
                   </div>
@@ -219,15 +203,10 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   </span>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-4"
-          >
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-background/60 backdrop-blur-sm px-4 py-2 rounded-lg border border-border/40">
               <Rocket className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-foreground">
@@ -237,85 +216,58 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 expedition{(expeditions || []).length !== 1 ? 's' : ''}
               </span>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
 
       {/* Enhanced Stats Overview with Animations */}
       {stats && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="p-8 border-b bg-gradient-to-br from-background via-muted/5 to-primary/5"
-        >
+        <div className="p-8 border-b bg-gradient-to-br from-background via-muted/5 to-primary/5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {/* Total Missions Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="group"
-            >
-              <Card className="relative overflow-hidden border-primary/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-primary/5">
+            <div className="group hover:scale-105 hover:-translate-y-1 transition-transform">
+              <Card className="relative overflow-hidden border-primary/30 shadow-sm hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-primary/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-primary/5 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
                         Total Missions
                       </p>
-                      <motion.p 
-                        className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.3 }}
-                      >
+                      <p className="text-4xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
                         {stats.totalExpeditions}
-                      </motion.p>
+                      </p>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-primary/10 blur-lg scale-125" />
-                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center shadow-lg group-hover:shadow-primary/30 transition-all duration-300">
+                      <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300">
                         <Rocket className="h-7 w-7 text-primary" />
                       </div>
                     </div>
                   </div>
                 </div>
               </Card>
-            </motion.div>
+            </div>
 
             {/* Active Now Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="group"
-            >
-              <Card className="relative overflow-hidden border-blue-500/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-blue-500/5">
+            <div className="group hover:scale-105 hover:-translate-y-1 transition-transform">
+              <Card className="relative overflow-hidden border-blue-500/30 shadow-sm hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-blue-500/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-blue-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-blue-500/5 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
                         Active Now
                       </p>
-                      <motion.p 
-                        className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.4 }}
-                      >
+                      <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">
                         {stats.activeExpeditions}
-                      </motion.p>
+                      </p>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-blue-500/10 blur-lg scale-125" />
-                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/30 flex items-center justify-center shadow-lg group-hover:shadow-blue-500/30 transition-all duration-300">
+                      <div className="absolute inset-0 bg-blue-500/5 blur-sm" />
+                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-blue-500/30 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300">
                         <Clock className="h-7 w-7 text-blue-500" />
                       </div>
                     </div>
@@ -328,56 +280,39 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                   )}
                 </div>
               </Card>
-            </motion.div>
+            </div>
 
             {/* Completed Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="group"
-            >
-              <Card className="relative overflow-hidden border-green-500/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-green-500/5">
+            <div className="group hover:scale-105 hover:-translate-y-1 transition-transform">
+              <Card className="relative overflow-hidden border-green-500/30 shadow-sm hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-green-500/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 via-green-500/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-green-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-green-500/5 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
                         Completed
                       </p>
-                      <motion.p 
-                        className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-500 bg-clip-text text-transparent"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.5 }}
-                      >
+                      <p className="text-4xl font-bold bg-gradient-to-r from-green-600 to-green-500 bg-clip-text text-transparent">
                         {stats.completedExpeditions}
-                      </motion.p>
+                      </p>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-green-500/10 blur-lg scale-125" />
-                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/30 flex items-center justify-center shadow-lg group-hover:shadow-green-500/30 transition-all duration-300">
+                      <div className="absolute inset-0 bg-green-500/5 blur-sm" />
+                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-green-500/20 to-green-500/30 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300">
                         <CheckCircle2 className="h-7 w-7 text-green-500" />
                       </div>
                     </div>
                   </div>
                 </div>
               </Card>
-            </motion.div>
+            </div>
 
             {/* Success Rate Card */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.4 }}
-              whileHover={{ scale: 1.05, y: -5 }}
-              className="group"
-            >
-              <Card className="relative overflow-hidden border-purple-500/30 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-purple-500/5">
+            <div className="group hover:scale-105 hover:-translate-y-1 transition-transform">
+              <Card className="relative overflow-hidden border-purple-500/30 shadow-sm hover:shadow-lg transition-all duration-300 bg-gradient-to-br from-card via-card/95 to-purple-500/5">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent opacity-50" />
-                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-purple-500/5 rounded-full blur-xl group-hover:scale-125 transition-transform duration-500" />
+                <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-purple-500/5 rounded-full blur-sm group-hover:scale-110 transition-transform duration-500" />
                 <div className="relative p-5">
                   <div className="flex items-center justify-between">
                     <div>
@@ -385,231 +320,180 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                         Success Rate
                       </p>
                       <div className="flex items-baseline gap-1">
-                        <motion.p 
-                          className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent"
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.5, delay: 0.6 }}
-                        >
+                        <p className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-purple-500 bg-clip-text text-transparent">
                           {Math.round(stats.successRate)}
-                        </motion.p>
+                        </p>
                         <span className="text-xl text-purple-600 dark:text-purple-400 font-bold">%</span>
                       </div>
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-0 bg-purple-500/10 blur-lg scale-125" />
-                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/30 flex items-center justify-center shadow-lg group-hover:shadow-purple-500/30 transition-all duration-300">
+                      <div className="absolute inset-0 bg-purple-500/5 blur-sm" />
+                      <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-purple-500/30 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-300">
                         <TrendingUp className="h-7 w-7 text-purple-500" />
                       </div>
                     </div>
                   </div>
                   <div className="mt-3">
                     <div className="w-full bg-purple-500/10 rounded-full h-1.5">
-                      <motion.div 
-                        className="bg-gradient-to-r from-purple-500 to-purple-600 h-1.5 rounded-full"
-                        initial={{ width: 0 }}
-                        animate={{ width: `${stats.successRate}%` }}
-                        transition={{ duration: 1, delay: 0.8 }}
+                      <div 
+                        className="bg-gradient-to-r from-purple-500 to-purple-600 h-1.5 rounded-full transition-all duration-1000"
+                        style={{ width: `${stats.successRate}%` }}
                       />
                     </div>
                   </div>
                 </div>
               </Card>
-            </motion.div>
+            </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Enhanced Filters and Search Section */}
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-        className="p-8 border-b bg-gradient-to-br from-muted/10 via-background to-muted/5"
-      >
-        <div className="flex flex-col gap-6">
+      <div className="px-8 py-6 border-b bg-card/50">
+        <div className="flex flex-col gap-4">
           {/* Search and Filter Row */}
           <div className="flex flex-col md:flex-row gap-4">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="flex-1 relative group"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5 blur-lg opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                <Input
-                  placeholder="Search expeditions by name, mission, or agent..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-12 h-12 bg-card/80 backdrop-blur-sm border-border/50 hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 text-base shadow-sm"
-                />
-                {searchQuery && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </motion.button>
-                )}
-              </div>
-            </motion.div>
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search expeditions..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-11 pr-11 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors text-sm"
+              />
+              {searchQuery && (
+                <button
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             
-            <motion.div whileHover={{ scale: 1.02 }}>
-              <Select
-                value={statusFilter}
-                onValueChange={value => setStatusFilter(value as ExpeditionStatus | 'all')}
-              >
-                <SelectTrigger className="w-full md:w-64 h-12 bg-card/80 backdrop-blur-sm border-border/50 hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-300 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <Filter className="h-4 w-4 text-primary" />
-                    </div>
-                    <SelectValue placeholder="Filter by status" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent className="bg-card/95 backdrop-blur-xl border-border/50">
-                  <SelectItem value="all" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-gray-400 to-gray-500" />
-                      <span className="font-medium">All Expeditions</span>
+            <Select
+              value={statusFilter}
+              onValueChange={value => setStatusFilter(value as ExpeditionStatus | 'all')}
+            >
+              <SelectTrigger className="w-full md:w-48 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+                      <span>All Status</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="draft" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-slate-400 to-slate-500" />
-                      <span className="font-medium">Draft</span>
+                  <SelectItem value="draft">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-slate-500" />
+                      <span>Draft</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="planning" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-blue-400 to-blue-500 animate-pulse" />
-                      <span className="font-medium">Planning</span>
+                  <SelectItem value="planning">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-blue-500" />
+                      <span>Planning</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="in-progress" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 animate-pulse" />
-                      <span className="font-medium">In Progress</span>
+                  <SelectItem value="in-progress">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-amber-500" />
+                      <span>In Progress</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="review" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-purple-400 to-purple-500" />
-                      <span className="font-medium">Review</span>
+                  <SelectItem value="review">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-purple-500" />
+                      <span>Review</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="completed" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" />
-                      <span className="font-medium">Completed</span>
+                  <SelectItem value="completed">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                      <span>Completed</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="failed" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-red-400 to-red-500" />
-                      <span className="font-medium">Failed</span>
+                  <SelectItem value="failed">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-red-500" />
+                      <span>Failed</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="cancelled" className="hover:bg-primary/10">
-                    <div className="flex items-center gap-3">
-                      <div className="h-3 w-3 rounded-full bg-gradient-to-r from-gray-400 to-gray-500" />
-                      <span className="font-medium">Cancelled</span>
+                  <SelectItem value="cancelled">
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-gray-500" />
+                      <span>Cancelled</span>
                     </div>
                   </SelectItem>
-                </SelectContent>
-              </Select>
-            </motion.div>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Enhanced Status Badges */}
+          {/* Status Badges */}
           {Object.keys(statusCounts).length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
-              className="flex flex-wrap gap-3"
-            >
-              {Object.entries(statusCounts).map(([status, count], index) => {
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(statusCounts).map(([status, count]) => {
                 const statusConfig = {
                   draft: {
-                    className:
-                      'bg-gradient-to-r from-slate-500/10 to-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/30',
-                    dotColor: 'from-slate-400 to-slate-500',
+                    className: 'bg-slate-50 text-slate-700 dark:bg-slate-900/50 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+                    dotColor: 'bg-slate-500',
                   },
                   planning: {
-                    className: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
-                    dotColor: 'from-blue-400 to-blue-500',
+                    className: 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border-blue-200 dark:border-blue-700',
+                    dotColor: 'bg-blue-500',
                   },
                   'in-progress': {
-                    className:
-                      'bg-gradient-to-r from-amber-500/10 to-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30',
-                    dotColor: 'from-amber-400 to-amber-500',
+                    className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-700',
+                    dotColor: 'bg-amber-500',
                   },
                   review: {
-                    className:
-                      'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
-                    dotColor: 'from-purple-400 to-purple-500',
+                    className: 'bg-purple-50 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-700',
+                    dotColor: 'bg-purple-500',
                   },
                   completed: {
-                    className:
-                      'bg-gradient-to-r from-emerald-500/10 to-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
-                    dotColor: 'from-emerald-400 to-emerald-500',
+                    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700',
+                    dotColor: 'bg-emerald-500',
                   },
                   failed: {
-                    className: 'bg-gradient-to-r from-red-500/10 to-red-500/20 text-red-700 dark:text-red-300 border-red-500/30',
-                    dotColor: 'from-red-400 to-red-500',
+                    className: 'bg-red-50 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-700',
+                    dotColor: 'bg-red-500',
                   },
                   cancelled: {
-                    className: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
-                    dotColor: 'from-gray-400 to-gray-500',
+                    className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+                    dotColor: 'bg-gray-500',
                   },
                 }[status] || {
-                  className: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
-                  dotColor: 'from-gray-400 to-gray-500',
+                  className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-700',
+                  dotColor: 'bg-gray-500',
                 }
 
                 return (
-                  <motion.button
+                  <button
                     key={status}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3, delay: 0.1 * index }}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
                     onClick={() => setStatusFilter(status as ExpeditionStatus)}
-                    className={`group inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-sm font-semibold ${statusConfig.className} border backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300`}
+                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium ${statusConfig.className} border hover:opacity-80 transition-opacity`}
                   >
-                    <div className={`h-2.5 w-2.5 rounded-full bg-gradient-to-r ${statusConfig.dotColor} group-hover:scale-125 transition-transform`} />
+                    <div className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotColor}`} />
                     <span>{status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}</span>
-                    <span className="ml-1 px-2 py-0.5 bg-white/20 dark:bg-black/20 rounded-md text-xs font-bold">
+                    <span className="font-semibold">
                       {count as number}
                     </span>
-                  </motion.button>
+                  </button>
                 )
               })}
-            </motion.div>
+            </div>
           )}
         </div>
-      </motion.div>
+      </div>
 
       {/* Expeditions List with Enhanced States */}
-      <div className="flex-1 p-8 overflow-auto bg-gradient-to-b from-background via-background/95 to-muted/10">
+      <div className="flex-1 p-8 overflow-auto bg-background">
         {expeditionsLoading || !starshipId ? (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-          >
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {[...Array(6)].map((_, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-              >
+              <div key={index}>
                 <Card className="relative overflow-hidden bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border/30">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
                   <CardHeader className="pb-3 relative">
@@ -646,17 +530,12 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                     <Skeleton className="h-9 w-full rounded-lg bg-primary/10" />
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         ) : expeditionsError ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', duration: 0.5 }}
-            className="flex items-center justify-center min-h-[400px]"
-          >
-            <Card className="p-8 text-center max-w-md bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-200 dark:border-red-800 shadow-xl">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <Card className="p-8 text-center max-w-md bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-200 dark:border-red-800 shadow-lg">
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="h-8 w-8 text-red-500" />
               </div>
@@ -673,71 +552,42 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 Try Again
               </Button>
             </Card>
-          </motion.div>
+          </div>
         ) : filteredExpeditions.length === 0 ? (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', duration: 0.5 }}
-            className="flex items-center justify-center min-h-[400px]"
-          >
-            <Card className="p-10 text-center max-w-lg bg-gradient-to-br from-card via-card/95 to-primary/5 border-primary/20 shadow-xl">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', delay: 0.2, duration: 0.5 }}
-                className="relative mb-6"
-              >
-                <div className="absolute inset-0 bg-primary/10 blur-xl" />
-                <div className="relative w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/30 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <Card className="p-10 text-center max-w-lg bg-gradient-to-br from-card via-card/95 to-primary/5 border-primary/20 shadow-lg">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                <div className="relative w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/30 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
                   <Rocket className="h-12 w-12 text-primary" />
                 </div>
-              </motion.div>
+              </div>
               
-              <motion.h3 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="text-2xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent"
-              >
+              <h3 className="text-2xl font-bold mb-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                 {(expeditions || []).length === 0 ? 'Launch Your First Expedition' : 'No Matching Expeditions'}
-              </motion.h3>
+              </h3>
               
-              <motion.p 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-                className="text-muted-foreground mb-6 text-base leading-relaxed"
-              >
+              <p className="text-muted-foreground mb-6 text-base leading-relaxed">
                 {(expeditions || []).length === 0
                   ? 'Begin your journey by creating an expedition. Set missions, assign agents, and explore new frontiers.'
                   : searchQuery || statusFilter !== 'all'
                   ? 'Try adjusting your search criteria or filters to find expeditions.'
                   : 'No expeditions match your current filters.'}
-              </motion.p>
+              </p>
               
               {(expeditions || []).length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
+                <div>
                   <Button 
                     onClick={handleCreateExpedition}
                     size="lg"
-                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
+                    className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-sm hover:shadow-md transition-all duration-300"
                   >
                     <Plus className="h-5 w-5 mr-2" />
                     Create Your First Expedition
                   </Button>
-                </motion.div>
+                </div>
               ) : (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex gap-3 justify-center"
-                >
+                <div className="flex gap-3 justify-center">
                   {searchQuery && (
                     <Button 
                       onClick={() => setSearchQuery('')}
@@ -756,31 +606,14 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       Clear Filter
                     </Button>
                   )}
-                </motion.div>
+                </div>
               )}
             </Card>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-            className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 auto-rows-fr"
-          >
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 auto-rows-fr">
             {filteredExpeditions.map((expedition, index) => (
-              <motion.div
-                key={expedition.id}
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ 
-                  duration: 0.5, 
-                  delay: index * 0.08, 
-                  type: 'spring', 
-                  stiffness: 100,
-                  damping: 15
-                }}
-                layout
-              >
+              <div key={expedition.id}>
                 <ExpeditionCard
                   expedition={expedition}
                   onClick={() => handleExpeditionClick(expedition.id)}
@@ -854,60 +687,12 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                     }
                   }}
                 />
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
+          </div>
         )}
       </div>
 
-      {/* Floating Action Button for Quick Creation */}
-      {!expeditionsLoading && starshipId && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ 
-            type: 'spring', 
-            stiffness: 260, 
-            damping: 20,
-            delay: 0.5
-          }}
-          className="fixed bottom-8 right-8 z-50"
-        >
-          <motion.div
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            className="relative group"
-          >
-            {/* Subtle glow effect */}
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg group-hover:bg-primary/30 transition-all duration-300" />
-            
-            {/* Main button */}
-            <Button
-              onClick={handleCreateExpedition}
-              size="lg"
-              className="relative h-16 w-16 rounded-full bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all duration-300 p-0"
-              aria-label="Create new expedition"
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
-            
-            {/* Tooltip */}
-            <motion.div
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 0, x: 10 }}
-              whileHover={{ opacity: 1, x: 0 }}
-              className="absolute right-full mr-4 top-1/2 -translate-y-1/2 pointer-events-none"
-            >
-              <div className="bg-foreground text-background px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-lg">
-                Create New Expedition
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full">
-                  <div className="border-8 border-transparent border-l-foreground" />
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        </motion.div>
-      )}
 
       {/* Create Expedition Modal */}
       <CreateExpeditionModal
@@ -917,6 +702,6 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
         starshipId={starshipId}
         starshipSlug={slug}
       />
-    </motion.div>
+    </div>
   )
 }

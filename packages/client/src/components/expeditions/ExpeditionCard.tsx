@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+// import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -348,14 +348,10 @@ export function ExpeditionCard({
   );
 
   return (
-    <motion.div
+    <div
       ref={cardRef}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={className}
     >
       <Card
@@ -381,21 +377,16 @@ export function ExpeditionCard({
         {/* Connection status removed - HTTP mode only */}
 
         {/* Enhanced error banner */}
-        <AnimatePresence>
-          {displayError && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="border-b px-4 py-2 bg-red-100 border-red-200"
-            >
-              <div className="flex items-center space-x-2 text-sm text-red-700">
-                <AlertCircle className="h-4 w-4" />
-                <span>{displayError}</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {displayError && (
+          <div
+            className="border-b px-4 py-2 bg-red-100 border-red-200"
+          >
+            <div className="flex items-center space-x-2 text-sm text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              <span>{displayError}</span>
+            </div>
+          </div>
+        )}
 
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
@@ -586,14 +577,10 @@ export function ExpeditionCard({
 
 
           {/* Enhanced Action Buttons with offline support */}
-          <AnimatePresence>
-            {showActions && (isHovered || ['in-progress', 'planning'].includes(localExpedition.status)) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex items-center justify-between pt-2 border-t"
-              >
+          {showActions && (isHovered || ['in-progress', 'planning'].includes(localExpedition.status)) && (
+            <div
+              className="flex items-center justify-between pt-2 border-t"
+            >
                 <div className="flex space-x-2">
                   {localExpedition.status === 'draft' && onStart && (
                     <ActionButton
@@ -660,11 +647,10 @@ export function ExpeditionCard({
                     />
                   )}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            </div>
+          )}
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }

@@ -266,13 +266,11 @@ export function ExpeditionCard({
     >
       <Card
         className={`
-          cursor-pointer transition-all duration-300 relative rounded-xl overflow-hidden group
-          min-h-[300px] flex flex-col
-          ${isHovered 
-            ? 'shadow-xl bg-gradient-to-br from-card to-primary/5 border-primary/30' 
-            : 'hover:bg-gradient-to-br hover:from-card hover:to-primary/5 border-border/40 hover:border-primary/30'
-          }
-          ${error ? 'border-red-200 bg-red-50/50' : ''}
+          cursor-pointer transition-all duration-300 relative overflow-hidden
+          bg-card/50 backdrop-blur-sm border-border/50 shadow-sm
+          hover:shadow-xl hover:border-primary/30
+          min-h-[280px] flex flex-col
+          ${error ? 'border-red-500/20 bg-red-500/5' : ''}
         `}
         onClick={onClick}
         role="button"
@@ -302,13 +300,13 @@ export function ExpeditionCard({
           </div>
         )}
 
-        <CardHeader className="pb-0 relative space-y-3">
+        <CardHeader className="pb-3 border-b border-border/40">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Status Icon */}
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5 blur-sm" />
-                <div className="relative p-2.5 rounded-xl bg-gradient-to-br from-background to-muted border border-border/50">
+                <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                <div className="relative bg-gradient-to-br from-primary/15 to-primary/10 p-2.5 rounded-xl shadow-sm border border-primary/15">
                   <StatusIcon className="h-5 w-5 text-primary" />
                 </div>
               </div>
@@ -391,12 +389,12 @@ export function ExpeditionCard({
           </div>
         </CardHeader>
 
-        <CardContent className="pt-3 pb-4 relative flex-1 flex flex-col justify-between gap-2">
+        <CardContent className="p-4 relative flex-1 flex flex-col justify-between gap-3">
           {/* Key Information */}
           <div className="space-y-3">
             {/* Expedition Stats */}
             <div className="grid grid-cols-3 gap-1.5">
-              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted/20 border border-border/20">
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
                 <Calendar className="w-3 h-3 text-muted-foreground" />
                 <div className="flex flex-col">
                   <span className="text-[9px] text-muted-foreground">Started</span>
@@ -404,7 +402,7 @@ export function ExpeditionCard({
                 </div>
               </div>
               
-              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted/20 border border-border/20">
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
                 <Target className="w-3 h-3 text-muted-foreground" />
                 <div className="flex flex-col">
                   <span className="text-[9px] text-muted-foreground">Tasks</span>
@@ -412,7 +410,7 @@ export function ExpeditionCard({
                 </div>
               </div>
               
-              <div className="flex items-center gap-1.5 p-1.5 rounded-md bg-muted/20 border border-border/20">
+              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
                 <Activity className="w-3 h-3 text-muted-foreground" />
                 <div className="flex flex-col">
                   <span className="text-[9px] text-muted-foreground">Status</span>

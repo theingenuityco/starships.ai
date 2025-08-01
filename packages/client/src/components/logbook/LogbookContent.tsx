@@ -185,16 +185,51 @@ export function LogbookContent({ slug }: LogbookContentProps) {
                         </div>
                         
                         {/* Astronaut writing */}
-                        <div className="absolute -top-6 right-0 transform scale-75 animate-float-delayed">
-                          <div className="relative">
-                            <div className="w-8 h-8 bg-white rounded-full">
-                              <div className="w-6 h-6 bg-slate-800 rounded-full mt-1 ml-1" />
-                            </div>
-                            <div className="w-6 h-8 bg-white rounded-lg mt-1 ml-1" />
-                            {/* Pen */}
-                            <div className="absolute -right-3 top-6 w-5 h-1 bg-amber-400 transform rotate-45" />
-                            <div className="absolute -right-4 top-5 w-2 h-2 bg-amber-300 rounded-full" />
-                          </div>
+                        <div className="absolute -top-10 right-0 transform animate-float-delayed">
+                          <svg width="70" height="90" viewBox="0 0 70 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            {/* Astronaut body */}
+                            <g transform="rotate(-10 35 45)">
+                              {/* Backpack */}
+                              <rect x="8" y="30" width="12" height="20" rx="2" fill="#4B5563" />
+                              
+                              {/* Main body */}
+                              <rect x="18" y="25" width="25" height="35" rx="12" fill="#F3F4F6" />
+                              
+                              {/* Right arm holding pen */}
+                              <g transform="rotate(30 43 35)">
+                                <rect x="40" y="30" width="18" height="8" rx="4" fill="#F3F4F6" />
+                                {/* Hand */}
+                                <circle cx="57" cy="34" r="4" fill="#F3F4F6" />
+                                {/* Pen */}
+                                <g transform="translate(58, 36) rotate(45)">
+                                  <rect x="0" y="-1" width="12" height="2" fill="#D97706" />
+                                  <polygon points="12,-1 15,0 12,1" fill="#92400E" />
+                                </g>
+                              </g>
+                              
+                              {/* Left arm */}
+                              <rect x="5" y="35" width="15" height="8" rx="4" fill="#F3F4F6" transform="rotate(-20 5 35)" />
+                              
+                              {/* Legs - sitting position */}
+                              <g transform="translate(0, 5)">
+                                <rect x="21" y="50" width="8" height="15" rx="4" fill="#F3F4F6" transform="rotate(-30 25 50)" />
+                                <rect x="32" y="50" width="8" height="15" rx="4" fill="#F3F4F6" transform="rotate(-30 36 50)" />
+                                <rect x="18" y="60" width="8" height="12" rx="4" fill="#F3F4F6" transform="rotate(60 22 60)" />
+                                <rect x="29" y="60" width="8" height="12" rx="4" fill="#F3F4F6" transform="rotate(60 33 60)" />
+                              </g>
+                              
+                              {/* Helmet */}
+                              <circle cx="30.5" cy="18" r="13" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="2" />
+                              <circle cx="30.5" cy="18" r="10" fill="#1F2937" opacity="0.8" />
+                              <path d="M23 15 Q30.5 11 38 15" stroke="#60A5FA" strokeWidth="1" opacity="0.5" />
+                              
+                              {/* Chest detail */}
+                              <rect x="23" y="33" width="15" height="10" rx="2" fill="#FBBF24" />
+                              <circle cx="26" cy="38" r="1.5" fill="#D97706" />
+                              <circle cx="30.5" cy="38" r="1.5" fill="#D97706" />
+                              <circle cx="35" cy="38" r="1.5" fill="#D97706" />
+                            </g>
+                          </svg>
                         </div>
                         
                         {/* Floating pages */}

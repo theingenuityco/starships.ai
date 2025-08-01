@@ -144,9 +144,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   return (
     <div className="h-full flex flex-col">
       <div className="relative overflow-hidden">
-        {/* Background gradient effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/10" />
+        {/* Background gradient effect - reduced opacity */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5" />
         
         <div className="relative flex items-center justify-between px-8 py-8 backdrop-blur-sm border-b border-border/40">
           <div className="flex items-center gap-6">
@@ -167,8 +167,8 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-primary/5 blur-sm" />
-                  <div className="relative bg-gradient-to-br from-primary/20 to-primary/10 p-3 rounded-xl shadow-sm border border-primary/20">
+                  <div className="absolute inset-0 bg-primary/3 blur-sm" />
+                  <div className="relative bg-gradient-to-br from-primary/15 to-primary/10 p-3 rounded-xl shadow-sm border border-primary/15">
                     <Compass className="h-6 w-6 text-primary" />
                   </div>
                 </div>

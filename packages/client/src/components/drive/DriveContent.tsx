@@ -181,13 +181,43 @@ export function DriveContent({ slug }: DriveContentProps) {
                         </div>
                         
                         {/* Astronaut working on ship */}
-                        <div className="absolute -top-8 left-8 transform -rotate-12 animate-float-delayed">
-                          <div className="w-8 h-8 bg-white rounded-full">
-                            <div className="w-6 h-6 bg-slate-800 rounded-full mt-1 ml-1" />
-                          </div>
-                          <div className="w-6 h-8 bg-white rounded-lg mt-1 ml-1" />
-                          {/* Wrench */}
-                          <div className="absolute -right-2 top-6 w-4 h-1 bg-slate-400 transform rotate-45" />
+                        <div className="absolute -top-16 left-8 transform animate-float-delayed">
+                          <svg width="60" height="80" viewBox="0 0 60 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            {/* Astronaut body */}
+                            <g>
+                              {/* Backpack */}
+                              <rect x="5" y="25" width="12" height="20" rx="2" fill="#4B5563" />
+                              
+                              {/* Main body */}
+                              <rect x="15" y="20" width="25" height="35" rx="12" fill="#F3F4F6" />
+                              
+                              {/* Arms */}
+                              <rect x="38" y="25" width="15" height="8" rx="4" fill="#F3F4F6" transform="rotate(25 38 25)" />
+                              <rect x="2" y="30" width="15" height="8" rx="4" fill="#F3F4F6" transform="rotate(-15 2 30)" />
+                              
+                              {/* Legs */}
+                              <rect x="18" y="50" width="8" height="20" rx="4" fill="#F3F4F6" />
+                              <rect x="29" y="50" width="8" height="20" rx="4" fill="#F3F4F6" />
+                              
+                              {/* Helmet */}
+                              <circle cx="27.5" cy="15" r="13" fill="#F3F4F6" stroke="#E5E7EB" strokeWidth="2" />
+                              <circle cx="27.5" cy="15" r="10" fill="#1F2937" opacity="0.8" />
+                              <path d="M20 12 Q27.5 8 35 12" stroke="#60A5FA" strokeWidth="1" opacity="0.5" />
+                              
+                              {/* Chest detail */}
+                              <rect x="20" y="28" width="15" height="10" rx="2" fill="#DBEAFE" />
+                              <circle cx="23" cy="33" r="1.5" fill="#3B82F6" />
+                              <circle cx="27.5" cy="33" r="1.5" fill="#3B82F6" />
+                              <circle cx="32" cy="33" r="1.5" fill="#3B82F6" />
+                              
+                              {/* Tool - wrench */}
+                              <g transform="translate(45, 30) rotate(45)">
+                                <rect x="0" y="0" width="15" height="3" fill="#6B7280" />
+                                <circle cx="15" cy="1.5" r="3" fill="none" stroke="#6B7280" strokeWidth="3" />
+                                <rect x="-3" y="-1" width="4" height="5" fill="#6B7280" />
+                              </g>
+                            </g>
+                          </svg>
                         </div>
                         
                         {/* Engine flames */}

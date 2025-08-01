@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-// import { motion } from 'motion/react'
+import { motion, AnimatePresence } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -611,9 +611,17 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
             </Card>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 auto-rows-fr">
-            {filteredExpeditions.map((expedition, index) => (
-              <div key={expedition.id}>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <AnimatePresence mode="popLayout">
+              {filteredExpeditions.map((expedition, index) => (
+              <motion.div
+                key={expedition.id}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: index * 0.05 }}
+              >
                 <ExpeditionCard
                   expedition={expedition}
                   onClick={() => handleExpeditionClick(expedition.id)}
@@ -687,8 +695,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                     }
                   }}
                 />
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
           </div>
         )}
       </div>

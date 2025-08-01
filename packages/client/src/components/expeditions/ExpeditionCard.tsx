@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-// import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,24 +21,13 @@ import {
   AlertCircle,
   CheckCircle,
   XCircle,
-  Pause,
-  Play,
   FileText,
   MoreVertical,
-  Star,
-  TrendingUp,
   Activity,
   Zap,
-  Eye,
-  Edit,
   Trash2,
-  Copy,
-  ExternalLink,
   MessageSquare,
-  BarChart3,
   Shield,
-  Loader2,
-  RotateCcw,
   Sparkles,
   Rocket
 } from 'lucide-react';
@@ -89,70 +76,16 @@ interface ExpeditionCardProps {
   className?: string;
 }
 
-interface ActionButtonProps {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  onClick: (e: React.MouseEvent) => void;
-  variant?: 'default' | 'outline' | 'destructive' | 'secondary';
-  disabled?: boolean;
-  loading?: boolean;
-  size?: 'sm' | 'default';
-}
-
-// Action Button Component
-const ActionButton: React.FC<ActionButtonProps> = ({
-  icon: Icon,
-  label,
-  onClick,
-  variant = 'outline',
-  disabled = false,
-  loading = false,
-  size = 'sm'
-}) => (
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant={variant}
-          size={size}
-          onClick={onClick}
-          disabled={disabled || loading}
-          className="h-8 w-8 p-0"
-          aria-label={label}
-        >
-          {loading ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Icon className="h-3 w-3" />
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>{label}</p>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-);
-
 // Main ExpeditionCard Component
 export function ExpeditionCard({
   expedition,
   onClick,
-  showActions = false,
   enableContextMenu = true,
   showAgentAvatars = true,
   showQualityScore = true,
   showTaskProgress = true,
-  onStart,
-  onPause,
-  onResume,
-  onCancel,
-  onEdit,
   onDelete,
-  onDuplicate,
-  onViewDetails,
   onViewChat,
-  onViewAnalytics,
   agents = [],
   tasks = [],
   qualityScore,
@@ -161,7 +94,6 @@ export function ExpeditionCard({
 
   // State management
   const [isHovered, setIsHovered] = useState(false);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [localExpedition, setLocalExpedition] = useState(expedition);
   const [error, setError] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -174,29 +106,6 @@ export function ExpeditionCard({
   useEffect(() => {
     setLocalExpedition(expedition);
   }, [expedition]);
-
-  // Enhanced action handlers with offline support and better error handling
-  const handleAction = useCallback(async (
-    action: string,
-    handler?: (expeditionId: string) => Promise<boolean>
-  ) => {
-    if (!handler) return;
-
-    setActionLoading(action);
-    setError(null);
-
-    try {
-      const success = await handler(localExpedition.id);
-      if (!success) {
-        setError(`Failed to ${action} expedition`);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : `Failed to ${action} expedition`;
-      setError(errorMessage);
-    } finally {
-      setActionLoading(null);
-    }
-  }, [localExpedition.id]);
 
   // Get status styling
   const getStatusConfig = (status: ExpeditionStatus) => {
@@ -348,19 +257,21 @@ export function ExpeditionCard({
   );
 
   return (
-    <div
+    <motion.div
       ref={cardRef}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      whileHover={{ scale: 1.01, y: -1 }}
+      whileTap={{ scale: 0.99 }}
+      transition={{ type: "tween", duration: 0.2, ease: "easeOut" }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
       className={className}
     >
       <Card
         className={`
-          relative cursor-pointer transition-all duration-300 group
-          bg-gradient-to-br from-background via-background to-muted/5
-          hover:shadow-xl hover:shadow-primary/10 hover:border-primary/40
-          hover:bg-gradient-to-br hover:from-background hover:via-background hover:to-primary/5
-          border-muted-foreground/10
+          cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden
+          h-[240px] flex flex-col
+          ${isHovered ? 'shadow-xl border-border/80 bg-card/70' : ''}
+          hover:shadow-2xl hover:shadow-primary/5
           ${error ? 'border-red-200 bg-red-50/50' : ''}
         `}
         onClick={onClick}
@@ -374,6 +285,9 @@ export function ExpeditionCard({
           }
         }}
       >
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        
         {/* Connection status removed - HTTP mode only */}
 
         {/* Enhanced error banner */}
@@ -388,56 +302,33 @@ export function ExpeditionCard({
           </div>
         )}
 
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-2 mb-2">
-                <CardTitle className="text-lg font-semibold truncate group-hover:text-primary transition-colors">
-                  {localExpedition.name}
-                </CardTitle>
-                {qualityDisplay && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Badge
-                          variant="outline"
-                          className={`${qualityDisplay.color} ${qualityDisplay.bgColor} border-current text-xs`}
-                        >
-                          <Star className="h-3 w-3 mr-1" />
-                          {qualityDisplay.score}
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="text-xs">
-                          <p>Quality Score: {qualityDisplay.score}/100</p>
-                          <p>Completeness: {qualityScore?.completeness || 0}/100</p>
-                          <p>Accuracy: {qualityScore?.accuracy || 0}/100</p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+        <CardHeader className="pb-0 relative space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Avatar className="w-14 h-14">
+                <AvatarFallback className="text-3xl bg-muted border border-border/30">
+                  <TypeIcon className="h-8 w-8 text-primary" />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <CardTitle className="text-lg font-bold">{localExpedition.name}</CardTitle>
+                <Badge 
+                  variant="outline"
+                  className={`mt-1 text-[10px] px-1.5 py-0.5 h-5 ${
+                    statusConfig.pulse 
+                      ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                      : localExpedition.status === 'completed'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : localExpedition.status === 'failed'
+                      ? 'bg-red-50 text-red-700 border-red-200'
+                      : 'bg-slate-50 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {statusConfig.label}
+                </Badge>
               </div>
-              <CardDescription className="mt-1 line-clamp-2 text-sm">
-                {localExpedition.mission}
-              </CardDescription>
             </div>
-
-            <div className="flex items-start space-x-2 ml-4">
-              <div className="flex flex-col items-end space-y-2">
-                <div
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${statusConfig.className}`}
-                >
-                  <div className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotColor} ${statusConfig.pulse ? 'animate-pulse' : ''}`} />
-                  <span>{statusConfig.label}</span>
-                </div>
-                <div
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${expeditionType.className}`}
-                >
-                  <TypeIcon className="h-3 w-3" />
-                  <span>{expeditionType.label}</span>
-                </div>
-              </div>
+            <div className="flex items-center space-x-2">
 
               {/* Context Menu */}
               {enableContextMenu && (
@@ -486,171 +377,91 @@ export function ExpeditionCard({
               )}
             </div>
           </div>
+          
+          {/* Description with ellipsis */}
+          <div>
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {localExpedition.mission}
+            </p>
+          </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground font-medium">Progress</span>
-              <div className="flex items-center space-x-2">
-                {showTaskProgress && tasks.length > 0 && (
-                  <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
-                    {tasks.filter(t => t.status === 'completed').length}/{tasks.length} tasks
-                  </span>
-                )}
-                <span className="font-bold text-primary">{progress}%</span>
-              </div>
-            </div>
-            <div className="relative">
-              <Progress value={progress} className="h-2 bg-muted/30" />
-              {progress > 0 && progress < 100 && statusConfig.pulse && (
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-primary animate-pulse" />
+        <CardContent className="pt-3 relative flex-1 flex flex-col justify-between">
+          {/* Agent Deployment */}
+          <div className="flex items-center">
+            <div className="relative flex items-center">
+              {/* Stacked avatars */}
+              {assignedAgents.slice(0, 3).map((agent, i) => (
+                <Avatar
+                  key={agent.id}
+                  className={`w-7 h-7 border-2 border-background shadow-sm transition-all duration-200 absolute ${
+                    i === 0 ? "[&>span]:bg-blue-500" :
+                    i === 1 ? "[&>span]:bg-purple-500" : 
+                    "[&>span]:bg-green-500"
+                  }`}
+                  style={{
+                    transform: `translateX(${i * -8}px)`,
+                    zIndex: 3 - i,
+                  }}
+                >
+                  <AvatarImage src={agent.avatar} />
+                  <AvatarFallback className="text-xs font-medium text-white">
+                    {agent.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              ))}
+              
+              {/* "+X more" indicator */}
+              {assignedAgents.length > 3 && (
+                <Avatar
+                  className="w-7 h-7 border-2 border-background shadow-sm"
+                  style={{
+                    transform: `translateX(${3 * -8}px)`,
+                    zIndex: 0,
+                  }}
+                >
+                  <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+                    +{assignedAgents.length - 3}
+                  </AvatarFallback>
+                </Avatar>
               )}
+              
+              {/* Empty state */}
+              {assignedAgents.length === 0 && (
+                <div className="flex items-center space-x-2 text-muted-foreground">
+                  <Avatar className="w-7 h-7 border-2 border-dashed border-muted-foreground/30">
+                    <AvatarFallback className="bg-transparent">
+                      <Users className="w-3 h-3" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs">No agents assigned</span>
+                </div>
+              )}
+              
+              {/* Spacing for overlapped avatars */}
+              <div style={{ width: `${Math.max(0, Math.min(3, assignedAgents.length) * 8 + (assignedAgents.length > 3 ? 8 : 0))}px` }} />
             </div>
           </div>
 
-          {/* Agent Avatars */}
-          {showAgentAvatars && assignedAgents.length > 0 && (
-            <div className="flex items-center justify-between bg-muted/10 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-muted-foreground">Crew</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="flex -space-x-2">
-                  {assignedAgents.slice(0, 3).map((agent) => (
-                    <TooltipProvider key={agent.id}>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Avatar className="h-7 w-7 border-2 border-background shadow-sm hover:scale-110 transition-transform">
-                            <AvatarImage src={agent.avatar} alt={agent.name} />
-                            <AvatarFallback className="text-xs bg-gradient-to-br from-primary/20 to-primary/30">
-                              {agent.name.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <div className="text-xs">
-                            <p className="font-semibold">{agent.name}</p>
-                            <p className="text-muted-foreground">{agent.category}</p>
-                            <div className="flex items-center gap-1 mt-1">
-                              <div className={`h-2 w-2 rounded-full ${agent.status === 'available' ? 'bg-green-500' :
-                                  agent.status === 'busy' ? 'bg-yellow-500' : 'bg-gray-500'
-                                }`} />
-                              <p className="capitalize">{agent.status}</p>
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  ))}
-                  {assignedAgents.length > 3 && (
-                    <div className="h-7 w-7 rounded-full bg-primary/10 border-2 border-background flex items-center justify-center shadow-sm">
-                      <span className="text-xs font-semibold">+{assignedAgents.length - 3}</span>
-                    </div>
-                  )}
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {assignedAgents.length} agent{assignedAgents.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Metadata */}
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="truncate">
+          {/* Status Notification */}
+          <div className="flex items-center justify-between pt-3 border-t border-border/50">
+            <div className="flex items-center space-x-2 text-xs">
+              <Clock className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground">
                 {formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}
               </span>
             </div>
-            {localExpedition.updatedAt !== localExpedition.createdAt && (
-              <Badge variant="outline" className="text-xs px-2 py-0 h-5">
-                <Clock className="h-3 w-3 mr-1" />
-                Updated
-              </Badge>
-            )}
+            <Badge 
+              variant="outline" 
+              className={`text-xs px-2 py-0.5 capitalize ${expeditionType.className}`}
+            >
+              {expeditionType.label}
+            </Badge>
           </div>
 
 
-          {/* Enhanced Action Buttons with offline support */}
-          {showActions && (isHovered || ['in-progress', 'planning'].includes(localExpedition.status)) && (
-            <div
-              className="flex items-center justify-between pt-2 border-t"
-            >
-                <div className="flex space-x-2">
-                  {localExpedition.status === 'draft' && onStart && (
-                    <ActionButton
-                      icon={Play}
-                      label="Start Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('start', onStart);
-                      }}
-                      loading={actionLoading === 'start'}
-                      variant="default"
-                    />
-                  )}
-
-                  {localExpedition.status === 'in-progress' && onPause && (
-                    <ActionButton
-                      icon={Pause}
-                      label="Pause Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('pause', onPause);
-                      }}
-                      loading={actionLoading === 'pause'}
-                    />
-                  )}
-
-                  {['paused', 'failed'].includes(localExpedition.status) && onResume && (
-                    <ActionButton
-                      icon={RotateCcw}
-                      label="Resume Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('resume', onResume);
-                      }}
-                      loading={actionLoading === 'resume'}
-                      variant="default"
-                    />
-                  )}
-
-                  {['draft', 'planning', 'in-progress'].includes(localExpedition.status) && onCancel && (
-                    <ActionButton
-                      icon={XCircle}
-                      label="Cancel Expedition"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction('cancel', onCancel);
-                      }}
-                      loading={actionLoading === 'cancel'}
-                      variant="destructive"
-                    />
-                  )}
-                </div>
-
-                {/* Quick access buttons */}
-                <div className="flex space-x-1">
-                  {onViewChat && (
-                    <ActionButton
-                      icon={MessageSquare}
-                      label="Open Chat"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewChat(localExpedition.id);
-                      }}
-                    />
-                  )}
-                </div>
-            </div>
-          )}
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   );
 }

@@ -79,8 +79,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-              <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+            <p className="text-xs text-muted-foreground truncate">
               {userEmail}
             </p>
           </div>

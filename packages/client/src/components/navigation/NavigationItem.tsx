@@ -23,7 +23,7 @@ export function NavigationItem({
   return (
     <Link href={href}>
       <motion.div
-        className={`group relative ${compact ? 'mx-3 px-3 py-2' : 'mx-3 px-3 py-2.5'} rounded-lg transition-all duration-300 ${
+        className={`group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 ${
           isActive 
             ? 'bg-gradient-to-r from-primary/15 to-primary/10 backdrop-blur-sm shadow-sm border border-primary/20' 
             : 'hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm'
@@ -31,15 +31,6 @@ export function NavigationItem({
         whileHover={{ scale: 1.02, x: 4 }}
         whileTap={{ scale: 0.98 }}
       >
-        {/* Active indicator */}
-        {isActive && (
-          <motion.div
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full"
-            initial={{ opacity: 0, scaleY: 0 }}
-            animate={{ opacity: 1, scaleY: 1 }}
-            transition={{ duration: 0.3 }}
-          />
-        )}
         
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex-shrink-0">

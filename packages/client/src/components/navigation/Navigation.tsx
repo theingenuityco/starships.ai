@@ -112,7 +112,7 @@ export function Navigation({
       animate="show"
     >
       {/* Enhanced Header */}
-      <motion.div className="p-4 border-b border-border/40 bg-card/50 backdrop-blur-sm" variants={itemVariants}>
+      <motion.div className="p-3 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0" variants={itemVariants}>
         <motion.div
           variants={itemVariants}
           className="flex items-center justify-between min-w-0"
@@ -122,7 +122,7 @@ export function Navigation({
               <Command className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Navigation</h2>
+              <h2 className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Navigation</h2>
               <p className="text-xs text-muted-foreground">System Control</p>
             </div>
           </div>
@@ -133,12 +133,12 @@ export function Navigation({
       </motion.div>
 
       {/* Enhanced Quick Status */}
-      <motion.div variants={itemVariants} className="p-4 border-b border-border/40 bg-gradient-to-br from-card/30 to-muted/20">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+      <motion.div variants={itemVariants} className="p-3 border-b border-border/40 bg-gradient-to-br from-card/30 to-muted/20 flex-shrink-0">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
           <Gauge className="w-3 h-3" />
           System Status
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {/* Power Status */}
           <div className="space-y-1">
             <div className="flex justify-between items-center text-sm min-w-0">
@@ -178,23 +178,12 @@ export function Navigation({
               {activeExpeditions}
             </span>
           </div>
-          
-          {/* Insights Status */}
-          <div className="flex justify-between items-center text-sm min-w-0 group hover:bg-primary/5 rounded-lg p-2 -m-2 transition-colors">
-            <span className="text-muted-foreground flex items-center gap-2">
-              <Lightbulb className="w-3 h-3" />
-              New Insights
-            </span>
-            <span className="font-mono flex-shrink-0 ml-2 font-semibold bg-purple-500/10 px-2 py-0.5 rounded text-purple-600 dark:text-purple-400">
-              {sibilInsights}
-            </span>
-          </div>
         </div>
       </motion.div>
 
       {/* Enhanced Navigation Sections */}
-      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-        <div className="space-y-6">
+      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
+        <div className="space-y-4">
           {navigationSections.map((section, index) => (
             <motion.div
               key={section.title}
@@ -216,7 +205,7 @@ export function Navigation({
       {/* Enhanced User Profile Section */}
       <motion.div 
         variants={itemVariants} 
-        className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm"
+        className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0"
       >
         <UserProfile mode="expanded" />
       </motion.div>

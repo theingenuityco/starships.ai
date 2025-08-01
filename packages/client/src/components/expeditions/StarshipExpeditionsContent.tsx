@@ -171,7 +171,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Expeditions Hub
+                    Expeditions
                   </h1>
                   <p className="text-sm text-muted-foreground">Manage and track all missions</p>
                 </div>
@@ -556,10 +556,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
         ) : filteredExpeditions.length === 0 ? (
           <div className="flex items-center justify-center min-h-[400px]">
             <Card className="p-10 text-center max-w-lg bg-gradient-to-br from-card via-card/95 to-primary/5 border-primary/20 shadow-lg">
-              <div className="relative mb-6">
-                <div className="absolute inset-0 bg-primary/5 blur-sm" />
-                <div className="relative w-24 h-24 bg-gradient-to-br from-primary/20 to-primary/30 rounded-3xl flex items-center justify-center mx-auto shadow-sm">
-                  <Rocket className="h-12 w-12 text-primary" />
+              <div className="mb-6">
+                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                  <Rocket className="h-10 w-10 text-primary" />
                 </div>
               </div>
               

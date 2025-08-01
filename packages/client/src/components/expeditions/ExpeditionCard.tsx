@@ -313,7 +313,7 @@ export function ExpeditionCard({
                 </div>
               </div>
               <div className="flex-1">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <CardTitle className="text-lg font-bold flex items-center gap-2 group-hover:text-primary transition-colors">
                   {localExpedition.name}
                   {expeditionType && <TypeIcon className="h-4 w-4 text-muted-foreground" />}
                 </CardTitle>

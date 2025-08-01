@@ -6,7 +6,9 @@ import { motion } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
 import {
   Users, Rocket, BookOpen, Brain,
-  Cpu, Zap, Eye, Command
+  Cpu, Zap, Eye, Command, Power,
+  Activity, Lightbulb, ChevronRight,
+  Gauge
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -24,18 +26,18 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: "Starship Systems",
     items: [
-      { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
+      { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" },
+      { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
-      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "warning" }
+      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "optimal" }
     ]
   },
   {
-    title: "Operations",
+    title: "Coming Soon",
     items: [
-      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "active" },
-      { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" },
-      { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
-      { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" }
+      { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
+      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "optimal" },
+      { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" }
     ]
   }
 ];
@@ -101,64 +103,70 @@ export function Navigation({
     );
   }
 
-  // Sidebar mode - island-style layout
+  // Sidebar mode - professional layout
   return (
     <motion.div
-      className="flex flex-col h-full"
+      className="flex flex-col h-full bg-gradient-to-b from-background to-muted/5 border-r border-border/50"
       variants={containerVariants}
       initial="hidden"
       animate="show"
     >
-      {/* Header */}
-      <motion.div className="p-3 border-b border-border/50" variants={itemVariants}>
+      {/* Enhanced Header */}
+      <motion.div className="p-3 pt-8 pb-8 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0" variants={itemVariants}>
         <motion.div
           variants={itemVariants}
           className="flex items-center justify-between min-w-0"
         >
-          <div className="flex items-center w-full justify-between">
-            <h2 className="text-lg font-semibold truncate">Navigation</h2>
-            <div className="flex items-center gap-1">
-              <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Command className="w-5 h-5 text-primary" />
             </div>
+            <div>
+              <h2 className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Navigation</h2>
+              <p className="text-xs text-muted-foreground">System Control</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
           </div>
         </motion.div>
       </motion.div>
 
-      {/* Quick Status */}
-      <motion.div variants={itemVariants} className="p-3 border-b border-border/50">
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-sm min-w-0">
-            <span className="text-muted-foreground truncate">Power</span>
-            <span className="font-mono flex-shrink-0 ml-2">{powerLevel}%</span>
-          </div>
-          <div className="flex justify-between text-sm min-w-0">
-            <span className="text-muted-foreground truncate">Expeditions</span>
-            <span className="font-mono flex-shrink-0 ml-2">{activeExpeditions}</span>
-          </div>
-          <div className="flex justify-between text-sm min-w-0">
-            <span className="text-muted-foreground truncate">Insights</span>
-            <span className="font-mono flex-shrink-0 ml-2">{sibilInsights}</span>
-          </div>
-        </div>
-      </motion.div>
 
-      {/* Navigation Sections */}
-      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-4">
-        <div className="space-y-6">
-          {navigationSections.map((section) => (
-            <NavigationSection
+      {/* Enhanced Navigation Sections */}
+      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
+        <div className="space-y-4 mt-4">
+          {navigationSections.map((section, index) => (
+            <motion.div
               key={section.title}
-              title={section.title}
-              items={section.items}
-              pathname={pathname}
-              compact={true}
-            />
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 * index }}
+            >
+              {index > 0 && (
+                <div className="my-3 px-3">
+                  <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+                </div>
+              )}
+              <NavigationSection
+                title={section.title}
+                items={section.items}
+                pathname={pathname}
+                compact={true}
+              />
+            </motion.div>
           ))}
         </div>
       </motion.div>
 
-      {/* User Profile Section */}
-      <motion.div variants={itemVariants} className="border-t border-border/50 p-3">
+      {/* Separator */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
+      
+      {/* Enhanced User Profile Section */}
+      <motion.div 
+        variants={itemVariants} 
+        className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0 pb-1"
+      >
         <UserProfile mode="expanded" />
       </motion.div>
     </motion.div>

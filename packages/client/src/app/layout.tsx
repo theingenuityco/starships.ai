@@ -16,7 +16,9 @@ export const metadata: Metadata = {
   title: `${UI_TEXT.APP_TITLE} - ${UI_TEXT.APP_DESCRIPTION}`,
   description: 'Connect with AI agents to boost your productivity and creativity',
   icons: {
-    icon: '/favicon.ico',
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
   },
 }
 

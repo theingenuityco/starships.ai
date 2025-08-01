@@ -195,22 +195,22 @@ export function AgentCard({
     <div className="transition-all duration-200">
       <Card
         className={`
-          cursor-pointer transition-all duration-300 hover:shadow-xl relative rounded-xl overflow-hidden group
+          cursor-pointer transition-all duration-300 hover:shadow-xl relative rounded-xl overflow-hidden group border-2
           ${isSelected 
-            ? 'ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 border-primary/30 shadow-lg shadow-primary/20' 
-            : 'hover:bg-gradient-to-br hover:from-card hover:to-primary/5 border-border/40 hover:border-primary/30'
+            ? 'ring-2 ring-primary bg-gradient-to-br from-primary/10 to-primary/5 border-primary/70 shadow-lg shadow-primary/20' 
+            : 'hover:bg-gradient-to-br hover:from-card hover:to-primary/5 border-border hover:border-primary/70'
           }
         `}
         onClick={onClick}
       >
         
-        <div className="px-4 py-5">
-          <div className="grid grid-cols-[auto_1fr_auto] gap-4 items-start">
+        <div className="px-3 py-3">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-3 items-start">
           {/* Left Column: Enhanced Avatar */}
           <div className="flex flex-col items-center space-y-2">
             <div className="relative">
               <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
-              <Avatar className="h-14 w-14 ring-2 ring-background shadow-lg relative">
+              <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
                 <AvatarFallback
                   className={`
                   ${isSelected 
@@ -219,22 +219,22 @@ export function AgentCard({
                   }
                 `}
                 >
-                  <span className="text-xl">{getAgentAvatarContent(agent)}</span>
+                  <span className="text-base">{getAgentAvatarContent(agent)}</span>
                 </AvatarFallback>
               </Avatar>
               {/* Online indicator */}
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background animate-pulse" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
             </div>
 
           </div>
 
           {/* Center Column: Main content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
                 <h3
                   className={`
-                  font-bold text-lg
+                  font-bold text-base
                   ${isSelected ? 'text-primary' : 'text-foreground'}
                   group-hover:text-primary transition-colors
                 `}
@@ -251,12 +251,12 @@ export function AgentCard({
               {agent.rating && (
                 <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
                   <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
-                  <span className="text-sm font-bold text-yellow-700 dark:text-yellow-300">{agent.rating.toFixed(1)}</span>
+                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{agent.rating.toFixed(1)}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-2">
               <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center border font-semibold`}>
                 {getCategoryIcon(agent.category)}
                 {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
@@ -270,7 +270,7 @@ export function AgentCard({
             </div>
 
             {agent.description && (
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed group-hover:text-foreground/80 transition-colors">
+              <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed group-hover:text-foreground/80 transition-colors">
                 {agent.description}
               </p>
             )}
@@ -282,7 +282,7 @@ export function AgentCard({
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="text-xs px-2 py-0.5 h-5 rounded-full bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors"
+                    className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors"
                   >
                     <Sparkles className="w-2.5 h-2.5 mr-1" />
                     {tag.charAt(0).toUpperCase() + tag.slice(1)}
@@ -291,7 +291,7 @@ export function AgentCard({
                 {agent.tags.length > 3 && (
                   <Badge
                     variant="outline"
-                    className="text-xs px-2 py-0.5 h-5 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold"
+                    className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold"
                   >
                     +{agent.tags.length - 3} more
                   </Badge>

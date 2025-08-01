@@ -192,12 +192,7 @@ export function AgentCard({
   }
 
   return (
-    <div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02, y: -2 }}
-      transition={{ duration: 0.2 }}
-    >
+    <div className="transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5">
       <Card
         className={`
           cursor-pointer transition-all duration-300 hover:shadow-xl relative rounded-xl overflow-hidden group
@@ -211,10 +206,7 @@ export function AgentCard({
         {/* Status indicator */}
         {isSelected && (
           <div
-            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-cyan-500 to-primary"
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 0.5 }}
+            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-cyan-500 to-primary animate-scale-x"
           />
         )}
         
@@ -223,7 +215,7 @@ export function AgentCard({
           {/* Left Column: Enhanced Avatar */}
           <div className="flex flex-col items-center space-y-2">
             <div className="relative">
-              <div className={`absolute inset-0 ${isSelected ? 'bg-primary/30' : 'bg-muted/20'} blur-xl scale-150`} />
+              <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
               <Avatar className="h-14 w-14 ring-2 ring-background shadow-lg relative">
                 <AvatarFallback
                   className={`

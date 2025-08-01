@@ -11,7 +11,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   return {
-    title: `${slug} Crew Management | Starships AI`,
+    title: `${slug} Crew Console | Starships AI`,
     description: `Crew management for starship ${slug}`,
   };
 }

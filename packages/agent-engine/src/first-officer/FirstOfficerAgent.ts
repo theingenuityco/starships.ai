@@ -305,7 +305,7 @@ export class FirstOfficerAgent {
         
         const result = resumeFinalState?.finalResult || 'Expedition resumed and completed successfully';
         
-        await this.sendWorkflowLog('✅', 'EXPEDITION COMPLETE', `Result: ${result.substring(0, 200)}...`);
+        await this.sendWorkflowLog('', 'MISSION COMPLETE', `Result: ${result.substring(0, 200)}...`);
         
         // Update expedition status
         await expeditionRepo.updateStatus(expeditionId, 'completed' as ExpeditionStatus);
@@ -363,7 +363,7 @@ export class FirstOfficerAgent {
       );
 
       // Now we can send workflow logs
-      await this.sendWorkflowLog('🚀', 'EXPEDITION START', `Initializing expedition orchestration for: "${objective}"`);
+      await this.sendWorkflowLog('', 'EXPEDITION INITIATED', `Mission orchestration commenced for: "${objective}"`);
 
       // Initialize workflow state
       const initialState: FirstOfficerState = {
@@ -388,7 +388,7 @@ export class FirstOfficerAgent {
       await expeditionRepo.updateStatus(expeditionId, 'planning');
       await expeditionRepo.updateWorkflowState(expeditionId, initialState);
       
-      await this.sendWorkflowLog('📋', 'WORKFLOW SETUP', 'Expedition workflow initialized and ready for execution');
+      await this.sendWorkflowLog('', 'WORKFLOW CONFIGURED', 'Mission workflow successfully initialized and operational');
 
       // Send initial coordination message
       console.log(`🚀 [FIRST-OFFICER] About to send initial phase update message`);
@@ -523,7 +523,7 @@ export class FirstOfficerAgent {
           this.calculateExpeditionStats(result)
         );
         
-        await this.sendWorkflowLog('✅', 'EXPEDITION COMPLETE', 'All tasks completed successfully and results synthesized');
+        await this.sendWorkflowLog('', 'MISSION COMPLETE', 'All operational tasks completed successfully with results compiled');
         console.log(`✅ [FIRST-OFFICER] Expedition completed successfully: ${expeditionId}`);
         return result.finalResult;
       } else {
@@ -544,7 +544,7 @@ export class FirstOfficerAgent {
           // No task failures, just workflow completion without final result
           await expeditionRepo.updateStatus(expeditionId, 'completed');
           const message = 'Workflow completed but no final result synthesized.';
-          await this.sendWorkflowLog('⚠️', 'EXPEDITION COMPLETED', message);
+          await this.sendWorkflowLog('', 'MISSION STATUS', message);
           await this.chatCoordinator?.sendCoordinationMessage('phase-update', 'waiting_for_approval', message);
           
           console.warn(`⚠️ [FIRST-OFFICER] Expedition completed without final result: ${expeditionId}`);
@@ -822,25 +822,31 @@ export class FirstOfficerAgent {
       ? ` As we work together, I'll ensure our plans align with our starship's vision and strategic direction.`
       : '';
 
-    const greeting = `👋 **Welcome aboard!** I'm your First Officer, ready to help you plan and refine "${expeditionName}".
+    const greeting = `**Welcome aboard!** I'm your First Officer for "${expeditionName}".
 
-I see we're preparing for: **${mission}**
+Mission: **${mission}**
 
 ${visionContext}
 
-Let's start with this: **What specific outcomes are you hoping to achieve with this expedition?** Understanding your key objectives will help me provide better guidance and suggestions as we develop the plan together.`;
+To help you get the best results, I'd like to understand:
+
+**What specific outcome are you looking to achieve with this expedition?**
+
+Feel free to include any important requirements or constraints you have in mind.`;
 
     return greeting;
   }
 
   /**
-   * Check if expedition is ready to start based on user interaction count
-   * Enables start button after 2-3 user messages to ensure sufficient planning discussion
+   * Check if expedition is ready to start based on planning conversation quality
+   * Analyzes conversation depth and key planning elements discussed
    */
   async isExpeditionReadyToStart(expeditionId: string, userId: string): Promise<{
     isReady: boolean;
     userMessageCount: number;
+    planningScore: number;
     reason?: string;
+    missingElements?: string[];
   }> {
     try {
       // Get expedition details to use the correct session key (same as chat system)
@@ -852,6 +858,7 @@ Let's start with this: **What specific outcomes are you hoping to achieve with t
         return {
           isReady: false,
           userMessageCount: 0,
+          planningScore: 0,
           reason: 'Expedition not found'
         };
       }
@@ -861,25 +868,62 @@ Let's start with this: **What specific outcomes are you hoping to achieve with t
       const memory = await this.memoryStore.get(sessionKey);
       
       // Count user messages (exclude assistant messages like greetings)
-      const userMessageCount = memory.filter(entry => entry.role === 'user').length;
+      const userMessages = memory.filter(entry => entry.role === 'user');
+      const userMessageCount = userMessages.length;
       
-      const MINIMUM_MESSAGES = 2; // Require at least 2 user messages before allowing start
-      const isReady = userMessageCount >= MINIMUM_MESSAGES;
+      // Analyze conversation content for planning completeness
+      const conversationText = memory.map(m => m.content).join(' ').toLowerCase();
       
-      console.log(`🎯 [FIRST-OFFICER] Readiness: ${userMessageCount}/${MINIMUM_MESSAGES} user messages, ready: ${isReady}`);
+      // Check for key planning elements in the conversation
+      const planningElements = {
+        objectives: /objective|goal|outcome|result|deliver|achieve|success/g.test(conversationText),
+        scope: /scope|boundary|include|exclude|limit|constraint/g.test(conversationText),
+        timeline: /time|deadline|schedule|duration|when|by/g.test(conversationText),
+        resources: /resource|skill|team|capability|need|require/g.test(conversationText),
+        requirements: /requirement|specification|criteria|standard|expect/g.test(conversationText),
+        challenges: /challenge|risk|problem|difficult|issue|concern/g.test(conversationText)
+      };
+      
+      const elementsDiscussed = Object.values(planningElements).filter(Boolean).length;
+      const totalElements = Object.keys(planningElements).length;
+      const planningScore = Math.round((elementsDiscussed / totalElements) * 100);
+      
+      // Determine missing elements for feedback
+      const missingElements = Object.entries(planningElements)
+        .filter(([_, discussed]) => !discussed)
+        .map(([element, _]) => element);
+      
+      const MINIMUM_MESSAGES = 1; // Require at least 1 user message  
+      const MINIMUM_PLANNING_SCORE = 20; // At least 20% of planning elements discussed (minimal threshold)
+      
+      const hasEnoughMessages = userMessageCount >= MINIMUM_MESSAGES;
+      const hasAdequatePlanning = planningScore >= MINIMUM_PLANNING_SCORE;
+      const isReady = hasEnoughMessages && hasAdequatePlanning;
+      
+      console.log(`🎯 [FIRST-OFFICER] Readiness: ${userMessageCount}/${MINIMUM_MESSAGES} messages, ${planningScore}% planning completeness, ready: ${isReady}`);
+      
+      let reason: string | undefined;
+      if (!isReady) {
+        if (!hasEnoughMessages) {
+          reason = `Please share your main objective to get started.`;
+        } else if (!hasAdequatePlanning) {
+          reason = `Ready to start! Just confirm your objective.`;
+        }
+      }
       
       return {
         isReady,
         userMessageCount,
-        reason: !isReady 
-          ? `Please have a brief planning discussion first. ${MINIMUM_MESSAGES - userMessageCount} more message(s) needed.`
-          : undefined
+        planningScore,
+        reason,
+        missingElements: missingElements.length > 0 ? missingElements : undefined
       };
     } catch (error) {
       console.error('Failed to check expedition readiness:', error);
       return {
         isReady: false,
         userMessageCount: 0,
+        planningScore: 0,
         reason: 'Unable to determine readiness. Please try again.'
       };
     }
@@ -900,13 +944,46 @@ EXPEDITION PLANNING MODE
 Expedition: "${expedition.name || 'Untitled Expedition'}"
 Mission: "${expedition.mission || 'Mission details to be defined'}"
 
-You are helping the user refine and plan this expedition before execution. Your role:
-1. Ask clarifying questions about objectives and scope
-2. Suggest improvements aligned with our vision
-3. Help think through potential challenges and solutions
-4. Prepare for optimal execution when ready
+You are helping the user refine and plan this expedition before execution through a structured planning conversation.
 
-Be collaborative, strategic, and ensure alignment with our starship's vision.`;
+MINIMAL PLANNING APPROACH:
+1. **What do you want to achieve?** (core objective)
+2. **Any specific requirements or constraints?** (key limitations)
+3. **Ready to start the expedition?** (confirmation)
+
+INTERACTION GUIDELINES:
+- Ask 2-3 focused questions to understand the core objective
+- Keep questions practical and relevant
+- Once you have a clear understanding, suggest moving to execution
+- Be helpful and professional, not pushy
+- Natural transition: "I have a good understanding of what you need. Ready to start?"
+
+READINESS ASSESSMENT:
+After understanding the user's objective, provide a natural transition to execution:
+
+**Standard response:** "I understand what you're looking to achieve. We have enough information to get started. Shall we begin the expedition?"
+
+**If clarification needed:** "Just to make sure I understand correctly: [specific question]. Once that's clear, we can proceed."
+
+**Keep the tone professional and helpful, not overly eager.**
+
+ALTERNATIVE USE CASES TO SUGGEST:
+If the current expedition seems unclear or overly complex, consider suggesting:
+- Breaking it into smaller, focused expeditions
+- Starting with a discovery/research phase
+- Creating a proof-of-concept or prototype first
+- Establishing foundational capabilities before the main objective
+- Conducting stakeholder alignment sessions
+- Performing a feasibility assessment
+
+IMPORTANT: 
+- Keep responses conversational but professional
+- Be collaborative and build on user input
+- Ensure all discussions align with our starship's vision
+- Focus on understanding the objective rather than extensive planning
+- When you have sufficient clarity, naturally suggest proceeding
+- Be helpful and supportive, not aggressive about starting
+- Maintain a confident, professional tone throughout`;
     }
     
     return `${basePrompt}${visionSection}
@@ -943,7 +1020,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Analyze Objective
    */
   private async analyzeObjectiveNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('🔍', 'ANALYZING OBJECTIVE', `Starting analysis of: "${state.requirements}"`);
+    await this.sendWorkflowLog('', 'OBJECTIVE ANALYSIS', `Commencing strategic analysis of: "${state.requirements}"`);
     
     // Emit typing start
     if (this.webSocketEmitter) {
@@ -951,19 +1028,19 @@ Help coordinate and provide guidance as needed.`;
     }
     
     try {
-      const analysis = await this.performObjectiveAnalysis(state.requirements);
+      const analysis = await this.performObjectiveAnalysis(state.requirements, state.expeditionId);
       
       console.log(`🔍 [FIRST-OFFICER] About to send objective analysis message`);
       try {
         await this.chatCoordinator?.sendCoordinationMessage(
           'phase-update',
           'analyzing',
-          `📋 **Objective Analysis Complete**\n\n` +
-          `**Complexity:** ${analysis.complexity}\n` +
-          `**Estimated Duration:** ${analysis.estimatedDuration} minutes\n` +
-          `**Required Skills:** ${analysis.requiredSkills.join(', ')}\n` +
-          `**Approach:** ${analysis.approach}\n\n` +
-          `**Success Criteria:**\n${analysis.successCriteria.map(c => `• ${c}`).join('\n')}`
+          `**ANALYSIS COMPLETE**\n\n` +
+          `**Mission Complexity:** ${analysis.complexity}\n` +
+          `**Projected Duration:** ${analysis.estimatedDuration} minutes\n` +
+          `**Required Capabilities:** ${analysis.requiredSkills.join(', ')}\n` +
+          `**Execution Strategy:** ${analysis.approach}\n\n` +
+          `**Success Metrics:**\n${analysis.successCriteria.map(c => `• ${c}`).join('\n')}`
         );
         console.log(`✅ [FIRST-OFFICER] Objective analysis message sent successfully`);
         
@@ -1000,7 +1077,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Plan Tasks
    */
   private async planTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('📋', 'PLANNING TASKS', 'Breaking down objectives into executable tasks');
+    await this.sendWorkflowLog('', 'TASK PLANNING', 'Decomposing objectives into actionable work units');
     
     // Emit typing start
     if (this.webSocketEmitter) {
@@ -1008,7 +1085,7 @@ Help coordinate and provide guidance as needed.`;
     }
     
     try {
-      const taskPlan = await this.createTaskPlan(state.requirements, state.objectiveAnalysis!);
+      const taskPlan = await this.createTaskPlan(state.requirements, state.objectiveAnalysis!, state.expeditionId);
       
       // Create tasks in database
       const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
@@ -1034,16 +1111,16 @@ Help coordinate and provide guidance as needed.`;
         });
       }
 
-      await this.sendWorkflowLog('📝', 'TASKS CREATED', `Generated ${createdTasks.length} tasks with ${taskPlan.estimatedTotalTime}min estimated time`);
+      await this.sendWorkflowLog('', 'TASKS CONFIGURED', `Established ${createdTasks.length} work units with ${taskPlan.estimatedTotalTime} minute operational timeline`);
       
       await this.chatCoordinator?.sendCoordinationMessage(
         'phase-update',
         'decomposing',
-        `📝 **Task Planning Complete**\n\n` +
-        `**Total Tasks:** ${createdTasks.length}\n` +
-        `**Estimated Total Time:** ${taskPlan.estimatedTotalTime} minutes\n` +
-        `**Execution Approach:** ${taskPlan.parallelGroups.length > 1 ? 'Parallel' : 'Sequential'}\n\n` +
-        `**Tasks Created:**\n${createdTasks.map(t => `• ${t.description}`).join('\n')}`
+        `**TASK CONFIGURATION COMPLETE**\n\n` +
+        `**Work Units Established:** ${createdTasks.length}\n` +
+        `**Projected Timeline:** ${taskPlan.estimatedTotalTime} minutes\n` +
+        `**Execution Model:** ${taskPlan.parallelGroups.length > 1 ? 'Parallel Processing' : 'Sequential Processing'}\n\n` +
+        `**Operational Breakdown:**\n${createdTasks.map(t => `• ${t.description}`).join('\n')}`
       );
       
       // Stop typing indicator
@@ -1083,7 +1160,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Select Agents
    */
   private async selectAgentsNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('👥', 'SELECTING AGENTS', 'Identifying optimal agents for task execution');
+    await this.sendWorkflowLog('', 'AGENT SELECTION', 'Identifying optimal personnel for mission execution');
     
     try {
       await this.agentSelector.initialize();
@@ -1123,7 +1200,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Assign Tasks
    */
   private async assignTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('⚡', 'ASSIGNING TASKS', 'Distributing tasks to selected agents');
+    await this.sendWorkflowLog('', 'TASK ASSIGNMENT', 'Allocating responsibilities to designated personnel');
     
     try {
       // If we have pre-selected agents but no task assignments yet, assign tasks to them
@@ -1141,12 +1218,12 @@ Help coordinate and provide guidance as needed.`;
           }
         }
 
-        await this.sendWorkflowLog('✅', 'TASKS ASSIGNED', `Successfully assigned ${updatedAssignments.reduce((sum, a) => sum + a.assignedTasks.length, 0)} tasks to ${updatedAssignments.length} agents`);
+        await this.sendWorkflowLog('', 'ASSIGNMENT COMPLETE', `Successfully allocated ${updatedAssignments.reduce((sum, a) => sum + a.assignedTasks.length, 0)} tasks to ${updatedAssignments.length} personnel`);
         
         await this.chatCoordinator?.sendCoordinationMessage(
           'phase-update',
           'assigning',
-          `🎯 **Pre-selected Agents Assigned**\n\n` +
+          `**PERSONNEL ASSIGNMENT CONFIRMED**\n\n` +
           `Successfully assigned tasks to ${updatedAssignments.length} pre-selected agents:\n` +
           updatedAssignments.map((a: AgentAssignment) => `• ${a.agentName}: ${a.assignedTasks.length} tasks`).join('\n')
         );
@@ -1202,7 +1279,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Execute Tasks
    */
   private async executeTasksNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('🚀', 'PREPARING EXECUTION', 'Setting up task execution framework');
+    await this.sendWorkflowLog('', 'EXECUTION PREP', 'Establishing operational framework for mission delivery');
     
     try {
       // Prepare active executions for monitoring phase
@@ -1223,7 +1300,7 @@ Help coordinate and provide guidance as needed.`;
         }
       }
 
-      await this.sendWorkflowLog('📋', 'TASKS PREPARED', `${activeExecutions.length} tasks ready for execution with real agents`);
+      await this.sendWorkflowLog('', 'TASKS READY', `${activeExecutions.length} work units prepared for operational deployment`);
 
       // Move to monitoring phase where actual execution happens
       return {
@@ -1245,7 +1322,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Monitor Progress
    */
   private async monitorProgressNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('📊', 'MONITORING PROGRESS', 'Tracking task execution and collecting results');
+    await this.sendWorkflowLog('', 'PROGRESS MONITORING', 'Tracking execution status and collecting deliverables');
     
     try {
       // Initialize task executor with our expeditionId and userId
@@ -1262,7 +1339,7 @@ Help coordinate and provide guidance as needed.`;
       }
 
       // Execute tasks using the TaskExecutor
-      await this.sendWorkflowLog('⚡', 'EXECUTING TASKS', `Starting execution of ${assignments.length} tasks with real agents`);
+      await this.sendWorkflowLog('', 'EXECUTION COMMENCED', `Initiating deployment of ${assignments.length} operational assignments`);
       
       // Small delay to ensure WebSocket connections are ready
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -1350,7 +1427,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Quality Check
    */
   private async qualityCheckNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('🔍', 'QUALITY REVIEW', 'Validating task results and ensuring quality standards');
+    await this.sendWorkflowLog('', 'QUALITY ASSURANCE', 'Validating deliverables against established quality benchmarks');
     
     try {
       const qualityChecks: QualityCheck[] = [];
@@ -1410,14 +1487,14 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: User Approval
    */
   private async userApprovalNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('👤', 'USER APPROVAL', 'Requesting user review and approval of results');
+    await this.sendWorkflowLog('', 'APPROVAL REQUEST', 'Requesting stakeholder review and authorization to proceed');
     
     try {
       // Send approval request to user
       await this.chatCoordinator?.sendCoordinationMessage(
         'user-question',
         state.currentPhase,
-        `🤔 **Approval Required**\n\nThe current workflow phase requires your approval to proceed.\n\nCurrent Phase: ${state.currentPhase}\n\nWould you like to continue?`
+        `**AUTHORIZATION REQUIRED**\n\nThe current workflow phase requires stakeholder approval to proceed.\n\nCurrent Phase: ${state.currentPhase}\n\nPlease confirm authorization to continue with the next phase.`
       );
 
       // In a real implementation, this would wait for user response
@@ -1439,7 +1516,7 @@ Help coordinate and provide guidance as needed.`;
    * Workflow Node: Synthesize Results
    */
   private async synthesizeResultsNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
-    await this.sendWorkflowLog('🔧', 'SYNTHESIZING RESULTS', 'Combining agent outputs into final deliverable');
+    await this.sendWorkflowLog('', 'RESULT SYNTHESIS', 'Consolidating outputs into comprehensive deliverable');
     
     try {
       const finalResult = await this.synthesizeFinalResult(
@@ -1558,13 +1635,13 @@ Help coordinate and provide guidance as needed.`;
           await this.chatCoordinator?.sendCoordinationMessage(
             'phase-update',
             'coordinating',
-            `🔄 **Retrying Task**\n\nTask ${qualityCheck.taskId} will be retried (attempt ${currentRetries + 1}/${this.config.maxRetries})\n\nIssues to address:\n${qualityCheck.issues.map(i => `• ${i}`).join('\n')}`
+            `**TASK RETRY SCHEDULED**\n\nTask ${qualityCheck.taskId} scheduled for retry (attempt ${currentRetries + 1}/${this.config.maxRetries})\n\nItems requiring attention:\n${qualityCheck.issues.map(i => `• ${i}`).join('\n')}`
           );
         } else {
           await this.chatCoordinator?.sendCoordinationMessage(
             'error-report',
             'failed',
-            `❌ **Task Failed**\n\nTask ${qualityCheck.taskId} has exceeded maximum retry attempts (${this.config.maxRetries})`
+            `**TASK ESCALATION REQUIRED**\n\nTask ${qualityCheck.taskId} has exceeded maximum retry attempts (${this.config.maxRetries}) and requires manual intervention`
           );
         }
       }
@@ -1780,9 +1857,80 @@ Help coordinate and provide guidance as needed.`;
   // ========================================
 
   /**
-   * Perform objective analysis using LLM with vision context
+   * Extract structured planning insights from pre-expedition chat
    */
-  private async performObjectiveAnalysis(objective: string): Promise<ObjectiveAnalysis> {
+  private async extractPlanningInsights(expeditionId: string): Promise<{
+    objectives: string[];
+    constraints: string[];
+    successCriteria: string[];
+    timeline: string[];
+    resources: string[];
+    risks: string[];
+    userPreferences: string[];
+  } | null> {
+    try {
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) return null;
+
+      const sessionKey = this.memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+      const memory = await this.memoryStore.get(sessionKey);
+      
+      if (memory.length === 0) return null;
+
+      // Use LLM to extract structured insights from conversation
+      const conversationText = memory
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => `${m.role}: ${m.content}`)
+        .join('\n');
+
+      const prompt = buildPrompt(
+        `You are an expert at extracting structured planning insights from conversations. 
+        
+Analyze the conversation and extract key planning elements in JSON format:
+
+RESPONSE FORMAT (JSON):
+{
+  "objectives": ["specific goal 1", "specific goal 2"],
+  "constraints": ["constraint 1", "constraint 2"], 
+  "successCriteria": ["success metric 1", "success metric 2"],
+  "timeline": ["timeline requirement 1", "timeline requirement 2"],
+  "resources": ["resource need 1", "resource need 2"],
+  "risks": ["risk 1", "risk 2"],
+  "userPreferences": ["preference 1", "preference 2"]
+}
+
+Extract only explicitly mentioned items. If a category has no explicit mentions, use empty array.`,
+        [],
+        `CONVERSATION TO ANALYZE:\n${conversationText}`
+      );
+
+      try {
+        const provider = await ProviderFactory.getProvider('first-officer-system');
+        const response = await provider.complete(prompt);
+        
+        const jsonMatch = response.reply.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const insights = JSON.parse(jsonMatch[0]);
+          console.log(`📊 [FIRST-OFFICER] Planning insights extracted for expedition ${expeditionId}:`, insights);
+          return insights;
+        }
+      } catch (error) {
+        console.warn('Failed to extract planning insights with LLM:', error);
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Failed to extract planning insights:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Perform objective analysis using LLM with vision context and pre-expedition chat insights
+   */
+  private async performObjectiveAnalysis(objective: string, expeditionId?: string): Promise<ObjectiveAnalysis> {
     // Load vision context for alignment
     let visionContext = '';
     try {
@@ -1797,10 +1945,41 @@ Help coordinate and provide guidance as needed.`;
       console.warn('⚠️ [FIRST-OFFICER] Could not load vision for analysis:', error);
     }
 
+    // Load pre-expedition chat context for richer analysis
+    let chatContext = '';
+    if (expeditionId) {
+      try {
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        const expedition = await expeditionRepo.findById(expeditionId);
+        
+        if (expedition) {
+          const sessionKey = this.memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+          const memory = await this.memoryStore.get(sessionKey);
+          
+          if (memory.length > 0) {
+            // Extract planning insights from conversation
+            const conversationSummary = memory
+              .filter(m => m.role === 'user' || m.role === 'assistant')
+              .map(m => `${m.role}: ${m.content}`)
+              .join('\n');
+            
+            chatContext = `\n\nPRE-EXPEDITION PLANNING DISCUSSION:
+${conversationSummary}
+
+IMPORTANT: Use the insights from this planning discussion to inform your analysis. The user has already provided context about objectives, scope, constraints, and expectations during the planning conversation.`;
+            
+            console.log(`💬 [FIRST-OFFICER] Chat context loaded for analysis: ${memory.length} messages`);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ [FIRST-OFFICER] Could not load chat context for analysis:', error);
+      }
+    }
+
     const prompt = buildPrompt(
       `You are the First Officer's analysis system. Analyze the given objective and provide a structured assessment.
 
-${visionContext}
+${visionContext}${chatContext}
 
 RESPONSE FORMAT (JSON):
 {
@@ -1810,7 +1989,14 @@ RESPONSE FORMAT (JSON):
   "riskFactors": ["risk1", "risk2"],
   "successCriteria": ["criteria1", "criteria2"],
   "approach": "sequential|parallel|hybrid"
-}`,
+}
+
+ANALYSIS INSTRUCTIONS:
+- If pre-expedition planning discussion is available, incorporate those insights into your assessment
+- Extract specific requirements, constraints, and success criteria mentioned in the conversation
+- Consider the user's stated preferences for timeline, scope, and approach
+- Identify any risks or challenges discussed during planning
+- Align complexity assessment with the depth of planning already conducted`,
       [],
       `Analyze this expedition objective: ${objective}`
     );
@@ -1839,9 +2025,9 @@ RESPONSE FORMAT (JSON):
   }
 
   /**
-   * Create task plan from objective and analysis
+   * Create task plan from objective and analysis with chat context
    */
-  private async createTaskPlan(objective: string, analysis: ObjectiveAnalysis): Promise<TaskPlan> {
+  private async createTaskPlan(objective: string, analysis: ObjectiveAnalysis, expeditionId?: string): Promise<TaskPlan> {
     // Load vision context for task planning
     let visionContext = '';
     try {
@@ -1855,10 +2041,53 @@ RESPONSE FORMAT (JSON):
       console.warn('⚠️ [FIRST-OFFICER] Could not load vision for task planning:', error);
     }
 
+    // Load pre-expedition chat context for task planning
+    let chatContext = '';
+    if (expeditionId) {
+      try {
+        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+        const expedition = await expeditionRepo.findById(expeditionId);
+        
+        if (expedition) {
+          const sessionKey = this.memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+          const memory = await this.memoryStore.get(sessionKey);
+          
+          if (memory.length > 0) {
+            // Extract key planning insights for task creation
+            const planningInsights = memory
+              .filter(m => m.role === 'user' || m.role === 'assistant')
+              .map(m => m.content)
+              .join(' ')
+              .toLowerCase();
+
+            // Extract specific deliverables, constraints, and preferences mentioned
+            const hasSpecificDeliverables = /deliverable|output|result|produce|create|build/g.test(planningInsights);
+            const hasTimeConstraints = /deadline|urgent|quick|time|schedule/g.test(planningInsights);
+            const hasQualityRequirements = /quality|standard|criteria|review|approval/g.test(planningInsights);
+            
+            chatContext = `\n\nPLANNING INSIGHTS FROM CONVERSATION:
+Based on the pre-expedition discussion, consider these aspects:
+- Specific deliverables mentioned: ${hasSpecificDeliverables ? 'Yes - incorporate mentioned outputs' : 'None specified'}
+- Time constraints discussed: ${hasTimeConstraints ? 'Yes - consider urgency factors' : 'Standard timeline'}
+- Quality requirements: ${hasQualityRequirements ? 'Yes - include quality assurance tasks' : 'Standard quality'}
+
+FULL CONVERSATION CONTEXT:
+${memory.slice(-8).map(m => `${m.role}: ${m.content.substring(0, 200)}`).join('\n')}
+
+TASK PLANNING INSTRUCTIONS: Use the conversation context to create more targeted and specific tasks that reflect the user's actual needs and constraints discussed during planning.`;
+            
+            console.log(`💬 [FIRST-OFFICER] Chat context applied to task planning: ${memory.length} messages analyzed`);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ [FIRST-OFFICER] Could not load chat context for task planning:', error);
+      }
+    }
+
     const prompt = buildPrompt(
       `You are the First Officer's task planning system. Break down the objective into executable tasks.
 
-${visionContext}
+${visionContext}${chatContext}
 
 RESPONSE FORMAT (JSON):
 {

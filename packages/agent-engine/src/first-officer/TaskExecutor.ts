@@ -811,49 +811,53 @@ ${performanceContext}
 
 ${resourceContext}
 
-ENHANCED INSTRUCTIONS:
-1. Carefully analyze the task requirements and performance context
-2. Apply your specialized skills efficiently to complete the task
-3. If this is a retry, specifically address the issues from previous attempts
-4. Ensure your response matches the expected deliverable format exactly
-5. Optimize for both quality and performance given the priority level
-6. Provide a comprehensive and well-structured result
-7. If you encounter any issues, explain them clearly with suggested solutions
+CRITICAL EXECUTION INSTRUCTIONS:
+⚠️ **YOU MUST ACTUALLY PERFORM THE WORK - NOT JUST EXPLAIN WHAT YOU WOULD DO** ⚠️
 
-CHAIN OF THOUGHT REQUIREMENTS:
-Please structure your response to include your detailed reasoning process:
+1. **DO THE ACTUAL WORK**: Execute the task completely, don't just describe your approach
+2. **USE YOUR TOOLS**: If you have access to tools (web search, code execution, file access, etc.), USE THEM to complete the task
+3. **PROVIDE REAL RESULTS**: Give actual findings, data, code, documents - not just explanations
+4. **BE COMPREHENSIVE**: Complete the entire deliverable as specified
+5. **TAKE ACTION**: If the task requires research, actually research. If it requires writing, actually write. If it requires analysis, actually analyze.
 
-**THINKING PROCESS:**
-- What is my understanding of this task?
-- What are the key requirements I need to fulfill?
-- What assumptions am I making?
-- What constraints do I need to consider?
+**EXECUTION FORMAT:**
+Provide your actual work output directly. Structure it as:
 
-**APPROACH:**
-- What steps will I take to complete this task?
-- What alternatives did I consider and why did I choose this approach?
-- What tools or resources will I utilize?
-- What dependencies exist that could affect my work?
+**IMPLEMENTATION PHASE:**
+[Put your actual completed work here - real data, actual analysis, working code, concrete deliverables]
 
-**RISK ANALYSIS:**
-- What potential issues or risks do I foresee?
-- How will I mitigate these risks?
-- What is my confidence level in this approach?
+**BRIEF SUMMARY:**
+[One paragraph explaining what you accomplished and any key insights]
 
-**EXECUTION:**
-[Your actual task implementation goes here]
+**EXAMPLE - WRONG APPROACH:**
+❌ "Implementation phase: I would collect and analyze data on each competitor's market share by researching industry reports..."
 
-**REFLECTION:**
-- What insights did I gain during this task?
-- Are there any learnings for future similar tasks?
+**EXAMPLE - CORRECT APPROACH:**
+✅ "Implementation phase: 
+COMPETITOR ANALYSIS RESULTS:
+
+Company A: 
+- Market Share: 23.5% (Source: Industry Report 2024)
+- Pricing: Premium tier ($199/month)
+- Customer Base: 50,000+ enterprise clients
+- Service Quality: 4.2/5 average rating
+
+Company B:
+- Market Share: 18.2% (Source: MarketAnalytics.com)
+- Pricing: Mid-tier ($99/month)
+- Customer Base: 125,000+ SMB clients  
+- Service Quality: 3.8/5 average rating
+
+[Complete analysis with actual data continues...]"
 
 QUALITY EXPECTATIONS:
-- Accuracy: Ensure all information is correct and reliable
-- Completeness: Address all aspects of the task requirements
-- Clarity: Structure your response clearly and logically
-- Efficiency: Optimize your approach for the given priority level
+- **EXECUTION OVER EXPLANATION**: Focus 90% on doing the work, 10% on explaining
+- **CONCRETE DELIVERABLES**: Provide tangible outputs, not theoretical approaches
+- **USE AVAILABLE TOOLS**: Leverage any tools you have access to for better results
+- **COMPLETENESS**: Deliver the full requirement, not partial explanations
+- **ACTIONABLE RESULTS**: Ensure your output can be directly used or implemented
 
-Please complete this task with enhanced focus on quality and performance optimization.
+⚠️ **REMINDER: Your response will be evaluated on the actual work completed, not on the quality of your explanations about what you might do.** ⚠️
 `;
   }
 
@@ -1888,20 +1892,28 @@ Please complete this task with enhanced focus on quality and performance optimiz
    * Extract execution result from agent response
    */
   private extractExecutionResult(response: string): string {
-    // Look for the EXECUTION section
+    // Look for the IMPLEMENTATION PHASE section first
+    const implementationMatch = response.match(/\*\*IMPLEMENTATION PHASE:\*\*([\s\S]*?)(?=\*\*BRIEF SUMMARY:\*\*|\*\*|$)/i);
+    
+    if (implementationMatch) {
+      return implementationMatch[1].trim();
+    }
+    
+    // Fall back to EXECUTION section for backwards compatibility
     const executionMatch = response.match(/\*\*EXECUTION:\*\*([\s\S]*?)(?=\*\*|$)/i);
     
     if (executionMatch) {
       return executionMatch[1].trim();
     }
     
-    // If no execution section found, try to extract the main content
-    // Skip chain of thought sections
+    // If no structured sections found, try to extract the main content
+    // Skip thinking/planning sections that don't contain actual work
     const sectionsToSkip = [
       /\*\*THINKING PROCESS:\*\*[\s\S]*?(?=\*\*|$)/gi,
       /\*\*APPROACH:\*\*[\s\S]*?(?=\*\*|$)/gi,
       /\*\*RISK ANALYSIS:\*\*[\s\S]*?(?=\*\*|$)/gi,
-      /\*\*REFLECTION:\*\*[\s\S]*?(?=\*\*|$)/gi
+      /\*\*REFLECTION:\*\*[\s\S]*?(?=\*\*|$)/gi,
+      /\*\*BRIEF SUMMARY:\*\*[\s\S]*?(?=\*\*|$)/gi
     ];
     
     let cleanedResponse = response;
@@ -1909,6 +1921,8 @@ Please complete this task with enhanced focus on quality and performance optimiz
       cleanedResponse = cleanedResponse.replace(pattern, '');
     }
     
-    return cleanedResponse.trim() || response;
+    // If we still have substantial content, return it, otherwise return the full response
+    const cleaned = cleanedResponse.trim();
+    return cleaned.length > 50 ? cleaned : response;
   }
 }

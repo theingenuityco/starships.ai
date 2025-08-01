@@ -7,6 +7,7 @@ import {
   ArrowLeft, Zap, Loader2, Activity, 
   Gauge, Battery
 } from 'lucide-react'
+import '@/styles/animations.css'
 import Link from 'next/link'
 import { starshipAPI, Starship } from '@/lib/api'
 
@@ -135,31 +136,111 @@ export function DriveContent({ slug }: DriveContentProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-6 overflow-auto">
-        <div className="max-w-4xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Zap className="h-5 w-5" />
-                <span>Drive Systems Control</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Zap className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">Drive Systems Control</h3>
-                <p className="text-muted-foreground mb-4">
-                  Advanced propulsion and navigation systems
-                </p>
-                <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    🚀 Coming Soon: Complete drive system interface with propulsion control,
-                    navigation systems, and energy management.
+      <div className="flex-1 p-6 overflow-auto bg-gradient-to-b from-background to-background/95">
+        <div className="max-w-5xl mx-auto">
+          <div className="relative">
+            {/* Decorative background elements */}
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-transparent to-orange-500/5 rounded-3xl" />
+            <div className="absolute top-10 left-10 w-20 h-20 bg-yellow-500/10 rounded-full blur-2xl" />
+            <div className="absolute bottom-10 right-10 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl" />
+            
+            <Card className="relative overflow-hidden bg-card/80 backdrop-blur-sm border-border/50 shadow-2xl">
+              <CardHeader className="pb-8 pt-8">
+                <div className="text-center space-y-4">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-2xl mb-4">
+                    <Zap className="h-10 w-10 text-yellow-500" />
+                  </div>
+                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-yellow-500 to-orange-500 bg-clip-text text-transparent">
+                    Drive Systems Under Construction
+                  </CardTitle>
+                  <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                    Our engineering team is working on advanced propulsion and navigation systems
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardHeader>
+              <CardContent className="pb-12">
+                <div className="relative">
+                  {/* Animated illustration placeholder */}
+                  <div className="relative h-64 mb-8 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden">
+                    {/* Stars background */}
+                    <div className="absolute inset-0 opacity-50">
+                      <div className="absolute top-10 left-20 w-1 h-1 bg-white rounded-full animate-pulse" />
+                      <div className="absolute top-20 right-30 w-1 h-1 bg-white rounded-full animate-pulse delay-100" />
+                      <div className="absolute bottom-20 left-40 w-1 h-1 bg-white rounded-full animate-pulse delay-200" />
+                      <div className="absolute top-40 right-20 w-1 h-1 bg-white rounded-full animate-pulse delay-300" />
+                      <div className="absolute bottom-30 right-50 w-1 h-1 bg-white rounded-full animate-pulse delay-500" />
+                    </div>
+                    
+                    {/* Spaceship illustration */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="relative">
+                        {/* Spaceship body */}
+                        <div className="w-32 h-20 bg-gradient-to-r from-slate-600 to-slate-700 rounded-full transform rotate-12 animate-float">
+                          <div className="absolute top-2 left-4 w-6 h-6 bg-cyan-400/30 rounded-full blur-sm" />
+                          <div className="absolute bottom-2 right-4 w-4 h-4 bg-yellow-400/30 rounded-full blur-sm" />
+                        </div>
+                        
+                        {/* Astronaut working on ship */}
+                        <div className="absolute -top-8 left-8 transform -rotate-12 animate-float-delayed">
+                          <div className="w-8 h-8 bg-white rounded-full">
+                            <div className="w-6 h-6 bg-slate-800 rounded-full mt-1 ml-1" />
+                          </div>
+                          <div className="w-6 h-8 bg-white rounded-lg mt-1 ml-1" />
+                          {/* Wrench */}
+                          <div className="absolute -right-2 top-6 w-4 h-1 bg-slate-400 transform rotate-45" />
+                        </div>
+                        
+                        {/* Engine flames */}
+                        <div className="absolute -bottom-2 -left-6 w-8 h-12 bg-gradient-to-b from-yellow-400 via-orange-500 to-red-500 opacity-80 blur-lg animate-pulse" />
+                      </div>
+                    </div>
+                    
+                    {/* Progress indicator */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm p-4">
+                      <div className="flex items-center justify-center gap-2 text-xs text-slate-400">
+                        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                        <span>Systems under maintenance</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Feature list */}
+                  <div className="grid md:grid-cols-3 gap-6 mb-8">
+                    <div className="text-center space-y-2">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-yellow-500/10 rounded-xl mb-2">
+                        <Gauge className="h-6 w-6 text-yellow-500" />
+                      </div>
+                      <h4 className="font-semibold">Propulsion Control</h4>
+                      <p className="text-sm text-muted-foreground">Advanced thrust management systems</p>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-orange-500/10 rounded-xl mb-2">
+                        <Activity className="h-6 w-6 text-orange-500" />
+                      </div>
+                      <h4 className="font-semibold">Navigation Systems</h4>
+                      <p className="text-sm text-muted-foreground">Quantum navigation algorithms</p>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <div className="inline-flex items-center justify-center w-12 h-12 bg-red-500/10 rounded-xl mb-2">
+                        <Battery className="h-6 w-6 text-red-500" />
+                      </div>
+                      <h4 className="font-semibold">Energy Management</h4>
+                      <p className="text-sm text-muted-foreground">Efficient power distribution</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-red-500/10 rounded-2xl p-6 text-center border border-yellow-500/20">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      🚧 Currently under development
+                    </p>
+                    <p className="text-lg font-semibold text-foreground">
+                      Drive Systems will be operational soon
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

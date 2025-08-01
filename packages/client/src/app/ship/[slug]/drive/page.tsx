@@ -1,27 +1,27 @@
-import { Metadata } from 'next';
-import { AuthGate } from '@/components/auth/AuthGate';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Zap } from 'lucide-react';
-import Link from 'next/link';
+import { Metadata } from 'next'
+import { AuthGate } from '@/components/auth/AuthGate'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ArrowLeft, Zap } from 'lucide-react'
+import Link from 'next/link'
 
 interface PageProps {
   params: Promise<{
-    slug: string;
-  }>;
+    slug: string
+  }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug } = await params
   return {
     title: `${slug} Drive Systems | Starships AI`,
     description: `Drive systems for starship ${slug}`,
-  };
+  }
 }
 
 export default async function StarshipDrivePage({ params }: PageProps) {
-  const { slug } = await params;
-  
+  const { slug } = await params
+
   return (
     <AuthGate>
       <div className="h-full p-6">
@@ -58,7 +58,7 @@ export default async function StarshipDrivePage({ params }: PageProps) {
                 </p>
                 <div className="bg-muted p-4 rounded-lg">
                   <p className="text-sm text-muted-foreground">
-                    🚀 Coming Soon: Complete drive system interface with propulsion control, 
+                    🚀 Coming Soon: Complete drive system interface with propulsion control,
                     navigation systems, and energy management.
                   </p>
                 </div>
@@ -68,5 +68,5 @@ export default async function StarshipDrivePage({ params }: PageProps) {
         </div>
       </div>
     </AuthGate>
-  );
+  )
 }

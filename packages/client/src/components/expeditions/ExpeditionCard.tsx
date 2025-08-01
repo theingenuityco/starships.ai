@@ -84,6 +84,10 @@ export function ExpeditionCard({
   showAgentAvatars = true,
   showQualityScore = true,
   showTaskProgress = true,
+  onStart,
+  onPause,
+  onResume,
+  onCancel,
   onDelete,
   onViewChat,
   agents = [],
@@ -96,6 +100,7 @@ export function ExpeditionCard({
   const [isHovered, setIsHovered] = useState(false);
   const [localExpedition, setLocalExpedition] = useState(expedition);
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // HTTP-only implementation: Real-time updates disabled
@@ -133,14 +138,6 @@ export function ExpeditionCard({
           className: 'text-amber-600 bg-amber-50 dark:bg-amber-900/50 dark:text-amber-400',
           dotColor: 'bg-amber-500',
           pulse: true
-        };
-      case 'review':
-        return {
-          icon: AlertCircle,
-          label: 'Review',
-          className: 'text-purple-600 bg-purple-50 dark:bg-purple-900/50 dark:text-purple-400',
-          dotColor: 'bg-purple-500',
-          pulse: false
         };
       case 'completed':
         return {
@@ -190,7 +187,6 @@ export function ExpeditionCard({
       case 'draft': return 0;
       case 'planning': return 20;
       case 'in-progress': return 60;
-      case 'review': return 90;
       case 'completed': return 100;
       case 'failed': return 0;
       case 'cancelled': return 0;
@@ -241,7 +237,7 @@ export function ExpeditionCard({
     if (mission.includes('deploy') || mission.includes('release') || mission.includes('launch')) {
       return { label: 'Deployment', icon: Activity, className: 'text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-400' };
     }
-    return { label: 'Mission', icon: Rocket, className: 'text-gray-600 bg-gray-50 dark:bg-gray-900/30 dark:text-gray-400' };
+    return null; // Don't show generic 'Mission' type
   };
 
   const statusConfig = getStatusConfig(localExpedition.status);
@@ -249,7 +245,7 @@ export function ExpeditionCard({
   const qualityDisplay = getQualityDisplay();
   const expeditionType = getExpeditionType();
   const StatusIcon = statusConfig.icon;
-  const TypeIcon = expeditionType.icon;
+  const TypeIcon = expeditionType?.icon || Rocket;
 
   // Get assigned agents for display
   const assignedAgents = agents.filter(agent =>
@@ -269,7 +265,7 @@ export function ExpeditionCard({
       <Card
         className={`
           cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/40 overflow-hidden
-          h-[240px] flex flex-col
+          min-h-[280px] flex flex-col
           ${isHovered ? 'shadow-lg border-border/60 bg-card/60' : ''}
           hover:shadow-xl hover:shadow-primary/3
           ${error ? 'border-red-200 bg-red-50/50' : ''}
@@ -305,30 +301,25 @@ export function ExpeditionCard({
         <CardHeader className="pb-0 relative space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Avatar className="w-14 h-14">
-                <AvatarFallback className="text-3xl bg-muted border border-border/30">
-                  <TypeIcon className="h-8 w-8 text-primary" />
-                </AvatarFallback>
-              </Avatar>
-              <div>
+              <div className="flex-1">
                 <CardTitle className="text-lg font-bold">{localExpedition.name}</CardTitle>
                 <Badge 
                   variant="outline"
-                  className={`mt-1 text-[10px] px-1.5 py-0.5 h-5 ${
-                    statusConfig.pulse 
-                      ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                      : localExpedition.status === 'completed'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : localExpedition.status === 'failed'
-                      ? 'bg-red-50 text-red-700 border-red-200'
-                      : 'bg-slate-50 text-slate-700 border-slate-200'
-                  }`}
+                  className={`mt-1 text-[10px] px-1.5 py-0.5 h-5 ${statusConfig.className}`}
                 >
+                  <div className={`w-1.5 h-1.5 rounded-full ${statusConfig.dotColor} ${statusConfig.pulse ? 'animate-pulse' : ''} mr-1`} />
                   {statusConfig.label}
                 </Badge>
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              {/* Quality Score */}
+              {qualityDisplay && (
+                <div className={`flex items-center gap-1 px-2 py-1 rounded-md ${qualityDisplay.bgColor}`}>
+                  <Star className={`w-3 h-3 fill-current ${qualityDisplay.color}`} />
+                  <span className={`text-xs font-bold ${qualityDisplay.color}`}>{qualityDisplay.score}%</span>
+                </div>
+              )}
 
               {/* Context Menu */}
               {enableContextMenu && (
@@ -386,77 +377,59 @@ export function ExpeditionCard({
           </div>
         </CardHeader>
 
-        <CardContent className="pt-3 relative flex-1 flex flex-col justify-between">
-          {/* Agent Deployment */}
-          <div className="flex items-center">
-            <div className="relative flex items-center">
-              {/* Stacked avatars */}
-              {assignedAgents.slice(0, 3).map((agent, i) => (
-                <Avatar
-                  key={agent.id}
-                  className={`w-7 h-7 border-2 border-background shadow-sm transition-all duration-200 absolute ${
-                    i === 0 ? "[&>span]:bg-blue-500" :
-                    i === 1 ? "[&>span]:bg-purple-500" : 
-                    "[&>span]:bg-green-500"
-                  }`}
-                  style={{
-                    transform: `translateX(${i * -8}px)`,
-                    zIndex: 3 - i,
-                  }}
-                >
-                  <AvatarImage src={agent.avatar} />
-                  <AvatarFallback className="text-xs font-medium text-white">
-                    {agent.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-              
-              {/* "+X more" indicator */}
-              {assignedAgents.length > 3 && (
-                <Avatar
-                  className="w-7 h-7 border-2 border-background shadow-sm"
-                  style={{
-                    transform: `translateX(${3 * -8}px)`,
-                    zIndex: 0,
-                  }}
-                >
-                  <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
-                    +{assignedAgents.length - 3}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-              
-              {/* Empty state */}
-              {assignedAgents.length === 0 && (
-                <div className="flex items-center space-x-2 text-muted-foreground">
-                  <Avatar className="w-7 h-7 border-2 border-dashed border-muted-foreground/30">
-                    <AvatarFallback className="bg-transparent">
-                      <Users className="w-3 h-3" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs">No agents assigned</span>
-                </div>
-              )}
-              
-              {/* Spacing for overlapped avatars */}
-              <div style={{ width: `${Math.max(0, Math.min(3, assignedAgents.length) * 8 + (assignedAgents.length > 3 ? 8 : 0))}px` }} />
+        <CardContent className="pt-3 pb-3 relative flex-1 flex flex-col justify-between gap-3">
+          {/* Key Information */}
+          <div className="space-y-3">
+            {/* Expedition Info */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Created</p>
+                <p className="font-medium">{formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">ID</p>
+                <p className="font-mono text-xs">{localExpedition.id.slice(0, 8)}...</p>
+              </div>
             </div>
+            
+            {/* Progress Bar */}
+            {showTaskProgress && progress > 0 && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Progress</span>
+                  <span className="font-medium">{progress}%</span>
+                </div>
+                <div className="w-full bg-secondary/20 rounded-full h-1.5">
+                  <div 
+                    className="bg-gradient-to-r from-primary to-primary/80 h-1.5 rounded-full transition-all duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Status Notification */}
-          <div className="flex items-center justify-between pt-3 border-t border-border/50">
-            <div className="flex items-center space-x-2 text-xs">
-              <Clock className="w-3 h-3 text-muted-foreground" />
-              <span className="text-muted-foreground">
-                {formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}
-              </span>
+          {/* Bottom Section */}
+          <div className="space-y-3">
+            {/* Additional Info */}
+            <div className="flex items-center justify-between pt-3 border-t border-border/50">
+              <div className="flex items-center gap-3">
+                {localExpedition.updatedAt && localExpedition.updatedAt !== localExpedition.createdAt && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3" />
+                    <span>Updated {formatDistanceToNow(new Date(localExpedition.updatedAt), { addSuffix: true })}</span>
+                  </div>
+                )}
+              </div>
+              {expeditionType && (
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs px-2 py-0.5 capitalize ${expeditionType.className}`}
+                >
+                  {expeditionType.label}
+                </Badge>
+              )}
             </div>
-            <Badge 
-              variant="outline" 
-              className={`text-xs px-2 py-0.5 capitalize ${expeditionType.className}`}
-            >
-              {expeditionType.label}
-            </Badge>
           </div>
 
 

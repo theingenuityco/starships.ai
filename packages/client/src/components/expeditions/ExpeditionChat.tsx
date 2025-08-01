@@ -86,6 +86,17 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   // Get starship ID from the slug first
   const [starshipId, setStarshipId] = useState<string>('');
   const [agentDetails, setAgentDetails] = useState<Record<string, any>>({});
+  
+  // Expedition readiness state
+  const [expeditionReadiness, setExpeditionReadiness] = useState<{
+    isReady: boolean;
+    userMessageCount: number;
+    reason?: string;
+  }>({
+    isReady: false,
+    userMessageCount: 0,
+    reason: 'Loading...'
+  });
 
   // Fetch starship by slug to get the real ID
   useEffect(() => {
@@ -140,6 +151,29 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
 
   // WebSocket integration enabled for real-time updates
   // Expedition control functions use HTTP API calls with real-time WebSocket updates
+
+  // Check expedition readiness based on message count
+  useEffect(() => {
+    const checkReadiness = async () => {
+      if (!starshipId || !expeditionId || expedition?.status !== 'draft') {
+        return;
+      }
+
+      try {
+        const readiness = await expeditionAPI.checkReadiness(starshipId, expeditionId);
+        setExpeditionReadiness(readiness);
+        console.log('[EXPEDITION CHAT] Readiness updated:', readiness);
+      } catch (error) {
+        console.error('[EXPEDITION CHAT] Failed to check readiness:', error);
+        // Keep previous state on error
+      }
+    };
+
+    // Check readiness when messages change or initially load
+    if (starshipId && expeditionId && expedition?.status === 'draft') {
+      checkReadiness();
+    }
+  }, [starshipId, expeditionId, messages.length, expedition?.status]);
 
   // Fetch agent details when expedition loads
   useEffect(() => {
@@ -521,18 +555,32 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           
           {/* Action Buttons */}
           {expedition.status === 'draft' && (
-            <Button 
-              onClick={handleStartExpedition}
-              disabled={actionLoading === 'start'}
-              size="sm"
-            >
-              {actionLoading === 'start' ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Start
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    onClick={handleStartExpedition}
+                    disabled={actionLoading === 'start' || !expeditionReadiness.isReady}
+                    size="sm"
+                  >
+                    {actionLoading === 'start' ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    Start
+                  </Button>
+                </TooltipTrigger>
+                {!expeditionReadiness.isReady && (
+                  <TooltipContent>
+                    <p>{expeditionReadiness.reason || 'Please have a brief planning discussion first'}</p>
+                    <p className="text-xs mt-1">
+                      Messages: {expeditionReadiness.userMessageCount}/2 minimum
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
           
           {expedition.status === 'in-progress' && (

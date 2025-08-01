@@ -15,7 +15,8 @@ import {
   WorkflowPhase,
   ChatResponse,
   LLMProvider,
-  ExpeditionMessage
+  ExpeditionMessage,
+  MemoryEntry
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
 import { ProviderFactory } from '../llm/provider-factory';
@@ -74,15 +75,16 @@ export class FirstOfficerAgent {
     messageEmitCallback?: (message: ExpeditionMessage) => Promise<void>, // Optional WebSocket emission callback
     webSocketEmitter?: WebSocketEventEmitter
   ) {
-    // MANDATORY: Validate that agents are provided
+    // VALIDATE: Check if agents are provided (required for execution, optional for pre-expedition chat)
     if (!selectedAgentIds || selectedAgentIds.length === 0) {
-      throw new Error(
-        'FirstOfficerAgent requires at least one agent to be selected. ' +
-        'Auto-assignment has been removed - agents must be explicitly provided during expedition creation.'
+      console.warn(
+        '⚠️ [FIRST-OFFICER] No agents selected - this is acceptable for pre-expedition chat, ' +
+        'but agents must be assigned before starting expedition execution.'
       );
+      selectedAgentIds = []; // Ensure it's an empty array
+    } else {
+      console.log(`🎯 [FIRST-OFFICER] Initializing with ${selectedAgentIds.length} pre-selected agents:`, selectedAgentIds);
     }
-
-    console.log(`🎯 [FIRST-OFFICER] Initializing with ${selectedAgentIds.length} pre-selected agents:`, selectedAgentIds);
 
     // Initialize configuration with defaults
     this.config = {
@@ -343,6 +345,14 @@ export class FirstOfficerAgent {
         throw new Error(`Expedition not found: ${expeditionId}`);
       }
 
+      // Validate that agents are assigned before starting execution
+      if (!expedition.assignedAgents || expedition.assignedAgents.length === 0) {
+        throw new Error(
+          'Cannot start expedition execution without assigned agents. ' +
+          'Please assign at least one agent to the expedition before starting.'
+        );
+      }
+
       // Initialize chat coordinator
       this.chatCoordinator = new ChatCoordinator(
         this.memoryStore,
@@ -583,17 +593,327 @@ export class FirstOfficerAgent {
     expeditionId: string,
     userMessage: string
   ): Promise<ChatResponse> {
-    if (!this.chatCoordinator) {
+    // Initialize chat coordinator if needed (for workflow coordination)
+    await this.initializeChatCoordinatorIfNeeded(expeditionId);
+
+    // Use direct chat implementation instead of ChatCoordinator
+    // (ChatCoordinator is only for workflow coordination messages)
+    return await this.handleDirectChat(expeditionId, userMessage);
+  }
+
+  /**
+   * Initialize chat coordinator for draft expeditions with vision context
+   */
+  private async initializeChatCoordinatorIfNeeded(expeditionId: string): Promise<void> {
+    if (this.chatCoordinator) {
+      return; // Already initialized
+    }
+
+    try {
+      // Get expedition details
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        throw new Error(`Expedition not found: ${expeditionId}`);
+      }
+
+      // Load vision context for the starship (same pattern as performObjectiveAnalysis)
+      await this.loadVisionContext();
+
+      // Initialize chat coordinator for any expedition status (for workflow messages only)
+      // Note: expedition.createdBy is the correct field, not expedition.userId
+      this.chatCoordinator = new ChatCoordinator(
+        this.memoryStore,
+        expeditionId,
+        expedition.createdBy, // ← CORRECTED: Use createdBy field
+        expedition.starshipId,
+        this.messageEmitCallback
+      );
+
+      console.log(`✅ [FIRST-OFFICER] Chat coordinator initialized for expedition: ${expeditionId} (status: ${expedition.status})`);
+      if (this.visionContent) {
+        console.log(`📖 [FIRST-OFFICER] Vision context loaded: ${this.visionContent.substring(0, 100)}...`);
+      }
+    } catch (error) {
+      console.error(`❌ [FIRST-OFFICER] Failed to initialize chat coordinator:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load and cache vision context for the starship
+   */
+  private async loadVisionContext(): Promise<void> {
+    if (this.visionContent) {
+      return; // Already loaded
+    }
+
+    try {
+      const visionRepo = RepositoryFactory.getVisionRepository();
+      const vision = await visionRepo.findByStarship(this.starshipId);
+      
+      if (vision && vision.statement) {
+        this.visionContent = vision.statement;
+        console.log(`📖 [FIRST-OFFICER] Vision loaded: ${vision.statement.substring(0, 100)}...`);
+      } else {
+        console.log(`⚠️ [FIRST-OFFICER] No vision found for starship: ${this.starshipId}`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [FIRST-OFFICER] Could not load vision context:', error);
+    }
+  }
+
+  /**
+   * Handle direct chat for pre-expedition conversations
+   */
+  private async handleDirectChat(expeditionId: string, userMessage: string): Promise<ChatResponse> {
+    // Load vision context if needed
+    await this.loadVisionContext();
+    
+    try {
+      // Get expedition details for context
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        return {
+          reply: "I apologize, but I couldn't find the expedition details. Please try again.",
+          usage: undefined
+        };
+      }
+
+      // Retrieve existing memory for conversation context (same pattern as chat function in index.ts)
+      const sessionKey = this.memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+      const memory = await this.memoryStore.get(sessionKey);
+      console.log('🧠 [FIRST-OFFICER] Memory loaded:', {
+        sessionKey,
+        memoryEntries: memory.length,
+        recentEntries: memory.slice(-3).map((m) => `${m.role}: ${m.content.substring(0, 50)}...`),
+      });
+
+      // Note: Greeting is now handled by initializeChat() method called when chat interface loads
+
+      // Initialize ProviderFactory (same pattern as chat function in index.ts)
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const llmRepo = RepositoryFactory.getLLMRepository();
+      ProviderFactory.initialize(agentRepo, llmRepo);
+
+      // Build system prompt with vision context (same pattern as performObjectiveAnalysis)
+      const systemPrompt = this.buildChatSystemPrompt(expedition);
+      
+      // Build prompt using buildPrompt utility with proper parameters (same as chat function in index.ts)
+      const prompt = buildPrompt(
+        systemPrompt,
+        memory, // retrieved memory for conversation context
+        userMessage,
+        undefined, // no relevant context for pre-expedition chat
+        this.visionContent // vision context if available
+      );
+      
+      // Use same LLM pattern as performObjectiveAnalysis method
+      const provider = await ProviderFactory.getProvider('first-officer-system');
+      const result = await provider.complete(prompt);
+
+      // Store in memory for context (exact same pattern as chat function in index.ts)
+      const userTimestamp = Date.now();
+      await this.memoryStore.append(sessionKey, {
+        role: 'user',
+        content: userMessage,
+        timestamp: userTimestamp,
+      } as MemoryEntry);
+
+      const assistantTimestamp = Date.now();
+      await this.memoryStore.append(sessionKey, {
+        role: 'assistant',
+        content: result.reply,
+        timestamp: assistantTimestamp,
+      } as MemoryEntry);
+
       return {
-        reply: "No active expedition found. Please start an expedition first.",
+        reply: result.reply,
+        usage: result.usage
+      };
+    } catch (error) {
+      console.error('Failed to handle user message:', error);
+      return {
+        reply: "I apologize, I'm having trouble processing your message right now. Please try again.",
         usage: undefined
       };
     }
-
-    return await this.chatCoordinator.handleUserResponse(userMessage);
   }
 
+  /**
+   * Initialize chat for expedition - sends greeting if needed
+   * Should be called when user first opens expedition chat interface
+   */
+  async initializeChat(expeditionId: string): Promise<ChatResponse | null> {
+    try {
+      // Get expedition details
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        return null;
+      }
 
+      // Check if greeting already sent by checking memory
+      const sessionKey = this.memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+      const memory = await this.memoryStore.get(sessionKey);
+      
+      // Only send greeting if no previous messages exist
+      if (memory.length === 0) {
+        console.log('👋 [FIRST-OFFICER] Initializing chat - sending automatic greeting');
+        return await this.sendAutomaticGreeting(expedition, sessionKey);
+      }
+      
+      console.log('🔄 [FIRST-OFFICER] Chat already initialized, no greeting needed');
+      return null; // No greeting needed
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Failed to initialize chat:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Send automatic greeting and contextual question for new expeditions
+   */
+  private async sendAutomaticGreeting(expedition: any, sessionKey: string): Promise<ChatResponse> {
+    try {
+      // Load vision context for contextual greeting
+      await this.loadVisionContext();
+
+      // Create contextual greeting based on expedition details
+      const greetingMessage = this.buildGreetingMessage(expedition);
+
+      // Store the greeting in memory as assistant message
+      const timestamp = Date.now();
+      await this.memoryStore.append(sessionKey, {
+        role: 'assistant',
+        content: greetingMessage,
+        timestamp: timestamp,
+      } as MemoryEntry);
+
+      console.log('✅ [FIRST-OFFICER] Automatic greeting sent and stored');
+
+      return {
+        reply: greetingMessage,
+        usage: undefined
+      };
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Failed to send automatic greeting:', error);
+      const fallbackMessage = "Welcome! I'm your First Officer. How can I help you plan this expedition?";
+      return {
+        reply: fallbackMessage,
+        usage: undefined
+      };
+    }
+  }
+
+  /**
+   * Build contextual greeting message based on expedition details
+   */
+  private buildGreetingMessage(expedition: any): string {
+    const expeditionName = expedition.name || 'your new expedition';
+    const mission = expedition.mission || 'the mission ahead';
+    
+    // Add vision context if available
+    const visionContext = this.visionContent 
+      ? ` As we work together, I'll ensure our plans align with our starship's vision and strategic direction.`
+      : '';
+
+    const greeting = `👋 **Welcome aboard!** I'm your First Officer, ready to help you plan and refine "${expeditionName}".
+
+I see we're preparing for: **${mission}**
+
+${visionContext}
+
+Let's start with this: **What specific outcomes are you hoping to achieve with this expedition?** Understanding your key objectives will help me provide better guidance and suggestions as we develop the plan together.`;
+
+    return greeting;
+  }
+
+  /**
+   * Check if expedition is ready to start based on user interaction count
+   * Enables start button after 2-3 user messages to ensure sufficient planning discussion
+   */
+  async isExpeditionReadyToStart(expeditionId: string, userId: string): Promise<{
+    isReady: boolean;
+    userMessageCount: number;
+    reason?: string;
+  }> {
+    try {
+      // Get expedition details to use the correct session key (same as chat system)
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        console.log(`❌ [FIRST-OFFICER] Expedition not found for readiness check: ${expeditionId} (user: ${userId})`);
+        return {
+          isReady: false,
+          userMessageCount: 0,
+          reason: 'Expedition not found'
+        };
+      }
+
+      // Use the same session key pattern as chat system (expedition.createdBy, not current userId)
+      const sessionKey = this.memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+      const memory = await this.memoryStore.get(sessionKey);
+      
+      // Count user messages (exclude assistant messages like greetings)
+      const userMessageCount = memory.filter(entry => entry.role === 'user').length;
+      
+      const MINIMUM_MESSAGES = 2; // Require at least 2 user messages before allowing start
+      const isReady = userMessageCount >= MINIMUM_MESSAGES;
+      
+      console.log(`🎯 [FIRST-OFFICER] Readiness: ${userMessageCount}/${MINIMUM_MESSAGES} user messages, ready: ${isReady}`);
+      
+      return {
+        isReady,
+        userMessageCount,
+        reason: !isReady 
+          ? `Please have a brief planning discussion first. ${MINIMUM_MESSAGES - userMessageCount} more message(s) needed.`
+          : undefined
+      };
+    } catch (error) {
+      console.error('Failed to check expedition readiness:', error);
+      return {
+        isReady: false,
+        userMessageCount: 0,
+        reason: 'Unable to determine readiness. Please try again.'
+      };
+    }
+  }
+
+  private buildChatSystemPrompt(expedition: any): string {
+    const basePrompt = `You are the First Officer of starship "${expedition.starshipId}".`;
+    
+    // Add vision context if available (same pattern as performObjectiveAnalysis)
+    const visionSection = this.visionContent 
+      ? `\n\n${this.visionContent}\n\nIMPORTANT: All discussions must align with this vision.`
+      : '';
+    
+    if (expedition.status === 'draft') {
+      return `${basePrompt}${visionSection}
+
+EXPEDITION PLANNING MODE
+Expedition: "${expedition.name || 'Untitled Expedition'}"
+Mission: "${expedition.mission || 'Mission details to be defined'}"
+
+You are helping the user refine and plan this expedition before execution. Your role:
+1. Ask clarifying questions about objectives and scope
+2. Suggest improvements aligned with our vision
+3. Help think through potential challenges and solutions
+4. Prepare for optimal execution when ready
+
+Be collaborative, strategic, and ensure alignment with our starship's vision.`;
+    }
+    
+    return `${basePrompt}${visionSection}
+    
+The expedition "${expedition.name || 'Current Expedition'}" is currently ${expedition.status}. 
+Help coordinate and provide guidance as needed.`;
+  }
 
   // ========================================
   // WORKFLOW NODE IMPLEMENTATIONS
@@ -1997,4 +2317,5 @@ Provide a helpful, contextual response based on the expedition status and user's
       return `I apologize, but I encountered an error while processing your message: ${error instanceof Error ? error.message : 'Unknown error'}`;
     }
   }
+
 }

@@ -390,23 +390,20 @@ export function ConnectorSelector({
   return (
     <div className={cn('space-y-6', className)}>
       {/* Enhanced Header with better visual hierarchy */}
-      <div className="flex items-center p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
+      <div className="p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-6">
+        <div className="flex items-center gap-4">
           <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
             <Plug className="h-6 w-6 text-primary" />
           </span>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">Connectors</h3>
             <p className="text-sm text-muted-foreground">
               Manage your starship's external connections
             </p>
           </div>
         </div>
-      </div>
-
-      {/* Browse Connectors Section */}
-      <div className="space-y-3">
-        {/* Multi-select Dropdown with professional styling */}
+        
+        {/* Browse Connectors Dropdown */}
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger asChild>
             <Button

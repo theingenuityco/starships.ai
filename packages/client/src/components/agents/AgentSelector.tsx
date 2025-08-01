@@ -250,12 +250,12 @@ export function AgentSelector({
   return (
     <div className="space-y-6">
       {/* Enhanced Header with better visual hierarchy */}
-      <div className="p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-4">
+      <div className="p-6 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg space-y-6">
         <div className="flex items-center gap-4">
           <span className="bg-primary/20 p-3 rounded-lg shadow-sm flex-shrink-0">
             <Bot className="h-6 w-6 text-primary" />
           </span>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
             <p className="text-sm text-muted-foreground">Manage your starship's AI crew members</p>
           </div>
@@ -315,7 +315,7 @@ export function AgentSelector({
                   placeholder="Search agents..."
                   value={filters.searchQuery}
                   onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-                  className="pl-12 pr-4 h-12 bg-background border-2 border-dashed border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="pl-12 pr-4 h-12 bg-background border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
                 />
               </div>
 

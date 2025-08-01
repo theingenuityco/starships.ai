@@ -15,7 +15,8 @@ import {
   Rocket, X, Check, AlertCircle, Sparkles, 
   Target, Bot, Search, Zap, Star, CircleCheck, 
   Wand2, ArrowRight, Shield, Brain, Code, Palette,
-  ChevronRight, Loader2
+  ChevronRight, Loader2, Database, Headphones, PenTool,
+  Lightbulb, BarChart2, HeartPulse, Hash
 } from 'lucide-react'
 import { expeditionAPI } from '@/lib/expeditionApi'
 import type { CreateExpeditionRequest } from '@starships/protocol'
@@ -200,12 +201,32 @@ export function CreateExpeditionModal({
     const styles: Record<string, { color: string; icon: any }> = {
       research: { color: 'bg-blue-500', icon: Brain },
       engineering: { color: 'bg-purple-500', icon: Code },
-      analysis: { color: 'bg-green-500', icon: Shield },
-      creative: { color: 'bg-pink-500', icon: Palette },
-      operations: { color: 'bg-orange-500', icon: Zap },
+      analysis: { color: 'bg-green-500', icon: BarChart2 },
+      creative: { color: 'bg-pink-500', icon: Lightbulb },
+      coding: { color: 'bg-violet-500', icon: Code },
+      support: { color: 'bg-orange-500', icon: HeartPulse },
+      operations: { color: 'bg-amber-500', icon: Zap },
       default: { color: 'bg-gray-500', icon: Bot },
     }
     return styles[category.toLowerCase()] || styles.default
+  }
+
+  // Get agent avatar icon based on name or category (matching Crew Console logic)
+  const getAgentAvatarIcon = (agent: Agent) => {
+    const name = agent.name.toLowerCase()
+    const category = agent.category.toLowerCase()
+    
+    if (name.includes('support') || category === 'support') {
+      return <Headphones className="h-6 w-6" />
+    } else if (name.includes('data') || name.includes('analyst') || category === 'analysis') {
+      return <Database className="h-6 w-6" />
+    } else if (name.includes('creative') || category === 'creative') {
+      return <PenTool className="h-6 w-6" />
+    } else if (name.includes('code') || name.includes('coding') || category === 'coding') {
+      return <Code className="h-6 w-6" />
+    } else {
+      return <Bot className="h-6 w-6" />
+    }
   }
 
   return (
@@ -448,7 +469,6 @@ export function CreateExpeditionModal({
                         {filteredAgents.map((agent, index) => {
                           const isSelected = formData.selectedAgents.includes(agent.id)
                           const categoryStyle = getCategoryStyle(agent.category)
-                          const IconComponent = categoryStyle.icon
 
                           return (
                             <motion.div
@@ -483,7 +503,7 @@ export function CreateExpeditionModal({
                                           <Avatar className="h-12 w-12 border-2 border-background shadow-md">
                                             <AvatarImage src={agent.avatar} alt={agent.name} />
                                             <AvatarFallback className={`${categoryStyle.color} text-white font-semibold`}>
-                                              <IconComponent className="h-6 w-6" />
+                                              {getAgentAvatarIcon(agent)}
                                             </AvatarFallback>
                                           </Avatar>
                                           {agent.status === 'active' && (
@@ -507,23 +527,25 @@ export function CreateExpeditionModal({
                                         <div>
                                           <div className="flex items-start justify-between gap-2">
                                             <div>
-                                              <h4 className="font-semibold text-base">{agent.name}</h4>
+                                              <div className="flex items-center gap-2">
+                                                <h4 className="font-semibold text-base">{agent.name}</h4>
+                                                <Badge 
+                                                  variant="outline" 
+                                                  className={`text-xs ${
+                                                    agent.category === 'research' ? 'border-blue-500/50 text-blue-600' :
+                                                    agent.category === 'engineering' ? 'border-purple-500/50 text-purple-600' :
+                                                    agent.category === 'analysis' ? 'border-green-500/50 text-green-600' :
+                                                    agent.category === 'creative' ? 'border-pink-500/50 text-pink-600' :
+                                                    'border-border'
+                                                  }`}
+                                                >
+                                                  {agent.category}
+                                                </Badge>
+                                              </div>
                                               {agent.role && (
                                                 <p className="text-sm text-muted-foreground mt-0.5">{agent.role}</p>
                                               )}
                                             </div>
-                                            <Badge 
-                                              variant="outline" 
-                                              className={`text-xs shrink-0 ${
-                                                agent.category === 'research' ? 'border-blue-500/50 text-blue-600' :
-                                                agent.category === 'engineering' ? 'border-purple-500/50 text-purple-600' :
-                                                agent.category === 'analysis' ? 'border-green-500/50 text-green-600' :
-                                                agent.category === 'creative' ? 'border-pink-500/50 text-pink-600' :
-                                                'border-border'
-                                              }`}
-                                            >
-                                              {agent.category}
-                                            </Badge>
                                           </div>
                                         </div>
 
@@ -561,29 +583,40 @@ export function CreateExpeditionModal({
                                           </div>
                                         )}
 
-                                        {/* Status indicator */}
-                                        <div className="flex items-center justify-between pt-2">
-                                          <div className="flex items-center gap-2">
-                                            <div className={`h-2 w-2 rounded-full ${
-                                              agent.status === 'active' ? 'bg-green-500' :
-                                              agent.status === 'busy' ? 'bg-amber-500' :
-                                              'bg-gray-400'
-                                            }`} />
-                                            <span className="text-xs text-muted-foreground capitalize">
-                                              {agent.status}
-                                            </span>
+                                        {/* Tags */}
+                                        {agent.tags && agent.tags.length > 0 && (
+                                          <div className="flex flex-wrap gap-1.5">
+                                              {agent.tags.slice(0, 3).map((tag, i) => (
+                                                <Badge 
+                                                  key={i} 
+                                                  variant="outline" 
+                                                  className="text-xs px-2 py-0.5 border-primary/30 text-primary/80"
+                                                >
+                                                  {tag}
+                                                </Badge>
+                                              ))}
+                                              {agent.tags.length > 3 && (
+                                                <Badge 
+                                                  variant="outline" 
+                                                  className="text-xs px-2 py-0.5 border-primary/30 text-primary/80"
+                                                >
+                                                  +{agent.tags.length - 3} more
+                                                </Badge>
+                                              )}
                                           </div>
-                                          {isSelected && (
-                                            <motion.div
-                                              initial={{ scale: 0 }}
-                                              animate={{ scale: 1 }}
-                                              className="flex items-center gap-1 text-xs text-primary"
-                                            >
-                                              <Check className="h-3 w-3" />
-                                              <span>Selected</span>
-                                            </motion.div>
-                                          )}
-                                        </div>
+                                        )}
+
+                                        {/* Selected indicator */}
+                                        {isSelected && (
+                                          <motion.div
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: 1 }}
+                                            className="flex items-center gap-1 text-xs text-primary pt-2"
+                                          >
+                                            <Check className="h-3 w-3" />
+                                            <span>Selected</span>
+                                          </motion.div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -626,8 +659,15 @@ export function CreateExpeditionModal({
                       const categoryStyle = agent ? getCategoryStyle(agent.category) : { color: 'bg-gray-500' }
                       return (
                         <Avatar key={agentId} className="h-8 w-8 border-2 border-background">
-                          <AvatarFallback className={`${categoryStyle.color} text-white text-xs`}>
-                            {agent?.name.charAt(0).toUpperCase()}
+                          <AvatarImage src={agent?.avatar} alt={agent?.name} />
+                          <AvatarFallback className={`${categoryStyle.color} text-white text-xs flex items-center justify-center`}>
+                            {agent ? (
+                              <div className="h-4 w-4">
+                                {getAgentAvatarIcon(agent)}
+                              </div>
+                            ) : (
+                              'A'
+                            )}
                           </AvatarFallback>
                         </Avatar>
                       )

@@ -415,11 +415,7 @@ export function ConnectorSelector({
             >
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4" />
-                {selectedConnectors.length === 0 ? (
-                  <span className="font-medium">Browse Connectors</span>
-                ) : (
-                  <span className="font-medium">Browse More Connectors</span>
-                )}
+                <span className="font-medium">Browse Connectors</span>
               </div>
               <ChevronDown className="w-4 h-4" />
             </Button>
@@ -609,17 +605,18 @@ export function ConnectorSelector({
       </div>
 
       {/* Enhanced Selected Connectors Display */}
-      {selectedConnectors.length > 0 ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 px-1">
-            <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
-            <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
-              Active Connectors
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
+          <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
+            ACTIVE CONNECTORS
             </h4>
             <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
           </div>
-          <div className="space-y-3">
-            {selectedConnectors.map(connector => {
+          
+          {selectedConnectors.length > 0 ? (
+            <div className="space-y-3">
+              {selectedConnectors.map(connector => {
               const isConnecting = connectingIds.has(connector.id)
               const connectorInstance = getConnectorInstance(connector)
               const status = getConnectorStatus(connector)
@@ -851,20 +848,19 @@ export function ConnectorSelector({
                   </div>
                 </div>
               )
-            })}
-          </div>
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
+              <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plug className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-base text-muted-foreground mb-3">
+                No connectors available
+              </p>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="bg-muted/20 rounded-full p-4 mb-4">
-            <Plug className="w-8 h-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium text-foreground mb-2">No connectors available</h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            Browse and select connectors to enhance your starship's capabilities
-          </p>
-        </div>
-      )}
 
       {/* Error Display */}
       {error && (

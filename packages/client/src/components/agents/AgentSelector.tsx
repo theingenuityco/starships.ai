@@ -299,15 +299,15 @@ export function AgentSelector({
             <div className="flex items-center gap-2 px-1">
               <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
               <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                Search & Filter
+                ACTIVE AGENTS
               </h4>
               <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
             </div>
 
-            {/* Search and Filters Side by Side */}
-            <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search and Filters Side by Side - COMMENTED OUT FOR NOW */}
+            {/* <div className="flex flex-col lg:flex-row gap-4">
               {/* Search Input */}
-              <div className="flex-1 relative">
+              {/* <div className="flex-1 relative">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
                   <Search className="w-4 h-4" />
                 </div>
@@ -317,17 +317,17 @@ export function AgentSelector({
                   onChange={e => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
                   className="pl-12 pr-4 h-12 bg-background border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
                 />
-              </div>
+              </div> */}
 
               {/* Filters */}
-              <div className="lg:flex-shrink-0">
+              {/* <div className="lg:flex-shrink-0">
                 <AgentFilters
                   filters={filters}
                   onFiltersChange={setFilters}
                   availableTags={Array.from(new Set(agents.flatMap(agent => agent.tags || [])))}
                 />
-              </div>
-            </div>
+              </div> */}
+            {/* </div> */}
           </div>
         </div>
       )}

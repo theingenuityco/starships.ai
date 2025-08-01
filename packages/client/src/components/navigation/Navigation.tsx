@@ -112,7 +112,7 @@ export function Navigation({
       animate="show"
     >
       {/* Enhanced Header */}
-      <motion.div className="p-3 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0" variants={itemVariants}>
+      <motion.div className="p-3 pt-8 pb-8 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0" variants={itemVariants}>
         <motion.div
           variants={itemVariants}
           className="flex items-center justify-between min-w-0"
@@ -165,7 +165,7 @@ export function Navigation({
       {/* Enhanced User Profile Section */}
       <motion.div 
         variants={itemVariants} 
-        className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0"
+        className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0 pb-1"
       >
         <UserProfile mode="expanded" />
       </motion.div>

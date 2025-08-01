@@ -401,14 +401,6 @@ export function ConnectorSelector({
               Manage your starship's external connections
             </p>
           </div>
-          {selectedConnectors.length > 0 && (
-            <Badge
-              variant="outline"
-              className="text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-500/30 flex-shrink-0"
-            >
-              {selectedConnectors.length} Active
-            </Badge>
-          )}
         </div>
       </div>
 

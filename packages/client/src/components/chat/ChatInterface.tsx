@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Agent, chatAPI } from '@/lib/api'
+import { Agent, chatAPI, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 import { getChatHistory, saveChatHistory, generateSessionId } from '@/lib/storage'
 import { MessageList } from './MessageList'
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { useTypewriter } from '@/hooks/useTypewriter'
-import { Wifi, WifiOff, AlertCircle } from 'lucide-react'
+import { Wifi, WifiOff, AlertCircle, CheckCircle } from 'lucide-react'
 
 interface ChatInterfaceProps {
   agent: Agent
@@ -21,23 +21,32 @@ interface ChatInterfaceProps {
   starshipSlug?: string
 }
 
-export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug }: ChatInterfaceProps) {
+export function ChatInterface({
+  agent,
+  sessionId,
+  onSessionCreated,
+  starshipSlug,
+}: ChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
-  
+
   // Socket.IO connection
   const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
-  
+
   // Typewriter effect
   const typewriter = useTypewriter({
-    onComplete: () => setLoading(false)
+    onComplete: () => setLoading(false),
   })
-  
+
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [currentStreamAbort, setCurrentStreamAbort] = useState<(() => void) | null>(null)
   const currentSessionId = useRef<string | null>(sessionId)
+
+  // Connector instances state
+  const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
+  const [loadingConnectors, setLoadingConnectors] = useState(false)
 
   // Initialize session when agent changes and user is available
   useEffect(() => {
@@ -55,6 +64,25 @@ export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug
     }
   }, [sessionId])
 
+  // Fetch connector instances if starshipSlug is provided
+  useEffect(() => {
+    const fetchConnectorInstances = async () => {
+      if (!starshipSlug) return
+
+      try {
+        setLoadingConnectors(true)
+        const instances = await mcpServerAPI.getConnectorInstances(starshipSlug)
+        setConnectorInstances(instances)
+      } catch (error) {
+        console.error('[CHAT-INTERFACE] Failed to fetch connector instances:', error)
+      } finally {
+        setLoadingConnectors(false)
+      }
+    }
+
+    fetchConnectorInstances()
+  }, [starshipSlug])
+
   const initializeSession = () => {
     if (!userId) {
       setError('User not authenticated')
@@ -63,12 +91,12 @@ export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug
 
     // TODO: Add debouncing for rapid agent switching
     let newSessionId = generateSessionId(agent.id, userId) // Use real user ID from auth
-    
+
     // If we have a starship slug, modify the session ID to include it
     if (starshipSlug) {
       newSessionId = `starship-${starshipSlug}:${newSessionId}`
     }
-    
+
     currentSessionId.current = newSessionId
     onSessionCreated(newSessionId)
     setError(null)
@@ -127,87 +155,91 @@ export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug
     setMessages(updatedMessages)
 
     // Start Socket.IO streaming
-    const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
-      sessionId,
-      message: content
-    }, {
-      onChunk: (chunk, accumulated) => {
-        // Create assistant message on first chunk, then update with accumulated content
-        // Also mark user message as no longer sending on first chunk
-        setMessages(prev => {
-          const hasAssistantMessage = prev.some(msg => msg.id === assistantMessageId)
-          
-          if (!hasAssistantMessage) {
-            // First chunk - create the assistant message and mark user message as sent
-            const streamingMessage: Message = {
-              id: assistantMessageId,
-              content: accumulated,
-              role: 'assistant',
-              timestamp: new Date().toISOString(),
-              sessionId: sessionId,
-              streaming: true,
-              agentId: agent.id
+    const { abort } = agentSocketAPI.sendMessageStream(
+      agent.id,
+      {
+        sessionId,
+        message: content,
+      },
+      {
+        onChunk: (chunk, accumulated) => {
+          // Create assistant message on first chunk, then update with accumulated content
+          // Also mark user message as no longer sending on first chunk
+          setMessages(prev => {
+            const hasAssistantMessage = prev.some(msg => msg.id === assistantMessageId)
+
+            if (!hasAssistantMessage) {
+              // First chunk - create the assistant message and mark user message as sent
+              const streamingMessage: Message = {
+                id: assistantMessageId,
+                content: accumulated,
+                role: 'assistant',
+                timestamp: new Date().toISOString(),
+                sessionId: sessionId,
+                streaming: true,
+                agentId: agent.id,
+              }
+              return prev
+                .map(msg =>
+                  msg.id === userMessage.id && msg.sending ? { ...msg, sending: false } : msg
+                )
+                .concat(streamingMessage)
+            } else {
+              // Subsequent chunks - update existing message
+              return prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: accumulated, streaming: true }
+                  : msg
+              )
             }
-            return prev.map(msg =>
-              msg.id === userMessage.id && msg.sending
-                ? { ...msg, sending: false }
-                : msg
-            ).concat(streamingMessage)
-          } else {
-            // Subsequent chunks - update existing message
-            return prev.map(msg =>
+          })
+        },
+        onComplete: finalMessage => {
+          // Update the streaming message to final state
+          setMessages(prev => {
+            const updatedMessages = prev.map(msg =>
               msg.id === assistantMessageId
-                ? { ...msg, content: accumulated, streaming: true }
+                ? {
+                    ...finalMessage,
+                    id: assistantMessageId,
+                    streaming: false,
+                  }
                 : msg
             )
-          }
-        })
-      },
-      onComplete: (finalMessage) => {
-        // Update the streaming message to final state
-        setMessages(prev => {
-          const updatedMessages = prev.map(msg =>
-            msg.id === assistantMessageId
-              ? {
-                  ...finalMessage,
-                  id: assistantMessageId,
-                  streaming: false
-                }
-              : msg
-          )
-          
-          // Save to history
-          saveChatHistory(sessionId, updatedMessages)
-          return updatedMessages
-        })
-        
-        setStreamingMessageId(null)
-        setLoading(false)
-        setError(null)
-      },
-      onError: (error) => {
-        console.error('Failed to send message:', error)
-        setError(`Chat failed: ${error}. Please check your connection and try again.`)
-        
-        // Remove failed streaming message
-        setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-        setStreamingMessageId(null)
-        setLoading(false)
-        
-        // Save messages without the failed attempt
-        setMessages(prev => {
-          const cleanMessages = prev.filter(msg => msg.id !== assistantMessageId)
-          saveChatHistory(sessionId, cleanMessages)
-          return cleanMessages
-        })
-      },
-      onTypingStart: () => {
-        // Removed typing indicator - content streams directly
-      },
-      onTypingStop: () => {
-        // Removed typing indicator - content streams directly
+
+            // Save to history
+            saveChatHistory(sessionId, updatedMessages)
+            return updatedMessages
+          })
+
+          setStreamingMessageId(null)
+          setLoading(false)
+          setError(null)
+        },
+        onError: error => {
+          console.error('Failed to send message:', error)
+          setError(`Chat failed: ${error}. Please check your connection and try again.`)
+
+          // Remove failed streaming message
+          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+          setStreamingMessageId(null)
+          setLoading(false)
+
+          // Save messages without the failed attempt
+          setMessages(prev => {
+            const cleanMessages = prev.filter(msg => msg.id !== assistantMessageId)
+            saveChatHistory(sessionId, cleanMessages)
+            return cleanMessages
+          })
+        },
+        onTypingStart: () => {
+          // Removed typing indicator - content streams directly
+        },
+        onTypingStop: () => {
+          // Removed typing indicator - content streams directly
+        },
       }
-    })
+    )
 
     // Store abort function for stream cancellation
     setCurrentStreamAbort(() => abort)
@@ -231,48 +263,37 @@ export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug
     )
   }
 
+  // Check if there are any active connectors
+  const hasActiveConnectors = connectorInstances.some(
+    instance => instance.status === 'active' && instance.isActive
+  )
+
   return (
     <div className="flex flex-col h-full bg-zinc-900 w-full">
       {/* Clean, Modern Header */}
       <div className="border-b border-zinc-800 bg-zinc-900 px-6 py-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-          
             <div>
-              <h2 className="font-semibold text-lg text-white">{agent.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-lg text-white">{agent.name}</h2>
+                {hasActiveConnectors && (
+                  <Badge
+                    variant="default"
+                    className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                  >
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Connected
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-zinc-400 flex items-center">
                 {agent.systemPrompt || 'AI Assistant'}
               </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            {/* Clean Connection Status Badge */}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-              isConnected
-                ? 'bg-green-500/10 text-green-500'
-                : connectionStatus === 'reconnecting'
-                ? 'bg-yellow-500/10 text-yellow-500'
-                : 'bg-red-500/10 text-red-500'
-            }`}>
-              {isConnected ? (
-                <>
-                  <Wifi className="w-3 h-3" />
-                  <span>Connected</span>
-                </>
-              ) : connectionStatus === 'reconnecting' ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
-                  <span>Reconnecting</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3 h-3" />
-                  <span>Disconnected</span>
-                </>
-              )}
-            </div>
 
+          <div className="flex items-center gap-3">
             {/* Connection Error Indicator */}
             {connectionError && (
               <div className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-red-500/10 text-red-500">
@@ -286,11 +307,7 @@ export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug
 
       {/* Messages */}
       <div className="flex-1 overflow-hidden bg-zinc-900">
-        <MessageList
-          messages={messages}
-          loading={loading}
-          error={error}
-        />
+        <MessageList messages={messages} loading={loading} error={error} />
       </div>
 
       {/* Input */}
@@ -299,12 +316,10 @@ export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug
           onSendMessage={handleSendMessage}
           disabled={!currentSessionId.current || loading || !userId || !isConnected}
         />
-        
+
         {/* Connection Error Message */}
         {error && (
-          <div className="mt-3 p-3 bg-red-500/10 rounded text-sm text-red-500">
-            {error}
-          </div>
+          <div className="mt-3 p-3 bg-red-500/10 rounded text-sm text-red-500">{error}</div>
         )}
       </div>
     </div>

@@ -207,9 +207,8 @@ export function AgentCard({
               </AvatarFallback>
             </Avatar>
 
-            {/* Usage info below avatar */}
+            {/* Version info below avatar */}
             <div className="flex flex-col items-center text-xs text-muted-foreground">
-              <span>{agent.usageCount || 0} uses</span>
               <span>v{agent.version || '1.0.0'}</span>
             </div>
           </div>

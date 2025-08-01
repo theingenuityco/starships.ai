@@ -68,14 +68,14 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
     <Tooltip delayDuration={200} open={showTooltip} onOpenChange={setShowTooltip}>
       <TooltipTrigger asChild>
         <div 
-          className="flex items-center gap-3 p-4 m-3 rounded-xl bg-gradient-to-r from-muted/30 to-muted/20 hover:from-muted/40 hover:to-muted/30 cursor-pointer transition-all duration-300 group border border-border/40 hover:border-border/60 shadow-sm hover:shadow-md"
+          className="flex items-center gap-2.5 p-3 m-3 rounded-lg bg-gradient-to-r from-muted/30 to-muted/20 hover:from-muted/40 hover:to-muted/30 cursor-pointer transition-all duration-300 group border border-border/40 hover:border-border/60 shadow-sm hover:shadow-md"
           onClick={() => setShowTooltip(!showTooltip)}
         >
           <div className="relative">
-            <div className="p-2.5 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
-              <User className="w-5 h-5 text-primary" />
+            <div className="p-2 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg group-hover:from-primary/25 group-hover:to-primary/15 transition-all duration-300">
+              <User className="w-4 h-4 text-primary" />
             </div>
-            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background animate-pulse shadow-lg shadow-emerald-500/50"></div>
+            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-background animate-pulse shadow-md shadow-emerald-500/30"></div>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">{userName}</p>

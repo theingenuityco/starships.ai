@@ -219,6 +219,15 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 expedition{(expeditions || []).length !== 1 ? 's' : ''}
               </span>
             </div>
+            
+            <Button
+              onClick={handleCreateExpedition}
+              size="sm"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Expedition
+            </Button>
           </div>
         </div>
       </div>
@@ -565,12 +574,12 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               className="relative w-full max-w-xl"
             >
               {/* Background decoration - reduced opacity */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5 blur-2xl -z-10" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/2 via-transparent to-cyan-500/2 blur-xl -z-10" />
               
-              <Card className="relative overflow-hidden p-8 text-center bg-gradient-to-br from-card via-card/98 to-primary/5 border-2 border-primary/20 shadow-xl">
+              <Card className="relative overflow-hidden p-8 text-center bg-gradient-to-br from-card via-card/99 to-primary/2 border border-primary/10 shadow-lg">
                 {/* Decorative elements - reduced size and opacity */}
-                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-xl" />
-                <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-cyan-500/10 to-transparent rounded-full blur-xl" />
+                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-primary/5 to-transparent rounded-full blur-lg" />
+                <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-cyan-500/5 to-transparent rounded-full blur-lg" />
                 
                 {/* Icon section - more compact */}
                 <div className="relative mb-6">
@@ -578,16 +587,16 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                     <div className="relative">
                       {/* Animated rings - reduced blur */}
                       <motion.div
-                        className="absolute inset-0 bg-primary/10 rounded-full blur-lg"
-                        animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.1, 0.3] }}
+                        className="absolute inset-0 bg-primary/5 rounded-full blur-md"
+                        animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.05, 0.2] }}
                         transition={{ duration: 3, repeat: Infinity }}
                       />
                       
                       {/* Main icon container - smaller */}
-                      <div className="relative w-16 h-16 bg-gradient-to-br from-primary/20 to-cyan-500/20 rounded-xl flex items-center justify-center shadow-lg border border-primary/20">
+                      <div className="relative w-16 h-16 bg-gradient-to-br from-primary/10 to-cyan-500/10 rounded-xl flex items-center justify-center shadow-md border border-primary/10">
                         <Rocket className="h-8 w-8 text-primary" />
                         {/* Sparkle decorations */}
-                        <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-cyan-500/70" />
+                        <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-cyan-500/50" />
                       </div>
                     </div>
                   </div>
@@ -609,41 +618,6 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                     </p>
                   </div>
                   
-                  {/* Feature highlights for first expedition - more compact */}
-                  {(expeditions || []).length === 0 && (
-                    <div className="grid grid-cols-3 gap-3 mb-6">
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="flex flex-col items-center gap-1 p-3 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20"
-                      >
-                        <Target className="h-4 w-4 text-primary" />
-                        <span className="text-xs font-medium text-foreground">Set Goals</span>
-                      </motion.div>
-                      
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="flex flex-col items-center gap-1 p-3 bg-gradient-to-br from-cyan-500/5 to-cyan-500/10 rounded-lg border border-cyan-500/20"
-                      >
-                        <Users className="h-4 w-4 text-cyan-500" />
-                        <span className="text-xs font-medium text-foreground">Deploy Agents</span>
-                      </motion.div>
-                      
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
-                        className="flex flex-col items-center gap-1 p-3 bg-gradient-to-br from-green-500/5 to-green-500/10 rounded-lg border border-green-500/20"
-                      >
-                        <Activity className="h-4 w-4 text-green-500" />
-                        <span className="text-xs font-medium text-foreground">Track Progress</span>
-                      </motion.div>
-                    </div>
-                  )}
-                  
                   {(expeditions || []).length === 0 ? (
                     <motion.div
                       whileHover={{ scale: 1.02 }}
@@ -654,7 +628,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                         size="lg"
                         className="relative group bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary/80 text-white shadow-md hover:shadow-lg transition-all duration-300 px-6 py-3 text-base font-semibold"
                       >
-                        <span className="absolute inset-0 bg-primary/10 blur-md group-hover:blur-lg transition-all opacity-50" />
+                        <span className="absolute inset-0 bg-primary/5 blur-sm group-hover:blur-md transition-all opacity-30" />
                         <span className="relative flex items-center gap-2">
                           <Plus className="h-4 w-4" />
                           Create Your First Expedition

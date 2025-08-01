@@ -218,9 +218,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background to-muted/5">
       {/* Enhanced Professional Header */}
       <div className="relative overflow-hidden">
-        {/* Background gradient effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-cyan-500/10" />
+        {/* Background gradient effect - reduced opacity */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-cyan-500/5" />
         
         <div className="relative flex items-center justify-between px-8 py-8 backdrop-blur-sm border-b border-border/40">
           <div className="flex items-center gap-6">
@@ -241,8 +241,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-4">
                 <div className="relative">
-                  <div className="absolute inset-0 bg-cyan-500/10 blur-sm" />
-                  <div className="relative bg-gradient-to-br from-cyan-500/20 to-cyan-500/10 p-3 rounded-xl shadow-md border border-cyan-500/20">
+                  <div className="absolute inset-0 bg-cyan-500/5 blur-sm" />
+                  <div className="relative bg-gradient-to-br from-cyan-500/15 to-cyan-500/10 p-3 rounded-xl shadow-sm border border-cyan-500/15">
                     <Users className="h-6 w-6 text-cyan-500" />
                   </div>
                 </div>

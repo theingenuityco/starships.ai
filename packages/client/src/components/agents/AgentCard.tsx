@@ -193,9 +193,10 @@ export function AgentCard({
       `}
       onClick={onClick}
     >
-      <div className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-4 flex-1">
+      <div className="px-3 py-5">
+        <div className="grid grid-cols-[auto_1fr_auto] gap-4 items-start">
+          {/* Left Column: Avatar + Info below it */}
+          <div className="flex flex-col items-center space-y-2">
             <Avatar className="h-12 w-12 ring-2 ring-background shadow-sm">
               <AvatarFallback
                 className={`
@@ -206,76 +207,79 @@ export function AgentCard({
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex-1 min-w-0 pr-16">
-              {' '}
-              {/* Added right padding to prevent content overlap with action buttons */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <h3
-                    className={`
-                    font-semibold text-base
-                    ${isSelected ? 'text-primary' : 'text-foreground'}
-                  `}
-                  >
-                    {agent.name}
-                  </h3>
-                  {!agent.isPublic && <EyeOff className="w-4 h-4 text-muted-foreground" />}
-                </div>
-
-                {agent.rating && (
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    <span className="text-sm font-medium">{agent.rating.toFixed(1)}</span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 mb-3">
-                <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center`}>
-                  {getCategoryIcon(agent.category)}
-                  {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
-                </Badge>
-                <span className="text-xs text-muted-foreground font-mono bg-secondary/30 px-2 py-0.5 rounded">
-                  {agent.model}
-                </span>
-              </div>
-              {agent.description && (
-                <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed">
-                  {agent.description}
-                </p>
-              )}
-              {/* Tags display */}
-              {agent.tags && agent.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {agent.tags.slice(0, 4).map(tag => (
-                    <Badge
-                      key={tag}
-                      variant="outline"
-                      className="text-xs px-1.5 py-0 h-5 rounded bg-secondary/30 border-secondary/50"
-                    >
-                      {tag.charAt(0).toUpperCase() + tag.slice(1)}
-                    </Badge>
-                  ))}
-                  {agent.tags.length > 4 && (
-                    <Badge
-                      variant="outline"
-                      className="text-xs px-1.5 py-0 h-5 rounded bg-secondary/30 border-secondary/50"
-                    >
-                      +{agent.tags.length - 4}
-                    </Badge>
-                  )}
-                </div>
-              )}
-              {/* Simplified bottom info */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/20">
-                <span>{agent.usageCount || 0} uses</span>
-                <span>v{agent.version || '1.0.0'}</span>
-              </div>
+            {/* Usage info below avatar */}
+            <div className="flex flex-col items-center text-xs text-muted-foreground">
+              <span>{agent.usageCount || 0} uses</span>
+              <span>v{agent.version || '1.0.0'}</span>
             </div>
           </div>
 
-          {/* Action dropdown menu positioned on the right side */}
+          {/* Center Column: Main content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <h3
+                  className={`
+                  font-semibold text-base
+                  ${isSelected ? 'text-primary' : 'text-foreground'}
+                `}
+                >
+                  {agent.name}
+                </h3>
+                {!agent.isPublic && <EyeOff className="w-4 h-4 text-muted-foreground" />}
+              </div>
+
+              {agent.rating && (
+                <div className="flex items-center gap-1">
+                  <Star className="w-4 h-4 text-yellow-500 fill-current" />
+                  <span className="text-sm font-medium">{agent.rating.toFixed(1)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 mb-3">
+              <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center`}>
+                {getCategoryIcon(agent.category)}
+                {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
+              </Badge>
+              <span className="text-xs text-muted-foreground font-mono bg-secondary/30 px-2 py-0.5 rounded">
+                {agent.model}
+              </span>
+            </div>
+
+            {agent.description && (
+              <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed">
+                {agent.description}
+              </p>
+            )}
+
+            {/* Tags display */}
+            {agent.tags && agent.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {agent.tags.slice(0, 4).map(tag => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="text-xs px-1.5 py-0 h-5 rounded bg-secondary/30 border-secondary/50"
+                  >
+                    {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                  </Badge>
+                ))}
+                {agent.tags.length > 4 && (
+                  <Badge
+                    variant="outline"
+                    className="text-xs px-1.5 py-0 h-5 rounded bg-secondary/30 border-secondary/50"
+                  >
+                    +{agent.tags.length - 4}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Action menu */}
           {showActions && (onEdit || onDelete || onTest || onAnalytics) && (
-            <div className="absolute top-4 right-4 z-10">
+            <div className="flex flex-col items-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

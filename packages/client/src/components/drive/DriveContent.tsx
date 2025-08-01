@@ -75,33 +75,6 @@ export function DriveContent({ slug }: DriveContentProps) {
                 </div>
               </div>
 
-              <div className="h-10 w-px bg-gradient-to-b from-transparent via-border/60 to-transparent" />
-
-              {/* Stats Cards */}
-              <div className="flex items-center gap-3">
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <Gauge className="h-3.5 w-3.5 text-yellow-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Power Output</p>
-                        <p className="text-sm font-bold">{powerOutput}%</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
-                  <CardContent className="p-2">
-                    <div className="flex items-center gap-2">
-                      <Battery className="h-3.5 w-3.5 text-yellow-500" />
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">Efficiency</p>
-                        <p className="text-sm font-bold">{efficiency}%</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </div>
 

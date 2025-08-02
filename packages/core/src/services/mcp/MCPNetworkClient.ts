@@ -22,7 +22,7 @@ export interface ToolExecutionResult {
 }
 
 export class MCPNetworkClient {
-  private defaultTimeout: number = 30000; // 30 seconds
+  private defaultTimeout: number = 120000; // 2 minutes for web scraping operations
   private defaultRetries: number = 3;
 
   constructor() {

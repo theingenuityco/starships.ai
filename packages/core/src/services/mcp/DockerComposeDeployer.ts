@@ -392,9 +392,9 @@ export class DockerComposeDeployer implements MCPDeployer {
       // Save updated compose file
       await this.saveComposeFile(starshipId, compose);
 
-      // Deploy the service using docker-compose
+      // Deploy the service using docker compose
       const composeFilePath = this.getComposeFilePath(starshipId);
-      const deployCommand = `docker-compose -f ${composeFilePath} up -d --no-recreate ${serviceName}`;
+      const deployCommand = `docker compose -f ${composeFilePath} up -d --no-recreate ${serviceName}`;
       
       console.log(`[DockerComposeDeployer] Executing: ${deployCommand}`);
       const { stdout, stderr } = await execAsync(deployCommand);
@@ -552,8 +552,8 @@ export class DockerComposeDeployer implements MCPDeployer {
 
       // Stop and remove the service
       const composeFilePath = this.getComposeFilePath(starshipId);
-      const stopCommand = `docker-compose -f ${composeFilePath} stop ${serviceToRemove}`;
-      const removeCommand = `docker-compose -f ${composeFilePath} rm -f ${serviceToRemove}`;
+      const stopCommand = `docker compose -f ${composeFilePath} stop ${serviceToRemove}`;
+      const removeCommand = `docker compose -f ${composeFilePath} rm -f ${serviceToRemove}`;
 
       await execAsync(stopCommand);
       await execAsync(removeCommand);
@@ -606,7 +606,7 @@ export class DockerComposeDeployer implements MCPDeployer {
       }
 
       // Stop and remove all services
-      const downCommand = `docker-compose -f ${composeFilePath} down --volumes`;
+      const downCommand = `docker compose -f ${composeFilePath} down --volumes`;
       await execAsync(downCommand);
 
       // Remove compose file

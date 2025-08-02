@@ -633,7 +633,7 @@ echo "🚀 Starting monitoring services..."
 cd ${process.cwd()}/deploy/monitoring
 
 # Start monitoring stack
-docker-compose up -d
+docker compose up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."

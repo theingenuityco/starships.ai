@@ -145,6 +145,9 @@ When appropriate, use these tools to provide better assistance. You are connecte
   
   systemPrompt += visionContext;
   
+  // Escape curly braces to prevent LangChain template parsing errors
+  systemPrompt = systemPrompt.replace(/\{/g, '{{').replace(/\}/g, '}}');
+  
   // If we have MCP tools, use an agent executor
   if (mcpTools.length > 0) {
     console.log('🤖 [AGENT-ENGINE-MCP] Creating agent executor with MCP tools');

@@ -43,9 +43,12 @@ async function* executeWithAgent(
       `- ${tool.name}: ${sanitizeToolDescription(tool.description)}`
     ).join('\n');
     
-    const enhancedSystemPrompt = systemPrompt + (mcpTools.length > 0 
+    let enhancedSystemPrompt = systemPrompt + (mcpTools.length > 0 
       ? `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:\n${toolDescriptions}\n\nWhen appropriate, use these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.` 
       : '');
+    
+    // Escape any remaining curly braces to prevent LangChain template parsing errors
+    enhancedSystemPrompt = enhancedSystemPrompt.replace(/\{/g, '{{').replace(/\}/g, '}}');
     
     // Create prompt template
     const prompt = ChatPromptTemplate.fromMessages([
@@ -188,7 +191,8 @@ function formatUserFriendlyError(error: any): string {
  */
 export async function* chatWithMCPStream(
   req: ChatRequest,
-  store: LangChainMemoryStore
+  store: LangChainMemoryStore,
+  options?: { overrideStarshipId?: string }
 ): AsyncGenerator<string, void, unknown> {
   console.log('🌊 [AGENT-ENGINE-MCP-STREAM] Starting MCP-enhanced streaming chat request:', {
     agent_id: req.agent_id,
@@ -260,10 +264,15 @@ export async function* chatWithMCPStream(
   let starshipId: string | null = null;
   
   try {
+    // Use override starshipId if provided, otherwise use agent's starshipId
+    const effectiveStarshipId = options?.overrideStarshipId || agent.starshipId;
     console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Looking for agent starship. Agent starshipId:', agent.starshipId);
-    if (agent && agent.starshipId) {
-      starshipId = agent.starshipId;
-      console.log('🚢 [AGENT-ENGINE-MCP-STREAM] Found starship for agent:', starshipId);
+    console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Override starshipId:', options?.overrideStarshipId);
+    console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Effective starshipId:', effectiveStarshipId);
+    
+    if (agent && effectiveStarshipId) {
+      starshipId = effectiveStarshipId;
+      console.log('🚢 [AGENT-ENGINE-MCP-STREAM] Using starship for MCP tools:', starshipId);
       
       // Create MCP tool wrapper
       const toolWrapper = new MCPToolWrapper({

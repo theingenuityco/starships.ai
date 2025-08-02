@@ -455,12 +455,12 @@ export class MCPToolWrapper {
   static getRecommendedTimeout(category: string): number {
     const timeouts: Record<string, number> = {
       'reasoning': 120000,    // 2 minutes for complex thinking
-      'web': 60000,          // 1 minute for web operations
+      'web': 120000,         // 2 minutes for web operations (web scraping needs more time)
       'memory': 5000,        // 5 seconds for memory operations
-      'data': 30000,         // 30 seconds for data operations
-      'other': 30000         // Default 30 seconds
+      'data': 60000,         // 1 minute for data operations
+      'other': 60000         // Default 1 minute
     };
     
-    return timeouts[category] || 30000;
+    return timeouts[category] || 60000;
   }
 }

@@ -132,7 +132,7 @@ export class MCPToolGateway {
         service,
         toolName,
         params,
-        { timeout: 30000 }
+        { timeout: 120000 }
       );
 
       if (result.error) {

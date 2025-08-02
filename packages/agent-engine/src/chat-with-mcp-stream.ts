@@ -44,7 +44,16 @@ async function* executeWithAgent(
     ).join('\n');
     
     let enhancedSystemPrompt = systemPrompt + (mcpTools.length > 0 
-      ? `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:\n${toolDescriptions}\n\nWhen appropriate, use these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.` 
+      ? `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:\n${toolDescriptions}
+
+🔧 TOOL USAGE BEST PRACTICES:
+- When using web search tools, keep queries SIMPLE and FOCUSED
+- Use ONE tool call at a time instead of multiple simultaneous requests
+- For web searches, use clear, specific keywords (e.g., "best food delivery apps 2024")
+- Avoid overly complex or multi-part queries that may timeout
+- If you need comprehensive information, make multiple simple searches instead of one complex query
+
+When appropriate, use these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.` 
       : '');
     
     // Escape any remaining curly braces to prevent LangChain template parsing errors
@@ -323,7 +332,23 @@ export async function* chatWithMCPStream(
     // If we found an expedition ID in the channel but no expedition context, add basic context
     if (expeditionIdFromChannel && !expeditionContext) {
       console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Adding basic expedition context for ID:', expeditionIdFromChannel);
-      expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.\n`;
+      expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.
+
+🔍 WEB SEARCH GUIDANCE FOR EXPEDITIONS:
+- When you need current information, market data, or external research, use web search tools
+- Keep search queries SIMPLE and FOCUSED (e.g., "best food delivery apps 2024" instead of complex multi-part queries)  
+- Use ONE search query at a time instead of multiple bulk requests
+- Start with broad searches, then narrow down based on results
+- For complex research, break it into multiple simple searches rather than one complex query
+
+Example good search patterns:
+✅ "food delivery market size 2024"
+✅ "top food delivery apps comparison"
+✅ "food delivery trends 2024"
+
+Avoid complex queries like:
+❌ "comprehensive analysis of food delivery market including market size, growth trends, competitor analysis, customer preferences, and future projections for 2024-2025"
+\n`;
       
       // Also try to get the starship from the expedition
       try {
@@ -512,6 +537,19 @@ export async function* chatWithMCPStream(
 
   // Build system prompt
   let systemPrompt = agent.systemPrompt || "You are a helpful AI assistant.";
+  
+  // For expedition agents, emphasize web search capabilities
+  if (req.channel_id?.includes('expedition')) {
+    systemPrompt += `\n\n🔍 WEB RESEARCH CAPABILITIES:
+You have access to web search tools that allow you to gather current information, research trends, and find real-time data. When users ask for information that requires current knowledge:
+
+1. Use web search tools to gather current information
+2. Search for specific data points, reports, and insights
+3. Combine web research with your expertise
+4. Provide informed responses based on current information
+
+Don't limit yourself to historical knowledge - actively use web search to provide the most current and relevant information.`;
+  }
   
   systemPrompt += visionContext;
   systemPrompt += expeditionContext;

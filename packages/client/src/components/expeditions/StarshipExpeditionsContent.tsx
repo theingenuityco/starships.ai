@@ -241,7 +241,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {/* Total Missions Card */}
             <div className="group transition-transform">
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+              <Card className="bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm border-primary/20 shadow-sm hover:shadow-md transition-all">
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -265,7 +265,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
             {/* Active Now Card */}
             <div className="group transition-transform">
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+              <Card className="bg-gradient-to-br from-blue-500/5 to-blue-500/10 backdrop-blur-sm border-blue-500/20 shadow-sm hover:shadow-md transition-all">
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -295,7 +295,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
             {/* Completed Card */}
             <div className="group transition-transform">
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+              <Card className="bg-gradient-to-br from-green-500/5 to-green-500/10 backdrop-blur-sm border-green-500/20 shadow-sm hover:shadow-md transition-all">
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -319,7 +319,7 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
 
             {/* Success Rate Card */}
             <div className="group transition-transform">
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-sm hover:shadow-md transition-all">
+              <Card className="bg-gradient-to-br from-purple-500/5 to-purple-500/10 backdrop-blur-sm border-purple-500/20 shadow-sm hover:shadow-md transition-all">
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -338,14 +338,6 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500/15 to-purple-500/20 flex items-center justify-center shadow-sm group-hover:shadow transition-all duration-300">
                         <TrendingUp className="h-5 w-5 text-purple-500" />
                       </div>
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <div className="w-full bg-purple-500/5 rounded-full h-1">
-                      <div 
-                        className="bg-gradient-to-r from-purple-500 to-purple-600 h-1 rounded-full transition-all duration-1000"
-                        style={{ width: `${stats.successRate}%` }}
-                      />
                     </div>
                   </div>
                 </CardContent>

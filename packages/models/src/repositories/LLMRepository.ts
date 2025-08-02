@@ -3,12 +3,28 @@ import { LLM, LLMRepository as LLMRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class LLMRepository implements LLMRepositoryInterface {
+  
+  private normalizeNumericFields(llm: LLM): LLM {
+    // Ensure numeric fields are properly typed (Neo4j may return them as different types)
+    return {
+      ...llm,
+      maxTokens: typeof llm.maxTokens === 'number' ? llm.maxTokens : 
+                 typeof llm.maxTokens === 'string' ? parseInt(llm.maxTokens, 10) : 
+                 llm.maxTokens, // Keep original if already undefined
+      temperature: typeof llm.temperature === 'number' ? llm.temperature : 
+                   typeof llm.temperature === 'string' ? parseFloat(llm.temperature) : 
+                   llm.temperature, // Keep original if already undefined
+      costPer1kTokens: typeof llm.costPer1kTokens === 'number' ? llm.costPer1kTokens : 
+                       typeof llm.costPer1kTokens === 'string' ? parseFloat(llm.costPer1kTokens) : 
+                       llm.costPer1kTokens, // Keep original if already undefined
+    };
+  }
   async findAll(): Promise<LLM[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ l: LLM }>(
       'MATCH (l:LLM) RETURN l ORDER BY l.name ASC'
     );
-    return result.map(record => record.l);
+    return result.map(record => this.normalizeNumericFields(record.l));
   }
 
   async findById(id: string): Promise<LLM | null> {
@@ -17,7 +33,10 @@ export class LLMRepository implements LLMRepositoryInterface {
       'MATCH (l:LLM) WHERE l.id = $id RETURN l',
       { id: id }
     );
-    return result.length > 0 ? result[0].l : null;
+    
+    if (result.length === 0) return null;
+    
+    return this.normalizeNumericFields(result[0].l);
   }
 
   async findByProvider(provider: string): Promise<LLM[]> {
@@ -26,7 +45,7 @@ export class LLMRepository implements LLMRepositoryInterface {
       'MATCH (l:LLM) WHERE l.provider = $provider RETURN l ORDER BY l.name ASC',
       { provider: provider }
     );
-    return result.map(record => record.l);
+    return result.map(record => this.normalizeNumericFields(record.l));
   }
 
   async create(entity: Omit<LLM, 'id'>): Promise<LLM> {

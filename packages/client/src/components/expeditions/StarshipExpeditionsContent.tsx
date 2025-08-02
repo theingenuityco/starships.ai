@@ -121,8 +121,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   })
 
   const handleExpeditionClick = (expeditionId: string) => {
-    router.push(`/ship/${slug}/expeditions/${expeditionId}`)
-  }
+    // Force hard refresh when navigating to expedition details
+    window.location.href = `/ship/${slug}/expeditions/${expeditionId}`;
+  };
 
   const handleCreateExpedition = () => {
     setShowCreateModal(true)
@@ -717,8 +718,9 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                       return false
                     }
                   }}
-                  onViewChat={expeditionId => {
-                    router.push(`/ship/${slug}/expeditions/${expeditionId}?tab=chat`)
+                  onViewChat={(expeditionId) => {
+                    // Force hard refresh when navigating to expedition chat
+                    window.location.href = `/ship/${slug}/expeditions/${expeditionId}?tab=chat`;
                   }}
                   onDelete={async expeditionId => {
                     if (

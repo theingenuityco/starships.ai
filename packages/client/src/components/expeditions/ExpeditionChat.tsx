@@ -86,6 +86,17 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
   // Get starship ID from the slug first
   const [starshipId, setStarshipId] = useState<string>('');
   const [agentDetails, setAgentDetails] = useState<Record<string, any>>({});
+  
+  // Expedition readiness state
+  const [expeditionReadiness, setExpeditionReadiness] = useState<{
+    isReady: boolean;
+    userMessageCount: number;
+    reason?: string;
+  }>({
+    isReady: false,
+    userMessageCount: 0,
+    reason: 'Loading...'
+  });
 
   // Fetch starship by slug to get the real ID
   useEffect(() => {
@@ -140,6 +151,29 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
 
   // WebSocket integration enabled for real-time updates
   // Expedition control functions use HTTP API calls with real-time WebSocket updates
+
+  // Check expedition readiness based on message count
+  useEffect(() => {
+    const checkReadiness = async () => {
+      if (!starshipId || !expeditionId || expedition?.status !== 'draft') {
+        return;
+      }
+
+      try {
+        const readiness = await expeditionAPI.checkReadiness(starshipId, expeditionId);
+        setExpeditionReadiness(readiness);
+        console.log('[EXPEDITION CHAT] Readiness updated:', readiness);
+      } catch (error) {
+        console.error('[EXPEDITION CHAT] Failed to check readiness:', error);
+        // Keep previous state on error
+      }
+    };
+
+    // Check readiness when messages change or initially load
+    if (starshipId && expeditionId && expedition?.status === 'draft') {
+      checkReadiness();
+    }
+  }, [starshipId, expeditionId, messages.length, expedition?.status]);
 
   // Fetch agent details when expedition loads
   useEffect(() => {
@@ -521,18 +555,32 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           
           {/* Action Buttons */}
           {expedition.status === 'draft' && (
-            <Button 
-              onClick={handleStartExpedition}
-              disabled={actionLoading === 'start'}
-              size="sm"
-            >
-              {actionLoading === 'start' ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Start
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    onClick={handleStartExpedition}
+                    disabled={actionLoading === 'start' || !expeditionReadiness.isReady}
+                    size="sm"
+                  >
+                    {actionLoading === 'start' ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    Start
+                  </Button>
+                </TooltipTrigger>
+                {!expeditionReadiness.isReady && (
+                  <TooltipContent>
+                    <p>{expeditionReadiness.reason || 'Please have a brief planning discussion first'}</p>
+                    <p className="text-xs mt-1">
+                      Messages: {expeditionReadiness.userMessageCount}/2 minimum
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
           
           {expedition.status === 'in-progress' && (
@@ -623,9 +671,9 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden">
             {activeTab === 'chat' && (
-              <div className="h-full flex flex-col relative">
+              <div className="h-full flex flex-col relative overflow-hidden">
                 {/* Search */}
                 {showSearch && (
                   <MessageSearch
@@ -644,84 +692,86 @@ export function ExpeditionChat({ starshipSlug, expeditionId }: ExpeditionChatPro
                   />
                 )}
 
-                {/* Messages */}
-                <ScrollArea
-                  className="flex-1 p-4 max-h-full"
-                  onScrollCapture={handleScroll}
-                  role="log"
-                  aria-label="Expedition chat messages"
-                  aria-live="polite"
-                  aria-atomic="false"
-                >
-                  <div
-                    className="space-y-4"
-                    style={{
-                      minHeight: memoizedMessages.length > 50 ? `${memoizedMessages.length * itemHeight}px` : 'auto'
-                    }}
+                {/* Messages Container - fixed height to prevent shrinking */}
+                <div className="flex-1 overflow-hidden relative min-h-0">
+                  <ScrollArea
+                    className="absolute inset-0 p-4"
+                    onScrollCapture={handleScroll}
+                    role="log"
+                    aria-label="Expedition chat messages"
+                    aria-live="polite"
+                    aria-atomic="false"
                   >
-                    {messagesLoading && messages.length === 0 ? (
-                      <div className="text-center text-muted-foreground" role="status" aria-label="Loading messages">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                        Loading messages...
-                      </div>
-                    ) : messagesError ? (
-                      <div className="text-center text-red-500" role="alert" aria-label="Error loading messages">
-                        <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                        Error loading messages: {messagesError}
-                      </div>
-                    ) : messages.length === 0 ? (
-                      <div className="text-center text-muted-foreground" role="status">
-                        <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">No messages yet</p>
-                        <p className="text-sm">Start the conversation to coordinate with your team!</p>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Virtual scrolling spacer for items above visible range */}
-                        {visibleRange.start > 0 && (
-                          <div style={{ height: `${visibleRange.start * itemHeight}px` }} />
-                        )}
-                        
-                        {visibleMessages.map((message, index) => (
-                          <div
-                            key={message.id}
-                            id={`message-${message.id}`}
-                            className={highlightedMessageId === message.id ? 'ring-2 ring-blue-500 rounded-lg' : ''}
-                            role="article"
-                            aria-label={`Message from ${message.role} at ${new Date(message.timestamp).toLocaleTimeString()}`}
-                            tabIndex={0}
-                          >
-                            <MessageBubble
-                              message={message}
-                              showReactions={true}
-                              showStatus={true}
-                              enableActions={true}
-                              onReply={handleReplyToMessage}
-                              onReact={(messageId, emoji) => {
-                                console.log('React to message:', messageId, emoji);
-                              }}
-                              onCopy={(content) => {
-                                navigator.clipboard.writeText(content);
-                              }}
-                            />
-                          </div>
-                        ))}
-                        
-                        {/* Virtual scrolling spacer for items below visible range */}
-                        {visibleRange.end < memoizedMessages.length && (
-                          <div style={{ height: `${(memoizedMessages.length - visibleRange.end) * itemHeight}px` }} />
-                        )}
-                      </>
-                    )}
-                    
-                    {/* Typing Indicator removed - not available in HTTP mode */}
-                    
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
+                    <div
+                      className="space-y-4 pb-4"
+                      style={{
+                        minHeight: memoizedMessages.length > 50 ? `${memoizedMessages.length * itemHeight}px` : 'auto'
+                      }}
+                    >
+                      {messagesLoading && messages.length === 0 ? (
+                        <div className="text-center text-muted-foreground" role="status" aria-label="Loading messages">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                          Loading messages...
+                        </div>
+                      ) : messagesError ? (
+                        <div className="text-center text-red-500" role="alert" aria-label="Error loading messages">
+                          <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                          Error loading messages: {messagesError}
+                        </div>
+                      ) : messages.length === 0 ? (
+                        <div className="text-center text-muted-foreground" role="status">
+                          <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p className="text-lg font-medium mb-2">No messages yet</p>
+                          <p className="text-sm">Start the conversation to coordinate with your team!</p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Virtual scrolling spacer for items above visible range */}
+                          {visibleRange.start > 0 && (
+                            <div style={{ height: `${visibleRange.start * itemHeight}px` }} />
+                          )}
+                          
+                          {visibleMessages.map((message, index) => (
+                            <div
+                              key={message.id}
+                              id={`message-${message.id}`}
+                              className={highlightedMessageId === message.id ? 'ring-2 ring-blue-500 rounded-lg' : ''}
+                              role="article"
+                              aria-label={`Message from ${message.role} at ${new Date(message.timestamp).toLocaleTimeString()}`}
+                              tabIndex={0}
+                            >
+                              <MessageBubble
+                                message={message}
+                                showReactions={true}
+                                showStatus={true}
+                                enableActions={true}
+                                onReply={handleReplyToMessage}
+                                onReact={(messageId, emoji) => {
+                                  console.log('React to message:', messageId, emoji);
+                                }}
+                                onCopy={(content) => {
+                                  navigator.clipboard.writeText(content);
+                                }}
+                              />
+                            </div>
+                          ))}
+                          
+                          {/* Virtual scrolling spacer for items below visible range */}
+                          {visibleRange.end < memoizedMessages.length && (
+                            <div style={{ height: `${(memoizedMessages.length - visibleRange.end) * itemHeight}px` }} />
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Typing Indicator removed - not available in HTTP mode */}
+                      
+                      <div ref={messagesEndRef} />
+                    </div>
+                  </ScrollArea>
+                </div>
 
-                {/* Message Input */}
-                <div className="border-t p-4">
+                {/* Message Input - Sticky to bottom with fixed height */}
+<div className="border-t bg-background p-4 sticky bottom-0 z-10 h-[200px] flex-shrink-0">
                   <MessageInput
                     onSendMessage={async (content, participantId) => {
                       // Pass participantId directly (undefined for First Officer)

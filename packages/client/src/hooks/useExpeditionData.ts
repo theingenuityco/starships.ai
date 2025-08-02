@@ -658,10 +658,11 @@ export function useExpeditionData({
   useEffect(() => {
     if (expeditionId && starshipId) {
       loadExpedition(expeditionId);
+      loadTasks(expeditionId); // Explicitly load tasks
       loadExpeditionStatus(expeditionId);
       loadExpeditionProgress(expeditionId);
     }
-  }, [expeditionId, starshipId, loadExpedition, loadExpeditionStatus, loadExpeditionProgress]);
+  }, [expeditionId, starshipId, loadExpedition, loadTasks, loadExpeditionStatus, loadExpeditionProgress]);
 
   // WebSocket setup for real-time updates
   useEffect(() => {
@@ -686,18 +687,25 @@ export function useExpeditionData({
 
     // Subscribe to task updates
     const unsubscribeTask = expeditionSocketAPI.subscribeToTaskUpdates(expeditionId, (task) => {
-      console.log('[EXPEDITION DATA] Task updated:', task);
+      console.log('[EXPEDITION DATA] ✅ Task updated via WebSocket:', task);
+      console.log('[EXPEDITION DATA] ✅ Task ID:', task.id, 'Status:', task.status);
       // Update local tasks state
       setTasks(prev => {
+        console.log('[EXPEDITION DATA] ✅ Current tasks before update:', prev.length);
         const index = prev.findIndex(t => t.id === task.id);
         if (index >= 0) {
           // Update existing task
+          console.log('[EXPEDITION DATA] ✅ Updating existing task at index:', index);
           const newTasks = [...prev];
-          newTasks[index] = task;
+          newTasks[index] = { ...newTasks[index], ...task, updatedAt: new Date().toISOString() };
+          console.log('[EXPEDITION DATA] ✅ Updated tasks:', newTasks.length);
           return newTasks;
         } else {
           // Add new task
-          return [...prev, task];
+          console.log('[EXPEDITION DATA] ✅ Adding new task:', task.id);
+          const newTasks = [...prev, { ...task, updatedAt: new Date().toISOString() }];
+          console.log('[EXPEDITION DATA] ✅ New tasks total:', newTasks.length);
+          return newTasks;
         }
       });
     });
@@ -750,6 +758,7 @@ export function useExpeditionData({
       if (expeditionId && starshipId) {
         refreshExpedition();
         loadMessages(expeditionId);
+        loadTasks(expeditionId); // Add task refresh
         loadExpeditionStatus(expeditionId);
         loadExpeditionProgress(expeditionId);
       }
@@ -764,10 +773,26 @@ export function useExpeditionData({
     refreshExpeditions, 
     refreshExpedition, 
     loadMessages, 
+    loadTasks, // Add loadTasks dependency
     loadActiveExpeditions,
     loadExpeditionStatus,
     loadExpeditionProgress
   ]);
+
+  // Task-specific polling for active expeditions
+  useEffect(() => {
+    if (!expeditionId || !starshipId) return;
+
+    // More frequent task polling for active expeditions
+    const taskInterval = setInterval(() => {
+      if (expedition?.status === 'in-progress' || expedition?.status === 'planning') {
+        console.log('[EXPEDITION DATA] 🔄 Polling tasks for active expedition');
+        loadTasks(expeditionId);
+      }
+    }, 5000); // Poll every 5 seconds for active expeditions
+
+    return () => clearInterval(taskInterval);
+  }, [expeditionId, starshipId, expedition?.status, loadTasks]);
 
   return {
     // Expedition list data

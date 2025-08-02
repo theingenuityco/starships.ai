@@ -38,14 +38,7 @@ export function MessageInput({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-resize textarea
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [content]);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -65,6 +58,12 @@ export function MessageInput({
     setIsSubmitting(true);
 
     try {
+      // Add a brief visual feedback before sending
+      if (containerRef.current) {
+        containerRef.current.style.transform = 'scale(0.98)';
+        containerRef.current.style.transition = 'transform 0.1s ease-out';
+      }
+
       // Determine participantId based on selection
       const participantId = selectedParticipant === 'first-officer' 
         ? undefined 
@@ -75,11 +74,7 @@ export function MessageInput({
       // Clear form on success
       setContent('');
       setSelectedParticipant('first-officer');
-      
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
     } finally {
@@ -98,112 +93,126 @@ export function MessageInput({
   const isOverLimit = remainingChars < 0;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Participant Selector */}
-      <div className="flex items-center gap-3">
-        <label htmlFor="participant-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-          Send to:
-        </label>
-        <Select
-          value={selectedParticipant}
-          onValueChange={setSelectedParticipant}
-          disabled={disabled || isSubmitting}
-        >
-          <SelectTrigger id="participant-select" className="w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="first-officer">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-blue-500" />
-                <span>First Officer</span>
-              </div>
-            </SelectItem>
-            {agents.map((agent) => (
-              <SelectItem key={agent.id} value={agent.id}>
+    <div 
+      ref={containerRef}
+      className={cn(
+        'h-full flex flex-col transition-all duration-200 ease-out',
+        isSubmitting && 'opacity-95'
+      )}
+    >
+      <form onSubmit={handleSubmit} className="h-full flex flex-col space-y-4">
+        {/* Participant Selector */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <label htmlFor="participant-select" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Send to:
+          </label>
+          <Select
+            value={selectedParticipant}
+            onValueChange={setSelectedParticipant}
+            disabled={disabled || isSubmitting}
+          >
+            <SelectTrigger id="participant-select" className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="first-officer">
                 <div className="flex items-center gap-2">
-                  <Bot className="h-4 w-4 text-green-500" />
-                  <span>{agent.name}</span>
+                  <User className="h-4 w-4 text-blue-500" />
+                  <span>First Officer</span>
                 </div>
               </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Message Input Area */}
-      <div className="relative">
-        <Textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled || isSubmitting}
-          className={cn(
-            'min-h-[100px] max-h-[400px] resize-none pr-12',
-            'focus:ring-2 focus:ring-blue-500 focus:border-transparent',
-            error && 'border-red-500 focus:ring-red-500',
-            isOverLimit && 'border-orange-500 focus:ring-orange-500'
-          )}
-          aria-label="Message content"
-          aria-invalid={!!error}
-          aria-describedby={error ? 'message-error' : undefined}
-        />
-        
-        {/* Send Button */}
-        <Button
-          type="submit"
-          size="icon"
-          disabled={disabled || isSubmitting || !content.trim() || isOverLimit}
-          className={cn(
-            'absolute bottom-2 right-2',
-            'transition-all duration-200',
-            isSubmitting && 'opacity-50 cursor-not-allowed'
-          )}
-          aria-label="Send message"
-        >
-          <Send className={cn('h-4 w-4', isSubmitting && 'animate-pulse')} />
-        </Button>
-      </div>
-
-      {/* Footer: Character count and error messages */}
-      <div className="flex items-center justify-between text-sm">
-        {/* Error Message */}
-        <div className="flex-1">
-          {error && (
-            <div id="message-error" className="flex items-center gap-1 text-red-500">
-              <AlertCircle className="h-3 w-3" />
-              <span>{error}</span>
-            </div>
-          )}
+              {agents.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id}>
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-green-500" />
+                    <span>{agent.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Character Count */}
-        <div
-          className={cn(
-            'text-gray-500 dark:text-gray-400',
-            remainingChars < 100 && 'text-orange-500 dark:text-orange-400',
-            isOverLimit && 'text-red-500 dark:text-red-400 font-medium'
-          )}
-        >
-          {remainingChars < 100 ? (
-            <span>
-              {isOverLimit ? 'Over limit: ' : ''}
-              {Math.abs(remainingChars)} {Math.abs(remainingChars) === 1 ? 'character' : 'characters'}
-              {isOverLimit ? ' too many' : ' remaining'}
-            </span>
-          ) : (
-            <span>{content.length} / {maxLength}</span>
-          )}
+        {/* Message Input Area */}
+        <div className="relative flex-1">
+          <Textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled || isSubmitting}
+            className={cn(
+              'h-full resize-none pr-12',
+              'focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+              'transition-all duration-200 ease-out',
+              error && 'border-red-500 focus:ring-red-500',
+              isOverLimit && 'border-orange-500 focus:ring-orange-500'
+            )}
+            aria-label="Message content"
+            aria-invalid={!!error}
+            aria-describedby={error ? 'message-error' : undefined}
+            data-testid="message-input"
+          />
+          
+          {/* Send Button */}
+          <Button
+            type="submit"
+            size="icon"
+            disabled={disabled || isSubmitting || !content.trim() || isOverLimit}
+            className={cn(
+              'absolute bottom-2 right-2',
+              'transition-all duration-200 hover:scale-105 active:scale-95',
+              isSubmitting && 'opacity-50 cursor-not-allowed scale-95',
+              content.trim() && !isOverLimit && 'bg-blue-600 hover:bg-blue-700'
+            )}
+            aria-label="Send message"
+          >
+            <Send className={cn(
+              'h-4 w-4 transition-transform duration-200',
+              isSubmitting && 'animate-pulse scale-90'
+            )} />
+          </Button>
         </div>
-      </div>
 
-      {/* Instructions */}
-      <div className="text-xs text-gray-500 dark:text-gray-400">
-        Press <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">Enter</kbd> to send or{' '}
-        <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">Shift+Enter</kbd> for new line
-      </div>
-    </form>
+        {/* Footer: Character count and error messages */}
+        <div className="flex items-center justify-between text-sm flex-shrink-0">
+          {/* Error Message */}
+          <div className="flex-1">
+            {error && (
+              <div id="message-error" className="flex items-center gap-1 text-red-500">
+                <AlertCircle className="h-3 w-3" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Character Count */}
+          <div
+            className={cn(
+              'text-gray-500 dark:text-gray-400',
+              remainingChars < 100 && 'text-orange-500 dark:text-orange-400',
+              isOverLimit && 'text-red-500 dark:text-red-400 font-medium'
+            )}
+          >
+            {remainingChars < 100 ? (
+              <span>
+                {isOverLimit ? 'Over limit: ' : ''}
+                {Math.abs(remainingChars)} {Math.abs(remainingChars) === 1 ? 'character' : 'characters'}
+                {isOverLimit ? ' too many' : ' remaining'}
+              </span>
+            ) : (
+              <span>{content.length} / {maxLength}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Instructions */}
+        <div className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+          Press <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">Enter</kbd> to send or{' '}
+          <kbd className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">Shift+Enter</kbd> for new line
+        </div>
+      </form>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+
 
 /**
  * Seed script for LLM models
@@ -13,85 +13,67 @@ const LLM_MODELS = [
     id: 'gpt-4',
     name: 'gpt-4',
     provider: 'openai',
-    contextWindow: 8192,
-    maxOutputTokens: 4096,
     temperature: 0.7,
     maxTokens: 4000,
-    capabilities: ['text-generation', 'chat', 'function-calling'],
-    costPer1kInput: 0.03,
-    costPer1kOutput: 0.06,
-    description: 'OpenAI GPT-4 - Advanced reasoning and analysis',
-    isActive: true
+    embeddingModel: 'text-embedding-3-small',
+    supportsStreaming: true,
+    supportsTools: true,
+    costPer1kTokens: 0.045
   },
   {
     id: 'gpt-4-turbo',
     name: 'gpt-4-turbo-preview',
     provider: 'openai',
-    contextWindow: 128000,
-    maxOutputTokens: 4096,
     temperature: 0.7,
     maxTokens: 4000,
-    capabilities: ['text-generation', 'chat', 'function-calling', 'vision'],
-    costPer1kInput: 0.01,
-    costPer1kOutput: 0.03,
-    description: 'OpenAI GPT-4 Turbo - Faster and more cost-effective',
-    isActive: true
+    embeddingModel: 'text-embedding-3-small',
+    supportsStreaming: true,
+    supportsTools: true,
+    costPer1kTokens: 0.02
   },
   {
     id: 'gpt-3.5-turbo',
     name: 'gpt-3.5-turbo',
     provider: 'openai',
-    contextWindow: 16385,
-    maxOutputTokens: 4096,
     temperature: 0.7,
     maxTokens: 4000,
-    capabilities: ['text-generation', 'chat', 'function-calling'],
-    costPer1kInput: 0.0005,
-    costPer1kOutput: 0.0015,
-    description: 'OpenAI GPT-3.5 Turbo - Fast and efficient',
-    isActive: true
+    embeddingModel: 'text-embedding-3-small',
+    supportsStreaming: true,
+    supportsTools: true,
+    costPer1kTokens: 0.001
   },
   {
     id: 'claude-3-opus',
     name: 'claude-3-opus-20240229',
     provider: 'anthropic',
-    contextWindow: 200000,
-    maxOutputTokens: 4096,
     temperature: 0.7,
     maxTokens: 4000,
-    capabilities: ['text-generation', 'chat', 'vision'],
-    costPer1kInput: 0.015,
-    costPer1kOutput: 0.075,
-    description: 'Claude 3 Opus - Most capable Claude model',
-    isActive: true
+    embeddingModel: null,
+    supportsStreaming: true,
+    supportsTools: true,
+    costPer1kTokens: 0.045
   },
   {
     id: 'claude-3-sonnet',
     name: 'claude-3-sonnet-20240229',
     provider: 'anthropic',
-    contextWindow: 200000,
-    maxOutputTokens: 4096,
     temperature: 0.7,
     maxTokens: 4000,
-    capabilities: ['text-generation', 'chat', 'vision'],
-    costPer1kInput: 0.003,
-    costPer1kOutput: 0.015,
-    description: 'Claude 3 Sonnet - Balanced performance',
-    isActive: true
+    embeddingModel: null,
+    supportsStreaming: true,
+    supportsTools: true,
+    costPer1kTokens: 0.009
   },
   {
     id: 'claude-3-haiku',
     name: 'claude-3-haiku-20240307',
     provider: 'anthropic',
-    contextWindow: 200000,
-    maxOutputTokens: 4096,
     temperature: 0.7,
     maxTokens: 4000,
-    capabilities: ['text-generation', 'chat', 'vision'],
-    costPer1kInput: 0.00025,
-    costPer1kOutput: 0.00125,
-    description: 'Claude 3 Haiku - Fast and affordable',
-    isActive: true
+    embeddingModel: null,
+    supportsStreaming: true,
+    supportsTools: true,
+    costPer1kTokens: 0.00175
   }
 ];
 
@@ -121,7 +103,10 @@ export async function seedLLMModels() {
       
       for (const model of modelsToAdd) {
         try {
-          await llmRepo.create(model as any);
+          await llmRepo.create({
+            ...model,
+            createdAt: new Date().toISOString()
+          } as any);
           console.log(`  ✅ Added: ${model.id} (${model.name})`);
         } catch (error) {
           console.error(`  ❌ Failed to add ${model.id}:`, error);
@@ -133,7 +118,10 @@ export async function seedLLMModels() {
       
       for (const model of LLM_MODELS) {
         try {
-          await llmRepo.create(model as any);
+          await llmRepo.create({
+            ...model,
+            createdAt: new Date().toISOString()
+          } as any);
           console.log(`  ✅ Added: ${model.id} (${model.name})`);
         } catch (error) {
           console.error(`  ❌ Failed to add ${model.id}:`, error);
@@ -151,13 +139,43 @@ export async function seedLLMModels() {
 // If running as a script
 if (require.main === module) {
   async function runSeedScript() {
+    // Load environment variables from project root
+    const path = require('path');
+    const fs = require('fs');
+    
+    // Look for .env file in project root (two levels up from this script)
+    const envPath = path.resolve(__dirname, '../../../../.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      envContent.split('\n').forEach((line: string) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const [key, ...valueParts] = trimmed.split('=');
+          if (key && valueParts.length > 0) {
+            const value = valueParts.join('=').trim();
+            if (!process.env[key]) {
+              process.env[key] = value;
+            }
+          }
+        }
+      });
+      console.log('📋 Loaded environment variables from', envPath);
+    }
+    
     // Load configuration from environment
     const config: Neo4jConfig = {
       uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
       username: process.env.NEO4J_USERNAME || 'neo4j',
-      password: process.env.NEO4J_PASSWORD || 'password',
+      password: process.env.NEO4J_PASSWORD || 'mcppassword',
       database: process.env.NEO4J_DATABASE || 'neo4j'
     };
+    
+    console.log('🔧 Using Neo4j config:', {
+      uri: config.uri,
+      username: config.username,
+      password: '***masked***',
+      database: config.database
+    });
     
     const connection = createConnection(config);
     

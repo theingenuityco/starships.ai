@@ -301,55 +301,6 @@ export function ExpeditionCard({
     }
   }, [])
 
-  // Determine available actions based on status
-  const getAvailableActions = () => {
-    const actions = []
-
-    switch (localExpedition.status) {
-      case 'draft':
-      case 'planning':
-        if (onStart) {
-          actions.push({
-            label: 'Start Expedition',
-            icon: Play,
-            onClick: () => handleAction(() => onStart(localExpedition.id), 'start'),
-            className: 'bg-green-600 hover:bg-green-700 text-white',
-            disabled: isLoading,
-          })
-        }
-        break
-      case 'in-progress':
-        if (onPause) {
-          actions.push({
-            label: 'Pause Expedition',
-            icon: Pause,
-            onClick: () => handleAction(() => onPause(localExpedition.id), 'pause'),
-            className: 'bg-amber-600 hover:bg-amber-700 text-white',
-            disabled: isLoading,
-          })
-        }
-        if (onCancel) {
-          actions.push({
-            label: 'Stop Expedition',
-            icon: Square,
-            onClick: () => handleAction(() => onCancel(localExpedition.id), 'stop'),
-            className: 'bg-red-600 hover:bg-red-700 text-white',
-            disabled: isLoading,
-          })
-        }
-        break
-      case 'completed':
-      case 'failed':
-      case 'cancelled':
-        // No actions available for completed states
-        break
-    }
-
-    return actions
-  }
-
-  const availableActions = getAvailableActions()
-
   // Get satellite emoji based on expedition ID (deterministic but appears random)
   const getSatelliteEmoji = (expeditionId: string) => {
     const satelliteEmojis = ['🛰️', '📡', '🚀', '🌌', '🔭', '🌠', '🪐', '🌕', '☄️', '🛸']
@@ -358,6 +309,38 @@ export function ExpeditionCard({
     return satelliteEmojis[hash % satelliteEmojis.length]
   }
 
+  // Get available actions for buttons outside the card
+  const getAvailableActions = () => {
+    const actions = []
+
+    // Always show play button if onStart is available
+    if (onStart) {
+      actions.push({
+        label: 'Start Expedition',
+        icon: Play,
+        onClick: () => handleAction(() => onStart(localExpedition.id), 'start'),
+        className:
+          'bg-green-500 hover:bg-green-600 text-white w-10 h-10 rounded-full flex items-center justify-center',
+        disabled: isLoading,
+      })
+    }
+
+    // Always show stop button if onCancel is available
+    if (onCancel) {
+      actions.push({
+        label: 'Stop Expedition',
+        icon: Square,
+        onClick: () => handleAction(() => onCancel(localExpedition.id), 'stop'),
+        className:
+          'bg-red-500 hover:bg-red-600 text-white w-10 h-10 rounded-full flex items-center justify-center',
+        disabled: isLoading,
+      })
+    }
+
+    return actions
+  }
+
+  const availableActions = getAvailableActions()
   const satelliteEmoji = getSatelliteEmoji(localExpedition.id)
 
   return (
@@ -373,9 +356,9 @@ export function ExpeditionCard({
       <Card
         className={`
           cursor-pointer transition-all duration-300 relative overflow-hidden
-          bg-card/50 backdrop-blur-sm border-border/50 shadow-sm
+          bg-card/50 backdrop-blur-sm border-border shadow-sm
           hover:shadow-xl hover:border-blue-500 hover:border-2
-          min-h-[280px] flex flex-col group
+          min-h-[240px] flex flex-col group
           ${error ? 'border-red-500/20 bg-red-500/5' : ''}
           ${isHovered ? 'border-blue-500 border-2' : ''}
         `}
@@ -405,7 +388,7 @@ export function ExpeditionCard({
           </div>
         )}
 
-        <CardHeader className="pb-3 border-b border-border/40">
+        <CardHeader className="pb-2 border-b border-border/40">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Satellite Emoji Icon */}
@@ -500,17 +483,20 @@ export function ExpeditionCard({
           </div>
         </CardHeader>
 
-        <CardContent className="p-4 relative flex-1 flex flex-col justify-between gap-3">
+        <CardContent className="p-3 relative flex-1 flex flex-col justify-between gap-2">
           {/* Key Information */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Expedition Stats */}
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
-                <Calendar className="w-3 h-3 text-muted-foreground" />
+                <Clock className="w-3 h-3 text-muted-foreground" />
                 <div className="flex flex-col">
-                  <span className="text-[9px] text-muted-foreground">Started</span>
+                  <span className="text-[9px] text-muted-foreground">Updated</span>
                   <span className="text-[10px] font-medium truncate">
-                    {formatDistanceToNow(new Date(localExpedition.createdAt), { addSuffix: true })}
+                    {formatDistanceToNow(
+                      new Date(localExpedition.updatedAt || localExpedition.createdAt),
+                      { addSuffix: true }
+                    )}
                   </span>
                 </div>
               </div>
@@ -520,16 +506,6 @@ export function ExpeditionCard({
                 <div className="flex flex-col">
                   <span className="text-[9px] text-muted-foreground">Tasks</span>
                   <span className="text-[10px] font-medium">{tasks.length || 0}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 p-2 rounded-lg bg-background/50 border border-border/50">
-                <Activity className="w-3 h-3 text-muted-foreground" />
-                <div className="flex flex-col">
-                  <span className="text-[9px] text-muted-foreground">Status</span>
-                  <span className="text-[10px] font-medium capitalize truncate">
-                    {localExpedition.status.replace('-', ' ')}
-                  </span>
                 </div>
               </div>
             </div>
@@ -557,23 +533,10 @@ export function ExpeditionCard({
           </div>
 
           {/* Bottom Section */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Additional Info */}
             <div className="flex items-center justify-between pt-3 border-t border-border/50">
-              <div className="flex items-center gap-3">
-                {localExpedition.updatedAt &&
-                  localExpedition.updatedAt !== localExpedition.createdAt && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="w-3 h-3" />
-                      <span>
-                        Updated{' '}
-                        {formatDistanceToNow(new Date(localExpedition.updatedAt), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                  )}
-              </div>
+              <div className="flex items-center gap-3"></div>
               <div className="flex items-center gap-2">
                 {localExpedition.result && (
                   <Badge
@@ -597,43 +560,42 @@ export function ExpeditionCard({
           </div>
         </CardContent>
 
-        {/* Action buttons on hover */}
-        {availableActions.length > 0 && (
-          <div
-            className={`
-              absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background/95 via-background/90 to-transparent
-              transform transition-all duration-300 ease-out
-              ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}
-            `}
-            style={{ pointerEvents: isHovered ? 'auto' : 'none' }}
-          >
-            <div className="flex gap-2 justify-center">
-              {availableActions.map((action, index) => (
-                <Button
-                  key={index}
-                  size="sm"
-                  className={`${action.className} transition-all duration-200 flex items-center gap-2 text-xs px-3 py-1.5`}
-                  onClick={e => {
-                    e.stopPropagation()
-                    action.onClick()
-                  }}
-                  disabled={action.disabled}
-                >
-                  {action.disabled ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <action.icon className="h-3 w-3" />
-                  )}
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Hover effect overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </Card>
+
+      {/* Action buttons OUTSIDE the card, below it on hover */}
+      {availableActions.length > 0 && (
+        <div
+          className={`
+            absolute -bottom-6 left-1/2 transform -translate-x-1/2 z-10
+            transition-all duration-300 ease-out
+            ${isHovered ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'}
+          `}
+          style={{ pointerEvents: isHovered ? 'auto' : 'none' }}
+        >
+          <div className="flex gap-3 bg-background/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-border/20">
+            {availableActions.map((action, index) => (
+              <button
+                key={index}
+                className={`${action.className} transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95`}
+                onClick={e => {
+                  e.stopPropagation()
+                  action.onClick()
+                }}
+                disabled={action.disabled}
+                title={action.label}
+              >
+                {action.disabled ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <action.icon className="h-4 w-4" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </motion.div>
   )
 }

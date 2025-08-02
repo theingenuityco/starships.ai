@@ -396,7 +396,16 @@ When appropriate, use these tools to provide better assistance. You are connecte
     console.log('🤖 [AGENT-ENGINE-MCP] Creating agent executor with MCP tools');
     
     // Create the LLM instance
-    const llmModel = await llmRepo.findById(agent.model);
+    // Try to find by ID first, then by name if it looks like a model name
+    let llmModel = await llmRepo.findById(agent.model);
+    
+    // If not found and doesn't look like a UUID, try finding by name
+    if (!llmModel && !agent.model.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      console.log(`🔍 [AGENT-ENGINE-MCP] Model ID "${agent.model}" not found, searching by name...`);
+      const allModels = await llmRepo.findAll();
+      llmModel = allModels.find(m => m.name === agent.model || m.id === agent.model) || null;
+    }
+    
     if (!llmModel) {
       throw new Error(`LLM model ${agent.model} not found`);
     }
@@ -484,7 +493,16 @@ When appropriate, use these tools to provide better assistance. You are connecte
     const provider = await ProviderFactory.getProvider(req.agent_id);
 
     // Execute completion
-    const llmModel = await llmRepo.findById(agent.model);
+    // Try to find by ID first, then by name if it looks like a model name
+    let llmModel = await llmRepo.findById(agent.model);
+    
+    // If not found and doesn't look like a UUID, try finding by name
+    if (!llmModel && !agent.model.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      console.log(`🔍 [AGENT-ENGINE-MCP] Model ID "${agent.model}" not found, searching by name...`);
+      const allModels = await llmRepo.findAll();
+      llmModel = allModels.find(m => m.name === agent.model || m.id === agent.model) || null;
+    }
+    
     const result = await provider.complete(prompt, { temperature: llmModel?.temperature });
 
     // Store the interaction in memory

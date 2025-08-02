@@ -575,11 +575,20 @@ Don't limit yourself to historical knowledge - actively use web search to provid
       }
       
       // Get LLM model configuration
-      const rawLLMModel = await llmRepo.findById(agent.model);
+      // Try to find by ID first, then by name if it looks like a model name
+      let rawLLMModel = await llmRepo.findById(agent.model);
+      
+      // If not found and doesn't look like a UUID, try finding by name
+      if (!rawLLMModel && !agent.model.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        console.log(`🔍 [AGENT-ENGINE-MCP-STREAM] Model ID "${agent.model}" not found, searching by name...`);
+        const allModels = await llmRepo.findAll();
+        rawLLMModel = allModels.find(m => m.name === agent.model || m.id === agent.model) || null;
+      }
+      
       if (!rawLLMModel) {
         console.error(`❌ [AGENT-ENGINE-MCP-STREAM] LLM model "${agent.model}" not found in database`);
         console.error('   This usually means the LLM models haven\'t been seeded.');
-        console.error('   Run: cd packages/models && npm run seed');
+        console.error('   Run: cd packages/models && npm run seed:llm');
         throw new Error(`LLM model ${agent.model} not found. Please ensure LLM models are properly seeded in the database.`);
       }
       

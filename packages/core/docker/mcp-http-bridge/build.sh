@@ -37,13 +37,24 @@ cp "$SCRIPT_DIR/../../src/services/mcp/HttpBridge.ts" "$BUILD_DIR/src/services/m
 # Build the Docker image
 echo "Building Docker image..."
 if command -v docker buildx &> /dev/null; then
-    # Use buildx for multi-platform builds
-    docker buildx build \
-        --platform "$PLATFORM" \
-        --tag "$IMAGE_NAME:$VERSION" \
-        --tag "$IMAGE_NAME:latest" \
-        --load \
-        .
+    # Check if building for multiple platforms
+    if [[ "$PLATFORM" == *","* ]]; then
+        # For multi-platform, build for current architecture only when using --load
+        echo "Note: Building for current architecture only (multi-platform with --load not supported)"
+        docker buildx build \
+            --tag "$IMAGE_NAME:$VERSION" \
+            --tag "$IMAGE_NAME:latest" \
+            --load \
+            .
+    else
+        # Single platform build
+        docker buildx build \
+            --platform "$PLATFORM" \
+            --tag "$IMAGE_NAME:$VERSION" \
+            --tag "$IMAGE_NAME:latest" \
+            --load \
+            .
+    fi
 else
     # Fallback to regular docker build
     docker build \

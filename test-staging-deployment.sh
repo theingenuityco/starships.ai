@@ -55,7 +55,7 @@ fi
 
 # Start staging environment
 print_status "Starting staging Docker Compose environment..."
-docker-compose -f docker-compose.staging.yml up -d
+docker compose -f docker-compose.staging.yml up -d
 
 # Wait for services to be healthy
 print_status "Waiting for services to start..."
@@ -135,7 +135,7 @@ fi
 
 # Check container status
 print_status "Container status:"
-docker-compose -f docker-compose.staging.yml ps
+docker compose -f docker-compose.staging.yml ps
 
 print_success "Staging deployment test completed!"
 print_status "Services running:"
@@ -144,4 +144,4 @@ print_status "  - Starships server: http://localhost:4001"
 print_status "  - HTTP Bridge MCP: http://localhost:8081"
 print_status ""
 print_status "To stop the staging environment:"
-print_status "  docker-compose -f docker-compose.staging.yml down"
+print_status "  docker compose -f docker-compose.staging.yml down"

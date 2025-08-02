@@ -44,7 +44,6 @@ async function* executeWithAgent(
     ).join('\n');
     
     let enhancedSystemPrompt = systemPrompt + (mcpTools.length > 0 
-<<<<<<< HEAD
       ? `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:\n${toolDescriptions}
 
 🔧 TOOL USAGE BEST PRACTICES:
@@ -55,9 +54,6 @@ async function* executeWithAgent(
 - If you need comprehensive information, make multiple simple searches instead of one complex query
 
 When appropriate, use these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.` 
-=======
-      ? `\n\nYou have access to the following MCP (Model Context Protocol) tools that you can use to help the user:\n${toolDescriptions}\n\nWhen appropriate, use these tools to provide better assistance. You are connected to MCP servers that provide these capabilities.` 
->>>>>>> 072d032dd8bdf203ab32093545396f3513cf3a2d
       : '');
     
     // Escape any remaining curly braces to prevent LangChain template parsing errors
@@ -336,7 +332,6 @@ export async function* chatWithMCPStream(
     // If we found an expedition ID in the channel but no expedition context, add basic context
     if (expeditionIdFromChannel && !expeditionContext) {
       console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Adding basic expedition context for ID:', expeditionIdFromChannel);
-<<<<<<< HEAD
       expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.
 
 🔍 WEB SEARCH GUIDANCE FOR EXPEDITIONS:
@@ -354,9 +349,6 @@ Example good search patterns:
 Avoid complex queries like:
 ❌ "comprehensive analysis of food delivery market including market size, growth trends, competitor analysis, customer preferences, and future projections for 2024-2025"
 \n`;
-=======
-      expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.\n`;
->>>>>>> 072d032dd8bdf203ab32093545396f3513cf3a2d
       
       // Also try to get the starship from the expedition
       try {

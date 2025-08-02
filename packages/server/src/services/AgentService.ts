@@ -17,13 +17,11 @@ export class AgentService {
   }
 
   static async initialize(): Promise<void> {
+    // No longer seeding default agents - agents are created per starship
+    // This method is kept for backward compatibility but does nothing
     if (this.isInitialized) {
       return;
     }
-
-    // No need to create connection here - it's already initialized in the main server
-    await this.seedDefaultAgents();
-
     this.isInitialized = true;
   }
 
@@ -291,6 +289,8 @@ export class AgentService {
     };
   }
 
+  // No longer used - agents are created per starship
+  /*
   private static async seedDefaultAgents(): Promise<void> {
     const agentRepo = RepositoryFactory.getAgentRepository();
     const existingAgents = await agentRepo.findAll();
@@ -344,4 +344,5 @@ export class AgentService {
       await agentRepo.create(agentData);
     }
   }
+  */
 }

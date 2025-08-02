@@ -213,9 +213,9 @@ httpServer.listen(PORT, async () => {
     await ensureDockerImages();
     console.log('✅ Docker images check completed');
     
-    // Initialize AgentService (seeds default agents)
-    await AgentService.initialize();
-    console.log('✅ AgentService initialized with default agents');
+    // AgentService no longer needs initialization - agents are created per starship
+    // await AgentService.initialize();
+    // console.log('✅ AgentService initialized with default agents');
 
     // Initialize AgentTemplateService (seeds default templates)
     const templateService = RepositoryFactory.getAgentTemplateService();

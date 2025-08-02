@@ -18,7 +18,7 @@ import { FirstOfficerService } from './FirstOfficerService';
 import { ExpeditionService } from './ExpeditionService';
 import { ContextBuilder } from './ContextBuilder';
 import { SocketIOService } from './SocketIOService';
-import { chat as agentChat, chatStream } from '@starships/agent-engine';
+import { chat as agentChat, chatStream, chatWithMCP, chatWithMCPStream } from '@starships/agent-engine';
 import type { ChatRequest } from '@starships/protocol';
 import getStore from '../store';
 import { env } from '../config/environment';
@@ -282,7 +282,19 @@ export class MessageService {
           }
         }
       } else {
-        // Handle agent streaming
+        // Handle agent streaming - get expedition starship for MCP tools
+        let expeditionStarshipId: string | undefined = undefined;
+        try {
+          const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+          const expedition = await expeditionRepo.findById(expeditionId);
+          if (expedition && expedition.starshipId) {
+            expeditionStarshipId = expedition.starshipId;
+            console.log(`[MESSAGE-SERVICE] Using expedition starship for MCP tools:`, expeditionStarshipId);
+          }
+        } catch (error) {
+          console.log(`[MESSAGE-SERVICE] Could not get expedition starship for streaming:`, error);
+        }
+
         const chatRequest: ChatRequest = {
           agent_id: participantId,
           user_id: userId,
@@ -293,8 +305,10 @@ export class MessageService {
 
         const store = getStore();
         
-        // Use streaming from agent engine
-        for await (const chunk of chatStream(chatRequest, store)) {
+        // Use MCP-enabled streaming from agent engine with starship override
+        for await (const chunk of chatWithMCPStream(chatRequest, store, { 
+          overrideStarshipId: expeditionStarshipId 
+        })) {
           fullResponse += chunk;
           
           // Stream each chunk character by character
@@ -967,16 +981,19 @@ private async handleAgentMessage(
       console.log(`[MESSAGE-SERVICE] User ID: ${userId}`);
       console.log(`[MESSAGE-SERVICE] Message Length: ${content?.length}`);
       
-      // Look up the expedition to get the starshipId
+      // Look up the expedition to get the starshipId for MCP tool override
       let channelId = `expedition-${expeditionId}`;
+      let expeditionStarshipId: string | undefined = undefined;
       try {
         const expeditionRepo = RepositoryFactory.getExpeditionRepository();
         const expedition = await expeditionRepo.findById(expeditionId);
         if (expedition && expedition.starshipId) {
+          expeditionStarshipId = expedition.starshipId;
           // Include both expedition and starship info for better context
           // Use a delimiter that won't appear in UUIDs
           channelId = `expedition:${expeditionId}:starship:${expedition.starshipId}`;
           console.log(`[MESSAGE-SERVICE] Enhanced channel_id with starship:`, channelId);
+          console.log(`[MESSAGE-SERVICE] Will override starshipId for MCP tools:`, expeditionStarshipId);
         }
       } catch (error) {
         console.log(`[MESSAGE-SERVICE] Could not enhance channel_id with starship:`, error);
@@ -991,9 +1008,11 @@ private async handleAgentMessage(
         stream: false
       };
 
-      console.log(`[MESSAGE-SERVICE] Sending request to agent engine...`);
+      console.log(`[MESSAGE-SERVICE] Sending request to agent engine with MCP support...`);
       const store = getStore();
-      const result = await agentChat(chatRequest, store);
+      const result = await chatWithMCP(chatRequest, store, { 
+        overrideStarshipId: expeditionStarshipId 
+      });
 
       console.log(`[MESSAGE-SERVICE] Agent response generated:`, {
         replyLength: result.reply?.length,
@@ -1093,9 +1112,11 @@ private async handleAgentMessage(
           stream: false
         };
 
-        console.log(`[MESSAGE-SERVICE] Sending request to agent engine for First Officer...`);
+        console.log(`[MESSAGE-SERVICE] Sending request to agent engine for First Officer with MCP support...`);
         const store = getStore();
-        const result = await agentChat(chatRequest, store);
+        const result = await chatWithMCP(chatRequest, store, { 
+          overrideStarshipId: expedition.starshipId 
+        });
 
         console.log(`[MESSAGE-SERVICE] First Officer response generated:`, {
           replyLength: result.reply?.length,

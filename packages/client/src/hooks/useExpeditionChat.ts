@@ -69,6 +69,7 @@ export function useExpeditionChat({
       const fetchedMessages = await expeditionAPI.getMessages(starshipId, expeditionId);
       // Ensure fetchedMessages is an array before calling slice
       if (Array.isArray(fetchedMessages)) {
+        console.log('[EXPEDITION CHAT] Loaded', fetchedMessages.length, 'messages from API');
         setMessages(fetchedMessages.slice(-maxMessages));
       } else {
         console.warn('[EXPEDITION CHAT] API returned non-array messages:', fetchedMessages);
@@ -188,7 +189,53 @@ export function useExpeditionChat({
     setError(null);
   }, []);
 
-  // Initial load
+  // Initialize chat (send greeting if needed)
+  useEffect(() => {
+    const initializeChat = async () => {
+      if (!expeditionId || !starshipId) return;
+
+      try {
+        console.log('[EXPEDITION CHAT] Initializing chat for expedition:', expeditionId);
+        const initResult = await expeditionAPI.initializeChat(starshipId, expeditionId);
+        
+        if (initResult.greeting) {
+          console.log('[EXPEDITION CHAT] New greeting received, adding to messages');
+          const greetingMessage: ExpeditionMessage = {
+            id: `greeting-${Date.now()}`,
+            expeditionId,
+            role: 'first-officer',
+            content: initResult.greeting.reply,
+            messageType: 'coordination',
+            timestamp: new Date().toISOString(),
+            metadata: { isGreeting: true }
+          };
+          
+          // Add greeting message to the beginning
+          setMessages(prev => {
+            // Check if greeting already exists to avoid duplicates
+            const hasGreeting = prev.some(msg => msg.metadata?.isGreeting);
+            if (hasGreeting) {
+              console.log('[EXPEDITION CHAT] Greeting already exists, skipping duplicate');
+              return prev;
+            }
+            console.log('[EXPEDITION CHAT] Adding greeting message to chat');
+            return [greetingMessage, ...prev];
+          });
+        } else {
+          console.log('[EXPEDITION CHAT] No new greeting needed (chat already initialized)');
+        }
+      } catch (error) {
+        console.error('[EXPEDITION CHAT] Failed to initialize chat:', error);
+      }
+    };
+
+    // Run initialization immediately when both IDs are available
+    if (expeditionId && starshipId) {
+      initializeChat();
+    }
+  }, [expeditionId, starshipId]);
+
+  // Load messages
   useEffect(() => {
     if (expeditionId) {
       refreshMessages();

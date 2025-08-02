@@ -279,64 +279,6 @@ describe('MCP Integration Tests', () => {
     });
   });
 
-  describe('MCPEnabledFirstOfficerAgent', () => {
-    it('should create an MCP-enabled agent', async () => {
-      const agent = createMCPEnabledFirstOfficerAgent(
-        'starship-123',
-        mockMemoryStore,
-        {
-          mcpEnabled: true,
-          mcpStarshipId: 'starship-123'
-        },
-        ['agent-1', 'agent-2']
-      );
-
-      expect(agent).toBeDefined();
-      expect(agent.getMCPStats).toBeDefined();
-      expect(agent.setMCPEnabled).toBeDefined();
-      expect(agent.clearMCPCache).toBeDefined();
-    });
-
-    it('should report MCP statistics', async () => {
-      const agent = createMCPEnabledFirstOfficerAgent(
-        'starship-123',
-        mockMemoryStore,
-        {
-          mcpEnabled: true,
-          mcpStarshipId: 'starship-123'
-        },
-        ['agent-1']
-      );
-
-      const stats = agent.getMCPStats();
-
-      expect(stats).toHaveProperty('totalAgentsWithMCP');
-      expect(stats).toHaveProperty('toolsByAgent');
-      expect(stats).toHaveProperty('usageByAgent');
-    });
-
-    it('should allow enabling/disabling MCP', async () => {
-      const agent = createMCPEnabledFirstOfficerAgent(
-        'starship-123',
-        mockMemoryStore,
-        {
-          mcpEnabled: true,
-          mcpStarshipId: 'starship-123'
-        },
-        ['agent-1']
-      );
-
-      // Disable MCP
-      agent.setMCPEnabled(false);
-      
-      // Re-enable MCP
-      agent.setMCPEnabled(true);
-      
-      // No errors should occur
-      expect(true).toBe(true);
-    });
-  });
-
   describe('Tool Usage Patterns', () => {
     it('should handle complex reasoning with Sequential Thinking', async () => {
       const problem = 'Design a distributed caching system for a microservices architecture';

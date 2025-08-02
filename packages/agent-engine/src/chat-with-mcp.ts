@@ -15,7 +15,11 @@ import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages
 /**
  * Enhanced chat function with MCP tool integration
  */
-export async function chatWithMCP(req: ChatRequest, store: LangChainMemoryStore): Promise<ChatResponse> {
+export async function chatWithMCP(
+  req: ChatRequest, 
+  store: LangChainMemoryStore, 
+  options?: { overrideStarshipId?: string }
+): Promise<ChatResponse> {
   console.log('🚀 [AGENT-ENGINE-MCP] Starting MCP-enhanced chat request:', {
     agent_id: req.agent_id,
     user_id: req.user_id,
@@ -87,11 +91,17 @@ export async function chatWithMCP(req: ChatRequest, store: LangChainMemoryStore)
   let starshipId: string | null = null;
   
   try {
-    // Get the agent's starship directly from agent data
+    // Use override starshipId if provided, otherwise use agent's starshipId
+    const effectiveStarshipId = options?.overrideStarshipId || agent.starshipId;
     console.log('🔍 [AGENT-ENGINE-MCP] Looking for agent starship. Agent starshipId:', agent.starshipId);
-    if (agent && agent.starshipId) {
-      starshipId = agent.starshipId;
-      console.log('🚢 [AGENT-ENGINE-MCP] Found starship for agent:', starshipId);
+    console.log('🔍 [AGENT-ENGINE-MCP] Override starshipId:', options?.overrideStarshipId);
+    console.log('🔍 [AGENT-ENGINE-MCP] Effective starshipId:', effectiveStarshipId);
+    console.log('🔍 [AGENT-ENGINE-MCP] Agent name:', agent.name);
+    console.log('🔍 [AGENT-ENGINE-MCP] Request details:', { agent_id: req.agent_id, message: req.message.substring(0, 100) });
+    
+    if (agent && effectiveStarshipId) {
+      starshipId = effectiveStarshipId;
+      console.log('🚢 [AGENT-ENGINE-MCP] Using starship for MCP tools:', starshipId);
       
       // Create MCP tool wrapper
       const toolWrapper = new MCPToolWrapper({

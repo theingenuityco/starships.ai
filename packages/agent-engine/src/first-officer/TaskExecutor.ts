@@ -15,7 +15,7 @@ import { Observable, Subject, BehaviorSubject, merge, timer, from, EMPTY, throwE
 import { map, filter, takeUntil, timeout, catchError, retry, delay, mergeMap, concatMap, switchMap } from 'rxjs/operators';
 import { TaskBreakdown, ChatRequest, AgentActivity, AgentActivityType } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
-import { chat } from '../index';
+import { chat, chatWithMCP } from '../index';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
 import { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
 import {
@@ -198,6 +198,8 @@ export class TaskExecutor {
   private performanceHistory: Map<string, TaskPerformanceMetrics[]> = new Map();
   private webSocketEmitter: WebSocketEventEmitter;
   private agentNames: Map<string, string> = new Map();
+  private mcpEnabled: boolean = false;
+  private starshipId: string | null = null;
 
   constructor(config: FirstOfficerConfig, memoryStore: LangChainMemoryStore, webSocketEmitter?: WebSocketEventEmitter) {
     this.config = config;
@@ -205,6 +207,37 @@ export class TaskExecutor {
     this.webSocketEmitter = webSocketEmitter || new WebSocketEventEmitter();
     this.initializeResourcePool();
     this.initializeExecutionStrategy();
+  }
+
+  /**
+   * Enable MCP tools for this task executor
+   */
+  enableMCP(starshipId: string): void {
+    this.mcpEnabled = true;
+    this.starshipId = starshipId;
+    console.log(`🔧 [TASK-EXECUTOR] MCP enabled for starship: ${starshipId}`);
+  }
+
+  /**
+   * Execute chat with MCP context, ensuring agent has correct starshipId
+   */
+  private async executeWithMCPContext(chatRequest: ChatRequest, starshipId: string): Promise<any> {
+    try {
+      console.log(`🔧 [TASK-EXECUTOR] Executing with MCP context for agent ${chatRequest.agent_id}, starshipId: ${starshipId}`);
+      
+      // Execute with MCP tools using starshipId override (no database changes needed)
+      const response = await chatWithMCP(chatRequest, this.memoryStore, { 
+        overrideStarshipId: starshipId 
+      });
+      
+      console.log(`✅ [TASK-EXECUTOR] MCP execution successful for agent ${chatRequest.agent_id}`);
+      return response;
+    } catch (error) {
+      console.error(`❌ [TASK-EXECUTOR] Error in executeWithMCPContext:`, error);
+      // Fallback to regular chat if MCP fails
+      console.log(`🔄 [TASK-EXECUTOR] Falling back to regular chat for agent ${chatRequest.agent_id}`);
+      return await chat(chatRequest, this.memoryStore);
+    }
   }
 
   /**
@@ -553,6 +586,13 @@ export class TaskExecutor {
       { priority: execution.priority }
     );
     
+    // Emit WebSocket task start event for real-time updates
+    this.webSocketEmitter.emitTaskStart(expeditionId, {
+      taskId: execution.taskId,
+      agentId: execution.agentId,
+      attempt: execution.retryCount + 1
+    });
+    
     try {
       // Allocate resources
       const allocatedResources = await this.allocateResources(
@@ -635,6 +675,13 @@ export class TaskExecutor {
             { retryCount: attempt, delay: backoffDelay }
           );
           
+          // Emit WebSocket task retry event for real-time updates
+          this.webSocketEmitter.emitTaskRetry(expeditionId, {
+            taskId: execution.taskId,
+            attempt: attempt + 1,
+            delay: backoffDelay
+          });
+          
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           execution.retryCount = attempt;
           execution.lastRetryAt = new Date().toISOString();
@@ -650,11 +697,22 @@ export class TaskExecutor {
           taskTitle
         );
 
+        // Add 7-second delay for natural conversation flow
+        console.log(`⏱️ [TASK-EXECUTOR] Adding 7-second delay for natural conversation flow...`);
+        await new Promise(resolve => setTimeout(resolve, 7000));
+
         // Execute the actual task
         const result = await this.executeTaskWithAgent(execution, expeditionId, userId);
         
         // Update progress
         execution.progress = 100;
+        
+        // Emit WebSocket task progress event for real-time updates
+        this.webSocketEmitter.emitTaskProgress(expeditionId, {
+          taskId: execution.taskId,
+          progress: 100
+        });
+        
         return result;
 
       } catch (error) {
@@ -701,6 +759,7 @@ export class TaskExecutor {
     
     // Execute task through agent with timeout
     console.log(`💬 [TASK-EXECUTOR] Sending enhanced task to agent: ${execution.agentId}`);
+    console.log(`🔧 [TASK-EXECUTOR] MCP enabled: ${this.mcpEnabled}, Starship: ${this.starshipId}`);
     
     // Emit typing start
     if (this.webSocketEmitter) {
@@ -709,10 +768,27 @@ export class TaskExecutor {
     }
     
     const timeoutMs = (this.config.timeoutMinutes || 30) * 60 * 1000;
-    const response = await Promise.race([
-      chat(chatRequest, this.memoryStore),
-      this.createTimeoutPromise(timeoutMs)
-    ]);
+    const chatFunction = this.mcpEnabled && this.starshipId ? chatWithMCP : chat;
+    console.log(`🔧 [TASK-EXECUTOR] Using ${this.mcpEnabled ? 'MCP-enabled' : 'regular'} chat function`);
+    console.log(`🔧 [TASK-EXECUTOR] [FIX-v2] MCP override starshipId fix is ACTIVE`);
+    
+    // For MCP-enabled execution, temporarily override the agent's starshipId if needed
+    let originalResponse;
+    if (this.mcpEnabled && this.starshipId) {
+      // We need to ensure the agent has the correct starshipId for MCP tool loading
+      console.log(`🔧 [TASK-EXECUTOR] Ensuring agent ${execution.agentId} has starshipId: ${this.starshipId}`);
+      originalResponse = await Promise.race([
+        this.executeWithMCPContext(chatRequest, this.starshipId),
+        this.createTimeoutPromise(timeoutMs)
+      ]);
+    } else {
+      originalResponse = await Promise.race([
+        chatFunction(chatRequest, this.memoryStore),
+        this.createTimeoutPromise(timeoutMs)
+      ]);
+    }
+    
+    const response = originalResponse;
     
     // Parse and emit chain of thought message
     if (this.webSocketEmitter) {
@@ -811,49 +887,53 @@ ${performanceContext}
 
 ${resourceContext}
 
-ENHANCED INSTRUCTIONS:
-1. Carefully analyze the task requirements and performance context
-2. Apply your specialized skills efficiently to complete the task
-3. If this is a retry, specifically address the issues from previous attempts
-4. Ensure your response matches the expected deliverable format exactly
-5. Optimize for both quality and performance given the priority level
-6. Provide a comprehensive and well-structured result
-7. If you encounter any issues, explain them clearly with suggested solutions
+CRITICAL EXECUTION INSTRUCTIONS:
+⚠️ **YOU MUST ACTUALLY PERFORM THE WORK - NOT JUST EXPLAIN WHAT YOU WOULD DO** ⚠️
 
-CHAIN OF THOUGHT REQUIREMENTS:
-Please structure your response to include your detailed reasoning process:
+1. **DO THE ACTUAL WORK**: Execute the task completely, don't just describe your approach
+2. **USE YOUR TOOLS**: If you have access to tools (web search, code execution, file access, etc.), USE THEM to complete the task
+3. **PROVIDE REAL RESULTS**: Give actual findings, data, code, documents - not just explanations
+4. **BE COMPREHENSIVE**: Complete the entire deliverable as specified
+5. **TAKE ACTION**: If the task requires research, actually research. If it requires writing, actually write. If it requires analysis, actually analyze.
 
-**THINKING PROCESS:**
-- What is my understanding of this task?
-- What are the key requirements I need to fulfill?
-- What assumptions am I making?
-- What constraints do I need to consider?
+**EXECUTION FORMAT:**
+Provide your actual work output directly. Structure it as:
 
-**APPROACH:**
-- What steps will I take to complete this task?
-- What alternatives did I consider and why did I choose this approach?
-- What tools or resources will I utilize?
-- What dependencies exist that could affect my work?
+**IMPLEMENTATION PHASE:**
+[Put your actual completed work here - real data, actual analysis, working code, concrete deliverables]
 
-**RISK ANALYSIS:**
-- What potential issues or risks do I foresee?
-- How will I mitigate these risks?
-- What is my confidence level in this approach?
+**BRIEF SUMMARY:**
+[One paragraph explaining what you accomplished and any key insights]
 
-**EXECUTION:**
-[Your actual task implementation goes here]
+**EXAMPLE - WRONG APPROACH:**
+❌ "Implementation phase: I would collect and analyze data on each competitor's market share by researching industry reports..."
 
-**REFLECTION:**
-- What insights did I gain during this task?
-- Are there any learnings for future similar tasks?
+**EXAMPLE - CORRECT APPROACH:**
+✅ "Implementation phase: 
+COMPETITOR ANALYSIS RESULTS:
+
+Company A: 
+- Market Share: 23.5% (Source: Industry Report 2024)
+- Pricing: Premium tier ($199/month)
+- Customer Base: 50,000+ enterprise clients
+- Service Quality: 4.2/5 average rating
+
+Company B:
+- Market Share: 18.2% (Source: MarketAnalytics.com)
+- Pricing: Mid-tier ($99/month)
+- Customer Base: 125,000+ SMB clients  
+- Service Quality: 3.8/5 average rating
+
+[Complete analysis with actual data continues...]"
 
 QUALITY EXPECTATIONS:
-- Accuracy: Ensure all information is correct and reliable
-- Completeness: Address all aspects of the task requirements
-- Clarity: Structure your response clearly and logically
-- Efficiency: Optimize your approach for the given priority level
+- **EXECUTION OVER EXPLANATION**: Focus 90% on doing the work, 10% on explaining
+- **CONCRETE DELIVERABLES**: Provide tangible outputs, not theoretical approaches
+- **USE AVAILABLE TOOLS**: Leverage any tools you have access to for better results
+- **COMPLETENESS**: Deliver the full requirement, not partial explanations
+- **ACTIONABLE RESULTS**: Ensure your output can be directly used or implemented
 
-Please complete this task with enhanced focus on quality and performance optimization.
+⚠️ **REMINDER: Your response will be evaluated on the actual work completed, not on the quality of your explanations about what you might do.** ⚠️
 `;
   }
 
@@ -876,6 +956,13 @@ Please complete this task with enhanced focus on quality and performance optimiz
     const taskRepo = RepositoryFactory.getExpeditionTaskRepository();
     await taskRepo.updateStatus(execution.taskId, 'completed');
     await taskRepo.updateResult(execution.taskId, result);
+    
+    // Emit WebSocket task completion event for real-time updates
+    this.webSocketEmitter.emitTaskComplete(expeditionId, {
+      taskId: execution.taskId,
+      result,
+      duration: actualDuration
+    });
     
     // Get task details for activity tracking
     const task = await taskRepo.findById(execution.taskId);
@@ -966,6 +1053,15 @@ Please complete this task with enhanced focus on quality and performance optimiz
     
     // Check if retry is possible
     const retryLimit = options.retryLimit || this.config.maxRetries;
+    const isFinalFailure = execution.retryCount >= retryLimit || !this.isRetryableError(error);
+    
+    // Emit WebSocket task failure event for real-time updates (only for final failures)
+    if (isFinalFailure) {
+      this.webSocketEmitter.emitTaskFailed(expeditionId, {
+        taskId: execution.taskId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
     
     if (execution.retryCount < retryLimit && this.isRetryableError(error)) {
       console.log(`🔄 [TASK-EXECUTOR] Task will be retried: ${execution.taskId} (attempt ${execution.retryCount + 1})`);
@@ -1888,20 +1984,28 @@ Please complete this task with enhanced focus on quality and performance optimiz
    * Extract execution result from agent response
    */
   private extractExecutionResult(response: string): string {
-    // Look for the EXECUTION section
+    // Look for the IMPLEMENTATION PHASE section first
+    const implementationMatch = response.match(/\*\*IMPLEMENTATION PHASE:\*\*([\s\S]*?)(?=\*\*BRIEF SUMMARY:\*\*|\*\*|$)/i);
+    
+    if (implementationMatch) {
+      return implementationMatch[1].trim();
+    }
+    
+    // Fall back to EXECUTION section for backwards compatibility
     const executionMatch = response.match(/\*\*EXECUTION:\*\*([\s\S]*?)(?=\*\*|$)/i);
     
     if (executionMatch) {
       return executionMatch[1].trim();
     }
     
-    // If no execution section found, try to extract the main content
-    // Skip chain of thought sections
+    // If no structured sections found, try to extract the main content
+    // Skip thinking/planning sections that don't contain actual work
     const sectionsToSkip = [
       /\*\*THINKING PROCESS:\*\*[\s\S]*?(?=\*\*|$)/gi,
       /\*\*APPROACH:\*\*[\s\S]*?(?=\*\*|$)/gi,
       /\*\*RISK ANALYSIS:\*\*[\s\S]*?(?=\*\*|$)/gi,
-      /\*\*REFLECTION:\*\*[\s\S]*?(?=\*\*|$)/gi
+      /\*\*REFLECTION:\*\*[\s\S]*?(?=\*\*|$)/gi,
+      /\*\*BRIEF SUMMARY:\*\*[\s\S]*?(?=\*\*|$)/gi
     ];
     
     let cleanedResponse = response;
@@ -1909,6 +2013,8 @@ Please complete this task with enhanced focus on quality and performance optimiz
       cleanedResponse = cleanedResponse.replace(pattern, '');
     }
     
-    return cleanedResponse.trim() || response;
+    // If we still have substantial content, return it, otherwise return the full response
+    const cleaned = cleanedResponse.trim();
+    return cleaned.length > 50 ? cleaned : response;
   }
 }

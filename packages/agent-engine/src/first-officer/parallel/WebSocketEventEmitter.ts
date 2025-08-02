@@ -179,6 +179,68 @@ export class WebSocketEventEmitter extends EventEmitter {
   }
 
   /**
+   * Emit task created (new method for task creation)
+   */
+  emitTaskCreated(
+    expeditionId: string,
+    taskId: string,
+    taskData: any
+  ): void {
+    const payload = { expeditionId, taskId, ...taskData };
+    
+    this.emit('task:created', payload);
+    
+    if (this.socketServer) {
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit('task:created', payload);
+      
+      // Emit task creation as task update for real-time UI updates
+      console.log(`🚀 [WEBSOCKET] Emitting task:updated for task creation - expeditionId: ${expeditionId}, taskId: ${taskId}, status: pending`);
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit('task:updated', {
+          expeditionId,
+          taskId,
+          status: 'pending' as TaskStatus,
+          ...taskData
+        });
+    }
+  }
+
+  /**
+   * Emit task assigned (new method for task assignment)
+   */
+  emitTaskAssigned(
+    expeditionId: string,
+    taskId: string,
+    agentId: string,
+    taskData?: any
+  ): void {
+    const payload = { expeditionId, taskId, agentId, ...taskData };
+    
+    this.emit('task:assigned', payload);
+    
+    if (this.socketServer) {
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit('task:assigned', payload);
+      
+      // Emit task assignment as task update for real-time UI updates
+      console.log(`🚀 [WEBSOCKET] Emitting task:updated for task assignment - expeditionId: ${expeditionId}, taskId: ${taskId}, agentId: ${agentId}, status: assigned`);
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit('task:updated', {
+          expeditionId,
+          taskId,
+          status: 'assigned' as TaskStatus,
+          assignedAgentId: agentId,
+          ...taskData
+        });
+    }
+  }
+
+  /**
    * Emit task start
    */
   emitTaskStart(
@@ -194,6 +256,17 @@ export class WebSocketEventEmitter extends EventEmitter {
       this.socketServer
         .to(`expedition:${expeditionId}`)
         .emit(event, payload);
+      
+      // Emit task start as task update for real-time UI updates
+      this.socketServer
+        .to(`expedition:${expeditionId}`)
+        .emit('task:updated', {
+          expeditionId,
+          taskId: data.taskId,
+          status: 'in-progress' as TaskStatus,
+          agentId: data.agentId,
+          attempt: data.attempt
+        });
       
       // Also emit agent activity
       this.emitAgentActivity(expeditionId, {
@@ -242,7 +315,7 @@ export class WebSocketEventEmitter extends EventEmitter {
       
       // Emit completion as task update
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit('task:updated', {
           expeditionId,
           taskId: data.taskId,
@@ -271,7 +344,7 @@ export class WebSocketEventEmitter extends EventEmitter {
       
       // Emit failure as task update
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit('task:updated', {
           expeditionId,
           taskId: data.taskId,
@@ -314,7 +387,7 @@ export class WebSocketEventEmitter extends EventEmitter {
     
     if (this.socketServer) {
       this.socketServer
-        .to(`expedition-${expeditionId}`)
+        .to(`expedition:${expeditionId}`)
         .emit('expedition:agent-activity', payload);
     }
   }

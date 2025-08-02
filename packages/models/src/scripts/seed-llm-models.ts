@@ -95,59 +95,88 @@ const LLM_MODELS = [
   }
 ];
 
-async function seedLLMModels() {
-  // Load configuration from environment
-  const config: Neo4jConfig = {
-    uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
-    username: process.env.NEO4J_USERNAME || 'neo4j',
-    [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[DEFAULT-PASSWORD]',
-    database: process.env.NEO4J_DATABASE || 'neo4j'
-  };
-  
-  const connection = createConnection(config);
-  
-  // Connect to the database
-  await connection.connect();
-  console.log('📊 Connected to Neo4j database');
+export async function seedLLMModels() {
+  console.log('🌱 Starting LLM models seeding...');
   
   const llmRepo = new LLMRepository();
 
-  console.log('🌱 Seeding LLM models...\n');
-
   try {
-    for (const model of LLM_MODELS) {
-      try {
-        // Check if model already exists
-        const existing = await llmRepo.findById(model.id);
-        if (existing) {
-          console.log(`✅ Model already exists: ${model.id} (${model.name})`);
-          continue;
+    // Check if any LLM models already exist
+    const existingModels = await llmRepo.findAll();
+    
+    if (existingModels.length > 0) {
+      console.log(`📋 Found ${existingModels.length} existing LLM models`);
+      console.log('🔄 Checking for missing models to add...');
+      
+      // Only add models that don't already exist
+      const existingIds = new Set(existingModels.map(m => m.id));
+      const modelsToAdd = LLM_MODELS.filter(m => !existingIds.has(m.id));
+      
+      if (modelsToAdd.length === 0) {
+        console.log('✅ All default LLM models already exist');
+        return;
+      }
+      
+      console.log(`📝 Adding ${modelsToAdd.length} new LLM models...`);
+      
+      for (const model of modelsToAdd) {
+        try {
+          await llmRepo.create(model as any);
+          console.log(`  ✅ Added: ${model.id} (${model.name})`);
+        } catch (error) {
+          console.error(`  ❌ Failed to add ${model.id}:`, error);
         }
-
-        // Create the model
-        await llmRepo.create(model as any);
-        console.log(`✅ Created model: ${model.id} (${model.name})`);
-      } catch (error) {
-        console.error(`❌ Failed to create model ${model.id}:`, error);
+      }
+    } else {
+      // No existing models, add all defaults
+      console.log('📝 No existing LLM models found, adding all defaults...');
+      
+      for (const model of LLM_MODELS) {
+        try {
+          await llmRepo.create(model as any);
+          console.log(`  ✅ Added: ${model.id} (${model.name})`);
+        } catch (error) {
+          console.error(`  ❌ Failed to add ${model.id}:`, error);
+        }
       }
     }
 
-    console.log('\n✅ LLM model seeding completed!');
+    console.log('✅ LLM model seeding completed!');
+  } catch (error) {
+    console.error('❌ Error seeding LLM models:', error);
+    // Don't throw - allow server to continue even if seeding fails
+  }
+}
+
+// If running as a script
+if (require.main === module) {
+  async function runSeedScript() {
+    // Load configuration from environment
+    const config: Neo4jConfig = {
+      uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
+      username: process.env.NEO4J_USERNAME || 'neo4j',
+      [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[DEFAULT-PASSWORD]',
+      database: process.env.NEO4J_DATABASE || 'neo4j'
+    };
+    
+    const connection = createConnection(config);
+    
+    // Connect to the database
+    await connection.connect();
+    console.log('📊 Connected to Neo4j database');
+    
+    await seedLLMModels();
     
     // List all models
     console.log('\n📋 Available LLM models:');
+    const llmRepo = new LLMRepository();
     const allModels = await llmRepo.findAll();
     allModels.forEach(model => {
       console.log(`  - ${model.id}: ${model.name} (${model.provider})`);
     });
-
-  } catch (error) {
-    console.error('❌ Error seeding LLM models:', error);
-    process.exit(1);
-  } finally {
+    
     await connection.disconnect();
   }
+  
+  runSeedScript().catch(console.error);
 }
-
-// Run the seed script
-seedLLMModels().catch(console.error);

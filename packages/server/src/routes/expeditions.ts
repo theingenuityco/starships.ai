@@ -1071,23 +1071,119 @@ router.get(
         `[EXPEDITION-API] Getting messages for expedition: ${expeditionId} in starship: ${starshipId}`
       );
 
-      // Validate expedition access first
-      console.log(`[EXPEDITION-API] Validating expedition access...`);
-      await expeditionService.getExpedition(expeditionId, userId);
-      console.log(`[EXPEDITION-API] Expedition access validated successfully`);
+      // Validate expedition access and get expedition details
+      console.log(`[EXPEDITION-API] Validating expedition access and getting details...`);
+      const expedition = await expeditionService.getExpedition(expeditionId, userId);
+      console.log(`[EXPEDITION-API] Expedition access validated successfully - Status: ${expedition.expedition.status}`);
 
       // Get messages from repository
       console.log(`[EXPEDITION-API] Fetching messages from repository...`);
       const { RepositoryFactory } = await import('@starships/models');
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      const messages = await messageRepo.findByExpedition(expeditionId);
+      const dbMessages = await messageRepo.findByExpedition(expeditionId);
       console.log(
-        `[EXPEDITION-API] Found ${messages.length} messages for expedition: ${expeditionId}`
+        `[EXPEDITION-API] Found ${dbMessages.length} database messages for expedition: ${expeditionId}`
+      );
+
+      // Smart message retrieval based on expedition status
+      const expeditionStatus = expedition.expedition.status;
+      console.log(`[EXPEDITION-API] Fetching messages based on expedition status: ${expeditionStatus}`);
+      
+      let memoryMessages: any[] = [];
+      
+      // Only fetch memory messages for draft expeditions or when there are no database messages
+      const shouldIncludeMemoryMessages = expeditionStatus === 'draft' || dbMessages.length === 0;
+      
+      if (shouldIncludeMemoryMessages) {
+        console.log(`[EXPEDITION-API] Fetching messages from LangChain memory...`);
+        try {
+          const memoryEntries = await firstOfficerService.getMemoryMessages(expeditionId, userId);
+          console.log(`[EXPEDITION-API] Found ${memoryEntries.length} memory entries`);
+        
+        // Convert memory entries to message format
+        const convertedMessages = memoryEntries.map((entry: any, index: number) => {
+          // Preserve original timestamp if valid, otherwise use a timestamp that ensures chronological order
+          let messageTimestamp;
+          if (entry.timestamp && !isNaN(new Date(entry.timestamp).getTime())) {
+            messageTimestamp = new Date(entry.timestamp).toISOString();
+          } else {
+            // Use expedition creation time minus some offset to ensure pre-expedition messages come first
+            const baseTime = new Date(Date.now() - (60000 * 60 * 24)); // 24 hours ago
+            messageTimestamp = new Date(baseTime.getTime() + (index * 1000)).toISOString(); // 1 second apart
+          }
+          
+          return {
+            id: `memory-${Date.now()}-${index}`,
+            expeditionId: expeditionId,
+            role: entry.role === 'assistant' ? 'first-officer' : entry.role,
+            agentId: entry.role === 'assistant' ? 'first-officer' : undefined,
+            userId: entry.role === 'user' ? userId : undefined,
+            content: entry.content,
+            messageType: entry.role === 'assistant' ? 'coordination' : 'user-input',
+            timestamp: messageTimestamp,
+            metadata: { fromMemory: true, isGreeting: entry.content.includes('Welcome aboard') }
+          };
+        });
+
+          // Include all memory messages (greetings should be managed by frontend session state)
+          memoryMessages = convertedMessages;
+        } catch (memoryError) {
+          console.warn(`[EXPEDITION-API] Failed to fetch memory messages:`, memoryError);
+        }
+      } else {
+        console.log(`[EXPEDITION-API] Skipping memory messages for ${expeditionStatus} expedition with ${dbMessages.length} database messages`);
+      }
+
+      // Deduplicate messages based on content and timestamp to avoid duplicates between memory and database
+      const allMessagesMap = new Map();
+      
+      // Add database messages first (they take priority)
+      dbMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        allMessagesMap.set(key, msg);
+      });
+      
+      // Add memory messages only if they don't duplicate database messages
+      memoryMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        if (!allMessagesMap.has(key)) {
+          allMessagesMap.set(key, msg);
+        } else {
+          console.log(`[EXPEDITION-API] Skipping duplicate message from memory: ${msg.content.substring(0, 50)}...`);
+        }
+      });
+      
+      // Convert back to array and sort messages with greetings first, then by timestamp
+      const allMessages = Array.from(allMessagesMap.values()).sort((a, b) => {
+        // Greetings always come first
+        const aIsGreeting = a.metadata?.isGreeting || (a.content && a.content.includes('Welcome aboard'));
+        const bIsGreeting = b.metadata?.isGreeting || (b.content && b.content.includes('Welcome aboard'));
+        
+        if (aIsGreeting && !bIsGreeting) return -1; // a (greeting) comes first
+        if (!aIsGreeting && bIsGreeting) return 1;  // b (greeting) comes first
+        
+        // If both are greetings or both are not greetings, sort by timestamp
+        const aTime = new Date(a.timestamp).getTime();
+        const bTime = new Date(b.timestamp).getTime();
+        
+        // Debug logging for timestamp issues
+        if (isNaN(aTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${a.id}: ${a.timestamp}`);
+        }
+        if (isNaN(bTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${b.id}: ${b.timestamp}`);
+        }
+        
+        return aTime - bTime;
+      });
+
+      console.log(
+        `[EXPEDITION-API] Total messages: ${allMessages.length} (${dbMessages.length} from DB, ${memoryMessages.length} from memory, ${dbMessages.length + memoryMessages.length - allMessages.length} duplicates removed)`
       );
 
       res.json({
         success: true,
-        data: { messages },
+        data: { messages: allMessages },
       });
     } catch (error: any) {
       console.error('[EXPEDITION-API] Failed to get messages:', error);
@@ -1847,13 +1943,104 @@ router.get(
 
       console.log(`[EXPEDITION-API] Getting recent messages for expedition: ${expeditionId}`);
 
-      // Validate expedition access first
-      await expeditionService.getExpedition(expeditionId, userId);
+      // Validate expedition access first and get expedition details
+      const expedition = await expeditionService.getExpedition(expeditionId, userId);
 
       // Get messages from repository
       const { RepositoryFactory } = await import('@starships/models');
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
-      const allMessages = await messageRepo.findByExpedition(expeditionId);
+      const dbMessages = await messageRepo.findByExpedition(expeditionId);
+
+      // Smart message retrieval based on expedition status
+      const expeditionStatus = expedition.expedition.status;
+      console.log(`[EXPEDITION-API] Recent messages - expedition status: ${expeditionStatus}`);
+      
+      let memoryMessages: any[] = [];
+      
+      // Only fetch memory messages for draft expeditions or when there are no database messages
+      const shouldIncludeMemoryMessages = expeditionStatus === 'draft' || dbMessages.length === 0;
+      
+      if (shouldIncludeMemoryMessages) {
+        console.log(`[EXPEDITION-API] Fetching recent messages from LangChain memory...`);
+        try {
+          const memoryEntries = await firstOfficerService.getMemoryMessages(expeditionId, userId);
+        
+        // Convert memory entries to message format
+        const convertedMessages = memoryEntries.map((entry: any, index: number) => {
+          // Preserve original timestamp if valid, otherwise use a timestamp that ensures chronological order
+          let messageTimestamp;
+          if (entry.timestamp && !isNaN(new Date(entry.timestamp).getTime())) {
+            messageTimestamp = new Date(entry.timestamp).toISOString();
+          } else {
+            // Use expedition creation time minus some offset to ensure pre-expedition messages come first
+            const baseTime = new Date(Date.now() - (60000 * 60 * 24)); // 24 hours ago
+            messageTimestamp = new Date(baseTime.getTime() + (index * 1000)).toISOString(); // 1 second apart
+          }
+          
+          return {
+            id: `memory-${Date.now()}-${index}`,
+            expeditionId: expeditionId,
+            role: entry.role === 'assistant' ? 'first-officer' : entry.role,
+            agentId: entry.role === 'assistant' ? 'first-officer' : undefined,
+            userId: entry.role === 'user' ? userId : undefined,
+            content: entry.content,
+            messageType: entry.role === 'assistant' ? 'coordination' : 'user-input',
+            timestamp: messageTimestamp,
+            metadata: { fromMemory: true, isGreeting: entry.content.includes('Welcome aboard') }
+          };
+        });
+
+          // Include all memory messages (greetings should be managed by frontend session state)
+          memoryMessages = convertedMessages;
+        } catch (memoryError) {
+          console.warn(`[EXPEDITION-API] Failed to fetch memory messages for recent:`, memoryError);
+        }
+      } else {
+        console.log(`[EXPEDITION-API] Skipping memory messages for recent ${expeditionStatus} expedition with ${dbMessages.length} database messages`);
+      }
+
+      // Deduplicate messages based on content and timestamp to avoid duplicates between memory and database
+      const allMessagesMap = new Map();
+      
+      // Add database messages first (they take priority)
+      dbMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        allMessagesMap.set(key, msg);
+      });
+      
+      // Add memory messages only if they don't duplicate database messages
+      memoryMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        if (!allMessagesMap.has(key)) {
+          allMessagesMap.set(key, msg);
+        } else {
+          console.log(`[EXPEDITION-API] Skipping duplicate message from memory (recent): ${msg.content.substring(0, 50)}...`);
+        }
+      });
+      
+      // Convert back to array and sort messages with greetings first, then by timestamp
+      const allMessages = Array.from(allMessagesMap.values()).sort((a, b) => {
+        // Greetings always come first
+        const aIsGreeting = a.metadata?.isGreeting || (a.content && a.content.includes('Welcome aboard'));
+        const bIsGreeting = b.metadata?.isGreeting || (b.content && b.content.includes('Welcome aboard'));
+        
+        if (aIsGreeting && !bIsGreeting) return -1; // a (greeting) comes first
+        if (!aIsGreeting && bIsGreeting) return 1;  // b (greeting) comes first
+        
+        // If both are greetings or both are not greetings, sort by timestamp
+        const aTime = new Date(a.timestamp).getTime();
+        const bTime = new Date(b.timestamp).getTime();
+        
+        // Debug logging for timestamp issues
+        if (isNaN(aTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${a.id}: ${a.timestamp}`);
+        }
+        if (isNaN(bTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${b.id}: ${b.timestamp}`);
+        }
+        
+        return aTime - bTime;
+      });
 
       // Apply pagination
       const totalMessages = allMessages.length;
@@ -1882,6 +2069,102 @@ router.get(
       res.status(statusCode).json({
         success: false,
         error: error.message || 'Failed to get recent messages',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/starships/:starshipId/expeditions/:expeditionId/chat/initialize
+ * Initialize chat for expedition - sends greeting if this is the first time
+ */
+router.post(
+  '/starships/:starshipId/expeditions/:expeditionId/chat/initialize',
+  authMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[EXPEDITION-API] Initializing chat for expedition: ${expeditionId}, user: ${userId}`);
+
+      // Initialize chat (sends greeting if needed)
+      const greetingResponse = await firstOfficerService.initializeChat(expeditionId, userId);
+
+      if (greetingResponse) {
+        console.log(`[EXPEDITION-API] Greeting sent for expedition: ${expeditionId}`);
+        res.json({
+          success: true,
+          data: {
+            greeting: greetingResponse,
+            isFirstTime: true
+          },
+          message: 'Chat initialized with greeting'
+        });
+      } else {
+        console.log(`[EXPEDITION-API] Chat already initialized for expedition: ${expeditionId}`);
+        res.json({
+          success: true,
+          data: {
+            greeting: null,
+            isFirstTime: false
+          },
+          message: 'Chat already initialized'
+        });
+      }
+    } catch (error: any) {
+      console.error('[EXPEDITION-API] Failed to initialize chat:', error);
+      const statusCode =
+        error.code === 'EXPEDITION_NOT_FOUND'
+          ? 404
+          : error.code === 'EXPEDITION_ACCESS_DENIED'
+            ? 403
+            : 500;
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to initialize chat',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/starships/:starshipId/expeditions/:expeditionId/readiness
+ * Check if expedition is ready to start based on user interaction count
+ */
+router.get(
+  '/starships/:starshipId/expeditions/:expeditionId/readiness',
+  authMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[EXPEDITION-API] Checking readiness for expedition: ${expeditionId}, user: ${userId}`);
+
+      // Check readiness using FirstOfficerService
+      const readinessResult = await firstOfficerService.checkExpeditionReadiness(expeditionId, userId);
+
+      res.json({
+        success: true,
+        data: readinessResult,
+        message: readinessResult.isReady 
+          ? 'Expedition is ready to start' 
+          : readinessResult.reason || 'Expedition not ready to start'
+      });
+    } catch (error: any) {
+      console.error('[EXPEDITION-API] Failed to check expedition readiness:', error);
+      const statusCode =
+        error.code === 'EXPEDITION_NOT_FOUND'
+          ? 404
+          : error.code === 'EXPEDITION_ACCESS_DENIED'
+            ? 403
+            : 500;
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to check expedition readiness',
         code: error.code,
       });
     }

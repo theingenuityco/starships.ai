@@ -828,6 +828,47 @@ export const expeditionAPI = {
     return data
   },
 
+  /**
+   * Initialize chat for expedition - sends greeting if this is the first time
+   */
+  initializeChat: async (
+    starshipId: string,
+    expeditionId: string,
+    options?: APIOptions
+  ): Promise<{ greeting: any | null; isFirstTime: boolean }> => {
+    validateRequest({ starshipId, expeditionId }, ['starshipId', 'expeditionId'])
+
+    const response = await api.post(
+      `/api/starships/${starshipId}/expeditions/${expeditionId}/chat/initialize`,
+      {},
+      {
+        timeout: options?.timeout || 30000
+      }
+    )
+    const data = response.data.data
+    return data
+  },
+
+  /**
+   * Check if expedition is ready to start based on user interaction count
+   */
+  checkReadiness: async (
+    starshipId: string,
+    expeditionId: string,
+    options?: APIOptions
+  ): Promise<{ isReady: boolean; userMessageCount: number; reason?: string }> => {
+    validateRequest({ starshipId, expeditionId }, ['starshipId', 'expeditionId'])
+
+    const response = await api.get(
+      `/api/starships/${starshipId}/expeditions/${expeditionId}/readiness`,
+      {
+        timeout: options?.timeout || 10000
+      }
+    )
+    const data = response.data.data
+    return data
+  },
+
   // ============================================================================
   // RESULTS ENDPOINTS
   // ============================================================================

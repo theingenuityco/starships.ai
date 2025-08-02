@@ -48,6 +48,9 @@ export class MCPEnhancedTaskExecutor {
     this.starshipId = starshipId;
     console.log(`[MCPEnhancedTaskExecutor] Set starship ID: ${starshipId}`);
     
+    // Enable MCP on the underlying task executor
+    this.taskExecutor.enableMCP(starshipId);
+    
     // Clear cached tools when starship changes
     this.mcpToolsByAgent.clear();
     this.toolWrappers.clear();

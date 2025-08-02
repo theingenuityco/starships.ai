@@ -123,8 +123,6 @@ export class FirstOfficerService {
       const memoryStore = new LangChainMemoryStore();
       this.memoryStores.set(expeditionId, memoryStore);
 
-      // Create MCP-enabled First Officer Agent instance
-      // const firstOfficer = createMCPEnabledFirstOfficerAgent(
       // Create WebSocket message emission callback
       const messageEmitCallback = async (message: any) => {
         const socketSvc = this.getSocketService();
@@ -159,8 +157,8 @@ export class FirstOfficerService {
         webSocketEmitter.setSocketServer(socketSvc.getIO());
       }
 
-      // Create First Officer Agent instance with proper configuration
-      const firstOfficer = new FirstOfficerAgent(
+      // Create MCP-enabled First Officer Agent instance
+      const firstOfficer = await await createMCPEnabledFirstOfficerAgent(
         expedition.starshipId,
         memoryStore,
         {
@@ -169,10 +167,9 @@ export class FirstOfficerService {
           timeoutMinutes: 60,
           requireUserApproval: false,
           enableParallelExecution: true,
-          autoEscalation: true
-          // COMMENTED OUT: MCP-related properties removed
-          // mcpEnabled: true,
-          // mcpStarshipId: expedition.starshipId
+          autoEscalation: true,
+          mcpEnabled: true,
+          mcpStarshipId: expedition.starshipId
         },
         expedition.assignedAgents, // Pass selected agents from expedition
         messageEmitCallback, // Pass WebSocket emission callback
@@ -310,8 +307,8 @@ export class FirstOfficerService {
           webSocketEmitter.setSocketServer(socketSvcEmitter.getIO());
         }
 
-        // Create First Officer Agent instance
-        const newFirstOfficer = new FirstOfficerAgent(
+        // Create MCP-enabled First Officer Agent instance
+        const newFirstOfficer = await await createMCPEnabledFirstOfficerAgent(
           expedition.starshipId,
           memoryStore,
           {
@@ -320,7 +317,9 @@ export class FirstOfficerService {
             timeoutMinutes: 60,
             requireUserApproval: false,
             enableParallelExecution: false,
-            autoEscalation: true
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
           },
           expedition.assignedAgents,
           messageEmitCallback,
@@ -562,7 +561,7 @@ export class FirstOfficerService {
           webSocketEmitter.setSocketServer(socketSvc.getIO());
         }
         
-        firstOfficer = new FirstOfficerAgent(
+        firstOfficer = await createMCPEnabledFirstOfficerAgent(
           expedition.starshipId,
           memoryStore,
           {
@@ -571,7 +570,9 @@ export class FirstOfficerService {
             timeoutMinutes: 60,
             requireUserApproval: false,
             enableParallelExecution: false,
-            autoEscalation: true
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
           },
           expedition.assignedAgents || [],
           messageEmitCallback,
@@ -906,6 +907,279 @@ export class FirstOfficerService {
         totalAgents: assignedAgents.length
       }
     };
+  }
+
+  /**
+   * Initialize chat for expedition - sends greeting if this is the first time
+   * Should be called when user first opens expedition chat interface
+   */
+  async initializeChat(
+    expeditionId: string,
+    userId: string
+  ): Promise<ChatResponse | null> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'initializeChat',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId }
+    };
+
+    this.logger.info('Initializing chat for expedition', context);
+
+    try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
+          context
+        );
+      }
+
+      if (!userId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
+          context
+        );
+      }
+
+      // Get expedition to ensure it exists
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        throw ErrorFactory.notFound(
+          'Expedition',
+          expeditionId,
+          context
+        );
+      }
+
+      // Create or get existing FirstOfficerAgent
+      let firstOfficer = this.activeAgents.get(expeditionId);
+      
+      if (!firstOfficer) {
+        // Create FirstOfficerAgent for chat initialization
+        const memoryStore = this.memoryStores.get(expeditionId) || new LangChainMemoryStore();
+        this.memoryStores.set(expeditionId, memoryStore);
+        
+        // Create WebSocket message emission callback
+        const messageEmitCallback = async (message: any) => {
+          const socketSvc = this.getSocketService();
+          if (socketSvc) {
+            const expeditionRoom = `expedition:${expeditionId}`;
+            const eventData = {
+              expeditionId,
+              message,
+              timestamp: new Date().toISOString()
+            };
+            socketSvc.getIO().to(expeditionRoom).emit('message:sent', eventData);
+          }
+        };
+
+        // Create WebSocketEventEmitter
+        const webSocketEmitter = new WebSocketEventEmitter();
+        const socketSvc = this.getSocketService();
+        if (socketSvc) {
+          webSocketEmitter.setSocketServer(socketSvc.getIO());
+        }
+        
+        firstOfficer = await createMCPEnabledFirstOfficerAgent(
+          expedition.starshipId,
+          memoryStore,
+          {
+            maxRetries: 3,
+            qualityThreshold: 70,
+            timeoutMinutes: 60,
+            requireUserApproval: false,
+            enableParallelExecution: false,
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
+          },
+          expedition.assignedAgents || [],
+          messageEmitCallback,
+          webSocketEmitter
+        );
+        
+        this.activeAgents.set(expeditionId, firstOfficer);
+      }
+
+      // Initialize chat (sends greeting if needed)
+      const greetingResponse = await firstOfficer.initializeChat(expeditionId);
+
+      if (greetingResponse) {
+        this.logger.info('Chat initialized with greeting', context, {
+          responseLength: greetingResponse.reply.length
+        });
+      } else {
+        this.logger.info('Chat already initialized, no greeting sent', context);
+      }
+
+      return greetingResponse;
+    } catch (error) {
+      this.logger.error('Failed to initialize chat', error instanceof Error ? error : undefined, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if expedition is ready to start based on user interaction count
+   */
+  async checkExpeditionReadiness(
+    expeditionId: string,
+    userId: string
+  ): Promise<{
+    isReady: boolean;
+    userMessageCount: number;
+    reason?: string;
+  }> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'checkExpeditionReadiness',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId }
+    };
+
+    this.logger.info('Checking expedition readiness', context);
+
+    try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
+          context
+        );
+      }
+
+      if (!userId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
+          context
+        );
+      }
+
+      // Get expedition to ensure it exists
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        throw ErrorFactory.notFound(
+          'Expedition',
+          expeditionId,
+          context
+        );
+      }
+
+      // Create or get existing FirstOfficerAgent
+      let firstOfficer = this.activeAgents.get(expeditionId);
+      
+      if (!firstOfficer) {
+        // Create MCP-enabled FirstOfficerAgent for readiness check
+        const memoryStore = this.memoryStores.get(expeditionId) || new LangChainMemoryStore();
+        this.memoryStores.set(expeditionId, memoryStore);
+        
+        firstOfficer = await createMCPEnabledFirstOfficerAgent(
+          expedition.starshipId,
+          memoryStore,
+          {
+            maxRetries: 3,
+            qualityThreshold: 70,
+            timeoutMinutes: 60,
+            requireUserApproval: false,
+            enableParallelExecution: false,
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
+          },
+          expedition.assignedAgents || [],
+          undefined, // no message callback needed for readiness check
+          undefined  // no websocket emitter needed
+        );
+        
+        this.activeAgents.set(expeditionId, firstOfficer);
+      }
+
+      // Check readiness using FirstOfficerAgent
+      const readinessResult = await firstOfficer.isExpeditionReadyToStart(expeditionId, userId);
+
+      this.logger.info('Expedition readiness checked successfully', context, {
+        isReady: readinessResult.isReady,
+        userMessageCount: readinessResult.userMessageCount,
+        reason: readinessResult.reason
+      });
+
+      return readinessResult;
+    } catch (error) {
+      this.logger.error('Failed to check expedition readiness', error instanceof Error ? error : undefined, context);
+      throw error;
+    }
+  }
+
+  /**
+   * Get memory messages for expedition (includes greetings and chat history)
+   */
+  async getMemoryMessages(
+    expeditionId: string,
+    userId: string
+  ): Promise<any[]> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'getMemoryMessages',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId }
+    };
+
+    this.logger.info('Getting memory messages for expedition', context);
+
+    try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'expeditionId', message: 'Expedition ID is required' }],
+          context
+        );
+      }
+
+      if (!userId?.trim()) {
+        throw ErrorFactory.validation(
+          [{ field: 'userId', message: 'User ID is required' }],
+          context
+        );
+      }
+
+      // Get expedition to determine the correct user for memory lookup
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const expedition = await expeditionRepo.findById(expeditionId);
+      
+      if (!expedition) {
+        throw ErrorFactory.notFound(
+          'Expedition',
+          expeditionId,
+          context
+        );
+      }
+
+      // Create memory store to access the session
+      const memoryStore = new LangChainMemoryStore();
+      const sessionKey = memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
+      
+      this.logger.debug('Retrieving memory entries', context, { sessionKey });
+      
+      // Get memory entries
+      const memoryEntries = await memoryStore.get(sessionKey);
+      
+      this.logger.info('Memory messages retrieved successfully', context, {
+        entriesCount: memoryEntries.length
+      });
+
+      return memoryEntries;
+    } catch (error) {
+      this.logger.error('Failed to get memory messages', error instanceof Error ? error : undefined, context);
+      throw error;
+    }
   }
 
 }

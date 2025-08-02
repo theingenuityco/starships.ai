@@ -90,9 +90,9 @@ export async function seedLLMModels() {
       console.log(`📋 Found ${existingModels.length} existing LLM models`);
       console.log('🔄 Checking for missing models to add...');
       
-      // Only add models that don't already exist
-      const existingIds = new Set(existingModels.map(m => m.id));
-      const modelsToAdd = LLM_MODELS.filter(m => !existingIds.has(m.id));
+      // Only add models that don't already exist (check by name, not ID)
+      const existingNames = new Set(existingModels.map(m => m.name));
+      const modelsToAdd = LLM_MODELS.filter(m => !existingNames.has(m.name));
       
       if (modelsToAdd.length === 0) {
         console.log('✅ All default LLM models already exist');

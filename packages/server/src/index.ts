@@ -22,7 +22,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedMCPServers } from '@starships/models';
+import { seedMCPServers, seedLLMModels } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -225,6 +225,10 @@ httpServer.listen(PORT, async () => {
     // Initialize MCP Server Options (seeds default connectors)
     await seedMCPServers();
     console.log('✅ MCP Server Options initialized with default connectors');
+    
+    // Initialize LLM Models (seeds default models)
+    await seedLLMModels();
+    console.log('✅ LLM Models initialized with default models');
 
     // Initialize MCPServerConnectorRepository (validate schema and constraints)
     try {

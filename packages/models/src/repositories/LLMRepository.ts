@@ -62,7 +62,8 @@ export class LLMRepository implements LLMRepositoryInterface {
         embeddingModel: $embeddingModel,
         supportsStreaming: $supportsStreaming,
         supportsTools: $supportsTools,
-        costPer1kTokens: $costPer1kTokens
+        costPer1kTokens: $costPer1kTokens,
+        createdAt: $createdAt
       }) RETURN l`,
       { 
         id: id, 
@@ -73,7 +74,8 @@ export class LLMRepository implements LLMRepositoryInterface {
         embeddingModel: entity.embeddingModel,
         supportsStreaming: entity.supportsStreaming,
         supportsTools: entity.supportsTools,
-        costPer1kTokens: entity.costPer1kTokens
+        costPer1kTokens: entity.costPer1kTokens,
+        createdAt: entity.createdAt
       }
     );
     

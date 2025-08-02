@@ -82,25 +82,54 @@ export class LangChainProvider implements LLMProvider {
   }
 
   private createModel(opts?: { stream?: boolean; temperature?: number; maxTokens?: number }): BaseChatModel {
+    // Debug logging to track input values
+    console.log(`[LANGCHAIN-PROVIDER] Creating model with config:`, {
+      modelConfig: this.modelConfig,
+      opts,
+      maxTokensFromModel: this.modelConfig.maxTokens,
+      maxTokensFromOpts: opts?.maxTokens,
+      temperatureFromModel: this.modelConfig.temperature,
+      temperatureFromOpts: opts?.temperature
+    });
+
     const config = {
       ...this.modelConfig,
       ...(opts?.temperature !== undefined && { temperature: opts.temperature }),
       ...(opts?.maxTokens !== undefined && { maxTokens: opts.maxTokens }),
     };
 
+    // Ensure numeric values are properly converted
+    const maxTokens = typeof config.maxTokens === 'number' ? config.maxTokens : 
+                     typeof config.maxTokens === 'string' ? parseInt(config.maxTokens, 10) : 
+                     4000; // Default fallback
+    
+    const temperature = typeof config.temperature === 'number' ? config.temperature : 
+                       typeof config.temperature === 'string' ? parseFloat(config.temperature) : 
+                       0.7; // Default fallback
+
+    // Debug logging to identify the issue
+    if (typeof config.maxTokens !== 'number' && config.maxTokens !== undefined) {
+      console.warn(`[LANGCHAIN-PROVIDER] Invalid maxTokens type: ${typeof config.maxTokens}, value:`, config.maxTokens);
+    }
+    if (typeof config.temperature !== 'number' && config.temperature !== undefined) {
+      console.warn(`[LANGCHAIN-PROVIDER] Invalid temperature type: ${typeof config.temperature}, value:`, config.temperature);
+    }
+
+    console.log(`[LANGCHAIN-PROVIDER] Final values: maxTokens=${maxTokens} (${typeof maxTokens}), temperature=${temperature} (${typeof temperature})`);
+
     switch (this.modelConfig.provider) {
       case 'openai':
         return new ChatOpenAI({
           model: config.name,
-          temperature: config.temperature,
-          maxTokens: config.maxTokens,
+          temperature: temperature,
+          maxTokens: maxTokens,
           apiKey: process.env.OPENAI_API_KEY,
         });
       case 'anthropic':
         return new ChatAnthropic({
           model: config.name,
-          temperature: config.temperature,
-          maxTokens: config.maxTokens,
+          temperature: temperature,
+          maxTokens: maxTokens,
           apiKey: process.env.ANTHROPIC_API_KEY,
         });
       default:

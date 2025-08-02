@@ -1085,35 +1085,76 @@ router.get(
         `[EXPEDITION-API] Found ${dbMessages.length} database messages for expedition: ${expeditionId}`
       );
 
-      // Also get messages from LangChain memory (includes greetings and chat history)
-      // Only include greetings for draft expeditions
-      console.log(`[EXPEDITION-API] Fetching messages from LangChain memory...`);
+      // Smart message retrieval based on expedition status
+      const expeditionStatus = expedition.expedition.status;
+      console.log(`[EXPEDITION-API] Fetching messages based on expedition status: ${expeditionStatus}`);
+      
       let memoryMessages: any[] = [];
-      try {
-        const memoryEntries = await firstOfficerService.getMemoryMessages(expeditionId, userId);
-        console.log(`[EXPEDITION-API] Found ${memoryEntries.length} memory entries`);
+      
+      // Only fetch memory messages for draft expeditions or when there are no database messages
+      const shouldIncludeMemoryMessages = expeditionStatus === 'draft' || dbMessages.length === 0;
+      
+      if (shouldIncludeMemoryMessages) {
+        console.log(`[EXPEDITION-API] Fetching messages from LangChain memory...`);
+        try {
+          const memoryEntries = await firstOfficerService.getMemoryMessages(expeditionId, userId);
+          console.log(`[EXPEDITION-API] Found ${memoryEntries.length} memory entries`);
         
         // Convert memory entries to message format
-        const convertedMessages = memoryEntries.map((entry: any, index: number) => ({
-          id: `memory-${Date.now()}-${index}`,
-          expeditionId: expeditionId,
-          role: entry.role === 'assistant' ? 'first-officer' : entry.role,
-          agentId: entry.role === 'assistant' ? 'first-officer' : undefined,
-          userId: entry.role === 'user' ? userId : undefined,
-          content: entry.content,
-          messageType: entry.role === 'assistant' ? 'coordination' : 'user-input',
-          timestamp: new Date(entry.timestamp || Date.now()).toISOString(),
-          metadata: { fromMemory: true, isGreeting: entry.content.includes('Welcome aboard') }
-        }));
+        const convertedMessages = memoryEntries.map((entry: any, index: number) => {
+          // Preserve original timestamp if valid, otherwise use a timestamp that ensures chronological order
+          let messageTimestamp;
+          if (entry.timestamp && !isNaN(new Date(entry.timestamp).getTime())) {
+            messageTimestamp = new Date(entry.timestamp).toISOString();
+          } else {
+            // Use expedition creation time minus some offset to ensure pre-expedition messages come first
+            const baseTime = new Date(Date.now() - (60000 * 60 * 24)); // 24 hours ago
+            messageTimestamp = new Date(baseTime.getTime() + (index * 1000)).toISOString(); // 1 second apart
+          }
+          
+          return {
+            id: `memory-${Date.now()}-${index}`,
+            expeditionId: expeditionId,
+            role: entry.role === 'assistant' ? 'first-officer' : entry.role,
+            agentId: entry.role === 'assistant' ? 'first-officer' : undefined,
+            userId: entry.role === 'user' ? userId : undefined,
+            content: entry.content,
+            messageType: entry.role === 'assistant' ? 'coordination' : 'user-input',
+            timestamp: messageTimestamp,
+            metadata: { fromMemory: true, isGreeting: entry.content.includes('Welcome aboard') }
+          };
+        });
 
-        // Include all memory messages (greetings should be managed by frontend session state)
-        memoryMessages = convertedMessages;
-      } catch (memoryError) {
-        console.warn(`[EXPEDITION-API] Failed to fetch memory messages:`, memoryError);
+          // Include all memory messages (greetings should be managed by frontend session state)
+          memoryMessages = convertedMessages;
+        } catch (memoryError) {
+          console.warn(`[EXPEDITION-API] Failed to fetch memory messages:`, memoryError);
+        }
+      } else {
+        console.log(`[EXPEDITION-API] Skipping memory messages for ${expeditionStatus} expedition with ${dbMessages.length} database messages`);
       }
 
-      // Combine and sort messages with greetings first, then by timestamp
-      const allMessages = [...dbMessages, ...memoryMessages].sort((a, b) => {
+      // Deduplicate messages based on content and timestamp to avoid duplicates between memory and database
+      const allMessagesMap = new Map();
+      
+      // Add database messages first (they take priority)
+      dbMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        allMessagesMap.set(key, msg);
+      });
+      
+      // Add memory messages only if they don't duplicate database messages
+      memoryMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        if (!allMessagesMap.has(key)) {
+          allMessagesMap.set(key, msg);
+        } else {
+          console.log(`[EXPEDITION-API] Skipping duplicate message from memory: ${msg.content.substring(0, 50)}...`);
+        }
+      });
+      
+      // Convert back to array and sort messages with greetings first, then by timestamp
+      const allMessages = Array.from(allMessagesMap.values()).sort((a, b) => {
         // Greetings always come first
         const aIsGreeting = a.metadata?.isGreeting || (a.content && a.content.includes('Welcome aboard'));
         const bIsGreeting = b.metadata?.isGreeting || (b.content && b.content.includes('Welcome aboard'));
@@ -1122,11 +1163,22 @@ router.get(
         if (!aIsGreeting && bIsGreeting) return 1;  // b (greeting) comes first
         
         // If both are greetings or both are not greetings, sort by timestamp
-        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        const aTime = new Date(a.timestamp).getTime();
+        const bTime = new Date(b.timestamp).getTime();
+        
+        // Debug logging for timestamp issues
+        if (isNaN(aTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${a.id}: ${a.timestamp}`);
+        }
+        if (isNaN(bTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${b.id}: ${b.timestamp}`);
+        }
+        
+        return aTime - bTime;
       });
 
       console.log(
-        `[EXPEDITION-API] Total messages: ${allMessages.length} (${dbMessages.length} from DB, ${memoryMessages.length} from memory)`
+        `[EXPEDITION-API] Total messages: ${allMessages.length} (${dbMessages.length} from DB, ${memoryMessages.length} from memory, ${dbMessages.length + memoryMessages.length - allMessages.length} duplicates removed)`
       );
 
       res.json({
@@ -1891,41 +1943,83 @@ router.get(
 
       console.log(`[EXPEDITION-API] Getting recent messages for expedition: ${expeditionId}`);
 
-      // Validate expedition access first
-      await expeditionService.getExpedition(expeditionId, userId);
+      // Validate expedition access first and get expedition details
+      const expedition = await expeditionService.getExpedition(expeditionId, userId);
 
       // Get messages from repository
       const { RepositoryFactory } = await import('@starships/models');
       const messageRepo = RepositoryFactory.getExpeditionMessageRepository();
       const dbMessages = await messageRepo.findByExpedition(expeditionId);
 
-      // Also get messages from LangChain memory (includes greetings and chat history)
-      // Only include greetings for draft expeditions
+      // Smart message retrieval based on expedition status
+      const expeditionStatus = expedition.expedition.status;
+      console.log(`[EXPEDITION-API] Recent messages - expedition status: ${expeditionStatus}`);
+      
       let memoryMessages: any[] = [];
-      try {
-        const memoryEntries = await firstOfficerService.getMemoryMessages(expeditionId, userId);
+      
+      // Only fetch memory messages for draft expeditions or when there are no database messages
+      const shouldIncludeMemoryMessages = expeditionStatus === 'draft' || dbMessages.length === 0;
+      
+      if (shouldIncludeMemoryMessages) {
+        console.log(`[EXPEDITION-API] Fetching recent messages from LangChain memory...`);
+        try {
+          const memoryEntries = await firstOfficerService.getMemoryMessages(expeditionId, userId);
         
         // Convert memory entries to message format
-        const convertedMessages = memoryEntries.map((entry: any, index: number) => ({
-          id: `memory-${Date.now()}-${index}`,
-          expeditionId: expeditionId,
-          role: entry.role === 'assistant' ? 'first-officer' : entry.role,
-          agentId: entry.role === 'assistant' ? 'first-officer' : undefined,
-          userId: entry.role === 'user' ? userId : undefined,
-          content: entry.content,
-          messageType: entry.role === 'assistant' ? 'coordination' : 'user-input',
-          timestamp: new Date(entry.timestamp || Date.now()).toISOString(),
-          metadata: { fromMemory: true, isGreeting: entry.content.includes('Welcome aboard') }
-        }));
+        const convertedMessages = memoryEntries.map((entry: any, index: number) => {
+          // Preserve original timestamp if valid, otherwise use a timestamp that ensures chronological order
+          let messageTimestamp;
+          if (entry.timestamp && !isNaN(new Date(entry.timestamp).getTime())) {
+            messageTimestamp = new Date(entry.timestamp).toISOString();
+          } else {
+            // Use expedition creation time minus some offset to ensure pre-expedition messages come first
+            const baseTime = new Date(Date.now() - (60000 * 60 * 24)); // 24 hours ago
+            messageTimestamp = new Date(baseTime.getTime() + (index * 1000)).toISOString(); // 1 second apart
+          }
+          
+          return {
+            id: `memory-${Date.now()}-${index}`,
+            expeditionId: expeditionId,
+            role: entry.role === 'assistant' ? 'first-officer' : entry.role,
+            agentId: entry.role === 'assistant' ? 'first-officer' : undefined,
+            userId: entry.role === 'user' ? userId : undefined,
+            content: entry.content,
+            messageType: entry.role === 'assistant' ? 'coordination' : 'user-input',
+            timestamp: messageTimestamp,
+            metadata: { fromMemory: true, isGreeting: entry.content.includes('Welcome aboard') }
+          };
+        });
 
-        // Include all memory messages (greetings should be managed by frontend session state)
-        memoryMessages = convertedMessages;
-      } catch (memoryError) {
-        console.warn(`[EXPEDITION-API] Failed to fetch memory messages for recent:`, memoryError);
+          // Include all memory messages (greetings should be managed by frontend session state)
+          memoryMessages = convertedMessages;
+        } catch (memoryError) {
+          console.warn(`[EXPEDITION-API] Failed to fetch memory messages for recent:`, memoryError);
+        }
+      } else {
+        console.log(`[EXPEDITION-API] Skipping memory messages for recent ${expeditionStatus} expedition with ${dbMessages.length} database messages`);
       }
 
-      // Combine and sort messages with greetings first, then by timestamp
-      const allMessages = [...dbMessages, ...memoryMessages].sort((a, b) => {
+      // Deduplicate messages based on content and timestamp to avoid duplicates between memory and database
+      const allMessagesMap = new Map();
+      
+      // Add database messages first (they take priority)
+      dbMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        allMessagesMap.set(key, msg);
+      });
+      
+      // Add memory messages only if they don't duplicate database messages
+      memoryMessages.forEach(msg => {
+        const key = `${msg.content}-${msg.role}-${new Date(msg.timestamp).getTime()}`;
+        if (!allMessagesMap.has(key)) {
+          allMessagesMap.set(key, msg);
+        } else {
+          console.log(`[EXPEDITION-API] Skipping duplicate message from memory (recent): ${msg.content.substring(0, 50)}...`);
+        }
+      });
+      
+      // Convert back to array and sort messages with greetings first, then by timestamp
+      const allMessages = Array.from(allMessagesMap.values()).sort((a, b) => {
         // Greetings always come first
         const aIsGreeting = a.metadata?.isGreeting || (a.content && a.content.includes('Welcome aboard'));
         const bIsGreeting = b.metadata?.isGreeting || (b.content && b.content.includes('Welcome aboard'));
@@ -1934,7 +2028,18 @@ router.get(
         if (!aIsGreeting && bIsGreeting) return 1;  // b (greeting) comes first
         
         // If both are greetings or both are not greetings, sort by timestamp
-        return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+        const aTime = new Date(a.timestamp).getTime();
+        const bTime = new Date(b.timestamp).getTime();
+        
+        // Debug logging for timestamp issues
+        if (isNaN(aTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${a.id}: ${a.timestamp}`);
+        }
+        if (isNaN(bTime)) {
+          console.warn(`[EXPEDITION-API] Invalid timestamp for message ${b.id}: ${b.timestamp}`);
+        }
+        
+        return aTime - bTime;
       });
 
       // Apply pagination

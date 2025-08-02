@@ -15,7 +15,7 @@ import { Observable, Subject, BehaviorSubject, merge, timer, from, EMPTY, throwE
 import { map, filter, takeUntil, timeout, catchError, retry, delay, mergeMap, concatMap, switchMap } from 'rxjs/operators';
 import { TaskBreakdown, ChatRequest, AgentActivity, AgentActivityType } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
-import { chat } from '../index';
+import { chat, chatWithMCP } from '../index';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
 import { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
 import {
@@ -198,6 +198,8 @@ export class TaskExecutor {
   private performanceHistory: Map<string, TaskPerformanceMetrics[]> = new Map();
   private webSocketEmitter: WebSocketEventEmitter;
   private agentNames: Map<string, string> = new Map();
+  private mcpEnabled: boolean = false;
+  private starshipId: string | null = null;
 
   constructor(config: FirstOfficerConfig, memoryStore: LangChainMemoryStore, webSocketEmitter?: WebSocketEventEmitter) {
     this.config = config;
@@ -205,6 +207,37 @@ export class TaskExecutor {
     this.webSocketEmitter = webSocketEmitter || new WebSocketEventEmitter();
     this.initializeResourcePool();
     this.initializeExecutionStrategy();
+  }
+
+  /**
+   * Enable MCP tools for this task executor
+   */
+  enableMCP(starshipId: string): void {
+    this.mcpEnabled = true;
+    this.starshipId = starshipId;
+    console.log(`🔧 [TASK-EXECUTOR] MCP enabled for starship: ${starshipId}`);
+  }
+
+  /**
+   * Execute chat with MCP context, ensuring agent has correct starshipId
+   */
+  private async executeWithMCPContext(chatRequest: ChatRequest, starshipId: string): Promise<any> {
+    try {
+      console.log(`🔧 [TASK-EXECUTOR] Executing with MCP context for agent ${chatRequest.agent_id}, starshipId: ${starshipId}`);
+      
+      // Execute with MCP tools using starshipId override (no database changes needed)
+      const response = await chatWithMCP(chatRequest, this.memoryStore, { 
+        overrideStarshipId: starshipId 
+      });
+      
+      console.log(`✅ [TASK-EXECUTOR] MCP execution successful for agent ${chatRequest.agent_id}`);
+      return response;
+    } catch (error) {
+      console.error(`❌ [TASK-EXECUTOR] Error in executeWithMCPContext:`, error);
+      // Fallback to regular chat if MCP fails
+      console.log(`🔄 [TASK-EXECUTOR] Falling back to regular chat for agent ${chatRequest.agent_id}`);
+      return await chat(chatRequest, this.memoryStore);
+    }
   }
 
   /**
@@ -664,9 +697,9 @@ export class TaskExecutor {
           taskTitle
         );
 
-        // Add 10-second delay for natural conversation flow
-        console.log(`⏱️ [TASK-EXECUTOR] Adding 10-second delay for natural conversation flow...`);
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // Add 7-second delay for natural conversation flow
+        console.log(`⏱️ [TASK-EXECUTOR] Adding 7-second delay for natural conversation flow...`);
+        await new Promise(resolve => setTimeout(resolve, 7000));
 
         // Execute the actual task
         const result = await this.executeTaskWithAgent(execution, expeditionId, userId);
@@ -726,6 +759,7 @@ export class TaskExecutor {
     
     // Execute task through agent with timeout
     console.log(`💬 [TASK-EXECUTOR] Sending enhanced task to agent: ${execution.agentId}`);
+    console.log(`🔧 [TASK-EXECUTOR] MCP enabled: ${this.mcpEnabled}, Starship: ${this.starshipId}`);
     
     // Emit typing start
     if (this.webSocketEmitter) {
@@ -734,10 +768,27 @@ export class TaskExecutor {
     }
     
     const timeoutMs = (this.config.timeoutMinutes || 30) * 60 * 1000;
-    const response = await Promise.race([
-      chat(chatRequest, this.memoryStore),
-      this.createTimeoutPromise(timeoutMs)
-    ]);
+    const chatFunction = this.mcpEnabled && this.starshipId ? chatWithMCP : chat;
+    console.log(`🔧 [TASK-EXECUTOR] Using ${this.mcpEnabled ? 'MCP-enabled' : 'regular'} chat function`);
+    console.log(`🔧 [TASK-EXECUTOR] [FIX-v2] MCP override starshipId fix is ACTIVE`);
+    
+    // For MCP-enabled execution, temporarily override the agent's starshipId if needed
+    let originalResponse;
+    if (this.mcpEnabled && this.starshipId) {
+      // We need to ensure the agent has the correct starshipId for MCP tool loading
+      console.log(`🔧 [TASK-EXECUTOR] Ensuring agent ${execution.agentId} has starshipId: ${this.starshipId}`);
+      originalResponse = await Promise.race([
+        this.executeWithMCPContext(chatRequest, this.starshipId),
+        this.createTimeoutPromise(timeoutMs)
+      ]);
+    } else {
+      originalResponse = await Promise.race([
+        chatFunction(chatRequest, this.memoryStore),
+        this.createTimeoutPromise(timeoutMs)
+      ]);
+    }
+    
+    const response = originalResponse;
     
     // Parse and emit chain of thought message
     if (this.webSocketEmitter) {

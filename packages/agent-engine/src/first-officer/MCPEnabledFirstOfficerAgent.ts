@@ -9,7 +9,8 @@ import { FirstOfficerAgent } from './FirstOfficerAgent';
 import { MCPEnhancedTaskExecutor } from './MCPEnhancedTaskExecutor';
 import { FirstOfficerConfig } from './types';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
-import { mcpToolGateway } from '@starships/core';
+import { WebSocketEventEmitter } from './parallel/WebSocketEventEmitter';
+import { ExpeditionMessage } from '@starships/protocol';
 
 export interface MCPEnabledFirstOfficerConfig extends FirstOfficerConfig {
   mcpEnabled?: boolean;
@@ -22,14 +23,16 @@ export interface MCPEnabledFirstOfficerConfig extends FirstOfficerConfig {
  * This function creates a FirstOfficerAgent instance that uses MCPEnhancedTaskExecutor
  * internally for MCP tool integration.
  */
-export function createMCPEnabledFirstOfficerAgent(
+export async function createMCPEnabledFirstOfficerAgent(
   starshipId: string,
   memoryStore: LangChainMemoryStore,
   config: Partial<MCPEnabledFirstOfficerConfig> = {},
-  selectedAgentIds: string[]
-): MCPEnabledFirstOfficerAgent {
+  selectedAgentIds: string[],
+  messageEmitCallback?: (message: ExpeditionMessage) => Promise<void>,
+  webSocketEmitter?: WebSocketEventEmitter
+): Promise<MCPEnabledFirstOfficerAgent> {
   // Create the base agent
-  const baseAgent = new FirstOfficerAgent(starshipId, memoryStore, config, selectedAgentIds);
+  const baseAgent = new FirstOfficerAgent(starshipId, memoryStore, config, selectedAgentIds, messageEmitCallback, webSocketEmitter);
   
   // Create MCP-enhanced task executor
   const mcpTaskExecutor = new MCPEnhancedTaskExecutor(
@@ -43,9 +46,12 @@ export function createMCPEnabledFirstOfficerAgent(
   
   // Set the starship ID for MCP tool discovery
   const mcpStarshipId = config.mcpStarshipId || starshipId;
-  mcpTaskExecutor.setStarshipId(mcpStarshipId).catch(error => {
+  try {
+    await mcpTaskExecutor.setStarshipId(mcpStarshipId);
+    console.log('[MCPEnabledFirstOfficer] Successfully set starship ID:', mcpStarshipId);
+  } catch (error) {
     console.error('[MCPEnabledFirstOfficer] Failed to set starship ID:', error);
-  });
+  }
   
   // Replace the taskExecutor using reflection (careful approach)
   const agentWithMCP = baseAgent as any;

@@ -123,8 +123,6 @@ export class FirstOfficerService {
       const memoryStore = new LangChainMemoryStore();
       this.memoryStores.set(expeditionId, memoryStore);
 
-      // Create MCP-enabled First Officer Agent instance
-      // const firstOfficer = createMCPEnabledFirstOfficerAgent(
       // Create WebSocket message emission callback
       const messageEmitCallback = async (message: any) => {
         const socketSvc = this.getSocketService();
@@ -159,8 +157,8 @@ export class FirstOfficerService {
         webSocketEmitter.setSocketServer(socketSvc.getIO());
       }
 
-      // Create First Officer Agent instance with proper configuration
-      const firstOfficer = new FirstOfficerAgent(
+      // Create MCP-enabled First Officer Agent instance
+      const firstOfficer = await await createMCPEnabledFirstOfficerAgent(
         expedition.starshipId,
         memoryStore,
         {
@@ -169,10 +167,9 @@ export class FirstOfficerService {
           timeoutMinutes: 60,
           requireUserApproval: false,
           enableParallelExecution: true,
-          autoEscalation: true
-          // COMMENTED OUT: MCP-related properties removed
-          // mcpEnabled: true,
-          // mcpStarshipId: expedition.starshipId
+          autoEscalation: true,
+          mcpEnabled: true,
+          mcpStarshipId: expedition.starshipId
         },
         expedition.assignedAgents, // Pass selected agents from expedition
         messageEmitCallback, // Pass WebSocket emission callback
@@ -310,8 +307,8 @@ export class FirstOfficerService {
           webSocketEmitter.setSocketServer(socketSvcEmitter.getIO());
         }
 
-        // Create First Officer Agent instance
-        const newFirstOfficer = new FirstOfficerAgent(
+        // Create MCP-enabled First Officer Agent instance
+        const newFirstOfficer = await await createMCPEnabledFirstOfficerAgent(
           expedition.starshipId,
           memoryStore,
           {
@@ -320,7 +317,9 @@ export class FirstOfficerService {
             timeoutMinutes: 60,
             requireUserApproval: false,
             enableParallelExecution: false,
-            autoEscalation: true
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
           },
           expedition.assignedAgents,
           messageEmitCallback,
@@ -562,7 +561,7 @@ export class FirstOfficerService {
           webSocketEmitter.setSocketServer(socketSvc.getIO());
         }
         
-        firstOfficer = new FirstOfficerAgent(
+        firstOfficer = await createMCPEnabledFirstOfficerAgent(
           expedition.starshipId,
           memoryStore,
           {
@@ -571,7 +570,9 @@ export class FirstOfficerService {
             timeoutMinutes: 60,
             requireUserApproval: false,
             enableParallelExecution: false,
-            autoEscalation: true
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
           },
           expedition.assignedAgents || [],
           messageEmitCallback,
@@ -983,7 +984,7 @@ export class FirstOfficerService {
           webSocketEmitter.setSocketServer(socketSvc.getIO());
         }
         
-        firstOfficer = new FirstOfficerAgent(
+        firstOfficer = await createMCPEnabledFirstOfficerAgent(
           expedition.starshipId,
           memoryStore,
           {
@@ -992,7 +993,9 @@ export class FirstOfficerService {
             timeoutMinutes: 60,
             requireUserApproval: false,
             enableParallelExecution: false,
-            autoEscalation: true
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
           },
           expedition.assignedAgents || [],
           messageEmitCallback,
@@ -1073,11 +1076,11 @@ export class FirstOfficerService {
       let firstOfficer = this.activeAgents.get(expeditionId);
       
       if (!firstOfficer) {
-        // Create FirstOfficerAgent for readiness check
+        // Create MCP-enabled FirstOfficerAgent for readiness check
         const memoryStore = this.memoryStores.get(expeditionId) || new LangChainMemoryStore();
         this.memoryStores.set(expeditionId, memoryStore);
         
-        firstOfficer = new FirstOfficerAgent(
+        firstOfficer = await createMCPEnabledFirstOfficerAgent(
           expedition.starshipId,
           memoryStore,
           {
@@ -1086,7 +1089,9 @@ export class FirstOfficerService {
             timeoutMinutes: 60,
             requireUserApproval: false,
             enableParallelExecution: false,
-            autoEscalation: true
+            autoEscalation: true,
+            mcpEnabled: true,
+            mcpStarshipId: expedition.starshipId
           },
           expedition.assignedAgents || [],
           undefined, // no message callback needed for readiness check

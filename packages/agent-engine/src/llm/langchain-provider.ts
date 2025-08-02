@@ -4,6 +4,7 @@ import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMChatPrompt, LLMProvider, LLMResult } from "@starships/protocol";
 import type { LLM } from "@starships/models";
+import { convertNeo4jInt, convertNeo4jIntsInObject } from "@starships/models/src/utils/neo4j-helpers";
 
 /**
  * LangChain-based LLM provider supporting OpenAI and Anthropic
@@ -12,7 +13,8 @@ export class LangChainProvider implements LLMProvider {
   private modelConfig: LLM;
 
   constructor(model: LLM) {
-    this.modelConfig = model;
+    // Convert any Neo4j Integer objects in the model config
+    this.modelConfig = convertNeo4jIntsInObject(model);
   }
 
   async complete(prompt: LLMChatPrompt, opts?: { stream?: boolean; temperature?: number; maxTokens?: number; tools?: any[] }): Promise<LLMResult> {
@@ -82,30 +84,35 @@ export class LangChainProvider implements LLMProvider {
   }
 
   private createModel(opts?: { stream?: boolean; temperature?: number; maxTokens?: number }): BaseChatModel {
+    // Convert any Neo4j Integer objects in opts first
+    const convertedOpts = opts ? {
+      ...opts,
+      ...(opts.maxTokens !== undefined && { maxTokens: convertNeo4jInt(opts.maxTokens) }),
+      ...(opts.temperature !== undefined && { temperature: typeof opts.temperature === 'number' ? opts.temperature : 
+          typeof opts.temperature === 'string' ? parseFloat(opts.temperature) : 0.7 })
+    } : undefined;
+
     // Debug logging to track input values
     console.log(`[LANGCHAIN-PROVIDER] Creating model with config:`, {
       modelConfig: this.modelConfig,
-      opts,
+      opts: convertedOpts,
       maxTokensFromModel: this.modelConfig.maxTokens,
-      maxTokensFromOpts: opts?.maxTokens,
+      maxTokensFromOpts: convertedOpts?.maxTokens,
       temperatureFromModel: this.modelConfig.temperature,
-      temperatureFromOpts: opts?.temperature
+      temperatureFromOpts: convertedOpts?.temperature
     });
 
     const config = {
       ...this.modelConfig,
-      ...(opts?.temperature !== undefined && { temperature: opts.temperature }),
-      ...(opts?.maxTokens !== undefined && { maxTokens: opts.maxTokens }),
+      ...(convertedOpts?.temperature !== undefined && { temperature: convertedOpts.temperature }),
+      ...(convertedOpts?.maxTokens !== undefined && { maxTokens: convertedOpts.maxTokens }),
     };
 
-    // Ensure numeric values are properly converted
-    const maxTokens = typeof config.maxTokens === 'number' ? config.maxTokens : 
-                     typeof config.maxTokens === 'string' ? parseInt(config.maxTokens, 10) : 
-                     4000; // Default fallback
-    
-    const temperature = typeof config.temperature === 'number' ? config.temperature : 
-                       typeof config.temperature === 'string' ? parseFloat(config.temperature) : 
-                       0.7; // Default fallback
+    // Ensure numeric values are properly converted (handle Neo4j Integer objects)
+    const maxTokens = config.maxTokens !== undefined ? convertNeo4jInt(config.maxTokens) : 4000;
+    const temperature = config.temperature !== undefined ? 
+      (typeof config.temperature === 'number' ? config.temperature : 
+       typeof config.temperature === 'string' ? parseFloat(config.temperature) : 0.7) : 0.7;
 
     // Debug logging to identify the issue
     if (typeof config.maxTokens !== 'number' && config.maxTokens !== undefined) {

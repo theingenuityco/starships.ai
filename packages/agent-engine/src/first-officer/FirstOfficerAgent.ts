@@ -1109,6 +1109,22 @@ Help coordinate and provide guidance as needed.`;
           ...task,
           id: createdTask.id
         });
+        
+        // Emit WebSocket event for new task creation (real-time updates)
+        if (this.webSocketEmitter) {
+          // Emit task creation event that the frontend can listen to
+          this.webSocketEmitter.emitTaskCreated(state.expeditionId, createdTask.id, {
+            title: createdTask.title,
+            description: createdTask.description,
+            requiredSkills: createdTask.requiredSkills,
+            priority: createdTask.priority,
+            dependencies: createdTask.dependencies,
+            deliverable: createdTask.deliverable,
+            estimatedEffort: createdTask.estimatedEffort,
+            createdAt: createdTask.createdAt,
+            updatedAt: createdTask.updatedAt
+          });
+        }
       }
 
       await this.sendWorkflowLog('', 'TASKS CONFIGURED', `Established ${createdTasks.length} work units with ${taskPlan.estimatedTotalTime} minute operational timeline`);
@@ -1215,6 +1231,13 @@ Help coordinate and provide guidance as needed.`;
         for (const assignment of updatedAssignments) {
           for (const taskId of assignment.assignedTasks) {
             await taskRepo.assignToAgent(taskId, assignment.agentId);
+            
+            // Emit WebSocket event for task assignment (real-time updates)
+            if (this.webSocketEmitter) {
+              this.webSocketEmitter.emitTaskAssigned(state.expeditionId, taskId, assignment.agentId, {
+                agentName: assignment.agentName
+              });
+            }
           }
         }
 

@@ -93,9 +93,19 @@ class ExpeditionSocketAPI {
     socket.on('expedition:failed', this.handleExpeditionEvent.bind(this, 'expedition:failed'));
     
     // Handle task events
-    socket.on('task:created', this.handleExpeditionEvent.bind(this, 'task:created'));
-    socket.on('task:assigned', this.handleExpeditionEvent.bind(this, 'task:assigned'));
-    socket.on('task:completed', this.handleExpeditionEvent.bind(this, 'task:completed'));
+    socket.on('task:created', (data) => {
+      console.log('[EXPEDITION-SOCKET] 🎯 RAW task:created event:', data);
+      this.handleExpeditionEvent('task:created', data);
+    });
+    socket.on('task:assigned', (data) => {
+      console.log('[EXPEDITION-SOCKET] 🎯 RAW task:assigned event:', data);
+      this.handleExpeditionEvent('task:assigned', data);
+    });
+    socket.on('task:updated', this.handleTaskUpdate.bind(this));
+    socket.on('task:completed', (data) => {
+      console.log('[EXPEDITION-SOCKET] 🎯 RAW task:completed event:', data);
+      this.handleExpeditionEvent('task:completed', data);
+    });
     
     // Handle message events - THIS IS THE CRITICAL ONE
     socket.on('message:sent', this.handleExpeditionEvent.bind(this, 'message:sent'));
@@ -197,7 +207,36 @@ class ExpeditionSocketAPI {
       case 'task:created':
       case 'task:assigned':
       case 'task:completed':
-        this.notifyTaskUpdate(data.task);
+        // Handle both nested task object and direct task data
+        const taskData = data.task || data;
+        console.log('[EXPEDITION-SOCKET] Processing task event:', type, 'with data:', taskData);
+        
+        if (taskData && (taskData.id || taskData.taskId)) {
+          // Convert to proper task format if needed
+          const task = {
+            id: taskData.id || taskData.taskId,
+            expeditionId: taskData.expeditionId || data.expeditionId,
+            status: taskData.status || 'pending',
+            assignedAgentId: taskData.assignedAgentId || taskData.agentId,
+            title: taskData.title || `Task ${taskData.id || taskData.taskId}`,
+            description: taskData.description || '',
+            requiredSkills: taskData.requiredSkills || [],
+            priority: taskData.priority || 'medium',
+            dependencies: taskData.dependencies || [],
+            deliverable: taskData.deliverable || '',
+            result: taskData.result,
+            error: taskData.error,
+            estimatedEffort: taskData.estimatedEffort,
+            actualEffort: taskData.actualEffort,
+            createdAt: taskData.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            dueDate: taskData.dueDate,
+            ...taskData
+          };
+          this.notifyTaskUpdate(task);
+        } else {
+          console.error('[EXPEDITION-SOCKET] ❌ Invalid task data for event:', type, data);
+        }
         break;
       case 'message:sent':
         // For message:sent events, the message is nested in data.message
@@ -225,6 +264,57 @@ class ExpeditionSocketAPI {
 
     // Notify global listeners
     this.globalSubscriptions.progressUpdate.forEach(listener => listener(expeditionId, progress));
+  }
+
+  /**
+   * Handle task update events
+   */
+  private handleTaskUpdate(data: any) {
+    console.log('[EXPEDITION-SOCKET] 🎯 RAW task:updated event received:', data);
+    
+    // Validate the data structure
+    if (!data) {
+      console.error('[EXPEDITION-SOCKET] ❌ Task update data is null/undefined');
+      return;
+    }
+    
+    if (!data.expeditionId) {
+      console.error('[EXPEDITION-SOCKET] ❌ Task update missing expeditionId:', data);
+      return;
+    }
+    
+    if (!data.taskId) {
+      console.error('[EXPEDITION-SOCKET] ❌ Task update missing taskId:', data);
+      return;
+    }
+    
+    // Convert the WebSocket data to a proper task object format
+    const task = {
+      id: data.taskId,
+      expeditionId: data.expeditionId,
+      status: data.status || 'pending',
+      assignedAgentId: data.assignedAgentId || data.agentId,
+      title: data.title || `Task ${data.taskId}`,
+      description: data.description || '',
+      requiredSkills: data.requiredSkills || [],
+      priority: data.priority || 'medium',
+      dependencies: data.dependencies || [],
+      deliverable: data.deliverable || '',
+      result: data.result,
+      error: data.error,
+      estimatedEffort: data.estimatedEffort,
+      actualEffort: data.actualEffort,
+      createdAt: data.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      dueDate: data.dueDate,
+      // Include any additional fields from the data
+      ...data
+    };
+    
+    console.log('[EXPEDITION-SOCKET] ✅ Processed task update:', task);
+    
+    // Notify task update listeners
+    this.notifyTaskUpdate(task);
   }
 
   /**
@@ -370,16 +460,43 @@ class ExpeditionSocketAPI {
    * Notify task update listeners
    */
   private notifyTaskUpdate(task: ExpeditionTask) {
+    if (!task) {
+      console.error('[EXPEDITION-SOCKET] ❌ Cannot notify task update: task is null/undefined');
+      return;
+    }
+    
+    if (!task.expeditionId) {
+      console.error('[EXPEDITION-SOCKET] ❌ Cannot notify task update: task missing expeditionId', task);
+      return;
+    }
+    
     const expeditionId = task.expeditionId;
+    console.log('[EXPEDITION-SOCKET] 📢 Notifying task update listeners for expedition:', expeditionId, 'task:', task.id);
 
     // Notify expedition-specific listeners
     const expeditionSubs = this.subscriptions.get(expeditionId);
     if (expeditionSubs) {
-      expeditionSubs.taskUpdate.forEach(listener => listener(task));
+      console.log('[EXPEDITION-SOCKET] 📢 Notifying', expeditionSubs.taskUpdate.size, 'expedition-specific listeners');
+      expeditionSubs.taskUpdate.forEach(listener => {
+        try {
+          listener(task);
+        } catch (error) {
+          console.error('[EXPEDITION-SOCKET] ❌ Error in expedition task listener:', error);
+        }
+      });
+    } else {
+      console.warn('[EXPEDITION-SOCKET] ⚠️ No expedition-specific subscriptions found for:', expeditionId);
     }
 
     // Notify global listeners
-    this.globalSubscriptions.taskUpdate.forEach(listener => listener(task));
+    console.log('[EXPEDITION-SOCKET] 📢 Notifying', this.globalSubscriptions.taskUpdate.size, 'global listeners');
+    this.globalSubscriptions.taskUpdate.forEach(listener => {
+      try {
+        listener(task);
+      } catch (error) {
+        console.error('[EXPEDITION-SOCKET] ❌ Error in global task listener:', error);
+      }
+    });
   }
 
   /**

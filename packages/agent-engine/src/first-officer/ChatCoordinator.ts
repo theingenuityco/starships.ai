@@ -98,6 +98,11 @@ export class ChatCoordinator {
       try {
         console.log(`🚀 [CHAT-COORDINATOR] Calling WebSocket emission callback for message type: ${type}`);
         console.log(`🚀 [CHAT-COORDINATOR] Created message:`, JSON.stringify(createdMessage, null, 2));
+        
+        // Add 5-second delay for natural First Officer message flow
+        console.log(`⏱️ [CHAT-COORDINATOR] Adding 5-second delay for natural First Officer message flow...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
         await this.messageEmitCallback(createdMessage);
         console.log(`📡 [CHAT-COORDINATOR] WebSocket event emitted successfully for message: ${type}`);
       } catch (error) {

@@ -553,6 +553,13 @@ export class TaskExecutor {
       { priority: execution.priority }
     );
     
+    // Emit WebSocket task start event for real-time updates
+    this.webSocketEmitter.emitTaskStart(expeditionId, {
+      taskId: execution.taskId,
+      agentId: execution.agentId,
+      attempt: execution.retryCount + 1
+    });
+    
     try {
       // Allocate resources
       const allocatedResources = await this.allocateResources(
@@ -635,6 +642,13 @@ export class TaskExecutor {
             { retryCount: attempt, delay: backoffDelay }
           );
           
+          // Emit WebSocket task retry event for real-time updates
+          this.webSocketEmitter.emitTaskRetry(expeditionId, {
+            taskId: execution.taskId,
+            attempt: attempt + 1,
+            delay: backoffDelay
+          });
+          
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           execution.retryCount = attempt;
           execution.lastRetryAt = new Date().toISOString();
@@ -650,11 +664,22 @@ export class TaskExecutor {
           taskTitle
         );
 
+        // Add 10-second delay for natural conversation flow
+        console.log(`⏱️ [TASK-EXECUTOR] Adding 10-second delay for natural conversation flow...`);
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
         // Execute the actual task
         const result = await this.executeTaskWithAgent(execution, expeditionId, userId);
         
         // Update progress
         execution.progress = 100;
+        
+        // Emit WebSocket task progress event for real-time updates
+        this.webSocketEmitter.emitTaskProgress(expeditionId, {
+          taskId: execution.taskId,
+          progress: 100
+        });
+        
         return result;
 
       } catch (error) {
@@ -881,6 +906,13 @@ QUALITY EXPECTATIONS:
     await taskRepo.updateStatus(execution.taskId, 'completed');
     await taskRepo.updateResult(execution.taskId, result);
     
+    // Emit WebSocket task completion event for real-time updates
+    this.webSocketEmitter.emitTaskComplete(expeditionId, {
+      taskId: execution.taskId,
+      result,
+      duration: actualDuration
+    });
+    
     // Get task details for activity tracking
     const task = await taskRepo.findById(execution.taskId);
     const taskTitle = task?.title || 'Unknown Task';
@@ -970,6 +1002,15 @@ QUALITY EXPECTATIONS:
     
     // Check if retry is possible
     const retryLimit = options.retryLimit || this.config.maxRetries;
+    const isFinalFailure = execution.retryCount >= retryLimit || !this.isRetryableError(error);
+    
+    // Emit WebSocket task failure event for real-time updates (only for final failures)
+    if (isFinalFailure) {
+      this.webSocketEmitter.emitTaskFailed(expeditionId, {
+        taskId: execution.taskId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
     
     if (execution.retryCount < retryLimit && this.isRetryableError(error)) {
       console.log(`🔄 [TASK-EXECUTOR] Task will be retried: ${execution.taskId} (attempt ${execution.retryCount + 1})`);

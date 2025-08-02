@@ -29,14 +29,8 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         timestamp: new Date().toISOString()
       });
       
-      // Emit a sync event to notify client they should refresh messages when joining
-      setTimeout(async () => {
-        socket.emit('expedition:sync-required', {
-          expeditionId: data.expeditionId,
-          reason: 'room-joined',
-          timestamp: new Date().toISOString()
-        });
-      }, 500);
+      // Note: Removed automatic sync-required emission to prevent unnecessary re-renders
+      // The client already refreshes messages when joining a room via the useEffect
     });
 
     // Handle expedition room leaving
@@ -82,7 +76,7 @@ export function setupExpeditionHandlers(io: SocketIOServer<SocketIOEvents>) {
         } else {
           console.log('[SOCKET.IO] Using regular message handling');
           // Send the message through the service with the authenticated user ID
-          const result = await messageService.sendExpeditionMessage(data, userId);
+          await messageService.sendExpeditionMessage(data, userId);
         }
         
         // Acknowledge success to the sender

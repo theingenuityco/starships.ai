@@ -201,9 +201,16 @@ export function SibilChatInterface() {
             </div>
             
             <div>
-              <h2 className="font-semibold text-lg text-foreground">
-                Sibil AI
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-lg text-foreground">
+                  Sibil AI
+                </h2>
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-500' :
+                  connectionStatus === 'reconnecting' ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`} />
+              </div>
               <p className="text-xs text-muted-foreground">AI Assistant</p>
             </div>
           </div>
@@ -218,12 +225,6 @@ export function SibilChatInterface() {
                 />
               )}
             </AnimatePresence>
-            
-            <div className={`w-2 h-2 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-500' :
-              connectionStatus === 'reconnecting' ? 'bg-yellow-500' :
-              'bg-red-500'
-            }`} />
           </div>
         </div>
       </div>

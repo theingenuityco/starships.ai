@@ -69,3 +69,4 @@ export {
 
 // Export scripts
 export { seedMCPServers } from './scripts/seed-mcp-servers';
+export { seedLLMModels } from './scripts/seed-llm-models';

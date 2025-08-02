@@ -108,7 +108,7 @@ export function SimpleVisionChamber() {
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-xl">
           <CardHeader className="border-b border-border/40">
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 <div className="relative">
                   <div className="absolute inset-0 bg-purple-500/10 blur-sm" />
                   <div className="relative bg-gradient-to-br from-purple-500/15 to-purple-500/10 p-2.5 rounded-xl">
@@ -119,6 +119,36 @@ export function SimpleVisionChamber() {
                   <CardTitle className="text-xl font-semibold">Vision Statement</CardTitle>
                   <p className="text-sm text-muted-foreground">Define your starship's guiding purpose</p>
                 </div>
+                
+                {!isEditing && vision.trim().length > 0 && (
+                  <div className={`flex items-center gap-3 px-6 py-3 rounded-xl ${
+                    vision.length > 200 
+                      ? 'bg-green-500/10 border border-green-500/20'
+                      : vision.length > 80
+                      ? 'bg-blue-500/10 border border-blue-500/20'
+                      : 'bg-red-500/10 border border-red-500/20'
+                  }`}>
+                    <Sparkles className={`w-6 h-6 ${
+                      vision.length > 200 
+                        ? 'text-green-500'
+                        : vision.length > 80
+                        ? 'text-blue-500'
+                        : 'text-red-500'
+                    }`} />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-muted-foreground leading-none">Vision Clarity</span>
+                      <span className={`text-lg font-bold leading-none ${
+                        vision.length > 200 
+                          ? 'text-green-600 dark:text-green-400'
+                          : vision.length > 80
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {vision.length > 200 ? 'Strong' : vision.length > 80 ? 'Good' : 'Weak'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {!isEditing && vision.trim().length > 0 && (
@@ -150,8 +180,21 @@ export function SimpleVisionChamber() {
                     className="min-h-[250px] resize-none bg-background/50 border-border/50 focus:border-purple-500/50 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors text-base leading-relaxed"
                     disabled={loading}
                   />
-                  <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
-                    {editingVision.length} characters
+                  <div className="absolute bottom-2 left-2">
+                    <span className={`text-xs font-medium ${
+                      editingVision.length > 200 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : editingVision.length > 80 
+                        ? 'text-blue-600 dark:text-blue-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      Vision Clarity: {editingVision.length > 200 ? 'Strong' : editingVision.length > 80 ? 'Good' : 'Weak'}
+                    </span>
+                  </div>
+                  <div className="absolute bottom-2 right-2">
+                    <span className="text-xs text-muted-foreground">
+                      {editingVision.length} characters
+                    </span>
                   </div>
                 </div>
                 
@@ -192,45 +235,6 @@ export function SimpleVisionChamber() {
                           {vision}
                         </p>
                       </div>
-                    </div>
-
-                    {/* Vision insights */}
-                    <div className="grid md:grid-cols-3 gap-4">
-                      <Card className="bg-gradient-to-br from-purple-500/5 to-transparent border-purple-500/20">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Sparkles className="w-4 w-4 text-purple-500" />
-                            <span className="text-sm font-medium">Vision Clarity</span>
-                          </div>
-                          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                            Strong
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="bg-gradient-to-br from-blue-500/5 to-transparent border-blue-500/20">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Target className="w-4 w-4 text-blue-500" />
-                            <span className="text-sm font-medium">Alignment</span>
-                          </div>
-                          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            Active
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="bg-gradient-to-br from-green-500/5 to-transparent border-green-500/20">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Lightbulb className="w-4 w-4 text-green-500" />
-                            <span className="text-sm font-medium">Impact</span>
-                          </div>
-                          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                            High
-                          </div>
-                        </CardContent>
-                      </Card>
                     </div>
                   </>
                 ) : (

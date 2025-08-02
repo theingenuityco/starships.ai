@@ -22,7 +22,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedMCPServers, seedLLMModels } from '@starships/models';
+import { seedMCPServers, seedLLMModels, ensureDockerImages } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -208,6 +208,10 @@ httpServer.listen(PORT, async () => {
     console.log('🔧 Initializing RepositoryFactory...');
     await RepositoryFactory.initialize();
     console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
+    
+    // Ensure required Docker images are available
+    await ensureDockerImages();
+    console.log('✅ Docker images check completed');
     
     // Initialize AgentService (seeds default agents)
     await AgentService.initialize();

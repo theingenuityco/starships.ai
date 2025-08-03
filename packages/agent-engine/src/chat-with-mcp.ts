@@ -225,13 +225,22 @@ Avoid complex queries like:
     const isOwnerMatch = activeStarship.ownerId === internalUserId || 
                         activeStarship.ownerId === req.user_id;
     
-    if (!isOwnerMatch) {
+    // For temporary users, skip ownership check but log a warning
+    const isTemporaryUser = req.user_id.startsWith('temp:');
+    
+    if (!isOwnerMatch && !isTemporaryUser) {
       console.error('❌ [AGENT-ENGINE-MCP] Starship ownership mismatch:', {
         starshipOwnerId: activeStarship.ownerId,
         internalUserId: internalUserId,
         kindeUserId: req.user_id
       });
       throw new Error('Agent\'s starship does not belong to the requesting user');
+    } else if (!isOwnerMatch && isTemporaryUser) {
+      console.warn('⚠️ [AGENT-ENGINE-MCP] Skipping ownership check for temporary user:', {
+        starshipOwnerId: activeStarship.ownerId,
+        tempUserId: req.user_id,
+        reason: 'Temporary user IDs cannot be resolved to internal IDs'
+      });
     }
     
     if (activeStarship) {

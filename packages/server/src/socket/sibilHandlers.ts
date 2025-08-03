@@ -35,7 +35,8 @@ export function setupSibilHandlers(io: SocketIOServer<SocketIOEvents>) {
           model: request.model,
           message: request.message,
           user_id: userId,
-          session_id: request.session_id
+          session_id: request.session_id,
+          starship_id: request.starship_id
         };
 
         // Start streaming with typewriter effect

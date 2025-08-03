@@ -15,7 +15,11 @@ import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { headerVariants, inputVariants, pageVariants } from '@/lib/animations'
 import { Bot } from 'lucide-react'
 
-export function SibilChatInterface() {
+interface SibilChatInterfaceProps {
+  starshipId?: string;
+}
+
+export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
   const [messages, setMessages] = useState<SibilMessage[]>([])
@@ -102,7 +106,8 @@ export function SibilChatInterface() {
           provider,
           model,
           message: content,
-          sessionId: currentSessionId
+          sessionId: currentSessionId,
+          starshipId
         },
         {
           onChunk: (chunk, accumulatedContent) => {

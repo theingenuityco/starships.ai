@@ -171,6 +171,7 @@ export interface SibilRequest {
   message: string;
   user_id: string;
   session_id?: string;
+  starship_id?: string;
 }
 
 export interface SibilResponse {

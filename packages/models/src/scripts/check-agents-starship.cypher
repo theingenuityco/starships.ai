@@ -1,6 +1,6 @@
 // Check all agents and their starship assignments
 MATCH (a:Agent)
-OPTIONAL MATCH (a)-[:DEPLOYED_TO]->(s:Starship)
+OPTIONAL MATCH (a)-[:DEPLOYED_ON]->(s:Starship)
 OPTIONAL MATCH (s)-[:HAS_VISION]->(v:Vision)
 RETURN 
   a.id AS agentId,

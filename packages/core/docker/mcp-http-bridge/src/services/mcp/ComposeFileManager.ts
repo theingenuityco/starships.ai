@@ -303,7 +303,7 @@ export class ComposeFileManager {
       for (const serviceName of Object.keys(compose.services)) {
         try {
           const { stdout } = await execAsync(
-            `docker-compose -f ${composePath} ps --format json ${serviceName}`
+            `docker compose -f ${composePath} ps --format json ${serviceName}`
           );
           
           if (stdout.trim()) {
@@ -444,8 +444,8 @@ export class ComposeFileManager {
       // Check if file exists
       await fs.access(composePath);
 
-      // Validate with docker-compose
-      const { stderr } = await execAsync(`docker-compose -f ${composePath} config -q`);
+      // Validate with docker compose
+      const { stderr } = await execAsync(`docker compose -f ${composePath} config -q`);
       
       if (stderr) {
         result.valid = false;
@@ -571,7 +571,7 @@ export class ComposeFileManager {
       switch (action) {
         case 'up':
           const { stdout: upOutput } = await execAsync(
-            `docker-compose -f ${composePath} up -d --no-recreate ${serviceName}`
+            `docker compose -f ${composePath} up -d --no-recreate ${serviceName}`
           );
           // Extract container ID from output
           const upMatch = upOutput.match(/([a-f0-9]{12})/);
@@ -579,14 +579,14 @@ export class ComposeFileManager {
           break;
 
         case 'down':
-          await execAsync(`docker-compose -f ${composePath} stop ${serviceName}`);
-          await execAsync(`docker-compose -f ${composePath} rm -f ${serviceName}`);
+          await execAsync(`docker compose -f ${composePath} stop ${serviceName}`);
+          await execAsync(`docker compose -f ${composePath} rm -f ${serviceName}`);
           break;
 
         case 'restart':
-          await execAsync(`docker-compose -f ${composePath} restart ${serviceName}`);
+          await execAsync(`docker compose -f ${composePath} restart ${serviceName}`);
           const { stdout: restartOutput } = await execAsync(
-            `docker-compose -f ${composePath} ps -q ${serviceName}`
+            `docker compose -f ${composePath} ps -q ${serviceName}`
           );
           containerId = restartOutput.trim();
           break;
@@ -680,7 +680,7 @@ export class ComposeFileManager {
     const composePath = this.getComposePath(starshipId);
     
     try {
-      await execAsync(`docker-compose -f ${composePath} down`);
+      await execAsync(`docker compose -f ${composePath} down`);
       console.log(`[ComposeFileManager] Stopped all services for starship ${starshipId}`);
     } catch (error) {
       console.error(`[ComposeFileManager] Failed to stop services:`, error);
@@ -691,7 +691,7 @@ export class ComposeFileManager {
     const composePath = this.getComposePath(starshipId);
     
     try {
-      await execAsync(`docker-compose -f ${composePath} up -d`);
+      await execAsync(`docker compose -f ${composePath} up -d`);
       console.log(`[ComposeFileManager] Started all services for starship ${starshipId}`);
     } catch (error) {
       console.error(`[ComposeFileManager] Failed to start services:`, error);

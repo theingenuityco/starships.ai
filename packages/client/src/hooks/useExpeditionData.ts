@@ -779,20 +779,20 @@ export function useExpeditionData({
     loadExpeditionProgress
   ]);
 
-  // Task-specific polling for active expeditions
+  // Task-specific polling for active expeditions (reduced frequency since we have WebSocket)
   useEffect(() => {
-    if (!expeditionId || !starshipId) return;
+    if (!expeditionId || !starshipId || !autoRefresh) return;
 
-    // More frequent task polling for active expeditions
+    // Fallback polling for task updates (less frequent since WebSocket handles real-time updates)
     const taskInterval = setInterval(() => {
       if (expedition?.status === 'in-progress' || expedition?.status === 'planning') {
-        console.log('[EXPEDITION DATA] 🔄 Polling tasks for active expedition');
+        console.log('[EXPEDITION DATA] 🔄 Fallback polling tasks for active expedition');
         loadTasks(expeditionId);
       }
-    }, 5000); // Poll every 5 seconds for active expeditions
+    }, 30000); // Reduced to poll every 30 seconds for active expeditions
 
     return () => clearInterval(taskInterval);
-  }, [expeditionId, starshipId, expedition?.status, loadTasks]);
+  }, [expeditionId, starshipId, expedition?.status, loadTasks, autoRefresh]);
 
   return {
     // Expedition list data

@@ -32,14 +32,14 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const sessionId = useRef<string>('sibil-session')
   const streamController = useRef<{ abort: () => void } | null>(null)
 
-  // Initialize session when user is available
+  // Initialize session when user and starship are available
   useEffect(() => {
     if (userId && isAuthenticated) {
-      const newSessionId = generateSibilSessionId(userId)
+      const newSessionId = generateSibilSessionId(userId, starshipId)
       sessionId.current = newSessionId
       loadMessages(newSessionId)
     }
-  }, [userId, isAuthenticated])
+  }, [userId, isAuthenticated, starshipId])
 
   const loadMessages = (sessionId: string) => {
     try {

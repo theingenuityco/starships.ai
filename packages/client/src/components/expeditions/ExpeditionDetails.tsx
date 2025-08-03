@@ -47,7 +47,6 @@ import { expeditionAPI } from '@/lib/expeditionApi';
 import { agentAPI } from '@/lib/api';
 import { TaskTimeline } from './TaskTimeline';
 import { AgentActivityFeed } from './AgentActivityFeed';
-import { QualityScoreDisplay } from './QualityScoreDisplay';
 import { ChatMessageMarkdown } from './ChatMessageMarkdown';
 import { TypingIndicator } from './TypingIndicator';
 import type { Expedition, ExpeditionStatus, ExpeditionTask } from '@starships/protocol';
@@ -100,8 +99,8 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
   } = useExpeditionData({
     starshipId,
     expeditionId,
-    autoRefresh: true, // Enable auto-refresh for real-time task updates
-    refreshInterval: 10000, // Refresh every 10 seconds
+    autoRefresh: false, // Disable auto-refresh since we have WebSocket for real-time updates
+    refreshInterval: 60000, // Reduce frequency to 1 minute for fallback
     enableWebSocket: true // Enable WebSocket for real-time updates
   });
 
@@ -478,12 +477,24 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
       
       if (!hasMessageActivity) {
         const agent = agentDetails[msg.agentId];
+        
+        // Add web search activity before processing
+        activities.push({
+          id: `search-${msg.id}`,
+          agentId: msg.agentId,
+          agentName: agent?.name || msg.agentId.slice(0, 8),
+          type: 'web_search',
+          message: 'searching for information',
+          timestamp: new Date(new Date(msg.timestamp).getTime() - 30000).toISOString(), // 30 seconds before message
+          metadata: {}
+        });
+        
         activities.push({
           id: `msg-${msg.id}`,
           agentId: msg.agentId,
           agentName: agent?.name || msg.agentId.slice(0, 8),
           type: 'agent_thinking',
-          message: 'processing request',
+          message: 'processing and analyzing information',
           timestamp: msg.timestamp,
           metadata: {}
         });
@@ -585,7 +596,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full flex gap-6 p-4 lg:p-6">
+        <div className="h-full flex gap-4 p-4 lg:p-6">
           {/* Left Column - Chat */}
           <div className="flex-1 min-w-0 flex">
             <div className="flex-1 flex flex-col bg-card/50 backdrop-blur-sm border border-muted rounded-lg overflow-hidden">
@@ -918,13 +929,12 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
           </div>
 
           {/* Right Column - Tabs */}
-          <aside className="w-96 flex-shrink-0 flex flex-col">
+          <aside className="w-[28rem] flex-shrink-0 flex flex-col">
             <Tabs defaultValue="overview" className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
+              <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="activity">Activity</TabsTrigger>
-                <TabsTrigger value="quality">Quality</TabsTrigger>
               </TabsList>
               
               <div className="flex-1 overflow-hidden mt-4">
@@ -1019,7 +1029,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                 </TabsContent>
                 
                 <TabsContent value="timeline" className="h-full overflow-y-auto pr-2 mt-0">
-                  <TaskTimeline tasks={tasks} showDetails={true} />
+                  <TaskTimeline tasks={tasks} showDetails={true} agentDetails={agentDetails} />
                 </TabsContent>
                 
                 <TabsContent value="activity" className="h-full overflow-y-auto pr-2 mt-0">
@@ -1033,24 +1043,6 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                       reasoning: 'Agent selected for expedition'
                     }))}
                     activities={generateActivities()}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="quality" className="h-full overflow-y-auto pr-2 mt-0">
-                  <QualityScoreDisplay 
-                    qualityChecks={results
-                      .filter(r => r.quality)
-                      .map(r => ({
-                        taskId: r.taskId || r.id,
-                        result: r.content,
-                        score: r.quality?.overall || 0,
-                        issues: [], // TODO: Extract from quality data
-                        suggestions: [],
-                        approved: (r.quality?.overall || 0) >= 70,
-                        assessedBy: r.quality?.assessedBy || 'first-officer',
-                        assessedAt: r.quality?.assessedAt || r.createdAt
-                      }))}
-                    threshold={70}
                   />
                 </TabsContent>
               </div>

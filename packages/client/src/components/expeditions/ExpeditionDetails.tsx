@@ -703,7 +703,7 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                               <div className={`flex flex-col gap-1 max-w-[70%] ${isUser ? 'items-end' : ''}`}>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
                                   <span className="font-semibold">
-                                    {isUser ? 'You' : agent?.name || message.role.replace('-', ' ')}
+                                    {isUser ? 'You' : agent?.name || (message.role === 'first-officer' ? 'First Officer' : message.role.replace('-', ' '))}
                                   </span>
                                   <span className="opacity-60">
                                     {new Date(message.timestamp).toLocaleTimeString('en-US', { 

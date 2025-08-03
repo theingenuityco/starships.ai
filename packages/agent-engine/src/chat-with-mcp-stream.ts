@@ -233,6 +233,11 @@ export async function* chatWithMCPStream(
     starshipId: agent.starshipId,
     systemPrompt: agent.systemPrompt?.substring(0, 100) + '...',
   });
+  
+  // Add explicit logging for debugging
+  console.log('🔍 [AGENT-ENGINE-MCP-STREAM] VISION DEBUG - Agent starshipId:', agent.starshipId);
+  console.log('🔍 [AGENT-ENGINE-MCP-STREAM] VISION DEBUG - Agent starshipId type:', typeof agent.starshipId);
+  console.log('🔍 [AGENT-ENGINE-MCP-STREAM] VISION DEBUG - Agent full object:', JSON.stringify(agent, null, 2));
 
   // ENHANCED USER ID RESOLUTION WITH COMPREHENSIVE FALLBACK STRATEGIES (STREAMING)
   console.log('🌊 [AGENT-ENGINE-MCP-STREAM] Starting enhanced vision context loading...');
@@ -407,13 +412,22 @@ Avoid complex queries like:
     const isOwnerMatch = activeStarship.ownerId === internalUserId || 
                         activeStarship.ownerId === req.user_id;
     
-    if (!isOwnerMatch) {
+    // For temporary users, skip ownership check but log a warning
+    const isTemporaryUser = req.user_id.startsWith('temp:');
+    
+    if (!isOwnerMatch && !isTemporaryUser) {
       console.error('❌ [AGENT-ENGINE-MCP-STREAM] Starship ownership mismatch:', {
         starshipOwnerId: activeStarship.ownerId,
         internalUserId: internalUserId,
         kindeUserId: req.user_id
       });
       throw new Error('Agent\'s starship does not belong to the requesting user');
+    } else if (!isOwnerMatch && isTemporaryUser) {
+      console.warn('⚠️ [AGENT-ENGINE-MCP-STREAM] Skipping ownership check for temporary user:', {
+        starshipOwnerId: activeStarship.ownerId,
+        tempUserId: req.user_id,
+        reason: 'Temporary user IDs cannot be resolved to internal IDs'
+      });
     }
     
     if (activeStarship) {

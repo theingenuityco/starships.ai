@@ -15,7 +15,11 @@ import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { headerVariants, inputVariants, pageVariants } from '@/lib/animations'
 import { Bot } from 'lucide-react'
 
-export function SibilChatInterface() {
+interface SibilChatInterfaceProps {
+  starshipId?: string;
+}
+
+export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
   const [messages, setMessages] = useState<SibilMessage[]>([])
@@ -28,14 +32,14 @@ export function SibilChatInterface() {
   const sessionId = useRef<string>('sibil-session')
   const streamController = useRef<{ abort: () => void } | null>(null)
 
-  // Initialize session when user is available
+  // Initialize session when user and starship are available
   useEffect(() => {
     if (userId && isAuthenticated) {
-      const newSessionId = generateSibilSessionId(userId)
+      const newSessionId = generateSibilSessionId(userId, starshipId)
       sessionId.current = newSessionId
       loadMessages(newSessionId)
     }
-  }, [userId, isAuthenticated])
+  }, [userId, isAuthenticated, starshipId])
 
   const loadMessages = (sessionId: string) => {
     try {
@@ -102,7 +106,8 @@ export function SibilChatInterface() {
           provider,
           model,
           message: content,
-          sessionId: currentSessionId
+          sessionId: currentSessionId,
+          starshipId
         },
         {
           onChunk: (chunk, accumulatedContent) => {

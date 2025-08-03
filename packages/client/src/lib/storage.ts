@@ -71,8 +71,12 @@ export function generateSessionId(agentId: string, userId: string): string {
 }
 
 /**
- * Generate a consistent session ID for Sibil/user combination
+ * Generate a consistent session ID for Sibil/user/starship combination
  */
-export function generateSibilSessionId(userId: string): string {
+export function generateSibilSessionId(userId: string, starshipId?: string): string {
+  if (starshipId) {
+    return `sibil:user-${userId}:starship-${starshipId}`
+  }
+  // Fallback for non-starship contexts
   return `sibil:user-${userId}`
 }

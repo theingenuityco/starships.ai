@@ -110,7 +110,7 @@ export function SibilContent({ slug }: SibilContentProps) {
 
       {/* Main Content - Full Height Sibil Interface */}
       <div className="flex-1 overflow-hidden">
-        <SibilChatInterface />
+        <SibilChatInterface starshipId={starship?.id} />
       </div>
     </div>
   )

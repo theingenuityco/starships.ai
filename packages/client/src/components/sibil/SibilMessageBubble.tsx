@@ -44,8 +44,8 @@ export function SibilMessageBubble({ message }: SibilMessageBubbleProps) {
         >
           {/* Provider info - simplified */}
           {!isUser && message.provider && (
-            <div className="text-xs text-white/70 mb-1">
-              {message.provider === 'openai' ? 'OpenAI' : 'Anthropic'}
+            <div className="text-sm text-white/70 mb-1">
+              Sibil AI
               {message.model && ` • ${message.model}`}
             </div>
           )}

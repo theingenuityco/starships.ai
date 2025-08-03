@@ -13,7 +13,14 @@ import {
   Pause,
   PlayCircle,
   StopCircle,
-  RefreshCw
+  RefreshCw,
+  Search,
+  Code,
+  TestTube,
+  BookOpen,
+  Target,
+  Bug,
+  FileText
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AgentAssignment } from '@starships/protocol';
@@ -26,7 +33,14 @@ type AgentActivityType =
   | 'agent_thinking' 
   | 'agent_blocked'
   | 'quality_check'
-  | 'retry_attempt';
+  | 'retry_attempt'
+  | 'web_search'
+  | 'implementation'
+  | 'testing'
+  | 'research'
+  | 'planning'
+  | 'debugging'
+  | 'documentation';
 
 interface AgentActivity {
   id: string;
@@ -110,6 +124,55 @@ export function AgentActivityFeed({
           color: 'text-yellow-500', 
           bg: 'bg-yellow-100',
           label: 'Retrying'
+        };
+      case 'web_search':
+        return { 
+          icon: Search, 
+          color: 'text-blue-500', 
+          bg: 'bg-blue-100',
+          label: 'Searching'
+        };
+      case 'implementation':
+        return { 
+          icon: Code, 
+          color: 'text-emerald-500', 
+          bg: 'bg-emerald-100',
+          label: 'Implementing'
+        };
+      case 'testing':
+        return { 
+          icon: TestTube, 
+          color: 'text-cyan-500', 
+          bg: 'bg-cyan-100',
+          label: 'Testing'
+        };
+      case 'research':
+        return { 
+          icon: BookOpen, 
+          color: 'text-purple-500', 
+          bg: 'bg-purple-100',
+          label: 'Researching'
+        };
+      case 'planning':
+        return { 
+          icon: Target, 
+          color: 'text-indigo-500', 
+          bg: 'bg-indigo-100',
+          label: 'Planning'
+        };
+      case 'debugging':
+        return { 
+          icon: Bug, 
+          color: 'text-red-500', 
+          bg: 'bg-red-100',
+          label: 'Debugging'
+        };
+      case 'documentation':
+        return { 
+          icon: FileText, 
+          color: 'text-gray-500', 
+          bg: 'bg-gray-100',
+          label: 'Documenting'
         };
       default:
         return { 
@@ -199,30 +262,10 @@ export function AgentActivityFeed({
                   </Avatar>
                   
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <p className="text-sm font-medium truncate">{agent.agentName}</p>
-                      <Badge {...statusBadge} className="text-xs">
-                        {status}
-                      </Badge>
-                    </div>
+                    <p className="text-sm font-medium truncate">{agent.agentName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {currentTasks} task{currentTasks !== 1 ? 's' : ''} assigned • 
-                      {Math.round(agent.skillMatch * 100)}% skill match
+                      {currentTasks} task{currentTasks !== 1 ? 's' : ''} assigned
                     </p>
-                  </div>
-                  
-                  <div className="flex items-center">
-                    {status === 'busy' && (
-                      <div className="animate-pulse">
-                        <Clock className="h-4 w-4 text-blue-500" />
-                      </div>
-                    )}
-                    {status === 'error' && (
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    {status === 'online' && (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    )}
                   </div>
                 </div>
               );
@@ -258,50 +301,34 @@ export function AgentActivityFeed({
                 const ActivityIcon = config.icon;
                 
                 return (
-                  <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full ${config.bg} flex items-center justify-center`}>
-                      <ActivityIcon className={`h-4 w-4 ${config.color}`} />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="text-sm">
-                            <span className="font-medium">{activity.agentName}</span>
-                            {' '}
-                            <span className="text-muted-foreground">{activity.message}</span>
-                          </p>
-                          
-                          {showDetails && activity.taskTitle && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Task: {activity.taskTitle}
-                            </p>
-                          )}
-                          
-                          {showDetails && activity.metadata && (
-                            <div className="flex items-center space-x-3 mt-1">
-                              {activity.metadata.qualityScore !== undefined && (
-                                <Badge variant="outline" className="text-xs">
-                                  Quality: {activity.metadata.qualityScore}%
-                                </Badge>
-                              )}
-                              {activity.metadata.duration !== undefined && (
-                                <span className="text-xs text-muted-foreground">
-                                  Duration: {activity.metadata.duration}m
-                                </span>
-                              )}
-                              {activity.metadata.retryCount !== undefined && (
-                                <span className="text-xs text-muted-foreground">
-                                  Retry #{activity.metadata.retryCount}
-                                </span>
-                              )}
-                            </div>
-                          )}
+                  <div key={activity.id} className="group relative">
+                    <div className="flex items-start gap-4 p-4 rounded-xl border border-border/50 bg-card/30 hover:bg-card/60 hover:border-border transition-all duration-200 shadow-sm hover:shadow-md">
+                      {/* Activity Icon */}
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full ${config.bg} border border-current/20 flex items-center justify-center shadow-sm`}>
+                        <ActivityIcon className={`h-5 w-5 ${config.color}`} />
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Agent and Action */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-semibold text-sm text-foreground">{activity.agentName}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                            {config.label}
+                          </span>
                         </div>
                         
-                        <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                          {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
-                        </span>
+                        {/* Action Message */}
+                        <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                          {activity.message}
+                        </p>                      
+                        
+                        {/* Timestamp */}
+                        <div className="border-t border-border/30">
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

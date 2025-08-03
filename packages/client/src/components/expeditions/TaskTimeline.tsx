@@ -12,9 +12,12 @@ import {
   Pause,
   XCircle,
   ArrowRight,
-  Target
+  Target,
+  Calendar,
+  Timer
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { ChatMessageMarkdown } from './ChatMessageMarkdown';
 
 // Local type definitions
 interface ExpeditionTask {
@@ -39,9 +42,10 @@ interface ExpeditionTask {
 interface TaskTimelineProps {
   tasks: ExpeditionTask[];
   showDetails?: boolean;
+  agentDetails?: Record<string, { id: string; name: string; category?: string }>;
 }
 
-export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
+export function TaskTimeline({ tasks, showDetails = true, agentDetails = {} }: TaskTimelineProps) {
   
   // Sort tasks by creation date and dependencies
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -53,89 +57,122 @@ export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 
-  // Get status configuration
+  // Get status configuration with proper theme support
   const getStatusConfig = (status: ExpeditionTask['status']) => {
     switch (status) {
       case 'pending':
         return { 
           icon: Circle, 
-          color: 'text-gray-500', 
-          bg: 'bg-gray-100', 
+          color: 'text-muted-foreground', 
+          bg: 'bg-muted', 
+          border: 'border-muted-foreground/20',
           label: 'Pending',
           description: 'Waiting to be assigned'
         };
       case 'assigned':
         return { 
           icon: User, 
-          color: 'text-blue-500', 
-          bg: 'bg-blue-100', 
+          color: 'text-blue-600 dark:text-blue-400', 
+          bg: 'bg-blue-100 dark:bg-blue-900/30', 
+          border: 'border-blue-200 dark:border-blue-700',
           label: 'Assigned',
           description: 'Assigned to agent'
         };
       case 'in-progress':
         return { 
           icon: Clock, 
-          color: 'text-yellow-500', 
-          bg: 'bg-yellow-100', 
+          color: 'text-amber-600 dark:text-amber-400', 
+          bg: 'bg-amber-100 dark:bg-amber-900/30', 
+          border: 'border-amber-200 dark:border-amber-700',
           label: 'In Progress',
           description: 'Currently being worked on'
         };
       case 'blocked':
         return { 
           icon: Pause, 
-          color: 'text-red-500', 
-          bg: 'bg-red-100', 
+          color: 'text-red-600 dark:text-red-400', 
+          bg: 'bg-red-100 dark:bg-red-900/30', 
+          border: 'border-red-200 dark:border-red-700',
           label: 'Blocked',
           description: 'Waiting for dependencies'
         };
       case 'review':
         return { 
           icon: AlertCircle, 
-          color: 'text-purple-500', 
-          bg: 'bg-purple-100', 
+          color: 'text-purple-600 dark:text-purple-400', 
+          bg: 'bg-purple-100 dark:bg-purple-900/30', 
+          border: 'border-purple-200 dark:border-purple-700',
           label: 'Review',
           description: 'Under review'
         };
       case 'completed':
         return { 
           icon: CheckCircle, 
-          color: 'text-green-500', 
-          bg: 'bg-green-100', 
+          color: 'text-emerald-600 dark:text-emerald-400', 
+          bg: 'bg-emerald-100 dark:bg-emerald-900/30', 
+          border: 'border-emerald-200 dark:border-emerald-700',
           label: 'Completed',
           description: 'Successfully completed'
         };
       case 'failed':
         return { 
           icon: XCircle, 
-          color: 'text-red-500', 
-          bg: 'bg-red-100', 
+          color: 'text-red-600 dark:text-red-400', 
+          bg: 'bg-red-100 dark:bg-red-900/30', 
+          border: 'border-red-200 dark:border-red-700',
           label: 'Failed',
           description: 'Failed to complete'
         };
       default:
         return { 
           icon: Circle, 
-          color: 'text-gray-500', 
-          bg: 'bg-gray-100', 
+          color: 'text-muted-foreground', 
+          bg: 'bg-muted', 
+          border: 'border-muted-foreground/20',
           label: status,
           description: ''
         };
     }
   };
 
-  // Get priority configuration
+  // Get priority configuration with theme support
   const getPriorityConfig = (priority: ExpeditionTask['priority']) => {
     switch (priority) {
       case 'low':
-        return { color: 'text-green-600', bg: 'bg-green-100', label: 'Low' };
+        return { 
+          color: 'text-emerald-700 dark:text-emerald-300', 
+          bg: 'bg-emerald-50 dark:bg-emerald-950/50', 
+          border: 'border-emerald-200 dark:border-emerald-800',
+          label: 'Low' 
+        };
       case 'medium':
-        return { color: 'text-yellow-600', bg: 'bg-yellow-100', label: 'Medium' };
+        return { 
+          color: 'text-amber-700 dark:text-amber-300', 
+          bg: 'bg-amber-50 dark:bg-amber-950/50', 
+          border: 'border-amber-200 dark:border-amber-800',
+          label: 'Medium' 
+        };
       case 'high':
-        return { color: 'text-orange-600', bg: 'bg-orange-100', label: 'High' };
+        return { 
+          color: 'text-orange-700 dark:text-orange-300', 
+          bg: 'bg-orange-50 dark:bg-orange-950/50', 
+          border: 'border-orange-200 dark:border-orange-800',
+          label: 'High' 
+        };
       case 'critical':
-        return { color: 'text-red-600', bg: 'bg-red-100', label: 'Critical' };
+        return { 
+          color: 'text-red-700 dark:text-red-300', 
+          bg: 'bg-red-50 dark:bg-red-950/50', 
+          border: 'border-red-200 dark:border-red-800',
+          label: 'Critical' 
+        };
       default:
-        return { color: 'text-gray-600', bg: 'bg-gray-100', label: priority };
+        return { 
+          color: 'text-muted-foreground', 
+          bg: 'bg-muted/50', 
+          border: 'border-muted-foreground/20',
+          label: priority 
+        };
     }
   };
 
@@ -146,54 +183,88 @@ export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
 
   if (tasks.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-32">
-          <div className="text-center text-muted-foreground">
-            <Target className="h-8 w-8 mx-auto mb-2" />
-            <p>No tasks have been created yet</p>
-            <p className="text-sm">Tasks will appear here once the expedition starts</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center h-64">
+        <Card className="w-full max-w-md border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+              <Target className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">No Tasks Available</h3>
+            <p className="text-sm text-muted-foreground text-center">
+              Tasks will appear here once the expedition planning is complete
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Overall Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Task Progress</span>
-            <Badge variant="outline">
-              {completedTasks} of {totalTasks} completed
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Progress Overview</CardTitle>
+                <CardDescription>Track completion across all tasks</CardDescription>
+              </div>
+            </div>
+            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 px-3 py-1">
+              {completedTasks}/{totalTasks} complete
             </Badge>
-          </CardTitle>
-          <CardDescription>
-            Track the progress of individual tasks in this expedition
-          </CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>Overall Progress</span>
-              <span>{overallProgress}%</span>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">Overall Progress</span>
+              <span className="text-sm font-bold text-primary">{overallProgress}%</span>
             </div>
-            <Progress value={overallProgress} className="h-2" />
+            <Progress 
+              value={overallProgress} 
+              className="h-2 bg-muted/30" 
+            />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">Total</div>
+                <div className="text-lg font-bold">{totalTasks}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Completed</div>
+                <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{completedTasks}</div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-amber-600 dark:text-amber-400">In Progress</div>
+                <div className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                  {tasks.filter(t => t.status === 'in-progress').length}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-muted-foreground">Pending</div>
+                <div className="text-lg font-bold text-muted-foreground">
+                  {tasks.filter(t => ['pending', 'assigned'].includes(t.status)).length}
+                </div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Task Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Task Timeline</CardTitle>
+      <Card className="border-border/50 shadow-sm">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-lg">Task Timeline</CardTitle>
           <CardDescription>
-            Chronological view of all tasks and their current status
+            Chronological view of all expedition tasks
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+          <div className="space-y-8">
             {sortedTasks.map((task, index) => {
               const statusConfig = getStatusConfig(task.status);
               const priorityConfig = getPriorityConfig(task.priority);
@@ -201,36 +272,25 @@ export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
               const isLast = index === sortedTasks.length - 1;
 
               return (
-                <div key={task.id} className="relative">
-                  {/* Timeline connector */}
-                  {!isLast && (
-                    <div className="absolute left-6 top-12 w-0.5 h-16 bg-border"></div>
-                  )}
-
-                  <div className="flex items-start space-x-4">
-                    {/* Status Icon */}
-                    <div className={`flex-shrink-0 w-12 h-12 rounded-full ${statusConfig.bg} flex items-center justify-center`}>
-                      <StatusIcon className={`h-6 w-6 ${statusConfig.color}`} />
-                    </div>
-
-                    {/* Task Content */}
-                    <div className="flex-1 min-w-0">
-                      <Card className="border-l-4 border-l-primary/20">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between">
+                <div key={task.id} className="group">
+                  {/* Task Content */}
+                  <div className="flex-1 min-w-0 pb-4">
+                    <Card className="border-l-4 border-l-primary/30 shadow-sm hover:shadow-md transition-all duration-200 bg-card">
+                        <CardHeader className="pb-4">
+                          <div className="flex items-start justify-between gap-4">
                             <div className="flex-1 min-w-0">
-                              <CardTitle className="text-base truncate">
+                              <CardTitle className="text-base font-semibold text-foreground line-clamp-2">
                                 {task.title}
                               </CardTitle>
-                              <CardDescription className="mt-1">
+                              <CardDescription className="mt-2 text-sm leading-relaxed">
                                 {task.description}
                               </CardDescription>
                             </div>
-                            <div className="flex flex-col items-end space-y-2 ml-4">
-                              <Badge variant="outline" className={`${statusConfig.color} ${statusConfig.bg}`}>
-                                {statusConfig.label}
-                              </Badge>
-                              <Badge variant="outline" className={`${priorityConfig.color} ${priorityConfig.bg}`}>
+                            <div className="flex flex-col gap-2">
+                              <Badge 
+                                variant="outline" 
+                                className={`${priorityConfig.color} ${priorityConfig.bg} ${priorityConfig.border} font-medium px-3 py-1`}
+                              >
                                 {priorityConfig.label}
                               </Badge>
                             </div>
@@ -238,61 +298,74 @@ export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
                         </CardHeader>
 
                         {showDetails && (
-                          <CardContent className="space-y-3">
+                          <CardContent className="space-y-6">
                             {/* Deliverable */}
-                            <div>
-                              <p className="text-sm font-medium mb-1">Deliverable</p>
-                              <p className="text-sm text-muted-foreground">{task.deliverable}</p>
+                            <div className="rounded-lg bg-muted/30 dark:bg-muted/20 p-4">
+                              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                                <Target className="h-4 w-4" />
+                                Deliverable
+                              </h4>
+                              <p className="text-sm leading-relaxed text-muted-foreground">
+                                {task.deliverable}
+                              </p>
                             </div>
 
                             {/* Skills and Agent */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="flex item-center justify-between">
+                              {/* Required Skills */}
                               <div>
-                                <p className="text-sm font-medium mb-2">Required Skills</p>
-                                <div className="flex flex-wrap gap-1">
+                                <h4 className="text-sm font-semibold mb-3">Required Skills</h4>
+                                <div className="flex flex-wrap gap-2">
                                   {task.requiredSkills.map((skill) => (
-                                    <Badge key={skill} variant="outline" className="text-xs">
+                                    <Badge 
+                                      key={skill} 
+                                      variant="secondary" 
+                                      className="text-xs bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors"
+                                    >
                                       {skill}
                                     </Badge>
                                   ))}
                                 </div>
                               </div>
                               
+                              {/* Assigned Agent */}
                               {task.assignedAgentId && (
                                 <div>
-                                  <p className="text-sm font-medium mb-2">Assigned Agent</p>
-                                  <div className="flex items-center space-x-1">
-                                    <User className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">{task.assignedAgentId.slice(0, 8)}</span>
-                                  </div>
+                                  <h4 className="text-sm font-semibold mb-3">Assigned Agent</h4>
+                                  <p className="text-sm text-muted-foreground">
+                                    {agentDetails[task.assignedAgentId]?.name || task.assignedAgentId.slice(0, 8)}
+                                  </p>
                                 </div>
                               )}
                             </div>
 
                             {/* Dependencies */}
                             {task.dependencies.length > 0 && (
-                              <div>
-                                <p className="text-sm font-medium mb-2">Dependencies</p>
-                                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                              <div className="border-l-4 border-l-amber-200 dark:border-l-amber-700 pl-4 py-2 bg-amber-50/50 dark:bg-amber-950/30 rounded-r-lg">
+                                <h4 className="text-sm font-semibold mb-2 text-amber-800 dark:text-amber-200 flex items-center gap-2">
                                   <ArrowRight className="h-4 w-4" />
-                                  <span>Depends on {task.dependencies.length} other task(s)</span>
-                                </div>
+                                  Dependencies
+                                </h4>
+                                <p className="text-sm text-amber-700 dark:text-amber-300">
+                                  Depends on {task.dependencies.length} other task{task.dependencies.length > 1 ? 's' : ''}
+                                </p>
                               </div>
                             )}
 
                             {/* Time tracking */}
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div className="flex items-center space-x-2">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">
-                                  {task.estimatedEffort ? `Est: ${task.estimatedEffort}m` : 'No estimate'}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold">Estimated Time</span>
+                                <span className="text-sm text-muted-foreground">
+                                  {task.estimatedEffort ? `${task.estimatedEffort} min` : 'Not estimated'}
                                 </span>
                               </div>
+                              
                               {task.actualEffort && (
-                                <div className="flex items-center space-x-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <span className="text-muted-foreground">
-                                    Actual: {task.actualEffort}m
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-semibold">Actual Time</span>
+                                  <span className="text-sm text-muted-foreground">
+                                    {task.actualEffort} min
                                   </span>
                                 </div>
                               )}
@@ -301,24 +374,48 @@ export function TaskTimeline({ tasks, showDetails = true }: TaskTimelineProps) {
                             {/* Result */}
                             {task.result && (
                               <div>
-                                <p className="text-sm font-medium mb-2">Result</p>
-                                <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                                  <p className="text-sm">{task.result}</p>
+                                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                  <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                  Result
+                                </h4>
+                                <div className="p-4 bg-gradient-to-r from-emerald-50 to-emerald-50/50 dark:from-emerald-950/30 dark:to-emerald-950/10 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+                                  <div className="text-sm leading-relaxed text-emerald-800 dark:text-emerald-200">
+                                    <ChatMessageMarkdown 
+                                      content={task.result} 
+                                      isUser={false}
+                                      messageType="default"
+                                    />
+                                  </div>
                                 </div>
                               </div>
                             )}
 
                             {/* Timestamps */}
-                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                              <span>Created {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}</span>
+                            <div className="pt-3 border-t border-border/50">
+                              <div className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-1.5 text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>Created</span>
+                                </div>
+                                <span className="font-medium text-foreground">
+                                  {formatDistanceToNow(new Date(task.createdAt), { addSuffix: true })}
+                                </span>
+                              </div>
                               {task.updatedAt !== task.createdAt && (
-                                <span>Updated {formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}</span>
+                                <div className="flex items-center justify-between text-xs mt-1.5">
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <Clock className="h-3 w-3" />
+                                    <span>Updated</span>
+                                  </div>
+                                  <span className="font-medium text-foreground">
+                                    {formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true })}
+                                  </span>
+                                </div>
                               )}
                             </div>
                           </CardContent>
                         )}
                       </Card>
-                    </div>
                   </div>
                 </div>
               );

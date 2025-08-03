@@ -99,8 +99,8 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
   } = useExpeditionData({
     starshipId,
     expeditionId,
-    autoRefresh: true, // Enable auto-refresh for real-time task updates
-    refreshInterval: 10000, // Refresh every 10 seconds
+    autoRefresh: false, // Disable auto-refresh since we have WebSocket for real-time updates
+    refreshInterval: 60000, // Reduce frequency to 1 minute for fallback
     enableWebSocket: true // Enable WebSocket for real-time updates
   });
 

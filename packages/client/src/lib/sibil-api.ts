@@ -22,6 +22,7 @@ export interface SibilRequest {
   model?: string;
   message: string;
   sessionId?: string;
+  starshipId?: string;
 }
 
 interface SibilBackendRequest {
@@ -29,6 +30,7 @@ interface SibilBackendRequest {
   model?: string;
   message: string;
   session_id?: string;
+  starship_id?: string;
 }
 
 interface SibilBackendResponse {
@@ -69,6 +71,7 @@ function toSibilBackendRequest(req: SibilRequest): SibilBackendRequest {
     model: req.model,
     message: req.message,
     session_id: req.sessionId,
+    starship_id: req.starshipId,
   };
 }
 
@@ -122,7 +125,8 @@ export const sibilAPI = {
       session_id: request.sessionId,
       stream_id: streamId,
       typewriter_enabled: true,
-      typing_speed: 75
+      typing_speed: 75,
+      starship_id: request.starshipId
     };
 
     const handleStreamStart = (receivedStreamId: string) => {

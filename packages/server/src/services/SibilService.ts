@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SibilRequest, SibilResponse, SibilStreamChunk, ContentBlock, UsageStats } from '@starships/protocol';
 import { env } from '../config/environment';
+import { RepositoryFactory } from '@starships/models';
 
 export class SibilService {
   private static openai = new OpenAI({
@@ -13,17 +14,20 @@ export class SibilService {
   });
 
   static async chat(request: SibilRequest): Promise<SibilResponse> {
-    const { provider, model, message } = request;
+    const { provider, model, message, starship_id } = request;
+
+    // Get system prompt with starship context
+    const systemPrompt = await this.getSibilSystemPromptWithContext(starship_id);
 
     let content: string;
     let usage: UsageStats | undefined;
     
     if (provider === 'openai') {
-      const result = await this.chatWithOpenAI(model || 'gpt-4', message);
+      const result = await this.chatWithOpenAI(model || 'gpt-4', message, systemPrompt);
       content = result.content;
       usage = result.usage;
     } else {
-      const result = await this.chatWithAnthropic(model || 'claude-3-sonnet-20240229', message);
+      const result = await this.chatWithAnthropic(model || 'claude-3-sonnet-20240229', message, systemPrompt);
       content = result.content;
       usage = result.usage;
     }
@@ -42,13 +46,16 @@ export class SibilService {
 
   // NEW: Streaming method
   static async *chatStream(request: SibilRequest): AsyncGenerator<SibilStreamChunk> {
-    const { provider, model, message } = request;
+    const { provider, model, message, starship_id } = request;
+
+    // Get system prompt with starship context
+    const systemPrompt = await this.getSibilSystemPromptWithContext(starship_id);
 
     try {
       if (provider === 'openai') {
-        yield* this.streamWithOpenAI(model || 'gpt-4', message);
+        yield* this.streamWithOpenAI(model || 'gpt-4', message, systemPrompt);
       } else {
-        yield* this.streamWithAnthropic(model || 'claude-3-sonnet-20240229', message);
+        yield* this.streamWithAnthropic(model || 'claude-3-sonnet-20240229', message, systemPrompt);
       }
     } catch (error) {
       yield {
@@ -59,13 +66,13 @@ export class SibilService {
     }
   }
 
-  private static async *streamWithOpenAI(model: string, message: string): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamWithOpenAI(model: string, message: string, systemPrompt: string): AsyncGenerator<SibilStreamChunk> {
     const stream = await this.openai.chat.completions.create({
       model,
       messages: [
         {
           role: 'system',
-          content: this.getSibilSystemPrompt(),
+          content: systemPrompt,
         },
         {
           role: 'user',
@@ -112,12 +119,12 @@ export class SibilService {
     };
   }
 
-  private static async *streamWithAnthropic(model: string, message: string): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamWithAnthropic(model: string, message: string, systemPrompt: string): AsyncGenerator<SibilStreamChunk> {
     const stream = await this.anthropic.messages.create({
       model,
       max_tokens: 4096,
       temperature: 0.7,
-      system: this.getSibilSystemPrompt(),
+      system: systemPrompt,
       messages: [
         {
           role: 'user',
@@ -191,14 +198,14 @@ export class SibilService {
     return blocks;
   }
 
-  private static async chatWithOpenAI(model: string, message: string): Promise<{ content: string; usage?: UsageStats }> {
+  private static async chatWithOpenAI(model: string, message: string, systemPrompt: string): Promise<{ content: string; usage?: UsageStats }> {
     try {
       const response = await this.openai.chat.completions.create({
         model,
         messages: [
           {
             role: 'system',
-            content: this.getSibilSystemPrompt(),
+            content: systemPrompt,
           },
           {
             role: 'user',
@@ -222,13 +229,13 @@ export class SibilService {
     }
   }
 
-  private static async chatWithAnthropic(model: string, message: string): Promise<{ content: string; usage?: UsageStats }> {
+  private static async chatWithAnthropic(model: string, message: string, systemPrompt: string): Promise<{ content: string; usage?: UsageStats }> {
     try {
       const response = await this.anthropic.messages.create({
         model,
         max_tokens: 4096,
         temperature: 0.7,
-        system: this.getSibilSystemPrompt(),
+        system: systemPrompt,
         messages: [
           {
             role: 'user',
@@ -262,6 +269,44 @@ FORMATTING GUIDELINES:
 - Use bullet points and numbered lists for clarity
 
 Respond naturally while following these formatting conventions to ensure your responses render beautifully.`;
+  }
+
+  private static async getSibilSystemPromptWithContext(starshipId?: string): Promise<string> {
+    let basePrompt = this.getSibilSystemPrompt();
+    
+    if (!starshipId) {
+      return basePrompt;
+    }
+
+    try {
+      // Get starship and vision data
+      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const visionRepo = RepositoryFactory.getVisionRepository();
+      
+      const starship = await starshipRepo.findById(starshipId);
+      if (!starship) {
+        return basePrompt;
+      }
+
+      const vision = await visionRepo.findByStarship(starshipId);
+      
+      // Add starship context to the prompt
+      let contextPrompt = basePrompt + `\n\nSTARSHIP CONTEXT:\n`;
+      contextPrompt += `- You are assisting the crew of "${starship.name}", a ${starship.class}-class starship.\n`;
+      
+      if (vision) {
+        contextPrompt += `- The starship's vision is: "${vision.statement}"\n`;
+        contextPrompt += `- Always keep this vision in mind when providing assistance and suggestions.\n`;
+      }
+      
+      contextPrompt += `- The starship can deploy up to ${starship.maxAgents} agents and handle ${starship.maxActiveExpeditions} concurrent expeditions.\n`;
+      contextPrompt += `\nUse this context to provide more relevant and personalized assistance to the crew.`;
+      
+      return contextPrompt;
+    } catch (error) {
+      console.error('Error loading starship context:', error);
+      return basePrompt;
+    }
   }
 
   private static parseStructuredContent(content: string): ContentBlock[] {

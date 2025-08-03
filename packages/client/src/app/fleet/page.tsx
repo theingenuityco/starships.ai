@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { PageLayout } from '@/components/layout/PageLayout';
+import { AuthGate } from '@/components/auth/AuthGate';
 import { StarshipDashboard } from '@/components/command-deck/starship/StarshipDashboard';
 
 export const metadata: Metadata = {
@@ -9,8 +9,10 @@ export const metadata: Metadata = {
 
 export default function ShipsPage() {
   return (
-    <PageLayout>
-      <StarshipDashboard />
-    </PageLayout>
+    <AuthGate>
+      <div className="h-screen w-screen overflow-hidden">
+        <StarshipDashboard />
+      </div>
+    </AuthGate>
   );
 }

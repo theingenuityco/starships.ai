@@ -64,8 +64,8 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
   const { expeditions, expeditionsLoading, expeditionsError, stats, refreshExpeditions } =
     useExpeditionData({
       starshipId,
-      autoRefresh: true,
-      refreshInterval: 30000,
+      autoRefresh: false, // Disable auto-refresh since we have WebSocket for real-time updates
+      refreshInterval: 60000, // Reduce frequency for fallback
       enableWebSocket: true, // Enable WebSocket for real-time updates
     })
 

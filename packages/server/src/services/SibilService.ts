@@ -203,6 +203,9 @@ export class SibilService {
     }
 
     try {
+      // Save the proposed vision before it gets cleared
+      const proposedVisionText = session.proposedVision;
+      
       // Update vision in database
       const visionRepo = RepositoryFactory.getVisionRepository();
       
@@ -212,12 +215,12 @@ export class SibilService {
       let updatedVision;
       if (existingVision) {
         // Update existing vision
-        updatedVision = await visionRepo.updateStatement(session.starshipId, session.proposedVision);
+        updatedVision = await visionRepo.updateStatement(session.starshipId, proposedVisionText);
       } else {
         // Create new vision if it doesn't exist
         updatedVision = await visionRepo.create({
           starshipId: session.starshipId,
-          statement: session.proposedVision,
+          statement: proposedVisionText,
           refinementCount: 1,
           confidence: 0.8,
           lastRefined: new Date().toISOString(),
@@ -229,12 +232,12 @@ export class SibilService {
         throw new Error('Failed to update or create vision');
       }
       
-      // Update session state
+      // Update session state (this will clear proposedVision)
       SibilService.getSessionManager().acceptProposal(session.sessionId);
       
-      // Calculate metrics for the new vision
+      // Calculate metrics for the new vision using the saved text
       const metrics = await SibilService.getMetricsCalculator().calculateMetrics(
-        session.proposedVision, 
+        proposedVisionText, 
         updatedVision?.refinementCount || 0
       );
 

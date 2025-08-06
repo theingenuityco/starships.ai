@@ -104,4 +104,112 @@ export class VisionRepository implements VisionRepositoryInterface {
     
     return result[0]?.deletedCount > 0;
   }
+
+  /**
+   * Updates vision metrics for a specific vision
+   */
+  async updateMetrics(
+    starshipId: string,
+    metrics: {
+      clarityScore: number;
+      specificityScore: number;
+      actionabilityScore: number;
+      inspirationalScore: number;
+      overallQuality: number;
+      hasObjectives: boolean;
+      hasTimeframe: boolean;
+      hasMeasurables: boolean;
+    }
+  ): Promise<Vision | null> {
+    const connection = getConnection();
+    const result = await connection.executeWrite<{ v: Vision }>(
+      `MATCH (v:Vision) WHERE v.starshipId = $starshipId 
+       SET v.clarityScore = $clarityScore,
+           v.specificityScore = $specificityScore,
+           v.actionabilityScore = $actionabilityScore,
+           v.inspirationalScore = $inspirationalScore,
+           v.overallQuality = $overallQuality,
+           v.hasObjectives = $hasObjectives,
+           v.hasTimeframe = $hasTimeframe,
+           v.hasMeasurables = $hasMeasurables,
+           v.updatedAt = $timestamp
+       RETURN v`,
+      { 
+        starshipId,
+        ...metrics,
+        timestamp: new Date().toISOString() 
+      }
+    );
+    
+    return result[0]?.v || null;
+  }
+
+  /**
+   * Gets vision metrics for a specific starship
+   */
+  async getMetrics(starshipId: string): Promise<{
+    clarityScore: number | null;
+    specificityScore: number | null;
+    actionabilityScore: number | null;
+    inspirationalScore: number | null;
+    overallQuality: number | null;
+    hasObjectives: boolean | null;
+    hasTimeframe: boolean | null;
+    hasMeasurables: boolean | null;
+  } | null> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ 
+      clarityScore: number | null;
+      specificityScore: number | null;
+      actionabilityScore: number | null;
+      inspirationalScore: number | null;
+      overallQuality: number | null;
+      hasObjectives: boolean | null;
+      hasTimeframe: boolean | null;
+      hasMeasurables: boolean | null;
+    }>(
+      `MATCH (v:Vision) WHERE v.starshipId = $starshipId 
+       RETURN v.clarityScore as clarityScore,
+              v.specificityScore as specificityScore,
+              v.actionabilityScore as actionabilityScore,
+              v.inspirationalScore as inspirationalScore,
+              v.overallQuality as overallQuality,
+              v.hasObjectives as hasObjectives,
+              v.hasTimeframe as hasTimeframe,
+              v.hasMeasurables as hasMeasurables`,
+      { starshipId }
+    );
+    
+    return result[0] || null;
+  }
+
+  /**
+   * Finds visions that need metrics calculation (where overallQuality is null)
+   */
+  async findVisionsMissingMetrics(limit: number = 50): Promise<Vision[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ v: Vision }>(
+      'MATCH (v:Vision) WHERE v.overallQuality IS NULL RETURN v ORDER BY v.createdAt DESC LIMIT $limit',
+      { limit }
+    );
+    return result.map(record => record.v);
+  }
+
+  /**
+   * Gets vision by starship ID (alias for findByStarship)
+   */
+  async getVisionByStarshipId(starshipId: string): Promise<{ vision: string } | null> {
+    const visionEntity = await this.findByStarship(starshipId);
+    if (!visionEntity) {
+      return null;
+    }
+    return { vision: visionEntity.statement };
+  }
+
+  /**
+   * Updates vision statement by starship ID (alias for updateStatement)
+   */
+  async updateVision(starshipId: string, newVision: string): Promise<Vision | null> {
+    return this.updateStatement(starshipId, newVision);
+  }
 }

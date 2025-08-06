@@ -28,7 +28,7 @@ import {
   ErrorFactory,
 } from '@starships/protocol/src/types/error-classes';
 
-import { getLogger } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import { FirstOfficerService } from './FirstOfficerService';
 import { SocketIOService } from './SocketIOService';
@@ -37,9 +37,7 @@ export class ExpeditionService {
   private static instance: ExpeditionService;
   private firstOfficerService: FirstOfficerService;
   private socketService: SocketIOService | null = null;
-  private logger = getLogger({
-    service: 'expedition-service',
-  });
+  private logger = Logger.getInstance();
 
   private constructor() {
     this.firstOfficerService = FirstOfficerService.getInstance();
@@ -55,7 +53,7 @@ export class ExpeditionService {
         this.socketService = SocketIOService.getInstance();
         this.logger.info('SocketIOService successfully connected');
       } catch (error) {
-        this.logger.warn('SocketIOService not available', undefined, { error: error instanceof Error ? error.message : String(error) });
+        this.logger.warn('SocketIOService not available', { error: error instanceof Error ? error.message : String(error) });
         return null;
       }
     }

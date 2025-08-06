@@ -39,7 +39,7 @@ export class FirstOfficerService {
   private socketService: SocketIOService | null = null;
 
   private constructor() {
-    this.logger = Logger.getInstance({ service: 'FirstOfficerService' });
+    this.logger = Logger.getInstance();
     this.contextBuilder = new ContextBuilder();
     // Note: SocketIOService will be accessed lazily when needed
   }
@@ -53,7 +53,7 @@ export class FirstOfficerService {
         this.socketService = SocketIOService.getInstance();
         this.logger.info('SocketIOService successfully connected');
       } catch (error) {
-        this.logger.warn('SocketIOService not available', undefined, { error: error instanceof Error ? error.message : String(error) });
+        this.logger.warn('SocketIOService not available', { error: error instanceof Error ? error.message : String(error) });
         return null;
       }
     }
@@ -219,7 +219,7 @@ export class FirstOfficerService {
       this.memoryStores.delete(expeditionId);
 
       if (error instanceof StandardError) {
-        this.logger.error('Failed to start expedition', error as StandardError, context);
+        this.logger.error('Failed to start expedition', context, error as StandardError);
         throw error;
       }
 
@@ -230,7 +230,7 @@ export class FirstOfficerService {
         context
       );
 
-      this.logger.error('Failed to start expedition', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to start expedition', context, error instanceof Error ? error : undefined);
       throw standardError;
     }
   }
@@ -350,7 +350,7 @@ export class FirstOfficerService {
       return result;
       
     } catch (error) {
-      this.logger.error('Failed to resume expedition', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to resume expedition', context, error instanceof Error ? error : undefined);
       throw error;
     }
   }
@@ -392,7 +392,7 @@ export class FirstOfficerService {
       this.logger.info('Expedition orchestration paused successfully', context);
     } catch (error) {
       if (error instanceof StandardError) {
-        this.logger.error('Failed to pause expedition', error as StandardError, context);
+        this.logger.error('Failed to pause expedition', context, error as StandardError);
         throw error;
       }
 
@@ -403,7 +403,7 @@ export class FirstOfficerService {
         context
       );
 
-      this.logger.error('Failed to pause expedition', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to pause expedition', context, error instanceof Error ? error : undefined);
       throw standardError;
     }
   }
@@ -445,7 +445,7 @@ export class FirstOfficerService {
       this.logger.info('Expedition orchestration resumed successfully', context);
     } catch (error) {
       if (error instanceof StandardError) {
-        this.logger.error('Failed to resume expedition', error as StandardError, context);
+        this.logger.error('Failed to resume expedition', context, error as StandardError);
         throw error;
       }
 
@@ -456,7 +456,7 @@ export class FirstOfficerService {
         context
       );
 
-      this.logger.error('Failed to resume expedition', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to resume expedition', context, error instanceof Error ? error : undefined);
       throw standardError;
     }
   }
@@ -592,20 +592,21 @@ export class FirstOfficerService {
         // Process message using the consolidated workflow's chat capabilities
         const response = await firstOfficer.handleUserMessage(expeditionId, message);
 
-        this.logger.info('Successfully processed user message', context, {
+        this.logger.info('Successfully processed user message', {
+          ...context,
           responseLength: response.reply.length
         });
 
         return response;
       } catch (chatError) {
-        this.logger.error('Chat processing failed, falling back to simple response', chatError instanceof Error ? chatError : undefined, context);
+        this.logger.error('Chat processing failed, falling back to simple response', context, chatError instanceof Error ? chatError : undefined);
         
         return {
           reply: 'I apologize, but I encountered an issue processing your message. Please try again.'
         };
       }
     } catch (error) {
-      this.logger.error('Failed to handle user message', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to handle user message', context, error instanceof Error ? error : undefined);
       
       return {
         reply: 'I encountered an error processing your message. Please try again.'
@@ -791,8 +792,7 @@ export class FirstOfficerService {
           
           this.logger.debug('Found agent details with tasks', {
             service: 'FirstOfficerService',
-            operation: 'buildCompleteExpeditionContext'
-          }, {
+            operation: 'buildCompleteExpeditionContext',
             agentId: agent.id,
             agentName: agent.name,
             agentCategory: agent.category,
@@ -825,16 +825,14 @@ export class FirstOfficerService {
         } else {
           this.logger.warn('Agent not found in database', {
             service: 'FirstOfficerService',
-            operation: 'buildCompleteExpeditionContext'
-          }, {
+            operation: 'buildCompleteExpeditionContext',
             agentId
           });
         }
       } catch (error) {
         this.logger.warn('Failed to fetch agent details', {
           service: 'FirstOfficerService',
-          operation: 'buildCompleteExpeditionContext'
-        }, {
+          operation: 'buildCompleteExpeditionContext',
           agentId,
           error: error instanceof Error ? error.message : 'Unknown error'
         });
@@ -1009,7 +1007,8 @@ export class FirstOfficerService {
       const greetingResponse = await firstOfficer.initializeChat(expeditionId);
 
       if (greetingResponse) {
-        this.logger.info('Chat initialized with greeting', context, {
+        this.logger.info('Chat initialized with greeting', {
+          ...context,
           responseLength: greetingResponse.reply.length
         });
       } else {
@@ -1018,7 +1017,7 @@ export class FirstOfficerService {
 
       return greetingResponse;
     } catch (error) {
-      this.logger.error('Failed to initialize chat', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to initialize chat', context, error instanceof Error ? error : undefined);
       throw error;
     }
   }
@@ -1104,7 +1103,8 @@ export class FirstOfficerService {
       // Check readiness using FirstOfficerAgent
       const readinessResult = await firstOfficer.isExpeditionReadyToStart(expeditionId, userId);
 
-      this.logger.info('Expedition readiness checked successfully', context, {
+      this.logger.info('Expedition readiness checked successfully', {
+        ...context,
         isReady: readinessResult.isReady,
         userMessageCount: readinessResult.userMessageCount,
         reason: readinessResult.reason
@@ -1112,7 +1112,7 @@ export class FirstOfficerService {
 
       return readinessResult;
     } catch (error) {
-      this.logger.error('Failed to check expedition readiness', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to check expedition readiness', context, error instanceof Error ? error : undefined);
       throw error;
     }
   }
@@ -1166,18 +1166,19 @@ export class FirstOfficerService {
       const memoryStore = new LangChainMemoryStore();
       const sessionKey = memoryStore.makeKey('first-officer', expedition.createdBy, expeditionId);
       
-      this.logger.debug('Retrieving memory entries', context, { sessionKey });
+      this.logger.debug('Retrieving memory entries', { ...context, sessionKey });
       
       // Get memory entries
       const memoryEntries = await memoryStore.get(sessionKey);
       
-      this.logger.info('Memory messages retrieved successfully', context, {
+      this.logger.info('Memory messages retrieved successfully', {
+        ...context,
         entriesCount: memoryEntries.length
       });
 
       return memoryEntries;
     } catch (error) {
-      this.logger.error('Failed to get memory messages', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to get memory messages', context, error instanceof Error ? error : undefined);
       throw error;
     }
   }

@@ -1,4 +1,4 @@
-import { getLogger, Logger } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import {
   AgentToOfficerMessage,
@@ -40,7 +40,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
   }> = new Map();
 
   constructor() {
-    this.logger = getLogger({ service: 'BidirectionalCommunicationService' });
+    this.logger = Logger.getInstance();
     this.firstOfficerService = FirstOfficerService.getInstance();
     this.messageService = MessageService.getInstance();
     // Note: SocketIOService will be accessed lazily when needed
@@ -55,7 +55,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
         this.socketService = SocketIOService.getInstance();
         this.logger.info('SocketIOService successfully connected');
       } catch (error) {
-        this.logger.warn('SocketIOService not available', undefined, { error: error instanceof Error ? error.message : String(error) });
+        this.logger.warn('SocketIOService not available', { error: error instanceof Error ? error.message : String(error) });
         return null;
       }
     }
@@ -106,8 +106,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     try {
       this.logger.info('Agent sending message to First Officer', {
         service: 'BidirectionalCommunicationService',
-        operation: 'sendToFirstOfficer'
-      }, {
+        operation: 'sendToFirstOfficer',
         expeditionId: message.expeditionId,
         agentId: message.agentId,
         messageType: message.messageType,
@@ -139,10 +138,10 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
       }
 
     } catch (error) {
-      this.logger.error('Failed to send message to First Officer', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to send message to First Officer', {
         service: 'BidirectionalCommunicationService',
         operation: 'sendToFirstOfficer'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -155,8 +154,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     // The actual handling is done in sendToFirstOfficer
     this.logger.debug('First Officer received agent message', {
       service: 'BidirectionalCommunicationService',
-      operation: 'handleAgentMessage'
-    }, {
+      operation: 'handleAgentMessage',
       messageType: message.messageType,
       agentName: message.agentName
     });
@@ -169,8 +167,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     try {
       this.logger.info('First Officer sending message to agent', {
         service: 'BidirectionalCommunicationService',
-        operation: 'sendToAgent'
-      }, {
+        operation: 'sendToAgent',
         expeditionId: message.expeditionId,
         agentId: message.agentId,
         messageType: message.messageType
@@ -200,10 +197,10 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
       }
 
     } catch (error) {
-      this.logger.error('Failed to send message to agent', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to send message to agent', {
         service: 'BidirectionalCommunicationService',
         operation: 'sendToAgent'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -216,8 +213,7 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     // For now, log the receipt
     this.logger.debug('Agent received First Officer message', {
       service: 'BidirectionalCommunicationService',
-      operation: 'handleOfficerMessage'
-    }, {
+      operation: 'handleOfficerMessage',
       messageType: message.messageType,
       actionRequired: message.actionRequired
     });
@@ -280,8 +276,9 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     // This would connect to WebSocket for real-time updates
     this.logger.debug('Subscribing to messages', {
       service: 'BidirectionalCommunicationService',
-      operation: 'subscribeToMessages'
-    }, { expeditionId });
+      operation: 'subscribeToMessages',
+      expeditionId
+    });
   }
 
   /**
@@ -291,8 +288,9 @@ export class BidirectionalCommunicationService implements BidirectionalCommunica
     // This would disconnect from WebSocket
     this.logger.debug('Unsubscribing from messages', {
       service: 'BidirectionalCommunicationService',
-      operation: 'unsubscribeFromMessages'
-    }, { expeditionId });
+      operation: 'unsubscribeFromMessages',
+      expeditionId
+    });
   }
 
   // ============================================================================
@@ -340,10 +338,10 @@ Please provide a clear, helpful clarification that addresses their specific ques
       await this.sendToAgent(request.agentId, clarificationResponse);
 
     } catch (error) {
-      this.logger.error('Failed to handle clarification request', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to handle clarification request', {
         service: 'BidirectionalCommunicationService',
         operation: 'handleClarificationRequest'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -396,10 +394,10 @@ Please provide guidance to help unblock the agent. Consider workarounds, alterna
       }
 
     } catch (error) {
-      this.logger.error('Failed to handle blocker report', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to handle blocker report', {
         service: 'BidirectionalCommunicationService',
         operation: 'handleBlockerReport'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -411,8 +409,7 @@ Please provide guidance to help unblock the agent. Consider workarounds, alterna
       // Log the progress
       this.logger.info('Agent progress update received', {
         service: 'BidirectionalCommunicationService',
-        operation: 'handleProgressUpdate'
-      }, {
+        operation: 'handleProgressUpdate',
         agentName: update.agentName,
         taskId: update.taskId,
         percentComplete: update.progress.percentComplete,
@@ -458,10 +455,10 @@ ${update.progress.confidence === 'low' ? 'The agent has low confidence. Please p
       }
 
     } catch (error) {
-      this.logger.error('Failed to handle progress update', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to handle progress update', {
         service: 'BidirectionalCommunicationService',
         operation: 'handleProgressUpdate'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -520,10 +517,10 @@ Please decide whether to approve this assistance request and coordinate accordin
       });
 
     } catch (error) {
-      this.logger.error('Failed to handle assistance request', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to handle assistance request', {
         service: 'BidirectionalCommunicationService',
         operation: 'handleAssistanceRequest'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -553,10 +550,10 @@ Please decide whether to approve this assistance request and coordinate accordin
       }
 
     } catch (error) {
-      this.logger.error('Failed to handle generic agent message', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to handle generic agent message', {
         service: 'BidirectionalCommunicationService',
         operation: 'handleGenericAgentMessage'
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
     }
   }
 

@@ -17,6 +17,7 @@ import {
 import { useStarshipStore } from '@/store/starship-store';
 import { StarshipCard } from './StarshipCard';
 import { StarshipCreateModal } from './StarshipCreateModal';
+import { StarshipCreateModalEnhanced } from './StarshipCreateModalEnhanced';
 import { StarshipEditModal } from './StarshipEditModal';
 import { StarshipDeleteDialog } from './StarshipDeleteDialog';
 import { StarshipStatusManager } from './StarshipStatusManager';
@@ -26,9 +27,10 @@ import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components';
 
 interface StarshipDashboardProps {
   className?: string;
+  autoOpenCreate?: boolean;
 }
 
-export function StarshipDashboard({ className }: StarshipDashboardProps) {
+export function StarshipDashboard({ className, autoOpenCreate = false }: StarshipDashboardProps) {
   const {
     starships,
     activeStarshipId,
@@ -53,6 +55,16 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   useEffect(() => {
     loadUserStarships();
   }, [loadUserStarships]);
+
+  // Auto-open create modal for onboarding
+  useEffect(() => {
+    if (autoOpenCreate && !loading) {
+      // Small delay to ensure everything is loaded
+      setTimeout(() => {
+        setShowCreateModal(true);
+      }, 500);
+    }
+  }, [autoOpenCreate, loading]);
 
   // Filter starships based on search query and active filter
   const filteredStarships = starships.filter(starship => {
@@ -490,11 +502,20 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
       </div>
 
       {/* Modals */}
-      <StarshipCreateModal
-        open={showCreateModal}
-        onOpenChange={setShowCreateModal}
-        onSuccess={handleCreateSuccess}
-      />
+      {autoOpenCreate ? (
+        <StarshipCreateModalEnhanced
+          open={showCreateModal}
+          onOpenChange={setShowCreateModal}
+          onSuccess={handleCreateSuccess}
+          isOnboarding={true}
+        />
+      ) : (
+        <StarshipCreateModal
+          open={showCreateModal}
+          onOpenChange={setShowCreateModal}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
 
       {editingStarship && (
         <StarshipEditModal

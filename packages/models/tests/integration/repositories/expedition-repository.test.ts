@@ -4,6 +4,24 @@ import { UserRepository } from '@/repositories/UserRepository';
 import { getConnection } from '@/connection';
 import { ExpeditionStatus } from '@starships/protocol';
 
+/**
+ * INTEGRATION TESTS FOR EXPEDITION REPOSITORY
+ * 
+ * These tests use real Neo4j database connections to test the full
+ * expedition lifecycle with actual database operations and relationships.
+ * 
+ * EXISTING TESTS: Basic CRUD and performance testing implemented
+ * 
+ * TODO PLACEHOLDER AREAS:
+ * - Complete expedition lifecycle testing
+ * - Complex relationship validation
+ * - Advanced error handling scenarios
+ * - Business rule enforcement
+ * - Concurrent operation handling
+ * - Analytics and monitoring integration
+ * 
+ * PRIORITY: CRITICAL - This is core business logic
+ */
 describe('ExpeditionRepository Integration Tests', () => {
   let expeditionRepository: ExpeditionRepository;
   let starshipRepository: StarshipRepository;
@@ -263,6 +281,196 @@ describe('ExpeditionRepository Integration Tests', () => {
       expect(retrievedExpeditions).toHaveLength(10);
       console.log(`✅ Retrieved 10 expeditions in ${retrievalTime}ms`);
       console.log(`⚡ Performance test completed - Total time: ${creationTime + retrievalTime}ms`);
+    });
+  });
+
+  // ============================================================================
+  // TODO: EXPEDITION LIFECYCLE COMPREHENSIVE TESTING
+  // ============================================================================
+
+  describe('TODO: Complete Expedition Lifecycle', () => {
+    describe('status transitions', () => {
+      it.todo('should handle planning → in-progress → completed workflow');
+      it.todo('should handle planning → in-progress → paused → in-progress → completed');
+      it.todo('should handle cancellation from any status');
+      it.todo('should validate business rules during transitions');
+      it.todo('should maintain audit trail for all transitions');
+    });
+
+    describe('agent lifecycle integration', () => {
+      it.todo('should assign agents during expedition planning');
+      it.todo('should handle agent reassignment during execution');
+      it.todo('should release agents upon expedition completion');
+      it.todo('should handle agent unavailability during expedition');
+    });
+
+    describe('resource management', () => {
+      it.todo('should enforce starship capacity limits');
+      it.todo('should handle resource conflicts between expeditions');
+      it.todo('should validate resource availability before starting');
+      it.todo('should cleanup resources on expedition failure');
+    });
+  });
+
+  // ============================================================================
+  // TODO: ADVANCED RELATIONSHIP TESTING
+  // ============================================================================
+
+  describe('TODO: Complex Database Relationships', () => {
+    describe('multi-repository consistency', () => {
+      it.todo('should maintain consistency with ExpeditionTaskRepository');
+      it.todo('should integrate with ExpeditionMessageRepository');
+      it.todo('should sync with ExpeditionResultRepository');
+      it.todo('should handle cascading updates across repositories');
+    });
+
+    describe('referential integrity', () => {
+      it.todo('should prevent orphaned expeditions when starship deleted');
+      it.todo('should handle user deletion with expedition reassignment');
+      it.todo('should maintain data consistency during bulk operations');
+      it.todo('should validate relationship constraints at database level');
+    });
+
+    describe('concurrent relationship management', () => {
+      it.todo('should handle concurrent agent assignments');
+      it.todo('should prevent race conditions in expedition creation');
+      it.todo('should maintain consistency with concurrent updates');
+      it.todo('should handle deadlock scenarios gracefully');
+    });
+  });
+
+  // ============================================================================
+  // TODO: BUSINESS RULE ENFORCEMENT
+  // ============================================================================
+
+  describe('TODO: Business Rule Integration', () => {
+    describe('capacity and limits', () => {
+      it.todo('should enforce maximum expeditions per starship');
+      it.todo('should validate agent assignment limits');
+      it.todo('should handle priority-based resource allocation');
+      it.todo('should enforce expedition duration limits');
+    });
+
+    describe('workflow validation', () => {
+      it.todo('should validate expedition prerequisites before starting');
+      it.todo('should enforce required roles for expedition types');
+      it.todo('should validate mission parameters against starship capabilities');
+      it.todo('should enforce expedition scheduling constraints');
+    });
+
+    describe('security and permissions', () => {
+      it.todo('should enforce user permissions on expedition operations');
+      it.todo('should validate agent access permissions');
+      it.todo('should handle expedition visibility and access controls');
+      it.todo('should audit sensitive expedition operations');
+    });
+  });
+
+  // ============================================================================
+  // TODO: ERROR HANDLING AND RECOVERY
+  // ============================================================================
+
+  describe('TODO: Advanced Error Scenarios', () => {
+    describe('database failures', () => {
+      it.todo('should handle connection failures during operations');
+      it.todo('should recover from transaction timeouts');
+      it.todo('should handle partial write failures with rollback');
+      it.todo('should maintain consistency during connection issues');
+    });
+
+    describe('data corruption scenarios', () => {
+      it.todo('should detect and handle corrupted expedition data');
+      it.todo('should validate data integrity on critical operations');
+      it.todo('should recover from inconsistent relationship states');
+      it.todo('should handle malformed metadata gracefully');
+    });
+
+    describe('system recovery', () => {
+      it.todo('should recover incomplete expeditions on system restart');
+      it.todo('should handle orphaned expedition processes');
+      it.todo('should validate expedition state consistency');
+      it.todo('should cleanup failed expedition artifacts');
+    });
+  });
+
+  // ============================================================================
+  // TODO: PERFORMANCE AND SCALABILITY
+  // ============================================================================
+
+  describe('TODO: Advanced Performance Testing', () => {
+    describe('large scale operations', () => {
+      it.todo('should handle 1000+ expeditions per starship efficiently');
+      it.todo('should maintain performance with complex relationship queries');
+      it.todo('should optimize expedition search with large datasets');
+      it.todo('should handle efficient pagination for expedition history');
+    });
+
+    describe('concurrent load testing', () => {
+      it.todo('should handle 50+ concurrent expedition operations');
+      it.todo('should maintain performance under high query load');
+      it.todo('should optimize database connection pooling');
+      it.todo('should handle burst traffic scenarios');
+    });
+
+    describe('query optimization', () => {
+      it.todo('should execute complex expedition queries efficiently');
+      it.todo('should optimize agent availability queries');
+      it.todo('should minimize database round trips for relationships');
+      it.todo('should cache frequently accessed expedition data');
+    });
+  });
+
+  // ============================================================================
+  // TODO: ANALYTICS AND MONITORING
+  // ============================================================================
+
+  describe('TODO: Analytics Integration', () => {
+    describe('expedition metrics', () => {
+      it.todo('should track expedition success rates by type');
+      it.todo('should monitor average expedition duration by complexity');
+      it.todo('should analyze agent utilization across expeditions');
+      it.todo('should generate expedition performance dashboards');
+    });
+
+    describe('predictive analytics', () => {
+      it.todo('should predict expedition duration based on historical data');
+      it.todo('should recommend optimal agent assignments');
+      it.todo('should identify expedition risk factors');
+      it.todo('should analyze expedition failure patterns');
+    });
+
+    describe('real-time monitoring', () => {
+      it.todo('should monitor active expedition health in real-time');
+      it.todo('should alert on expedition anomalies');
+      it.todo('should track resource utilization trends');
+      it.todo('should monitor database performance for expedition queries');
+    });
+  });
+
+  // ============================================================================
+  // TODO: INTEGRATION WITH OTHER SYSTEMS
+  // ============================================================================
+
+  describe('TODO: External System Integration', () => {
+    describe('event system integration', () => {
+      it.todo('should publish expedition lifecycle events');
+      it.todo('should handle event ordering for expedition operations');
+      it.todo('should ensure event delivery guarantees');
+      it.todo('should handle event system failures gracefully');
+    });
+
+    describe('notification system', () => {
+      it.todo('should trigger notifications for expedition milestones');
+      it.todo('should handle user preference-based notifications');
+      it.todo('should batch notification delivery efficiently');
+      it.todo('should track notification delivery status');
+    });
+
+    describe('external API integration', () => {
+      it.todo('should sync expedition data with external systems');
+      it.todo('should handle API rate limiting gracefully');
+      it.todo('should validate external data before integration');
+      it.todo('should maintain data consistency across systems');
     });
   });
 });

@@ -1,4 +1,4 @@
-import { getLogger, Logger } from '../utils/logger';
+import { Logger } from '../utils/logger';
 import { RepositoryFactory } from '@starships/models';
 import { ExpeditionMessage } from '@starships/protocol';
 
@@ -70,7 +70,7 @@ export class ContextBuilder {
   private logger: Logger;
 
   constructor() {
-    this.logger = getLogger({ service: 'ContextBuilder' });
+    this.logger = Logger.getInstance();
   }
 
   async buildExpeditionContext(expeditionId: string): Promise<ExpeditionContext> {
@@ -88,8 +88,7 @@ export class ContextBuilder {
   async buildContext(expeditionId: string, starshipId: string): Promise<ExpeditionContext> {
     this.logger.info('Building context for expedition', {
       service: 'ContextBuilder',
-      operation: 'buildContext'
-    }, {
+      operation: 'buildContext',
       expeditionId,
       starshipId
     });
@@ -134,8 +133,7 @@ export class ContextBuilder {
 
       this.logger.info('Context built successfully', {
         service: 'ContextBuilder',
-        operation: 'buildContext'
-      }, {
+        operation: 'buildContext',
         expeditionId,
         agentCount: agents.length,
         taskCount: taskSummaries.length,
@@ -145,12 +143,11 @@ export class ContextBuilder {
 
       return context;
     } catch (error) {
-      this.logger.error('Failed to build context', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to build context', {
         service: 'ContextBuilder',
-        operation: 'buildContext'
-      }, {
+        operation: 'buildContext',
         expeditionId
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -176,12 +173,11 @@ export class ContextBuilder {
         metadata: {} // Not available in Expedition model
       };
     } catch (error) {
-      this.logger.error('Failed to fetch expedition details', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to fetch expedition details', {
         service: 'ContextBuilder',
-        operation: 'fetchExpeditionDetails'
-      }, {
+        operation: 'fetchExpeditionDetails',
         expeditionId
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -228,8 +224,7 @@ export class ContextBuilder {
         } catch (agentError) {
           this.logger.warn('Failed to fetch agent details', {
             service: 'ContextBuilder',
-            operation: 'fetchAgents'
-          }, {
+            operation: 'fetchAgents',
             expeditionId,
             agentId
           });
@@ -238,12 +233,11 @@ export class ContextBuilder {
       
       return agents;
     } catch (error) {
-      this.logger.error('Failed to fetch agents', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to fetch agents', {
         service: 'ContextBuilder',
-        operation: 'fetchAgents'
-      }, {
+        operation: 'fetchAgents',
         expeditionId
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       // Return empty array if fetch fails to handle gracefully
       return [];
     }
@@ -255,12 +249,11 @@ export class ContextBuilder {
       const tasks = await taskRepo.findByExpedition(expeditionId);
       return tasks || [];
     } catch (error) {
-      this.logger.error('Failed to fetch tasks', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to fetch tasks', {
         service: 'ContextBuilder',
-        operation: 'fetchTasks'
-      }, {
+        operation: 'fetchTasks',
         expeditionId
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -302,12 +295,11 @@ export class ContextBuilder {
           metadata: result.metadata || {}
         }));
     } catch (error) {
-      this.logger.error('Failed to fetch recent results', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to fetch recent results', {
         service: 'ContextBuilder',
-        operation: 'fetchRecentResults'
-      }, {
+        operation: 'fetchRecentResults',
         expeditionId
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }
@@ -336,12 +328,11 @@ export class ContextBuilder {
           metadata: msg.metadata || {}
         }));
     } catch (error) {
-      this.logger.error('Failed to fetch recent messages', error instanceof Error ? error : new Error(String(error)), {
+      this.logger.error('Failed to fetch recent messages', {
         service: 'ContextBuilder',
-        operation: 'fetchRecentMessages'
-      }, {
+        operation: 'fetchRecentMessages',
         expeditionId
-      });
+      }, error instanceof Error ? error : new Error(String(error)));
       return [];
     }
   }

@@ -1,28 +1,184 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStarshipStore } from '@/store/starship-store';
 import { visionAPI } from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, Save, Edit, AlertTriangle, Sparkles, Target, Lightbulb } from 'lucide-react';
+import { Eye, Save, Edit, AlertTriangle, Sparkles, Target, Lightbulb, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { VisionMetricsDisplay } from '@/components/vision/VisionMetricsDisplay';
+import SocketClient from '@/lib/socket-client';
+import { useToast } from '@/hooks/useToast';
+import { useAuth } from '@/hooks/useAuth';
+import type { 
+  VisionMetrics, 
+  VisionAnalyzingEventData, 
+  VisionProposalEventData, 
+  VisionUpdatedEventData,
+  VisionRefinementProposal,
+  VisionAnalysisEventData,
+  VisionRefinementErrorEventData
+} from '@starships/protocol';
 
 export function SimpleVisionChamber() {
   const { activeStarshipId } = useStarshipStore();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [vision, setVision] = useState('');
   const [editingVision, setEditingVision] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Vision refinement state
+  const [currentMetrics, setCurrentMetrics] = useState<VisionMetrics | undefined>();
+  const [previousMetrics, setPreviousMetrics] = useState<VisionMetrics | undefined>();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentProposal, setCurrentProposal] = useState<VisionRefinementProposal | undefined>();
+  const [refinementSessionId, setRefinementSessionId] = useState<string | undefined>();
+  
+  // Socket client reference
+  const socketClient = useRef<SocketClient | null>(null);
+  const isSocketSetup = useRef(false);
 
-  // Load vision on mount
+  // Initialize socket connection and listeners
+  const setupSocketListeners = useCallback(() => {
+    if (!activeStarshipId || !user?.id || isSocketSetup.current) return;
+    
+    const socket = SocketClient.getInstance();
+    socketClient.current = socket;
+    
+    // Set up vision refinement listeners
+    socket.on('vision:analyzing', (data: VisionAnalyzingEventData) => {
+      if (data.starshipId === activeStarshipId && data.userId === user.id) {
+        setIsAnalyzing(true);
+        setCurrentProposal(undefined);
+        setRefinementSessionId(data.sessionId);
+        
+        toast({
+          title: 'Vision Analysis Started',
+          description: 'Sibil is analyzing your vision statement...',
+          variant: 'default',
+          duration: 3000
+        });
+      }
+    });
+    
+    socket.on('vision:analysis-complete', (data: VisionAnalysisEventData) => {
+      if (data.starshipId === activeStarshipId && data.userId === user.id) {
+        setIsAnalyzing(false);
+        setPreviousMetrics(currentMetrics);
+        setCurrentMetrics(data.analysis.metrics);
+        
+        toast({
+          title: 'Vision Analysis Complete',
+          description: `Overall quality score: ${data.analysis.metrics.overallQuality}`,
+          variant: 'success',
+          duration: 4000
+        });
+      }
+    });
+    
+    socket.on('vision:proposal', (data: VisionProposalEventData) => {
+      if (data.starshipId === activeStarshipId && data.userId === user.id) {
+        setIsAnalyzing(false);
+        setCurrentProposal(data.proposal);
+        setPreviousMetrics(currentMetrics);
+        setCurrentMetrics(data.proposal.metrics);
+        
+        toast({
+          title: 'Vision Refinement Proposal',
+          description: 'Sibil has a suggestion to improve your vision statement.',
+          variant: 'default',
+          duration: 5000
+        });
+      }
+    });
+    
+    socket.on('vision:updated', (data: VisionUpdatedEventData) => {
+      if (data.starshipId === activeStarshipId && data.userId === user.id) {
+        setVision(data.newVision);
+        setEditingVision(data.newVision);
+        setPreviousMetrics(currentMetrics);
+        setCurrentMetrics(data.metrics);
+        setCurrentProposal(undefined);
+        setIsAnalyzing(false);
+        
+        const updateSourceText = {
+          'user_acceptance': 'Your acceptance of the proposal',
+          'direct_update': 'Direct update',
+          'chat_integration': 'Chat interaction'
+        }[data.updateSource];
+        
+        toast({
+          title: 'Vision Updated',
+          description: `Vision successfully updated via ${updateSourceText}.`,
+          variant: 'success',
+          duration: 4000
+        });
+      }
+    });
+    
+    socket.on('vision:error', (data: VisionRefinementErrorEventData) => {
+      if (data.starshipId === activeStarshipId && data.userId === user.id) {
+        setIsAnalyzing(false);
+        
+        const errorMessages = {
+          'ANALYSIS_FAILED': 'Failed to analyze vision statement',
+          'REFINEMENT_FAILED': 'Failed to generate refinement proposal',
+          'RATE_LIMITED': 'Too many requests. Please wait before trying again.',
+          'INVALID_INPUT': 'Invalid vision statement provided',
+          'SESSION_EXPIRED': 'Refinement session has expired'
+        };
+        
+        toast({
+          title: 'Vision Refinement Error',
+          description: errorMessages[data.errorCode] || data.error,
+          variant: 'destructive',
+          duration: 6000
+        });
+      }
+    });
+    
+    // Join starship room for vision events
+    if (socket.isConnected()) {
+      socket.emit('vision:join-starship-room', { starshipId: activeStarshipId, userId: user.id });
+    }
+    
+    isSocketSetup.current = true;
+  }, [activeStarshipId, user?.id, currentMetrics, toast]);
+  
+  // Cleanup socket listeners
+  const cleanupSocketListeners = useCallback(() => {
+    if (!socketClient.current || !activeStarshipId || !user?.id) return;
+    
+    socketClient.current.off('vision:analyzing');
+    socketClient.current.off('vision:analysis-complete');
+    socketClient.current.off('vision:proposal');
+    socketClient.current.off('vision:updated');
+    socketClient.current.off('vision:error');
+    
+    // Leave starship room
+    if (socketClient.current.isConnected()) {
+      socketClient.current.emit('vision:leave-starship-room', { starshipId: activeStarshipId, userId: user.id });
+    }
+    
+    isSocketSetup.current = false;
+  }, [activeStarshipId, user?.id]);
+  
+  // Load vision and setup socket listeners on mount
   useEffect(() => {
     if (activeStarshipId) {
       loadVision();
+      setupSocketListeners();
     }
-  }, [activeStarshipId]);
+    
+    return () => {
+      cleanupSocketListeners();
+    };
+  }, [activeStarshipId, setupSocketListeners, cleanupSocketListeners]);
 
   // Auto-edit if empty
   useEffect(() => {
@@ -47,7 +203,7 @@ export function SimpleVisionChamber() {
   };
 
   const saveVision = async () => {
-    if (!activeStarshipId) return;
+    if (!activeStarshipId || !user?.id) return;
     
     setLoading(true);
     try {
@@ -55,11 +211,74 @@ export function SimpleVisionChamber() {
       setVision(editingVision);
       setIsEditing(false);
       setError('');
+      
+      // Trigger vision analysis after save
+      if (socketClient.current && socketClient.current.isConnected()) {
+        socketClient.current.emit('vision:analyze', {
+          starshipId: activeStarshipId,
+          vision: editingVision,
+          userId: user.id
+        });
+      }
+      
+      toast({
+        title: 'Vision Saved',
+        description: 'Your vision statement has been saved successfully.',
+        variant: 'success'
+      });
     } catch (err) {
       setError('Failed to save vision');
+      toast({
+        title: 'Save Failed',
+        description: 'Failed to save your vision statement.',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
     }
+  };
+  
+  const acceptProposal = async () => {
+    if (!activeStarshipId || !user?.id || !refinementSessionId || !socketClient.current) return;
+    
+    socketClient.current.emit('vision:accept-proposal', {
+      starshipId: activeStarshipId,
+      sessionId: refinementSessionId,
+      userId: user.id
+    }, (response) => {
+      if (!response.success) {
+        toast({
+          title: 'Failed to Accept Proposal',
+          description: response.error || 'Unknown error occurred',
+          variant: 'destructive'
+        });
+      }
+    });
+  };
+  
+  const rejectProposal = async () => {
+    if (!activeStarshipId || !user?.id || !refinementSessionId || !socketClient.current) return;
+    
+    socketClient.current.emit('vision:reject-proposal', {
+      starshipId: activeStarshipId,
+      sessionId: refinementSessionId,
+      userId: user.id
+    }, (response) => {
+      if (response.success) {
+        setCurrentProposal(undefined);
+        toast({
+          title: 'Proposal Rejected',
+          description: 'The vision refinement proposal has been rejected.',
+          variant: 'default'
+        });
+      } else {
+        toast({
+          title: 'Failed to Reject Proposal',
+          description: response.error || 'Unknown error occurred',
+          variant: 'destructive'
+        });
+      }
+    });
   };
 
   if (!activeStarshipId) {
@@ -104,6 +323,125 @@ export function SimpleVisionChamber() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Vision Metrics Display */}
+        {(currentMetrics || isAnalyzing) && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <VisionMetricsDisplay
+              metrics={currentMetrics}
+              previousMetrics={previousMetrics}
+              isAnalyzing={isAnalyzing}
+            />
+          </motion.div>
+        )}
+        
+        {/* Vision Refinement Proposal */}
+        {currentProposal && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className="bg-blue-500/10 border-blue-500/20">
+              <CardHeader className="border-b border-blue-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-blue-500/20 blur-sm" />
+                    <div className="relative bg-gradient-to-br from-blue-500/25 to-blue-500/15 p-2 rounded-xl">
+                      <Brain className="w-5 h-5 text-blue-500" />
+                    </div>
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-blue-700 dark:text-blue-300">
+                      Sibil's Vision Refinement
+                    </CardTitle>
+                    <p className="text-sm text-blue-600 dark:text-blue-400">
+                      Confidence: {currentProposal.confidenceLevel}% • {currentProposal.keyChanges.length} key changes
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 space-y-4">
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Reasoning</h4>
+                    <p className="text-sm text-foreground/90">{currentProposal.reasoning}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Proposed Vision</h4>
+                    <div className="p-4 bg-background/50 rounded-lg border border-border/50">
+                      <p className="text-sm text-foreground/90 whitespace-pre-wrap">
+                        {currentProposal.proposedVision}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {currentProposal.keyChanges.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Key Changes</h4>
+                      <ul className="space-y-1">
+                        {currentProposal.keyChanges.map((change, index) => (
+                          <li key={index} className="text-sm text-foreground/80 flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0" />
+                            {change}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-3 pt-4 border-t border-border/50">
+                  <Button
+                    onClick={acceptProposal}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    Accept Proposal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={rejectProposal}
+                    className="hover:bg-muted"
+                  >
+                    Keep Current
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+        
+        {/* Analyzing Indicator */}
+        {isAnalyzing && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            <Card className="bg-purple-500/10 border-purple-500/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin">
+                    <Brain className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-purple-700 dark:text-purple-300 font-medium">
+                      Sibil is refining your vision...
+                    </p>
+                    <p className="text-sm text-purple-600 dark:text-purple-400">
+                      Analyzing clarity, specificity, actionability, and inspiration
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         <Card className="bg-card/50 backdrop-blur-sm border-border/50 shadow-xl">
           <CardHeader className="border-b border-border/40">

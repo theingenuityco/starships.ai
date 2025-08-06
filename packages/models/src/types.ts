@@ -99,6 +99,17 @@ export interface Vision {
   refinementCount: number;
   lastRefined: string;
   isActive: boolean;
+  
+  // Vision Metrics
+  clarityScore?: number;
+  specificityScore?: number;
+  actionabilityScore?: number;
+  inspirationalScore?: number;
+  overallQuality?: number;
+  hasObjectives?: boolean;
+  hasTimeframe?: boolean;
+  hasMeasurables?: boolean;
+  
   createdAt: string;
   updatedAt: string;
 }
@@ -814,6 +825,8 @@ export interface VisionRepository {
   delete(id: string): Promise<boolean>;
   findByStarship(starshipId: string): Promise<Vision | null>;
   updateStatement(starshipId: string, statement: string): Promise<Vision | null>;
+  getVisionByStarshipId(starshipId: string): Promise<{ vision: string } | null>;
+  updateVision(starshipId: string, newVision: string): Promise<Vision | null>;
 }
 
 export interface AgentChannelRelationship {

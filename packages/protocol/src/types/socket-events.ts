@@ -1,5 +1,7 @@
 // Socket.IO event types for real-time communication
 
+import type { VisionRefinementSocketEvents } from './vision-refinement';
+
 // Base socket events
 export interface BaseSocketEvents {
   connect: () => void;
@@ -98,7 +100,7 @@ export interface ExpeditionSocketEvents {
 }
 
 // Combined socket events interface
-export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents, ExpeditionSocketEvents {}
+export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents, ExpeditionSocketEvents, VisionRefinementSocketEvents {}
 
 // Main SocketIO Events interface
 export interface SocketIOEvents extends SocketEvents {}

@@ -65,7 +65,7 @@ export class TaskService {
   private logger: Logger;
 
   private constructor() {
-    this.logger = Logger.getInstance({ service: 'TaskService' });
+    this.logger = Logger.getInstance();
   }
 
 
@@ -149,12 +149,12 @@ export class TaskService {
       return task;
     } catch (error) {
       if (error instanceof StandardError) {
-        this.logger.error('Failed to create task', error as StandardError, context);
+        this.logger.error('Failed to create task', context, error as StandardError);
         throw error;
       }
 
       const standardError = this.handleError(error, 'CREATE_TASK_FAILED', context);
-      this.logger.error('Failed to create task', error instanceof Error ? error : undefined, context);
+      this.logger.error('Failed to create task', context, error instanceof Error ? error : undefined);
       throw standardError;
     }
   }

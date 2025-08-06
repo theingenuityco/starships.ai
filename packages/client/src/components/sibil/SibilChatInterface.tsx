@@ -9,11 +9,13 @@ import { MessageList } from '../chat/MessageList'
 import { SibilMessageBubble } from './SibilMessageBubble'
 import { ModernProviderSelector } from './ModernProviderSelector'
 import { StreamingIndicator } from './StreamingIndicator'
+import { VisionChatContextIndicator } from '../vision/VisionChatContextIndicator'
 import { ERROR_TEXT } from '@/constants/text'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { headerVariants, inputVariants, pageVariants } from '@/lib/animations'
 import { Bot } from 'lucide-react'
+import type { VisionRefinementProposal } from '@starships/protocol'
 
 interface SibilChatInterfaceProps {
   starshipId?: string;
@@ -31,6 +33,26 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const [model, setModel] = useState<string>('gpt-4')
   const sessionId = useRef<string>('sibil-session')
   const streamController = useRef<{ abort: () => void } | null>(null)
+
+  // Vision refinement handlers
+  const handleVisionProposalAction = (action: 'accept' | 'reject', proposal?: VisionRefinementProposal) => {
+    // Add a system message to chat indicating the action
+    const actionMessage: SibilMessage = {
+      id: Date.now().toString(),
+      role: 'system',
+      content: action === 'accept' 
+        ? '✅ Vision refinement proposal accepted and applied to your starship.'
+        : '❌ Vision refinement proposal rejected. Current vision remains unchanged.',
+      timestamp: Date.now(),
+      model,
+      provider,
+      starshipId
+    }
+    
+    const updatedMessages = [...messages, actionMessage]
+    setMessages(updatedMessages)
+    saveChatHistory(sessionId.current, updatedMessages)
+  }
 
   // Initialize session when user and starship are available
   useEffect(() => {
@@ -236,6 +258,14 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
 
       {/* Messages Area */}
       <div className="flex-1 overflow-hidden bg-background">
+        {/* Vision Context Indicator */}
+        <div className="p-4">
+          <VisionChatContextIndicator 
+            starshipId={starshipId}
+            onVisionProposalAction={handleVisionProposalAction}
+          />
+        </div>
+        
         <MessageList
           messages={messages}
           loading={loading}

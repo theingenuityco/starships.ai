@@ -335,6 +335,9 @@ export * from './types/agent-communication';
 // Export enhanced Socket.IO event types
 export * from './types/socket-events';
 
+// Export vision refinement types
+export * from './types/vision-refinement';
+
 // Export standardized error handling types and classes
 export * from './types/errors';
 

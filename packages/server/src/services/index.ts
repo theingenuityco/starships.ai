@@ -20,6 +20,12 @@ export { AgentService } from './AgentService';
 export { UserService } from './UserService';
 export { SibilService } from './SibilService';
 
+// Vision refinement services
+export { VisionRefinementService } from './VisionRefinementService';
+export { AffirmationDetector } from './AffirmationDetector';
+export { VisionMetricsCalculator } from './VisionMetricsCalculator';
+export { VisionRefinementSessionManager } from './VisionRefinementSessionManager';
+
 // New specialized services
 export { TaskService } from './TaskService';
 export { MessageService } from './MessageService';
@@ -164,3 +170,18 @@ export type {
   ResultAnalytics,
   ResultInsight
 } from './ResultService';
+
+// Vision refinement types
+export type {
+  VisionAnalysis,
+  RefinementContext,
+  VisionRefinementResponse
+} from './VisionRefinementService';
+
+export type {
+  VisionMetrics
+} from './VisionMetricsCalculator';
+
+export type {
+  VisionRefinementSession
+} from './VisionRefinementSessionManager';

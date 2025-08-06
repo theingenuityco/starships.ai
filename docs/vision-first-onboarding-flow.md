@@ -839,7 +839,7 @@ NEXT_PUBLIC_ENABLE_VISION_ONBOARDING=false pnpm build
 ## Next Steps
 
 1. ✅ Review and approve enhanced plan
-2. Create feature branch `feature/vision-first-onboarding`
+2. ✅ Continue implementation on `onboardingflow` branch (NO BRANCH SWITCHING)
 3. Set up feature flags in environment
 4. Implement Phase 1 components
 5. Daily progress reviews
@@ -850,7 +850,7 @@ NEXT_PUBLIC_ENABLE_VISION_ONBOARDING=false pnpm build
 - [ ] Plan reviewed and approved
 - [ ] Team assigned to phases
 - [ ] Environment variables configured
-- [ ] Feature branch created
+- [ ] ✅ Working on `onboardingflow` branch (NO NEW BRANCHES)
 - [ ] Dependencies installed
 - [ ] Testing environment ready
 - [ ] Progress tracker bookmarked

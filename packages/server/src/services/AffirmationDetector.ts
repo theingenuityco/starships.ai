@@ -17,9 +17,11 @@ export class AffirmationDetector {
     /^i (like|love|approve of?) (it|that|this)$/i,
     /^(go|move) (ahead|forward)( with (it|that|this))?$/i,
     /^(update|save|use) (it|that|this|the vision)$/i,
-    /^(looks|sounds) (good|great|perfect|right|fine)$/i,
+    /^(looks|sounds) (good|great|perfect|right|fine)( for now)?$/i,
     /^(accept|adopt|implement) (it|that|this)$/i,
     /^that('s| is) exactly what I (want|need|meant)$/i,
+    // Complex affirmations with comma
+    /^(yes|yeah|yep|sure|okay|ok),?\s+(.*\s)?(sounds|looks|seems|that's|that is)\s+(good|great|perfect|excellent|fine|right)/i,
     
     // Enthusiastic responses
     /^(awesome|amazing|fantastic|brilliant|wonderful)!?$/i,
@@ -42,6 +44,8 @@ export class AffirmationDetector {
     /^(let's|let me) think about (it|that|this)$/i,
     /^not (yet|ready|quite|there)$/i,
     /^(maybe|perhaps) not$/i,
+    // Complex negations with comma
+    /^(no|nope|nah),?\s+(.*\s)?(that's|that is|it's|it is)\s+not\s+(good|right|it|correct|what I want)/i,
     
     // Hesitation patterns
     /^(hmm|well|actually).*(not|don't)/i,

@@ -6,8 +6,9 @@ import {
   Vision
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
-import { generateSlug } from '../utils/slugGenerator';
-import { ValidationError } from '../errors';
+import { 
+  EnhancedValidationError as ValidationError,
+} from '@starships/models';
 
 const router: Router = Router();
 
@@ -98,11 +99,11 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
       }
     }
 
-    // Generate slug
-    const slug = generateSlug(name);
+    // Generate unique slug
+    const slug = await starshipRepo.generateUniqueSlug(name, userId);
 
     // Check for duplicate name/slug
-    const existingBySlug = await starshipRepo.findBySlug(slug);
+    const existingBySlug = await starshipRepo.findBySlug(slug, userId);
     if (existingBySlug) {
       res.status(409).json({
         error: 'Starship name already exists',
@@ -122,12 +123,7 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
         class: starshipClass,
         status: 'active',
         ownerId: userId,
-        crewCount: 0,
-        description: vision?.statement ? `Vision: ${vision.statement}` : null,
-        launchDate: new Date().toISOString(),
-        location: 'Earth Orbit',
-        missionType: starshipClass === 'scout' ? 'exploration' : 'operations',
-        maxCrew: starshipClass === 'scout' ? 3 : 6,
+        maxActiveExpeditions: starshipClass === 'scout' ? 2 : 5,
       });
 
       console.log('[STARSHIP-CREATE-ENHANCED] Starship created successfully:', createdStarship.id);
@@ -163,12 +159,8 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
         class: createdStarship.class,
         status: createdStarship.status,
         ownerId: createdStarship.ownerId,
-        crewCount: createdStarship.crewCount,
-        description: createdStarship.description,
-        launchDate: createdStarship.launchDate,
-        location: createdStarship.location,
-        missionType: createdStarship.missionType,
-        maxCrew: createdStarship.maxCrew,
+        maxActiveExpeditions: createdStarship.maxActiveExpeditions,
+        maxAgents: createdStarship.maxAgents,
         createdAt: createdStarship.createdAt,
         updatedAt: createdStarship.updatedAt,
       };
@@ -210,8 +202,8 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: error.message,
-        field: error.field,
-        details: error.details,
+        field: (error as any).field,
+        details: (error as any).details,
       });
     } else {
       res.status(500).json({

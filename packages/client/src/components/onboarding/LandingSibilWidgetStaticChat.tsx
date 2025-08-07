@@ -28,10 +28,10 @@ interface LandingSibilWidgetStaticChatProps {
 }
 
 const VISION_EXAMPLES = [
-  "I want to build the best cosmic TV in the world",
-  "Create an AI-powered learning platform for kids",
-  "Launch a marketplace for sustainable products",
-  "Build a tool that helps developers ship faster"
+  "I want to build the best cosmic TV in the world.",
+  "I want to create an AI-powered learning platform for kids.",
+  "I want to launch a marketplace for sustainable products.",
+  "I want to develop a tool that helps developers ship faster."
 ];
 
 interface Message {
@@ -59,6 +59,7 @@ export function LandingSibilWidgetStaticChat({
   const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [placeholderReady, setPlaceholderReady] = useState(false);
+  const [showCursor, setShowCursor] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -87,6 +88,15 @@ export function LandingSibilWidgetStaticChat({
       setPlaceholderReady(true);
     }
   }, [placeholderReady]);
+
+  // Cursor blinking effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setShowCursor(prev => !prev);
+    }, 500); // Blink every 500ms
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Typewriter effect for placeholder
   useEffect(() => {
@@ -176,13 +186,11 @@ export function LandingSibilWidgetStaticChat({
         configResponse += `I recommend naming your starship "${result.analysis.suggestedName}"`;
       }
       
-      if (result.analysis?.recommendedClass) {
-        const className = result.analysis.recommendedClass === 'scout' ? 'Scout' : 'Cruiser';
-        if (configResponse) {
-          configResponse += ` and using the ${className} class configuration`;
-        } else {
-          configResponse += `The ${className} class would be ideal for your mission`;
-        }
+      // Always recommend Cruiser class - never Scout
+      if (configResponse) {
+        configResponse += ` and using the Cruiser class configuration`;
+      } else {
+        configResponse = `The Cruiser class would be ideal for your mission`;
       }
       
       if (configResponse) {
@@ -323,16 +331,28 @@ export function LandingSibilWidgetStaticChat({
 
         {/* Input Area - Connected to Chat */}
         <div className="relative border-2 border-t-0 border-border rounded-b-xl bg-background/50 backdrop-blur-sm">
+          {/* Fake placeholder with glow effect */}
+          {!inputValue && !hasSubmitted && (
+            <div 
+              className="absolute pl-4 pr-36 pt-2 pb-8 pointer-events-none"
+              style={{
+                textShadow: '0 0 15px rgba(255, 255, 255, 0.6), 0 0 25px rgba(59, 130, 246, 0.4), 0 0 35px rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              <span className="text-base leading-relaxed text-white/45 font-light">
+                {displayedPlaceholder}{showCursor ? '|' : ''}
+              </span>
+            </div>
+          )}
           <Textarea
             ref={textareaRef}
             value={inputValue}
             onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={displayedPlaceholder}
+            placeholder=""
             className={cn(
-              "min-h-[50px] text-base leading-relaxed resize-none",
+              "min-h-[50px] text-base leading-relaxed resize-none relative",
               "bg-transparent border-0 focus:ring-0 focus:outline-none",
-              "placeholder:text-muted-foreground/50",
               "pl-4 pr-36 pt-2 pb-8",
               hasSubmitted && "opacity-50"
             )}
@@ -343,27 +363,15 @@ export function LandingSibilWidgetStaticChat({
           {/* Submit Button or Create Starship Button */}
           {showCreateButton ? (
             <div className="absolute top-1/2 -translate-y-1/2 right-2">
-              {/* Glow effect layers */}
+              {/* Subtle glow effect */}
               <motion.div
-                className="absolute inset-0 rounded-full bg-primary blur-2xl scale-150"
+                className="absolute inset-0 rounded-full bg-primary blur-xl"
                 initial={{ opacity: 0 }}
                 animate={{ 
-                  opacity: [0.4, 0.8, 0.4],
+                  opacity: [0.2, 0.35, 0.2],
                 }}
                 transition={{ 
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              <motion.div
-                className="absolute inset-0 rounded-full bg-white blur-xl scale-125"
-                initial={{ opacity: 0 }}
-                animate={{ 
-                  opacity: [0.2, 0.4, 0.2],
-                }}
-                transition={{ 
-                  duration: 2,
+                  duration: 2.5,
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
@@ -371,12 +379,26 @@ export function LandingSibilWidgetStaticChat({
               {/* Button */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
+                animate={{ 
+                  opacity: 1, 
+                  scale: [1, 1.1, 1, 1.1, 1, 1, 1, 1, 1, 1, 1, 1]
+                }}
+                transition={{ 
+                  opacity: { duration: 0.3 },
+                  scale: {
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    times: [0, 0.075, 0.15, 0.225, 0.3, 0.375, 0.45, 0.6, 0.75, 0.9, 0.95, 1]
+                  }
+                }}
               >
                 <Button
                   onClick={() => window.location.href = '/login'}
-                  className="relative rounded-full px-4 py-2 h-auto bg-primary hover:bg-primary/90 transition-all flex items-center justify-center gap-1 shadow-lg"
+                  className="relative rounded-full px-4 py-2 h-auto bg-primary hover:bg-primary/90 transition-all flex items-center justify-center gap-1"
+                  style={{
+                    boxShadow: "0 4px 20px rgba(59, 130, 246, 0.5), 0 2px 10px rgba(59, 130, 246, 0.3)"
+                  }}
                 >
                   <span className="text-sm font-medium">Create Starship</span>
                   <ArrowRight className="w-4 h-4" />

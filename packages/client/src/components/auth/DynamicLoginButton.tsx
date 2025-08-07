@@ -58,7 +58,7 @@ export function DynamicLoginButton({
   
   // Log for debugging
   if (session?.pendingVision) {
-    console.log('[DynamicLoginButton] Session found with vision:', session.pendingVision.slice(0, 50));
+    console.log('[DynamicLoginButton] Session found with vision:', session.pendingVision?.slice(0, 50));
   }
   
   return (

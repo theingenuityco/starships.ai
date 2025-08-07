@@ -139,7 +139,7 @@ export function StarshipCreateModalEnhanced({
     });
     
     if (session?.pendingVision && isOnboarding) {
-      console.log('[CreateModal] Populating form with vision:', session.pendingVision.slice(0, 50));
+      console.log('[CreateModal] Populating form with vision:', session.pendingVision?.slice(0, 50));
       setFormData(prev => ({
         ...prev,
         vision: session.pendingVision || '',

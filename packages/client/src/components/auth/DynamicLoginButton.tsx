@@ -47,12 +47,19 @@ export function DynamicLoginButton({
       if (session.sibilSessionId) {
         url += `&session=${encodeURIComponent(session.sibilSessionId)}`;
       }
+      
+      console.log('[DynamicLoginButton] Built redirect URL with onboarding params:', url);
     }
     
     return url;
   };
   
   const redirectUrl = buildRedirectUrl();
+  
+  // Log for debugging
+  if (session?.pendingVision) {
+    console.log('[DynamicLoginButton] Session found with vision:', session.pendingVision.slice(0, 50));
+  }
   
   return (
     <LoginLink postLoginRedirectURL={redirectUrl}>

@@ -97,8 +97,25 @@ export function StarshipCreateModalEnhanced({
   isOnboarding = false 
 }: StarshipCreateModalEnhancedProps) {
   const { createStarship, loading } = useStarshipStore();
-  const { session, clearSession, updateStep } = useOnboardingSession();
+  const { session: hookSession, clearSession, updateStep } = useOnboardingSession();
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+  
+  // Try to get session from hook or fallback to localStorage
+  let session = hookSession;
+  if (isOnboarding && !session) {
+    try {
+      const stored = localStorage.getItem('onboarding_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.data) {
+          session = parsed.data;
+          console.log('[CreateModal] Using localStorage fallback for session');
+        }
+      }
+    } catch (e) {
+      console.error('[CreateModal] Failed to get localStorage fallback:', e);
+    }
+  }
   
   // Determine if we have a vision from onboarding
   const hasVision = isOnboarding && session?.pendingVision;
@@ -114,7 +131,15 @@ export function StarshipCreateModalEnhanced({
 
   // Update form data if session changes
   useEffect(() => {
+    console.log('[CreateModal] Session check:', { 
+      hasSession: !!session, 
+      hasPendingVision: !!session?.pendingVision,
+      isOnboarding,
+      vision: session?.pendingVision?.slice(0, 50)
+    });
+    
     if (session?.pendingVision && isOnboarding) {
+      console.log('[CreateModal] Populating form with vision:', session.pendingVision.slice(0, 50));
       setFormData(prev => ({
         ...prev,
         vision: session.pendingVision || '',

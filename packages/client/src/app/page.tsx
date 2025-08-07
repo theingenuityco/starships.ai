@@ -237,24 +237,25 @@ export default function HomePage() {
           viewport={{ once: false, margin: "-10%" }}
           className="relative z-10 w-full px-8"
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
-            className="mb-6 relative"
-          >
-            <motion.svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="128"
-              height="128"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="url(#gradient)"
-              strokeWidth="1"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mx-auto"
+          <div className="flex items-center justify-center gap-8">
+            {/* Rocket Logo on the left */}
+            <motion.div
+              initial={{ scale: 0, x: -50 }}
+              animate={{ scale: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
+              className="relative flex-shrink-0"
             >
+              <motion.svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="120"
+                height="120"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="url(#gradient)"
+                strokeWidth="1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
               <defs>
                 <motion.linearGradient
                   id="gradient"
@@ -353,30 +354,34 @@ export default function HomePage() {
                 animate={{ pathLength: 1 }}
                 transition={{ duration: 0.2, delay: 1.2 }}
               />
-            </motion.svg>
-          </motion.div>
-          
-          <motion.h1 
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 1, type: "spring" }}
-            className="text-5xl md:text-7xl font-bold mb-6 text-center"
-          >
-            <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
-              Starships.ai
-            </span>
-          </motion.h1>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.1, duration: 0.8 }}
-            className="flex items-center justify-center gap-3 text-sm text-muted-foreground/60 mb-10 w-full"
-          >
-            <div className="h-px w-12 bg-gradient-to-r from-transparent to-muted-foreground/30" />
-            <span>Where vision meets intelligence</span>
-            <div className="h-px w-12 bg-gradient-to-l from-transparent to-muted-foreground/30" />
-          </motion.div>
+              </motion.svg>
+            </motion.div>
+            
+            {/* Title and Tagline on the right */}
+            <div className="flex flex-col items-center">
+              <motion.h1 
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.8, duration: 1, type: "spring" }}
+                className="text-5xl md:text-7xl font-bold mb-3"
+              >
+                <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
+                  Starships.ai
+                </span>
+              </motion.h1>
+              
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.1, duration: 0.8 }}
+                className="flex items-center gap-3 text-sm text-muted-foreground/60"
+              >
+                <div className="h-px w-12 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                <span>Where vision meets intelligence</span>
+                <div className="h-px w-12 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+              </motion.div>
+            </div>
+          </div>
           
           {/* Sibil AI Widget for non-authenticated users */}
           {!isAuthenticated && !hasExistingStarships && (
@@ -384,7 +389,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1.2, duration: 0.8 }}
-              className="w-full mb-8"
+              className="w-full mb-8 mt-12"
             >
               <LandingSibilWidgetStaticChat onVisionSubmit={handleVisionSubmit} />
             </motion.div>

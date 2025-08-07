@@ -92,7 +92,7 @@ export class FirstOfficerAgent {
       qualityThreshold: 70,
       timeoutMinutes: 60,
       requireUserApproval: false,
-      enableParallelExecution: true,
+      enableParallelExecution: false, // CHANGED: Disabled for workflow DSL sequential execution
       autoEscalation: true,
       ...config
     };
@@ -378,6 +378,7 @@ export class FirstOfficerAgent {
         errors: [],
         retryCount: 0,
         lastUpdated: new Date().toISOString(),
+        requireUserApproval: this.config.requireUserApproval,
         // Set selectedAgents if provided (from expedition.assignedAgents)
         selectedAgents: expedition.assignedAgents && expedition.assignedAgents.length > 0
           ? await this.convertAgentIdsToAssignments(expedition.assignedAgents)
@@ -2549,6 +2550,12 @@ Provide a helpful, contextual response based on the expedition status and user's
         retryCount: 0,
         retryAttempts: undefined,
         finalResult: undefined,
+        
+        // NEW: Workflow DSL fields
+        workflowDSL: undefined,
+        currentWorkflowNode: undefined,
+        workflowRuntimeState: undefined,
+        
         lastUpdated: new Date().toISOString(),
         messages: [],
         

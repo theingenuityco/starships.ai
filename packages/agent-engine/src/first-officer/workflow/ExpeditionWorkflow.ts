@@ -16,7 +16,7 @@ import {
   QualityCheck,
   TaskExecution
 } from '../types';
-import { WorkflowPhase, TaskBreakdown } from '@starships/protocol';
+import { WorkflowPhase, TaskBreakdown, WorkflowDSL, WorkflowRuntimeState } from '@starships/protocol';
 
 /**
  * Define the state annotation for the workflow
@@ -64,6 +64,11 @@ const ExpeditionStateAnnotation = Annotation.Root({
   
   // Final results
   finalResult: Annotation<string | undefined>(),
+  
+  // NEW: Workflow DSL fields (replacing old workflowState)
+  workflowDSL: Annotation<WorkflowDSL | undefined>(),
+  currentWorkflowNode: Annotation<string | undefined>(),
+  workflowRuntimeState: Annotation<WorkflowRuntimeState | undefined>(),
   
   // Metadata
   lastUpdated: Annotation<string>(),
@@ -427,6 +432,12 @@ export function convertToExpeditionState(state: FirstOfficerState, requireUserAp
     retryCount: state.retryCount,
     retryAttempts: state.retryAttempts,
     finalResult: state.finalResult,
+    
+    // NEW: Workflow DSL fields
+    workflowDSL: state.workflowDSL,
+    currentWorkflowNode: state.currentWorkflowNode,
+    workflowRuntimeState: state.workflowRuntimeState,
+    
     lastUpdated: state.lastUpdated,
     messages: [],
     
@@ -448,6 +459,7 @@ export function convertFromExpeditionState(state: ExpeditionState): FirstOfficer
     starshipId: state.starshipId,
     currentPhase: state.currentPhase,
     requirements: state.requirements,
+    requireUserApproval: state.requireUserApproval,
     objectiveAnalysis: state.objectiveAnalysis,
     taskPlan: state.taskPlan,
     taskBreakdown: state.taskBreakdown,
@@ -461,6 +473,12 @@ export function convertFromExpeditionState(state: ExpeditionState): FirstOfficer
     retryCount: state.retryCount,
     retryAttempts: state.retryAttempts,
     finalResult: state.finalResult,
+    
+    // NEW: Workflow DSL fields
+    workflowDSL: state.workflowDSL,
+    currentWorkflowNode: state.currentWorkflowNode,
+    workflowRuntimeState: state.workflowRuntimeState,
+    
     lastUpdated: state.lastUpdated
   };
 }

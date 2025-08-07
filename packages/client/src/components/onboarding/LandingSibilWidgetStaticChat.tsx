@@ -334,12 +334,12 @@ export function LandingSibilWidgetStaticChat({
           {/* Fake placeholder with glow effect */}
           {!inputValue && !hasSubmitted && (
             <div 
-              className="absolute pl-4 pr-36 pt-2 pb-8 pointer-events-none"
+              className="absolute inset-0 flex items-center pl-4 pr-16 pointer-events-none"
               style={{
                 textShadow: '0 0 15px rgba(255, 255, 255, 0.6), 0 0 25px rgba(59, 130, 246, 0.4), 0 0 35px rgba(59, 130, 246, 0.3)'
               }}
             >
-              <span className="text-base leading-relaxed text-white/45 font-light">
+              <span className="text-base text-white/45 font-light">
                 {displayedPlaceholder}{showCursor ? '|' : ''}
               </span>
             </div>
@@ -351,11 +351,12 @@ export function LandingSibilWidgetStaticChat({
             onKeyDown={handleKeyDown}
             placeholder=""
             className={cn(
-              "min-h-[50px] text-base leading-relaxed resize-none relative",
+              "min-h-[54px] h-[54px] text-base resize-none relative flex items-center",
               "bg-transparent border-0 focus:ring-0 focus:outline-none",
-              "pl-4 pr-36 pt-2 pb-8",
+              "pl-4 pr-16 py-4",
               hasSubmitted && "opacity-50"
             )}
+            style={{ lineHeight: '22px' }}
             disabled={isAnalyzing || hasSubmitted}
             maxLength={500}
           />
@@ -411,23 +412,18 @@ export function LandingSibilWidgetStaticChat({
               disabled={inputValue.length < 20 || isAnalyzing || hasSubmitted}
               size="sm"
               className={cn(
-                "absolute top-1/2 -translate-y-1/2 right-2 rounded-full px-3 h-11 w-11",
+                "absolute top-1/2 -translate-y-1/2 right-2 rounded-full px-2 h-8 w-8",
                 "bg-primary hover:bg-primary/90 transition-all",
                 inputValue.length >= 20 && !isAnalyzing && !hasSubmitted && "shadow-md hover:shadow-lg"
               )}
             >
               {isAnalyzing ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <ArrowUp className="w-5 h-5" />
+                <ArrowUp className="w-4 h-4" />
               )}
             </Button>
           )}
-          
-          {/* Character count */}
-          <div className="absolute bottom-2 left-3 text-xs text-muted-foreground">
-            {inputValue.length}/500
-          </div>
         </div>
 
         {/* Error message */}

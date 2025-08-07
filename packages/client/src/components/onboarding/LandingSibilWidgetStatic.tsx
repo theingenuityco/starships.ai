@@ -243,7 +243,7 @@ export function LandingSibilWidgetStatic({
                         )}
                         {analysis.recommendedClass && (
                           <Badge variant="secondary">
-                            {analysis.recommendedClass === 'scout' ? '🚀 Scout Class' : '🛸 Cruiser Class'}
+                            🛸 Cruiser Class
                           </Badge>
                         )}
                       </div>

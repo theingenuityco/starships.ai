@@ -18,7 +18,6 @@ import {
   ExpeditionFilters,
   ExpeditionSort,
   PaginationOptions,
-  ExpeditionWorkflowState,
   WorkflowPhase,
   TaskBreakdown,
 } from '@starships/protocol';
@@ -41,7 +40,6 @@ export {
   ExpeditionFilters,
   ExpeditionSort,
   PaginationOptions,
-  ExpeditionWorkflowState,
   WorkflowPhase,
   TaskBreakdown,
 };
@@ -1159,7 +1157,7 @@ export interface ExpeditionRepository extends Repository<Expedition> {
     total: number;
   }>;
   updateStatus(id: string, status: ExpeditionStatus): Promise<Expedition | null>;
-  updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null>;
+  // updateWorkflowState method removed - replaced by new workflow DSL system
   assignAgent(expeditionId: string, agentId: string): Promise<boolean>;
   removeAgent(expeditionId: string, agentId: string): Promise<boolean>;
   getAssignedAgents(expeditionId: string): Promise<Agent[]>;

@@ -6,7 +6,6 @@ import {
   ExpeditionFilters,
   ExpeditionSort,
   PaginationOptions,
-  ExpeditionWorkflowState,
   Agent
 } from '../types';
 import { v4 as uuidv4 } from 'uuid';
@@ -331,9 +330,10 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
   }
 
   /**
-   * Update expedition workflow state
+   * Update expedition workflow state - DEPRECATED
+   * TODO: Remove this method in Phase 2 when replacing with new workflow DSL system
    */
-  async updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null> {
+  async updateWorkflowState(id: string, state: any): Promise<Expedition | null> {
     const connection = getConnection();
     // Serialize the workflow state to JSON string for Neo4j storage
     const serializedState = JSON.stringify(state);

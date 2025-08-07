@@ -329,6 +329,9 @@ export * from './types/starship';
 // Export expedition-related types
 export * from './types/expedition';
 
+// Export workflow DSL types
+export * from './types/workflow';
+
 // Export agent communication types
 export * from './types/agent-communication';
 

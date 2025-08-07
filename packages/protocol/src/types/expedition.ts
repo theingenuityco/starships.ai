@@ -387,23 +387,9 @@ export interface PaginationOptions {
 // ============================================================================
 
 /**
- * LangGraph workflow state for expeditions
+ * NOTE: ExpeditionWorkflowState has been removed and replaced with WorkflowDSL system.
+ * See packages/protocol/src/types/workflow.ts for new workflow types.
  */
-export interface ExpeditionWorkflowState {
-  expeditionId: string;
-  currentPhase: WorkflowPhase;
-  requirements: string;
-  taskBreakdown: TaskBreakdown[];
-  agentAssignments: Record<string, string[]>;
-  agentResults: Record<string, string>;
-  finalResult?: string;
-  analysis?: any;
-  userId: string;
-  starshipId: string;
-  errors?: string[];
-  retryCount: number;
-  lastUpdated: string;
-}
 
 /**
  * Workflow phases for First Officer coordination

@@ -14,7 +14,6 @@ import {
 } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
 import {
-  ExpeditionWorkflowState,
   WorkflowPhase,
   ChatRequest,
   ChatResponse
@@ -677,27 +676,12 @@ export class FirstOfficerService {
     console.log(`[FIRST-OFFICER-SERVICE] Status update for ${expeditionId}: ${phase}`);
 
     try {
-      // Update expedition workflow state
-      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      const expedition = await expeditionRepo.findById(expeditionId);
+      // TODO: Replace with new WorkflowDSL system in Phase 2
+      // Update expedition workflow state - TEMPORARILY DISABLED
+      // const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      // const expedition = await expeditionRepo.findById(expeditionId);
       
-      if (expedition) {
-        const workflowState: ExpeditionWorkflowState = {
-          expeditionId,
-          currentPhase: phase,
-          requirements: expedition.mission,
-          taskBreakdown: [],
-          agentAssignments: {},
-          agentResults: {},
-          userId: expedition.createdBy,
-          starshipId: expedition.starshipId,
-          errors: progress.issues,
-          retryCount: 0,
-          lastUpdated: new Date().toISOString()
-        };
-
-        await expeditionRepo.updateWorkflowState(expeditionId, workflowState);
-      }
+      console.log(`[FIRST-OFFICER-SERVICE] Status update handled: ${phase} (workflow state update disabled - will be replaced with WorkflowDSL system)`);
     } catch (error) {
       console.error(`[FIRST-OFFICER-SERVICE] Failed to handle status update:`, error);
     }

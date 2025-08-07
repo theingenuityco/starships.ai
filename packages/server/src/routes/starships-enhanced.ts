@@ -138,31 +138,26 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
           confidence: vision.confidence || 0.8,
           refinementCount: 0,
           lastRefined: new Date().toISOString(),
-          isActive: true,
-          // Add metadata if session ID provided
-          ...(vision.sibilSessionId && {
-            metadata: {
-              sibilSessionId: vision.sibilSessionId,
-              createdFromOnboarding: true,
-            }
-          })
+          isActive: true
         });
 
         console.log('[STARSHIP-CREATE-ENHANCED] Vision created successfully:', createdVision.id);
       }
 
-      // Success response
+      // Success response - match expected format
       const response: any = {
-        id: createdStarship.id,
-        name: createdStarship.name,
-        slug: createdStarship.slug,
-        class: createdStarship.class,
-        status: createdStarship.status,
-        ownerId: createdStarship.ownerId,
-        maxActiveExpeditions: createdStarship.maxActiveExpeditions,
-        maxAgents: createdStarship.maxAgents,
-        createdAt: createdStarship.createdAt,
-        updatedAt: createdStarship.updatedAt,
+        starship: {
+          id: createdStarship.id,
+          name: createdStarship.name,
+          slug: createdStarship.slug,
+          class: createdStarship.class,
+          status: createdStarship.status,
+          ownerId: createdStarship.ownerId,
+          maxActiveExpeditions: createdStarship.maxActiveExpeditions,
+          maxAgents: createdStarship.maxAgents,
+          createdAt: createdStarship.createdAt,
+          updatedAt: createdStarship.updatedAt,
+        }
       };
 
       // Include vision in response if created

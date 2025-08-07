@@ -235,7 +235,7 @@ export function StarshipCreateModalEnhanced({
     setStep(hasVision ? 1 : 2);
     setFormData({
       name: '',
-      class: 'scout',
+      class: 'cruiser', // Always default to cruiser
       vision: ''
     });
     setErrors({});

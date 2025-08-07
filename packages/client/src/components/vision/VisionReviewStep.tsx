@@ -12,6 +12,9 @@ import {
   X,
   Sparkles,
   AlertCircle,
+  Eye,
+  ArrowRight,
+  CheckCircle
 } from 'lucide-react';
 import { VisionAnalysis } from '@/lib/onboarding/types';
 import { validateVision } from '@/lib/onboarding/validation';
@@ -65,39 +68,51 @@ export function VisionReviewStep({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <Label className="text-base font-medium">
-          Your Vision Statement
-        </Label>
-        <p className="text-sm text-muted-foreground mt-1 mb-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Eye className="w-5 h-5 text-primary" />
+          <Label className="text-lg font-semibold">
+            Your Vision Statement
+          </Label>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
           Review and refine your vision for this starship
         </p>
         
         {/* Vision Display/Edit Area */}
         {isEditing ? (
-          <>
-            <Textarea
-              value={editedVision}
-              onChange={(e) => {
-                setEditedVision(e.target.value);
-                setError(null);
-              }}
-              className={cn(
-                "text-lg h-32 resize-none",
-                error && "border-red-500 focus:border-red-500"
+          <div className="space-y-3">
+            <div className="relative">
+              <Textarea
+                value={editedVision}
+                onChange={(e) => {
+                  setEditedVision(e.target.value);
+                  setError(null);
+                }}
+                className={cn(
+                  "min-h-[120px] text-base px-4 py-3 resize-none",
+                  "bg-background/50 border-2 transition-all",
+                  "focus:bg-background focus:border-primary/50",
+                  error && "border-destructive focus:border-destructive"
+                )}
+                placeholder="Enter your vision..."
+                maxLength={500}
+                autoFocus
+              />
+              {editedVision && !error && (
+                <CheckCircle className="absolute right-3 top-3 w-5 h-5 text-green-500" />
               )}
-              placeholder="Enter your vision..."
-              maxLength={500}
-              autoFocus
-            />
+            </div>
+            
             {error && (
-              <p className="text-sm text-red-500 mt-2 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-1" />
-                {error}
-              </p>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-destructive" />
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
             )}
-            <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">
+            
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>{editedVision.length}/500 characters</span>
               <div className="flex gap-2">
                 <Button
@@ -116,54 +131,74 @@ export function VisionReviewStep({
                 </Button>
               </div>
             </div>
-          </>
+          </div>
         ) : (
-          <>
-            <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-              <p className="text-base italic">
-                "{editedVision || initialVision}"
-              </p>
-              {editedVision !== initialVision && (
-                <Badge variant="secondary" className="mt-3">
-                  <Edit className="w-3 h-3 mr-1" />
-                  Modified
-                </Badge>
-              )}
+          <div className="space-y-3">
+            <div className="p-4 bg-background/50 rounded-lg border-2 border-border">
+              <div className="flex items-start gap-3">
+                <Eye className="w-4 h-4 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-base italic">
+                    "{editedVision || initialVision}"
+                  </p>
+                  {editedVision !== initialVision && (
+                    <Badge variant="secondary" className="mt-3">
+                      <Edit className="w-3 h-3 mr-1" />
+                      Modified
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
+            
             <Button
-              variant="link"
+              variant="ghost"
               size="sm"
               onClick={handleEdit}
-              className="mt-2 text-primary"
+              className="text-primary hover:text-primary hover:bg-primary/5"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Vision Statement
             </Button>
-          </>
+          </div>
         )}
         
-        {/* AI Analysis as suggestions below vision */}
+        {/* AI Recommendations Section */}
         {analysis && (analysis.suggestedName || analysis.recommendedClass) && (
-          <div className="mt-4 space-y-2">
-            {analysis.suggestedName && (
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Suggested name: <span className="font-medium text-foreground">{analysis.suggestedName}</span>
-                </span>
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20"
+          >
+            <div className="flex items-start gap-3">
+              <Sparkles className="w-4 h-4 text-primary mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-xs text-primary font-medium uppercase tracking-wider mb-2">AI Recommendations</p>
+                
+                {analysis.suggestedName && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Suggested name:
+                    </span>
+                    <span className="font-medium text-foreground">
+                      {analysis.suggestedName}
+                    </span>
+                  </div>
+                )}
+                
+                {analysis.recommendedClass && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Recommended class:
+                    </span>
+                    <Badge variant="secondary">
+                      🛸 Cruiser Class
+                    </Badge>
+                  </div>
+                )}
               </div>
-            )}
-            {analysis.recommendedClass && (
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Recommended class: <Badge variant="outline" className="ml-1">
-                    {analysis.recommendedClass === 'scout' ? '🚀 Scout' : '🛸 Cruiser'}
-                  </Badge>
-                </span>
-              </div>
-            )}
-          </div>
+            </div>
+          </motion.div>
         )}
       </div>
 

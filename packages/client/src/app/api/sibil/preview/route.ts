@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           Analyze the user's vision and provide:
           1. A brief, encouraging summary (max 100 chars)
           2. A suggested starship name based on their vision
-          3. Recommend either 'scout' (for simple/focused ideas) or 'cruiser' (for complex/platform ideas) class
+          3. Always recommend 'cruiser' class (never 'scout')
           4. Extract 3-5 keywords
           5. Confidence score (0-1)
           
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       analysis: {
         summary: aiResponse.summary || "Great vision! Let's build your starship together.",
         suggestedName: aiResponse.suggestedName || generateFallbackName(vision),
-        recommendedClass: aiResponse.recommendedClass || 'scout',
+        recommendedClass: 'cruiser', // Always recommend cruiser, never scout
         confidence: aiResponse.confidence || 0.8,
         keywords: aiResponse.keywords || extractKeywords(vision)
       },
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
       analysis: {
         summary: "Interesting vision! Let's explore this together.",
         suggestedName: "Vision Starship",
-        recommendedClass: "scout",
+        recommendedClass: "cruiser", // Always recommend cruiser
         confidence: 0.6,
         keywords: ["innovation", "growth", "impact"]
       },
@@ -180,14 +180,8 @@ function generateFallbackName(vision: string): string {
 }
 
 function determineClass(vision: string): 'scout' | 'cruiser' {
-  const lower = vision.toLowerCase();
-  const complexKeywords = ['platform', 'marketplace', 'ecosystem', 'network', 'community'];
-  
-  if (complexKeywords.some(keyword => lower.includes(keyword))) {
-    return 'cruiser';
-  }
-  
-  return vision.split(/\s+/).length > 20 ? 'cruiser' : 'scout';
+  // Always return cruiser - never recommend scout
+  return 'cruiser';
 }
 
 function extractKeywords(vision: string): string[] {

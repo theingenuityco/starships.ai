@@ -36,20 +36,26 @@ export function storeSession(session: OnboardingSession): boolean {
 
   const serialized = JSON.stringify(schema);
 
-  // Try sessionStorage first
+  // Use localStorage as primary (persists across auth redirects)
+  try {
+    localStorage.setItem(STORAGE_KEY, serialized);
+    // Also store in sessionStorage for same-session access
+    try {
+      sessionStorage.setItem(STORAGE_KEY, serialized);
+    } catch (e) {
+      // SessionStorage failure is not critical
+    }
+    return true;
+  } catch (e) {
+    console.warn('LocalStorage failed:', e);
+  }
+
+  // Fall back to sessionStorage only
   try {
     sessionStorage.setItem(STORAGE_KEY, serialized);
     return true;
   } catch (e) {
     console.warn('SessionStorage failed:', e);
-  }
-
-  // Fall back to localStorage
-  try {
-    localStorage.setItem(STORAGE_KEY, serialized);
-    return true;
-  } catch (e) {
-    console.warn('LocalStorage failed:', e);
   }
 
   // Fall back to URL state (compressed)
@@ -75,17 +81,7 @@ export function storeSession(session: OnboardingSession): boolean {
 
 // Retrieve session from storage
 export function retrieveSession(): StorageSchema | null {
-  // Try sessionStorage first
-  try {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (e) {
-    console.warn('Failed to retrieve from sessionStorage:', e);
-  }
-
-  // Try localStorage
+  // Try localStorage first (persists across auth redirects)
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -93,6 +89,16 @@ export function retrieveSession(): StorageSchema | null {
     }
   } catch (e) {
     console.warn('Failed to retrieve from localStorage:', e);
+  }
+
+  // Try sessionStorage as fallback
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('Failed to retrieve from sessionStorage:', e);
   }
 
   // Try URL state

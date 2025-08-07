@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
 import type { Request, Response } from 'express';
-import { getConnection, Subscription } from '@starships/models';
+import { getConnection, Subscription as LocalSubscription } from '@starships/models';
 
 const router: Router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -53,13 +53,13 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
           
           if (checkoutSession.subscription) {
             try {
-              const subscription = await stripe.subscriptions.retrieve(checkoutSession.subscription as string);
+              const subscription: Stripe.Subscription = await stripe.subscriptions.retrieve(checkoutSession.subscription as string);
               const priceId = subscription.items.data[0]?.price?.id;
               if (priceId) {
                 planId = getPlanFromPriceId(priceId);
               }
               // Get actual period end from Stripe
-              currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+              currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString();
             } catch (error) {
               console.warn('[WEBHOOK] Could not retrieve subscription details:', error);
             }
@@ -77,7 +77,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
               now
             });
             
-            await connection.executeWrite<{ s: Subscription }>(`
+            await connection.executeWrite<{ s: LocalSubscription }>(`
               MERGE (user:User {id: $userId})
               MERGE (s:Subscription {
                 id: $subscriptionId,
@@ -115,7 +115,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
         console.log(`[WEBHOOK] Subscription updated: ${updatedSub.id}`);
         
         // Update subscription status in Neo4j
-        await connection.executeWrite<{ s: Subscription }>(`
+        await connection.executeWrite<{ s: LocalSubscription }>(`
           MATCH (s:Subscription {stripeSubscriptionId: $stripeSubscriptionId})
           SET s.status = $status,
               s.currentPeriodEnd = $currentPeriodEnd,
@@ -135,7 +135,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
         console.log(`[WEBHOOK] Subscription canceled: ${deletedSub.id}`);
         
         // Mark subscription as canceled in Neo4j
-        await connection.executeWrite<{ s: Subscription }>(`
+        await connection.executeWrite<{ s: LocalSubscription }>(`
           MATCH (s:Subscription {stripeSubscriptionId: $stripeSubscriptionId})
           SET s.status = 'canceled',
               s.updatedAt = $now

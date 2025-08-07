@@ -9,6 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
 import { Toaster } from '@/components/ui/toast'
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -33,15 +34,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <AuthProvider>
-            <QueryProvider>
-              <SocketProvider>
-                <TooltipProvider>
-                  <div className="min-h-screen bg-background">
-                    <ClientLayout>{children}</ClientLayout>
-                  </div>
-                </TooltipProvider>
-              </SocketProvider>
-            </QueryProvider>
+            <SubscriptionProvider>
+              <QueryProvider>
+                <SocketProvider>
+                  <TooltipProvider>
+                    <div className="min-h-screen bg-background">
+                      <ClientLayout>{children}</ClientLayout>
+                    </div>
+                  </TooltipProvider>
+                </SocketProvider>
+              </QueryProvider>
+            </SubscriptionProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

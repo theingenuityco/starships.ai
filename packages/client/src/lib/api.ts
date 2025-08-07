@@ -1421,6 +1421,48 @@ export const subscriptionAPI = {
 
     return data
   },
+
+  // Create checkout session and redirect to Stripe
+  createCheckout: async (priceId: string): Promise<{ url: string }> => {
+    console.log('[API] Creating checkout session for price:', priceId);
+    const data = await api.post('/api/subscriptions/checkout', {
+      priceId
+    }).then((res: AxiosResponse<{ url: string }>) => {
+      console.log('[API] Checkout session created successfully');
+      return res.data;
+    });
+    
+    return data;
+  },
+
+  // Verify checkout session status after payment attempt
+  verifySession: async (sessionId: string): Promise<{
+    status: 'complete' | 'expired' | 'open';
+    payment_status: 'paid' | 'unpaid' | 'no_payment_required';
+    subscription_id?: string;
+  }> => {
+    const data = await api.get(`/api/subscriptions/verify-session/${sessionId}`)
+      .then((res: AxiosResponse<any>) => res.data);
+    
+    return data;
+  },
+
+  // Get user's current subscription status for feature gating
+  getCurrentSubscription: async (): Promise<{
+    plan: 'scout' | 'cruiser';
+    isActive: boolean;
+    features: any;
+    subscription?: {
+      currentPeriodEnd: string;
+      stripeCustomerId: string;
+      status: string;
+    } | null;
+  }> => {
+    const data = await api.get('/api/subscriptions/current')
+      .then((res: AxiosResponse<any>) => res.data);
+    
+    return data;
+  },
 }
 
 // Utility function for generating client-side IDs

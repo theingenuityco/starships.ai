@@ -11,12 +11,16 @@ interface PlanCardProps {
   plan: SubscriptionPlan;
   isYearly: boolean;
   onSelectPlan: (plan: SubscriptionPlan) => void;
+  isCurrentPlan?: boolean;
+  isSubscribed?: boolean;
 }
 
 export const PlanCard: React.FC<PlanCardProps> = ({
   plan,
   isYearly,
   onSelectPlan,
+  isCurrentPlan = false,
+  isSubscribed = false,
 }) => {
   const price = isYearly ? plan.priceYearly : plan.priceMonthly;
   const displayPrice = price / 100; // Convert from cents
@@ -84,15 +88,22 @@ export const PlanCard: React.FC<PlanCardProps> = ({
       
       <Button
         className={`w-full ${
-          plan.isPopular
+          isCurrentPlan
+            ? 'bg-green-600 hover:bg-green-700'
+            : plan.isPopular
             ? 'bg-purple-600 hover:bg-purple-700'
             : isFree
             ? 'bg-slate-600 hover:bg-slate-700'
             : 'bg-slate-700 hover:bg-slate-600'
         }`}
         onClick={() => onSelectPlan(plan)}
+        disabled={isCurrentPlan}
       >
-        {isFree ? 'Current Plan' : 'Choose Plan'}
+        {isCurrentPlan 
+          ? 'Current Plan' 
+          : isFree && !isSubscribed
+          ? 'Current Plan' 
+          : 'Choose Plan'}
       </Button>
     </Card>
   );

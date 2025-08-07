@@ -114,6 +114,18 @@ export interface Vision {
   updatedAt: string;
 }
 
+export interface Subscription {
+  id: string;
+  userId: string;
+  status: 'active' | 'canceled' | 'past_due';
+  planId: 'scout' | 'cruiser';
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  currentPeriodEnd: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Neo4j Relationship Types (keeping only essential ones)
 export interface ActiveInRelationship {
   type: 'ACTIVE_IN';

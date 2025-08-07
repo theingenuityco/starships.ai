@@ -4,6 +4,8 @@ export interface SubscriptionPlan {
   description: string;
   priceMonthly: number;
   priceYearly: number;
+  monthlyPriceId: string;
+  yearlyPriceId: string;
   features: PlanFeatures;
   isPopular?: boolean;
 }

@@ -3,18 +3,25 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Rocket } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PricingToggle } from './PricingToggle';
 import { PlanCard } from './PlanCard';
 import { subscriptionAPI } from '@/lib/api';
 import { SubscriptionPlan } from '@/types/subscriptions';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 export const PricingPage: React.FC = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { subscription: currentSubscription, refetchSubscription } = useSubscription();
   const [isYearly, setIsYearly] = useState(false);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<{
+    type: 'success' | 'failed' | 'expired' | 'cancelled' | null;
+    message: string;
+  }>({ type: null, message: '' });
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -24,7 +31,7 @@ export const PricingPage: React.FC = () => {
         setPlans(fetchedPlans);
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch subscription plans:', err);
+        console.error('Failed to fetch plans:', err);
         setError('Failed to load subscription plans. Please try again later.');
       } finally {
         setLoading(false);
@@ -34,12 +41,83 @@ export const PricingPage: React.FC = () => {
     fetchPlans();
   }, []);
 
-  const handleSelectPlan = (plan: SubscriptionPlan) => {
-    // For now, just show an alert since payment processing is not yet implemented
-    if (plan.priceMonthly === 0) {
-      alert('You are already on the Scout (Free) plan!');
-    } else {
-      alert(`Payment processing for ${plan.name} will be implemented in a future update.`);
+  useEffect(() => {
+    const verifyPaymentStatus = async () => {
+      const sessionId = searchParams?.get('session_id');
+      const success = searchParams?.get('success');
+      const canceled = searchParams?.get('canceled');
+
+      // Handle cancellation
+      if (canceled === 'true') {
+        setPaymentStatus({
+          type: 'cancelled',
+          message: 'Payment was cancelled. You can try again anytime.'
+        });
+        return;
+      }
+
+      // Handle success with session verification
+      if (success === 'true' && sessionId) {
+        try {
+          const sessionStatus = await subscriptionAPI.verifySession(sessionId);
+          
+          if (sessionStatus.status === 'complete' && sessionStatus.payment_status === 'paid') {
+            setPaymentStatus({
+              type: 'success',
+              message: '🎉 Payment successful! Your subscription has been activated.'
+            });
+            // Refetch subscription data after successful payment
+            await refetchSubscription();
+          } else if (sessionStatus.status === 'expired') {
+            setPaymentStatus({
+              type: 'expired',
+              message: 'Payment session expired. Please try again.'
+            });
+          } else {
+            setPaymentStatus({
+              type: 'failed',
+              message: 'Payment was not completed. Please try again.'
+            });
+          }
+        } catch (error) {
+          console.error('Failed to verify payment session:', error);
+          setPaymentStatus({
+            type: 'failed',
+            message: 'Unable to verify payment status. Please contact support if charged.'
+          });
+        }
+      }
+
+      // Clean up URL parameters
+      if (sessionId || success || canceled) {
+        window.history.replaceState({}, '', '/fleet/pricing');
+      }
+    };
+
+    verifyPaymentStatus();
+  }, [searchParams]);
+
+  const handleSelectPlan = async (plan: SubscriptionPlan) => {
+    try {
+      if (plan.priceMonthly === 0) {
+        alert('You are already on the Scout (Free) plan!');
+        return;
+      }
+
+      // Get the correct price ID based on billing toggle
+      const priceId = isYearly ? plan.yearlyPriceId : plan.monthlyPriceId;
+      
+      console.log(`Creating checkout for plan: ${plan.name}, priceId: ${priceId}`);
+      
+      // Call API to create checkout session  
+      const { url } = await subscriptionAPI.createCheckout(priceId);
+      
+      // Redirect to Stripe Checkout
+      window.location.href = url;
+      
+    } catch (error) {
+      console.error('Failed to create checkout session:', error);
+      alert('Failed to start checkout. Please try again.');
     }
   };
 
@@ -102,20 +180,64 @@ export const PricingPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Payment Status Messages */}
+      {paymentStatus.type && (
+        <div className={`p-4 rounded-lg mb-6 text-center ${
+          paymentStatus.type === 'success' ? 'bg-green-600 text-white' :
+          paymentStatus.type === 'failed' || paymentStatus.type === 'expired' ? 'bg-red-600 text-white' :
+          'bg-yellow-600 text-white'
+        }`}>
+          {paymentStatus.message}
+          {(paymentStatus.type === 'failed' || paymentStatus.type === 'expired') && (
+            <div className="mt-2">
+              <button 
+                onClick={() => setPaymentStatus({ type: null, message: '' })}
+                className="underline hover:no-underline"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Current Subscription Status */}
+      {currentSubscription?.isActive && (
+        <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-center">
+          <div className="text-blue-300 text-sm mb-1">Current Plan</div>
+          <div className="text-white text-xl font-semibold capitalize mb-2">
+            {currentSubscription.plan} Plan
+          </div>
+          {currentSubscription.subscription && (
+            <div className="text-blue-200 text-sm">
+              Active until {new Date(currentSubscription.subscription.currentPeriodEnd).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Pricing Toggle */}
       <PricingToggle isYearly={isYearly} onChange={setIsYearly} />
 
       {/* Plans Grid */}
       {plans.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
-          {plans.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              isYearly={isYearly}
-              onSelectPlan={handleSelectPlan}
-            />
-          ))}
+          {plans.map((plan) => {
+            const isCurrentPlan = currentSubscription?.isActive && 
+              currentSubscription.plan === plan.name.toLowerCase();
+            const isSubscribed = currentSubscription?.isActive || false;
+            
+            return (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                isYearly={isYearly}
+                onSelectPlan={handleSelectPlan}
+                isCurrentPlan={isCurrentPlan}
+                isSubscribed={isSubscribed}
+              />
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-12">

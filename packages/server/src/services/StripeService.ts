@@ -6,6 +6,8 @@ export interface SubscriptionPlan {
   description: string;
   priceMonthly: number;
   priceYearly: number;
+  monthlyPriceId: string;
+  yearlyPriceId: string;
   features: PlanFeatures;
   isPopular?: boolean;
 }
@@ -68,6 +70,8 @@ export class StripeService {
           description: product.description || '',
           priceMonthly: monthlyPrice.unit_amount || 0,
           priceYearly: yearlyPrice.unit_amount || 0,
+          monthlyPriceId: monthlyPrice.id,
+          yearlyPriceId: yearlyPrice.id,
           features: {
             agents: parseInt(product.metadata.agents || '0'),
             firstOfficer: product.metadata.first_officer === 'true',
@@ -125,6 +129,8 @@ export class StripeService {
         description: product.description || '',
         priceMonthly: monthlyPrice.unit_amount || 0,
         priceYearly: yearlyPrice.unit_amount || 0,
+        monthlyPriceId: monthlyPrice.id,
+        yearlyPriceId: yearlyPrice.id,
         features: {
           agents: parseInt(product.metadata.agents || '0'),
           firstOfficer: product.metadata.first_officer === 'true',
@@ -141,6 +147,57 @@ export class StripeService {
     } catch (error) {
       console.error(`[STRIPE-SERVICE] Failed to fetch plan ${productId}:`, error);
       throw new Error(`Failed to fetch subscription plan: ${error}`);
+    }
+  }
+
+  /**
+   * Create Stripe Checkout Session (subscription mode)
+   * Based on Stripe API v18+ (2025-03-31.basil) - postpones subscription creation until payment success
+   */
+  static async createCheckoutSession(priceId: string, userId: string): Promise<{ url: string }> {
+    try {
+      console.log(`[STRIPE-SERVICE] Creating checkout session for price: ${priceId}, user: ${userId}`);
+      
+      const session = await this.stripe.checkout.sessions.create({
+        mode: 'subscription',
+        client_reference_id: userId, // Link payment to user for webhook processing
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.CLIENT_URL}/fleet/pricing?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_URL}/fleet/pricing?canceled=true`,
+      });
+
+      console.log(`[STRIPE-SERVICE] Checkout session created: ${session.id}`);
+      return { url: session.url! };
+    } catch (error) {
+      console.error('[STRIPE-SERVICE] Failed to create checkout session:', error);
+      throw new Error(`Failed to create checkout session: ${error}`);
+    }
+  }
+
+  /**
+   * Verify checkout session status for payment confirmation
+   */
+  static async verifyCheckoutSession(sessionId: string): Promise<{
+    status: 'complete' | 'expired' | 'open';
+    payment_status: 'paid' | 'unpaid' | 'no_payment_required';
+    subscription_id?: string;
+  }> {
+    try {
+      const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+      
+      return {
+        status: session.status as any,
+        payment_status: session.payment_status as any,
+        subscription_id: session.subscription as string | undefined
+      };
+    } catch (error) {
+      console.error('[STRIPE-SERVICE] Failed to verify session:', error);
+      throw new Error(`Failed to verify checkout session: ${error}`);
     }
   }
 }

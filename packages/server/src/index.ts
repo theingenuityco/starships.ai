@@ -38,6 +38,7 @@ import agentTemplateRoutes from './routes/agent-templates';
 import expeditionRoutes from './routes/expeditions';
 import agentCommunicationRoutes from './routes/agent-communication';
 import subscriptionRoutes from './routes/subscriptions';
+import webhookRoutes from './routes/webhooks';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
@@ -131,6 +132,11 @@ const starshipRepository = new StarshipRepository();
 const visionRepository = new VisionRepository();
 // Middleware - Order is important!
 app.use(cors());
+
+// Register webhook route BEFORE express.json() middleware
+// Webhooks need raw body for signature verification
+app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
+
 app.use(express.json());
 
 // Add error handling middleware

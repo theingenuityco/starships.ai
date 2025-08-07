@@ -271,7 +271,7 @@ export function StarshipCreateModalEnhanced({
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Enter starship name..."
               className={cn(
-                "text-lg h-12",
+                "mt-2 h-11 text-base",
                 errors.name && "border-red-500 focus:border-red-500"
               )}
               autoFocus
@@ -281,18 +281,23 @@ export function StarshipCreateModalEnhanced({
             )}
             {session?.visionAnalysis?.suggestedName && 
              formData.name !== session.visionAnalysis.suggestedName && (
-              <Button
-                variant="link"
-                size="sm"
-                className="mt-2 text-primary"
-                onClick={() => setFormData({ 
-                  ...formData, 
-                  name: session.visionAnalysis?.suggestedName || '' 
-                })}
-              >
-                <Sparkles className="w-3 h-3 mr-1" />
-                Use suggested: "{session.visionAnalysis.suggestedName}"
-              </Button>
+              <div className="flex items-center gap-2 mt-3">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-sm text-muted-foreground">
+                  Suggested name: 
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="px-1 h-auto font-medium"
+                    onClick={() => setFormData({ 
+                      ...formData, 
+                      name: session.visionAnalysis?.suggestedName || '' 
+                    })}
+                  >
+                    {session.visionAnalysis.suggestedName}
+                  </Button>
+                </span>
+              </div>
             )}
           </div>
           
@@ -313,71 +318,91 @@ export function StarshipCreateModalEnhanced({
         <div className="space-y-6">
           <div>
             <Label className="text-base font-medium">Select Class</Label>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">
+            <p className="text-sm text-muted-foreground mt-1">
               Choose the class that best fits your mission requirements
             </p>
           </div>
           
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {Object.entries(STARSHIP_CLASSES).map(([key, shipClass]) => (
-              <Card
+              <div
                 key={key}
                 className={cn(
-                  "cursor-pointer transition-all hover:shadow-md",
-                  formData.class === key && "ring-2 ring-primary"
+                  "relative p-4 rounded-lg border cursor-pointer transition-all",
+                  "hover:border-primary/50 hover:bg-muted/30",
+                  formData.class === key ? "border-primary bg-primary/5" : "border-border bg-card/50"
                 )}
                 onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' })}
               >
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="text-2xl">{shipClass.icon}</span>
-                      <span>{shipClass.name} Class</span>
-                    </span>
-                    {formData.class === key && (
-                      <CheckCircle className="w-5 h-5 text-primary" />
-                    )}
-                    {session?.visionAnalysis?.recommendedClass === key && (
-                      <Badge variant="secondary" className="ml-2">
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        Recommended
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {shipClass.description}
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                      <span>Max {shipClass.maxAgents} agents</span>
+                {/* Recommended badge */}
+                {session?.visionAnalysis?.recommendedClass === key && (
+                  <Badge 
+                    variant="secondary" 
+                    className="absolute top-3 right-3"
+                  >
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Recommended
+                  </Badge>
+                )}
+                
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl mt-1">{shipClass.icon}</span>
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{shipClass.name} Class</h3>
+                        {formData.class === key && (
+                          <CheckCircle className="w-4 h-4 text-primary" />
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {shipClass.description}
+                      </p>
                     </div>
-                    {Object.entries(shipClass.stats).slice(0, 2).map(([stat, value]) => (
-                      <div key={stat} className="flex items-center gap-2 text-sm">
-                        <div className="w-16 bg-muted rounded-full h-1.5">
+                    
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>Max {shipClass.maxAgents} agents</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Speed</span>
+                        <div className="w-12 bg-muted rounded-full h-1.5">
                           <div 
                             className="h-full bg-primary rounded-full"
-                            style={{ width: `${value}%` }}
+                            style={{ width: `${shipClass.stats.speed}%` }}
                           />
                         </div>
-                        <span className="capitalize text-xs">{stat}</span>
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Capacity</span>
+                        <div className="w-12 bg-muted rounded-full h-1.5">
+                          <div 
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${shipClass.stats.capacity}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      {shipClass.features.slice(0, 2).map((feature, index) => (
+                        <p key={index} className="text-xs text-muted-foreground">
+                          • {feature}
+                        </p>
+                      ))}
+                    </div>
                   </div>
-                  
-                  <div className="space-y-1">
-                    {shipClass.features.slice(0, 2).map((feature, index) => (
-                      <p key={index} className="text-xs text-muted-foreground">
-                        • {feature}
-                      </p>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
+          </div>
+          
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              <strong>Tip:</strong> Scout class is ideal for quick, focused missions. 
+              Cruiser class excels at complex, multi-agent operations.
+            </p>
           </div>
         </div>
       );
@@ -396,37 +421,43 @@ export function StarshipCreateModalEnhanced({
             </p>
           </div>
           
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              {formData.vision && (
-                <div>
-                  <Label className="text-sm text-muted-foreground">Vision</Label>
-                  <div className="mt-1 p-3 bg-primary/10 rounded-lg">
-                    <p className="text-sm italic">"{formData.vision}"</p>
-                  </div>
+          <div className="space-y-4">
+            {formData.vision && (
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Vision</Label>
+                <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+                  <p className="text-base italic">"{formData.vision}"</p>
                 </div>
-              )}
-              
-              <div>
-                <Label className="text-sm text-muted-foreground">Name</Label>
-                <p className="text-lg font-semibold mt-1">{formData.name}</p>
               </div>
-              
-              <div>
-                <Label className="text-sm text-muted-foreground">Class</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xl">{selectedClass.icon}</span>
-                  <span className="font-medium">{selectedClass.name} Class</span>
+            )}
+            
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Name</Label>
+              <div className="p-3 bg-card/50 rounded-lg border border-border">
+                <p className="text-lg font-semibold">{formData.name}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Class</Label>
+              <div className="p-3 bg-card/50 rounded-lg border border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{selectedClass.icon}</span>
+                    <span className="font-medium">{selectedClass.name} Class</span>
+                  </div>
                   <Badge variant="outline">
                     <Users className="w-3 h-3 mr-1" />
                     Max {selectedClass.maxAgents} agents
                   </Badge>
                 </div>
               </div>
-              
-              <div>
-                <Label className="text-sm text-muted-foreground">Capabilities</Label>
-                <div className="mt-2 space-y-1">
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Capabilities</Label>
+              <div className="p-3 bg-card/50 rounded-lg border border-border">
+                <div className="space-y-1">
                   {selectedClass.features.slice(0, 3).map((feature, index) => (
                     <p key={index} className="text-sm text-muted-foreground">
                       • {feature}
@@ -434,11 +465,12 @@ export function StarshipCreateModalEnhanced({
                   ))}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
           
-          <div className="p-4 bg-primary/10 rounded-lg">
+          <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
             <p className="text-sm">
+              <CheckCircle className="w-4 h-4 inline mr-2 text-green-600" />
               <strong>Ready to launch!</strong> Your starship will be created with the configuration above.
             </p>
           </div>

@@ -7,13 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
   Send, 
-  Sparkles,
+  Bot,
   Loader2,
   AlertCircle,
   ArrowUp,
   ArrowRight,
   Eye,
-  Bot,
   User,
   Rocket
 } from 'lucide-react';
@@ -255,7 +254,7 @@ export function LandingSibilWidgetStaticChat({
         <div className="bg-background/50 backdrop-blur-sm border-2 border-border rounded-t-xl">
           {/* Chat Header */}
           <div className="border-b border-border/50 px-6 py-3 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-500" />
+            <Bot className="w-5 h-5 text-emerald-500" />
             <span className="font-semibold text-base">Sibil AI</span>
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           </div>
@@ -277,8 +276,8 @@ export function LandingSibilWidgetStaticChat({
                 >
                   {message.type === 'sibil' && (
                     <div className="flex-shrink-0 mt-1">
-                      <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
-                        <Sparkles className="w-5 h-5 text-purple-500" />
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                        <Bot className="w-5 h-5 text-emerald-500" />
                       </div>
                     </div>
                   )}
@@ -311,8 +310,8 @@ export function LandingSibilWidgetStaticChat({
                 className="flex gap-3"
               >
                 <div className="flex-shrink-0 mt-1">
-                  <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
-                    <Sparkles className="w-5 h-5 text-purple-500 animate-pulse" />
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                    <Bot className="w-5 h-5 text-emerald-500 animate-pulse" />
                   </div>
                 </div>
                 <div className="bg-white/5 backdrop-blur-sm border border-border/50 rounded-2xl px-5 py-3">

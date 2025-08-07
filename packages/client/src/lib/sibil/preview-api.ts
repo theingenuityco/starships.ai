@@ -3,10 +3,10 @@ import { VisionAnalysis } from '../onboarding/types';
 // Fallback responses for when API fails
 const FALLBACK_RESPONSES = {
   generic: "That's an interesting vision! Let's create your starship to make it reality.",
-  saas: "Perfect for a Scout class starship! Let's get started.",
+  saas: "Perfect for a Cruiser class starship! Let's get started.",
   platform: "This sounds like a Cruiser class mission! Let's begin.",
   marketplace: "A marketplace vision - ideal for a Cruiser class starship!",
-  tool: "Building tools for developers - a Scout class would be perfect!",
+  tool: "Building tools for developers - a Cruiser class would be perfect!",
   ai: "AI-powered innovation - let's launch your Cruiser class starship!"
 };
 
@@ -101,11 +101,8 @@ export async function analyzeVisionPreAuth(vision: string): Promise<{
     const suggestedName = generateSuggestedName(vision);
     const keywords = extractKeywords(vision);
     
-    // Determine recommended class based on vision complexity
-    const wordCount = vision.split(/\s+/).length;
-    const recommendedClass = wordCount > 15 || vision.includes('platform') || vision.includes('marketplace') 
-      ? 'cruiser' 
-      : 'scout';
+    // Always recommend Cruiser class - never Scout
+    const recommendedClass = 'cruiser';
     
     return {
       analysis: {

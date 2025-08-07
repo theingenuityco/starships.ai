@@ -24,7 +24,9 @@ import {
   CheckCircle,
   Loader2,
   Eye,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
@@ -124,7 +126,7 @@ export function StarshipCreateModalEnhanced({
   const [step, setStep] = useState(hasVision ? 1 : 2); // Start at vision step if we have one
   const [formData, setFormData] = useState<StarshipFormData>({
     name: session?.visionAnalysis?.suggestedName || '',
-    class: session?.visionAnalysis?.recommendedClass || 'scout',
+    class: session?.visionAnalysis?.recommendedClass || 'cruiser', // Always default to cruiser
     vision: session?.pendingVision || ''
   });
   const [errors, setErrors] = useState<StarshipFormErrors>({});
@@ -257,54 +259,77 @@ export function StarshipCreateModalEnhanced({
     const nameStepNumber = hasVision ? 2 : 1;
     if (step === nameStepNumber) {
       return (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div>
-            <Label htmlFor="name" className="text-base font-medium">
-              Starship Name
-            </Label>
-            <p className="text-sm text-muted-foreground mt-1 mb-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Rocket className="w-5 h-5 text-primary" />
+              <Label htmlFor="name" className="text-lg font-semibold">
+                Starship Name
+              </Label>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
               Choose a unique name for your starship
             </p>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Enter starship name..."
-              className={cn(
-                "mt-2 h-11 text-base",
-                errors.name && "border-red-500 focus:border-red-500"
+            
+            <div className="relative">
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter starship name..."
+                className={cn(
+                  "h-12 text-base px-4",
+                  "bg-background/50 border-2 transition-all",
+                  "focus:bg-background focus:border-primary/50",
+                  errors.name && "border-destructive focus:border-destructive"
+                )}
+                autoFocus
+              />
+              {formData.name && !errors.name && (
+                <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
               )}
-              autoFocus
-            />
+            </div>
+            
             {errors.name && (
-              <p className="text-sm text-red-500 mt-2">{errors.name}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <AlertCircle className="w-4 h-4 text-destructive" />
+                <p className="text-sm text-destructive">{errors.name}</p>
+              </div>
             )}
+            
             {session?.visionAnalysis?.suggestedName && 
              formData.name !== session.visionAnalysis.suggestedName && (
-              <div className="flex items-center gap-2 mt-3">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="text-sm text-muted-foreground">
-                  Suggested name: 
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="px-1 h-auto font-medium"
-                    onClick={() => setFormData({ 
-                      ...formData, 
-                      name: session.visionAnalysis?.suggestedName || '' 
-                    })}
-                  >
-                    {session.visionAnalysis.suggestedName}
-                  </Button>
-                </span>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20"
+              >
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-4 h-4 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs text-primary font-medium uppercase tracking-wider mb-1">AI Suggestion</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="p-0 h-auto font-medium text-foreground hover:text-primary hover:bg-transparent"
+                      onClick={() => setFormData({ 
+                        ...formData, 
+                        name: session.visionAnalysis?.suggestedName || '' 
+                      })}
+                    >
+                      Use "{session.visionAnalysis.suggestedName}"
+                      <ArrowRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
             )}
           </div>
           
           <div className="p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
-              <strong>Tip:</strong> Choose a name that reflects your starship's mission or personality. 
-              Examples: "Pioneer", "Voyager", "Constellation"
+              <strong>Tip:</strong> Choose a memorable name that reflects your vision. Consider names from mythology, 
+              astronomy, or words that embody your mission's spirit.
             </p>
           </div>
         </div>
@@ -323,50 +348,56 @@ export function StarshipCreateModalEnhanced({
             </p>
           </div>
           
-          <div className="grid gap-3">
-            {Object.entries(STARSHIP_CLASSES).map(([key, shipClass]) => (
-              <div
-                key={key}
-                className={cn(
-                  "relative p-4 rounded-lg border cursor-pointer transition-all",
-                  "hover:border-primary/50 hover:bg-muted/30",
-                  formData.class === key ? "border-primary bg-primary/5" : "border-border bg-card/50"
-                )}
-                onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' })}
-              >
-                {/* Recommended badge */}
-                {session?.visionAnalysis?.recommendedClass === key && (
-                  <Badge 
-                    variant="secondary" 
-                    className="absolute top-3 right-3"
-                  >
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Recommended
-                  </Badge>
-                )}
-                
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl mt-1">{shipClass.icon}</span>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{shipClass.name} Class</h3>
-                        {formData.class === key && (
-                          <CheckCircle className="w-4 h-4 text-primary" />
-                        )}
+          <div className="grid grid-cols-2 gap-3">
+            {Object.entries(STARSHIP_CLASSES).map(([key, shipClass]) => {
+              // Only show Cruiser as recommended, never Scout
+              const isRecommended = key === 'cruiser' && session?.visionAnalysis?.recommendedClass;
+              
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    "relative p-4 rounded-lg border cursor-pointer transition-all",
+                    "hover:border-primary/50 hover:bg-muted/30",
+                    formData.class === key ? "border-primary bg-primary/5" : "border-border"
+                  )}
+                  onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' })}
+                >
+                  {/* Only show recommended badge for Cruiser */}
+                  {isRecommended && (
+                    <Badge 
+                      variant="secondary" 
+                      className="absolute top-3 right-3"
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Recommended
+                    </Badge>
+                  )}
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{shipClass.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{shipClass.name} Class</h3>
+                          {formData.class === key && (
+                            <CheckCircle className="w-4 h-4 text-primary" />
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {shipClass.description}
-                      </p>
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm">
+                    <p className="text-sm text-muted-foreground">
+                      {shipClass.description}
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-3 text-xs">
                       <div className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 text-muted-foreground" />
                         <span>Max {shipClass.maxAgents} agents</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Speed</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground">Speed</span>
                         <div className="w-12 bg-muted rounded-full h-1.5">
                           <div 
                             className="h-full bg-primary rounded-full"
@@ -374,8 +405,8 @@ export function StarshipCreateModalEnhanced({
                           />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Capacity</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-muted-foreground">Capacity</span>
                         <div className="w-12 bg-muted rounded-full h-1.5">
                           <div 
                             className="h-full bg-primary rounded-full"
@@ -385,7 +416,7 @@ export function StarshipCreateModalEnhanced({
                       </div>
                     </div>
                     
-                    <div className="flex gap-3">
+                    <div className="pt-2 border-t border-border/50 space-y-1">
                       {shipClass.features.slice(0, 2).map((feature, index) => (
                         <p key={index} className="text-xs text-muted-foreground">
                           • {feature}
@@ -394,14 +425,14 @@ export function StarshipCreateModalEnhanced({
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           <div className="p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
-              <strong>Tip:</strong> Scout class is ideal for quick, focused missions. 
-              Cruiser class excels at complex, multi-agent operations.
+              <strong>Tip:</strong> Cruiser class is recommended for most projects as it provides 
+              the best balance of capabilities and room for growth.
             </p>
           </div>
         </div>
@@ -413,66 +444,72 @@ export function StarshipCreateModalEnhanced({
     if (step === reviewStepNumber) {
       const selectedClass = STARSHIP_CLASSES[formData.class];
       return (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div>
-            <Label className="text-base font-medium">Review & Create</Label>
-            <p className="text-sm text-muted-foreground mt-1">
-              Confirm your starship configuration
-            </p>
-          </div>
-          
-          <div className="space-y-4">
-            {formData.vision && (
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Vision</Label>
-                <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                  <p className="text-base italic">"{formData.vision}"</p>
-                </div>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Name</Label>
-              <div className="p-3 bg-card/50 rounded-lg border border-border">
-                <p className="text-lg font-semibold">{formData.name}</p>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Class</Label>
-              <div className="p-3 bg-card/50 rounded-lg border border-border">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">{selectedClass.icon}</span>
-                    <span className="font-medium">{selectedClass.name} Class</span>
-                  </div>
-                  <Badge variant="outline">
-                    <Users className="w-3 h-3 mr-1" />
-                    Max {selectedClass.maxAgents} agents
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Capabilities</Label>
-              <div className="p-3 bg-card/50 rounded-lg border border-border">
-                <div className="space-y-1">
-                  {selectedClass.features.slice(0, 3).map((feature, index) => (
-                    <p key={index} className="text-sm text-muted-foreground">
-                      • {feature}
-                    </p>
-                  ))}
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-primary" />
+              <Label className="text-lg font-semibold">Review & Create</Label>
             </div>
           </div>
           
           <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-            <p className="text-sm">
-              <CheckCircle className="w-4 h-4 inline mr-2 text-green-600" />
-              <strong>Ready to launch!</strong> Your starship will be created with the configuration above.
-            </p>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+              <p className="text-sm">
+                <strong className="text-foreground">Ready to launch!</strong> Your starship will be created with the configuration above.
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            {formData.vision && (
+              <div className="p-4 bg-background/50 rounded-lg border-2 border-border">
+                <div className="flex items-start gap-3">
+                  <Eye className="w-4 h-4 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Vision Statement</p>
+                    <p className="text-sm italic">"{formData.vision}"</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="p-4 bg-background/50 rounded-lg border-2 border-border">
+              <div className="flex items-start gap-3">
+                <Rocket className="w-4 h-4 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Starship Name</p>
+                  <p className="text-base font-semibold">{formData.name}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-background/50 rounded-lg border-2 border-border">
+              <div className="flex items-start gap-3">
+                <Navigation className="w-4 h-4 text-primary mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Class Configuration</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{selectedClass.icon}</span>
+                      <span className="font-semibold">{selectedClass.name} Class</span>
+                    </div>
+                    <Badge variant="secondary">
+                      <Users className="w-3 h-3 mr-1" />
+                      Max {selectedClass.maxAgents} agents
+                    </Badge>
+                  </div>
+                  <div className="space-y-1.5 pt-3 border-t border-border/50">
+                    {selectedClass.features.slice(0, 3).map((feature, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <div className="w-1 h-1 rounded-full bg-primary mt-1.5" />
+                        <p className="text-xs text-muted-foreground">{feature}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -577,23 +614,55 @@ export function StarshipCreateModalEnhanced({
           </Button>
           
           {isLastStep ? (
-            <Button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Rocket className="w-4 h-4 mr-2" />
-                  Launch Starship
-                </>
-              )}
-            </Button>
+            <div className="relative">
+              {/* Glow effect layer */}
+              <motion.div
+                className="absolute inset-0 rounded-md bg-primary blur-xl"
+                initial={{ opacity: 0 }}
+                animate={{ 
+                  opacity: [0.2, 0.35, 0.2],
+                }}
+                transition={{ 
+                  duration: 2.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              <motion.div
+                animate={{ 
+                  scale: [1, 1.05, 1, 1.05, 1, 1, 1, 1, 1, 1, 1, 1]
+                }}
+                transition={{ 
+                  scale: {
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    times: [0, 0.075, 0.15, 0.225, 0.3, 0.375, 0.45, 0.6, 0.75, 0.9, 0.95, 1]
+                  }
+                }}
+              >
+                <Button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="relative bg-primary hover:bg-primary/90"
+                  style={{
+                    boxShadow: "0 4px 20px rgba(59, 130, 246, 0.5), 0 2px 10px rgba(59, 130, 246, 0.3)"
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="w-4 h-4 mr-2" />
+                      Launch Starship
+                    </>
+                  )}
+                </Button>
+              </motion.div>
+            </div>
           ) : (
             <Button onClick={handleNext}>
               Next

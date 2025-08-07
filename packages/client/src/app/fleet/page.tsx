@@ -76,18 +76,18 @@ export default function ShipsPage() {
         }
         setShouldOpenCreate(true);
         
-        console.log('[Fleet] Opening create modal with vision:', restoredSession.pendingVision.slice(0, 50));
+        console.log('[Fleet] Opening create modal with vision:', restoredSession.pendingVision?.slice(0, 50));
         
         // Show a welcome back message if resumed
         if (isResumed) {
           toast.success('Welcome back! Let\'s continue creating your starship.', {
-            description: `Vision: "${restoredSession.pendingVision.slice(0, 50)}..."`,
+            description: `Vision: "${restoredSession.pendingVision?.slice(0, 50) || 'Your vision'}..."`,
             duration: 5000,
           });
         } else {
           // Show vision confirmation toast
           toast.success('Vision captured! Let\'s create your starship.', {
-            description: `"${restoredSession.pendingVision.slice(0, 50)}..."`,
+            description: `"${restoredSession.pendingVision?.slice(0, 50) || 'Your vision'}..."`,
             duration: 5000,
           });
         }

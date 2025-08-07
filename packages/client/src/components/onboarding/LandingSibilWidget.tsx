@@ -98,7 +98,7 @@ export function LandingSibilWidget({
       setState('responding');
       
       // Save to session storage
-      console.log('[LandingSibil] Saving vision to session:', vision.slice(0, 50));
+      console.log('[LandingSibil] Saving vision to session:', vision?.slice(0, 50));
       saveVision(vision, result.analysis);
       
       // Show response for 2 seconds then transition to ready

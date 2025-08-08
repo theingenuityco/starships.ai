@@ -23,6 +23,7 @@ import { StarshipStatusManager } from './StarshipStatusManager';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components';
+import { useRouter } from 'next/navigation';
 
 interface StarshipDashboardProps {
   className?: string;
@@ -41,6 +42,7 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
   } = useStarshipStore();
 
   const { user, userName, userEmail, isAuthenticated } = useAuth();
+  const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
@@ -210,8 +212,19 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                 </div>
               </div>
               
-              {/* User Profile Dropdown */}
-              {isAuthenticated && user && (
+              <div className="flex items-center gap-4">
+                {/* Pricing Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/fleet/pricing')}
+                  className="bg-gradient-to-r from-purple-600/20 to-purple-500/20 border-purple-500/30 hover:border-purple-400/50 hover:bg-purple-500/20 text-purple-200 hover:text-white transition-all duration-200"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  Pricing
+                </Button>
+
+                {/* User Profile Dropdown */}
+                {isAuthenticated && user && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button 
@@ -250,7 +263,8 @@ export function StarshipDashboard({ className }: StarshipDashboardProps) {
                     </LogoutLink>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

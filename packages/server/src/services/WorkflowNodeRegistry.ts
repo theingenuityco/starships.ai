@@ -127,11 +127,11 @@ export class WorkflowNodeRegistry {
   }
 
   /**
-   * Clear all handlers
+   * Clear all handlers and prevent auto-initialization
    */
   clear(): void {
     this.handlers.clear();
-    this.initialized = false;
+    this.initialized = true; // Set to true to prevent auto-initialization
     console.log('Cleared all workflow node handlers');
   }
 

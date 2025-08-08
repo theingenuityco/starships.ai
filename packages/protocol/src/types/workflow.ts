@@ -205,11 +205,14 @@ export interface WorkflowServices {
  */
 export interface WorkflowGenerationRequest {
   expeditionId: string;
-  taskBreakdown: any[]; // Use any[] to avoid circular dependency with expedition types
-  selectedAgents: AgentAssignment[];
+  taskBreakdown?: any[]; // Use any[] to avoid circular dependency with expedition types
+  selectedAgents: string[] | AgentAssignment[]; // Support both formats
   objective: string;
-  complexity?: WorkflowComplexity;
+  complexity?: WorkflowComplexity | any;
   preferences?: WorkflowGenerationPreferences;
+  agentAssignments?: Record<string, string[]>;
+  requirements?: string[];
+  constraints?: string[];
 }
 
 /**
@@ -236,7 +239,11 @@ export interface WorkflowGenerationPreferences {
   allowConditionals?: boolean;
   estimatedDuration?: number; // Target duration in minutes
   qualityGates?: boolean; // Include quality check nodes
+  parallelExecution?: boolean; // Allow parallel task execution
+  errorRecovery?: string; // Error recovery strategy
+  userInteraction?: string; // User interaction level
 }
+
 
 // Note: TaskBreakdown is imported from expedition types to avoid duplication
 

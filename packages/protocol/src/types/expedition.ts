@@ -190,6 +190,7 @@ export type ExpeditionStatus =
   | 'refining'     // Phase 1: Mission clarification and refinement
   | 'planning'     // Phase 2: Task breakdown and workflow generation  
   | 'executing'    // Phase 3: WorkflowDSL execution
+  | 'in-progress'  // Generic in-progress state
   | 'completed'    // Phase 4: Results synthesis complete
   | 'failed'       // Failed at any phase
   | 'cancelled'    // Cancelled by user
@@ -222,6 +223,7 @@ export const statusToPhase: Record<ExpeditionStatus, ExpeditionPhase | null> = {
   'refining': 'refine',
   'planning': 'plan',
   'executing': 'execute',
+  'in-progress': null, // Generic in-progress state
   'completed': 'result',
   'failed': null,
   'cancelled': null,

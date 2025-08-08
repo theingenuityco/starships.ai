@@ -208,9 +208,12 @@ export class ExpeditionValidationService {
    */
   validateStatusTransition(currentStatus: ExpeditionStatus, newStatus: ExpeditionStatus): boolean {
     const validTransitions: Record<ExpeditionStatus, ExpeditionStatus[]> = {
-      'draft': ['planning', 'cancelled'],
-      'planning': ['in-progress', 'cancelled', 'failed'],
+      'draft': ['refining', 'cancelled'],
+      'refining': ['planning', 'failed', 'cancelled'], 
+      'planning': ['executing', 'in-progress', 'cancelled', 'failed'],
+      'executing': ['completed', 'paused', 'failed', 'cancelled'],
       'in-progress': ['completed', 'failed', 'cancelled'],
+      'paused': ['executing', 'cancelled', 'failed'],
       'completed': [], // Terminal state
       'failed': ['draft'], // Can restart from failed
       'cancelled': ['draft'], // Can restart from cancelled

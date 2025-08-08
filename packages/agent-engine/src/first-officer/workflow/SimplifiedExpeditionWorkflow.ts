@@ -535,7 +535,7 @@ export function createSimplified4PhaseWorkflow(
     ? new MemorySaver() // Neo4j when available
     : new MemorySaver();
     
-  const interruptBefore = [
+  const interruptBefore: ('user_approval_gate')[] = [
     'user_approval_gate' // Always interrupt for plan approval
   ];
   

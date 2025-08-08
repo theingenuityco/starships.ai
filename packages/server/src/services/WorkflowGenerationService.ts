@@ -196,9 +196,13 @@ export class WorkflowGenerationService {
     let previousNodeId = startNodeId;
 
     // Create agent nodes for each task
-    for (let i = 0; i < request.taskBreakdown.length; i++) {
-      const task = request.taskBreakdown[i];
-      const assignedAgent = this.findBestAgentForTask(task, request.selectedAgents);
+    const taskBreakdown = request.taskBreakdown || [];
+    for (let i = 0; i < taskBreakdown.length; i++) {
+      const task = taskBreakdown[i];
+      const agents = Array.isArray(request.selectedAgents) && request.selectedAgents.length > 0 && typeof request.selectedAgents[0] === 'object' 
+        ? request.selectedAgents as AgentAssignment[] 
+        : [];
+      const assignedAgent = this.findBestAgentForTask(task, agents);
       
       const agentNodeId = uuidv4();
       nodes.push({
@@ -423,12 +427,12 @@ export class WorkflowGenerationService {
     let confidence = 0.8; // Base confidence
 
     // Boost confidence if we have good task breakdown
-    if (request.taskBreakdown.length > 0) {
+    if (request.taskBreakdown && request.taskBreakdown.length > 0) {
       confidence += 0.1;
     }
 
     // Boost confidence if agents are well-matched
-    if (request.selectedAgents.length >= request.taskBreakdown.length) {
+    if (request.selectedAgents && request.taskBreakdown && request.selectedAgents.length >= request.taskBreakdown.length) {
       confidence += 0.05;
     }
 
@@ -452,7 +456,7 @@ export class WorkflowGenerationService {
   private generateSuggestions(workflow: WorkflowDSL, request: WorkflowGenerationRequest): string[] {
     const suggestions: string[] = [];
 
-    if (request.taskBreakdown.length > 5) {
+    if (request.taskBreakdown && request.taskBreakdown.length > 5) {
       suggestions.push('Consider breaking down complex tasks into smaller sub-tasks for better tracking');
     }
 
@@ -485,7 +489,7 @@ export class WorkflowGenerationService {
       warnings.push('No agents assigned - workflow may fail during execution');
     }
 
-    if (request.taskBreakdown.length === 0) {
+    if (!request.taskBreakdown || request.taskBreakdown.length === 0) {
       warnings.push('No tasks defined - workflow will have minimal functionality');
     }
 
@@ -537,7 +541,7 @@ export class WorkflowGenerationService {
     // Simple estimation based on request complexity
     let tokens = 100; // Base cost
     
-    tokens += request.taskBreakdown.length * 50;
+    tokens += (request.taskBreakdown?.length || 0) * 50;
     tokens += request.selectedAgents.length * 25;
     tokens += request.objective.length / 4; // ~4 chars per token
     

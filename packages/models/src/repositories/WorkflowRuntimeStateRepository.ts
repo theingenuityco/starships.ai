@@ -64,7 +64,7 @@ export class WorkflowRuntimeStateRepository extends BaseRepository {
         RETURN wrs
       `;
 
-      const result = await connection.executeQuery<{ wrs: any }>(query, stateData);
+      const result = await connection.executeWrite<{ wrs: any }>(query, stateData);
       
       if (result.length === 0) {
         throw new Error('Failed to create workflow runtime state');
@@ -180,7 +180,7 @@ export class WorkflowRuntimeStateRepository extends BaseRepository {
         RETURN wrs
       `;
 
-      const result = await connection.executeQuery<{ wrs: any }>(query, params);
+      const result = await connection.executeWrite<{ wrs: any }>(query, params);
       
       if (result.length === 0) {
         return null;
@@ -223,7 +223,7 @@ export class WorkflowRuntimeStateRepository extends BaseRepository {
         RETURN wrs
       `;
 
-      const result = await connection.executeQuery<{ wrs: any }>(query, params);
+      const result = await connection.executeWrite<{ wrs: any }>(query, params);
       return result.length > 0;
     } catch (error) {
       throw this.handleDatabaseError(error, 'updateStatus', 'WorkflowRuntimeState', id);
@@ -294,7 +294,7 @@ export class WorkflowRuntimeStateRepository extends BaseRepository {
         RETURN COUNT(wrs) as deletedCount
       `;
 
-      const result = await connection.executeQuery<{ deletedCount: number }>(query, { id });
+      const result = await connection.executeWrite<{ deletedCount: number }>(query, { id });
       return result.length > 0 && result[0].deletedCount > 0;
     } catch (error) {
       throw this.handleDatabaseError(error, 'delete', 'WorkflowRuntimeState', id);

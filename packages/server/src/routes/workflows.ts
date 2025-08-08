@@ -39,7 +39,7 @@ const workflowEventService = WorkflowEventService.getInstance();
 router.get('/:expeditionId/workflow', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { expeditionId } = req.params;
-    const workflowRepo = await RepositoryFactory.getWorkflowRepository();
+    const workflowRepo = RepositoryFactory.getWorkflowRepository();
     
     const workflows = await workflowRepo.findByExpeditionId(expeditionId);
     if (!workflows || workflows.length === 0) {
@@ -74,7 +74,7 @@ router.post('/:expeditionId/workflow/approve', authMiddleware, async (req: Reque
   try {
     const { expeditionId } = req.params;
     const { userId } = req.body;
-    const workflowRepo = await RepositoryFactory.getWorkflowRepository();
+    const workflowRepo = RepositoryFactory.getWorkflowRepository();
     
     const workflows = await workflowRepo.findByExpeditionId(expeditionId);
     if (!workflows || workflows.length === 0) {
@@ -136,7 +136,7 @@ router.post('/:expeditionId/workflow/reject', authMiddleware, async (req: Reques
   try {
     const { expeditionId } = req.params;
     const { userId, reason } = req.body;
-    const workflowRepo = await RepositoryFactory.getWorkflowRepository();
+    const workflowRepo = RepositoryFactory.getWorkflowRepository();
     
     const workflows = await workflowRepo.findByExpeditionId(expeditionId);
     if (!workflows || workflows.length === 0) {
@@ -199,7 +199,7 @@ router.put('/:expeditionId/workflow', authMiddleware, async (req: Request, res: 
   try {
     const { expeditionId } = req.params;
     const { workflow: workflowData } = req.body;
-    const workflowRepo = await RepositoryFactory.getWorkflowRepository();
+    const workflowRepo = RepositoryFactory.getWorkflowRepository();
     
     const existingWorkflows = await workflowRepo.findByExpeditionId(expeditionId);
     if (!existingWorkflows || existingWorkflows.length === 0) {
@@ -236,7 +236,7 @@ router.put('/:expeditionId/workflow', authMiddleware, async (req: Request, res: 
 router.post('/:expeditionId/workflow/visualize', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { expeditionId } = req.params;
-    const workflowRepo = await RepositoryFactory.getWorkflowRepository();
+    const workflowRepo = RepositoryFactory.getWorkflowRepository();
     
     const workflows = await workflowRepo.findByExpeditionId(expeditionId);
     if (!workflows || workflows.length === 0) {
@@ -291,8 +291,8 @@ router.post('/:expeditionId/workflow/visualize', authMiddleware, async (req: Req
 router.get('/:expeditionId/workflow/execution-status', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { expeditionId } = req.params;
-    const workflowRepo = await RepositoryFactory.getWorkflowRepository();
-    const runtimeStateRepo = await RepositoryFactory.getWorkflowRuntimeStateRepository();
+    const workflowRepo = RepositoryFactory.getWorkflowRepository();
+    const runtimeStateRepo = RepositoryFactory.getWorkflowRuntimeStateRepository();
     
     const workflows = await workflowRepo.findByExpeditionId(expeditionId);
     if (!workflows || workflows.length === 0) {

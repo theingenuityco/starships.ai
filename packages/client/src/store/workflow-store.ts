@@ -110,6 +110,7 @@ interface WorkflowActions {
   
   // WebSocket event handlers
   handleWorkflowUpdate: (expeditionId: string, workflow: WorkflowDSL) => void
+  handleApprovalStatusUpdate: (expeditionId: string, status: 'pending' | 'approved' | 'rejected') => void
   handleExecutionStatusUpdate: (expeditionId: string, status: WorkflowExecutionStatus) => void
   handleUserPrompt: (expeditionId: string, prompt: WorkflowUserPrompt) => void
   handleNotification: (notification: WorkflowNotification) => void
@@ -427,6 +428,21 @@ export const useWorkflowStore = create<WorkflowState & WorkflowActions>()(
         set(state => ({
           workflows: { ...state.workflows, [expeditionId]: workflow }
         }))
+      },
+      
+      handleApprovalStatusUpdate: (expeditionId: string, status: 'pending' | 'approved' | 'rejected') => {
+        set(state => {
+          const existingWorkflow = state.workflows[expeditionId]
+          if (existingWorkflow) {
+            return {
+              workflows: {
+                ...state.workflows,
+                [expeditionId]: { ...existingWorkflow, approvalStatus: status }
+              }
+            }
+          }
+          return state
+        })
       },
       
       handleExecutionStatusUpdate: (expeditionId: string, status: WorkflowExecutionStatus) => {

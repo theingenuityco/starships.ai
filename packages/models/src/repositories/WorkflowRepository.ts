@@ -63,7 +63,7 @@ export class WorkflowRepository extends BaseRepository {
         RETURN w
       `;
 
-      const result = await connection.executeQuery<{ w: any }>(query, workflowData);
+      const result = await connection.executeWrite<{ w: any }>(query, workflowData);
       
       if (result.length === 0) {
         throw new Error('Failed to create workflow');
@@ -175,7 +175,7 @@ export class WorkflowRepository extends BaseRepository {
         RETURN w
       `;
 
-      const result = await connection.executeQuery<{ w: any }>(query, params);
+      const result = await connection.executeWrite<{ w: any }>(query, params);
       
       if (result.length === 0) {
         return null;
@@ -218,7 +218,7 @@ export class WorkflowRepository extends BaseRepository {
         RETURN w
       `;
 
-      const result = await connection.executeQuery<{ w: any }>(query, params);
+      const result = await connection.executeWrite<{ w: any }>(query, params);
       return result.length > 0;
     } catch (error) {
       throw this.handleDatabaseError(error, 'updateApprovalStatus', 'Workflow', id);
@@ -242,7 +242,7 @@ export class WorkflowRepository extends BaseRepository {
         RETURN COUNT(w) as deletedCount
       `;
 
-      const result = await connection.executeQuery<{ deletedCount: number }>(query, { id });
+      const result = await connection.executeWrite<{ deletedCount: number }>(query, { id });
       return result.length > 0 && result[0].deletedCount > 0;
     } catch (error) {
       throw this.handleDatabaseError(error, 'delete', 'Workflow', id);

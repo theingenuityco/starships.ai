@@ -84,6 +84,9 @@ class WorkflowWebSocketService {
 
     // Register workflow event listeners
     socket.on('workflow:updated', this.handleWorkflowUpdate.bind(this))
+    socket.on('expedition:workflow-dsl-generated', this.handleWorkflowDSLGenerated.bind(this))
+    socket.on('expedition:workflow-dsl-approved', this.handleWorkflowDSLApproved.bind(this))
+    socket.on('expedition:workflow-dsl-rejected', this.handleWorkflowDSLRejected.bind(this))
     socket.on('workflow:execution-status', this.handleExecutionStatusUpdate.bind(this))
     socket.on('workflow:user-prompt', this.handleUserPrompt.bind(this))
     socket.on('workflow:notification', this.handleNotification.bind(this))
@@ -101,6 +104,9 @@ class WorkflowWebSocketService {
 
     // Remove workflow event listeners
     socket.off('workflow:updated', this.handleWorkflowUpdate.bind(this))
+    socket.off('expedition:workflow-dsl-generated', this.handleWorkflowDSLGenerated.bind(this))
+    socket.off('expedition:workflow-dsl-approved', this.handleWorkflowDSLApproved.bind(this))
+    socket.off('expedition:workflow-dsl-rejected', this.handleWorkflowDSLRejected.bind(this))
     socket.off('workflow:execution-status', this.handleExecutionStatusUpdate.bind(this))
     socket.off('workflow:user-prompt', this.handleUserPrompt.bind(this))
     socket.off('workflow:notification', this.handleNotification.bind(this))
@@ -210,6 +216,48 @@ class WorkflowWebSocketService {
     
     // Emit custom event for components
     this.emitCustomEvent('workflow-approval-request', event)
+  }
+
+  /**
+   * Handle workflow DSL generated events
+   */
+  private handleWorkflowDSLGenerated(event: any) {
+    console.log('[WORKFLOW WS] Received workflow DSL generated:', event)
+    
+    // Get store instance and update workflow
+    const store = useWorkflowStore.getState()
+    store.handleWorkflowUpdate(event.expeditionId, event.workflow)
+    
+    // Emit custom event for components
+    this.emitCustomEvent('workflow-updated', { expeditionId: event.expeditionId, workflow: event.workflow })
+  }
+
+  /**
+   * Handle workflow DSL approved events
+   */
+  private handleWorkflowDSLApproved(event: any) {
+    console.log('[WORKFLOW WS] Received workflow DSL approved:', event)
+    
+    // Get store instance and update workflow approval status
+    const store = useWorkflowStore.getState()
+    store.handleApprovalStatusUpdate(event.expeditionId, 'approved')
+    
+    // Emit custom event for components
+    this.emitCustomEvent('workflow-approved', event)
+  }
+
+  /**
+   * Handle workflow DSL rejected events
+   */
+  private handleWorkflowDSLRejected(event: any) {
+    console.log('[WORKFLOW WS] Received workflow DSL rejected:', event)
+    
+    // Get store instance and update workflow approval status
+    const store = useWorkflowStore.getState()
+    store.handleApprovalStatusUpdate(event.expeditionId, 'rejected')
+    
+    // Emit custom event for components
+    this.emitCustomEvent('workflow-rejected', event)
   }
 
   /**

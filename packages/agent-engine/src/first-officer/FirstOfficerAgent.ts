@@ -19,7 +19,10 @@ import {
   MemoryEntry
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
+// TODO: Import from @starships/server once properly exported
+// For now, use the local implementation and upgrade it to match server's implementation
 import { WorkflowGenerationService } from './WorkflowGenerationService';
+// WebSocket event emission will be handled directly through webSocketEmitter
 import { ProviderFactory } from '../llm/provider-factory';
 import { buildPrompt } from '../prompt/builder';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
@@ -59,6 +62,7 @@ export class FirstOfficerAgent {
   private qualityValidator: QualityValidator;
   private taskExecutor: TaskExecutor;
   private workflowGenerationService: WorkflowGenerationService;
+  // Removed workflowEventService - using direct WebSocket emission
   private chatCoordinator: ChatCoordinator | null;
   private workflow: any; // CompiledStateGraph from LangGraph
   private nodeHandlers: WorkflowNodeHandlers;
@@ -1376,7 +1380,7 @@ Help coordinate and provide guidance as needed.`;
       const workflow = workflowResult.workflow;
 
       // Save the workflow to the database
-      const workflowRepo = await RepositoryFactory.getWorkflowRepository();
+      const workflowRepo = RepositoryFactory.getWorkflowRepository();
       const savedWorkflow = await workflowRepo.create(workflow);
 
       console.log(`✅ [FIRST-OFFICER] Workflow DSL generated successfully. Confidence: ${workflowResult.confidence.toFixed(2)}`);
@@ -1392,6 +1396,23 @@ Help coordinate and provide guidance as needed.`;
 
       // Log the workflow visualization
       console.log('\n' + workflow.visualization + '\n');
+
+      // Emit WebSocket event to notify frontend of workflow generation
+      try {
+        await this.webSocketEmitter.emit('expedition:workflow-dsl-generated', {
+          expeditionId: state.expeditionId,
+          workflowId: savedWorkflow.id,
+          workflow: savedWorkflow,
+          nodeCount: savedWorkflow.nodes.length,
+          estimatedDuration: savedWorkflow.metadata?.estimatedDuration || 0,
+          complexity: state.objectiveAnalysis?.complexity || 'moderate',
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`🔔 [FIRST-OFFICER] Workflow DSL generated event emitted for expedition ${state.expeditionId}`);
+      } catch (error) {
+        console.warn('⚠️ [FIRST-OFFICER] Failed to emit workflow DSL generated event:', error);
+      }
 
       return {
         currentPhase: 'waiting_for_approval',

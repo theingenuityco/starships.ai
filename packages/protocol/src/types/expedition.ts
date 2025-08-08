@@ -24,6 +24,52 @@ export interface Expedition {
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID who created the expedition
+  
+  // ========================================
+  // 4-PHASE EXPEDITION FIELDS
+  // ========================================
+  
+  // Phase tracking
+  currentPhase?: ExpeditionPhase;
+  phaseStartedAt?: string;
+  phaseCompletedAt?: string;
+  
+  // Phase 1: Refine data
+  refinedMission?: string;
+  refinedRequirements?: string[];
+  missionComplexity?: 'simple' | 'moderate' | 'complex' | 'expert';
+  estimatedDuration?: number; // in minutes
+  
+  // Phase 2: Plan data
+  taskBreakdown?: TaskBreakdown[];
+  agentAssignments?: Record<string, string[]>; // agentId -> taskIds
+  workflowDSL?: any; // WorkflowDSL from workflow types
+  workflowVisualization?: string;
+  dependencyGraph?: Record<string, string[]>; // taskId -> dependsOn
+  
+  // User approval fields
+  planApprovalRequired?: boolean;
+  userApprovedPlan?: boolean;
+  planApprovedAt?: string;
+  userResponse?: any;
+  
+  // Phase 3: Execute data
+  executionProgress?: number; // 0-100
+  executionComplete?: boolean;
+  executionSummary?: string;
+  agentOutputs?: Record<string, any>;
+  
+  // Phase 4: Result data
+  finalResult?: string;
+  expeditionSummary?: string;
+  qualityScore?: number;
+  keyAchievements?: string[];
+  lessonsLearned?: string[];
+  deliverables?: Array<{
+    name: string;
+    content: string;
+    type: string;
+  }>;
 }
 
 /**
@@ -137,15 +183,50 @@ export interface ExpeditionResult {
 // ============================================================================
 
 /**
- * Expedition lifecycle status
+ * Expedition lifecycle status - Enhanced for 4-phase flow
  */
 export type ExpeditionStatus = 
   | 'draft'        // Created but not started
-  | 'planning'     // First Officer analyzing requirements
-  | 'in-progress'  // Active execution with agents
-  | 'completed'    // Successfully finished
-  | 'failed'       // Failed or abandoned
-  | 'cancelled';   // Cancelled by user
+  | 'refining'     // Phase 1: Mission clarification and refinement
+  | 'planning'     // Phase 2: Task breakdown and workflow generation  
+  | 'executing'    // Phase 3: WorkflowDSL execution
+  | 'completed'    // Phase 4: Results synthesis complete
+  | 'failed'       // Failed at any phase
+  | 'cancelled'    // Cancelled by user
+  | 'paused';      // Temporarily paused (execute phase only)
+
+/**
+ * 4-Phase expedition phases for tracking progression
+ */
+export type ExpeditionPhase = 
+  | 'refine'       // Phase 1: Mission clarification and refinement
+  | 'plan'         // Phase 2: Task breakdown and workflow generation  
+  | 'execute'      // Phase 3: WorkflowDSL execution
+  | 'result';      // Phase 4: Results synthesis
+
+/**
+ * Phase to status mapping for 4-phase expeditions
+ */
+export const phaseToStatus: Record<ExpeditionPhase, ExpeditionStatus> = {
+  'refine': 'refining',
+  'plan': 'planning', 
+  'execute': 'executing',
+  'result': 'completed'
+};
+
+/**
+ * Status to phase mapping for 4-phase expeditions
+ */
+export const statusToPhase: Record<ExpeditionStatus, ExpeditionPhase | null> = {
+  'draft': null,
+  'refining': 'refine',
+  'planning': 'plan',
+  'executing': 'execute',
+  'completed': 'result',
+  'failed': null,
+  'cancelled': null,
+  'paused': 'execute' // Paused expeditions are still in execute phase
+};
 
 
 /**
@@ -464,7 +545,7 @@ export interface ExpeditionEvent {
 }
 
 /**
- * Types of real-time expedition events
+ * Types of real-time expedition events - Enhanced for 4-phase flow
  */
 export type ExpeditionEventType = 
   | 'expedition:created'
@@ -479,7 +560,27 @@ export type ExpeditionEventType =
   | 'agent:assigned'
   | 'agent:completed-task'
   | 'workflow:phase-changed'
-  | 'result:created';
+  | 'result:created'
+  
+  // 4-Phase specific events
+  | 'expedition:phase-changed'
+  | 'expedition:refinement-progress'
+  | 'expedition:plan-ready'
+  | 'expedition:plan-approved'
+  | 'expedition:plan-rejected'
+  | 'expedition:execution-started'
+  | 'expedition:execution-progress'
+  | 'expedition:execution-paused'
+  | 'expedition:execution-resumed'
+  | 'expedition:result-synthesis-progress'
+  | 'workflow:node-started'
+  | 'workflow:node-completed'
+  | 'workflow:node-failed'
+  | 'agent:task-started'
+  | 'agent:task-progress'
+  | 'agent:task-completed'
+  | 'agent:task-failed'
+  | 'agent:activity-stream';
 
 // ============================================================================
 // ERROR TYPES

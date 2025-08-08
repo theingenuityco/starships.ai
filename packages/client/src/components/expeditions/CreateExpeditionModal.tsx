@@ -16,7 +16,8 @@ import {
   Target, Bot, Search, Zap, Star, CircleCheck, 
   Wand2, ArrowRight, Shield, Brain, Code, Palette,
   ChevronRight, Loader2, Database, Headphones, PenTool,
-  Lightbulb, BarChart2, HeartPulse, Hash
+  Lightbulb, BarChart2, HeartPulse, Hash, Settings,
+  Trophy, Eye, Workflow
 } from 'lucide-react'
 import { expeditionAPI } from '@/lib/expeditionApi'
 import type { CreateExpeditionRequest } from '@starships/protocol'
@@ -38,6 +39,8 @@ interface FormData {
   name: string
   mission: string
   selectedAgents: string[]
+  workflowType: 'traditional' | 'fourPhase'
+  visionContext?: string
 }
 
 interface ValidationErrors {
@@ -85,6 +88,8 @@ export function CreateExpeditionModal({
     name: '',
     mission: '',
     selectedAgents: [],
+    workflowType: 'traditional',
+    visionContext: '',
   })
 
   // Validation
@@ -154,15 +159,40 @@ export function CreateExpeditionModal({
     setSubmitError(null)
 
     try {
-      const expeditionRequest: CreateExpeditionRequest = {
-        starshipId,
-        name: formData.name.trim(),
-        mission: formData.mission.trim(),
-        selectedAgents: formData.selectedAgents,
-      }
+      // Handle different workflow types
+      if (formData.workflowType === 'fourPhase') {
+        // Create 4-phase expedition using new API endpoint
+        const response = await fetch(`/api/starships/${starshipId}/expeditions/start-4phase`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalMission: formData.mission.trim(),
+            selectedAgents: formData.selectedAgents,
+            visionContext: formData.visionContext?.trim(),
+            expeditionName: formData.name.trim()
+          })
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Failed to create 4-phase expedition')
+        }
+        
+        const data = await response.json()
+        onExpeditionCreated(data.expeditionId)
+      } else {
+        // Traditional expedition creation
+        const expeditionRequest: CreateExpeditionRequest = {
+          starshipId,
+          name: formData.name.trim(),
+          mission: formData.mission.trim(),
+          selectedAgents: formData.selectedAgents,
+        }
 
-      const response = await expeditionAPI.createExpedition(expeditionRequest)
-      onExpeditionCreated(response.expedition.id)
+        const response = await expeditionAPI.createExpedition(expeditionRequest)
+        onExpeditionCreated(response.expedition.id)
+      }
+      
       onClose()
     } catch (error: any) {
       console.error('Failed to create expedition:', error)
@@ -178,7 +208,7 @@ export function CreateExpeditionModal({
       loadAvailableAgents()
     } else {
       // Reset form when modal closes
-      setFormData({ name: '', mission: '', selectedAgents: [] })
+      setFormData({ name: '', mission: '', selectedAgents: [], workflowType: 'traditional', visionContext: '' })
       setValidationErrors({})
       setSubmitError(null)
       setSearchQuery('')
@@ -369,6 +399,162 @@ export function CreateExpeditionModal({
                       )}
                     </div>
                   </div>
+                </motion.div>
+
+                {/* Workflow Type Selection */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="bg-card/50 backdrop-blur-sm rounded-lg p-6 border border-border/50"
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <Workflow className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-medium text-foreground">Workflow Type</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Traditional Workflow */}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        formData.workflowType === 'traditional'
+                          ? 'border-primary bg-primary/5 shadow-md'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setFormData(prev => ({ ...prev, workflowType: 'traditional' }))}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                          <Settings className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm mb-1">Traditional Workflow</h4>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Classic expedition with immediate agent coordination and execution
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">Immediate Start</Badge>
+                            <Badge variant="secondary" className="text-xs">Auto-execution</Badge>
+                          </div>
+                        </div>
+                        {formData.workflowType === 'traditional' && (
+                          <CheckCircle className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
+                    </motion.div>
+
+                    {/* Four-Phase Workflow */}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        formData.workflowType === 'fourPhase'
+                          ? 'border-primary bg-primary/5 shadow-md'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => setFormData(prev => ({ ...prev, workflowType: 'fourPhase' }))}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
+                          <Brain className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-sm mb-1 flex items-center gap-1">
+                            4-Phase Workflow
+                            <Badge variant="outline" className="text-xs bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0">
+                              NEW
+                            </Badge>
+                          </h4>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Guided workflow with user control: Refine → Plan → Execute → Result
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="secondary" className="text-xs">User Control</Badge>
+                            <Badge variant="secondary" className="text-xs">Step-by-step</Badge>
+                          </div>
+                        </div>
+                        {formData.workflowType === 'fourPhase' && (
+                          <CheckCircle className="w-5 h-5 text-primary" />
+                        )}
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Four-Phase Workflow Description */}
+                  <AnimatePresence>
+                    {formData.workflowType === 'fourPhase' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mt-4 p-4 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200/50"
+                      >
+                        <div className="flex items-start gap-3 mb-3">
+                          <Sparkles className="w-4 h-4 text-purple-600 mt-0.5" />
+                          <div>
+                            <h5 className="font-medium text-sm text-purple-800">4-Phase Guided Workflow</h5>
+                            <p className="text-xs text-purple-700 mt-1">
+                              Take full control over your expedition with our new structured approach
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-4 gap-3 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                              <Brain className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-medium">Refine</span>
+                            <span className="text-xs text-muted-foreground">Clarify mission</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
+                              <Target className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-medium">Plan</span>
+                            <span className="text-xs text-muted-foreground">Review & approve</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                              <Zap className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-medium">Execute</span>
+                            <span className="text-xs text-muted-foreground">Monitor progress</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center">
+                              <Trophy className="w-4 h-4" />
+                            </div>
+                            <span className="text-xs font-medium">Result</span>
+                            <span className="text-xs text-muted-foreground">Review output</span>
+                          </div>
+                        </div>
+
+                        {/* Vision Context for 4-Phase */}
+                        <div className="mt-4 space-y-2">
+                          <Label htmlFor="visionContext" className="text-xs font-medium text-purple-800">
+                            Vision & Context <span className="text-muted-foreground">(Optional)</span>
+                          </Label>
+                          <Textarea
+                            id="visionContext"
+                            value={formData.visionContext}
+                            onChange={(e) => setFormData(prev => ({ ...prev, visionContext: e.target.value }))}
+                            placeholder="Provide additional context or vision for this 4-phase expedition..."
+                            rows={2}
+                            className="resize-none text-sm bg-white/50 border-purple-200 focus:border-purple-400"
+                            maxLength={200}
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Help the AI understand your broader goals and constraints</span>
+                            <span>{formData.visionContext?.length || 0}/200</span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
 
                 {/* Agent Selection Section */}
@@ -702,10 +888,10 @@ export function CreateExpeditionModal({
                     {isSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Launching...
+                        {formData.workflowType === 'fourPhase' ? 'Starting 4-Phase...' : 'Launching...'}
                       </>
                     ) : (
-                      'Launch Expedition'
+                      formData.workflowType === 'fourPhase' ? 'Start 4-Phase Expedition' : 'Launch Expedition'
                     )}
                   </Button>
                 </div>

@@ -43,6 +43,7 @@ export {
 export { AgentNodeHandler } from './AgentNodeHandler';
 export { ConditionalNodeHandler } from './ConditionalNodeHandler';
 export { UserPromptNodeHandler } from './UserPromptNodeHandler';
+export { StartNodeHandler, EndNodeHandler, OutputNodeHandler } from './BasicNodeHandlers';
 export { 
   WorkflowExecutionService,
   type WorkflowExecutionEvent,

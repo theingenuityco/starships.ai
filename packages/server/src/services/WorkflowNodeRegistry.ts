@@ -82,7 +82,7 @@ export class WorkflowNodeRegistry {
     }
     
     // If no exact match, try all handlers
-    for (const [, handler] of this.handlers) {
+    for (const handler of Array.from(this.handlers.values())) {
       if (handler.canHandle(node)) {
         return handler;
       }
@@ -170,15 +170,21 @@ export class WorkflowNodeRegistry {
       const { AgentNodeHandler } = require('./AgentNodeHandler');
       const { ConditionalNodeHandler } = require('./ConditionalNodeHandler');
       const { UserPromptNodeHandler } = require('./UserPromptNodeHandler');
+      const { StartNodeHandler, EndNodeHandler, OutputNodeHandler } = require('./BasicNodeHandlers');
       
       this.register(new AgentNodeHandler());
       this.register(new ConditionalNodeHandler());
       this.register(new UserPromptNodeHandler());
+      this.register(new StartNodeHandler());
+      this.register(new EndNodeHandler());
+      this.register(new OutputNodeHandler());
       
       console.log('WorkflowNodeRegistry initialized with built-in handlers');
     } catch (error) {
-      console.warn('Some built-in handlers failed to load:', error);
-      console.log('WorkflowNodeRegistry initialized (partial)');
+      console.error('Some built-in handlers failed to load:', error);
+      console.error('WorkflowNodeRegistry initialized (partial)');
+      // Re-throw so tests can see the error
+      throw error;
     }
   }
 

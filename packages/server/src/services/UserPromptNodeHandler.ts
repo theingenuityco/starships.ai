@@ -412,7 +412,7 @@ export class UserPromptNodeHandler extends BaseWorkflowNodeHandler {
           });
         } else if (choiceIds.has(choice.id)) {
           errors.push({
-            code: 'DUPLICATE_CHOICE_ID',
+            code: 'INVALID_PARAMETERS',
             message: `Duplicate choice ID: ${choice.id}`,
             nodeId: node.id,
             severity: 'error'

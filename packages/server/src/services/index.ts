@@ -33,6 +33,22 @@ export { ResultService } from './ResultService';
 export { WorkflowGenerationService } from './WorkflowGenerationService';
 export { WorkflowEventService } from './WorkflowEventService';
 
+// Workflow execution engine
+export { 
+  WorkflowNodeRegistry, 
+  workflowNodeRegistry,
+  BaseWorkflowNodeHandler,
+  type WorkflowNodeHandler
+} from './WorkflowNodeRegistry';
+export { AgentNodeHandler } from './AgentNodeHandler';
+export { ConditionalNodeHandler } from './ConditionalNodeHandler';
+export { UserPromptNodeHandler } from './UserPromptNodeHandler';
+export { 
+  WorkflowExecutionService,
+  type WorkflowExecutionEvent,
+  type WorkflowExecutionEventCallback
+} from './WorkflowExecutionService';
+
 // Service factory for centralized service management
 export class ServiceFactory {
   private static taskService: TaskService;

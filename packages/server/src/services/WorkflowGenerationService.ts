@@ -371,7 +371,7 @@ export class WorkflowGenerationService {
   /**
    * Generate ASCII visualization of workflow
    */
-  private generateVisualization(workflow: WorkflowDSL): string {
+  public generateVisualization(workflow: WorkflowDSL): string {
     const lines: string[] = [];
     lines.push('Workflow Visualization:');
     lines.push('=====================');

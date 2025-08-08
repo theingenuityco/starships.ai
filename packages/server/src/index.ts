@@ -37,6 +37,7 @@ import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import expeditionRoutes from './routes/expeditions';
 import agentCommunicationRoutes from './routes/agent-communication';
+import workflowRoutes from './routes/workflows';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
@@ -183,6 +184,7 @@ app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
+app.use('/api/expeditions', workflowRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

@@ -30,6 +30,8 @@ export { VisionRefinementSessionManager } from './VisionRefinementSessionManager
 export { TaskService } from './TaskService';
 export { MessageService } from './MessageService';
 export { ResultService } from './ResultService';
+export { WorkflowGenerationService } from './WorkflowGenerationService';
+export { WorkflowEventService } from './WorkflowEventService';
 
 // Service factory for centralized service management
 export class ServiceFactory {

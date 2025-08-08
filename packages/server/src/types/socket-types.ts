@@ -52,6 +52,18 @@ export interface ExtendedSocketEvents {
   // Agent events
   'agent:assigned': (data: any) => void;
   'expedition:agent-activity': (data: any) => void;
+
+  // Workflow events
+  'expedition:workflow-dsl-generated': (data: any) => void;
+  'expedition:workflow-dsl-approved': (data: any) => void;
+  'expedition:workflow-dsl-rejected': (data: any) => void;
+  'expedition:workflow-dsl-modified': (data: any) => void;
+  'expedition:workflow-execution-started': (data: any) => void;
+  'expedition:workflow-node-executing': (data: any) => void;
+  'expedition:workflow-node-completed': (data: any) => void;
+  'expedition:workflow-conditional-evaluated': (data: any) => void;
+  'expedition:workflow-user-prompt-required': (data: any) => void;
+  'expedition:workflow-user-prompt-responded': (data: any) => void;
 }
 
 // Type helper to cast events properly

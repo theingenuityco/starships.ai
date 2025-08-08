@@ -33,6 +33,12 @@ export { ResultService } from './ResultService';
 export { WorkflowGenerationService } from './WorkflowGenerationService';
 export { WorkflowEventService } from './WorkflowEventService';
 
+// Extracted expedition services (Phase 1 decomposition)
+export { ExpeditionLifecycleService } from './ExpeditionLifecycleService';
+export { TaskOrchestrationService } from './TaskOrchestrationService';
+export { AgentCoordinationService } from './AgentCoordinationService';
+export { ExpeditionValidationService } from './ExpeditionValidationService';
+
 // Workflow execution engine
 export { 
   WorkflowNodeRegistry, 
@@ -57,6 +63,12 @@ export class ServiceFactory {
   private static resultService: ResultService;
   private static expeditionService: ExpeditionService;
   private static firstOfficerService: FirstOfficerService;
+  
+  // Extracted expedition services
+  private static expeditionLifecycleService: any;
+  private static taskOrchestrationService: any;
+  private static agentCoordinationService: any;
+  private static expeditionValidationService: any;
 
   /**
    * Get TaskService singleton instance
@@ -117,13 +129,20 @@ export class ServiceFactory {
     
     // Initialize services in dependency order:
     // 1. Core services first (no dependencies)
-    // 2. Services that depend on core services
-    // 3. Orchestration services last (depend on all others)
+    // 2. Extracted expedition services (domain-specific)
+    // 3. Services that depend on core services
+    // 4. Orchestration services last (depend on all others)
     
     // Core services (no socket dependencies initially)
     this.getTaskService();
     this.getMessageService();
     this.getResultService();
+    
+    // Initialize extracted expedition services
+    this.getExpeditionLifecycleService();
+    this.getTaskOrchestrationService();
+    this.getAgentCoordinationService();
+    this.getExpeditionValidationService();
     
     // Business logic services (may use socket service)
     this.getExpeditionService();
@@ -132,6 +151,39 @@ export class ServiceFactory {
     this.getFirstOfficerService();
     
     console.log('[SERVICE-FACTORY] All specialized services initialized in correct dependency order');
+  }
+
+  // Getters for extracted expedition services
+  static getExpeditionLifecycleService() {
+    if (!this.expeditionLifecycleService) {
+      const { ExpeditionLifecycleService } = require('./ExpeditionLifecycleService');
+      this.expeditionLifecycleService = ExpeditionLifecycleService.getInstance();
+    }
+    return this.expeditionLifecycleService;
+  }
+
+  static getTaskOrchestrationService() {
+    if (!this.taskOrchestrationService) {
+      const { TaskOrchestrationService } = require('./TaskOrchestrationService');
+      this.taskOrchestrationService = TaskOrchestrationService.getInstance();
+    }
+    return this.taskOrchestrationService;
+  }
+
+  static getAgentCoordinationService() {
+    if (!this.agentCoordinationService) {
+      const { AgentCoordinationService } = require('./AgentCoordinationService');
+      this.agentCoordinationService = AgentCoordinationService.getInstance();
+    }
+    return this.agentCoordinationService;
+  }
+
+  static getExpeditionValidationService() {
+    if (!this.expeditionValidationService) {
+      const { ExpeditionValidationService } = require('./ExpeditionValidationService');
+      this.expeditionValidationService = ExpeditionValidationService.getInstance();
+    }
+    return this.expeditionValidationService;
   }
 
   /**
@@ -143,6 +195,10 @@ export class ServiceFactory {
     resultService: boolean;
     expeditionService: boolean;
     firstOfficerService: boolean;
+    expeditionLifecycleService: boolean;
+    taskOrchestrationService: boolean;
+    agentCoordinationService: boolean;
+    expeditionValidationService: boolean;
     socketIntegration: boolean;
   }> {
     // Check if SocketIOService is available for integration
@@ -161,6 +217,10 @@ export class ServiceFactory {
       resultService: !!this.resultService,
       expeditionService: !!this.expeditionService,
       firstOfficerService: !!this.firstOfficerService,
+      expeditionLifecycleService: !!this.expeditionLifecycleService,
+      taskOrchestrationService: !!this.taskOrchestrationService,
+      agentCoordinationService: !!this.agentCoordinationService,
+      expeditionValidationService: !!this.expeditionValidationService,
       socketIntegration
     };
   }

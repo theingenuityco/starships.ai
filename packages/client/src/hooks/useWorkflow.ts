@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { workflowAPI } from '@/lib/workflowApi'
+import { useEffect } from 'react'
+import { useExpeditionWorkflow, useWorkflowStore } from '@/store/workflow-store'
 import type { WorkflowDSL } from '@starships/protocol'
 
 export interface UseWorkflowOptions {
@@ -31,145 +31,27 @@ export interface UseWorkflowReturn {
 
 /**
  * Custom hook for managing workflow data and operations
+ * Now uses the centralized workflow store for state management
  */
 export function useWorkflow({
   expeditionId,
   enabled = true,
   pollInterval = 30000
 }: UseWorkflowOptions): UseWorkflowReturn {
-  const [workflow, setWorkflow] = useState<WorkflowDSL | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  const [executionStatus, setExecutionStatus] = useState<{
-    workflowId: string
-    expeditionId: string
-    currentStatus: string
-    currentNodeId: string | null
-    startTime: string | null
-    endTime: string | null
-    totalNodes: number
-    completedNodes: number
-  } | null>(null)
-  const [pendingPrompts, setPendingPrompts] = useState<any[]>([])
-
-  /**
-   * Fetch workflow data
-   */
-  const fetchWorkflow = useCallback(async () => {
-    if (!expeditionId || !enabled) return
-
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const workflowData = await workflowAPI.getWorkflow(expeditionId)
-      setWorkflow(workflowData)
-    } catch (err) {
-      console.error('Failed to fetch workflow:', err)
-      setError(err as Error)
-      setWorkflow(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [expeditionId, enabled])
-
-  /**
-   * Fetch execution status
-   */
-  const fetchExecutionStatus = useCallback(async () => {
-    if (!expeditionId || !enabled) return
-
-    try {
-      const status = await workflowAPI.getWorkflowExecutionStatus(expeditionId)
-      setExecutionStatus(status)
-    } catch (err) {
-      console.error('Failed to fetch execution status:', err)
-      setExecutionStatus(null)
-    }
-  }, [expeditionId, enabled])
-
-  /**
-   * Fetch pending prompts
-   */
-  const fetchPendingPrompts = useCallback(async () => {
-    if (!expeditionId || !enabled) return
-
-    try {
-      const prompts = await workflowAPI.getPendingUserPrompts(expeditionId)
-      setPendingPrompts(prompts)
-    } catch (err) {
-      console.error('Failed to fetch pending prompts:', err)
-      setPendingPrompts([])
-    }
-  }, [expeditionId, enabled])
-
-  /**
-   * Approve workflow
-   */
-  const approveWorkflow = useCallback(async (userId: string) => {
-    if (!expeditionId) throw new Error('No expedition ID provided')
-
-    try {
-      setLoading(true)
-      await workflowAPI.approveWorkflow(expeditionId, userId)
-      
-      // Refresh workflow data to get updated status
-      await fetchWorkflow()
-      await fetchExecutionStatus()
-    } catch (err) {
-      console.error('Failed to approve workflow:', err)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [expeditionId, fetchWorkflow, fetchExecutionStatus])
-
-  /**
-   * Reject workflow
-   */
-  const rejectWorkflow = useCallback(async (userId: string, reason?: string) => {
-    if (!expeditionId) throw new Error('No expedition ID provided')
-
-    try {
-      setLoading(true)
-      await workflowAPI.rejectWorkflow(expeditionId, userId, reason)
-      
-      // Refresh workflow data to get updated status
-      await fetchWorkflow()
-    } catch (err) {
-      console.error('Failed to reject workflow:', err)
-      throw err
-    } finally {
-      setLoading(false)
-    }
-  }, [expeditionId, fetchWorkflow])
-
-  /**
-   * Refresh workflow data
-   */
-  const refreshWorkflow = useCallback(async () => {
-    await Promise.all([
-      fetchWorkflow(),
-      fetchExecutionStatus(),
-      fetchPendingPrompts()
-    ])
-  }, [fetchWorkflow, fetchExecutionStatus, fetchPendingPrompts])
-
-  /**
-   * Refresh execution status only
-   */
-  const refreshExecutionStatus = useCallback(async () => {
-    await fetchExecutionStatus()
-  }, [fetchExecutionStatus])
+  // Use expedition-specific hook from store
+  const expeditionData = useExpeditionWorkflow(expeditionId)
+  
+  // Get additional store actions
+  const { fetchExecutionStatus, fetchPendingPrompts } = useWorkflowStore()
 
   /**
    * Initial data fetch
    */
   useEffect(() => {
     if (enabled && expeditionId) {
-      refreshWorkflow()
+      expeditionData.refresh()
     }
-  }, [enabled, expeditionId, refreshWorkflow])
+  }, [enabled, expeditionId, expeditionData])
 
   /**
    * Polling for execution status updates
@@ -178,22 +60,29 @@ export function useWorkflow({
     if (!enabled || !expeditionId || !pollInterval) return
 
     const interval = setInterval(() => {
-      fetchExecutionStatus()
-      fetchPendingPrompts()
+      fetchExecutionStatus(expeditionId)
+      fetchPendingPrompts(expeditionId)
     }, pollInterval)
 
     return () => clearInterval(interval)
   }, [enabled, expeditionId, pollInterval, fetchExecutionStatus, fetchPendingPrompts])
 
+  /**
+   * Legacy refreshExecutionStatus function for backward compatibility
+   */
+  const refreshExecutionStatus = async () => {
+    await fetchExecutionStatus(expeditionId)
+  }
+
   return {
-    workflow,
-    loading,
-    error,
-    executionStatus,
-    pendingPrompts,
-    approveWorkflow,
-    rejectWorkflow,
-    refreshWorkflow,
+    workflow: expeditionData.workflow,
+    loading: expeditionData.loading || expeditionData.approvalLoading,
+    error: expeditionData.error ? new Error(expeditionData.error) : null,
+    executionStatus: expeditionData.executionStatus,
+    pendingPrompts: expeditionData.pendingPrompts,
+    approveWorkflow: expeditionData.approve,
+    rejectWorkflow: expeditionData.reject,
+    refreshWorkflow: expeditionData.refresh,
     refreshExecutionStatus
   }
 }

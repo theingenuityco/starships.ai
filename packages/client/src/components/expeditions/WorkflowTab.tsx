@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { WorkflowVisualization, WorkflowApprovalModal } from '@/components/workflow'
 import { useWorkflow } from '@/hooks/useWorkflow'
+import { useWorkflowWebSocket } from '@/services/workflow-websocket'
 import type { WorkflowDSL } from '@starships/protocol'
 
 interface WorkflowTabProps {
@@ -249,8 +250,42 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
   } = useWorkflow({ 
     expeditionId,
     enabled: true,
-    pollInterval: 15000 // Poll every 15 seconds
+    pollInterval: 30000 // Increased interval since WebSocket handles real-time updates
   })
+
+  // Initialize WebSocket connection for real-time workflow updates
+  const { subscribe, isConnected: wsConnected } = useWorkflowWebSocket(expeditionId, userId)
+
+  // Subscribe to real-time workflow events
+  React.useEffect(() => {
+    // Subscribe to workflow updates
+    const unsubscribeWorkflowUpdate = subscribe('workflow-updated', () => {
+      console.log('Real-time workflow update received')
+      // Data is already updated in store via WebSocket service
+    })
+
+    const unsubscribeExecutionUpdate = subscribe('workflow-execution-status-updated', () => {
+      console.log('Real-time execution status update received')
+      // Data is already updated in store via WebSocket service
+    })
+
+    const unsubscribeUserPrompt = subscribe('workflow-user-prompt', () => {
+      console.log('Real-time user prompt received')
+      // Data is already updated in store via WebSocket service
+    })
+
+    const unsubscribeNotification = subscribe('workflow-notification', (event: any) => {
+      console.log('Real-time workflow notification received:', event)
+      // Could show toast notifications here
+    })
+
+    return () => {
+      unsubscribeWorkflowUpdate()
+      unsubscribeExecutionUpdate()
+      unsubscribeUserPrompt()
+      unsubscribeNotification()
+    }
+  }, [subscribe])
 
   const handleApprove = () => {
     if (workflow) {
@@ -363,6 +398,13 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <WorkflowStatus workflow={workflow} executionStatus={executionStatus} />
+              {/* WebSocket connection indicator */}
+              <div className="flex items-center gap-1 text-xs">
+                <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-gray-500">
+                  {wsConnected ? 'Live' : 'Offline'}
+                </span>
+              </div>
               <WorkflowActions
                 workflow={workflow}
                 loading={loading}

@@ -5,9 +5,13 @@ import { useEffect, useState, useRef, memo, useCallback, lazy, Suspense } from '
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { LoginButton } from '@/components/auth/LoginButton';
+import { DynamicLoginButton } from '@/components/auth/DynamicLoginButton';
 import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
+import { LandingSibilWidgetStaticChat } from '@/components/onboarding/LandingSibilWidgetStaticChat';
+import { useOnboardingSession } from '@/hooks/useOnboardingSession';
+import { ReturnFlowBanner } from '@/components/onboarding/ReturnFlow';
+import { useStarshipStore } from '@/store/starship-store';
 const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import { 
   Sparkles, 
@@ -105,63 +109,35 @@ StarshipClass.displayName = 'StarshipClass';
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [currentTextIndex, setCurrentTextIndex] = useState(0);
-  const [displayedText, setDisplayedText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [hasVision, setHasVision] = useState(false);
+  const [hasExistingStarships, setHasExistingStarships] = useState(false);
   const { isAuthenticated, isLoading } = useAuth();
   const { scrollYProgress } = useScroll();
+  const { session } = useOnboardingSession();
+  const { starships, loadUserStarships } = useStarshipStore();
 
-  const dynamicTexts = [
-    "your vision into reality",
-    "the next big SaaS",
-    "your strategic consultancy",
-    "an AI-powered platform",
-    "your creative digital agency",
-    "the future of work",
-    "your research studio",
-    "your own intelligent vessel",
-  ];
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const typewriterEffect = useCallback(() => {
-    const currentText = dynamicTexts[currentTextIndex];
-    
-    if (isDeleting) {
-      if (displayedText.length > 0) {
-        timeoutRef.current = setTimeout(() => {
-          setDisplayedText(prev => prev.slice(0, -1));
-        }, 50);
-      } else {
-        setIsDeleting(false);
-        setCurrentTextIndex((prev) => (prev + 1) % dynamicTexts.length);
-      }
-    } else {
-      if (displayedText.length < currentText.length) {
-        timeoutRef.current = setTimeout(() => {
-          setDisplayedText(currentText.slice(0, displayedText.length + 1));
-        }, 100);
-      } else {
-        timeoutRef.current = setTimeout(() => {
-          setIsDeleting(true);
-        }, 2000);
-      }
-    }
-  }, [displayedText, isDeleting, currentTextIndex, dynamicTexts]);
-
   useEffect(() => {
-    typewriterEffect();
-    
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
-  }, [typewriterEffect]);
+    // Check for existing starships for authenticated users
+    if (isAuthenticated && !isLoading) {
+      loadUserStarships().then(() => {
+        if (starships && starships.length > 0) {
+          setHasExistingStarships(true);
+        }
+      });
+    }
+  }, [isAuthenticated, isLoading, loadUserStarships]);
+
+  // Check if user has a vision in session
+  useEffect(() => {
+    if (session?.pendingVision) {
+      setHasVision(true);
+    }
+  }, [session]);
 
   if (!mounted || isLoading) return null;
 
@@ -170,7 +146,12 @@ export default function HomePage() {
     // Don't reset launching state - let it continue until page unloads
     setTimeout(() => {
       if (isAuthenticated) {
-        window.location.href = '/fleet';
+        // If user has no starships and has a vision, go through onboarding flow
+        if (!hasExistingStarships && hasVision) {
+          window.location.href = '/fleet?onboarding=true';
+        } else {
+          window.location.href = '/fleet';
+        }
       } else {
         // Trigger login
         const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement;
@@ -181,6 +162,12 @@ export default function HomePage() {
     }, 1000);
   };
 
+  const handleVisionSubmit = (vision: string, analysis: any) => {
+    setHasVision(true);
+    // The vision is already saved in session by the widget
+    // Just update our local state to transform the button
+  };
+
   return (
     <StarTheme theme="dark">
       <div className="min-h-screen bg-background relative overflow-hidden">
@@ -188,9 +175,54 @@ export default function HomePage() {
         <StarfieldBackground launching={launching} density={600} speed={1.5} />
       </Suspense>
       
+      {/* Top Navigation Bar */}
+      <div className="absolute top-0 left-0 right-0 z-50 p-6">
+        <div className="flex justify-between items-center">
+          {/* Logo/Brand (empty div for spacing) */}
+          <div></div>
+          
+          {/* Right side buttons */}
+          <div className="flex gap-4">
+            {isAuthenticated ? (
+              <Button 
+                size="lg" 
+                onClick={handleLaunch}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full"
+              >
+                {hasExistingStarships ? 'Enter Command Deck' : 'Create Your First Starship'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            ) : (
+              <DynamicLoginButton 
+                size="default" 
+                data-login-button
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full"
+                preserveOnboarding={true}
+                showIcon={false}
+              >
+                Login
+              </DynamicLoginButton>
+            )}
+            <Button 
+              variant="outline" 
+              size="default" 
+              className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
+            >
+              <Book className="w-4 h-4 mr-2" />
+              View Documentation
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Return Flow Banner for users with abandoned sessions */}
+      {!isAuthenticated && (
+        <ReturnFlowBanner />
+      )}
+      
       {/* Hero Section */}
       <motion.section 
-        className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pb-20"
+        className="relative min-h-screen flex flex-col items-center justify-center px-4 pb-20"
       >
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/20 to-black/60 pointer-events-none" />
         
@@ -203,26 +235,27 @@ export default function HomePage() {
             ease: [0.25, 0.1, 0.25, 1]
           }}
           viewport={{ once: false, margin: "-10%" }}
-          className="relative z-10 max-w-4xl mx-auto"
+          className="relative z-10 w-full px-8"
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
-            className="mb-6 relative"
-          >
-            <motion.svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="128"
-              height="128"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="url(#gradient)"
-              strokeWidth="1"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mx-auto"
+          <div className="flex items-center justify-center gap-8">
+            {/* Rocket Logo on the left */}
+            <motion.div
+              initial={{ scale: 0, x: -50 }}
+              animate={{ scale: 1, x: 0 }}
+              transition={{ delay: 0.5, duration: 0.8, type: "spring", stiffness: 80 }}
+              className="relative flex-shrink-0"
             >
+              <motion.svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="120"
+                height="120"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="url(#gradient)"
+                strokeWidth="1"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
               <defs>
                 <motion.linearGradient
                   id="gradient"
@@ -321,105 +354,46 @@ export default function HomePage() {
                 animate={{ pathLength: 1 }}
                 transition={{ duration: 0.2, delay: 1.2 }}
               />
-            </motion.svg>
-          </motion.div>
-          
-          <motion.h1 
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 1, type: "spring" }}
-            className="text-5xl md:text-7xl font-bold mb-6"
-          >
-            <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
-              Starships.ai
-            </span>
-          </motion.h1>
-          
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1, duration: 1 }}
-            className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed"
-          >
-            Build and pilot{" "}
-            <span className="text-primary font-semibold">
-              {displayedText}
-              <motion.span
-                animate={{ opacity: [0, 1, 0] }}
-                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                className="text-primary ml-1"
-              >
-                |
-              </motion.span>
-            </span>
-          </motion.p>
-          
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2, duration: 0.8 }}
-            className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-          >
-            {isAuthenticated ? (
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  size="lg" 
-                  onClick={handleLaunch}
-                  className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
-                >
-                  <span className="relative z-10">Enter Command Deck</span>
-                  <ArrowRight className="w-5 h-5 ml-2 relative z-10 group-hover:translate-x-1 transition-transform" />
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                    initial={{ x: '-100%' }}
-                    whileHover={{ x: '100%' }}
-                    transition={{ duration: 0.6 }}
-                  />
-                </Button>
-              </motion.div>
-            ) : (
-              <div className="relative">
-                <motion.div
-                  className="absolute inset-0 rounded-full"
-                  animate={{
-                    boxShadow: [
-                      "0 0 30px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.2)",
-                      "0 0 35px hsl(var(--primary) / 0.5), 0 0 70px hsl(var(--primary) / 0.3)",
-                      "0 0 30px hsl(var(--primary) / 0.3), 0 0 60px hsl(var(--primary) / 0.2)"
-                    ]
-                  }}
-                  transition={{
-                    duration: 3, 
-                    repeat: Infinity, 
-                    ease: "easeInOut"
-                  }}
-                />
-                <motion.div 
-                  whileHover={{ scale: 1.05 }} 
-                  whileTap={{ scale: 0.95 }}
-                  className="relative rounded-full"
-                >
-                  <LoginButton 
-                    size="lg" 
-                    data-login-button
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg rounded-full transition-colors"
-                  >
-                    Launch Your Starship
-                  </LoginButton>
-                </motion.div>
-              </div>
-            )}
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="px-8 py-4 text-lg rounded-full backdrop-blur-sm"
-              >
-                <Book className="w-5 h-5 mr-2" />
-                View Documentation
-              </Button>
+              </motion.svg>
             </motion.div>
-          </motion.div>
+            
+            {/* Title and Tagline on the right */}
+            <div className="flex flex-col items-center">
+              <motion.h1 
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.8, duration: 1, type: "spring" }}
+                className="text-5xl md:text-7xl font-bold mb-3"
+              >
+                <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
+                  Starships.ai
+                </span>
+              </motion.h1>
+              
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.1, duration: 0.8 }}
+                className="flex items-center gap-3 text-sm text-muted-foreground/60"
+              >
+                <div className="h-px w-12 bg-gradient-to-r from-transparent to-muted-foreground/30" />
+                <span>Where vision meets intelligence</span>
+                <div className="h-px w-12 bg-gradient-to-l from-transparent to-muted-foreground/30" />
+              </motion.div>
+            </div>
+          </div>
+          
+          {/* Sibil AI Widget for non-authenticated users */}
+          {!isAuthenticated && !hasExistingStarships && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2, duration: 0.8 }}
+              className="w-full mb-8 mt-12"
+            >
+              <LandingSibilWidgetStaticChat onVisionSubmit={handleVisionSubmit} />
+            </motion.div>
+          )}
           
         </motion.div>
         

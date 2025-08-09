@@ -90,8 +90,9 @@ export class MissionOrchestratorService {
       // Get or create orchestrator
       const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
 
-      // Check if this is the first initialization (no conversation history)
-      const hasHistory = orchestrator.getConversationHistory(missionId).length > 0;
+      // Check if this is the first initialization (no conversation history in database)
+      const existingMessages = await this.getRecentMessages(missionId, 1);
+      const hasHistory = existingMessages.length > 0;
 
       if (!hasHistory) {
         // Generate welcome message for first-time initialization
@@ -254,6 +255,80 @@ export class MissionOrchestratorService {
   }
 
   /**
+   * Get message history for a mission with pagination
+   */
+  async getMessageHistory(missionId: string, page?: number, pageSize?: number): Promise<{
+    messages: MissionMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    const context = {
+      service: 'MissionOrchestratorService',
+      operation: 'getMessageHistory',
+      resource: 'mission',
+      resourceId: missionId,
+      metadata: { page, pageSize }
+    };
+
+    this.logger.info('Retrieving message history', context);
+
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      
+      // Check if mission exists first
+      await missionRepo.getMissionById(missionId);
+
+      const result = await missionRepo.getMessagesByMissionWithPagination(
+        missionId, 
+        page || 1, 
+        pageSize || 50
+      );
+
+      this.logger.info('Retrieved message history successfully', {
+        ...context,
+        metadata: {
+          ...context.metadata,
+          messageCount: result.messages.length,
+          totalMessages: result.total
+        }
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to retrieve message history', context, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get recent messages for a mission (for context)
+   */
+  async getRecentMessages(missionId: string, limit: number = 10): Promise<MissionMessage[]> {
+    const context = {
+      service: 'MissionOrchestratorService',
+      operation: 'getRecentMessages',
+      resource: 'mission',
+      resourceId: missionId,
+      metadata: { limit }
+    };
+
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      
+      // Get messages with limit, ordered by timestamp DESC for recent messages
+      const messages = await missionRepo.getMessagesByMission(missionId, limit);
+      
+      // Reverse to get chronological order for context
+      return messages.reverse();
+    } catch (error) {
+      this.logger.error('Failed to retrieve recent messages', context, error as Error);
+      throw error;
+    }
+  }
+
+  /**
    * Get or create orchestrator agent instance (lazy creation)
    */
   private async getOrCreateOrchestratorAgent(missionId: string): Promise<MissionOrchestratorAgent> {
@@ -301,67 +376,86 @@ export class MissionOrchestratorService {
    * Save user message to database
    */
   private async saveUserMessage(missionId: string, userId: string, content: string): Promise<MissionMessage> {
-    // TODO: Implement when MissionRepository is extended with message methods in Phase 4
-    // For now, return a mock message structure
-    
-    const message: MissionMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      missionId,
-      role: 'user',
-      content,
-      timestamp: new Date().toISOString(),
-      userId,
-      senderName: 'User' // TODO: Get actual user name from UserRepository
-    };
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      
+      // TODO: Get actual user name from UserRepository when available
+      const userName = 'User'; // Placeholder
 
-    // TODO: Replace with actual database call
-    // await missionRepo.saveMessage(message);
+      const messageData = {
+        missionId,
+        role: 'user' as const,
+        content,
+        timestamp: new Date().toISOString(),
+        userId,
+        senderName: userName
+      };
 
-    return message;
+      return await missionRepo.saveMessage(messageData);
+    } catch (error) {
+      this.logger.error('Failed to save user message to database', {
+        service: 'MissionOrchestratorService',
+        operation: 'saveUserMessage',
+        resource: 'mission',
+        resourceId: missionId,
+        metadata: { userId }
+      }, error as Error);
+      throw error;
+    }
   }
 
   /**
    * Save orchestrator message to database
    */
   private async saveOrchestratorMessage(missionId: string, content: string): Promise<MissionMessage> {
-    // TODO: Implement when MissionRepository is extended with message methods in Phase 4
-    // For now, return a mock message structure
-    
-    const message: MissionMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      missionId,
-      role: 'orchestrator',
-      content,
-      timestamp: new Date().toISOString(),
-      senderName: 'Mission Orchestrator'
-    };
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      
+      const messageData = {
+        missionId,
+        role: 'orchestrator' as const,
+        content,
+        timestamp: new Date().toISOString(),
+        senderName: 'Mission Orchestrator'
+      };
 
-    // TODO: Replace with actual database call
-    // await missionRepo.saveMessage(message);
-
-    return message;
+      return await missionRepo.saveMessage(messageData);
+    } catch (error) {
+      this.logger.error('Failed to save orchestrator message to database', {
+        service: 'MissionOrchestratorService',
+        operation: 'saveOrchestratorMessage',
+        resource: 'mission',
+        resourceId: missionId
+      }, error as Error);
+      throw error;
+    }
   }
 
   /**
    * Save system message to database
    */
   private async saveSystemMessage(missionId: string, content: string): Promise<MissionMessage> {
-    // TODO: Implement when MissionRepository is extended with message methods in Phase 4
-    // For now, return a mock message structure
-    
-    const message: MissionMessage = {
-      id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      missionId,
-      role: 'system',
-      content,
-      timestamp: new Date().toISOString(),
-      senderName: 'System'
-    };
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      
+      const messageData = {
+        missionId,
+        role: 'system' as const,
+        content,
+        timestamp: new Date().toISOString(),
+        senderName: 'System'
+      };
 
-    // TODO: Replace with actual database call
-    // await missionRepo.saveMessage(message);
-
-    return message;
+      return await missionRepo.saveMessage(messageData);
+    } catch (error) {
+      this.logger.error('Failed to save system message to database', {
+        service: 'MissionOrchestratorService',
+        operation: 'saveSystemMessage',
+        resource: 'mission',
+        resourceId: missionId
+      }, error as Error);
+      throw error;
+    }
   }
 
   /**

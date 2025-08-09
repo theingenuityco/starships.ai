@@ -10,6 +10,7 @@ import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import type { 
   Mission, 
+  MissionMessage,
   LLMChatPrompt,
   LLMProvider 
 } from '@starships/protocol';
@@ -25,14 +26,6 @@ export interface MissionOrchestratorAgentConfig {
   model?: string;
 }
 
-/**
- * Conversation history entry for in-memory storage
- */
-interface ConversationHistoryEntry {
-  role: 'user' | 'orchestrator' | 'system';
-  content: string;
-  timestamp: string;
-}
 
 /**
  * Mission context for AI response generation
@@ -41,7 +34,7 @@ interface MissionContext {
   mission: Mission;
   agentCount: number;
   starshipName?: string;
-  recentHistory: ConversationHistoryEntry[];
+  recentHistory: MissionMessage[];
 }
 
 /**
@@ -50,8 +43,6 @@ interface MissionContext {
 export class MissionOrchestratorAgent {
   private logger: Logger;
   private llmProvider: LLMProvider | null = null;
-  private conversationHistory: Map<string, ConversationHistoryEntry[]> = new Map();
-  private readonly maxHistoryLength: number = 20; // Keep last 20 messages
   
   private readonly config: Required<MissionOrchestratorAgentConfig> = {
     temperature: 0.7,
@@ -90,26 +81,12 @@ export class MissionOrchestratorAgent {
     this.logger.info('Generating orchestrator response', context);
 
     try {
-      // Build mission context
+      // Build mission context (includes recent history from database)
       const missionContext = await this.buildMissionContext(missionId);
-      
-      // Add user message to conversation history
-      this.addToConversationHistory(missionId, {
-        role: 'user',
-        content: message,
-        timestamp: new Date().toISOString()
-      });
 
       // Generate AI response
       const prompt = this.buildPrompt(message, missionContext);
       const response = await this.callLLM(prompt);
-      
-      // Add orchestrator response to conversation history
-      this.addToConversationHistory(missionId, {
-        role: 'orchestrator',
-        content: response,
-        timestamp: new Date().toISOString()
-      });
 
       this.logger.info('Generated orchestrator response successfully', {
         ...context,
@@ -130,18 +107,30 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Get conversation history for a mission
+   * Get recent conversation history for a mission from database
    */
-  getConversationHistory(missionId: string): ConversationHistoryEntry[] {
-    return this.conversationHistory.get(missionId) || [];
+  async getConversationHistory(missionId: string, limit: number = 10): Promise<MissionMessage[]> {
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      return await missionRepo.getMessagesByMission(missionId, limit);
+    } catch (error) {
+      this.logger.error('Failed to get conversation history', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'getConversationHistory',
+        resource: 'mission',
+        resourceId: missionId
+      }, error as Error);
+      return []; // Return empty array on error
+    }
   }
 
   /**
-   * Clear conversation history for a mission (cleanup)
+   * Clear conversation history for a mission (cleanup) - now a no-op since we use database
    */
   clearConversationHistory(missionId: string): void {
-    this.conversationHistory.delete(missionId);
-    this.logger.info('Cleared conversation history', {
+    // Since we're using database storage, this is now a no-op
+    // Message cleanup would be handled by database migration/cleanup jobs if needed
+    this.logger.info('Conversation history cleanup requested (using database storage)', {
       service: 'MissionOrchestratorAgent',
       operation: 'clearConversationHistory',
       resource: 'mission',
@@ -162,11 +151,12 @@ export class MissionOrchestratorAgent {
 
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
-      const mission = await missionRepo.getMissionById(missionId);
       
-      // Get conversation history
-      const recentHistory = this.getConversationHistory(missionId)
-        .slice(-10); // Last 10 messages for context
+      // Get mission details and recent message history in parallel
+      const [mission, recentHistory] = await Promise.all([
+        missionRepo.getMissionById(missionId),
+        missionRepo.getMessagesByMission(missionId, 10) // Last 10 messages for context
+      ]);
 
       // TODO: Fetch starship name when starship integration is available
       // const starshipRepo = RepositoryFactory.getStarshipRepository();
@@ -232,12 +222,13 @@ COMMUNICATION STYLE:
     ];
 
     // Add recent conversation history for context
-    recentHistory.forEach(entry => {
-      if (entry.role === 'user') {
-        messages.push({ role: 'user', content: entry.content });
-      } else if (entry.role === 'orchestrator') {
-        messages.push({ role: 'assistant', content: entry.content });
+    recentHistory.forEach(message => {
+      if (message.role === 'user') {
+        messages.push({ role: 'user', content: message.content });
+      } else if (message.role === 'orchestrator') {
+        messages.push({ role: 'assistant', content: message.content });
       }
+      // Skip system messages in conversation context
     });
 
     // Add current user message
@@ -303,22 +294,6 @@ COMMUNICATION STYLE:
     }
   }
 
-  /**
-   * Add message to conversation history with length management
-   */
-  private addToConversationHistory(missionId: string, entry: ConversationHistoryEntry): void {
-    if (!this.conversationHistory.has(missionId)) {
-      this.conversationHistory.set(missionId, []);
-    }
-
-    const history = this.conversationHistory.get(missionId)!;
-    history.push(entry);
-
-    // Trim history to max length (keep recent messages)
-    if (history.length > this.maxHistoryLength) {
-      history.splice(0, history.length - this.maxHistoryLength);
-    }
-  }
 
   /**
    * Generate fallback response when LLM fails

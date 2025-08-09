@@ -8,7 +8,9 @@ import {
   UpdateMissionRequest,
   MissionFilters,
   MissionSort,
-  MissionListResponse
+  MissionListResponse,
+  MissionMessage,
+  MissionMessageRole
 } from '@starships/protocol';
 
 export interface MissionRepositoryInterface {
@@ -18,6 +20,18 @@ export interface MissionRepositoryInterface {
   getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse>;
   updateMission(id: string, updates: UpdateMissionRequest): Promise<Mission>;
   deleteMission(id: string): Promise<void>;
+  
+  // Message methods for Mission Orchestrator
+  saveMessage(message: Omit<MissionMessage, 'id'>): Promise<MissionMessage>;
+  getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessage[]>;
+  getMessageCount(missionId: string): Promise<number>;
+  getMessagesByMissionWithPagination(missionId: string, page?: number, pageSize?: number): Promise<{
+    messages: MissionMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }>;
 }
 
 export class MissionRepository extends BaseRepository implements MissionRepositoryInterface {
@@ -338,5 +352,195 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         { id }
       );
     }, 'delete', 'Mission', id);
+  }
+
+  // ============================================================================
+  // MESSAGE METHODS FOR MISSION ORCHESTRATOR
+  // ============================================================================
+
+  async saveMessage(message: Omit<MissionMessage, 'id'>): Promise<MissionMessage> {
+    return this.executeWithErrorHandling(async () => {
+      // Validate required fields
+      this.validateRequired(message, ['missionId', 'role', 'content', 'timestamp'], 'saveMessage');
+
+      // Validate field types
+      this.validateTypes(message, {
+        missionId: 'string',
+        role: 'string',
+        content: 'string',
+        timestamp: 'string'
+      }, 'saveMessage');
+
+      // Validate role
+      const validRoles: MissionMessageRole[] = ['user', 'orchestrator', 'system'];
+      if (!validRoles.includes(message.role as MissionMessageRole)) {
+        this.handleValidationError([{
+          field: 'role',
+          message: `Role must be one of: ${validRoles.join(', ')}`,
+          value: message.role
+        }], 'saveMessage');
+      }
+
+      // Validate string lengths
+      this.validateStringLengths(message, {
+        content: { min: 1, max: 10000 }, // Allow up to 10k characters
+        ...(message.senderName && { senderName: { min: 1, max: 200 } })
+      }, 'saveMessage');
+
+      const connection = getConnection();
+      const id = uuidv4();
+
+      // Check if mission exists
+      const missionCheck = await connection.executeQuery<{ id: string }>(
+        'MATCH (m:Mission {id: $missionId}) RETURN m.id as id',
+        { missionId: message.missionId }
+      );
+
+      if (!missionCheck || missionCheck.length === 0) {
+        this.handleNotFound('Mission', message.missionId, 'saveMessage');
+      }
+
+      // Prepare message data
+      const messageData: MissionMessage = {
+        ...message,
+        id
+      };
+
+      // Create the message node and relationships
+      let query: string;
+      let params: any;
+
+      if (message.role === 'user' && message.userId) {
+        // Create message with user relationship
+        query = `
+          MATCH (m:Mission {id: $missionId})
+          MATCH (u:User {id: $userId})
+          CREATE (msg:MissionMessage $messageProps)
+          CREATE (u)-[:SENT]->(msg)
+          CREATE (msg)-[:BELONGS_TO]->(m)
+          RETURN msg
+        `;
+        params = {
+          missionId: message.missionId,
+          userId: message.userId,
+          messageProps: messageData
+        };
+      } else {
+        // Create message without user relationship (orchestrator/system)
+        query = `
+          MATCH (m:Mission {id: $missionId})
+          CREATE (msg:MissionMessage $messageProps)
+          CREATE (msg)-[:BELONGS_TO]->(m)
+          RETURN msg
+        `;
+        params = {
+          missionId: message.missionId,
+          messageProps: messageData
+        };
+      }
+
+      const result = await connection.executeWrite<{ msg: MissionMessage }>(query, params);
+
+      if (!result || result.length === 0) {
+        throw new Error('Failed to save message');
+      }
+
+      return result[0].msg;
+    }, 'saveMessage', 'MissionMessage');
+  }
+
+  async getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessage[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ missionId }, ['missionId'], 'getMessagesByMission');
+
+      const connection = getConnection();
+
+      // Build query with optional LIMIT and SKIP
+      let query = `
+        MATCH (msg:MissionMessage)-[:BELONGS_TO]->(m:Mission {id: $missionId})
+        RETURN msg
+        ORDER BY msg.timestamp ASC
+      `;
+
+      const params: any = { missionId };
+
+      if (limit !== undefined && limit > 0) {
+        if (offset !== undefined && offset > 0) {
+          query += ` SKIP $offset`;
+          params.offset = offset;
+        }
+        query += ` LIMIT $limit`;
+        params.limit = limit;
+      }
+
+      const result = await connection.executeQuery<{ msg: MissionMessage }>(query, params);
+
+      return result?.map(record => record.msg) || [];
+    }, 'getMessagesByMission', 'MissionMessage');
+  }
+
+  async getMessageCount(missionId: string): Promise<number> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ missionId }, ['missionId'], 'getMessageCount');
+
+      const connection = getConnection();
+
+      const result = await connection.executeQuery<{ count: number }>(
+        `MATCH (msg:MissionMessage)-[:BELONGS_TO]->(m:Mission {id: $missionId})
+         RETURN count(msg) as count`,
+        { missionId }
+      );
+
+      return result?.[0]?.count || 0;
+    }, 'getMessageCount', 'MissionMessage');
+  }
+
+  async getMessagesByMissionWithPagination(
+    missionId: string, 
+    page: number = 1, 
+    pageSize: number = 50
+  ): Promise<{
+    messages: MissionMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ missionId }, ['missionId'], 'getMessagesByMissionWithPagination');
+
+      // Validate pagination parameters
+      if (page < 1) {
+        this.handleValidationError([{
+          field: 'page',
+          message: 'Page must be >= 1',
+          value: page
+        }], 'getMessagesByMissionWithPagination');
+      }
+
+      if (pageSize < 1 || pageSize > 200) {
+        this.handleValidationError([{
+          field: 'pageSize',
+          message: 'Page size must be between 1 and 200',
+          value: pageSize
+        }], 'getMessagesByMissionWithPagination');
+      }
+
+      // Get total count and messages in parallel
+      const [total, messages] = await Promise.all([
+        this.getMessageCount(missionId),
+        this.getMessagesByMission(missionId, pageSize, (page - 1) * pageSize)
+      ]);
+
+      const totalPages = Math.ceil(total / pageSize);
+
+      return {
+        messages,
+        total,
+        page,
+        pageSize,
+        totalPages
+      };
+    }, 'getMessagesByMissionWithPagination', 'MissionMessage');
   }
 }

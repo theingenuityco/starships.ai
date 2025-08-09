@@ -482,4 +482,72 @@ router.post('/:id/messages',
   }
 );
 
+/**
+ * GET /missions/:id/messages
+ * Get message history for a mission with pagination
+ */
+router.get('/:id/messages', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const page = req.query.page ? parseInt(String(req.query.page)) : 1;
+    const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : 50;
+
+    validateUUID(id, 'id');
+
+    // Validate pagination parameters
+    if (page < 1) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Page must be >= 1',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    if (pageSize < 1 || pageSize > 200) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Page size must be between 1 and 200',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+    const result = await missionOrchestratorService.getMessageHistory(id, page, pageSize);
+
+    res.json({ 
+      success: true, 
+      data: result 
+    });
+
+  } catch (error) {
+    console.error('Error fetching message history:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'MISSION_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 export default router;

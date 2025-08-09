@@ -31,6 +31,7 @@ import sibilRoutes from './routes/sibil';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
+import starshipEnhancedRoutes, { initializeEnhancedStarshipRoutes } from './routes/starships-enhanced';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import redeployRoutes from './routes/redeploy';
@@ -157,6 +158,12 @@ initializeVisionRoutes({
   visionRepository,
 });
 
+// Initialize enhanced starship routes with dependencies (for vision onboarding)
+initializeEnhancedStarshipRoutes({
+  starshipRepository,
+  visionRepository,
+});
+
 // Initialize MCP server routes with dependencies
 initializeMCPServerRoutes({
   mcpServerOptionRepository,
@@ -180,6 +187,7 @@ app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', deploymentRoutes); // Enhanced MCP connector routes with Docker deployment (PRIORITY)
 app.use('/api', starshipRoutes);
+app.use('/api', starshipEnhancedRoutes); // Enhanced starship routes with vision support
 app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);

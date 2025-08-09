@@ -683,12 +683,21 @@ export const starshipAPI = {
     return data
   },
 
-  // Create new starship
+  // Create new starship (with optional vision support)
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser'
     maxActiveExpeditions?: number
-  }): Promise<{ starship: Starship }> => api.post('/api/starships', data).then(res => res.data),
+    vision?: {
+      statement: string
+      confidence?: number
+      sibilSessionId?: string
+    }
+  }): Promise<{ starship: Starship; vision?: any }> => {
+    // Use enhanced endpoint if vision is provided
+    const endpoint = data.vision ? '/api/starships/enhanced' : '/api/starships';
+    return api.post(endpoint, data).then(res => res.data);
+  },
 
   // Get starship details with caching (supports both ID and slug)
   getStarship: async (

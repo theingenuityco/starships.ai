@@ -94,7 +94,15 @@ interface StarshipState {
 interface StarshipActions {
   // Existing API actions
   loadUserStarships: () => Promise<void>;
-  createStarship: (data: { name: string; class: 'scout' | 'cruiser' }) => Promise<void>;
+  createStarship: (data: { 
+    name: string; 
+    class: 'scout' | 'cruiser';
+    vision?: {
+      statement: string;
+      confidence?: number;
+      sibilSessionId?: string;
+    };
+  }) => Promise<void>;
   setActiveStarship: (starshipId: string | null) => void;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;

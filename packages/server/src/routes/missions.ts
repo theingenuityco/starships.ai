@@ -5,19 +5,23 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { RepositoryFactory } from '@starships/models';
+import { ServiceFactory } from '../services';
 import type {
   Mission,
   CreateMissionRequest,
   UpdateMissionRequest,
   MissionFilters,
   MissionSort,
-  MissionListResponse
+  MissionListResponse,
+  SendMissionMessageRequest,
+  MissionChatResponse
 } from '@starships/protocol';
 import {
   EnhancedValidationError as ValidationError,
   EnhancedNotFoundError as NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
+import { validateSendMissionMessage } from '../middleware/validation';
 
 const router: Router = Router();
 
@@ -331,5 +335,151 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+/**
+ * GET /missions/:id/initialize-chat
+ * Initialize orchestrator chat for a mission (sends welcome message if first time)
+ */
+router.get('/:id/initialize-chat', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'User not authenticated' 
+      });
+      return;
+    }
+
+    validateUUID(id, 'id');
+
+    const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+    const greeting = await missionOrchestratorService.initializeChat(id, userId);
+
+    res.json({ 
+      success: true, 
+      data: greeting || { message: 'Chat already initialized' }
+    });
+
+  } catch (error) {
+    console.error('Error initializing mission chat:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'MISSION_NOT_FOUND'
+      });
+      return;
+    }
+
+    // Handle mission orchestrator specific errors
+    if (error instanceof Error && 'code' in error) {
+      const statusCode = (error as any).code === 'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED' ? 500 : 500;
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to initialize chat',
+        code: (error as any).code
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * POST /missions/:id/messages
+ * Send message to mission orchestrator and get AI response
+ */
+router.post('/:id/messages', 
+  validateSendMissionMessage,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { content } = req.body as SendMissionMessageRequest;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        res.status(401).json({ 
+          success: false, 
+          error: 'User not authenticated' 
+        });
+        return;
+      }
+
+      validateUUID(id, 'id');
+
+      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      const response = await missionOrchestratorService.handleUserMessage(id, userId, content);
+
+      res.json({ 
+        success: true, 
+        data: response 
+      });
+
+    } catch (error) {
+      console.error('Error sending mission message:', error);
+      
+      if (error instanceof ValidationError) {
+        res.status(400).json({ 
+          success: false, 
+          error: error.message,
+          code: 'VALIDATION_ERROR'
+        });
+        return;
+      }
+      
+      if (error instanceof NotFoundError) {
+        res.status(404).json({ 
+          success: false, 
+          error: error.message,
+          code: 'MISSION_NOT_FOUND'
+        });
+        return;
+      }
+
+      // Handle mission orchestrator specific errors
+      if (error instanceof Error && 'code' in error) {
+        const errorCode = (error as any).code;
+        let statusCode = 500;
+        
+        // Map error codes to appropriate HTTP status codes
+        if (errorCode === 'MISSION_MESSAGE_INVALID') statusCode = 400;
+        else if (errorCode === 'MISSION_ORCHESTRATOR_NOT_FOUND') statusCode = 404;
+        else if (errorCode === 'MISSION_MESSAGE_SEND_FAILED') statusCode = 500;
+        else if (errorCode === 'MISSION_CHAT_FAILED') statusCode = 500;
+
+        res.status(statusCode).json({
+          success: false,
+          error: error.message || 'Failed to send message',
+          code: errorCode
+        });
+        return;
+      }
+      
+      res.status(500).json({ 
+        success: false, 
+        error: 'Internal server error',
+        code: 'INTERNAL_SERVER_ERROR'
+      });
+    }
+  }
+);
 
 export default router;

@@ -93,3 +93,50 @@ export interface MissionSort {
   field: 'createdAt' | 'updatedAt' | 'status' | 'name';
   direction: 'asc' | 'desc';
 }
+
+// ============================================================================
+// MISSION ORCHESTRATOR MESSAGE TYPES
+// ============================================================================
+
+/**
+ * Mission message roles - determines UI styling and behavior
+ */
+export type MissionMessageRole = 
+  | 'user'         // Human user messages
+  | 'orchestrator' // AI orchestrator responses
+  | 'system';      // System notifications
+
+/**
+ * Core message entity for mission orchestrator communication
+ */
+export interface MissionMessage {
+  id: string;
+  missionId: string;
+  role: MissionMessageRole;
+  content: string;
+  timestamp: string;
+  
+  // Neo4j relationship support
+  userId?: string;        // Set when role = 'user'
+  
+  // Display support
+  senderName?: string;    // Cached display name
+  
+  // Extensibility
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Request to send a message to mission orchestrator
+ */
+export interface SendMissionMessageRequest {
+  missionId: string;
+  content: string;
+}
+
+/**
+ * Response from mission orchestrator
+ */
+export interface MissionChatResponse {
+  reply: string;
+}

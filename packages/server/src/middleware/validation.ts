@@ -11,6 +11,7 @@ import {
   CreateTaskRequest,
   SendMessageRequest,
   CreateResultRequest,
+  SendMissionMessageRequest,
   ExpeditionStatus,
   TaskStatus,
   TaskPriority,
@@ -441,3 +442,27 @@ export function validate4PhaseExpedition(req: Request, res: Response, next: Next
   
   next();
 }
+
+/**
+ * Validate mission message send request
+ */
+export function validateSendMissionMessage(req: Request, res: Response, next: NextFunction): void {
+  const body = req.body as SendMissionMessageRequest;
+  let errors: ValidationError[] = [];
+  
+  // Required content field
+  errors = errors.concat(validateRequired(body, ['content']));
+  errors = errors.concat(validateStringLength(body, 'content', 1, 5000)); // Max 5000 chars
+  
+  if (errors.length > 0) {
+    sendValidationError(res, errors);
+    return;
+  }
+  
+  next();
+}
+
+/**
+ * Export the sendValidationError function for use in routes
+ */
+export { sendValidationError };

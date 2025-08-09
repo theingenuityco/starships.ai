@@ -130,6 +130,14 @@ export type StandardErrorCode =
   | 'MESSAGE_SEND_FAILED'
   | 'MESSAGE_INVALID_TYPE'
   
+  // Mission Orchestrator Errors
+  | 'MISSION_ORCHESTRATOR_FAILED'
+  | 'MISSION_ORCHESTRATOR_NOT_FOUND'
+  | 'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED'
+  | 'MISSION_MESSAGE_SEND_FAILED'
+  | 'MISSION_MESSAGE_INVALID'
+  | 'MISSION_CHAT_FAILED'
+  
   // Result-Specific Errors
   | 'RESULT_NOT_FOUND'
   | 'RESULT_VALIDATION_FAILED'
@@ -255,6 +263,7 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   'TASK_CANNOT_COMPLETE': 400,
   'TASK_CANNOT_DELETE': 400,
   'TASK_DEPENDENCY_NOT_MET': 400,
+  'MISSION_MESSAGE_INVALID': 400,
   'INVALID_STATUS_TRANSITION': 400,
   'OPERATION_NOT_ALLOWED': 400,
   'MESSAGE_INVALID_TYPE': 400,
@@ -280,6 +289,7 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   'TASK_NOT_FOUND': 404,
   'AGENT_NOT_FOUND': 404,
   'MESSAGE_NOT_FOUND': 404,
+  'MISSION_ORCHESTRATOR_NOT_FOUND': 404,
   'RESULT_NOT_FOUND': 404,
   
   // 409 Conflict
@@ -314,6 +324,10 @@ export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
   'STARSHIP_VALIDATION_FAILED': 500,
   'AGENT_DEPLOYMENT_FAILED': 500,
   'MESSAGE_SEND_FAILED': 500,
+  'MISSION_ORCHESTRATOR_FAILED': 500,
+  'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED': 500,
+  'MISSION_MESSAGE_SEND_FAILED': 500,
+  'MISSION_CHAT_FAILED': 500,
   'RESULT_QUALITY_ASSESSMENT_FAILED': 500,
   'CREATE_FAILED': 500,
   'UPDATE_FAILED': 500,
@@ -359,6 +373,7 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'INVALID_RANGE': 'validation',
   'INVALID_TYPE': 'validation',
   'MESSAGE_INVALID_TYPE': 'validation',
+  'MISSION_MESSAGE_INVALID': 'validation',
   'RESULT_VALIDATION_FAILED': 'validation',
   
   // Authentication errors
@@ -381,6 +396,7 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'TASK_NOT_FOUND': 'not_found',
   'AGENT_NOT_FOUND': 'not_found',
   'MESSAGE_NOT_FOUND': 'not_found',
+  'MISSION_ORCHESTRATOR_NOT_FOUND': 'not_found',
   'RESULT_NOT_FOUND': 'not_found',
   
   // Conflict errors
@@ -441,6 +457,10 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'STARSHIP_VALIDATION_FAILED': 'business',
   'AGENT_DEPLOYMENT_FAILED': 'business',
   'MESSAGE_SEND_FAILED': 'business',
+  'MISSION_ORCHESTRATOR_FAILED': 'business',
+  'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED': 'business',
+  'MISSION_MESSAGE_SEND_FAILED': 'business',
+  'MISSION_CHAT_FAILED': 'business',
   'RESULT_QUALITY_ASSESSMENT_FAILED': 'business',
   'CREATE_FAILED': 'business',
   'UPDATE_FAILED': 'business',
@@ -461,12 +481,14 @@ export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
   'INVALID_RANGE': 'low',
   'INVALID_TYPE': 'low',
   'MESSAGE_INVALID_TYPE': 'low',
+  'MISSION_MESSAGE_INVALID': 'low',
   'RESOURCE_NOT_FOUND': 'low',
   'EXPEDITION_NOT_FOUND': 'low',
   'STARSHIP_NOT_FOUND': 'low',
   'TASK_NOT_FOUND': 'low',
   'AGENT_NOT_FOUND': 'low',
   'MESSAGE_NOT_FOUND': 'low',
+  'MISSION_ORCHESTRATOR_NOT_FOUND': 'low',
   'RESULT_NOT_FOUND': 'low',
   
   // Medium severity
@@ -492,6 +514,10 @@ export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
   'RESULT_VALIDATION_FAILED': 'medium',
   'AGENT_NOT_QUALIFIED': 'medium',
   'RESOURCE_EXPIRED': 'medium',
+  'MISSION_ORCHESTRATOR_FAILED': 'medium',
+  'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED': 'medium',
+  'MISSION_MESSAGE_SEND_FAILED': 'medium',
+  'MISSION_CHAT_FAILED': 'medium',
   
   // High severity
   'TOKEN_EXPIRED': 'high',

@@ -77,7 +77,7 @@ export const missionApi = {
     }
 
     const queryString = searchParams.toString();
-    const endpoint = `/missions${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/missions${queryString ? `?${queryString}` : ''}`;
     
     return apiRequest<MissionListResponse>(endpoint);
   },
@@ -86,7 +86,7 @@ export const missionApi = {
    * Get mission by ID
    */
   async getMissionById(id: string): Promise<ApiResponse<MissionResponse>> {
-    return apiRequest<MissionResponse>(`/missions/${id}`);
+    return apiRequest<MissionResponse>(`/api/missions/${id}`);
   },
 
   /**
@@ -116,7 +116,7 @@ export const missionApi = {
     }
 
     const queryString = searchParams.toString();
-    const endpoint = `/missions/starship/${starshipId}${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/missions/starship/${starshipId}${queryString ? `?${queryString}` : ''}`;
     
     return apiRequest<MissionListResponse>(endpoint);
   },
@@ -125,7 +125,7 @@ export const missionApi = {
    * Create a new mission
    */
   async createMission(request: CreateMissionRequest): Promise<ApiResponse<MissionResponse>> {
-    return apiRequest<MissionResponse>('/missions', {
+    return apiRequest<MissionResponse>('/api/missions', {
       method: 'POST',
       body: JSON.stringify(request)
     });
@@ -138,7 +138,7 @@ export const missionApi = {
     id: string,
     updates: UpdateMissionRequest
   ): Promise<ApiResponse<MissionResponse>> {
-    return apiRequest<MissionResponse>(`/missions/${id}`, {
+    return apiRequest<MissionResponse>(`/api/missions/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
@@ -148,7 +148,7 @@ export const missionApi = {
    * Delete a mission
    */
   async deleteMission(id: string): Promise<ApiResponse<void>> {
-    return apiRequest<void>(`/missions/${id}`, {
+    return apiRequest<void>(`/api/missions/${id}`, {
       method: 'DELETE'
     });
   },

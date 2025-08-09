@@ -53,14 +53,6 @@ export default function MissionsPage({ params }: MissionsPageProps) {
   return (
     <div className="h-full command-deck-bg p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">
-            {starship.name} Missions
-          </h1>
-          <p className="text-muted-foreground">
-            Mission control for {starship.name}
-          </p>
-        </div>
         <MissionList starshipId={starship.id} showCreateButton={true} />
       </div>
     </div>

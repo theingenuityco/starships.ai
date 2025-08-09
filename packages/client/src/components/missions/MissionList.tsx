@@ -14,13 +14,15 @@ import {
   AlertCircle,
   Filter,
   SortAsc,
-  SortDesc
+  SortDesc,
+  Users
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Dialog, 
   DialogContent, 
@@ -33,6 +35,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
+import { starshipAPI, type Agent } from '@/lib/api';
+
+// Type for deployed agents (excludes starshipId since it's implied by context)
+type DeployedAgent = Omit<Agent, 'starshipId'>;
 import type { 
   Mission, 
   MissionStatus, 
@@ -379,6 +385,16 @@ function MissionCard({
       <CardContent>
         <p className="text-muted-foreground mb-4">{mission.description}</p>
         
+        {/* Assigned Agents */}
+        {mission.agentIds && mission.agentIds.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+              <Users className="w-3 h-3" />
+              <span>{mission.agentIds.length} agent{mission.agentIds.length !== 1 ? 's' : ''} assigned</span>
+            </div>
+          </div>
+        )}
+        
         {/* Status Actions */}
         <div className="flex gap-2 flex-wrap">
           {mission.status === 'draft' && (
@@ -441,14 +457,45 @@ function CreateMissionForm({
   const [formData, setFormData] = useState<CreateMissionRequest>({
     starshipId,
     name: '',
-    description: ''
+    description: '',
+    agentIds: []
   });
+  const [agents, setAgents] = useState<DeployedAgent[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+
+  // Load agents for this starship
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        setLoadingAgents(true);
+        setAgentsError(null);
+        const response = await starshipAPI.getStarshipAgents(starshipId);
+        setAgents(response.deployedAgents || []);
+      } catch (error) {
+        setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
+      } finally {
+        setLoadingAgents(false);
+      }
+    };
+
+    loadAgents();
+  }, [starshipId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.name.trim() && formData.description.trim()) {
+    if (formData.name.trim() && formData.description.trim() && formData.agentIds.length > 0) {
       onSubmit(formData);
     }
+  };
+
+  const handleAgentToggle = (agentId: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      agentIds: checked 
+        ? [...prev.agentIds, agentId]
+        : prev.agentIds.filter(id => id !== agentId)
+    }));
   };
 
   return (
@@ -480,12 +527,77 @@ function CreateMissionForm({
             required
           />
         </div>
+
+        {/* Agent Selection */}
+        <div>
+          <Label className="text-base font-medium flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Assign Agents
+          </Label>
+          <p className="text-sm text-muted-foreground mb-3">
+            Select at least one agent to assign to this mission
+          </p>
+          
+          {loadingAgents ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+              <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
+            </div>
+          ) : agentsError ? (
+            <div className="text-sm text-red-500 py-2">{agentsError}</div>
+          ) : agents.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2">
+              No agents available. Deploy agents to your starship first.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-3">
+              {agents.map((agent) => (
+                <div key={agent.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`agent-${agent.id}`}
+                    checked={formData.agentIds.includes(agent.id)}
+                    onCheckedChange={(checked) => 
+                      handleAgentToggle(agent.id, checked as boolean)
+                    }
+                  />
+                  <label 
+                    htmlFor={`agent-${agent.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{agent.name}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {agent.category}
+                      </Badge>
+                    </div>
+                    {agent.description && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {agent.description}
+                      </p>
+                    )}
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {formData.agentIds.length > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {formData.agentIds.length} agent{formData.agentIds.length !== 1 ? 's' : ''} selected
+            </p>
+          )}
+        </div>
         
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">Create Mission</Button>
+          <Button 
+            type="submit" 
+            disabled={!formData.name.trim() || !formData.description.trim() || formData.agentIds.length === 0}
+          >
+            Create Mission
+          </Button>
         </DialogFooter>
       </form>
     </>
@@ -505,12 +617,43 @@ function EditMissionForm({
   const [formData, setFormData] = useState<UpdateMissionRequest>({
     name: mission.name,
     description: mission.description,
-    status: mission.status
+    status: mission.status,
+    agentIds: mission.agentIds
   });
+  const [agents, setAgents] = useState<DeployedAgent[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(true);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+
+  // Load agents for this starship
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        setLoadingAgents(true);
+        setAgentsError(null);
+        const response = await starshipAPI.getStarshipAgents(mission.starshipId);
+        setAgents(response.deployedAgents || []);
+      } catch (error) {
+        setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
+      } finally {
+        setLoadingAgents(false);
+      }
+    };
+
+    loadAgents();
+  }, [mission.starshipId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
+  };
+
+  const handleAgentToggle = (agentId: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      agentIds: checked 
+        ? [...(prev.agentIds || []), agentId]
+        : (prev.agentIds || []).filter(id => id !== agentId)
+    }));
   };
 
   return (
@@ -539,6 +682,63 @@ function EditMissionForm({
             placeholder="Describe the mission objectives and details"
             rows={3}
           />
+        </div>
+
+        {/* Agent Selection */}
+        <div>
+          <Label className="text-base font-medium flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Assigned Agents
+          </Label>
+          
+          {loadingAgents ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+              <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
+            </div>
+          ) : agentsError ? (
+            <div className="text-sm text-red-500 py-2">{agentsError}</div>
+          ) : agents.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2">
+              No agents available.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-3">
+              {agents.map((agent) => (
+                <div key={agent.id} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`edit-agent-${agent.id}`}
+                    checked={(formData.agentIds || []).includes(agent.id)}
+                    onCheckedChange={(checked) => 
+                      handleAgentToggle(agent.id, checked as boolean)
+                    }
+                  />
+                  <label 
+                    htmlFor={`edit-agent-${agent.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{agent.name}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {agent.category}
+                      </Badge>
+                    </div>
+                    {agent.description && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {agent.description}
+                      </p>
+                    )}
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {(formData.agentIds || []).length > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {(formData.agentIds || []).length} agent{(formData.agentIds || []).length !== 1 ? 's' : ''} selected
+            </p>
+          )}
         </div>
         
         <div>

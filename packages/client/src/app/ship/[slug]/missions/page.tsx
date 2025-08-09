@@ -1,10 +1,8 @@
 'use client';
 
-import { use } from 'react';
-import { motion } from 'motion/react';
-import { Target, Plus } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { use, useEffect, useState } from 'react';
+import { MissionList } from '@/components/missions/MissionList';
+import { starshipAPI, type Starship } from '@/lib/api';
 
 interface MissionsPageProps {
   params: Promise<{
@@ -14,42 +12,57 @@ interface MissionsPageProps {
 
 export default function MissionsPage({ params }: MissionsPageProps) {
   const { slug } = use(params);
+  const [starship, setStarship] = useState<Starship | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadStarship = async () => {
+      try {
+        const response = await starshipAPI.getStarshipBySlug(slug);
+        setStarship(response.starship);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load starship');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStarship();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  if (error || !starship) {
+    return (
+      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 mb-2">⚠️ Error</div>
+          <p className="text-muted-foreground">{error || 'Starship not found'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full command-deck-bg p-8 flex items-center justify-center">
-      <motion.div 
-        className="text-center max-w-md w-full"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Card className="bg-card/50 backdrop-blur-sm border-2 border-primary/20">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Target className="w-8 h-8 text-primary" />
-            </div>
-            <CardTitle className="text-2xl starship-accent">🎯 Missions</CardTitle>
-            <CardDescription>
-              Mission control for {slug}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground mb-6">
-              A clean, efficient system for managing your starship's missions. 
-              Ready to build something amazing.
-            </p>
-            <Button className="mb-4" disabled>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Mission
-            </Button>
-            <div className="mt-6 p-4 bg-accent/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Ready for your next implementation phase...
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+    <div className="h-full command-deck-bg p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-foreground">
+            {starship.name} Missions
+          </h1>
+          <p className="text-muted-foreground">
+            Mission control for {starship.name}
+          </p>
+        </div>
+        <MissionList starshipId={starship.id} showCreateButton={true} />
+      </div>
     </div>
   );
 }

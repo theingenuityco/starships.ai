@@ -16,6 +16,7 @@ export { StarshipRepository } from './StarshipRepository';
 export { VisionRepository } from './VisionRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
+export { MissionRepository } from './MissionRepository';
 
 // Export expedition repositories (STUB IMPLEMENTATIONS)
 export { ExpeditionRepository } from './ExpeditionRepository.stub';
@@ -32,6 +33,7 @@ import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
+import { MissionRepository } from './MissionRepository';
 
 // Import expedition repositories (STUB IMPLEMENTATIONS)
 import { ExpeditionRepository } from './ExpeditionRepository.stub';
@@ -65,6 +67,7 @@ export class RepositoryFactory {
   private static visionRepo: VisionRepository | null = null;
   private static mcpServerOptionRepo: MCPServerOptionRepository | null = null;
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
+  private static missionRepo: MissionRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
   // Expedition repository instances (STUB IMPLEMENTATIONS)
@@ -131,6 +134,7 @@ export class RepositoryFactory {
       this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
       this.mcpServerOptionRepo = new MCPServerOptionRepository();
+      this.missionRepo = new MissionRepository();
 
       // Initialize expedition repositories (no dependencies) (STUB IMPLEMENTATIONS)
       this.expeditionRepo = new ExpeditionRepository();
@@ -198,6 +202,7 @@ export class RepositoryFactory {
         visionRepo: this.visionRepo !== null,
         mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
         mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
+        missionRepo: this.missionRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
         expeditionRepo: this.expeditionRepo !== null,
         expeditionTaskRepo: this.expeditionTaskRepo !== null,
@@ -389,6 +394,17 @@ export class RepositoryFactory {
     return this.workflowRuntimeStateRepo;
   }
 
+  /**
+   * Get MissionRepository instance (synchronous)
+   */
+  static getMissionRepository(): MissionRepository {
+    this.ensureInitialized();
+    if (!this.missionRepo) {
+      throw new Error('MissionRepository not initialized');
+    }
+    return this.missionRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -408,6 +424,7 @@ export class RepositoryFactory {
     this.visionRepo = null;
     this.mcpServerOptionRepo = null;
     this.mcpServerConnectorRepo = null;
+    this.missionRepo = null;
     this.agentTemplateService = null;
     this.expeditionRepo = null;
     this.expeditionTaskRepo = null;

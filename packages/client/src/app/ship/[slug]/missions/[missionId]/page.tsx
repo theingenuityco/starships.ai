@@ -171,123 +171,183 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   }
 
   return (
-    <div className="h-full command-deck-bg p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+    <div className="h-screen command-deck-bg flex flex-col">
+      {/* Header */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex-shrink-0">
+        <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={handleBack}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Missions
+            Back
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {statusIcons[mission.status]}
-            <h1 className="text-3xl font-bold">{mission.name}</h1>
+            <h1 className="text-2xl font-bold">{mission.name}</h1>
             <Badge className={statusColors[mission.status]}>
               {mission.status}
             </Badge>
           </div>
         </div>
+      </div>
 
-        {/* Mission Info Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Mission Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold mb-2">Description</h3>
-              <p className="text-muted-foreground">{mission.description}</p>
+      {/* Main Content - Split Layout */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0">
+        {/* Chat Area - Main Content */}
+        <div className="flex-1 flex flex-col min-h-0 bg-background">
+          <div className="flex flex-col flex-1 min-h-0">
+            <div className="pb-3 p-4 lg:p-6 flex-shrink-0">
+              <h2 className="text-lg font-semibold">Mission Orchestrator</h2>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Created</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(mission.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Last Updated</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(mission.updatedAt).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm font-medium">Assigned Agents</p>
-                  <p className="text-sm text-muted-foreground">
-                    {mission.agentIds?.length || 0} agent{(mission.agentIds?.length || 0) !== 1 ? 's' : ''}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Chat Interface */}
-        <Card className="flex-1">
-          <CardHeader>
-            <CardTitle>Mission Orchestrator</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col h-96">
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+            <div className="flex flex-col flex-1 p-4 lg:p-6 pt-0 min-h-0">
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 lg:pr-4 min-h-0">
+                {messages.map((message) => (
                   <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
+                    key={message.id}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <p className="text-sm">{message.content}</p>
-                    <p className="text-xs mt-1 opacity-70">
-                      {new Date(message.timestamp).toLocaleTimeString()}
+                    <div
+                      className={`max-w-[280px] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      <p className="text-xs mt-2 opacity-70">
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted text-muted-foreground px-4 py-3 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+                        <span className="text-sm">Orchestrator is thinking...</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+              
+              {/* Input */}
+              <div className="flex space-x-2 lg:space-x-3 pt-4 border-t flex-shrink-0">
+                <Input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ask the orchestrator..."
+                  disabled={chatLoading}
+                  className="text-sm"
+                />
+                <Button onClick={handleSendMessage} disabled={chatLoading || !newMessage.trim()}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar - Mission Details */}
+        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-muted/30 flex-shrink-0">
+          <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 h-full overflow-y-auto">
+            {/* Status Card */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                {statusIcons[mission.status]}
+                <h3 className="font-semibold">Status</h3>
+              </div>
+              <Badge className={`${statusColors[mission.status]} text-xs`}>
+                {mission.status.toUpperCase()}
+              </Badge>
+            </Card>
+
+            {/* Quick Info */}
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3">Quick Info</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Created</p>
+                    <p className="text-muted-foreground text-xs">
+                      {new Date(mission.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
-              ))}
-              {chatLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-muted text-muted-foreground px-4 py-2 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
-                      <span className="text-sm">Orchestrator is thinking...</span>
-                    </div>
+                
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Updated</p>
+                    <p className="text-muted-foreground text-xs">
+                      {new Date(mission.updatedAt).toLocaleDateString()}
+                    </p>
                   </div>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-            
-            {/* Input */}
-            <div className="flex space-x-2">
-              <Input
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask the orchestrator..."
-                disabled={chatLoading}
-              />
-              <Button onClick={handleSendMessage} disabled={chatLoading || !newMessage.trim()}>
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+                
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium">Agents</p>
+                    <p className="text-muted-foreground text-xs">
+                      {mission.agentIds?.length || 0} assigned
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Mission Description */}
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3">Description</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {mission.description}
+              </p>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card className="p-4">
+              <h3 className="font-semibold mb-3">Actions</h3>
+              <div className="space-y-2">
+                {mission.status === 'draft' && (
+                  <Button size="sm" className="w-full justify-start">
+                    <Target className="w-4 h-4 mr-2" />
+                    Start Mission
+                  </Button>
+                )}
+                {mission.status === 'active' && (
+                  <Button size="sm" variant="outline" className="w-full justify-start">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Pause Mission
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" className="w-full justify-start">
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage Agents
+                </Button>
+              </div>
+            </Card>
+
+            {/* Agent Status */}
+            {mission.agentIds && mission.agentIds.length > 0 && (
+              <Card className="p-4">
+                <h3 className="font-semibold mb-3">Agent Status</h3>
+                <div className="space-y-2 text-sm">
+                  {mission.agentIds.map((agentId, index) => (
+                    <div key={agentId} className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>Agent {index + 1}</span>
+                      <span className="text-xs text-muted-foreground ml-auto">Online</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

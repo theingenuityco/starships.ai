@@ -298,6 +298,7 @@ export const expeditionAPI = {
       console.log('[EXPEDITION-API] API instance details:', {
         baseURL: api.defaults.baseURL,
         timeout: api.defaults.timeout,
+        fullURL: `${api.defaults.baseURL}/api/starships/${request.starshipId}/expeditions`,
         hasInterceptors: {
           request: !!api.interceptors.request,
           response: !!api.interceptors.response
@@ -317,6 +318,22 @@ export const expeditionAPI = {
       });
       
       console.log('[EXPEDITION-API] About to validate response...');
+      
+      // Check if response.data exists and is valid JSON
+      if (!response.data || typeof response.data !== 'object') {
+        console.error('[EXPEDITION-API] Invalid response data:', {
+          hasData: !!response.data,
+          dataType: typeof response.data,
+          dataString: typeof response.data === 'string' ? response.data.substring(0, 200) : 'Not a string'
+        });
+        throw new ExpeditionAPIError(
+          'Server returned invalid response format',
+          'INVALID_RESPONSE',
+          500,
+          { responseData: response.data }
+        );
+      }
+      
       const data = validateResponse<ExpeditionResponse>(response.data.data, ['expedition'])
       console.log('[EXPEDITION-API] Response validation completed:', data);
       
@@ -338,7 +355,26 @@ export const expeditionAPI = {
       
       // Convert AxiosError to ExpeditionAPIError
       if (error && typeof error === 'object' && 'response' in error) {
-        throw ExpeditionAPIError.fromAxiosError(error as AxiosError)
+        const axiosError = error as AxiosError;
+        console.error('[EXPEDITION-API] Axios error details:', {
+          status: axiosError.response?.status,
+          statusText: axiosError.response?.statusText,
+          data: axiosError.response?.data,
+          headers: axiosError.response?.headers
+        });
+        
+        // Special handling for HTML responses
+        if (axiosError.response?.data && typeof axiosError.response.data === 'string' && 
+            axiosError.response.data.includes('<!DOCTYPE')) {
+          throw new ExpeditionAPIError(
+            'Server returned HTML error page instead of JSON. This usually indicates the API endpoint does not exist or the server is misconfigured.',
+            'HTML_RESPONSE_ERROR',
+            axiosError.response.status || 500,
+            { htmlResponse: axiosError.response.data.substring(0, 500) }
+          );
+        }
+        
+        throw ExpeditionAPIError.fromAxiosError(axiosError)
       }
       
       // Re-throw ExpeditionAPIError as-is

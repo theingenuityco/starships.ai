@@ -17,6 +17,7 @@ import {
   validateQualityScore,
   validateTaskAssignment,
   validateTaskCompletion,
+  validate4PhaseExpedition,
 } from '../middleware/validation';
 import {
   ExpeditionService,
@@ -568,6 +569,104 @@ router.post(
 // ============================================================================
 // 4-PHASE EXPEDITION ENDPOINTS
 // ============================================================================
+
+/**
+ * POST /api/starships/:starshipId/expeditions/start-4phase
+ * Create and start expedition with 4-phase flow in one step
+ */
+router.post(
+  '/starships/:starshipId/expeditions/start-4phase',
+  authMiddleware,
+  validate4PhaseExpedition,
+  async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST START =====`);
+    
+    try {
+      const { starshipId } = req.params;
+      const userId = req.user!.id;
+      const { expeditionName, originalMission, selectedAgents, visionContext } = req.body;
+      
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Creating expedition first`, {
+        starshipId,
+        userId,
+        expeditionName,
+        selectedAgentsCount: selectedAgents?.length || 0,
+        hasVisionContext: !!visionContext,
+        timestamp: new Date().toISOString()
+      });
+
+      // First create the expedition
+      const createRequest: CreateExpeditionRequest = {
+        starshipId,
+        name: expeditionName || 'Untitled 4-Phase Expedition',
+        mission: originalMission,
+        selectedAgents,
+      };
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Calling expeditionService.createExpedition`);
+      const expeditionResponse = await expeditionService.createExpedition(userId, createRequest);
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 3: Expedition created successfully`, {
+        expeditionId: expeditionResponse.expedition.id,
+        expeditionTitle: expeditionResponse.expedition.name,
+        timestamp: new Date().toISOString()
+      });
+
+      // Then start the 4-phase workflow
+      console.log(`[EXPEDITION-API] [${requestId}] Step 4: Starting 4-phase workflow`);
+      const phaseResult = await firstOfficerService.start4PhaseExpedition(
+        expeditionResponse.expedition.id,
+        userId,
+        starshipId,
+        originalMission,
+        selectedAgents,
+        visionContext
+      );
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 5: 4-phase workflow started successfully`, {
+        phase: phaseResult.phase,
+        status: phaseResult.status,
+        message: phaseResult.message,
+        timestamp: new Date().toISOString()
+      });
+
+      res.status(201).json({
+        success: true,
+        data: {
+          expeditionId: expeditionResponse.expedition.id,
+          expedition: expeditionResponse.expedition,
+          phase: phaseResult.phase,
+          status: phaseResult.status,
+          message: phaseResult.message
+        }
+      });
+
+      console.log(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST SUCCESS =====`);
+    } catch (error: any) {
+      console.error(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST ERROR =====`);
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to create and start 4-phase expedition:`, error);
+      
+      const statusCode = error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 :
+                        error.code === 'VALIDATION_ERROR' ? 400 :
+                        error.code === 'STARSHIP_NOT_FOUND' ? 404 :
+                        error.code === 'AGENT_NOT_AVAILABLE' ? 400 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to create and start 4-phase expedition',
+        code: error.code || 'UNKNOWN_ERROR',
+        debug: {
+          errorType: error.constructor?.name,
+          requestId,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      
+      console.error(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST FAILED =====`);
+    }
+  }
+);
 
 /**
  * POST /api/starships/:starshipId/expeditions/:expeditionId/start-4phase

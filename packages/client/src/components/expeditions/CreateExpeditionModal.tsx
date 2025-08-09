@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { 
   Rocket, X, Check, AlertCircle, Sparkles, 
-  Target, Bot, Search, Zap, Star, CircleCheck, 
+  Target, Bot, Search, Zap, Star, CircleCheck, CheckCircle,
   Wand2, ArrowRight, Shield, Brain, Code, Palette,
   ChevronRight, Loader2, Database, Headphones, PenTool,
   Lightbulb, BarChart2, HeartPulse, Hash, Settings,
@@ -161,25 +161,24 @@ export function CreateExpeditionModal({
     try {
       // Handle different workflow types
       if (formData.workflowType === 'fourPhase') {
-        // Create 4-phase expedition using new API endpoint
-        const response = await fetch(`/api/starships/${starshipId}/expeditions/start-4phase`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originalMission: formData.mission.trim(),
-            selectedAgents: formData.selectedAgents,
-            visionContext: formData.visionContext?.trim(),
-            expeditionName: formData.name.trim()
-          })
+        // Create 4-phase expedition using new API endpoint with axios for proper base URL
+        const { default: api } = await import('@/lib/api')
+        
+        const response = await api.post(`/api/starships/${starshipId}/expeditions/start-4phase`, {
+          expeditionName: formData.name.trim(),
+          originalMission: formData.mission.trim(),
+          selectedAgents: formData.selectedAgents,
+          visionContext: formData.visionContext?.trim()
         })
         
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Failed to create 4-phase expedition')
+        console.log('[CREATE-MODAL] 4-phase expedition response:', response.data)
+        
+        if (!response.data.success || !response.data.data || !response.data.data.expeditionId) {
+          console.error('[CREATE-MODAL] Invalid 4-phase response structure:', response.data)
+          throw new Error('Invalid response from server: missing expedition data')
         }
         
-        const data = await response.json()
-        onExpeditionCreated(data.expeditionId)
+        onExpeditionCreated(response.data.data.expeditionId)
       } else {
         // Traditional expedition creation
         const expeditionRequest: CreateExpeditionRequest = {
@@ -190,13 +189,39 @@ export function CreateExpeditionModal({
         }
 
         const response = await expeditionAPI.createExpedition(expeditionRequest)
+        console.log('[CREATE-MODAL] Received response from expeditionAPI.createExpedition:', response)
+        
+        if (!response || !response.expedition || !response.expedition.id) {
+          console.error('[CREATE-MODAL] Invalid response structure:', response)
+          throw new Error('Invalid response from server: missing expedition data')
+        }
+        
         onExpeditionCreated(response.expedition.id)
       }
       
       onClose()
     } catch (error: any) {
-      console.error('Failed to create expedition:', error)
-      setSubmitError(error?.message || 'Failed to create expedition')
+      console.error('[CREATE-MODAL] Failed to create expedition:', {
+        error,
+        message: error?.message,
+        stack: error?.stack,
+        response: error?.response,
+        code: error?.code
+      })
+      
+      let errorMessage = 'Failed to create expedition'
+      
+      if (error?.message) {
+        if (error.message.includes('<!DOCTYPE')) {
+          errorMessage = 'Server error: The server returned an HTML error page instead of JSON. Please check if the server is running correctly.'
+        } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
+          errorMessage = 'Network error: Unable to connect to the server. Please check your connection and try again.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
+      setSubmitError(errorMessage)
     } finally {
       setIsSubmitting(false)
     }

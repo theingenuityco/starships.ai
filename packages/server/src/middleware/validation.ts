@@ -415,3 +415,29 @@ export function validateTaskCompletion(req: Request, res: Response, next: NextFu
   
   next();
 }
+
+/**
+ * Middleware to validate 4-phase expedition creation request
+ */
+export function validate4PhaseExpedition(req: Request, res: Response, next: NextFunction): void {
+  const body = req.body;
+  let errors: ValidationError[] = [];
+  
+  // Required fields with 4-phase naming
+  errors = errors.concat(validateRequired(body, ['expeditionName', 'originalMission', 'selectedAgents']));
+  
+  // String length validations
+  errors = errors.concat(validateStringLength(body, 'expeditionName', 1, 200));
+  errors = errors.concat(validateStringLength(body, 'originalMission', 1, 1000));
+  errors = errors.concat(validateStringLength(body, 'visionContext', 0, 500));
+  
+  // Array validations
+  errors = errors.concat(validateArray(body, 'selectedAgents', true, 10)); // Required array with max 10 agents
+  
+  if (errors.length > 0) {
+    sendValidationError(res, errors);
+    return;
+  }
+  
+  next();
+}

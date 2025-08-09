@@ -430,7 +430,7 @@ export class ExpeditionRepository extends BaseRepository implements ExpeditionRe
     }
     
     // Remove agent from assignedAgents array
-    const updatedAgents = expedition.assignedAgents.filter(id => id !== agentId);
+    const updatedAgents = expedition.assignedAgents.filter((id: string) => id !== agentId);
     
     const result = await connection.executeWrite<{ deletedCount: number }>(
       `MATCH (e:Expedition {id: $expeditionId})<-[r:ASSIGNED_TO]-(a:Agent {id: $agentId})

@@ -326,8 +326,14 @@ export interface AgentStreamError {
 // Export starship-related types
 export * from './types/starship';
 
-// Export expedition-related types
-export * from './types/expedition';
+// Export expedition-related types (DISCONNECTED)
+// export * from './types/expedition';
+
+// Export expedition stub types for compilation compatibility
+export * from './types/expedition-stubs';
+
+// Export mission-related types
+export * from './types/mission';
 
 // Export workflow DSL types
 export * from './types/workflow';
@@ -359,11 +365,11 @@ export {
   isStandardError
 } from './types/error-classes';
 
-// Re-export specific types to resolve naming conflicts
+// Re-export specific types to resolve naming conflicts (STUB IMPLEMENTATIONS)
 export type {
   ExpeditionError as LegacyExpeditionError,
   ExpeditionErrorCode as LegacyExpeditionErrorCode
-} from './types/expedition';
+} from './types/expedition-stubs';
 
 // Re-export specific types to avoid conflicts
 export type {

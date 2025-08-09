@@ -17,11 +17,11 @@ export { VisionRepository } from './VisionRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
-// Export expedition repositories
-export { ExpeditionRepository } from './ExpeditionRepository';
-export { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
-export { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
-export { ExpeditionResultRepository } from './ExpeditionResultRepository';
+// Export expedition repositories (STUB IMPLEMENTATIONS)
+export { ExpeditionRepository } from './ExpeditionRepository.stub';
+export { ExpeditionTaskRepository } from './ExpeditionTaskRepository.stub';
+export { ExpeditionMessageRepository } from './ExpeditionMessageRepository.stub';
+export { ExpeditionResultRepository } from './ExpeditionResultRepository.stub';
 
 // Export workflow repositories
 export { WorkflowRepository } from './WorkflowRepository';
@@ -33,11 +33,11 @@ import { VisionRepository } from './VisionRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 
-// Import expedition repositories
-import { ExpeditionRepository } from './ExpeditionRepository';
-import { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
-import { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
-import { ExpeditionResultRepository } from './ExpeditionResultRepository';
+// Import expedition repositories (STUB IMPLEMENTATIONS)
+import { ExpeditionRepository } from './ExpeditionRepository.stub';
+import { ExpeditionTaskRepository } from './ExpeditionTaskRepository.stub';
+import { ExpeditionMessageRepository } from './ExpeditionMessageRepository.stub';
+import { ExpeditionResultRepository } from './ExpeditionResultRepository.stub';
 
 // Import workflow repositories
 import { WorkflowRepository } from './WorkflowRepository';
@@ -67,7 +67,7 @@ export class RepositoryFactory {
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
-  // Expedition repository instances
+  // Expedition repository instances (STUB IMPLEMENTATIONS)
   private static expeditionRepo: ExpeditionRepository | null = null;
   private static expeditionTaskRepo: ExpeditionTaskRepository | null = null;
   private static expeditionMessageRepo: ExpeditionMessageRepository | null = null;
@@ -132,7 +132,7 @@ export class RepositoryFactory {
       this.visionRepo = new VisionRepository();
       this.mcpServerOptionRepo = new MCPServerOptionRepository();
 
-      // Initialize expedition repositories (no dependencies)
+      // Initialize expedition repositories (no dependencies) (STUB IMPLEMENTATIONS)
       this.expeditionRepo = new ExpeditionRepository();
       this.expeditionTaskRepo = new ExpeditionTaskRepository();
       this.expeditionMessageRepo = new ExpeditionMessageRepository();
@@ -324,7 +324,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionRepository instance (synchronous)
+   * Get ExpeditionRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionRepository(): ExpeditionRepository {
     this.ensureInitialized();
@@ -335,7 +335,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionTaskRepository instance (synchronous)
+   * Get ExpeditionTaskRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionTaskRepository(): ExpeditionTaskRepository {
     this.ensureInitialized();
@@ -346,7 +346,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionMessageRepository instance (synchronous)
+   * Get ExpeditionMessageRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionMessageRepository(): ExpeditionMessageRepository {
     this.ensureInitialized();
@@ -357,7 +357,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionResultRepository instance (synchronous)
+   * Get ExpeditionResultRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionResultRepository(): ExpeditionResultRepository {
     this.ensureInitialized();

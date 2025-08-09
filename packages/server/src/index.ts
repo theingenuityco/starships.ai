@@ -35,7 +35,7 @@ import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
-import expeditionRoutes from './routes/expeditions';
+// import expeditionRoutes from './routes/expeditions';
 import agentCommunicationRoutes from './routes/agent-communication';
 import workflowRoutes from './routes/workflows';
 import subscriptionRoutes from './routes/subscriptions';
@@ -183,7 +183,7 @@ app.use('/api', deploymentRoutes); // Enhanced MCP connector routes with Docker 
 app.use('/api', starshipRoutes);
 app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
-app.use('/api', expeditionRoutes);
+// app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
 app.use('/api/expeditions', workflowRoutes);

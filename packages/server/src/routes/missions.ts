@@ -226,7 +226,23 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       throw new ValidationError('description is required', 'description');
     }
 
+    if (!createRequest.agentIds || !Array.isArray(createRequest.agentIds)) {
+      throw new ValidationError('agentIds is required and must be an array', 'agentIds');
+    }
+
+    if (createRequest.agentIds.length === 0) {
+      throw new ValidationError('At least one agent must be assigned to the mission', 'agentIds');
+    }
+
     validateUUID(createRequest.starshipId, 'starshipId');
+
+    // Validate each agent ID is a valid UUID
+    createRequest.agentIds.forEach((agentId, index) => {
+      if (typeof agentId !== 'string') {
+        throw new ValidationError(`agentIds[${index}] must be a string`, 'agentIds');
+      }
+      validateUUID(agentId, `agentIds[${index}]`);
+    });
 
     const mission = await missionRepo.createMission(createRequest, userId);
     res.status(201).json({ mission });

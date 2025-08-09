@@ -39,14 +39,15 @@ export class MissionRepository extends BaseRepository implements MissionReposito
   async createMission(request: CreateMissionRequest, userId: string): Promise<Mission> {
     return this.executeWithErrorHandling(async () => {
       // Validate required fields
-      this.validateRequired(request, ['starshipId', 'name', 'description'], 'create');
+      this.validateRequired(request, ['starshipId', 'name', 'description', 'agentIds'], 'create');
       this.validateRequired({ userId }, ['userId'], 'create');
 
       // Validate field types
       this.validateTypes(request, {
         starshipId: 'string',
         name: 'string',
-        description: 'string'
+        description: 'string',
+        agentIds: 'object'
       }, 'create');
 
       // Validate string lengths
@@ -54,6 +55,23 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         name: { min: 1, max: 200 },
         description: { min: 1, max: 1000 }
       }, 'create');
+
+      // Validate agentIds array
+      if (!Array.isArray(request.agentIds)) {
+        this.handleValidationError([{
+          field: 'agentIds',
+          message: 'agentIds must be an array',
+          value: request.agentIds
+        }], 'create');
+      }
+
+      if (request.agentIds.length === 0) {
+        this.handleValidationError([{
+          field: 'agentIds',
+          message: 'At least one agent must be assigned to the mission',
+          value: request.agentIds
+        }], 'create');
+      }
 
       const connection = getConnection();
       const id = uuidv4();
@@ -76,6 +94,7 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         name: request.name,
         description: request.description,
         status: 'draft',
+        agentIds: request.agentIds,
         createdAt: now,
         updatedAt: now,
         createdBy: userId
@@ -265,6 +284,20 @@ export class MissionRepository extends BaseRepository implements MissionReposito
       if (updates.status !== undefined) {
         setClause.push('m.status = $status');
         params.status = updates.status;
+      }
+
+      if (updates.agentIds !== undefined) {
+        // Validate agentIds array if provided
+        if (!Array.isArray(updates.agentIds)) {
+          this.handleValidationError([{
+            field: 'agentIds',
+            message: 'agentIds must be an array',
+            value: updates.agentIds
+          }], 'update');
+        }
+        
+        setClause.push('m.agentIds = $agentIds');
+        params.agentIds = updates.agentIds;
       }
 
       const query = `

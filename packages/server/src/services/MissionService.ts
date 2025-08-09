@@ -26,6 +26,7 @@ export class MissionService {
   static async createMission(request: CreateMissionRequest, userId: string): Promise<Mission> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
 
     // Verify that the starship exists and user has access
     try {
@@ -35,6 +36,27 @@ export class MissionService {
         throw new NotFoundError('Starship not found', 'Starship', request.starshipId);
       }
       throw error;
+    }
+
+    // Verify all assigned agents exist and belong to this starship
+    for (const agentId of request.agentIds) {
+      try {
+        const agent = await agentRepo.findById(agentId);
+        if (!agent) {
+          throw new NotFoundError('Agent not found', 'Agent', agentId);
+        }
+        if (agent.starshipId !== request.starshipId) {
+          throw new ValidationError(
+            `Agent ${agentId} does not belong to starship ${request.starshipId}`,
+            'agentIds'
+          );
+        }
+      } catch (error) {
+        if (error instanceof NotFoundError) {
+          throw new NotFoundError('Agent not found', 'Agent', agentId);
+        }
+        throw error;
+      }
     }
 
     // Validate mission name is unique for this starship (optional business rule)
@@ -109,6 +131,7 @@ export class MissionService {
     userId?: string
   ): Promise<Mission> {
     const missionRepo = RepositoryFactory.getMissionRepository();
+    const agentRepo = RepositoryFactory.getAgentRepository();
 
     // Get existing mission first
     const existingMission = await missionRepo.getMissionById(id);
@@ -116,6 +139,29 @@ export class MissionService {
     // Business logic validation for status transitions
     if (updates.status && updates.status !== existingMission.status) {
       this.validateStatusTransition(existingMission.status, updates.status);
+    }
+
+    // Validate agent assignments if being updated
+    if (updates.agentIds) {
+      for (const agentId of updates.agentIds) {
+        try {
+          const agent = await agentRepo.findById(agentId);
+          if (!agent) {
+            throw new NotFoundError('Agent not found', 'Agent', agentId);
+          }
+          if (agent.starshipId !== existingMission.starshipId) {
+            throw new ValidationError(
+              `Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`,
+              'agentIds'
+            );
+          }
+        } catch (error) {
+          if (error instanceof NotFoundError) {
+            throw new NotFoundError('Agent not found', 'Agent', agentId);
+          }
+          throw error;
+        }
+      }
     }
 
     // If updating name, check for duplicates

@@ -18,6 +18,7 @@ export interface Mission {
   name: string;
   description: string;
   status: MissionStatus;
+  agentIds: string[]; // Assigned agent IDs from starship's crew
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
@@ -44,6 +45,7 @@ export interface CreateMissionRequest {
   starshipId: string;
   name: string;
   description: string;
+  agentIds: string[]; // Agent IDs to assign to this mission
 }
 
 /**
@@ -53,6 +55,7 @@ export interface UpdateMissionRequest {
   name?: string;
   description?: string;
   status?: MissionStatus;
+  agentIds?: string[]; // Update agent assignments
 }
 
 /**

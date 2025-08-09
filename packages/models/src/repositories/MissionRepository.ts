@@ -1,6 +1,8 @@
 import { getConnection } from '../connection';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
+import { int } from 'neo4j-driver';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../utils/neo4j-helpers';
 import {
   Mission,
   MissionStatus,
@@ -445,7 +447,7 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         throw new Error('Failed to save message');
       }
 
-      return result[0].msg;
+      return convertNeo4jIntsInObject(result[0].msg);
     }, 'saveMessage', 'MissionMessage');
   }
 
@@ -467,15 +469,15 @@ export class MissionRepository extends BaseRepository implements MissionReposito
       if (limit !== undefined && limit > 0) {
         if (offset !== undefined && offset > 0) {
           query += ` SKIP $offset`;
-          params.offset = offset;
+          params.offset = int(Math.floor(offset));
         }
         query += ` LIMIT $limit`;
-        params.limit = limit;
+        params.limit = int(Math.floor(limit));
       }
 
       const result = await connection.executeQuery<{ msg: MissionMessage }>(query, params);
 
-      return result?.map(record => record.msg) || [];
+      return convertNeo4jIntsInArray(result?.map(record => record.msg) || []);
     }, 'getMessagesByMission', 'MissionMessage');
   }
 
@@ -491,7 +493,9 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         { missionId }
       );
 
-      return result?.[0]?.count || 0;
+      const count = result?.[0]?.count || 0;
+      // Convert Neo4j integer to regular number
+      return convertNeo4jIntsInObject({ count }).count;
     }, 'getMessageCount', 'MissionMessage');
   }
 
@@ -526,10 +530,13 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         }], 'getMessagesByMissionWithPagination');
       }
 
+      // Calculate offset as regular number
+      const offset = (page - 1) * pageSize;
+
       // Get total count and messages in parallel
       const [total, messages] = await Promise.all([
         this.getMessageCount(missionId),
-        this.getMessagesByMission(missionId, pageSize, (page - 1) * pageSize)
+        this.getMessagesByMission(missionId, pageSize, offset)
       ]);
 
       const totalPages = Math.ceil(total / pageSize);

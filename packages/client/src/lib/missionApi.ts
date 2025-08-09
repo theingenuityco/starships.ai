@@ -10,7 +10,10 @@ import type {
   MissionFilters,
   MissionSort,
   MissionListResponse,
-  MissionResponse
+  MissionResponse,
+  MissionMessage,
+  SendMissionMessageRequest,
+  MissionChatResponse
 } from '@starships/protocol';
 import api from './api';
 
@@ -36,6 +39,10 @@ async function apiRequest<T>(
       data: options.body ? JSON.parse(options.body) : undefined,
     });
 
+    // Handle server response format { success: true, data: actualData }
+    if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+      return { data: response.data.data };
+    }
     return { data: response.data };
   } catch (error: any) {
     const errorMessage = error.response?.data?.error || error.message || 'Network error';
@@ -170,5 +177,25 @@ export const missionApi = {
 
   async cancelMission(id: string): Promise<ApiResponse<MissionResponse>> {
     return this.updateMission(id, { status: 'cancelled' });
+  },
+
+  /**
+   * Chat functions
+   */
+  async initializeChat(missionId: string): Promise<ApiResponse<any>> {
+    return apiRequest<any>(`/api/missions/${missionId}/initialize-chat`, {
+      method: 'GET'
+    });
+  },
+
+  async sendMessage(missionId: string, content: string): Promise<ApiResponse<MissionChatResponse>> {
+    return apiRequest<MissionChatResponse>(`/api/missions/${missionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content })
+    });
+  },
+
+  async getMessageHistory(missionId: string): Promise<ApiResponse<{ messages: MissionMessage[] }>> {
+    return apiRequest<{ messages: MissionMessage[] }>(`/api/missions/${missionId}/messages`);
   }
 };

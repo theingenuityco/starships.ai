@@ -53,7 +53,7 @@ export default function MissionsPage({ params }: MissionsPageProps) {
   return (
     <div className="h-full command-deck-bg p-8">
       <div className="max-w-6xl mx-auto">
-        <MissionList starshipId={starship.id} showCreateButton={true} />
+        <MissionList starshipId={starship.id} starshipSlug={slug} showCreateButton={true} />
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { 
   Target,
   Plus,
@@ -50,6 +51,7 @@ import type {
 
 interface MissionListProps {
   starshipId?: string;
+  starshipSlug?: string;
   showCreateButton?: boolean;
 }
 
@@ -69,7 +71,7 @@ const statusColors: Record<MissionStatus, string> = {
   cancelled: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
 };
 
-export function MissionList({ starshipId, showCreateButton = true }: MissionListProps) {
+export function MissionList({ starshipId, starshipSlug, showCreateButton = true }: MissionListProps) {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +81,7 @@ export function MissionList({ starshipId, showCreateButton = true }: MissionList
   const [sort, setSort] = useState<MissionSort>({ field: 'createdAt', direction: 'desc' });
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+  const router = useRouter();
 
   // Load missions
   const loadMissions = async () => {
@@ -176,6 +179,13 @@ export function MissionList({ starshipId, showCreateButton = true }: MissionList
   // Status transition actions
   const handleStatusChange = async (mission: Mission, newStatus: MissionStatus) => {
     await handleUpdateMission(mission.id, { status: newStatus });
+  };
+
+  // Navigate to mission detail
+  const handleMissionClick = (mission: Mission) => {
+    if (starshipSlug) {
+      router.push(`/ship/${starshipSlug}/missions/${mission.id}`);
+    }
   };
 
   if (loading) {
@@ -310,6 +320,7 @@ export function MissionList({ starshipId, showCreateButton = true }: MissionList
                   onEdit={setEditingMission}
                   onDelete={handleDeleteMission}
                   onStatusChange={handleStatusChange}
+                  onClick={handleMissionClick}
                 />
               </motion.div>
             ))}
@@ -338,15 +349,17 @@ function MissionCard({
   mission, 
   onEdit, 
   onDelete, 
-  onStatusChange 
+  onStatusChange,
+  onClick 
 }: {
   mission: Mission;
   onEdit: (mission: Mission) => void;
   onDelete: (id: string) => void;
   onStatusChange: (mission: Mission, status: MissionStatus) => void;
+  onClick: (mission: Mission) => void;
 }) {
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onClick(mission)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -367,14 +380,20 @@ function MissionCard({
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onEdit(mission)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(mission);
+              }}
             >
               <Edit className="w-4 h-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onDelete(mission.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(mission.id);
+              }}
               className="text-destructive hover:text-destructive"
             >
               <Trash2 className="w-4 h-4" />
@@ -400,7 +419,10 @@ function MissionCard({
           {mission.status === 'draft' && (
             <Button
               size="sm"
-              onClick={() => onStatusChange(mission, 'active')}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStatusChange(mission, 'active');
+              }}
             >
               <Play className="w-3 h-3 mr-1" />
               Start
@@ -412,7 +434,10 @@ function MissionCard({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onStatusChange(mission, 'completed')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(mission, 'completed');
+                }}
               >
                 <CheckCircle className="w-3 h-3 mr-1" />
                 Complete
@@ -420,7 +445,10 @@ function MissionCard({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onStatusChange(mission, 'failed')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(mission, 'failed');
+                }}
               >
                 <XCircle className="w-3 h-3 mr-1" />
                 Fail
@@ -432,7 +460,10 @@ function MissionCard({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onStatusChange(mission, 'cancelled')}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStatusChange(mission, 'cancelled');
+              }}
             >
               <AlertCircle className="w-3 h-3 mr-1" />
               Cancel

@@ -5,6 +5,7 @@
  * using basic LangChain integration with mission context awareness.
  */
 
+import { StateGraph, END, START, Annotation } from '@langchain/langgraph';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
@@ -38,6 +39,16 @@ interface MissionContext {
 }
 
 /**
+ * LangGraph state annotation for mission chat
+ */
+const MissionChatStateAnnotation = Annotation.Root({
+  message: Annotation<string>(),
+  missionId: Annotation<string>(),
+  missionContext: Annotation<MissionContext | null>(),
+  response: Annotation<string>()
+});
+
+/**
  * MissionOrchestratorAgent - Generates intelligent AI responses for mission coordination
  */
 export class MissionOrchestratorAgent {
@@ -67,6 +78,40 @@ export class MissionOrchestratorAgent {
   }
 
   /**
+   * Create LangGraph workflow for mission chat
+   */
+  private async createMissionChatGraph() {
+    return new StateGraph(MissionChatStateAnnotation)
+      .addNode("build_context", async (state) => {
+        this.logger.info('Building mission context', {
+          service: 'MissionOrchestratorAgent',
+          operation: 'build_context',
+          resource: 'mission',
+          resourceId: state.missionId
+        });
+        
+        const missionContext = await this.buildMissionContext(state.missionId);
+        return { ...state, missionContext };
+      })
+      .addNode("generate_response", async (state) => {
+        this.logger.info('Generating AI response', {
+          service: 'MissionOrchestratorAgent', 
+          operation: 'generate_response',
+          resource: 'mission',
+          resourceId: state.missionId
+        });
+
+        const prompt = this.buildPrompt(state.message, state.missionContext!);
+        const response = await this.callLLM(prompt);
+        return { ...state, response };
+      })
+      .addEdge(START, "build_context")
+      .addEdge("build_context", "generate_response")
+      .addEdge("generate_response", END)
+      .compile();
+  }
+
+  /**
    * Generate AI response for a user message with mission context
    */
   async generateResponse(message: string, missionId: string): Promise<string> {
@@ -81,22 +126,24 @@ export class MissionOrchestratorAgent {
     this.logger.info('Generating orchestrator response', context);
 
     try {
-      // Build mission context (includes recent history from database)
-      const missionContext = await this.buildMissionContext(missionId);
-
-      // Generate AI response
-      const prompt = this.buildPrompt(message, missionContext);
-      const response = await this.callLLM(prompt);
+      // Use LangGraph workflow instead of direct calls
+      const graph = await this.createMissionChatGraph();
+      const result = await graph.invoke({ 
+        message, 
+        missionId, 
+        missionContext: null,
+        response: ''
+      });
 
       this.logger.info('Generated orchestrator response successfully', {
         ...context,
         metadata: { 
           ...context.metadata,
-          responseLength: response?.length 
+          responseLength: result.response?.length 
         }
       });
 
-      return response;
+      return result.response;
 
     } catch (error) {
       this.logger.error('Failed to generate orchestrator response', context, error as Error);

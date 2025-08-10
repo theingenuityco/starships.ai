@@ -4,6 +4,7 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
+import { ServiceFactory } from './index';
 import type {
   Mission,
   CreateMissionRequest,
@@ -77,7 +78,21 @@ export class MissionService {
       );
     }
 
-    return await missionRepo.createMission(request, userId);
+    const mission = await missionRepo.createMission(request, userId);
+
+    // Auto-trigger welcome message
+    try {
+      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      await missionOrchestratorService.handleSystemMessage(
+        mission.id, 
+        `Welcome to your new mission: "${mission.name}". This mission was just created and is ready to begin.`
+      );
+    } catch (error) {
+      console.error('Failed to trigger welcome message:', error);
+      // Silent fail - welcome can be triggered later
+    }
+
+    return mission;
   }
 
   /**

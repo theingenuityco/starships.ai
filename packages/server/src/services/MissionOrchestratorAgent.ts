@@ -6,7 +6,7 @@
  */
 
 import { StateGraph, END, START, Annotation, MemorySaver, MessagesAnnotation } from '@langchain/langgraph';
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
@@ -48,6 +48,10 @@ const MissionChatStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec, // Standard messages handling
   missionId: Annotation<string>(),
   currentPhase: Annotation<MissionPhase>(),
+  isSystemInitiated: Annotation<boolean>({
+    value: (x, y) => y ?? x,
+    default: () => false
+  }),
   metadata: Annotation<MissionMetadata | null>({
     value: (x, y) => y ?? x,
     default: () => null
@@ -61,6 +65,7 @@ const MissionChatStateAnnotation = Annotation.Root({
 export type MissionChatState = typeof MessagesAnnotation.State & {
   missionId: string;
   currentPhase: MissionPhase;
+  isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
 };
 
@@ -132,17 +137,13 @@ export class MissionOrchestratorAgent {
       updates.metadata = metadata;
       updates.currentPhase = metadata.mission.phase;
       
-      // Auto-transition from 'init' to 'welcome' phase after context is successfully built
-      if (metadata.mission.phase === 'init') {
+      // For system-initiated messages, auto-transition to welcome if in init
+      if (state.isSystemInitiated && metadata.mission.phase === 'init') {
         try {
           await MissionService.updateMissionPhase(state.missionId, 'welcome');
-          updates.currentPhase = 'welcome'; // Update the state for this execution
+          updates.currentPhase = 'welcome';
         } catch (error) {
-          this.logger.error('Failed to auto-transition from init to welcome phase', {
-            service: 'MissionOrchestratorAgent',
-            operation: 'contextBuilderNode',
-            missionId: state.missionId
-          }, error as Error);
+          this.logger.error('Failed to auto-transition phase', error as Error);
         }
       }
     }
@@ -193,6 +194,8 @@ COMMUNICATION STYLE:
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
     const context = this.buildContext(state);
+    const latestMessage = state.messages[state.messages.length - 1];
+    const systemMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
     
     const systemPrompt = `${context}
 
@@ -203,20 +206,17 @@ WELCOME PHASE - Your primary responsibilities:
 - Encourage questions about the mission
 - Be welcoming, informative, and encouraging
 
+${state.isSystemInitiated ? `System message: "${systemMessage}"` : ''}
+
 Generate a welcoming message that introduces the mission and explains how you can help.`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    // Auto-transition from 'welcome' to 'converse' phase after welcome message
     try {
       await MissionService.updateMissionPhase(state.missionId, 'converse');
     } catch (error) {
-      this.logger.error('Failed to auto-transition mission phase', {
-        service: 'MissionOrchestratorAgent',
-        operation: 'welcomePhaseNode',
-        missionId: state.missionId
-      }, error as Error);
+      this.logger.error('Failed to transition phase', error as Error);
     }
     
     const aiMessage = new AIMessage({ content: responseContent });
@@ -351,6 +351,39 @@ Provide a helpful response based on the mission context.`;
 
 
 
+  /**
+   * Generate system-initiated response (no user input required)
+   */
+  async generateSystemResponse(missionId: string, message: string): Promise<string> {
+    try {
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      const systemMessage = new SystemMessage({ 
+        content: message
+      });
+      
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [systemMessage],
+          isSystemInitiated: true
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      const lastMessage = result.messages[result.messages.length - 1];
+      if (lastMessage instanceof AIMessage) {
+        return typeof lastMessage.content === 'string' ? lastMessage.content : '';
+      }
+
+      return this.getFallbackResponse(missionId);
+
+    } catch (error) {
+      this.logger.error('Failed to generate system response', error as Error);
+      return this.getFallbackResponse(missionId);
+    }
+  }
 
 
   /**

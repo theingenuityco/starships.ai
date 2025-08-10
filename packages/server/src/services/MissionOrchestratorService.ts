@@ -389,4 +389,25 @@ export class MissionOrchestratorService {
       });
     }
   }
+
+  /**
+   * Handle system-initiated messages
+   */
+  async handleSystemMessage(missionId: string, message: string): Promise<string> {
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      await missionRepo.getMissionById(missionId);
+
+      const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
+      const aiResponse = await orchestrator.generateSystemResponse(missionId, message);
+
+      const savedSystemMessage = await this.saveSystemMessage(missionId, aiResponse);
+      this.emitMessageEvent(missionId, savedSystemMessage);
+
+      return aiResponse;
+    } catch (error) {
+      this.logger.error('Failed to handle system message', error as Error);
+      throw error;
+    }
+  }
 }

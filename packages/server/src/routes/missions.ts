@@ -6,6 +6,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { RepositoryFactory } from '@starships/models';
 import { ServiceFactory } from '../services';
+import { MissionService } from '../services/MissionService';
 import type {
   Mission,
   CreateMissionRequest,
@@ -248,7 +249,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       validateUUID(agentId, `agentIds[${index}]`);
     });
 
-    const mission = await missionRepo.createMission(createRequest, userId);
+    const mission = await MissionService.createMission(createRequest, userId);
     res.status(201).json({ mission });
 
   } catch (error) {

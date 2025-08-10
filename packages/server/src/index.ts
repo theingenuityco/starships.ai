@@ -39,6 +39,7 @@ import agentTemplateRoutes from './routes/agent-templates';
 import expeditionRoutes from './routes/expeditions';
 import agentCommunicationRoutes from './routes/agent-communication';
 import { AgentService } from './services/AgentService';
+import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
 // Import new error handling and health check routes
 import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -130,6 +131,7 @@ const starshipRepository = new StarshipRepository();
 const visionRepository = new VisionRepository();
 // Middleware - Order is important!
 app.use(cors());
+app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 app.use(express.json());
 
 // Add error handling middleware
@@ -143,11 +145,17 @@ app.use('/health', healthRoutes);
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
+  userRepository,
   mcpServerOptionRepository,
   mcpServerConnectorRepository,
   connectorConfigTemplateRepository,
   connectorConfigHistoryRepository,
   visionRepository,
+});
+
+// Initialize webhook routes with dependencies
+initializeWebhookRoutes({
+  starshipRepository,
 });
 
 // Initialize vision routes with dependencies
@@ -174,6 +182,19 @@ const deploymentRoutes = createDeploymentApiRoutes({
   mcpServerOptionRepo: mcpServerOptionRepository,
   enableDockerDeployment: true,
   authMiddleware
+});
+
+// Public pricing endpoint - must be before auth-protected routes
+app.get('/api/starships/pricing', async (req, res) => {
+  try {
+    const { SubscriptionService } = await import('./services/SubscriptionService');
+    const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
+    const pricing = await subscriptionService.getPricingData();
+    res.json(pricing);
+  } catch (error) {
+    console.error('Failed to fetch pricing:', error);
+    res.status(500).json({ error: 'Failed to fetch pricing' });
+  }
 });
 
 // API Routes

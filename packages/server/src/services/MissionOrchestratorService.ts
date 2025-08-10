@@ -154,24 +154,23 @@ export class MissionOrchestratorService {
     this.logger.info('Handling user message', context);
 
     try {
-      // Allow empty messages for initial greeting through LangGraph workflow
-      // The LangGraph buildPrompt will handle empty messages by creating a greeting scenario
-
       // Check if mission exists
       const missionRepo = RepositoryFactory.getMissionRepository();
       await missionRepo.getMissionById(missionId); // Will throw if not found
 
-      // Only save and emit user message if it's not empty (for initial greeting scenarios)
-      let savedUserMessage: MissionMessage | null = null;
-      if (message?.trim()) {
-        savedUserMessage = await this.saveUserMessage(missionId, userId, message);
-        this.emitMessageEvent(missionId, savedUserMessage);
+      // Validate message content
+      if (!message?.trim()) {
+        throw ErrorFactory.validation([
+          { field: 'message', message: 'Message content is required' }
+        ], context);
       }
 
-      // Get or create orchestrator agent
-      const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
+      // Save user message
+      const savedUserMessage = await this.saveUserMessage(missionId, userId, message);
+      this.emitMessageEvent(missionId, savedUserMessage);
 
-      // Generate AI response
+      // Always use LangGraph for all responses (greetings + conversations)
+      const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
       const aiResponse = await orchestrator.generateResponse(message, missionId);
 
       // Save orchestrator response to database
@@ -180,7 +179,7 @@ export class MissionOrchestratorService {
       // Emit orchestrator response event
       this.emitMessageEvent(missionId, savedOrchestratorMessage);
 
-      this.logger.info('Successfully handled user message', {
+      this.logger.info('Successfully handled user message via LangGraph', {
         ...context,
         metadata: {
           ...context.metadata,

@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { missionApi } from '@/lib/missionApi';
 import { starshipAPI } from '@/lib/api';
+import { useSocket } from '@/providers/socket-provider';
+import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage } from '@starships/protocol';
 
 interface MissionDetailPageProps {
@@ -47,6 +49,38 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // WebSocket state
+  const { isConnected } = useSocket();
+  const socketClient = SocketClient.getInstance();
+
+  // Central message handler - single source of truth
+  const addMessageToUI = (message: MissionMessage) => {
+    setMessages(prev => [...prev, message]);
+  };
+
+  // WebSocket setup for mission messages
+  useEffect(() => {
+    if (!isConnected || !socketClient) return;
+
+    const handleMissionMessage = (data: any) => {
+      console.log('[MISSION] Received WebSocket message:', data);
+      if (data.message && data.missionId === missionId) {
+        addMessageToUI(data.message);
+      }
+    };
+
+    // Listen for mission messages
+    socketClient.on('mission:message-sent', handleMissionMessage);
+
+    // Join mission room for real-time updates
+    socketClient.emit('mission:join-room', missionId);
+
+    return () => {
+      socketClient.off('mission:message-sent', handleMissionMessage);
+      socketClient.emit('mission:leave-room', missionId);
+    };
+  }, [isConnected, missionId, socketClient]);
+
   useEffect(() => {
     const loadMission = async () => {
       try {
@@ -59,15 +93,10 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         } else if (response.data) {
           setMission(response.data.mission);
           
-          // Load chat history
+          // Load chat history - LangGraph will handle greetings automatically
           const historyResponse = await missionApi.getMessageHistory(missionId);
           if (historyResponse.data) {
             setMessages(historyResponse.data.messages);
-            
-            // If no messages exist, generate initial greeting through LangGraph
-            if (historyResponse.data.messages.length === 0) {
-              await generateInitialGreeting(missionId);
-            }
           }
         }
       } catch (err) {
@@ -92,50 +121,35 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     scrollToBottom();
   }, [messages]);
 
-  const generateInitialGreeting = async (missionId: string) => {
-    setChatLoading(true);
-    try {
-      // Generate greeting through LangGraph workflow - no user message needed for first interaction
-      const response = await missionApi.sendMessage(missionId, '');
-      
-      if (response.data) {
-        const greetingMessage: MissionMessage = {
-          id: `greeting-${Date.now()}`,
-          missionId,
-          role: 'orchestrator',
-          content: response.data.reply,
-          timestamp: new Date().toISOString(),
-          senderName: 'Mission Orchestrator'
-        };
-        setMessages([greetingMessage]);
-      }
-    } catch (error) {
-      console.error('Failed to generate initial greeting:', error);
-    } finally {
-      setChatLoading(false);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || chatLoading) return;
 
-    const userMessage: MissionMessage = {
-      id: `user-${Date.now()}`,
-      missionId,
-      role: 'user',
-      content: newMessage,
-      timestamp: new Date().toISOString(),
-      senderName: 'You'
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    const messageContent = newMessage;
     setNewMessage('');
     setChatLoading(true);
 
     try {
-      const response = await missionApi.sendMessage(missionId, newMessage);
+      // WebSocket-first: Server saves messages to DB and emits WebSocket events  
+      // WebSocket handler will automatically add both user and orchestrator messages to UI
+      const response = await missionApi.sendMessage(missionId, messageContent);
       
-      if (response.data) {
+      // HTTP fallback: Only add messages if WebSocket is not connected
+      if (!isConnected && response.data) {
+        console.log('[MISSION] WebSocket disconnected, using HTTP fallback for messages');
+        
+        // Add user message
+        const userMessage: MissionMessage = {
+          id: `user-${Date.now()}`,
+          missionId,
+          role: 'user',
+          content: messageContent,
+          timestamp: new Date().toISOString(),
+          senderName: 'You'
+        };
+        addMessageToUI(userMessage);
+        
+        // Add orchestrator response
         const orchestratorMessage: MissionMessage = {
           id: `orchestrator-${Date.now()}`,
           missionId,
@@ -144,10 +158,21 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           timestamp: new Date().toISOString(),
           senderName: 'Mission Orchestrator'
         };
-        setMessages(prev => [...prev, orchestratorMessage]);
+        addMessageToUI(orchestratorMessage);
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      
+      // On error, always show user message (they typed it)
+      const userMessage: MissionMessage = {
+        id: `user-error-${Date.now()}`,
+        missionId,
+        role: 'user',
+        content: messageContent,
+        timestamp: new Date().toISOString(),
+        senderName: 'You'
+      };
+      addMessageToUI(userMessage);
     } finally {
       setChatLoading(false);
     }

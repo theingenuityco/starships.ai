@@ -78,7 +78,7 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Create LangGraph workflow for mission chat
+   * Create LangGraph workflow for mission chat conversations
    */
   private async createMissionChatGraph() {
     return new StateGraph(MissionChatStateAnnotation)
@@ -270,7 +270,7 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Build LLM prompt with mission context and conversation history
+   * Build LLM prompt with mission context for conversations
    */
   private buildPrompt(userMessage: string, missionContext: MissionContext): LLMChatPrompt {
     const { mission, starship, vision, chatHistory } = missionContext;
@@ -301,7 +301,8 @@ ROLE & RESPONSIBILITIES:
 
 COMMUNICATION STYLE:
 - Professional but approachable
-- Clear and direct
+- Clear, direct, and concise
+- Keep responses brief (2-3 sentences max for greetings)
 - Action-oriented suggestions
 - Mission-context and vision-aware responses`;
 
@@ -310,27 +311,18 @@ COMMUNICATION STYLE:
       { role: 'system', content: systemPrompt }
     ];
 
-    // Handle first interaction (no chat history) vs ongoing conversation
-    if (chatHistory.length === 0) {
-      // First interaction - create a greeting scenario
-      messages.push({ 
-        role: 'user', 
-        content: 'Hello! I just started this mission and would like an introduction from the Mission Orchestrator.' 
-      });
-    } else {
-      // Ongoing conversation - add chat history for context
-      chatHistory.forEach(message => {
-        if (message.role === 'user') {
-          messages.push({ role: 'user', content: message.content });
-        } else if (message.role === 'orchestrator') {
-          messages.push({ role: 'assistant', content: message.content });
-        }
-        // Skip system messages in conversation context
-      });
+    // Add chat history for context
+    chatHistory.forEach(message => {
+      if (message.role === 'user') {
+        messages.push({ role: 'user', content: message.content });
+      } else if (message.role === 'orchestrator') {
+        messages.push({ role: 'assistant', content: message.content });
+      }
+      // Skip system messages in conversation context
+    });
 
-      // Add current user message
-      messages.push({ role: 'user', content: userMessage });
-    }
+    // Add current user message
+    messages.push({ role: 'user', content: userMessage });
 
     return { messages };
   }

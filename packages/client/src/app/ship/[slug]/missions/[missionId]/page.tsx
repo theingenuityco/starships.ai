@@ -63,21 +63,10 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           const historyResponse = await missionApi.getMessageHistory(missionId);
           if (historyResponse.data) {
             setMessages(historyResponse.data.messages);
-          }
-          
-          // Initialize chat if no messages exist
-          if (!historyResponse.data?.messages.length) {
-            const initResponse = await missionApi.initializeChat(missionId);
-            if (initResponse.data?.greeting) {
-              const greetingMessage: MissionMessage = {
-                id: `greeting-${Date.now()}`,
-                missionId,
-                role: 'orchestrator',
-                content: initResponse.data.greeting.reply,
-                timestamp: new Date().toISOString(),
-                senderName: 'Mission Orchestrator'
-              };
-              setMessages([greetingMessage]);
+            
+            // If no messages exist, generate initial greeting through LangGraph
+            if (historyResponse.data.messages.length === 0) {
+              await generateInitialGreeting(missionId);
             }
           }
         }
@@ -102,6 +91,30 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const generateInitialGreeting = async (missionId: string) => {
+    setChatLoading(true);
+    try {
+      // Generate greeting through LangGraph workflow - no user message needed for first interaction
+      const response = await missionApi.sendMessage(missionId, '');
+      
+      if (response.data) {
+        const greetingMessage: MissionMessage = {
+          id: `greeting-${Date.now()}`,
+          missionId,
+          role: 'orchestrator',
+          content: response.data.reply,
+          timestamp: new Date().toISOString(),
+          senderName: 'Mission Orchestrator'
+        };
+        setMessages([greetingMessage]);
+      }
+    } catch (error) {
+      console.error('Failed to generate initial greeting:', error);
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || chatLoading) return;

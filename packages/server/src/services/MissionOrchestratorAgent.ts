@@ -310,18 +310,27 @@ COMMUNICATION STYLE:
       { role: 'system', content: systemPrompt }
     ];
 
-    // Add recent conversation history for context
-    chatHistory.forEach(message => {
-      if (message.role === 'user') {
-        messages.push({ role: 'user', content: message.content });
-      } else if (message.role === 'orchestrator') {
-        messages.push({ role: 'assistant', content: message.content });
-      }
-      // Skip system messages in conversation context
-    });
+    // Handle first interaction (no chat history) vs ongoing conversation
+    if (chatHistory.length === 0) {
+      // First interaction - create a greeting scenario
+      messages.push({ 
+        role: 'user', 
+        content: 'Hello! I just started this mission and would like an introduction from the Mission Orchestrator.' 
+      });
+    } else {
+      // Ongoing conversation - add chat history for context
+      chatHistory.forEach(message => {
+        if (message.role === 'user') {
+          messages.push({ role: 'user', content: message.content });
+        } else if (message.role === 'orchestrator') {
+          messages.push({ role: 'assistant', content: message.content });
+        }
+        // Skip system messages in conversation context
+      });
 
-    // Add current user message
-    messages.push({ role: 'user', content: userMessage });
+      // Add current user message
+      messages.push({ role: 'user', content: userMessage });
+    }
 
     return { messages };
   }

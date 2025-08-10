@@ -182,12 +182,6 @@ export const missionApi = {
   /**
    * Chat functions
    */
-  async initializeChat(missionId: string): Promise<ApiResponse<any>> {
-    return apiRequest<any>(`/api/missions/${missionId}/initialize-chat`, {
-      method: 'GET'
-    });
-  },
-
   async sendMessage(missionId: string, content: string): Promise<ApiResponse<MissionChatResponse>> {
     return apiRequest<MissionChatResponse>(`/api/missions/${missionId}/messages`, {
       method: 'POST',

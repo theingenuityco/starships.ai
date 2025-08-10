@@ -450,9 +450,20 @@ export function validateSendMissionMessage(req: Request, res: Response, next: Ne
   const body = req.body as SendMissionMessageRequest;
   let errors: ValidationError[] = [];
   
-  // Required content field
-  errors = errors.concat(validateRequired(body, ['content']));
-  errors = errors.concat(validateStringLength(body, 'content', 1, 5000)); // Max 5000 chars
+  // Content field - required but can be empty for initial greeting
+  if (body.content === undefined || body.content === null) {
+    errors.push({
+      field: 'content',
+      message: 'Content field is required',
+      value: body.content
+    });
+  } else if (body.content.length > 5000) {
+    errors.push({
+      field: 'content', 
+      message: 'Content must be 5000 characters or less',
+      value: body.content?.length
+    });
+  }
   
   if (errors.length > 0) {
     sendValidationError(res, errors);

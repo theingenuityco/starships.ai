@@ -18,6 +18,7 @@ export interface Mission {
   name: string;
   description: string;
   status: MissionStatus;
+  phase: MissionPhase;
   agentIds: string[]; // Assigned agent IDs from starship's crew
   createdAt: string;
   updatedAt: string;
@@ -33,6 +34,13 @@ export type MissionStatus =
   | 'completed'    // Successfully finished
   | 'failed'       // Failed to complete
   | 'cancelled';   // Cancelled by user
+
+/**
+ * Mission phase - controls chat behavior and UI sections
+ */
+export type MissionPhase = 
+  | 'welcome'      // Initial welcome and mission introduction
+  | 'converse';    // General conversation and mission guidance
 
 // ============================================================================
 // REQUEST/RESPONSE TYPES

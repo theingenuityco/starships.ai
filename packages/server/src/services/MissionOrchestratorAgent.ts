@@ -13,6 +13,7 @@ import { Logger } from '../utils/logger';
 import type { 
   Mission, 
   MissionMessage,
+  MissionPhase,
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
@@ -45,6 +46,7 @@ interface MissionMetadata {
 const MissionChatStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec, // Standard messages handling
   missionId: Annotation<string>(),
+  currentPhase: Annotation<MissionPhase>(),
   metadata: Annotation<MissionMetadata | null>({
     value: (x, y) => y ?? x,
     default: () => null
@@ -57,6 +59,7 @@ const MissionChatStateAnnotation = Annotation.Root({
  */
 export type MissionChatState = typeof MessagesAnnotation.State & {
   missionId: string;
+  currentPhase: MissionPhase;
   metadata: MissionMetadata | null;
 };
 
@@ -92,11 +95,22 @@ export class MissionOrchestratorAgent {
   private async getGraph() {
     if (!this.compiledGraph) {
       this.compiledGraph = new StateGraph(MissionChatStateAnnotation)
-        .addNode("ensure_metadata", this.ensureMetadataNode.bind(this))
-        .addNode("generate_response", this.generateResponseNode.bind(this))
-        .addEdge(START, "ensure_metadata")
-        .addEdge("ensure_metadata", "generate_response")
-        .addEdge("generate_response", END)
+        .addNode("context_builder", this.contextBuilderNode.bind(this))
+        .addNode("phase_router", this.phaseRouterNode.bind(this))
+        .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
+        .addNode("converse_phase", this.conversePhaseNode.bind(this))
+        .addEdge(START, "context_builder")
+        .addEdge("context_builder", "phase_router")
+        .addConditionalEdges(
+          "phase_router",
+          this.determinePhaseRoute.bind(this),
+          {
+            welcome: "welcome_phase",
+            converse: "converse_phase"
+          }
+        )
+        .addEdge("welcome_phase", END)
+        .addEdge("converse_phase", END)
         .compile({ checkpointer: this.checkpointer });
     }
     
@@ -104,32 +118,111 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Load mission metadata once per conversation
+   * Build mission context - loads metadata and sets current phase
    */
-  private async ensureMetadataNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+  private async contextBuilderNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    const updates: Partial<MissionChatState> = {};
+    
     if (!state.metadata) {
       if (!state.missionId) {
         throw new Error('missionId is required in state');
       }
       
       const metadata = await this.loadMissionMetadata(state.missionId);
-      return { metadata };
+      updates.metadata = metadata;
+      updates.currentPhase = metadata.mission.phase;
     }
     
-    return {}; // No changes needed
+    return updates;
   }
 
   /**
-   * Generate response using cached metadata - Standard MessagesAnnotation pattern
+   * Phase router node - determines which phase-specific node to execute
    */
-  private async generateResponseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    // Use state.metadata which is guaranteed to exist by previous node
-    const prompt = this.buildPrompt(state.metadata!);
+  private async phaseRouterNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    // Router node doesn't modify state, just passes it through
+    return {};
+  }
+
+  /**
+   * Conditional edge function to determine phase routing
+   */
+  private determinePhaseRoute(state: MissionChatState): string {
+    return state.currentPhase; // Returns 'welcome' or 'converse'
+  }
+
+  /**
+   * Welcome phase node - handles initial mission introduction
+   */
+  private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    const latestMessage = state.messages[state.messages.length - 1];
+    const promptMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
+    
+    const { metadata } = state;
+    const { mission, starship, vision } = metadata!;
+    
+    const systemPrompt = `You are a Mission Orchestrator AI providing a warm welcome.
+
+WELCOME PHASE - Your primary responsibilities:
+- Provide a friendly introduction to the mission
+- Explain the mission objectives clearly  
+- Outline how you can assist the user
+- Encourage questions about the mission
+- Be welcoming, informative, and encouraging
+
+MISSION CONTEXT:
+- Mission: "${mission.name}"
+- Description: ${mission.description}
+- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
+- Vision: "${vision.statement}"
+- Status: ${mission.status}
+
+CURRENT PROMPT MESSAGE: "${promptMessage}"
+
+Be warm, welcoming, and focus on helping the user understand the mission and your role.`;
+
+    const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    // Return AI message - standard MessagesAnnotation pattern
     const aiMessage = new AIMessage({ content: responseContent });
+    return { messages: [aiMessage] };
+  }
+
+  /**
+   * Converse phase node - handles ongoing mission conversation
+   */
+  private async conversePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    const latestMessage = state.messages[state.messages.length - 1];
+    const promptMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
     
+    const { metadata } = state;
+    const { mission, starship, vision } = metadata!;
+    
+    const systemPrompt = `You are a Mission Orchestrator AI engaging in mission conversation.
+
+CONVERSE PHASE - Your primary responsibilities:
+- Provide helpful guidance and answers
+- Support mission progress and problem-solving
+- Be responsive to user questions and needs
+- Maintain focus on mission objectives
+- Be helpful, knowledgeable, and mission-focused
+
+MISSION CONTEXT:
+- Mission: "${mission.name}"
+- Description: ${mission.description}
+- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
+- Vision: "${vision.statement}"
+- Status: ${mission.status}
+- Assigned Agents: ${mission.agentIds?.length || 0}
+
+CURRENT PROMPT MESSAGE: "${promptMessage}"
+
+Be helpful, direct, and focused on mission success.`;
+
+    const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
+    const responseContent = await this.callLLM(prompt);
+    
+    const aiMessage = new AIMessage({ content: responseContent });
     return { messages: [aiMessage] };
   }
 
@@ -190,52 +283,6 @@ export class MissionOrchestratorAgent {
       this.logger.error('Failed to load mission metadata', error as Error);
       throw error;
     }
-  }
-
-  /**
-   * Build LLM prompt with state
-   */
-  private buildPrompt(metadata: MissionMetadata): LLMChatPrompt {
-    const { mission, starship, vision } = metadata;
-
-    // Enhanced system prompt with mission context
-    const systemPrompt = `You are a Mission Orchestrator AI assistant providing intelligent guidance and coordination for starship missions.
-
-MISSION CONTEXT:
-- Mission: "${mission.name}"
-- Description: ${mission.description}
-- Status: ${mission.status}
-- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
-- Vision: "${vision.statement}"
-- Assigned Agents: ${mission.agentIds?.length || 0}
-- Max Agents: ${starship.maxAgents}
-- Max Expeditions: ${starship.maxActiveExpeditions}
-- Created: ${new Date(mission.createdAt).toLocaleDateString()}
-
-STARSHIP VISION:
-${vision.statement}
-
-ROLE & RESPONSIBILITIES:
-- Provide helpful guidance aligned with the starship's vision
-- Answer questions about mission objectives and progress
-- Suggest next steps based on starship capabilities
-- Maintain awareness of mission context and agent capabilities
-- Be concise, actionable, and mission-focused
-
-COMMUNICATION STYLE:
-- Professional but approachable
-- Clear, direct, and concise
-- Keep responses brief
-- Action-oriented suggestions
-- Mission-context and vision-aware responses`;
-
-    // For now, return simple system prompt
-    // Conversation history is handled by LangGraph checkpointer
-    const messages: LLMChatPrompt['messages'] = [
-      { role: 'system', content: systemPrompt }
-    ];
-
-    return { messages };
   }
 
   /**

@@ -8,7 +8,6 @@ import {
   invalidateMCPServerCaches,
   invalidateConnectorInstanceCaches,
 } from './cache'
-import { SubscriptionPlan } from '@/types/subscriptions'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -1403,34 +1402,6 @@ export const userAPI = {
     api.get(`/api/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
 }
 
-// Subscription API for managing Stripe subscription plans
-export const subscriptionAPI = {
-  // Get all available subscription plans (no caching - fetch fresh)
-  getPlans: async (): Promise<SubscriptionPlan[]> => {
-    console.log('[API] Fetching subscription plans from server')
-    const data = await api
-      .get('/api/subscriptions/plans')
-      .then((res: AxiosResponse<SubscriptionPlan[]>) => {
-        console.log('[API] Received subscription plans from server:', res.data.length)
-        return res.data
-      })
-
-    return data
-  },
-
-  // Get a specific subscription plan by ID
-  getPlan: async (planId: string): Promise<SubscriptionPlan> => {
-    console.log('[API] Fetching subscription plan:', planId)
-    const data = await api
-      .get(`/api/subscriptions/plans/${planId}`)
-      .then((res: AxiosResponse<SubscriptionPlan>) => {
-        console.log('[API] Received subscription plan from server:', res.data.name)
-        return res.data
-      })
-
-    return data
-  },
-}
 
 // Utility function for generating client-side IDs
 function generateId(): string {

@@ -38,7 +38,6 @@ import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 import expeditionRoutes from './routes/expeditions';
 import agentCommunicationRoutes from './routes/agent-communication';
-import subscriptionRoutes from './routes/subscriptions';
 import { AgentService } from './services/AgentService';
 
 // Import new error handling and health check routes
@@ -57,7 +56,6 @@ function validateEnvironmentVariables() {
   const requiredVars = [
     'CLIENT_URL',
     'NEXT_PUBLIC_API_URL',
-    'STRIPE_SECRET_KEY'
   ];
   
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
@@ -193,7 +191,6 @@ app.use('/api', mcpServerRoutes);
 app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

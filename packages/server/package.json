@@ -13,10 +13,7 @@
     "test:unit": "jest --testPathIgnorePatterns=integration",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
-    "stripe:setup": "tsx src/scripts/setup-stripe-products.ts",
-    "stripe:setup:dev": "NODE_ENV=development pnpm run stripe:setup",
-    "stripe:setup:prod": "NODE_ENV=production pnpm run stripe:setup"
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
@@ -35,7 +32,6 @@
     "jose": "^6.0.11",
     "openai": "^5.8.4",
     "socket.io": "^4.8.1",
-    "stripe": "^18.4.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

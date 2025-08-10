@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Rocket, AlertCircle, Zap, Filter, Check, Activity, User, LogOut } from 'lucide-react';
+import { Search, Rocket, AlertCircle, Filter, Check, Activity, User, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,6 @@ import { StarshipStatusManager } from './StarshipStatusManager';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components';
-import { useRouter } from 'next/navigation';
 
 interface StarshipDashboardProps {
   className?: string;
@@ -45,7 +44,6 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   } = useStarshipStore();
 
   const { user, userName, userEmail, isAuthenticated } = useAuth();
-  const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
@@ -237,15 +235,6 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
               </div>
               
               <div className="flex items-center gap-4">
-                {/* Pricing Button */}
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/fleet/pricing')}
-                  className="bg-gradient-to-r from-purple-600/20 to-purple-500/20 border-purple-500/30 hover:border-purple-400/50 hover:bg-purple-500/20 text-purple-200 hover:text-white transition-all duration-200"
-                >
-                  <Zap className="w-4 h-4 mr-2" />
-                  Pricing
-                </Button>
 
                 {/* User Profile Dropdown */}
                 {isAuthenticated && user && (
@@ -315,7 +304,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
             >
               <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <div className="relative flex items-center">
-                <Zap className="w-4 h-4 mr-2" />
+                <Rocket className="w-4 h-4 mr-2" />
                 Launch New Starship
               </div>
             </Button>
@@ -417,7 +406,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
                       "flex items-center gap-2.5 font-medium",
                       activeFilter !== 'scout' ? 'ml-7' : ''
                     )}>
-                      <Zap className="w-3.5 h-3.5 text-blue-500" />
+                      <Rocket className="w-3.5 h-3.5 text-blue-500" />
                       Scouts
                     </span>
                   </span>
@@ -489,7 +478,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-primary/90 to-primary/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div className="relative flex items-center">
-                      <Zap className="w-5 h-5 mr-2" />
+                      <Rocket className="w-5 h-5 mr-2" />
                       Launch Your First Starship
                     </div>
                   </Button>

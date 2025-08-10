@@ -13,9 +13,9 @@ import type {
   Mission, 
   MissionMessage,
   LLMChatPrompt,
-  LLMProvider 
+  LLMProvider
 } from '@starships/protocol';
-import type { LLM } from '@starships/models';
+import type { LLM, Starship, Vision } from '@starships/models';
 
 /**
  * Configuration for MissionOrchestratorAgent
@@ -33,9 +33,9 @@ export interface MissionOrchestratorAgentConfig {
  */
 interface MissionContext {
   mission: Mission;
-  agentCount: number;
-  starshipName?: string;
-  recentHistory: MissionMessage[];
+  starship: Starship;
+  vision: Vision;
+  chatHistory: MissionMessage[];
 }
 
 /**
@@ -186,7 +186,7 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Build mission context with details and agent information
+   * Build enhanced mission context with starship, vision, and chat history
    */
   private async buildMissionContext(missionId: string): Promise<MissionContext> {
     const context = {
@@ -197,30 +197,66 @@ export class MissionOrchestratorAgent {
     };
 
     try {
+      // Step 1: Get mission first to access starshipId
       const missionRepo = RepositoryFactory.getMissionRepository();
-      
-      // Get mission details and recent message history in parallel
-      const [mission, recentHistory] = await Promise.all([
-        missionRepo.getMissionById(missionId),
-        missionRepo.getMessagesByMission(missionId, 10) // Last 10 messages for context
+      const mission = await missionRepo.getMissionById(missionId);
+
+      // Step 2: Validate required data
+      if (!mission.starshipId) {
+        this.logger.error('Mission has no associated starship', {
+          ...context,
+          missionId,
+          mission: { id: mission.id, name: mission.name }
+        });
+        throw new Error(`Mission ${missionId} has no associated starship`);
+      }
+
+      // Step 3: Get repositories following existing patterns  
+      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const visionRepo = RepositoryFactory.getVisionRepository();
+
+      // Step 4: Parallel fetch with proper error context
+      const [starship, vision, chatHistory] = await Promise.all([
+        starshipRepo.findById(mission.starshipId),
+        visionRepo.findByStarship(mission.starshipId),
+        missionRepo.getMessagesByMission(missionId, 10)
       ]);
 
-      // TODO: Fetch starship name when starship integration is available
-      // const starshipRepo = RepositoryFactory.getStarshipRepository();
-      // const starship = await starshipRepo.getStarshipById(mission.starshipId);
+      // Step 5: Validate all required data exists
+      if (!starship) {
+        this.logger.error('Starship not found', {
+          ...context,
+          starshipId: mission.starshipId,
+          missionName: mission.name
+        });
+        throw new Error(`Starship not found: ${mission.starshipId}`);
+      }
+
+      if (!vision) {
+        this.logger.error('Vision not found for starship', {
+          ...context,
+          starshipId: mission.starshipId,
+          starshipName: starship.name
+        });
+        throw new Error(`Vision not found for starship: ${mission.starshipId}`);
+      }
 
       const missionContext: MissionContext = {
         mission,
-        agentCount: mission.agentIds?.length || 0,
-        starshipName: 'Unknown Starship', // Placeholder until starship integration
-        recentHistory
+        starship,
+        vision,
+        chatHistory
       };
 
-      this.logger.info('Built mission context successfully', {
+      // Step 6: Success logging with enhanced metadata
+      this.logger.info('Built enhanced mission context successfully', {
         ...context,
         metadata: { 
-          agentCount: missionContext.agentCount,
-          historyLength: recentHistory.length,
+          starshipName: starship.name,
+          starshipClass: starship.class,
+          visionLength: vision.statement?.length || 0,
+          agentCount: mission.agentIds?.length || 0,
+          chatHistoryLength: chatHistory.length,
           missionStatus: mission.status
         }
       });
@@ -228,7 +264,7 @@ export class MissionOrchestratorAgent {
       return missionContext;
 
     } catch (error) {
-      this.logger.error('Failed to build mission context', context, error as Error);
+      this.logger.error('Failed to build enhanced mission context', context, error as Error);
       throw error;
     }
   }
@@ -237,23 +273,29 @@ export class MissionOrchestratorAgent {
    * Build LLM prompt with mission context and conversation history
    */
   private buildPrompt(userMessage: string, missionContext: MissionContext): LLMChatPrompt {
-    const { mission, agentCount, starshipName, recentHistory } = missionContext;
+    const { mission, starship, vision, chatHistory } = missionContext;
 
-    // System prompt with mission context
+    // Enhanced system prompt with mission context
     const systemPrompt = `You are a Mission Orchestrator AI assistant providing intelligent guidance and coordination for starship missions.
 
 MISSION CONTEXT:
 - Mission: "${mission.name}"
 - Description: ${mission.description}
 - Status: ${mission.status}
-- Starship: ${starshipName}
-- Assigned Agents: ${agentCount}
+- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
+- Vision: "${vision.statement}"
+- Assigned Agents: ${mission.agentIds?.length || 0}
+- Max Agents: ${starship.maxAgents}
+- Max Expeditions: ${starship.maxActiveExpeditions}
 - Created: ${new Date(mission.createdAt).toLocaleDateString()}
 
+STARSHIP VISION:
+${vision.statement}
+
 ROLE & RESPONSIBILITIES:
-- Provide helpful guidance and coordination for mission execution
+- Provide helpful guidance aligned with the starship's vision
 - Answer questions about mission objectives and progress
-- Suggest next steps and best practices
+- Suggest next steps based on starship capabilities
 - Maintain awareness of mission context and agent capabilities
 - Be concise, actionable, and mission-focused
 
@@ -261,7 +303,7 @@ COMMUNICATION STYLE:
 - Professional but approachable
 - Clear and direct
 - Action-oriented suggestions
-- Mission-context aware responses`;
+- Mission-context and vision-aware responses`;
 
     // Build conversation messages
     const messages: LLMChatPrompt['messages'] = [
@@ -269,7 +311,7 @@ COMMUNICATION STYLE:
     ];
 
     // Add recent conversation history for context
-    recentHistory.forEach(message => {
+    chatHistory.forEach(message => {
       if (message.role === 'user') {
         messages.push({ role: 'user', content: message.content });
       } else if (message.role === 'orchestrator') {

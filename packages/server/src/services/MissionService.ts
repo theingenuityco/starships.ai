@@ -81,14 +81,19 @@ export class MissionService {
     const mission = await missionRepo.createMission(request, userId);
 
     // Auto-trigger welcome message
+    console.log('🚀 Auto-triggering welcome message for mission:', mission.id);
     try {
       const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
-      await missionOrchestratorService.handleSystemMessage(
-        mission.id, 
-        `Welcome to your new mission: "${mission.name}". This mission was just created and is ready to begin.`
-      );
+      console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
+      
+      const welcomeMessage = `Welcome to your new mission: "${mission.name}". This mission was just created and is ready to begin.`;
+      console.log('💬 Sending welcome message:', welcomeMessage);
+      
+      const response = await missionOrchestratorService.handleSystemMessage(mission.id, welcomeMessage);
+      console.log('✅ Welcome message sent successfully, response:', response);
+      
     } catch (error) {
-      console.error('Failed to trigger welcome message:', error);
+      console.error('❌ Failed to trigger welcome message:', error);
       // Silent fail - welcome can be triggered later
     }
 

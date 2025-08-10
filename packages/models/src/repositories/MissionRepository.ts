@@ -303,6 +303,11 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         params.status = updates.status;
       }
 
+      if (updates.phase !== undefined) {
+        setClause.push('m.phase = $phase');
+        params.phase = updates.phase;
+      }
+
       if (updates.agentIds !== undefined) {
         // Validate agentIds array if provided
         if (!Array.isArray(updates.agentIds)) {

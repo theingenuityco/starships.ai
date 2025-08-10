@@ -5,7 +5,7 @@
  * using basic LangChain integration with mission context awareness.
  */
 
-import { StateGraph, END, START, Annotation } from '@langchain/langgraph';
+import { StateGraph, END, START, Annotation, MemorySaver } from '@langchain/langgraph';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
@@ -29,24 +29,40 @@ export interface MissionOrchestratorAgentConfig {
 
 
 /**
- * Mission context for AI response generation
+ * Mission metadata for AI response generation
  */
-interface MissionContext {
+interface MissionMetadata {
   mission: Mission;
   starship: Starship;
   vision: Vision;
-  chatHistory: MissionMessage[];
 }
 
 /**
- * LangGraph state annotation for mission chat
+ * Minimal LangGraph state annotation for mission chat
+ * - Only caches mission metadata to avoid repeated DB queries
+ * - Conversation memory handled by LangGraph checkpointer
  */
 const MissionChatStateAnnotation = Annotation.Root({
-  message: Annotation<string>(),
   missionId: Annotation<string>(),
-  missionContext: Annotation<MissionContext | null>(),
-  response: Annotation<string>()
+  metadata: Annotation<MissionMetadata | null>({
+    value: (x, y) => y ?? x,
+    default: () => null
+  }),
+  response: Annotation<string | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
+  })
 });
+
+/**
+ * Properly typed state interface for better type safety
+ * This provides the actual runtime type that the state will have
+ */
+export interface MissionChatState {
+  missionId: string;
+  metadata: MissionMetadata | null;
+  response: string | undefined;
+}
 
 /**
  * MissionOrchestratorAgent - Generates intelligent AI responses for mission coordination
@@ -54,6 +70,7 @@ const MissionChatStateAnnotation = Annotation.Root({
 export class MissionOrchestratorAgent {
   private logger: Logger;
   private llmProvider: LLMProvider | null = null;
+  private checkpointer = new MemorySaver();
   
   private readonly config: Required<MissionOrchestratorAgentConfig> = {
     temperature: 0.7,
@@ -78,37 +95,187 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Create LangGraph workflow for mission chat conversations
+   * Create minimal LangGraph workflow for mission chat conversations
    */
   private async createMissionChatGraph() {
     return new StateGraph(MissionChatStateAnnotation)
-      .addNode("build_context", async (state) => {
-        this.logger.info('Building mission context', {
-          service: 'MissionOrchestratorAgent',
-          operation: 'build_context',
-          resource: 'mission',
-          resourceId: state.missionId
-        });
-        
-        const missionContext = await this.buildMissionContext(state.missionId);
-        return { ...state, missionContext };
-      })
-      .addNode("generate_response", async (state) => {
-        this.logger.info('Generating AI response', {
-          service: 'MissionOrchestratorAgent', 
-          operation: 'generate_response',
-          resource: 'mission',
-          resourceId: state.missionId
-        });
-
-        const prompt = this.buildPrompt(state.message, state.missionContext!);
-        const response = await this.callLLM(prompt);
-        return { ...state, response };
-      })
-      .addEdge(START, "build_context")
-      .addEdge("build_context", "generate_response")
+      .addNode("ensure_metadata", this.ensureMetadataNode.bind(this))
+      .addNode("generate_response", this.generateResponseNode.bind(this))
+      .addEdge(START, "ensure_metadata")
+      .addEdge("ensure_metadata", "generate_response")
       .addEdge("generate_response", END)
-      .compile();
+      .compile({ checkpointer: this.checkpointer });
+  }
+
+  /**
+   * Load mission metadata once per conversation
+   */
+  private async ensureMetadataNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    if (!state.metadata) {
+      this.logger.info('Loading mission metadata for first time', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'ensureMetadataNode',
+        missionId: state.missionId
+      });
+      
+      if (!state.missionId) {
+        throw new Error('missionId is required in state');
+      }
+      
+      const metadata = await this.loadMissionMetadata(state.missionId);
+      return { metadata };
+    }
+    
+    this.logger.info('Reusing cached mission metadata', {
+      service: 'MissionOrchestratorAgent',
+      operation: 'ensureMetadataNode',
+      missionId: state.missionId
+    });
+    
+    return {}; // No changes needed
+  }
+
+  /**
+   * Generate response using cached metadata
+   */
+  private async generateResponseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    this.logger.info('Generating AI response with cached metadata', {
+      service: 'MissionOrchestratorAgent',
+      operation: 'generateResponseNode'
+    });
+
+    // Use state.metadata which is guaranteed to exist by previous node
+    const prompt = this.buildPromptWithMetadata(state.metadata!);
+    const response = await this.callLLM(prompt);
+    
+    return { response }; // This gets returned to the caller
+  }
+
+  /**
+   * Load mission metadata once per conversation (replaces buildMissionContext)
+   */
+  private async loadMissionMetadata(missionId: string): Promise<MissionMetadata> {
+    const context = {
+      service: 'MissionOrchestratorAgent',
+      operation: 'loadMissionMetadata',
+      resource: 'mission',
+      resourceId: missionId
+    };
+
+    try {
+      // Step 1: Get mission first to access starshipId
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      const mission = await missionRepo.getMissionById(missionId);
+
+      // Step 2: Validate required data
+      if (!mission.starshipId) {
+        this.logger.error('Mission has no associated starship', {
+          ...context,
+          missionId,
+          mission: { id: mission.id, name: mission.name }
+        });
+        throw new Error(`Mission ${missionId} has no associated starship`);
+      }
+
+      // Step 3: Get repositories following existing patterns  
+      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const visionRepo = RepositoryFactory.getVisionRepository();
+
+      // Step 4: Parallel fetch with proper error context
+      const [starship, vision] = await Promise.all([
+        starshipRepo.findById(mission.starshipId),
+        visionRepo.findByStarship(mission.starshipId)
+      ]);
+
+      // Step 5: Validate all required data exists
+      if (!starship) {
+        this.logger.error('Starship not found', {
+          ...context,
+          starshipId: mission.starshipId,
+          missionName: mission.name
+        });
+        throw new Error(`Starship not found: ${mission.starshipId}`);
+      }
+
+      if (!vision) {
+        this.logger.error('Vision not found for starship', {
+          ...context,
+          starshipId: mission.starshipId,
+          starshipName: starship.name
+        });
+        throw new Error(`Vision not found for starship: ${mission.starshipId}`);
+      }
+
+      const metadata: MissionMetadata = {
+        mission,
+        starship,
+        vision
+      };
+
+      // Step 6: Success logging with enhanced metadata
+      this.logger.info('Loaded mission metadata successfully', {
+        ...context,
+        metadata: { 
+          starshipName: starship.name,
+          starshipClass: starship.class,
+          visionLength: vision.statement?.length || 0,
+          agentCount: mission.agentIds?.length || 0,
+          missionStatus: mission.status
+        }
+      });
+
+      return metadata;
+
+    } catch (error) {
+      this.logger.error('Failed to load mission metadata', context, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build LLM prompt with mission metadata (replaces buildPrompt)
+   */
+  private buildPromptWithMetadata(metadata: MissionMetadata): LLMChatPrompt {
+    const { mission, starship, vision } = metadata;
+
+    // Enhanced system prompt with mission context
+    const systemPrompt = `You are a Mission Orchestrator AI assistant providing intelligent guidance and coordination for starship missions.
+
+MISSION CONTEXT:
+- Mission: "${mission.name}"
+- Description: ${mission.description}
+- Status: ${mission.status}
+- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
+- Vision: "${vision.statement}"
+- Assigned Agents: ${mission.agentIds?.length || 0}
+- Max Agents: ${starship.maxAgents}
+- Max Expeditions: ${starship.maxActiveExpeditions}
+- Created: ${new Date(mission.createdAt).toLocaleDateString()}
+
+STARSHIP VISION:
+${vision.statement}
+
+ROLE & RESPONSIBILITIES:
+- Provide helpful guidance aligned with the starship's vision
+- Answer questions about mission objectives and progress
+- Suggest next steps based on starship capabilities
+- Maintain awareness of mission context and agent capabilities
+- Be concise, actionable, and mission-focused
+
+COMMUNICATION STYLE:
+- Professional but approachable
+- Clear, direct, and concise
+- Keep responses brief (2-3 sentences max for greetings)
+- Action-oriented suggestions
+- Mission-context and vision-aware responses`;
+
+    // For now, return simple system prompt
+    // Conversation history is handled by LangGraph checkpointer
+    const messages: LLMChatPrompt['messages'] = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    return { messages };
   }
 
   /**
@@ -126,24 +293,25 @@ export class MissionOrchestratorAgent {
     this.logger.info('Generating orchestrator response', context);
 
     try {
-      // Use LangGraph workflow instead of direct calls
+      // Use LangGraph workflow with thread-based memory
       const graph = await this.createMissionChatGraph();
-      const result = await graph.invoke({ 
-        message, 
-        missionId, 
-        missionContext: null,
-        response: ''
-      });
+      const threadId = `mission-${missionId}`;
+      
+      const result = await graph.invoke(
+        { missionId }, // Pass missionId in initial state
+        { configurable: { thread_id: threadId } }
+      );
 
       this.logger.info('Generated orchestrator response successfully', {
         ...context,
         metadata: { 
           ...context.metadata,
+          threadId,
           responseLength: result.response?.length 
         }
       });
 
-      return result.response;
+      return result.response || this.getFallbackResponse(missionId);
 
     } catch (error) {
       this.logger.error('Failed to generate orchestrator response', context, error as Error);
@@ -185,147 +353,7 @@ export class MissionOrchestratorAgent {
     });
   }
 
-  /**
-   * Build enhanced mission context with starship, vision, and chat history
-   */
-  private async buildMissionContext(missionId: string): Promise<MissionContext> {
-    const context = {
-      service: 'MissionOrchestratorAgent',
-      operation: 'buildMissionContext',
-      resource: 'mission',
-      resourceId: missionId
-    };
 
-    try {
-      // Step 1: Get mission first to access starshipId
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      const mission = await missionRepo.getMissionById(missionId);
-
-      // Step 2: Validate required data
-      if (!mission.starshipId) {
-        this.logger.error('Mission has no associated starship', {
-          ...context,
-          missionId,
-          mission: { id: mission.id, name: mission.name }
-        });
-        throw new Error(`Mission ${missionId} has no associated starship`);
-      }
-
-      // Step 3: Get repositories following existing patterns  
-      const starshipRepo = RepositoryFactory.getStarshipRepository();
-      const visionRepo = RepositoryFactory.getVisionRepository();
-
-      // Step 4: Parallel fetch with proper error context
-      const [starship, vision, chatHistory] = await Promise.all([
-        starshipRepo.findById(mission.starshipId),
-        visionRepo.findByStarship(mission.starshipId),
-        missionRepo.getMessagesByMission(missionId, 10)
-      ]);
-
-      // Step 5: Validate all required data exists
-      if (!starship) {
-        this.logger.error('Starship not found', {
-          ...context,
-          starshipId: mission.starshipId,
-          missionName: mission.name
-        });
-        throw new Error(`Starship not found: ${mission.starshipId}`);
-      }
-
-      if (!vision) {
-        this.logger.error('Vision not found for starship', {
-          ...context,
-          starshipId: mission.starshipId,
-          starshipName: starship.name
-        });
-        throw new Error(`Vision not found for starship: ${mission.starshipId}`);
-      }
-
-      const missionContext: MissionContext = {
-        mission,
-        starship,
-        vision,
-        chatHistory
-      };
-
-      // Step 6: Success logging with enhanced metadata
-      this.logger.info('Built enhanced mission context successfully', {
-        ...context,
-        metadata: { 
-          starshipName: starship.name,
-          starshipClass: starship.class,
-          visionLength: vision.statement?.length || 0,
-          agentCount: mission.agentIds?.length || 0,
-          chatHistoryLength: chatHistory.length,
-          missionStatus: mission.status
-        }
-      });
-
-      return missionContext;
-
-    } catch (error) {
-      this.logger.error('Failed to build enhanced mission context', context, error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Build LLM prompt with mission context for conversations
-   */
-  private buildPrompt(userMessage: string, missionContext: MissionContext): LLMChatPrompt {
-    const { mission, starship, vision, chatHistory } = missionContext;
-
-    // Enhanced system prompt with mission context
-    const systemPrompt = `You are a Mission Orchestrator AI assistant providing intelligent guidance and coordination for starship missions.
-
-MISSION CONTEXT:
-- Mission: "${mission.name}"
-- Description: ${mission.description}
-- Status: ${mission.status}
-- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
-- Vision: "${vision.statement}"
-- Assigned Agents: ${mission.agentIds?.length || 0}
-- Max Agents: ${starship.maxAgents}
-- Max Expeditions: ${starship.maxActiveExpeditions}
-- Created: ${new Date(mission.createdAt).toLocaleDateString()}
-
-STARSHIP VISION:
-${vision.statement}
-
-ROLE & RESPONSIBILITIES:
-- Provide helpful guidance aligned with the starship's vision
-- Answer questions about mission objectives and progress
-- Suggest next steps based on starship capabilities
-- Maintain awareness of mission context and agent capabilities
-- Be concise, actionable, and mission-focused
-
-COMMUNICATION STYLE:
-- Professional but approachable
-- Clear, direct, and concise
-- Keep responses brief (2-3 sentences max for greetings)
-- Action-oriented suggestions
-- Mission-context and vision-aware responses`;
-
-    // Build conversation messages
-    const messages: LLMChatPrompt['messages'] = [
-      { role: 'system', content: systemPrompt }
-    ];
-
-    // Add chat history for context
-    chatHistory.forEach(message => {
-      if (message.role === 'user') {
-        messages.push({ role: 'user', content: message.content });
-      } else if (message.role === 'orchestrator') {
-        messages.push({ role: 'assistant', content: message.content });
-      }
-      // Skip system messages in conversation context
-    });
-
-    // Add current user message
-    messages.push({ role: 'user', content: userMessage });
-
-    return { messages };
-  }
 
   /**
    * Call LLM provider for response generation

@@ -67,6 +67,8 @@ export interface User {
   displayName?: string;
   avatar?: string;
   createdAt: string;
+  // Stripe integration
+  stripeCustomerId?: string;  // Stripe customer ID
 }
 
 export interface Channel {
@@ -82,13 +84,17 @@ export interface Starship {
   id: string;
   slug: string;
   ownerId: string; // Foreign key to User
-  class: 'scout' | 'cruiser';
+  class: 'scout' | 'cruiser' | 'draught';  // ADD: 'draught' plan
   name: string;
   maxActiveExpeditions: number;
-  maxAgents: number; // Based on class: Scout=3, Cruiser=6
-  status: 'active' | 'inactive';
+  maxAgents: number; // Based on class: Scout=3, Cruiser=5, Draught=10
+  status: 'active' | 'inactive' | 'restricted' | 'disabled';  // ADD: billing status
   createdAt: string;
   updatedAt: string;
+  // Stripe integration
+  subscriptionId?: string;     // Stripe subscription ID
+  plan?: 'scout' | 'cruiser' | 'draught';  // Separate from class for billing
+  billingPeriod?: 'monthly' | 'yearly';  // Billing period
 }
 
 export interface Vision {

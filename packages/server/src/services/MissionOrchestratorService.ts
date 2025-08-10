@@ -20,7 +20,6 @@ import type {
  * Configuration for MissionOrchestratorService
  */
 export interface MissionOrchestratorServiceConfig {
-  autoCleanupMinutes?: number;
   maxConcurrentOrchestrators?: number;
 }
 
@@ -36,7 +35,6 @@ export class MissionOrchestratorService {
   private orchestrators: Map<string, MissionOrchestratorAgent> = new Map();
   
   private readonly config: Required<MissionOrchestratorServiceConfig> = {
-    autoCleanupMinutes: 60, // Auto cleanup inactive orchestrators after 1 hour
     maxConcurrentOrchestrators: 100 // Limit concurrent orchestrators
   };
 
@@ -53,8 +51,7 @@ export class MissionOrchestratorService {
 
     this.logger.info('MissionOrchestratorService initialized', {
       service: 'MissionOrchestratorService',
-      operation: 'constructor',
-      metadata: { config: this.config }
+      operation: 'constructor'
     });
   }
 
@@ -68,73 +65,6 @@ export class MissionOrchestratorService {
     return MissionOrchestratorService.instance;
   }
 
-  /**
-   * Initialize chat for a mission (lazy creation of orchestrator)
-   */
-  async initializeChat(missionId: string, userId: string): Promise<MissionChatResponse | null> {
-    const context = {
-      service: 'MissionOrchestratorService',
-      operation: 'initializeChat',
-      resource: 'mission',
-      resourceId: missionId,
-      metadata: { userId }
-    };
-
-    this.logger.info('Initializing mission chat', context);
-
-    try {
-      // Check if mission exists
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      const mission = await missionRepo.getMissionById(missionId);
-
-      // Get or create orchestrator
-      const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
-
-      // Check if this is the first initialization (no conversation history in database)
-      const existingMessages = await this.getRecentMessages(missionId, 1);
-      const hasHistory = existingMessages.length > 0;
-
-      if (!hasHistory) {
-        // Generate welcome message for first-time initialization
-        const welcomeMessage = await orchestrator.generateResponse(
-          `Hello, I'm ready to help coordinate this mission: "${mission.name}". What can I assist you with?`,
-          missionId
-        );
-
-        // Save system greeting message to database
-        await this.saveSystemMessage(missionId, welcomeMessage);
-
-        // Emit WebSocket event for real-time updates
-        this.emitMessageEvent(missionId, {
-          id: `greeting-${Date.now()}`,
-          missionId,
-          role: 'orchestrator',
-          content: welcomeMessage,
-          timestamp: new Date().toISOString(),
-          senderName: 'Mission Orchestrator'
-        });
-
-        this.logger.info('Generated welcome message for mission chat', {
-          ...context,
-          metadata: { ...context.metadata, hasWelcome: true }
-        });
-
-        return { reply: welcomeMessage };
-      }
-
-      // Chat already initialized, return null (no greeting needed)
-      return null;
-
-    } catch (error) {
-      this.logger.error('Failed to initialize mission chat', context, error as Error);
-      throw ErrorFactory.businessLogic(
-        'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED',
-        'Failed to initialize mission chat',
-        error instanceof Error ? error.message : 'Unknown error',
-        context
-      );
-    }
-  }
 
   /**
    * Handle user message and generate AI response
@@ -169,7 +99,7 @@ export class MissionOrchestratorService {
       const savedUserMessage = await this.saveUserMessage(missionId, userId, message);
       this.emitMessageEvent(missionId, savedUserMessage);
 
-      // Always use LangGraph for all responses (greetings + conversations)
+      // Use LangGraph agent for AI response
       const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
       const aiResponse = await orchestrator.generateResponse(message, missionId);
 
@@ -179,7 +109,7 @@ export class MissionOrchestratorService {
       // Emit orchestrator response event
       this.emitMessageEvent(missionId, savedOrchestratorMessage);
 
-      this.logger.info('Successfully handled user message via LangGraph', {
+      this.logger.info('Successfully handled user message', {
         ...context,
         metadata: {
           ...context.metadata,
@@ -206,49 +136,6 @@ export class MissionOrchestratorService {
     }
   }
 
-  /**
-   * Check if orchestrator exists for mission
-   */
-  hasActiveOrchestrator(missionId: string): boolean {
-    return this.orchestrators.has(missionId);
-  }
-
-  /**
-   * Cleanup orchestrator when mission completes
-   */
-  async cleanupMission(missionId: string): Promise<void> {
-    const context = {
-      service: 'MissionOrchestratorService',
-      operation: 'cleanupMission',
-      resource: 'mission',
-      resourceId: missionId
-    };
-
-    this.logger.info('Cleaning up mission orchestrator', context);
-
-    try {
-      const orchestrator = this.orchestrators.get(missionId);
-      if (orchestrator) {
-        // Clear conversation history
-        orchestrator.clearConversationHistory(missionId);
-        
-        // Remove from active orchestrators
-        this.orchestrators.delete(missionId);
-
-        this.logger.info('Mission orchestrator cleaned up successfully', context);
-      }
-    } catch (error) {
-      this.logger.error('Failed to cleanup mission orchestrator', context, error as Error);
-      // Don't throw on cleanup errors - log and continue
-    }
-  }
-
-  /**
-   * Get orchestrator agent count (for monitoring)
-   */
-  getActiveOrchestratorCount(): number {
-    return this.orchestrators.size;
-  }
 
   /**
    * Get message history for a mission with pagination
@@ -346,10 +233,12 @@ export class MissionOrchestratorService {
         );
       }
 
-      // Create new orchestrator agent
+      // Create new orchestrator agent with shared configuration
       orchestrator = new MissionOrchestratorAgent({
         temperature: 0.7,
-        maxTokens: 1000
+        maxTokens: 1000,
+        provider: 'openai',
+        model: 'gpt-4'
       });
 
       this.orchestrators.set(missionId, orchestrator);

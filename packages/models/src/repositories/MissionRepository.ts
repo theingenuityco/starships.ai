@@ -110,6 +110,7 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         name: request.name,
         description: request.description,
         status: 'draft',
+        phase: 'init',
         agentIds: request.agentIds,
         createdAt: now,
         updatedAt: now,

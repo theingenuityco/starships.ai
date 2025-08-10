@@ -10,6 +10,7 @@ import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
+import { MissionService } from './MissionService';
 import type { 
   Mission, 
   MissionMessage,
@@ -96,15 +97,14 @@ export class MissionOrchestratorAgent {
     if (!this.compiledGraph) {
       this.compiledGraph = new StateGraph(MissionChatStateAnnotation)
         .addNode("context_builder", this.contextBuilderNode.bind(this))
-        .addNode("phase_router", this.phaseRouterNode.bind(this))
         .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
         .addNode("converse_phase", this.conversePhaseNode.bind(this))
         .addEdge(START, "context_builder")
-        .addEdge("context_builder", "phase_router")
         .addConditionalEdges(
-          "phase_router",
-          this.determinePhaseRoute.bind(this),
+          "context_builder",
+          this.phaseRouterNode.bind(this),
           {
+            init: "welcome_phase",      // init phase also goes to welcome (fallback)
             welcome: "welcome_phase",
             converse: "converse_phase"
           }
@@ -131,23 +131,60 @@ export class MissionOrchestratorAgent {
       const metadata = await this.loadMissionMetadata(state.missionId);
       updates.metadata = metadata;
       updates.currentPhase = metadata.mission.phase;
+      
+      // Auto-transition from 'init' to 'welcome' phase after context is successfully built
+      if (metadata.mission.phase === 'init') {
+        try {
+          await MissionService.updateMissionPhase(state.missionId, 'welcome');
+          updates.currentPhase = 'welcome'; // Update the state for this execution
+        } catch (error) {
+          this.logger.error('Failed to auto-transition from init to welcome phase', {
+            service: 'MissionOrchestratorAgent',
+            operation: 'contextBuilderNode',
+            missionId: state.missionId
+          }, error as Error);
+        }
+      }
     }
     
     return updates;
   }
 
   /**
-   * Phase router node - determines which phase-specific node to execute
+   * Build context string from state for use in prompts
    */
-  private async phaseRouterNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    // Router node doesn't modify state, just passes it through
-    return {};
+  private buildContext(state: MissionChatState): string {
+    const { metadata, currentPhase } = state;
+    const { mission, starship, vision } = metadata!;
+    
+    return `You are a Mission Orchestrator AI assistant providing intelligent guidance and coordination for starship missions.
+
+CURRENT PHASE: ${currentPhase}
+
+MISSION CONTEXT:
+- Mission: "${mission.name}"
+- Description: ${mission.description}
+- Status: ${mission.status}
+- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
+- Vision: "${vision.statement}"
+- Assigned Agents: ${mission.agentIds?.length || 0}/${starship.maxAgents}
+- Created: ${new Date(mission.createdAt).toLocaleDateString()}
+
+STARSHIP VISION:
+${vision.statement}
+
+COMMUNICATION STYLE:
+- Professional but approachable
+- Clear, direct, and concise
+- Keep responses brief
+- Action-oriented suggestions
+- Mission-context and vision-aware responses`;
   }
 
   /**
    * Conditional edge function to determine phase routing
    */
-  private determinePhaseRoute(state: MissionChatState): string {
+  private phaseRouterNode(state: MissionChatState): string {
     return state.currentPhase; // Returns 'welcome' or 'converse'
   }
 
@@ -155,13 +192,9 @@ export class MissionOrchestratorAgent {
    * Welcome phase node - handles initial mission introduction
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const latestMessage = state.messages[state.messages.length - 1];
-    const promptMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
+    const context = this.buildContext(state);
     
-    const { metadata } = state;
-    const { mission, starship, vision } = metadata!;
-    
-    const systemPrompt = `You are a Mission Orchestrator AI providing a warm welcome.
+    const systemPrompt = `${context}
 
 WELCOME PHASE - Your primary responsibilities:
 - Provide a friendly introduction to the mission
@@ -170,19 +203,21 @@ WELCOME PHASE - Your primary responsibilities:
 - Encourage questions about the mission
 - Be welcoming, informative, and encouraging
 
-MISSION CONTEXT:
-- Mission: "${mission.name}"
-- Description: ${mission.description}
-- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
-- Vision: "${vision.statement}"
-- Status: ${mission.status}
-
-CURRENT PROMPT MESSAGE: "${promptMessage}"
-
-Be warm, welcoming, and focus on helping the user understand the mission and your role.`;
+Generate a welcoming message that introduces the mission and explains how you can help.`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
+    
+    // Auto-transition from 'welcome' to 'converse' phase after welcome message
+    try {
+      await MissionService.updateMissionPhase(state.missionId, 'converse');
+    } catch (error) {
+      this.logger.error('Failed to auto-transition mission phase', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'welcomePhaseNode',
+        missionId: state.missionId
+      }, error as Error);
+    }
     
     const aiMessage = new AIMessage({ content: responseContent });
     return { messages: [aiMessage] };
@@ -193,12 +228,11 @@ Be warm, welcoming, and focus on helping the user understand the mission and you
    */
   private async conversePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
     const latestMessage = state.messages[state.messages.length - 1];
-    const promptMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
+    const userMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
     
-    const { metadata } = state;
-    const { mission, starship, vision } = metadata!;
+    const context = this.buildContext(state);
     
-    const systemPrompt = `You are a Mission Orchestrator AI engaging in mission conversation.
+    const systemPrompt = `${context}
 
 CONVERSE PHASE - Your primary responsibilities:
 - Provide helpful guidance and answers
@@ -207,17 +241,9 @@ CONVERSE PHASE - Your primary responsibilities:
 - Maintain focus on mission objectives
 - Be helpful, knowledgeable, and mission-focused
 
-MISSION CONTEXT:
-- Mission: "${mission.name}"
-- Description: ${mission.description}
-- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
-- Vision: "${vision.statement}"
-- Status: ${mission.status}
-- Assigned Agents: ${mission.agentIds?.length || 0}
+User message: "${userMessage}"
 
-CURRENT PROMPT MESSAGE: "${promptMessage}"
-
-Be helpful, direct, and focused on mission success.`;
+Provide a helpful response based on the mission context.`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
@@ -286,31 +312,32 @@ Be helpful, direct, and focused on mission success.`;
   }
 
   /**
-   * Generate AI response for a user message with mission context - Standard MessagesAnnotation pattern
+   * Generate AI response using LangGraph flow - respects graph state transitions
    */
   async generateResponse(message: string, missionId: string): Promise<string> {
     try {
-      // Use cached compiled graph - efficient pattern
       const graph = await this.getGraph();
       const threadId = `mission-${missionId}`;
       
-      // Add user message to conversation - standard pattern
+      // Create user message and let LangGraph handle the flow
       const userMessage = new HumanMessage({ content: message });
       
+      // Invoke the graph - it will handle context building, phase routing, and response generation
       const result = await graph.invoke(
         { 
           missionId,
-          messages: [userMessage] // MessagesAnnotation automatically handles conversation history
+          messages: [userMessage]
         },
         { configurable: { thread_id: threadId } }
       );
 
-      // Extract response from last AI message - standard pattern
+      // Extract final AI response from the graph result
       const lastMessage = result.messages[result.messages.length - 1];
-      const responseContent = lastMessage instanceof AIMessage ? lastMessage.content : '';
-      const response = typeof responseContent === 'string' ? responseContent : '';
+      if (lastMessage instanceof AIMessage) {
+        return typeof lastMessage.content === 'string' ? lastMessage.content : '';
+      }
 
-      return response || this.getFallbackResponse(missionId);
+      return this.getFallbackResponse(missionId);
 
     } catch (error) {
       this.logger.error('Failed to generate orchestrator response', {
@@ -322,31 +349,7 @@ Be helpful, direct, and focused on mission success.`;
     }
   }
 
-  /**
-   * Get recent conversation history for a mission from database
-   */
-  async getConversationHistory(missionId: string, limit: number = 10): Promise<MissionMessage[]> {
-    try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      return await missionRepo.getMessagesByMission(missionId, limit);
-    } catch (error) {
-      this.logger.error('Failed to get conversation history', {
-        service: 'MissionOrchestratorAgent',
-        operation: 'getConversationHistory',
-        resource: 'mission',
-        resourceId: missionId
-      }, error as Error);
-      return []; // Return empty array on error
-    }
-  }
 
-  /**
-   * Clear conversation history for a mission (cleanup) - now a no-op since we use database
-   */
-  clearConversationHistory(missionId: string): void {
-    // Since we're using database storage, this is now a no-op
-    // Message cleanup would be handled by database migration/cleanup jobs if needed
-  }
 
 
 

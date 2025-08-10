@@ -39,6 +39,7 @@ export type MissionStatus =
  * Mission phase - controls chat behavior and UI sections
  */
 export type MissionPhase = 
+  | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
   | 'converse';    // General conversation and mission guidance
 
@@ -63,6 +64,7 @@ export interface UpdateMissionRequest {
   name?: string;
   description?: string;
   status?: MissionStatus;
+  phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
 }
 

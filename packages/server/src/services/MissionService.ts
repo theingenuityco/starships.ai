@@ -11,7 +11,8 @@ import type {
   MissionFilters,
   MissionSort,
   MissionListResponse,
-  MissionStatus
+  MissionStatus,
+  MissionPhase
 } from '@starships/protocol';
 import {
   EnhancedValidationError as ValidationError,
@@ -239,6 +240,13 @@ export class MissionService {
    */
   static async cancelMission(id: string, userId?: string): Promise<Mission> {
     return await this.updateMission(id, { status: 'cancelled' }, userId);
+  }
+
+  /**
+   * Update mission phase
+   */
+  static async updateMissionPhase(id: string, phase: MissionPhase, userId?: string): Promise<Mission> {
+    return await this.updateMission(id, { phase }, userId);
   }
 
   /**

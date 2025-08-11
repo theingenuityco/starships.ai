@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { SimpleVisionChamber } from './SimpleVisionChamber'
+import { SibilFloatingMessage } from '@/components/sibil/SibilFloatingMessage'
 import { 
   ArrowLeft, Eye, Loader2, Activity, 
-  Sparkles, Target
+  Sparkles, Target, Info
 } from 'lucide-react'
 import Link from 'next/link'
 import { starshipAPI, Starship } from '@/lib/api'
+import { useStarshipStore } from '@/store/starship-store'
 
 interface VisionChamberContentProps {
   slug: string
@@ -20,14 +22,27 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
   const [starshipLoading, setStarshipLoading] = useState(true)
   const [activeVisions, setActiveVisions] = useState(0)
   const [totalInsights, setTotalInsights] = useState(0)
+  const [isFirstStarship, setIsFirstStarship] = useState(false)
+  const [showFloatingMessage, setShowFloatingMessage] = useState(false)
+  const [isManualOpen, setIsManualOpen] = useState(false)
+  const { starships } = useStarshipStore()
 
-  // Fetch starship data
+  // Fetch starship data and check if first starship
   useEffect(() => {
     const fetchStarship = async () => {
       try {
         setStarshipLoading(true)
         const data = await starshipAPI.getStarshipBySlug(slug)
         setStarship(data.starship)
+        
+        // Check if this is the user's first starship and auto-show message
+        if (starships && starships.length === 1) {
+          setIsFirstStarship(true)
+          const dismissed = localStorage.getItem('sibil-vision-message-dismissed')
+          if (!dismissed) {
+            setShowFloatingMessage(true)
+          }
+        }
       } catch (error) {
         console.error('Failed to fetch starship:', error)
       } finally {
@@ -36,7 +51,25 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
     }
 
     fetchStarship()
-  }, [slug])
+  }, [slug, starships])
+
+  // Function to manually show the info modal
+  const handleShowInfo = () => {
+    setIsManualOpen(true)
+    setShowFloatingMessage(true)
+  }
+
+  // State for info button animation
+  const [animateInfoButton, setAnimateInfoButton] = useState(false)
+
+  // Handle dismissing the floating message
+  const handleDismissMessage = () => {
+    setShowFloatingMessage(false)
+    setIsManualOpen(false)
+    // Animate the info button to show where the information is stored
+    setAnimateInfoButton(true)
+    setTimeout(() => setAnimateInfoButton(false), 2000)
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background to-muted/5">
@@ -68,9 +101,23 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Vision Chamber
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                      Vision Chamber
+                    </h1>
+                    <button
+                      onClick={handleShowInfo}
+                      className="rounded-full p-0 hover:opacity-80 transition-all relative"
+                      title="Vision Chamber Guide"
+                    >
+                      <Info className={`h-6 w-6 text-emerald-500 transition-all ${
+                        animateInfoButton ? 'scale-110' : ''
+                      }`} />
+                      {animateInfoButton && (
+                        <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping-slow" />
+                      )}
+                    </button>
+                  </div>
                   <p className="text-sm text-muted-foreground">Explore visual insights and perspectives</p>
                 </div>
               </div>
@@ -112,6 +159,13 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
       <div className="flex-1 overflow-hidden">
         <SimpleVisionChamber />
       </div>
+
+      {/* Floating Message for first-time users */}
+      <SibilFloatingMessage 
+        show={showFloatingMessage} 
+        onDismiss={handleDismissMessage}
+        isManualOpen={isManualOpen}
+      />
     </div>
   )
 }

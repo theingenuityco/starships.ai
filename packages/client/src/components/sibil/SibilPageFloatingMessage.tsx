@@ -31,11 +31,8 @@ export function SibilPageFloatingMessage({ show, onDismiss, isManualOpen = false
     }
 
     if (show && !hasBeenDismissed) {
-      // Show message after a very short delay
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 500); // Quick appearance
-      return () => clearTimeout(timer);
+      // Show message immediately without delay
+      setIsVisible(true);
     }
   }, [show, hasBeenDismissed, isManualOpen]);
 

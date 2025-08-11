@@ -384,7 +384,16 @@ export default function HomePage() {
           >
             {isAuthenticated ? (
               <LandingSibilWidgetAuthenticated 
-                userName={user?.given_name || user?.family_name || user?.email?.split('@')[0] || 'there'}
+                userName={(() => {
+                  // Simply use the first word from displayName
+                  if (user?.displayName) {
+                    const firstName = user.displayName.trim().split(' ')[0];
+                    return firstName;
+                  }
+                  
+                  // Fallback to 'there'
+                  return 'there';
+                })()}
               />
             ) : (
               <LandingSibilWidgetStaticChat onVisionSubmit={handleVisionSubmit} />

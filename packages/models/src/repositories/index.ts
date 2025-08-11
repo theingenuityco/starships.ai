@@ -16,24 +16,34 @@ export { StarshipRepository } from './StarshipRepository';
 export { VisionRepository } from './VisionRepository';
 export { MCPServerOptionRepository } from './MCPServerOptionRepository';
 export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
+export { MissionRepository } from './MissionRepository';
 
-// Export expedition repositories
-export { ExpeditionRepository } from './ExpeditionRepository';
-export { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
-export { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
-export { ExpeditionResultRepository } from './ExpeditionResultRepository';
+// Export expedition repositories (STUB IMPLEMENTATIONS)
+export { ExpeditionRepository } from './ExpeditionRepository.stub';
+export { ExpeditionTaskRepository } from './ExpeditionTaskRepository.stub';
+export { ExpeditionMessageRepository } from './ExpeditionMessageRepository.stub';
+export { ExpeditionResultRepository } from './ExpeditionResultRepository.stub';
+
+// Export workflow repositories
+export { WorkflowRepository } from './WorkflowRepository';
+export { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
 import { MCPServerOptionRepository } from './MCPServerOptionRepository';
 import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
+import { MissionRepository } from './MissionRepository';
 
-// Import expedition repositories
-import { ExpeditionRepository } from './ExpeditionRepository';
-import { ExpeditionTaskRepository } from './ExpeditionTaskRepository';
-import { ExpeditionMessageRepository } from './ExpeditionMessageRepository';
-import { ExpeditionResultRepository } from './ExpeditionResultRepository';
+// Import expedition repositories (STUB IMPLEMENTATIONS)
+import { ExpeditionRepository } from './ExpeditionRepository.stub';
+import { ExpeditionTaskRepository } from './ExpeditionTaskRepository.stub';
+import { ExpeditionMessageRepository } from './ExpeditionMessageRepository.stub';
+import { ExpeditionResultRepository } from './ExpeditionResultRepository.stub';
+
+// Import workflow repositories
+import { WorkflowRepository } from './WorkflowRepository';
+import { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -57,13 +67,18 @@ export class RepositoryFactory {
   private static visionRepo: VisionRepository | null = null;
   private static mcpServerOptionRepo: MCPServerOptionRepository | null = null;
   private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
+  private static missionRepo: MissionRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
-  // Expedition repository instances
+  // Expedition repository instances (STUB IMPLEMENTATIONS)
   private static expeditionRepo: ExpeditionRepository | null = null;
   private static expeditionTaskRepo: ExpeditionTaskRepository | null = null;
   private static expeditionMessageRepo: ExpeditionMessageRepository | null = null;
   private static expeditionResultRepo: ExpeditionResultRepository | null = null;
+
+  // Workflow repository instances
+  private static workflowRepo: WorkflowRepository | null = null;
+  private static workflowRuntimeStateRepo: WorkflowRuntimeStateRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -119,12 +134,17 @@ export class RepositoryFactory {
       this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
       this.mcpServerOptionRepo = new MCPServerOptionRepository();
+      this.missionRepo = new MissionRepository();
 
-      // Initialize expedition repositories (no dependencies)
+      // Initialize expedition repositories (no dependencies) (STUB IMPLEMENTATIONS)
       this.expeditionRepo = new ExpeditionRepository();
       this.expeditionTaskRepo = new ExpeditionTaskRepository();
       this.expeditionMessageRepo = new ExpeditionMessageRepository();
       this.expeditionResultRepo = new ExpeditionResultRepository();
+
+      // Initialize workflow repositories (no dependencies)
+      this.workflowRepo = new WorkflowRepository();
+      this.workflowRuntimeStateRepo = new WorkflowRuntimeStateRepository();
 
       // Initialize repositories with dependencies
       this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
@@ -182,11 +202,14 @@ export class RepositoryFactory {
         visionRepo: this.visionRepo !== null,
         mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
         mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
+        missionRepo: this.missionRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
         expeditionRepo: this.expeditionRepo !== null,
         expeditionTaskRepo: this.expeditionTaskRepo !== null,
         expeditionMessageRepo: this.expeditionMessageRepo !== null,
         expeditionResultRepo: this.expeditionResultRepo !== null,
+        workflowRepo: this.workflowRepo !== null,
+        workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
       }
     };
   }
@@ -306,7 +329,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionRepository instance (synchronous)
+   * Get ExpeditionRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionRepository(): ExpeditionRepository {
     this.ensureInitialized();
@@ -317,7 +340,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionTaskRepository instance (synchronous)
+   * Get ExpeditionTaskRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionTaskRepository(): ExpeditionTaskRepository {
     this.ensureInitialized();
@@ -328,7 +351,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionMessageRepository instance (synchronous)
+   * Get ExpeditionMessageRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionMessageRepository(): ExpeditionMessageRepository {
     this.ensureInitialized();
@@ -339,7 +362,7 @@ export class RepositoryFactory {
   }
 
   /**
-   * Get ExpeditionResultRepository instance (synchronous)
+   * Get ExpeditionResultRepository instance (synchronous) (STUB IMPLEMENTATION)
    */
   static getExpeditionResultRepository(): ExpeditionResultRepository {
     this.ensureInitialized();
@@ -347,6 +370,39 @@ export class RepositoryFactory {
       throw new Error('ExpeditionResultRepository not initialized');
     }
     return this.expeditionResultRepo;
+  }
+
+  /**
+   * Get WorkflowRepository instance (synchronous)
+   */
+  static getWorkflowRepository(): WorkflowRepository {
+    this.ensureInitialized();
+    if (!this.workflowRepo) {
+      throw new Error('WorkflowRepository not initialized');
+    }
+    return this.workflowRepo;
+  }
+
+  /**
+   * Get WorkflowRuntimeStateRepository instance (synchronous)
+   */
+  static getWorkflowRuntimeStateRepository(): WorkflowRuntimeStateRepository {
+    this.ensureInitialized();
+    if (!this.workflowRuntimeStateRepo) {
+      throw new Error('WorkflowRuntimeStateRepository not initialized');
+    }
+    return this.workflowRuntimeStateRepo;
+  }
+
+  /**
+   * Get MissionRepository instance (synchronous)
+   */
+  static getMissionRepository(): MissionRepository {
+    this.ensureInitialized();
+    if (!this.missionRepo) {
+      throw new Error('MissionRepository not initialized');
+    }
+    return this.missionRepo;
   }
 
   // ========================================================================
@@ -368,11 +424,14 @@ export class RepositoryFactory {
     this.visionRepo = null;
     this.mcpServerOptionRepo = null;
     this.mcpServerConnectorRepo = null;
+    this.missionRepo = null;
     this.agentTemplateService = null;
     this.expeditionRepo = null;
     this.expeditionTaskRepo = null;
     this.expeditionMessageRepo = null;
     this.expeditionResultRepo = null;
+    this.workflowRepo = null;
+    this.workflowRuntimeStateRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

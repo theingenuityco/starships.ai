@@ -2,6 +2,7 @@ import { SocketIOService } from '../services/SocketIOService';
 import { setupSibilHandlers } from './sibilHandlers';
 import { setupAgentHandlers } from './agentHandlers';
 import { setupExpeditionHandlers } from './expeditionHandlers';
+import { setupMissionHandlers } from './missionHandlers';
 import type { Server as HTTPServer } from 'http';
 
 export function initializeSocketIO(httpServer: HTTPServer) {
@@ -21,6 +22,9 @@ export function initializeSocketIO(httpServer: HTTPServer) {
 
   // Setup Expedition-specific handlers
   setupExpeditionHandlers(io);
+
+  // Setup Mission-specific handlers
+  setupMissionHandlers(io);
 
   // Log connection statistics periodically
   setInterval(() => {

@@ -29,7 +29,8 @@ import {
   AlertCircle,
   ArrowRight,
   X,
-  Brain
+  Brain,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
@@ -106,7 +107,6 @@ export function StarshipCreateModalUnified({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
   const [analyzingVision, setAnalyzingVision] = useState(false);
-  const [showVisionInput, setShowVisionInput] = useState(!isOnboarding); // Show vision input for regular flow
   
   // Try to get session from hook or fallback to localStorage for onboarding
   let session = hookSession;
@@ -124,14 +124,14 @@ export function StarshipCreateModalUnified({
     }
   }
   
-  // Determine initial step and total steps
+  // Now only 3 steps: Vision+Name, Class, Review
   const hasPrefilledVision = isOnboarding && session?.pendingVision;
-  const totalSteps = 4; // Always 4 steps: Vision, Name, Class, Review
+  const totalSteps = 3;
   
-  const [step, setStep] = useState(1); // Always start at step 1
+  const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<StarshipFormData>({
     name: '',
-    class: 'cruiser', // Default to cruiser
+    class: 'cruiser',
     vision: hasPrefilledVision ? session?.pendingVision : ''
   });
   const [errors, setErrors] = useState<StarshipFormErrors>({});
@@ -152,23 +152,21 @@ export function StarshipCreateModalUnified({
   const validateStep = (stepNumber: number): boolean => {
     const newErrors: StarshipFormErrors = {};
     
-    // Vision step validation
+    // Combined Vision + Name step validation
     if (stepNumber === 1) {
-      if (!formData.vision?.trim()) {
-        newErrors.vision = 'Please enter your vision or skip this step';
-      } else if (formData.vision.length < 20) {
-        newErrors.vision = 'Vision should be at least 20 characters';
-      }
-    }
-    
-    // Name step validation
-    if (stepNumber === 2) {
       if (!formData.name.trim()) {
         newErrors.name = 'Starship name is required';
       } else if (formData.name.length < 3) {
         newErrors.name = 'Name must be at least 3 characters';
       } else if (formData.name.length > 50) {
         newErrors.name = 'Name must be less than 50 characters';
+      }
+      
+      // Vision is mandatory
+      if (!formData.vision?.trim()) {
+        newErrors.vision = 'Vision statement is required';
+      } else if (formData.vision.length < 20) {
+        newErrors.vision = 'Vision should be at least 20 characters';
       }
     }
     
@@ -177,10 +175,7 @@ export function StarshipCreateModalUnified({
   };
 
   const handleAnalyzeVision = async () => {
-    if (!formData.vision?.trim()) {
-      handleSkipVision();
-      return;
-    }
+    if (!formData.vision?.trim()) return;
 
     setAnalyzingVision(true);
     try {
@@ -195,31 +190,24 @@ export function StarshipCreateModalUnified({
       if (analysis.recommendedClass) {
         setFormData(prev => ({ ...prev, class: analysis.recommendedClass }));
       }
-      
-      setStep(2);
     } catch (error) {
       console.error('Failed to analyze vision:', error);
-      // Still proceed even if analysis fails
-      setStep(2);
     } finally {
       setAnalyzingVision(false);
     }
   };
 
-  const handleSkipVision = () => {
-    setFormData(prev => ({ ...prev, vision: '' }));
-    setVisionAnalysis(null);
-    setStep(2);
-  };
-
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1) {
-      // Special handling for vision step
-      if (formData.vision?.trim()) {
-        handleAnalyzeVision();
-      } else {
-        handleSkipVision();
+      // Validate first
+      if (!validateStep(step)) return;
+      
+      // Analyze vision if provided and not already analyzed
+      if (formData.vision?.trim() && !visionAnalysis) {
+        await handleAnalyzeVision();
       }
+      
+      setStep(step + 1);
     } else if (validateStep(step)) {
       setStep(step + 1);
     }
@@ -284,7 +272,7 @@ export function StarshipCreateModalUnified({
   };
 
   const renderStepContent = () => {
-    // Step 1: Vision Input
+    // Step 1: Combined Vision + Name Input
     if (step === 1) {
       return (
         <motion.div
@@ -294,35 +282,76 @@ export function StarshipCreateModalUnified({
           exit={{ opacity: 0, x: -20 }}
           className="space-y-6"
         >
-          <div className="text-center space-y-2">
-            <Brain className="w-12 h-12 mx-auto text-primary" />
-            <h3 className="text-xl font-semibold">Share Your Vision</h3>
-            <p className="text-muted-foreground">
-              {isOnboarding && hasPrefilledVision 
-                ? "Review your vision statement"
-                : "What would you like to build? (Optional)"}
-            </p>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-3">
+              <Brain className="w-10 h-10 text-primary" />
+              <h3 className="text-xl font-semibold">Vision</h3>
+            </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-5 px-1">
+            {/* Vision Input (Required) */}
             <div className="space-y-2">
-              <Label htmlFor="vision">Vision Statement</Label>
+              <Label htmlFor="vision" className="flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                Vision Statement
+                <span className="text-xs text-destructive">*</span>
+              </Label>
               <Textarea
                 id="vision"
-                placeholder="Describe what you want to build..."
+                placeholder="What would you like to build?"
                 value={formData.vision}
                 onChange={(e) => setFormData({ ...formData, vision: e.target.value })}
+                onBlur={handleAnalyzeVision}
                 className={cn(
-                  "min-h-[120px] bg-background/50 backdrop-blur-sm border-border/50",
-                  errors.vision && "border-destructive"
+                  "min-h-[100px] bg-background/50 backdrop-blur-sm border border-border/50",
+                  "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                  errors.vision && "border-destructive focus:border-destructive"
                 )}
                 disabled={isOnboarding && hasPrefilledVision}
+                tabIndex={1}
               />
               {errors.vision && (
-                <p className="text-sm text-destructive">{errors.vision}</p>
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {errors.vision}
+                </p>
               )}
             </div>
 
+            {/* Starship Name Input (Required) */}
+            <div className="space-y-2">
+              <Label htmlFor="starship-name" className="flex items-center gap-2">
+                <Rocket className="w-4 h-4" />
+                Starship Name
+                <span className="text-xs text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="starship-name"
+                  placeholder="Enter a memorable name for your starship."
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className={cn(
+                    "pr-10 bg-background/50 backdrop-blur-sm border border-border/50",
+                    "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                    errors.name && "border-destructive focus:border-destructive"
+                  )}
+                  tabIndex={2}
+                />
+                {formData.name && !errors.name && (
+                  <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                )}
+              </div>
+              {errors.name && (
+                <p className="text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {errors.name}
+                </p>
+              )}
+            </div>
+
+            {/* AI Suggestions */}
             {visionAnalysis && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -330,106 +359,60 @@ export function StarshipCreateModalUnified({
                 className="p-4 bg-primary/5 rounded-lg border border-primary/20"
               >
                 <div className="flex items-start gap-3">
-                  <Sparkles className="w-4 h-4 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium mb-2">AI Analysis</p>
-                    <p className="text-sm text-muted-foreground">{visionAnalysis.summary}</p>
+                  <Bot className="w-4 h-4 text-emerald-500 mt-0.5" />
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <p className="text-xs font-medium text-primary tracking-wider mb-1">
+                        Sibil AI Analysis
+                      </p>
+                      <p className="text-sm text-muted-foreground">{visionAnalysis.summary}</p>
+                    </div>
+                    
+                    {visionAnalysis.suggestedName && formData.name !== visionAnalysis.suggestedName && (
+                      <div className="pt-2 border-t border-primary/10">
+                        <p className="text-xs text-muted-foreground mb-1">Suggested name:</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-0 h-auto font-medium text-foreground hover:text-primary hover:bg-transparent"
+                          onClick={() => setFormData({ 
+                            ...formData, 
+                            name: visionAnalysis.suggestedName 
+                          })}
+                        >
+                          Use "{visionAnalysis.suggestedName}"
+                          <ArrowRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </motion.div>
             )}
 
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                <strong>Tip:</strong> A clear vision helps AI agents better understand your goals 
-                and provide more relevant assistance.
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      );
-    }
-
-    // Step 2: Name Input
-    if (step === 2) {
-      return (
-        <motion.div
-          key="step2"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          className="space-y-6"
-        >
-          <div className="text-center space-y-2">
-            <Rocket className="w-12 h-12 mx-auto text-primary" />
-            <h3 className="text-xl font-semibold">Name Your Starship</h3>
-            <p className="text-muted-foreground">
-              Choose a memorable name for your vessel
-            </p>
-          </div>
-
-          <div className="space-y-4">
+            {/* Preview Card */}
             <div className="space-y-2">
-              <Label htmlFor="starship-name">Starship Name</Label>
-              <Input
-                id="starship-name"
-                placeholder="Enter starship name..."
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className={cn(
-                  "bg-background/50 backdrop-blur-sm border-border/50",
-                  errors.name && "border-destructive"
-                )}
-              />
-              {errors.name && (
-                <p className="text-sm text-destructive">{errors.name}</p>
-              )}
-            </div>
-
-            {visionAnalysis?.suggestedName && formData.name !== visionAnalysis.suggestedName && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-primary/5 rounded-lg border border-primary/20"
-              >
-                <div className="flex items-start gap-3">
-                  <Sparkles className="w-4 h-4 text-primary mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-xs text-primary font-medium uppercase tracking-wider mb-1">
-                      AI Suggestion
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-0 h-auto font-medium text-foreground hover:text-primary hover:bg-transparent"
-                      onClick={() => setFormData({ 
-                        ...formData, 
-                        name: visionAnalysis.suggestedName 
-                      })}
-                    >
-                      Use "{visionAnalysis.suggestedName}"
-                      <ArrowRight className="w-3 h-3 ml-1" />
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Preview</Label>
+              <Label className="text-xs text-muted-foreground">Preview</Label>
               <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">
                     <div className="text-2xl">{STARSHIP_CLASSES[formData.class].icon}</div>
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium">
-                        {formData.name || 'Unnamed Starship'}
+                        {formData.name || '________'}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {STARSHIP_CLASSES[formData.class].name} Class Starship
                       </div>
                     </div>
                   </div>
+                  {formData.vision && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <p className="text-xs text-muted-foreground italic line-clamp-2">
+                        "{formData.vision}"
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -438,11 +421,11 @@ export function StarshipCreateModalUnified({
       );
     }
 
-    // Step 3: Class Selection
-    if (step === 3) {
+    // Step 2: Class Selection
+    if (step === 2) {
       return (
         <motion.div
-          key="step3"
+          key="step2"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
@@ -526,12 +509,12 @@ export function StarshipCreateModalUnified({
       );
     }
 
-    // Step 4: Review
-    if (step === 4) {
+    // Step 3: Review
+    if (step === 3) {
       const selectedClass = STARSHIP_CLASSES[formData.class];
       return (
         <motion.div
-          key="step4"
+          key="step3"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
@@ -619,10 +602,9 @@ export function StarshipCreateModalUnified({
 
   const getStepTitle = () => {
     switch (step) {
-      case 1: return formData.vision && isOnboarding ? 'Review Your Vision' : 'Share Your Vision (Optional)';
-      case 2: return 'Name Your Starship';
-      case 3: return 'Choose Your Class';
-      case 4: return 'Review & Launch';
+      case 1: return 'Vision';
+      case 2: return 'Choose Your Class';
+      case 3: return 'Review & Launch';
       default: return '';
     }
   };
@@ -635,9 +617,6 @@ export function StarshipCreateModalUnified({
             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Create New Starship
             </DialogTitle>
-            <DialogDescription>
-              {getStepTitle()}
-            </DialogDescription>
           </DialogHeader>
 
           {/* Progress Bar */}
@@ -668,18 +647,13 @@ export function StarshipCreateModalUnified({
             </Button>
 
             <div className="flex space-x-2">
-              {step === 1 && !isOnboarding && (
-                <Button variant="outline" onClick={handleSkipVision}>
-                  Skip Vision
-                </Button>
-              )}
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
               {step < totalSteps ? (
                 <Button 
                   onClick={handleNext} 
-                  disabled={analyzingVision}
+                  disabled={analyzingVision || (step === 1 && (!formData.name.trim() || !formData.vision?.trim()))}
                   className="flex items-center space-x-2"
                 >
                   {analyzingVision ? (

@@ -9,6 +9,7 @@ import { DynamicLoginButton } from '@/components/auth/DynamicLoginButton';
 import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
 import { LandingSibilWidgetStaticChat } from '@/components/onboarding/LandingSibilWidgetStaticChat';
+import { LandingSibilWidgetAuthenticated } from '@/components/onboarding/LandingSibilWidgetAuthenticated';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { ReturnFlowBanner } from '@/components/onboarding/ReturnFlow';
 import { useStarshipStore } from '@/store/starship-store';
@@ -111,7 +112,7 @@ export default function HomePage() {
   const [launching, setLaunching] = useState(false);
   const [hasVision, setHasVision] = useState(false);
   const [hasExistingStarships, setHasExistingStarships] = useState(false);
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const { scrollYProgress } = useScroll();
   const { session } = useOnboardingSession();
   const { starships, loadUserStarships } = useStarshipStore();
@@ -183,16 +184,7 @@ export default function HomePage() {
           
           {/* Right side buttons */}
           <div className="flex gap-4">
-            {isAuthenticated ? (
-              <Button 
-                size="lg" 
-                onClick={handleLaunch}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full"
-              >
-                {hasExistingStarships ? 'Enter Command Deck' : 'Create Your First Starship'}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            ) : (
+            {!isAuthenticated && (
               <DynamicLoginButton 
                 size="default" 
                 data-login-button
@@ -383,17 +375,30 @@ export default function HomePage() {
             </div>
           </div>
           
-          {/* Sibil AI Widget for non-authenticated users */}
-          {!isAuthenticated && !hasExistingStarships && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1.2, duration: 0.8 }}
-              className="w-full mb-8 mt-12"
-            >
+          {/* Sibil AI Widget */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2, duration: 0.8 }}
+            className="w-full mb-8 mt-12"
+          >
+            {isAuthenticated ? (
+              <LandingSibilWidgetAuthenticated 
+                userName={(() => {
+                  // Simply use the first word from displayName
+                  if (user?.displayName) {
+                    const firstName = user.displayName.trim().split(' ')[0];
+                    return firstName;
+                  }
+                  
+                  // Fallback to 'there'
+                  return 'there';
+                })()}
+              />
+            ) : (
               <LandingSibilWidgetStaticChat onVisionSubmit={handleVisionSubmit} />
-            </motion.div>
-          )}
+            )}
+          </motion.div>
           
         </motion.div>
         

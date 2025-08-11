@@ -260,11 +260,15 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               loading: false,
               vision: ''
             });
+            
+            // Return the created starship for navigation
+            return response.starship;
           } catch (error) {
             set({
               error: error instanceof Error ? error.message : 'Failed to create starship',
               loading: false
             });
+            throw error;
           }
         },
 

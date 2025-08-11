@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { SibilChatInterface } from './SibilChatInterface'
+import { SibilPageFloatingMessage } from './SibilPageFloatingMessage'
 import { 
   ArrowLeft, Brain, Loader2, Activity, 
-  MessageSquare, Lightbulb
+  MessageSquare, Lightbulb, Info
 } from 'lucide-react'
 import Link from 'next/link'
 import { starshipAPI, Starship } from '@/lib/api'
+import { useStarshipStore } from '@/store/starship-store'
 
 interface SibilContentProps {
   slug: string
@@ -20,6 +22,12 @@ export function SibilContent({ slug }: SibilContentProps) {
   const [starshipLoading, setStarshipLoading] = useState(true)
   const [activeConversations, setActiveConversations] = useState(0)
   const [insights, setInsights] = useState(0)
+  const { starships } = useStarshipStore()
+  
+  // Floating message state
+  const [showFloatingMessage, setShowFloatingMessage] = useState(false)
+  const [isManualOpen, setIsManualOpen] = useState(false)
+  const [animateInfoButton, setAnimateInfoButton] = useState(false)
 
   // Fetch starship data
   useEffect(() => {
@@ -37,6 +45,31 @@ export function SibilContent({ slug }: SibilContentProps) {
 
     fetchStarship()
   }, [slug])
+
+  // Check if this is the user's first starship and show onboarding
+  useEffect(() => {
+    if (starship && starships && starships.length === 1) {
+      const dismissed = localStorage.getItem('sibil-page-message-dismissed')
+      if (!dismissed) {
+        setShowFloatingMessage(true)
+      }
+    }
+  }, [starship, starships])
+
+  // Function to manually show the info modal
+  const handleShowInfo = () => {
+    setIsManualOpen(true)
+    setShowFloatingMessage(true)
+  }
+
+  // Handle dismissing the floating message
+  const handleDismissMessage = () => {
+    setShowFloatingMessage(false)
+    setIsManualOpen(false)
+    // Animate the info button to show where the information is stored
+    setAnimateInfoButton(true)
+    setTimeout(() => setAnimateInfoButton(false), 2000)
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background to-muted/5">
@@ -68,9 +101,23 @@ export function SibilContent({ slug }: SibilContentProps) {
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Sibil AI
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                      Sibil AI
+                    </h1>
+                    <button
+                      onClick={handleShowInfo}
+                      className="rounded-full p-0 hover:opacity-80 transition-all relative"
+                      title="Sibil AI Guide"
+                    >
+                      <Info className={`h-6 w-6 text-emerald-500 transition-all ${
+                        animateInfoButton ? 'scale-110' : ''
+                      }`} />
+                      {animateInfoButton && (
+                        <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping-slow" />
+                      )}
+                    </button>
+                  </div>
                   <p className="text-sm text-muted-foreground">Advanced AI intelligence assistant for strategic analysis and decision support</p>
                 </div>
               </div>
@@ -112,6 +159,13 @@ export function SibilContent({ slug }: SibilContentProps) {
       <div className="flex-1 overflow-hidden">
         <SibilChatInterface starshipId={starship?.id} />
       </div>
+
+      {/* Sibil Page Floating Message */}
+      <SibilPageFloatingMessage 
+        show={showFloatingMessage} 
+        onDismiss={handleDismissMessage}
+        isManualOpen={isManualOpen}
+      />
     </div>
   )
 }

@@ -15,6 +15,8 @@ import type {
   Mission, 
   MissionMessage,
   MissionPhase,
+  MissionClarity,
+  CreateMissionClarityRequest,
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
@@ -55,6 +57,12 @@ const MissionChatStateAnnotation = Annotation.Root({
   metadata: Annotation<MissionMetadata | null>({
     value: (x, y) => y ?? x,
     default: () => null
+  }),
+  
+  // ADDED: Current clarity for context and iteration tracking
+  clarity: Annotation<MissionClarity | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
   })
 });
 
@@ -67,6 +75,7 @@ export type MissionChatState = typeof MessagesAnnotation.State & {
   currentPhase: MissionPhase;
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
+  clarity: MissionClarity | undefined; // ADDED: Mission clarity state
 };
 
 /**
@@ -77,6 +86,10 @@ export class MissionOrchestratorAgent {
   private llmProvider: LLMProvider | null = null;
   private checkpointer = new MemorySaver();
   private compiledGraph: any = null; // Cache compiled graph
+  
+  // Clarity assessment configuration constants
+  private static readonly CLARITY_THRESHOLD = 7.0;
+  private static readonly MAX_CLARITY_ITERATIONS = 10;
   
   private readonly config: Required<MissionOrchestratorAgentConfig> = {
     temperature: 0.7,
@@ -156,16 +169,18 @@ export class MissionOrchestratorAgent {
 
   /**
    * Build context string from state for use in prompts
+   * Now includes clarity data when available
    */
   private buildContext(state: MissionChatState): string {
-    const { metadata, currentPhase } = state;
+    const { metadata, currentPhase, clarity } = state;
     const { mission, starship, vision } = metadata!;
     
     return renderTemplate(MISSION_PROMPTS.CONTEXT, {
       currentPhase,
       mission,
       starship,
-      vision
+      vision,
+      clarity
     });
   }
 
@@ -202,27 +217,38 @@ ${welcomePhase}`;
   }
 
   /**
-   * Analysis phase node - handles mission analysis and breakdown
+   * ENHANCED Analysis phase node - handles mission clarity assessment with iterative questioning
+   * Uses buildContext() which now includes clarity data, and MISSION_PROMPTS for consistency
    */
   private async analysisPhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const latestMessage = state.messages[state.messages.length - 1];
-    const userMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
+    // 1. EVALUATE: AI assessment + DB save
+    const clarity = await this.assessAndSaveClarity(state);
     
-    // Build complete analysis prompt using template literals
-    const context = this.buildContext(state);
-    const analysisPhase = renderTemplate(MISSION_PROMPTS.ANALYSIS_PHASE, {
-      userMessage
-    });
+    // 2. CHECK: Threshold evaluation  
+    const isComplete = clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
+                      clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS;
     
-    const systemPrompt = `${context}
-
-${analysisPhase}`;
-
-    const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
-    const responseContent = await this.callLLM(prompt);
-    
-    const aiMessage = new AIMessage({ content: responseContent });
-    return { messages: [aiMessage] };
+    // 3. DECISION: Complete or continue
+    if (isComplete) {
+      // COMPLETE: Transition to converse phase
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      await missionRepo.updateMission(state.missionId, { phase: 'converse' });
+      
+      const summary = await this.generateCompletionSummary(clarity);
+      return {
+        currentPhase: 'converse',
+        messages: [new AIMessage({ content: summary })],
+        clarity
+      };
+    } else {
+      // ASK: Generate next clarifying question using context with clarity data
+      const conversationText = this.buildConversationText(state.messages);
+      const question = await this.generateFocusedQuestion(clarity, conversationText);
+      return {
+        messages: [new AIMessage({ content: question })],
+        clarity // Update state with latest clarity
+      };
+    }
   }
 
   /**
@@ -438,5 +464,215 @@ ${conversePhase}`;
    */
   private getFallbackResponse(missionId: string): string {
     return MISSION_PROMPTS.FALLBACK;
+  }
+
+  // ============================================================================
+  // CLARITY ASSESSMENT METHODS
+  // ============================================================================
+
+  /**
+   * Main orchestrator method - assesses clarity and saves to database
+   */
+  private async assessAndSaveClarity(state: MissionChatState): Promise<MissionClarity> {
+    try {
+      // Get current iteration count
+      const currentClarity = await this.getClarityFromDB(state.missionId);
+      const iteration = (currentClarity?.iteration || 0) + 1;
+      
+      // Update state with current clarity for context
+      const stateWithClarity = { ...state, clarity: currentClarity };
+      
+      // Assess clarity using AI with full context
+      const clarityRequest = await this.assessMissionClarity(stateWithClarity, iteration);
+      clarityRequest.missionId = state.missionId; // Set the mission ID
+      
+      // Save to database
+      const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+      return await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
+    } catch (error) {
+      this.logger.error('Failed to assess and save clarity', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'assessAndSaveClarity',
+        missionId: state.missionId
+      }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * AI clarity assessment using LLM - returns structured clarity data
+   * Uses full context (including existing clarity data) via buildContext
+   */
+  private async assessMissionClarity(state: MissionChatState, iteration: number): Promise<CreateMissionClarityRequest> {
+    // Build full context including mission, vision, and any existing clarity
+    const context = this.buildContext(state);
+    const clarityPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_ASSESSMENT, {});
+
+    const systemPrompt = `${context}
+
+${clarityPrompt}`;
+
+    const prompt: LLMChatPrompt = {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+
+    const response = await this.callLLM(prompt);
+    const clarityData = this.parseJSONResponse(response);
+    
+    return {
+      missionId: '', // Will be set by caller
+      objectiveClarity: clarityData.objectiveClarity,
+      successMetrics: clarityData.successMetrics,
+      timelineDefinition: clarityData.timelineDefinition,
+      scopeBoundaries: clarityData.scopeBoundaries,
+      visionAlignment: clarityData.visionAlignment,
+      reasoning: clarityData.reasoning,
+      iteration
+    };
+  }
+
+  /**
+   * Generate focused question based on lowest scoring clarity dimension
+   */
+  private async generateFocusedQuestion(clarity: MissionClarity, conversationText: string): Promise<string> {
+    // Find the lowest scoring dimension
+    const dimensions = [
+      { name: 'Objective Clarity', score: clarity.objectiveClarity, key: 'objectiveClarity' },
+      { name: 'Success Metrics', score: clarity.successMetrics, key: 'successMetrics' },
+      { name: 'Timeline Definition', score: clarity.timelineDefinition, key: 'timelineDefinition' },
+      { name: 'Scope Boundaries', score: clarity.scopeBoundaries, key: 'scopeBoundaries' },
+      { name: 'Vision Alignment', score: clarity.visionAlignment, key: 'visionAlignment' }
+    ];
+    
+    const lowestDimension = dimensions.reduce((min, current) => 
+      current.score < min.score ? current : min
+    );
+
+    const questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {
+      dimensionName: lowestDimension.name,
+      currentScore: lowestDimension.score,
+      conversationText,
+      clarityReasoning: clarity.reasoning
+    });
+
+    const prompt: LLMChatPrompt = {
+      messages: [{
+        role: 'system', 
+        content: questionPrompt
+      }]
+    };
+
+    return await this.callLLM(prompt);
+  }
+
+  /**
+   * Generate completion summary when clarity threshold is met
+   */
+  private async generateCompletionSummary(clarity: MissionClarity): Promise<string> {
+    const completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {
+      clarity,
+      overallScore: clarity.overallScore.toFixed(1) // Keep formatted version for display
+    });
+
+    const prompt: LLMChatPrompt = {
+      messages: [{
+        role: 'system',
+        content: completionPrompt
+      }]
+    };
+
+    return await this.callLLM(prompt);
+  }
+
+  /**
+   * Get clarity from database for iteration tracking
+   */
+  private async getClarityFromDB(missionId: string): Promise<MissionClarity | null> {
+    try {
+      const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+      return await clarityRepo.getByMissionId(missionId);
+    } catch (error) {
+      this.logger.error('Failed to get clarity from database', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'getClarityFromDB',
+        missionId
+      }, error as Error);
+      return null;
+    }
+  }
+
+  /**
+   * Build conversation text from LangChain messages
+   */
+  private buildConversationText(messages: any[]): string {
+    return messages
+      .filter(msg => msg.content && typeof msg.content === 'string')
+      .map(msg => {
+        const role = msg instanceof HumanMessage ? 'Human' : 
+                    msg instanceof AIMessage ? 'AI' : 'System';
+        return `${role}: ${msg.content}`;
+      })
+      .join('\n\n');
+  }
+
+  /**
+   * Parse JSON response from LLM with error handling
+   */
+  private parseJSONResponse(response: string): any {
+    try {
+      // Extract JSON from response if wrapped in text
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : response;
+      
+      const parsed = JSON.parse(jsonStr);
+      this.validateClarity(parsed);
+      return parsed;
+    } catch (error) {
+      this.logger.error('Failed to parse JSON response', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'parseJSONResponse',
+        response: response.substring(0, 200)
+      }, error as Error);
+      
+      // Return default scores if parsing fails
+      return {
+        objectiveClarity: 5,
+        successMetrics: 5,
+        timelineDefinition: 5,
+        scopeBoundaries: 5,
+        visionAlignment: 5,
+        reasoning: 'Unable to parse AI assessment, using default scores'
+      };
+    }
+  }
+
+  /**
+   * Validate clarity assessment structure and ranges
+   */
+  private validateClarity(clarity: any): void {
+    const requiredFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment', 'reasoning'];
+    const errors: string[] = [];
+    
+    for (const field of requiredFields) {
+      if (clarity[field] === undefined) {
+        errors.push(`Missing field: ${field}`);
+      }
+    }
+    
+    // Validate score ranges (0-10)
+    const scoreFields = requiredFields.slice(0, 5); // First 5 are scores
+    for (const field of scoreFields) {
+      const score = clarity[field];
+      if (typeof score !== 'number' || score < 0 || score > 10) {
+        errors.push(`Invalid score for ${field}: must be number 0-10, got ${score}`);
+      }
+    }
+    
+    if (errors.length > 0) {
+      throw new Error(`Clarity validation failed: ${errors.join(', ')}`);
+    }
   }
 }

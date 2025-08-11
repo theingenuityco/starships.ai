@@ -1,7 +1,7 @@
 // Import Agent from protocol to avoid circular dependency
 import { Agent } from '@starships/protocol';
 
-// Import expedition types from protocol
+// Import expedition stub types from protocol (STUBS FOR COMPILATION ONLY)
 import {
   Expedition,
   ExpeditionTask,
@@ -18,12 +18,11 @@ import {
   ExpeditionFilters,
   ExpeditionSort,
   PaginationOptions,
-  ExpeditionWorkflowState,
   WorkflowPhase,
   TaskBreakdown,
 } from '@starships/protocol';
 
-// Re-export Agent and expedition types for backward compatibility
+// Re-export Agent and expedition stub types for backward compatibility (STUBS ONLY)
 export { Agent };
 export {
   Expedition,
@@ -41,7 +40,6 @@ export {
   ExpeditionFilters,
   ExpeditionSort,
   PaginationOptions,
-  ExpeditionWorkflowState,
   WorkflowPhase,
   TaskBreakdown,
 };
@@ -1151,7 +1149,7 @@ export const BUILTIN_CONFIG_TEMPLATES: Omit<
     },
   },
 ];
-// NEW: Expedition Repository Interfaces
+// NEW: Expedition Repository Interfaces (STUB IMPLEMENTATIONS - COMPILATION ONLY)
 export interface ExpeditionRepository extends Repository<Expedition> {
   findByStarship(starshipId: string): Promise<Expedition[]>;
   findByStatus(starshipId: string, status: ExpeditionStatus): Promise<Expedition[]>;
@@ -1165,7 +1163,6 @@ export interface ExpeditionRepository extends Repository<Expedition> {
     total: number;
   }>;
   updateStatus(id: string, status: ExpeditionStatus): Promise<Expedition | null>;
-  updateWorkflowState(id: string, state: ExpeditionWorkflowState): Promise<Expedition | null>;
   assignAgent(expeditionId: string, agentId: string): Promise<boolean>;
   removeAgent(expeditionId: string, agentId: string): Promise<boolean>;
   getAssignedAgents(expeditionId: string): Promise<Agent[]>;

@@ -8,7 +8,7 @@ import {
   Users, Rocket, BookOpen, Brain,
   Cpu, Zap, Eye, Command, Power,
   Activity, Lightbulb, ChevronRight,
-  Gauge
+  Gauge, Target
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -29,7 +29,7 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
       { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" },
       { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
-      { href: `/ship/${starshipSlug}/expeditions`, label: "Expeditions", icon: Rocket, status: "optimal" }
+      { href: `/ship/${starshipSlug}/missions`, label: "Missions", icon: Target, status: "optimal" }
     ]
   },
   {

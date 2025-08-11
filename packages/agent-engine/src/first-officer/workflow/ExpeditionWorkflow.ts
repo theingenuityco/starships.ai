@@ -16,7 +16,7 @@ import {
   QualityCheck,
   TaskExecution
 } from '../types';
-import { WorkflowPhase, TaskBreakdown } from '@starships/protocol';
+import { WorkflowPhase, TaskBreakdown, WorkflowDSL, WorkflowRuntimeState } from '@starships/protocol';
 
 /**
  * Define the state annotation for the workflow
@@ -65,6 +65,11 @@ const ExpeditionStateAnnotation = Annotation.Root({
   // Final results
   finalResult: Annotation<string | undefined>(),
   
+  // NEW: Workflow DSL fields (replacing old workflowState)
+  workflowDSL: Annotation<WorkflowDSL | undefined>(),
+  currentWorkflowNode: Annotation<string | undefined>(),
+  workflowRuntimeState: Annotation<WorkflowRuntimeState | undefined>(),
+  
   // Metadata
   lastUpdated: Annotation<string>(),
   
@@ -94,11 +99,13 @@ export interface WorkflowNodeHandlers {
   planTasks: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   selectAgents: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   assignTasks: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+  createWorkflowDSL: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   executeTasks: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   monitorProgress: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   qualityCheck: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   synthesizeResults: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   userApproval: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
+  userApprovalWorkflow: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   handleError: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   retryTask: (state: ExpeditionState) => Promise<Partial<ExpeditionState>>;
   
@@ -130,6 +137,8 @@ export function createExpeditionWorkflow(
     .addNode('plan_tasks', handlers.planTasks)
     .addNode('select_agents', handlers.selectAgents)
     .addNode('assign_tasks', handlers.assignTasks)
+    .addNode('create_workflow_dsl', handlers.createWorkflowDSL)
+    .addNode('user_approval_workflow', handlers.userApprovalWorkflow)
     .addNode('execute_tasks', handlers.executeTasks)
     .addNode('monitor_progress', handlers.monitorProgress)
     .addNode('quality_check', handlers.qualityCheck)
@@ -204,14 +213,48 @@ export function createExpeditionWorkflow(
       }
     )
     
-    // Assign Tasks -> Execute
+    // Assign Tasks -> Create Workflow DSL
     .addConditionalEdges(
       'assign_tasks',
       (state) => {
         if (state.currentPhase === 'failed') return 'handle_error';
-        return 'execute_tasks';
+        return 'create_workflow_dsl';
       },
       {
+        'create_workflow_dsl': 'create_workflow_dsl',
+        'handle_error': 'handle_error'
+      }
+    )
+    
+    // Create Workflow DSL -> User Approval Workflow
+    .addConditionalEdges(
+      'create_workflow_dsl',
+      (state) => {
+        if (state.currentPhase === 'failed') return 'handle_error';
+        return 'user_approval_workflow';
+      },
+      {
+        'user_approval_workflow': 'user_approval_workflow',
+        'handle_error': 'handle_error'
+      }
+    )
+    
+    // User Approval Workflow -> Execute or Wait
+    .addConditionalEdges(
+      'user_approval_workflow',
+      (state) => {
+        if (state.currentPhase === 'failed') return 'handle_error';
+        if (state.currentPhase === 'waiting_for_approval') {
+          // Use LangGraph interrupt mechanism to pause execution
+          return 'user_approval_workflow'; // Stay in the same node for retry
+        }
+        if (state.currentPhase === 'coordinating') {
+          return 'execute_tasks';
+        }
+        return 'handle_error';
+      },
+      {
+        'user_approval_workflow': 'user_approval_workflow',
         'execute_tasks': 'execute_tasks',
         'handle_error': 'handle_error'
       }
@@ -395,11 +438,13 @@ export function createExpeditionWorkflow(
     : new MemorySaver();
   
   // Configure interrupts based on settings  
-  const interruptBefore = config.requireUserApproval ? ['user_approval'] : undefined;
+  const interruptBefore = config.requireUserApproval 
+    ? ['user_approval' as const, 'user_approval_workflow' as const] 
+    : ['user_approval_workflow' as const]; // Always interrupt for workflow approval
 
   return workflow.compile({
     checkpointer,
-    ...(config.requireUserApproval && { interruptBefore: ['user_approval'] })
+    interruptBefore
   });
 }
 
@@ -427,6 +472,12 @@ export function convertToExpeditionState(state: FirstOfficerState, requireUserAp
     retryCount: state.retryCount,
     retryAttempts: state.retryAttempts,
     finalResult: state.finalResult,
+    
+    // NEW: Workflow DSL fields
+    workflowDSL: state.workflowDSL,
+    currentWorkflowNode: state.currentWorkflowNode,
+    workflowRuntimeState: state.workflowRuntimeState,
+    
     lastUpdated: state.lastUpdated,
     messages: [],
     
@@ -448,6 +499,7 @@ export function convertFromExpeditionState(state: ExpeditionState): FirstOfficer
     starshipId: state.starshipId,
     currentPhase: state.currentPhase,
     requirements: state.requirements,
+    requireUserApproval: state.requireUserApproval,
     objectiveAnalysis: state.objectiveAnalysis,
     taskPlan: state.taskPlan,
     taskBreakdown: state.taskBreakdown,
@@ -461,6 +513,12 @@ export function convertFromExpeditionState(state: ExpeditionState): FirstOfficer
     retryCount: state.retryCount,
     retryAttempts: state.retryAttempts,
     finalResult: state.finalResult,
+    
+    // NEW: Workflow DSL fields
+    workflowDSL: state.workflowDSL,
+    currentWorkflowNode: state.currentWorkflowNode,
+    workflowRuntimeState: state.workflowRuntimeState,
+    
     lastUpdated: state.lastUpdated
   };
 }

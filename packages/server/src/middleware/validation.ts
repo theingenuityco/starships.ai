@@ -11,6 +11,7 @@ import {
   CreateTaskRequest,
   SendMessageRequest,
   CreateResultRequest,
+  SendMissionMessageRequest,
   ExpeditionStatus,
   TaskStatus,
   TaskPriority,
@@ -415,3 +416,64 @@ export function validateTaskCompletion(req: Request, res: Response, next: NextFu
   
   next();
 }
+
+/**
+ * Middleware to validate 4-phase expedition creation request
+ */
+export function validate4PhaseExpedition(req: Request, res: Response, next: NextFunction): void {
+  const body = req.body;
+  let errors: ValidationError[] = [];
+  
+  // Required fields with 4-phase naming
+  errors = errors.concat(validateRequired(body, ['expeditionName', 'originalMission', 'selectedAgents']));
+  
+  // String length validations
+  errors = errors.concat(validateStringLength(body, 'expeditionName', 1, 200));
+  errors = errors.concat(validateStringLength(body, 'originalMission', 1, 1000));
+  errors = errors.concat(validateStringLength(body, 'visionContext', 0, 500));
+  
+  // Array validations
+  errors = errors.concat(validateArray(body, 'selectedAgents', true, 10)); // Required array with max 10 agents
+  
+  if (errors.length > 0) {
+    sendValidationError(res, errors);
+    return;
+  }
+  
+  next();
+}
+
+/**
+ * Validate mission message send request
+ */
+export function validateSendMissionMessage(req: Request, res: Response, next: NextFunction): void {
+  const body = req.body as SendMissionMessageRequest;
+  let errors: ValidationError[] = [];
+  
+  // Content field - required but can be empty for initial greeting
+  if (body.content === undefined || body.content === null) {
+    errors.push({
+      field: 'content',
+      message: 'Content field is required',
+      value: body.content
+    });
+  } else if (body.content.length > 5000) {
+    errors.push({
+      field: 'content', 
+      message: 'Content must be 5000 characters or less',
+      value: body.content?.length
+    });
+  }
+  
+  if (errors.length > 0) {
+    sendValidationError(res, errors);
+    return;
+  }
+  
+  next();
+}
+
+/**
+ * Export the sendValidationError function for use in routes
+ */
+export { sendValidationError };

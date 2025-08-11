@@ -361,15 +361,14 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pl-11 pr-11 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors text-sm"
               />
-                {searchQuery && (
-                  <button
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    <XCircle className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+              {searchQuery && (
+                <button
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
             
             <Select
@@ -379,60 +378,58 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
               <SelectTrigger className="w-full md:w-48 h-10 bg-background border-input hover:border-muted-foreground/50 focus:border-primary transition-colors">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-muted-foreground" />
-                      <span>All Status</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="draft">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-slate-500" />
-                      <span>Draft</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="planning">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-blue-500" />
-                      <span>Planning</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="in-progress">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-amber-500" />
-                      <span>In Progress</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="review">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-purple-500" />
-                      <span>Review</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="completed">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                      <span>Completed</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="failed">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-red-500" />
-                      <span>Failed</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="cancelled">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-gray-500" />
-                      <span>Cancelled</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+                    <span>All Status</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="draft">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-slate-500" />
+                    <span>Draft</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="planning">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-blue-500" />
+                    <span>Planning</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="in-progress">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-amber-500" />
+                    <span>In Progress</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="review">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-purple-500" />
+                    <span>Review</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="completed">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <span>Completed</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="failed">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-red-500" />
+                    <span>Failed</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="cancelled">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-gray-500" />
+                    <span>Cancelled</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-
           {/* Status Badges */}
           {Object.keys(statusCounts).length > 0 && (
             <div className="flex flex-wrap gap-2">
@@ -695,15 +692,16 @@ export function StarshipExpeditionsContent({ slug }: StarshipExpeditionsContentP
         )}
       </div>
 
-
       {/* Create Expedition Modal */}
-      <CreateExpeditionModal
-        open={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onExpeditionCreated={handleExpeditionCreated}
-        starshipId={starshipId}
-        starshipSlug={slug}
-      />
+      {showCreateModal && (
+        <CreateExpeditionModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onExpeditionCreated={handleExpeditionCreated}
+          starshipId={starshipId}
+          starshipSlug={slug}
+        />
+      )}
     </div>
   )
 }

@@ -4,7 +4,6 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { RepositoryFactory } from '@starships/models';
 import { ServiceFactory } from '../services';
 import { MissionService } from '../services/MissionService';
 import type {
@@ -49,7 +48,6 @@ const validateUUID = (id: string, fieldName: string): void => {
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const missionRepo = RepositoryFactory.getMissionRepository();
     const userId = req.user?.id;
 
     // Parse query parameters
@@ -91,7 +89,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    const result = await missionRepo.getAllMissions(filters, sort);
+    const result = await MissionService.getAllMissions(filters, sort);
     res.json(result);
 
   } catch (error) {
@@ -112,12 +110,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  */
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const missionRepo = RepositoryFactory.getMissionRepository();
     const { id } = req.params;
 
     validateUUID(id, 'id');
 
-    const mission = await missionRepo.getMissionById(id);
+    const mission = await MissionService.getMissionById(id);
     res.json({ mission });
 
   } catch (error) {
@@ -143,7 +140,6 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
  */
 router.get('/starship/:starshipId', async (req: Request, res: Response): Promise<void> => {
   try {
-    const missionRepo = RepositoryFactory.getMissionRepository();
     const { starshipId } = req.params;
 
     validateUUID(starshipId, 'starshipId');
@@ -182,7 +178,7 @@ router.get('/starship/:starshipId', async (req: Request, res: Response): Promise
       }
     }
 
-    const result = await missionRepo.getMissionsByStarshipId(starshipId, filters, sort);
+    const result = await MissionService.getMissionsByStarshipId(starshipId, filters, sort);
     res.json(result);
 
   } catch (error) {
@@ -208,7 +204,6 @@ router.get('/starship/:starshipId', async (req: Request, res: Response): Promise
  */
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const missionRepo = RepositoryFactory.getMissionRepository();
     const userId = req.user?.id;
 
     if (!userId) {
@@ -275,9 +270,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
  */
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const missionRepo = RepositoryFactory.getMissionRepository();
     const { id } = req.params;
     const updates: UpdateMissionRequest = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
 
     validateUUID(id, 'id');
 
@@ -286,7 +286,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       throw new ValidationError('At least one field must be provided for update', 'updates');
     }
 
-    const mission = await missionRepo.updateMission(id, updates);
+    const mission = await MissionService.updateMission(id, updates, userId);
     res.json({ mission });
 
   } catch (error) {
@@ -312,12 +312,17 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
  */
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const missionRepo = RepositoryFactory.getMissionRepository();
     const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
 
     validateUUID(id, 'id');
 
-    await missionRepo.deleteMission(id);
+    await MissionService.deleteMission(id, userId);
     res.status(204).send();
 
   } catch (error) {

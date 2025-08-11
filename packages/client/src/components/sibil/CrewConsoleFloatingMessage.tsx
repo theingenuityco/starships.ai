@@ -57,15 +57,12 @@ export function CrewConsoleFloatingMessage({
     }
 
     if (show && !hasBeenDismissed && !isManualOpen && !hasInitialized) {
-      // Show message after a very short delay
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-        setCurrentStep(1);
-        setHasInitialized(true);
-        // Navigate to AI Agents tab for first step
-        onTabChange('agents');
-      }, 500); // Reduced from 1500ms to 500ms
-      return () => clearTimeout(timer);
+      // Show message immediately without delay
+      setIsVisible(true);
+      setCurrentStep(1);
+      setHasInitialized(true);
+      // Navigate to AI Agents tab for first step
+      onTabChange('agents');
     }
   }, [show, hasBeenDismissed, isManualOpen, onTabChange, hasInitialized]);
 

@@ -37,6 +37,7 @@ import { useStarshipStore } from '@/store/starship-store';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { analyzeVisionPreAuth } from '@/lib/sibil/preview-api';
 import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 interface StarshipCreateModalUnifiedProps {
   open: boolean;
@@ -104,6 +105,7 @@ export function StarshipCreateModalUnified({
 }: StarshipCreateModalUnifiedProps) {
   const { createStarship, loading } = useStarshipStore();
   const { session: hookSession, clearSession, updateStep } = useOnboardingSession();
+  const router = useRouter();
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
   const [analyzingVision, setAnalyzingVision] = useState(false);
@@ -236,7 +238,7 @@ export function StarshipCreateModalUnified({
         };
       }
       
-      await createStarship(starshipData);
+      const newStarship = await createStarship(starshipData);
       
       // Clear onboarding session if we're in onboarding flow
       if (isOnboarding) {
@@ -246,6 +248,11 @@ export function StarshipCreateModalUnified({
       
       onSuccess();
       handleReset();
+      
+      // Navigate to the new starship's vision-chamber
+      if (newStarship && newStarship.slug) {
+        router.push(`/ship/${newStarship.slug}/vision-chamber`);
+      }
     } catch (error) {
       console.error('Failed to create starship:', error);
     }

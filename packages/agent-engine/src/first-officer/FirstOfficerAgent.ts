@@ -19,6 +19,10 @@ import {
   MemoryEntry
 } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
+// TODO: Import from @starships/server once properly exported
+// For now, use the local implementation and upgrade it to match server's implementation
+import { WorkflowGenerationService } from './WorkflowGenerationService';
+// WebSocket event emission will be handled directly through webSocketEmitter
 import { ProviderFactory } from '../llm/provider-factory';
 import { buildPrompt } from '../prompt/builder';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
@@ -57,6 +61,8 @@ export class FirstOfficerAgent {
   private agentSelector: AgentSelector;
   private qualityValidator: QualityValidator;
   private taskExecutor: TaskExecutor;
+  private workflowGenerationService: WorkflowGenerationService;
+  // Removed workflowEventService - using direct WebSocket emission
   private chatCoordinator: ChatCoordinator | null;
   private workflow: any; // CompiledStateGraph from LangGraph
   private nodeHandlers: WorkflowNodeHandlers;
@@ -92,7 +98,7 @@ export class FirstOfficerAgent {
       qualityThreshold: 70,
       timeoutMinutes: 60,
       requireUserApproval: false,
-      enableParallelExecution: true,
+      enableParallelExecution: false, // CHANGED: Disabled for workflow DSL sequential execution
       autoEscalation: true,
       ...config
     };
@@ -106,6 +112,7 @@ export class FirstOfficerAgent {
     this.agentSelector = new AgentSelector(starshipId, selectedAgentIds);
     this.qualityValidator = new QualityValidator(this.config);
     this.taskExecutor = new TaskExecutor(this.config, memoryStore, this.webSocketEmitter);
+    this.workflowGenerationService = new WorkflowGenerationService();
     this.statePersistence = new StatePersistence();
     
     // Chat coordinator will be initialized per expedition
@@ -117,11 +124,13 @@ export class FirstOfficerAgent {
       planTasks: this.planTasksNode.bind(this),
       selectAgents: this.selectAgentsNode.bind(this),
       assignTasks: this.assignTasksNode.bind(this),
+      createWorkflowDSL: this.createWorkflowDSLNode.bind(this),
       executeTasks: this.executeTasksNode.bind(this),
       monitorProgress: this.monitorProgressNode.bind(this),
       qualityCheck: this.qualityCheckNode.bind(this),
       synthesizeResults: this.synthesizeResultsNode.bind(this),
       userApproval: this.userApprovalNode.bind(this),
+      userApprovalWorkflow: this.userApprovalWorkflowNode.bind(this),
       handleError: this.handleErrorNode.bind(this),
       retryTask: this.retryTaskNode.bind(this),
       
@@ -378,6 +387,7 @@ export class FirstOfficerAgent {
         errors: [],
         retryCount: 0,
         lastUpdated: new Date().toISOString(),
+        requireUserApproval: this.config.requireUserApproval,
         // Set selectedAgents if provided (from expedition.assignedAgents)
         selectedAgents: expedition.assignedAgents && expedition.assignedAgents.length > 0
           ? await this.convertAgentIdsToAssignments(expedition.assignedAgents)
@@ -1342,6 +1352,84 @@ Help coordinate and provide guidance as needed.`;
   }
 
   /**
+   * Workflow Node: Create Workflow DSL
+   * Generates workflow DSL from task breakdown and agent assignments
+   */
+  private async createWorkflowDSLNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('', 'WORKFLOW DSL GENERATION', 'Creating executable workflow from task breakdown and agent assignments');
+    
+    try {
+      // Convert selectedAgents to workflow AgentAssignment format
+      const workflowAgents = (state.selectedAgents || []).map(agent => ({
+        agentId: agent.agentId,
+        agentName: agent.agentName,
+        assignedTasks: agent.assignedTasks,
+        skills: [], // Will be populated from agent metadata
+        availability: 'available' as const
+      }));
+
+      // Generate workflow from current state
+      const workflowResult = await this.workflowGenerationService.generateWorkflowFromState(
+        state.expeditionId,
+        state.taskBreakdown || [],
+        workflowAgents,
+        state.requirements,
+        state.objectiveAnalysis?.complexity === 'expert' ? 'advanced' : (state.objectiveAnalysis?.complexity || 'moderate')
+      );
+
+      const workflow = workflowResult.workflow;
+
+      // Save the workflow to the database
+      const workflowRepo = RepositoryFactory.getWorkflowRepository();
+      const savedWorkflow = await workflowRepo.create(workflow);
+
+      console.log(`✅ [FIRST-OFFICER] Workflow DSL generated successfully. Confidence: ${workflowResult.confidence.toFixed(2)}`);
+      console.log(`📊 [WORKFLOW-DSL] Nodes: ${workflow.nodes.length}, Edges: ${workflow.edges.length}`);
+      
+      if (workflowResult.suggestions && workflowResult.suggestions.length > 0) {
+        console.log('💡 [WORKFLOW-DSL] Suggestions:', workflowResult.suggestions.join(', '));
+      }
+      
+      if (workflowResult.warnings && workflowResult.warnings.length > 0) {
+        console.warn('⚠️ [WORKFLOW-DSL] Warnings:', workflowResult.warnings.join(', '));
+      }
+
+      // Log the workflow visualization
+      console.log('\n' + workflow.visualization + '\n');
+
+      // Emit WebSocket event to notify frontend of workflow generation
+      try {
+        await this.webSocketEmitter.emit('expedition:workflow-dsl-generated', {
+          expeditionId: state.expeditionId,
+          workflowId: savedWorkflow.id,
+          workflow: savedWorkflow,
+          nodeCount: savedWorkflow.nodes.length,
+          estimatedDuration: savedWorkflow.metadata?.estimatedDuration || 0,
+          complexity: state.objectiveAnalysis?.complexity || 'moderate',
+          timestamp: new Date().toISOString()
+        });
+        
+        console.log(`🔔 [FIRST-OFFICER] Workflow DSL generated event emitted for expedition ${state.expeditionId}`);
+      } catch (error) {
+        console.warn('⚠️ [FIRST-OFFICER] Failed to emit workflow DSL generated event:', error);
+      }
+
+      return {
+        currentPhase: 'waiting_for_approval',
+        workflowDSL: savedWorkflow,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Workflow DSL generation failed:', error);
+      return {
+        currentPhase: 'failed',
+        errors: [...(state.errors || []), `Workflow DSL generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
    * Workflow Node: Monitor Progress
    */
   private async monitorProgressNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
@@ -1530,6 +1618,71 @@ Help coordinate and provide guidance as needed.`;
       return {
         currentPhase: 'failed',
         errors: [...(state.errors || []), `User approval failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Workflow Node: User Approval for Workflow DSL
+   * This node handles workflow DSL approval status checking and transitions
+   */
+  private async userApprovalWorkflowNode(state: ExpeditionState): Promise<Partial<ExpeditionState>> {
+    await this.sendWorkflowLog('', 'WORKFLOW APPROVAL CHECK', 'Checking workflow DSL approval status');
+    
+    try {
+      // Check if we have a workflow DSL
+      if (!state.workflowDSL) {
+        return {
+          currentPhase: 'failed',
+          errors: [...(state.errors || []), 'No workflow DSL found for approval check'],
+          lastUpdated: new Date().toISOString()
+        };
+      }
+
+      // Check approval status
+      if (state.workflowDSL.approvalStatus === 'approved') {
+        await this.chatCoordinator?.sendCoordinationMessage(
+          'phase-update',
+          'coordinating',
+          `**WORKFLOW APPROVED**\n\nWorkflow DSL has been approved and is ready for execution.\n\nWorkflow ID: ${state.workflowDSL.id}\nNodes: ${state.workflowDSL.nodes.length}\nExpected Duration: ${state.workflowDSL.metadata?.estimatedDuration || 'Unknown'} minutes`
+        );
+        
+        return {
+          currentPhase: 'coordinating',
+          currentWorkflowNode: state.workflowDSL.nodes.find(n => n.type === 'start')?.id,
+          lastUpdated: new Date().toISOString()
+        };
+      } else if (state.workflowDSL.approvalStatus === 'rejected') {
+        await this.chatCoordinator?.sendCoordinationMessage(
+          'error-report',
+          'failed', 
+          `**WORKFLOW REJECTED**\n\nWorkflow DSL has been rejected and cannot proceed.\n\nPlease modify the workflow or approach and regenerate.`
+        );
+        
+        return {
+          currentPhase: 'failed',
+          errors: [...(state.errors || []), 'Workflow DSL rejected by user'],
+          lastUpdated: new Date().toISOString()
+        };
+      } else {
+        // Still pending approval
+        await this.chatCoordinator?.sendCoordinationMessage(
+          'user-question',
+          'waiting_for_approval',
+          `**WORKFLOW AWAITING APPROVAL**\n\nWorkflow DSL is pending review and approval.\n\nWorkflow ID: ${state.workflowDSL.id}\nNodes: ${state.workflowDSL.nodes.length}\nEstimated Duration: ${state.workflowDSL.metadata?.estimatedDuration || 'Unknown'} minutes\n\nPlease review the workflow before proceeding.`
+        );
+        
+        return {
+          currentPhase: 'waiting_for_approval',
+          lastUpdated: new Date().toISOString()
+        };
+      }
+    } catch (error) {
+      console.error('❌ [FIRST-OFFICER] Workflow approval check failed:', error);
+      return {
+        currentPhase: 'failed',
+        errors: [...(state.errors || []), `Workflow approval check failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
         lastUpdated: new Date().toISOString()
       };
     }
@@ -2549,6 +2702,12 @@ Provide a helpful, contextual response based on the expedition status and user's
         retryCount: 0,
         retryAttempts: undefined,
         finalResult: undefined,
+        
+        // NEW: Workflow DSL fields
+        workflowDSL: undefined,
+        currentWorkflowNode: undefined,
+        workflowRuntimeState: undefined,
+        
         lastUpdated: new Date().toISOString(),
         messages: [],
         

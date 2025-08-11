@@ -36,7 +36,8 @@ import {
   Copy,
   Check,
   ListTodo,
-  BarChart
+  BarChart,
+  GitBranch
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
@@ -49,6 +50,7 @@ import { TaskTimeline } from './TaskTimeline';
 import { AgentActivityFeed } from './AgentActivityFeed';
 import { ChatMessageMarkdown } from './ChatMessageMarkdown';
 import { TypingIndicator } from './TypingIndicator';
+import { WorkflowTab } from './WorkflowTab';
 import type { Expedition, ExpeditionStatus, ExpeditionTask } from '@starships/protocol';
 
 interface ExpeditionDetailsProps {
@@ -931,8 +933,9 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
           {/* Right Column - Tabs */}
           <aside className="w-[28rem] flex-shrink-0 flex flex-col">
             <Tabs defaultValue="overview" className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-3 flex-shrink-0">
+              <TabsList className="grid w-full grid-cols-4 flex-shrink-0">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="workflow">Workflow</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="activity">Activity</TabsTrigger>
               </TabsList>
@@ -1026,6 +1029,13 @@ export function ExpeditionDetails({ starshipSlug, expeditionId }: ExpeditionDeta
                       </div>
                     </CardContent>
                   </Card>
+                </TabsContent>
+                
+                <TabsContent value="workflow" className="h-full overflow-y-auto pr-2 mt-0">
+                  <WorkflowTab
+                    expeditionId={expeditionId}
+                    userId="current-user" // TODO: Replace with actual user ID from auth context
+                  />
                 </TabsContent>
                 
                 <TabsContent value="timeline" className="h-full overflow-y-auto pr-2 mt-0">

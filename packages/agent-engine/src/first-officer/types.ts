@@ -6,18 +6,41 @@
  */
 
 import { 
-  ExpeditionWorkflowState, 
   WorkflowPhase, 
   TaskBreakdown,
   ExpeditionStatus,
   TaskStatus,
-  Agent
+  Agent,
+  WorkflowDSL,
+  WorkflowRuntimeState
 } from '@starships/protocol';
 
 /**
- * Extended workflow state for First Officer operations
+ * Core expedition state fields (replacing old ExpeditionWorkflowState)
  */
-export interface FirstOfficerState extends ExpeditionWorkflowState {
+export interface FirstOfficerState {
+  // Core expedition identifiers
+  expeditionId: string;
+  userId: string;
+  starshipId: string;
+  
+  // Workflow state
+  currentPhase: WorkflowPhase;
+  requirements: string;
+  taskBreakdown: TaskBreakdown[];
+  selectedAgents?: AgentAssignment[]; // From agent selection phase
+  agentAssignments: Record<string, string[]>; // Task to agent mapping
+  agentResults: Record<string, any>;
+  errors: string[];
+  retryCount: number;
+  lastUpdated: string;
+  requireUserApproval: boolean;
+  
+  // NEW: Workflow DSL fields (replacing old workflowState)
+  workflowDSL?: WorkflowDSL;
+  currentWorkflowNode?: string;
+  workflowRuntimeState?: WorkflowRuntimeState;
+  
   // Analysis phase
   objectiveAnalysis?: ObjectiveAnalysis;
   
@@ -26,7 +49,6 @@ export interface FirstOfficerState extends ExpeditionWorkflowState {
   
   // Agent selection phase
   availableAgents?: Agent[];
-  selectedAgents?: AgentAssignment[];
   
   // Execution phase
   activeExecutions?: TaskExecution[];
@@ -42,7 +64,7 @@ export interface FirstOfficerState extends ExpeditionWorkflowState {
   // Enhanced workflow features
   userApprovalRequired?: boolean;
   userApprovalResponse?: UserApprovalResponse;
-  parallelExecutionEnabled?: boolean;
+  parallelExecutionEnabled?: boolean; // Will be set to false
   dependencyGraph?: Record<string, string[]>;
   criticalPath?: string[];
   
@@ -155,7 +177,7 @@ export interface FirstOfficerConfig {
   qualityThreshold: number;
   timeoutMinutes: number;
   requireUserApproval: boolean;
-  enableParallelExecution: boolean;
+  enableParallelExecution: boolean; // Will be set to false for workflow DSL
   autoEscalation: boolean;
   provider?: string;
   model?: string;

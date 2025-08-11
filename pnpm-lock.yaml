@@ -425,6 +425,9 @@ importers:
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@types/lodash':
+        specifier: ^4.17.20
+        version: 4.17.20
       '@types/socket.io':
         specifier: ^3.0.2
         version: 3.0.2
@@ -443,6 +446,12 @@ importers:
       jose:
         specifier: ^6.0.11
         version: 6.0.11
+      jsonata:
+        specifier: ^2.1.0
+        version: 2.1.0
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       openai:
         specifier: ^5.8.4
         version: 5.8.4(ws@8.18.3)(zod@3.25.76)
@@ -2559,6 +2568,9 @@ packages:
 
   '@types/jsonfile@6.1.4':
     resolution: {integrity: sha512-D5qGUYwjvnNNextdU59/+fI+spnwtTFmyQP0h+PfIOSkNfpU6AOICUOkm4i0OnSk+NyjdPJrxCDro0sJsWlRpQ==}
+
+  '@types/lodash@4.17.20':
+    resolution: {integrity: sha512-H3MHACvFUEiujabxhaI/ImO6gUrd8oOurg7LQtS7mbwIXA/cUqWrvBsaeJ23aZEPk1TAYkurjfMbSELfoCXlGA==}
 
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
@@ -4866,6 +4878,10 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
+
+  jsonata@2.1.0:
+    resolution: {integrity: sha512-OCzaRMK8HobtX8fp37uIVmL8CY1IGc/a6gLsDqz3quExFR09/U78HUzWYr7T31UEB6+Eu0/8dkVD5fFDOl9a8w==}
+    engines: {node: '>= 8'}
 
   jsonfile@6.1.0:
     resolution: {integrity: sha512-5dgndWOriYSm5cnYaJNhalLNDKOqFwyDB/rr1E9ZsGciGvKPs8R2xYGCacuf3z6K1YKDz182fd+fY3cn3pMqXQ==}
@@ -8925,6 +8941,8 @@ snapshots:
     dependencies:
       '@types/node': 24.0.15
 
+  '@types/lodash@4.17.20': {}
+
   '@types/mdast@4.0.4':
     dependencies:
       '@types/unist': 3.0.3
@@ -12120,6 +12138,8 @@ snapshots:
       minimist: 1.2.8
 
   json5@2.2.3: {}
+
+  jsonata@2.1.0: {}
 
   jsonfile@6.1.0:
     dependencies:

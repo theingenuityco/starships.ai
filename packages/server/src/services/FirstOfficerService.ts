@@ -1,8 +1,14 @@
 /**
- * First Officer Service - Workflow Coordination Layer
+ * First Officer Service - Workflow Coordination Layer (Enhanced for 4-Phase Flow)
  * 
  * Manages First Officer Agent instances and coordinates expedition workflows.
  * Handles agent lifecycle, state persistence, and real-time communication.
+ * 
+ * Enhanced to support simplified 4-phase expedition flow:
+ * Phase 1: Refine - Mission clarification and refinement  
+ * Phase 2: Plan - Task breakdown and workflow generation
+ * Phase 3: Execute - WorkflowDSL execution with user control
+ * Phase 4: Result - Results synthesis and completion
  */
 
 import { 
@@ -14,10 +20,13 @@ import {
 } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
 import {
-  ExpeditionWorkflowState,
   WorkflowPhase,
   ChatRequest,
-  ChatResponse
+  ChatResponse,
+  ExpeditionPhase,
+  ExpeditionStatus,
+  phaseToStatus,
+  statusToPhase
 } from '@starships/protocol';
 import { ExpeditionProgress } from '@starships/agent-engine';
 import {
@@ -30,6 +39,20 @@ import { Logger } from '../utils/logger';
 import { ContextBuilder } from './ContextBuilder';
 import { SocketIOService } from './SocketIOService';
 
+// Import 4-phase workflow components
+import {
+  createSimplified4PhaseWorkflow,
+  Simplified4PhaseHandlers,
+  Simplified4PhaseState,
+  createInitial4PhaseState,
+  is4PhaseExpedition,
+  getNextPhase,
+  DEFAULT_4PHASE_CONFIG
+} from '@starships/agent-engine/src/first-officer/workflow/SimplifiedExpeditionWorkflow';
+
+// Import WorkflowDSL integration service
+import Workflow4PhaseIntegrationService from './Workflow4PhaseIntegrationService';
+
 export class FirstOfficerService {
   private static instance: FirstOfficerService;
   private activeAgents: Map<string, FirstOfficerAgent> = new Map();
@@ -37,10 +60,16 @@ export class FirstOfficerService {
   private contextBuilder: ContextBuilder;
   private logger: Logger;
   private socketService: SocketIOService | null = null;
+  
+  // 4-Phase workflow management
+  private active4PhaseWorkflows: Map<string, any> = new Map(); // expeditionId -> compiled workflow
+  private workflow4PhaseStates: Map<string, Simplified4PhaseState> = new Map(); // expeditionId -> state
+  private workflowIntegrationService: Workflow4PhaseIntegrationService;
 
   private constructor() {
     this.logger = Logger.getInstance();
     this.contextBuilder = new ContextBuilder();
+    this.workflowIntegrationService = Workflow4PhaseIntegrationService.getInstance();
     // Note: SocketIOService will be accessed lazily when needed
   }
 
@@ -232,6 +261,637 @@ export class FirstOfficerService {
 
       this.logger.error('Failed to start expedition', context, error instanceof Error ? error : undefined);
       throw standardError;
+    }
+  }
+
+  // ============================================================================
+  // 4-PHASE EXPEDITION METHODS
+  // ============================================================================
+
+  /**
+   * Start expedition with simplified 4-phase flow
+   */
+  async start4PhaseExpedition(
+    expeditionId: string,
+    userId: string,
+    starshipId: string,
+    originalMission: string,
+    selectedAgents: string[],
+    visionContext?: string
+  ): Promise<{ 
+    phase: ExpeditionPhase, 
+    status: ExpeditionStatus, 
+    message: string 
+  }> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'start4PhaseExpedition',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId, starshipId, phase: 'refine' }
+    };
+
+    this.logger.info('Starting 4-phase expedition', context);
+
+    try {
+      // Validate inputs
+      if (!expeditionId?.trim()) {
+        throw ErrorFactory.validation([
+          { field: 'expeditionId', message: 'Expedition ID is required' }
+        ], context);
+      }
+
+      // Initialize 4-phase state
+      const initialState = createInitial4PhaseState(
+        expeditionId,
+        userId,
+        starshipId,
+        originalMission,
+        selectedAgents,
+        visionContext
+      );
+
+      // Store state
+      this.workflow4PhaseStates.set(expeditionId, initialState as Simplified4PhaseState);
+
+      // Create 4-phase workflow handlers
+      const handlers = this.create4PhaseHandlers(expeditionId);
+
+      // Create and store compiled workflow
+      const workflow = createSimplified4PhaseWorkflow(handlers, DEFAULT_4PHASE_CONFIG);
+      this.active4PhaseWorkflows.set(expeditionId, workflow);
+
+      // Update expedition in database
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      await expeditionRepo.update(expeditionId, {
+        status: 'refining',
+        currentPhase: 'refine',
+        phaseStartedAt: new Date().toISOString()
+      });
+
+      // Emit phase change event
+      await this.emit4PhaseEvent(expeditionId, 'expedition:phase-changed', {
+        fromPhase: null,
+        toPhase: 'refine',
+        phaseStartedAt: initialState.phaseStartedAt
+      });
+
+      this.logger.info('4-phase expedition started successfully', {
+        ...context,
+        metadata: { ...context.metadata, currentPhase: 'refine' }
+      });
+
+      return {
+        phase: 'refine',
+        status: 'refining',
+        message: 'Expedition started in refinement phase. First Officer is ready to clarify your mission.'
+      };
+
+    } catch (error) {
+      // Clean up on failure
+      this.workflow4PhaseStates.delete(expeditionId);
+      this.active4PhaseWorkflows.delete(expeditionId);
+
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to start 4-phase expedition', context, error as StandardError);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'EXPEDITION_4PHASE_START_FAILED',
+        'Failed to start 4-phase expedition',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to start 4-phase expedition', context, error instanceof Error ? error : undefined);
+      throw standardError;
+    }
+  }
+
+  /**
+   * Progress expedition to next phase
+   */
+  async progressPhase(
+    expeditionId: string,
+    userId: string,
+    transitionData?: any
+  ): Promise<{
+    fromPhase: ExpeditionPhase,
+    toPhase: ExpeditionPhase | null,
+    success: boolean,
+    message: string
+  }> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'progressPhase',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId }
+    };
+
+    this.logger.info('Progressing expedition phase', context);
+
+    try {
+      // Get current state
+      const currentState = this.workflow4PhaseStates.get(expeditionId);
+      if (!currentState) {
+        throw ErrorFactory.notFound('4PhaseWorkflow', expeditionId, context);
+      }
+
+      const currentPhase = currentState.currentPhase;
+      const nextPhase = getNextPhase(currentPhase);
+
+      if (!nextPhase) {
+        return {
+          fromPhase: currentPhase,
+          toPhase: null,
+          success: false,
+          message: 'Expedition is already in final phase'
+        };
+      }
+
+      // Get workflow
+      const workflow = this.active4PhaseWorkflows.get(expeditionId);
+      if (!workflow) {
+        throw ErrorFactory.notFound('4PhaseWorkflowInstance', expeditionId, context);
+      }
+
+      // Update state for phase transition
+      const updatedState = {
+        ...currentState,
+        currentPhase: nextPhase,
+        expeditionStatus: phaseToStatus[nextPhase],
+        phaseStartedAt: new Date().toISOString(),
+        phaseCompletedAt: undefined,
+        lastUpdated: new Date().toISOString(),
+        ...transitionData
+      };
+
+      // Store updated state
+      this.workflow4PhaseStates.set(expeditionId, updatedState);
+
+      // Update database
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      await expeditionRepo.update(expeditionId, {
+        status: phaseToStatus[nextPhase],
+        currentPhase: nextPhase,
+        phaseStartedAt: updatedState.phaseStartedAt
+      });
+
+      // Emit phase change event
+      await this.emit4PhaseEvent(expeditionId, 'expedition:phase-changed', {
+        fromPhase: currentPhase,
+        toPhase: nextPhase,
+        phaseStartedAt: updatedState.phaseStartedAt,
+        transitionData
+      });
+
+      this.logger.info('Phase progression completed', {
+        ...context,
+        metadata: { ...context.metadata, fromPhase: currentPhase, toPhase: nextPhase }
+      });
+
+      return {
+        fromPhase: currentPhase,
+        toPhase: nextPhase,
+        success: true,
+        message: `Expedition progressed from ${currentPhase} to ${nextPhase} phase`
+      };
+
+    } catch (error) {
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to progress phase', context, error as StandardError);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'EXPEDITION_PHASE_PROGRESSION_FAILED',
+        'Failed to progress expedition phase',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to progress phase', context, error instanceof Error ? error : undefined);
+      throw standardError;
+    }
+  }
+
+  /**
+   * Approve plan and prepare for execution
+   */
+  async approvePlan(
+    expeditionId: string,
+    userId: string,
+    approved: boolean,
+    comments?: string
+  ): Promise<{ 
+    approved: boolean, 
+    readyForExecution: boolean, 
+    message: string 
+  }> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'approvePlan',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId, approved }
+    };
+
+    this.logger.info('Processing plan approval', context);
+
+    try {
+      // Get current state
+      const currentState = this.workflow4PhaseStates.get(expeditionId);
+      if (!currentState || currentState.currentPhase !== 'plan') {
+        throw ErrorFactory.validation([
+          { field: 'phase', message: 'Expedition must be in planning phase for approval' }
+        ], context);
+      }
+
+      // Update state with approval
+      const updatedState = {
+        ...currentState,
+        userApprovedPlan: approved,
+        planApprovedAt: approved ? new Date().toISOString() : undefined,
+        userResponse: comments,
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Store updated state
+      this.workflow4PhaseStates.set(expeditionId, updatedState);
+
+      // Update database
+      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      await expeditionRepo.update(expeditionId, {
+        userApprovedPlan: approved,
+        planApprovedAt: updatedState.planApprovedAt,
+        userResponse: comments
+      });
+
+      // Emit plan approval event
+      await this.emit4PhaseEvent(expeditionId, approved ? 'expedition:plan-approved' : 'expedition:plan-rejected', {
+        approved,
+        approvedAt: updatedState.planApprovedAt,
+        userComments: comments
+      });
+
+      const message = approved 
+        ? 'Plan approved successfully. Ready to start execution.'
+        : 'Plan rejected. Please request modifications or create a new plan.';
+
+      this.logger.info('Plan approval processed', {
+        ...context,
+        metadata: { ...context.metadata, readyForExecution: approved }
+      });
+
+      return {
+        approved,
+        readyForExecution: approved,
+        message
+      };
+
+    } catch (error) {
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to approve plan', context, error as StandardError);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'EXPEDITION_PLAN_APPROVAL_FAILED',
+        'Failed to process plan approval',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to approve plan', context, error instanceof Error ? error : undefined);
+      throw standardError;
+    }
+  }
+
+  /**
+   * Start execution phase (user-triggered)
+   */
+  async startExecution(
+    expeditionId: string,
+    userId: string,
+    executionConfig?: any
+  ): Promise<{ 
+    executionStarted: boolean, 
+    message: string,
+    estimatedDuration?: number 
+  }> {
+    const context = {
+      service: 'FirstOfficerService',
+      operation: 'startExecution',
+      resource: 'expedition',
+      resourceId: expeditionId,
+      metadata: { userId }
+    };
+
+    this.logger.info('Starting expedition execution', context);
+
+    try {
+      // Get current state
+      const currentState = this.workflow4PhaseStates.get(expeditionId);
+      if (!currentState) {
+        throw ErrorFactory.notFound('4PhaseWorkflow', expeditionId, context);
+      }
+
+      if (currentState.currentPhase !== 'plan' || !currentState.userApprovedPlan) {
+        throw ErrorFactory.validation([
+          { field: 'phase', message: 'Plan must be approved before starting execution' }
+        ], context);
+      }
+
+      // Progress to execute phase
+      const result = await this.progressPhase(expeditionId, userId, {
+        executionStartedAt: new Date().toISOString(),
+        executionConfig
+      });
+
+      // Emit execution started event
+      await this.emit4PhaseEvent(expeditionId, 'expedition:execution-started', {
+        executionStartedAt: new Date().toISOString(),
+        workflowDSL: currentState.workflowDSL,
+        estimatedDuration: currentState.estimatedDuration
+      });
+
+      this.logger.info('Expedition execution started', {
+        ...context,
+        metadata: { ...context.metadata, phase: 'execute' }
+      });
+
+      return {
+        executionStarted: true,
+        message: 'Execution started successfully. Workflow is now running.',
+        estimatedDuration: currentState.estimatedDuration
+      };
+
+    } catch (error) {
+      if (error instanceof StandardError) {
+        this.logger.error('Failed to start execution', context, error as StandardError);
+        throw error;
+      }
+
+      const standardError = new StandardError(
+        'EXPEDITION_EXECUTION_START_FAILED',
+        'Failed to start expedition execution',
+        { originalError: error instanceof Error ? error.message : String(error) },
+        context
+      );
+
+      this.logger.error('Failed to start execution', context, error instanceof Error ? error : undefined);
+      throw standardError;
+    }
+  }
+
+  /**
+   * Get current 4-phase expedition state
+   */
+  async get4PhaseState(expeditionId: string): Promise<Simplified4PhaseState | null> {
+    return this.workflow4PhaseStates.get(expeditionId) || null;
+  }
+
+  /**
+   * Check if expedition is using 4-phase flow
+   */
+  is4PhaseExpedition(expeditionId: string): boolean {
+    return this.workflow4PhaseStates.has(expeditionId);
+  }
+
+  // ============================================================================
+  // 4-PHASE HELPER METHODS
+  // ============================================================================
+
+  /**
+   * Create 4-phase workflow handlers for an expedition
+   */
+  private create4PhaseHandlers(expeditionId: string): Simplified4PhaseHandlers {
+    return {
+      // Core phase handlers - These will be implemented by specific handler classes
+      refineMission: async (state) => {
+        // TODO: Implement mission refinement logic
+        // For now, return mock refined data
+        return {
+          refinedMission: state.originalMission + " (refined)",
+          refinedRequirements: ["Requirement 1", "Requirement 2"],
+          missionComplexity: 'moderate' as const,
+          estimatedDuration: 120,
+          currentPhase: 'plan' as const,
+          expeditionStatus: 'planning' as const,
+          lastUpdated: new Date().toISOString()
+        };
+      },
+
+      planWorkflow: async (state) => {
+        try {
+          // Generate task breakdown using integration service
+          const taskBreakdownResult = await this.workflowIntegrationService.generateTaskBreakdown(
+            state.expeditionId,
+            state.refinedMission,
+            state.refinedRequirements,
+            state.missionComplexity || 'moderate',
+            Object.keys(state.planningContext?.selectedAgents || {})
+          );
+
+          // Generate WorkflowDSL using integration service
+          const workflowResult = await this.workflowIntegrationService.generateWorkflowDSL(
+            state.expeditionId,
+            taskBreakdownResult.tasks,
+            taskBreakdownResult.agentAssignments,
+            state.refinedMission
+          );
+
+          return {
+            taskBreakdown: taskBreakdownResult.tasks,
+            agentAssignments: taskBreakdownResult.agentAssignments,
+            dependencyGraph: taskBreakdownResult.dependencyGraph,
+            workflowDSL: workflowResult.workflowDSL,
+            workflowVisualization: workflowResult.visualization,
+            planApprovalRequired: true,
+            userApprovedPlan: false,
+            lastUpdated: new Date().toISOString()
+          };
+        } catch (error) {
+          // Handle error and provide fallback
+          this.logger.error('Failed to generate plan workflow', {
+            service: 'FirstOfficerService',
+            operation: 'planWorkflow',
+            expeditionId: state.expeditionId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          
+          return {
+            errors: [...(state.errors || []), {
+              phase: 'plan' as const,
+              error: `Plan generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              timestamp: new Date().toISOString(),
+              recoverable: true
+            }],
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      },
+
+      executeWorkflow: async (state) => {
+        try {
+          // Check if workflow execution has been initialized
+          if (!state.workflowRuntimeState && state.workflowDSL && state.userApprovedPlan) {
+            // Initialize workflow execution
+            const initResult = await this.workflowIntegrationService.initializeWorkflowExecution(
+              state.expeditionId,
+              state.workflowDSL,
+              {
+                userId: state.userId,
+                expeditionId: state.expeditionId,
+                selectedAgents: Object.keys(state.agentAssignments || {})
+              }
+            );
+
+            // Update state with runtime information
+            return {
+              workflowRuntimeState: initResult.runtimeState,
+              executionProgress: 10, // Started
+              executionComplete: false,
+              lastUpdated: new Date().toISOString()
+            };
+          }
+
+          // If execution is already running, monitor progress
+          if (state.workflowRuntimeState && !state.executionComplete) {
+            const progress = await this.workflowIntegrationService.monitorWorkflowExecution(
+              state.expeditionId,
+              state.workflowRuntimeState.id
+            );
+
+            const isComplete = progress.progress >= 100;
+
+            return {
+              executionProgress: progress.progress,
+              currentWorkflowNode: progress.currentNode,
+              executionComplete: isComplete,
+              executionSummary: isComplete ? "Workflow execution completed successfully" : undefined,
+              agentOutputs: isComplete ? {} : state.agentOutputs, // TODO: Get actual agent outputs
+              currentPhase: isComplete ? 'result' as const : state.currentPhase,
+              expeditionStatus: isComplete ? 'completed' as const : state.expeditionStatus,
+              lastUpdated: new Date().toISOString()
+            };
+          }
+
+          // If execution is already complete, return current state
+          return {
+            lastUpdated: new Date().toISOString()
+          };
+
+        } catch (error) {
+          this.logger.error('Failed to execute workflow', {
+            service: 'FirstOfficerService',
+            operation: 'executeWorkflow',
+            expeditionId: state.expeditionId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+
+          return {
+            errors: [...(state.errors || []), {
+              phase: 'execute' as const,
+              error: `Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              timestamp: new Date().toISOString(),
+              recoverable: true
+            }],
+            executionComplete: false,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+      },
+
+      synthesizeResult: async (state) => {
+        // TODO: Implement result synthesis logic
+        // For now, return mock results
+        return {
+          finalResult: "Mock final result",
+          expeditionSummary: "Mock expedition summary",
+          qualityScore: 85,
+          keyAchievements: ["Achievement 1", "Achievement 2"],
+          lessonsLearned: ["Lesson 1", "Lesson 2"],
+          deliverables: [],
+          lastUpdated: new Date().toISOString()
+        };
+      },
+
+      // Supporting handlers
+      handleUserApproval: async (state) => {
+        // User approval is handled by the service layer
+        return {
+          requiresUserInput: true,
+          userPrompt: "Please review and approve the generated plan",
+          lastUpdated: new Date().toISOString()
+        };
+      },
+
+      handleError: async (state) => {
+        // Error handling logic
+        return {
+          expeditionStatus: 'failed' as const,
+          errors: [...(state.errors || []), {
+            phase: state.currentPhase,
+            error: "Expedition failed",
+            timestamp: new Date().toISOString(),
+            recoverable: false
+          }],
+          lastUpdated: new Date().toISOString()
+        };
+      },
+
+      handlePause: async (state) => {
+        // Pause handling logic
+        return {
+          expeditionStatus: 'paused' as const,
+          lastUpdated: new Date().toISOString()
+        };
+      },
+
+      // Chat support handlers
+      refreshContext: async (state) => {
+        // Context refresh logic for chat
+        return {
+          lastUpdated: new Date().toISOString()
+        };
+      },
+
+      processMessage: async (state) => {
+        // Message processing logic for refinement phase
+        return {
+          lastUpdated: new Date().toISOString()
+        };
+      }
+    };
+  }
+
+  /**
+   * Emit 4-phase specific WebSocket events
+   */
+  private async emit4PhaseEvent(
+    expeditionId: string, 
+    eventType: string, 
+    data: any
+  ): Promise<void> {
+    const socketSvc = this.getSocketService();
+    if (socketSvc) {
+      const expeditionRoom = `expedition:${expeditionId}`;
+      const eventData = {
+        expeditionId,
+        data,
+        timestamp: new Date().toISOString()
+      };
+
+      this.logger.debug('Emitting 4-phase WebSocket event', {
+        service: 'FirstOfficerService',
+        operation: 'emit4PhaseEvent',
+        metadata: { eventType, expeditionId, room: expeditionRoom }
+      });
+
+      socketSvc.getIO().to(expeditionRoom).emit(eventType as any, eventData);
     }
   }
 
@@ -677,27 +1337,12 @@ export class FirstOfficerService {
     console.log(`[FIRST-OFFICER-SERVICE] Status update for ${expeditionId}: ${phase}`);
 
     try {
-      // Update expedition workflow state
-      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-      const expedition = await expeditionRepo.findById(expeditionId);
+      // TODO: Replace with new WorkflowDSL system in Phase 2
+      // Update expedition workflow state - TEMPORARILY DISABLED
+      // const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      // const expedition = await expeditionRepo.findById(expeditionId);
       
-      if (expedition) {
-        const workflowState: ExpeditionWorkflowState = {
-          expeditionId,
-          currentPhase: phase,
-          requirements: expedition.mission,
-          taskBreakdown: [],
-          agentAssignments: {},
-          agentResults: {},
-          userId: expedition.createdBy,
-          starshipId: expedition.starshipId,
-          errors: progress.issues,
-          retryCount: 0,
-          lastUpdated: new Date().toISOString()
-        };
-
-        await expeditionRepo.updateWorkflowState(expeditionId, workflowState);
-      }
+      console.log(`[FIRST-OFFICER-SERVICE] Status update handled: ${phase} (workflow state update disabled - will be replaced with WorkflowDSL system)`);
     } catch (error) {
       console.error(`[FIRST-OFFICER-SERVICE] Failed to handle status update:`, error);
     }

@@ -17,6 +17,7 @@ import {
   validateQualityScore,
   validateTaskAssignment,
   validateTaskCompletion,
+  validate4PhaseExpedition,
 } from '../middleware/validation';
 import {
   ExpeditionService,
@@ -559,6 +560,472 @@ router.post(
       res.status(statusCode).json({
         success: false,
         error: error.message || 'Failed to cancel expedition',
+        code: error.code,
+      });
+    }
+  }
+);
+
+// ============================================================================
+// 4-PHASE EXPEDITION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/starships/:starshipId/expeditions/start-4phase
+ * Create and start expedition with 4-phase flow in one step
+ */
+router.post(
+  '/starships/:starshipId/expeditions/start-4phase',
+  authMiddleware,
+  validate4PhaseExpedition,
+  async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST START =====`);
+    
+    try {
+      const { starshipId } = req.params;
+      const userId = req.user!.id;
+      const { expeditionName, originalMission, selectedAgents, visionContext } = req.body;
+      
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Creating expedition first`, {
+        starshipId,
+        userId,
+        expeditionName,
+        selectedAgentsCount: selectedAgents?.length || 0,
+        hasVisionContext: !!visionContext,
+        timestamp: new Date().toISOString()
+      });
+
+      // First create the expedition
+      const createRequest: CreateExpeditionRequest = {
+        starshipId,
+        name: expeditionName || 'Untitled 4-Phase Expedition',
+        mission: originalMission,
+        selectedAgents,
+      };
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Calling expeditionService.createExpedition`);
+      const expeditionResponse = await expeditionService.createExpedition(userId, createRequest);
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 3: Expedition created successfully`, {
+        expeditionId: expeditionResponse.expedition.id,
+        expeditionTitle: expeditionResponse.expedition.name,
+        timestamp: new Date().toISOString()
+      });
+
+      // Then start the 4-phase workflow
+      console.log(`[EXPEDITION-API] [${requestId}] Step 4: Starting 4-phase workflow`);
+      const phaseResult = await firstOfficerService.start4PhaseExpedition(
+        expeditionResponse.expedition.id,
+        userId,
+        starshipId,
+        originalMission,
+        selectedAgents,
+        visionContext
+      );
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 5: 4-phase workflow started successfully`, {
+        phase: phaseResult.phase,
+        status: phaseResult.status,
+        message: phaseResult.message,
+        timestamp: new Date().toISOString()
+      });
+
+      res.status(201).json({
+        success: true,
+        data: {
+          expeditionId: expeditionResponse.expedition.id,
+          expedition: expeditionResponse.expedition,
+          phase: phaseResult.phase,
+          status: phaseResult.status,
+          message: phaseResult.message
+        }
+      });
+
+      console.log(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST SUCCESS =====`);
+    } catch (error: any) {
+      console.error(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST ERROR =====`);
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to create and start 4-phase expedition:`, error);
+      
+      const statusCode = error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 :
+                        error.code === 'VALIDATION_ERROR' ? 400 :
+                        error.code === 'STARSHIP_NOT_FOUND' ? 404 :
+                        error.code === 'AGENT_NOT_AVAILABLE' ? 400 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to create and start 4-phase expedition',
+        code: error.code || 'UNKNOWN_ERROR',
+        debug: {
+          errorType: error.constructor?.name,
+          requestId,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      
+      console.error(`[EXPEDITION-API] [${requestId}] ===== CREATE & START 4-PHASE EXPEDITION REQUEST FAILED =====`);
+    }
+  }
+);
+
+/**
+ * POST /api/starships/:starshipId/expeditions/:expeditionId/start-4phase
+ * Start expedition with simplified 4-phase flow
+ */
+router.post(
+  '/starships/:starshipId/expeditions/:expeditionId/start-4phase',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== START 4-PHASE EXPEDITION REQUEST START =====`);
+    
+    try {
+      const { starshipId, expeditionId } = req.params;
+      const userId = req.user!.id;
+      const { visionContext } = req.body;
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Starting 4-phase expedition`, {
+        starshipId,
+        expeditionId,
+        userId,
+        hasVisionContext: !!visionContext,
+        timestamp: new Date().toISOString()
+      });
+
+      // Get expedition details
+      const expedition = await expeditionService.getExpedition(expeditionId, userId);
+      
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Expedition retrieved`, {
+        expeditionName: expedition.expedition.name,
+        assignedAgents: expedition.assignedAgents?.map(a => a.id) || [],
+        timestamp: new Date().toISOString()
+      });
+
+      // Start 4-phase expedition
+      const result = await firstOfficerService.start4PhaseExpedition(
+        expeditionId,
+        userId,
+        starshipId,
+        expedition.expedition.mission,
+        expedition.expedition.assignedAgents,
+        visionContext
+      );
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 3: 4-phase expedition started successfully`, {
+        phase: result.phase,
+        status: result.status,
+        message: result.message,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        data: {
+          expeditionId,
+          phase: result.phase,
+          status: result.status,
+          message: result.message
+        }
+      });
+
+    } catch (error: any) {
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to start 4-phase expedition:`, error);
+      const statusCode = error.code === 'EXPEDITION_NOT_FOUND' ? 404 : 
+                         error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to start 4-phase expedition',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/starships/:starshipId/expeditions/:expeditionId/phases/progress
+ * Progress expedition to next phase
+ */
+router.post(
+  '/starships/:starshipId/expeditions/:expeditionId/phases/progress',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== PROGRESS PHASE REQUEST START =====`);
+    
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+      const { transitionData } = req.body;
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Progressing expedition phase`, {
+        expeditionId,
+        userId,
+        hasTransitionData: !!transitionData,
+        timestamp: new Date().toISOString()
+      });
+
+      const result = await firstOfficerService.progressPhase(
+        expeditionId,
+        userId,
+        transitionData
+      );
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Phase progression completed`, {
+        fromPhase: result.fromPhase,
+        toPhase: result.toPhase,
+        success: result.success,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        data: result
+      });
+
+    } catch (error: any) {
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to progress phase:`, error);
+      const statusCode = error.code === 'EXPEDITION_NOT_FOUND' ? 404 : 
+                         error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to progress expedition phase',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/starships/:starshipId/expeditions/:expeditionId/approve-plan
+ * Approve or reject expedition plan
+ */
+router.post(
+  '/starships/:starshipId/expeditions/:expeditionId/approve-plan',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== APPROVE PLAN REQUEST START =====`);
+    
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+      const { approved, comments } = req.body;
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Processing plan approval`, {
+        expeditionId,
+        userId,
+        approved,
+        hasComments: !!comments,
+        timestamp: new Date().toISOString()
+      });
+
+      const result = await firstOfficerService.approvePlan(
+        expeditionId,
+        userId,
+        approved,
+        comments
+      );
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Plan approval processed`, {
+        approved: result.approved,
+        readyForExecution: result.readyForExecution,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        data: result
+      });
+
+    } catch (error: any) {
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to approve plan:`, error);
+      const statusCode = error.code === 'EXPEDITION_NOT_FOUND' ? 404 : 
+                         error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to approve expedition plan',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/starships/:starshipId/expeditions/:expeditionId/start-execution
+ * Start execution phase (user-triggered)
+ */
+router.post(
+  '/starships/:starshipId/expeditions/:expeditionId/start-execution',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const requestId = Math.random().toString(36).substring(7);
+    console.log(`[EXPEDITION-API] [${requestId}] ===== START EXECUTION REQUEST START =====`);
+    
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+      const { executionConfig } = req.body;
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 1: Starting expedition execution`, {
+        expeditionId,
+        userId,
+        hasExecutionConfig: !!executionConfig,
+        timestamp: new Date().toISOString()
+      });
+
+      const result = await firstOfficerService.startExecution(
+        expeditionId,
+        userId,
+        executionConfig
+      );
+
+      console.log(`[EXPEDITION-API] [${requestId}] Step 2: Execution started successfully`, {
+        executionStarted: result.executionStarted,
+        estimatedDuration: result.estimatedDuration,
+        timestamp: new Date().toISOString()
+      });
+
+      res.json({
+        success: true,
+        data: result
+      });
+
+    } catch (error: any) {
+      console.error(`[EXPEDITION-API] [${requestId}] Failed to start execution:`, error);
+      const statusCode = error.code === 'EXPEDITION_NOT_FOUND' ? 404 : 
+                         error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to start expedition execution',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/starships/:starshipId/expeditions/:expeditionId/phases/current
+ * Get current phase information
+ */
+router.get(
+  '/starships/:starshipId/expeditions/:expeditionId/phases/current',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+
+      console.log(`[EXPEDITION-API] Getting current phase for expedition: ${expeditionId}`);
+
+      // First verify access to expedition
+      await expeditionService.getExpedition(expeditionId, userId);
+
+      // Get 4-phase state
+      const state = await firstOfficerService.get4PhaseState(expeditionId);
+
+      if (!state) {
+        res.status(404).json({
+          success: false,
+          error: 'Expedition is not using 4-phase flow',
+          code: 'NOT_4PHASE_EXPEDITION'
+        });
+        return;
+      }
+
+      // Calculate available actions based on current phase and state
+      const availableActions = [];
+      if (state.currentPhase === 'refine' && state.refinedMission) {
+        availableActions.push({ action: 'progress_phase', enabled: true });
+      }
+      if (state.currentPhase === 'plan' && !state.userApprovedPlan && state.workflowDSL) {
+        availableActions.push({ action: 'approve_plan', enabled: true });
+      }
+      if (state.currentPhase === 'plan' && state.userApprovedPlan) {
+        availableActions.push({ action: 'start_execution', enabled: true });
+      }
+      if (state.currentPhase === 'execute' && !state.executionComplete) {
+        availableActions.push({ action: 'pause', enabled: true });
+        availableActions.push({ action: 'cancel', enabled: true });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          currentPhase: state.currentPhase,
+          expeditionStatus: state.expeditionStatus,
+          phaseStartedAt: state.phaseStartedAt,
+          phaseProgress: {
+            percentage: state.executionProgress || 0,
+            currentStep: state.currentWorkflowNode,
+            estimatedTimeRemaining: state.estimatedDuration
+          },
+          availableActions,
+          phaseData: {
+            type: state.currentPhase,
+            ...state
+          }
+        }
+      });
+
+    } catch (error: any) {
+      console.error('[EXPEDITION-API] Failed to get current phase:', error);
+      const statusCode = error.code === 'EXPEDITION_NOT_FOUND' ? 404 : 
+                         error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to get current phase',
+        code: error.code,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/starships/:starshipId/expeditions/:expeditionId/execution/control
+ * Control expedition execution (pause/resume/cancel)
+ */
+router.post(
+  '/starships/:starshipId/expeditions/:expeditionId/execution/control',
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    try {
+      const { expeditionId } = req.params;
+      const userId = req.user!.id;
+      const { action, reason } = req.body;
+
+      console.log(`[EXPEDITION-API] Execution control for expedition: ${expeditionId}, action: ${action}`);
+
+      // For now, return a placeholder response
+      // TODO: Implement actual execution control logic
+      res.json({
+        success: true,
+        data: {
+          action,
+          executionStatus: action === 'pause' ? 'paused' : 
+                          action === 'resume' ? 'running' :
+                          action === 'cancel' ? 'cancelled' : 'unknown',
+          actionPerformedAt: new Date().toISOString(),
+          expedition: {
+            id: expeditionId,
+            expeditionStatus: action === 'cancel' ? 'cancelled' : 'executing'
+          },
+          reason
+        }
+      });
+
+    } catch (error: any) {
+      console.error('[EXPEDITION-API] Failed to control execution:', error);
+      const statusCode = error.code === 'EXPEDITION_NOT_FOUND' ? 404 : 
+                         error.code === 'EXPEDITION_ACCESS_DENIED' ? 403 : 500;
+      
+      res.status(statusCode).json({
+        success: false,
+        error: error.message || 'Failed to control execution',
         code: error.code,
       });
     }

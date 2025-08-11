@@ -11,10 +11,12 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@kubernetes/client-node": "^0.20.0",
     "@starships/models": "workspace:*",
     "dockerode": "^4.0.2",
     "express": "^5.1.0",
     "js-yaml": "^4.1.0",
+    "p-queue": "^7.4.1",
     "yaml": "^2.3.4"
   },
   "devDependencies": {

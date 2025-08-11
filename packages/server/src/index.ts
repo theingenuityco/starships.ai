@@ -52,6 +52,9 @@ import { logger } from '@starships/models/src/logging';
 import { createDeploymentApiRoutes } from '@starships/core';
 import { authMiddleware } from './middleware/auth';
 
+// Import K8s initialization
+import { initializeK8sEnvironment, getDeployerType } from '@starships/core/dist/services/k8s/init';
+
 /**
  * Validate required environment variables
  */
@@ -214,6 +217,24 @@ const socketService = initializeSocketIO(httpServer);
 // Start server
 httpServer.listen(PORT, async () => {
   try {
+    // Initialize Kubernetes environment (required)
+    const k8sReady = await initializeK8sEnvironment({
+      skipSetup: process.env.SKIP_K8S_SETUP === 'true',
+      requireCluster: true, // K8s is required now
+      environment: process.env.NODE_ENV as 'development' | 'staging' | 'production'
+    });
+    
+    if (!k8sReady) {
+      console.error('❌ Kubernetes environment is required for MCP deployment');
+      console.error('   Please ensure Docker Desktop is running and try again');
+      console.error('   Or run: pnpm run k8s:setup');
+      process.exit(1);
+    }
+    
+    const deployerType = getDeployerType();
+    console.log(`🚢 Using ${deployerType} deployer for MCP containers`);
+    process.env.K8S_AVAILABLE = 'true';
+    
     // Initialize database connection
     await dbConnection.connect();
     await dbConnection.initializeSchema();

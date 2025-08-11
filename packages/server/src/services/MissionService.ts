@@ -90,10 +90,8 @@ export class MissionService {
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
       const welcomeMessage = renderTemplate(MISSION_PROMPTS.INITIAL_WELCOME, {
-        missionName: mission.name,
-        description: mission.description,
-        agentCount: assignedAgents.length,
-        agentNames: assignedAgents.map(agent => agent.name)
+        mission: mission,
+        agents: assignedAgents
       });
       console.log('💬 Sending welcome message:', welcomeMessage);
       

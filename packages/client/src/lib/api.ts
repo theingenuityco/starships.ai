@@ -298,7 +298,7 @@ export interface Starship {
   id: string
   slug: string
   name: string
-  class: 'scout' | 'cruiser'
+  class: 'scout' | 'cruiser' | 'draught'
   ownerId: string
   status: 'active' | 'inactive'
   maxAgents: number
@@ -616,7 +616,7 @@ export const chatAPI = {
 interface UpdateStarshipRequest {
   name?: string
   status?: 'active' | 'inactive'
-  class?: 'scout' | 'cruiser'
+  class?: 'scout' | 'cruiser' | 'draught'
   maxActiveExpeditions?: number
 }
 
@@ -631,7 +631,7 @@ interface StarshipResponse {
 interface StarshipAgentsResponse {
   starshipId: string
   starshipName: string
-  starshipClass: 'scout' | 'cruiser'
+  starshipClass: 'scout' | 'cruiser' | 'draught'
   maxAgents: number
   deployedAgents: Array<{
     id: string
@@ -651,7 +651,7 @@ interface StarshipAgentsResponse {
     temperature?: number
     maxTokens?: number
     customInstructions?: string
-    allowedStarshipClasses?: ('scout' | 'cruiser')[]
+    allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[]
     requiredPermissions?: string[]
   }>
   availableSlots: number
@@ -685,7 +685,7 @@ export const starshipAPI = {
   // Create new starship (with optional vision support)
   createStarship: (data: {
     name: string
-    class: 'scout' | 'cruiser'
+    class: 'scout' | 'cruiser' | 'draught'
     maxActiveExpeditions?: number
     vision?: {
       statement: string

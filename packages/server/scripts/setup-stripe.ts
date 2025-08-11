@@ -78,7 +78,7 @@ async function setupStripe() {
   try {
     // First, check if products already exist
     console.log('📦 Checking existing products...');
-    const existingProducts = await stripe.products.list({ limit: 100 });
+    const existingProducts = await stripe.products.list({ limit: 100, active: true });
     
     for (const [key, config] of Object.entries(PRODUCTS)) {
       let product = existingProducts.data.find(

@@ -3,13 +3,9 @@
 import { createConnection, getConnection, Neo4jConfig } from '../connection';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import * as dotenv from 'dotenv';
 
 async function runStripeMigration() {
   console.log('🚀 Starting Stripe database migration...');
-
-  // Load environment variables
-  dotenv.config({ path: join(__dirname, '../../../../.env') });
 
   const config: Neo4jConfig = {
     uri: process.env.NEO4J_URI || 'bolt://localhost:7687',

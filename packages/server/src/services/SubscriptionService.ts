@@ -57,10 +57,20 @@ export class SubscriptionService {
       throw new Error(`Price not found for ${params.plan} ${params.billingPeriod}`);
     }
 
-    // Build URLs
-    const baseUrl = this.env.NODE_ENV === 'production' 
-      ? 'https://app.starships.ai' // TODO: Set your production domain
-      : `http://localhost:${this.env.PORT}`;
+    // Build URLs - use CLIENT_URL for frontend redirects
+    let baseUrl = process.env.CLIENT_URL;
+    
+    if (!baseUrl) {
+      throw new Error('CLIENT_URL environment variable is required for Stripe checkout');
+    }
+    
+    // Ensure baseUrl has proper scheme and remove trailing slash
+    baseUrl = baseUrl.trim().replace(/\/$/, '');
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = `http://${baseUrl}`;
+    }
+    
+    console.log('[SUBSCRIPTION] Using baseUrl for Stripe checkout:', baseUrl);
 
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,

@@ -10,7 +10,6 @@ import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
-import { MissionService } from './MissionService';
 import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type { 
   Mission, 
@@ -129,25 +128,25 @@ export class MissionOrchestratorAgent {
   private async contextBuilderNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
     const updates: Partial<MissionChatState> = {};
     
-    if (!state.metadata) {
-      if (!state.missionId) {
-        throw new Error('missionId is required in state');
-      }
-      
-      const metadata = await this.loadMissionMetadata(state.missionId);
-      updates.metadata = metadata;
-      updates.currentPhase = metadata.mission.phase;
+    // Always reload metadata to get fresh mission phase
+    if (!state.missionId) {
+      throw new Error('missionId is required in state');
+    }
+    
+    const metadata = await this.loadMissionMetadata(state.missionId);
+    updates.metadata = metadata;
+    updates.currentPhase = metadata.mission.phase;
       
       // For system-initiated messages, auto-transition to welcome if in init
       if (state.isSystemInitiated && metadata.mission.phase === 'init') {
         try {
-          await MissionService.updateMissionPhase(state.missionId, 'welcome');
+          const missionRepo = RepositoryFactory.getMissionRepository();
+          await missionRepo.updateMission(state.missionId, { phase: 'welcome' });
           updates.currentPhase = 'welcome';
         } catch (error) {
           this.logger.error('Failed to auto-transition phase', error as Error);
         }
       }
-    }
     
     return updates;
   }
@@ -194,12 +193,6 @@ ${welcomePhase}`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
-    
-    try {
-      await MissionService.updateMissionPhase(state.missionId, 'converse');
-    } catch (error) {
-      this.logger.error('Failed to transition phase', error as Error);
-    }
     
     const aiMessage = new AIMessage({ content: responseContent });
     return { messages: [aiMessage] };

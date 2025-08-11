@@ -84,9 +84,20 @@ export class MissionOrchestratorService {
     this.logger.info('Handling user message', context);
 
     try {
-      // Check if mission exists
+      // Check if mission exists and handle phase transitions
       const missionRepo = RepositoryFactory.getMissionRepository();
-      await missionRepo.getMissionById(missionId); // Will throw if not found
+      const mission = await missionRepo.getMissionById(missionId); // Will throw if not found
+
+      // Handle phase transitions based on mission state
+      if (mission.phase === 'welcome') {
+        // User message after welcome: transition to converse
+        try {
+          await missionRepo.updateMission(missionId, { phase: 'converse' });
+          this.logger.info('Transitioned mission from welcome to converse', { missionId });
+        } catch (error) {
+          this.logger.error('Failed to transition mission phase', { missionId, error });
+        }
+      }
 
       // Validate message content
       if (!message?.trim()) {

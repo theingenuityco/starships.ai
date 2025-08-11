@@ -250,7 +250,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      <p className="text-sm leading-relaxed">{message.content}</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
                       <p className="text-xs mt-2 opacity-70">
                         {new Date(message.timestamp).toLocaleTimeString()}
                       </p>

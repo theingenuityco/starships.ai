@@ -5,6 +5,7 @@
 
 import { RepositoryFactory } from '@starships/models';
 import { ServiceFactory } from './index';
+import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type {
   Mission,
   CreateMissionRequest,
@@ -41,6 +42,7 @@ export class MissionService {
     }
 
     // Verify all assigned agents exist and belong to this starship
+    const assignedAgents = [];
     for (const agentId of request.agentIds) {
       try {
         const agent = await agentRepo.findById(agentId);
@@ -53,6 +55,7 @@ export class MissionService {
             'agentIds'
           );
         }
+        assignedAgents.push(agent);
       } catch (error) {
         if (error instanceof NotFoundError) {
           throw new NotFoundError('Agent not found', 'Agent', agentId);
@@ -86,7 +89,12 @@ export class MissionService {
       const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
-      const welcomeMessage = `Welcome to your new mission: "${mission.name}". This mission was just created and is ready to begin.`;
+      const welcomeMessage = renderTemplate(MISSION_PROMPTS.INITIAL_WELCOME, {
+        missionName: mission.name,
+        description: mission.description,
+        agentCount: assignedAgents.length,
+        agentNames: assignedAgents.map(agent => agent.name)
+      });
       console.log('💬 Sending welcome message:', welcomeMessage);
       
       // Removed await here - fire and forget!

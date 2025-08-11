@@ -422,6 +422,9 @@ importers:
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@types/lodash':
+        specifier: ^4.17.20
+        version: 4.17.20
       '@types/socket.io':
         specifier: ^3.0.2
         version: 3.0.2
@@ -443,6 +446,9 @@ importers:
       jsonata:
         specifier: ^2.1.0
         version: 2.1.0
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       openai:
         specifier: ^5.8.4
         version: 5.8.4(ws@8.18.3)(zod@3.25.76)
@@ -2559,6 +2565,9 @@ packages:
 
   '@types/jsonfile@6.1.4':
     resolution: {integrity: sha512-D5qGUYwjvnNNextdU59/+fI+spnwtTFmyQP0h+PfIOSkNfpU6AOICUOkm4i0OnSk+NyjdPJrxCDro0sJsWlRpQ==}
+
+  '@types/lodash@4.17.20':
+    resolution: {integrity: sha512-H3MHACvFUEiujabxhaI/ImO6gUrd8oOurg7LQtS7mbwIXA/cUqWrvBsaeJ23aZEPk1TAYkurjfMbSELfoCXlGA==}
 
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
@@ -8922,6 +8931,8 @@ snapshots:
   '@types/jsonfile@6.1.4':
     dependencies:
       '@types/node': 24.0.15
+
+  '@types/lodash@4.17.20': {}
 
   '@types/mdast@4.0.4':
     dependencies:

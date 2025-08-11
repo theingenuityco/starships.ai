@@ -11,6 +11,7 @@ import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-pro
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionService } from './MissionService';
+import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type { 
   Mission, 
   MissionMessage,
@@ -158,28 +159,12 @@ export class MissionOrchestratorAgent {
     const { metadata, currentPhase } = state;
     const { mission, starship, vision } = metadata!;
     
-    return `You are a Mission Orchestrator AI assistant providing intelligent guidance and coordination for starship missions.
-
-CURRENT PHASE: ${currentPhase}
-
-MISSION CONTEXT:
-- Mission: "${mission.name}"
-- Description: ${mission.description}
-- Status: ${mission.status}
-- Starship: "${starship.name}" (${starship.class || 'Unknown Class'})
-- Vision: "${vision.statement}"
-- Assigned Agents: ${mission.agentIds?.length || 0}/${starship.maxAgents}
-- Created: ${new Date(mission.createdAt).toLocaleDateString()}
-
-STARSHIP VISION:
-${vision.statement}
-
-COMMUNICATION STYLE:
-- Professional but approachable
-- Clear, direct, and concise
-- Keep responses brief
-- Action-oriented suggestions
-- Mission-context and vision-aware responses`;
+    return renderTemplate(MISSION_PROMPTS.CONTEXT, {
+      currentPhase,
+      mission,
+      starship,
+      vision
+    });
   }
 
   /**
@@ -193,22 +178,19 @@ COMMUNICATION STYLE:
    * Welcome phase node - handles initial mission introduction
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const context = this.buildContext(state);
     const latestMessage = state.messages[state.messages.length - 1];
     const systemMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
     
+    // Build complete welcome prompt using template literals
+    const context = this.buildContext(state);
+    const welcomePhase = renderTemplate(MISSION_PROMPTS.WELCOME_PHASE, {
+      systemMessage,
+      isSystemInitiated: !!state.isSystemInitiated
+    });
+    
     const systemPrompt = `${context}
 
-WELCOME PHASE - Your primary responsibilities:
-- Provide a friendly introduction to the mission
-- Explain the mission objectives clearly  
-- Outline how you can assist the user
-- Encourage questions about the mission
-- Be welcoming, informative, and encouraging
-
-${state.isSystemInitiated ? `System message: "${systemMessage}"` : ''}
-
-Generate a welcoming message that introduces the mission and explains how you can help.`;
+${welcomePhase}`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
@@ -230,20 +212,15 @@ Generate a welcoming message that introduces the mission and explains how you ca
     const latestMessage = state.messages[state.messages.length - 1];
     const userMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
     
+    // Build complete converse prompt using template literals
     const context = this.buildContext(state);
+    const conversePhase = renderTemplate(MISSION_PROMPTS.CONVERSE_PHASE, {
+      userMessage
+    });
     
     const systemPrompt = `${context}
 
-CONVERSE PHASE - Your primary responsibilities:
-- Provide helpful guidance and answers
-- Support mission progress and problem-solving
-- Be responsive to user questions and needs
-- Maintain focus on mission objectives
-- Be helpful, knowledgeable, and mission-focused
-
-User message: "${userMessage}"
-
-Provide a helpful response based on the mission context.`;
+${conversePhase}`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
@@ -440,16 +417,6 @@ Provide a helpful response based on the mission context.`;
    * Generate fallback response when LLM fails
    */
   private getFallbackResponse(missionId: string): string {
-    const fallbackResponses = [
-      "I'm here to help guide your mission. Could you provide more details about what you need assistance with?",
-      "I'm experiencing some technical difficulties but I'm still here to support your mission. What specific guidance do you need?",
-      "Let me help coordinate your mission activities. What's your current priority or challenge?",
-      "I'm ready to assist with mission planning and execution. What would you like to focus on?",
-      "How can I help optimize your mission progress today?"
-    ];
-
-    // Simple deterministic selection based on missionId
-    const index = missionId.length % fallbackResponses.length;
-    return fallbackResponses[index];
+    return MISSION_PROMPTS.FALLBACK;
   }
 }

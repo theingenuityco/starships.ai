@@ -131,7 +131,14 @@ export function MissionList({ starshipId, starshipSlug, showCreateButton = true 
         description: 'Mission created successfully',
       });
       setShowCreateModal(false);
-      loadMissions();
+      
+      // Redirect to the newly created mission
+      if (response.data?.mission?.id && starshipSlug) {
+        router.push(`/ship/${starshipSlug}/missions/${response.data.mission.id}`);
+      } else {
+        // Fallback: refresh the list if redirect fails
+        loadMissions();
+      }
     }
   };
 

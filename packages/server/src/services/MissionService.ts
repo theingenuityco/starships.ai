@@ -80,7 +80,7 @@ export class MissionService {
 
     const mission = await missionRepo.createMission(request, userId);
 
-    // Auto-trigger welcome message
+    // Auto-trigger welcome message asynchronously (fire-and-forget)
     console.log('🚀 Auto-triggering welcome message for mission:', mission.id);
     try {
       const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
@@ -89,8 +89,14 @@ export class MissionService {
       const welcomeMessage = `Welcome to your new mission: "${mission.name}". This mission was just created and is ready to begin.`;
       console.log('💬 Sending welcome message:', welcomeMessage);
       
-      const response = await missionOrchestratorService.handleSystemMessage(mission.id, welcomeMessage);
-      console.log('✅ Welcome message sent successfully, response:', response);
+      // Removed await here - fire and forget!
+      missionOrchestratorService.handleSystemMessage(mission.id, welcomeMessage)
+        .then(response => {
+          console.log('✅ Welcome message sent successfully, response:', response);
+        })
+        .catch(error => {
+          console.error('❌ Failed to trigger welcome message:', error);
+        });
       
     } catch (error) {
       console.error('❌ Failed to trigger welcome message:', error);

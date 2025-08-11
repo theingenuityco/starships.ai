@@ -41,6 +41,7 @@ export type MissionStatus =
 export type MissionPhase = 
   | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
+  | 'analysis'     // Mission analysis and breakdown
   | 'converse';    // General conversation and mission guidance
 
 // ============================================================================

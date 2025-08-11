@@ -103,6 +103,7 @@ export class MissionOrchestratorAgent {
       this.compiledGraph = new StateGraph(MissionChatStateAnnotation)
         .addNode("context_builder", this.contextBuilderNode.bind(this))
         .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
+        .addNode("analysis_phase", this.analysisPhaseNode.bind(this))
         .addNode("converse_phase", this.conversePhaseNode.bind(this))
         .addEdge(START, "context_builder")
         .addConditionalEdges(
@@ -111,10 +112,12 @@ export class MissionOrchestratorAgent {
           {
             init: "welcome_phase",      // init phase also goes to welcome (fallback)
             welcome: "welcome_phase",
+            analysis: "analysis_phase",
             converse: "converse_phase"
           }
         )
         .addEdge("welcome_phase", END)
+        .addEdge("analysis_phase", END)
         .addEdge("converse_phase", END)
         .compile({ checkpointer: this.checkpointer });
     }
@@ -190,6 +193,30 @@ export class MissionOrchestratorAgent {
     const systemPrompt = `${context}
 
 ${welcomePhase}`;
+
+    const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
+    const responseContent = await this.callLLM(prompt);
+    
+    const aiMessage = new AIMessage({ content: responseContent });
+    return { messages: [aiMessage] };
+  }
+
+  /**
+   * Analysis phase node - handles mission analysis and breakdown
+   */
+  private async analysisPhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    const latestMessage = state.messages[state.messages.length - 1];
+    const userMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
+    
+    // Build complete analysis prompt using template literals
+    const context = this.buildContext(state);
+    const analysisPhase = renderTemplate(MISSION_PROMPTS.ANALYSIS_PHASE, {
+      userMessage
+    });
+    
+    const systemPrompt = `${context}
+
+${analysisPhase}`;
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);

@@ -28,6 +28,10 @@ export interface ConversePhaseData extends MissionContextData {
   userMessage: string;
 }
 
+export interface AnalysisPhaseData extends MissionContextData {
+  userMessage: string;
+}
+
 export interface WelcomeMessageData {
   mission: Mission;
   agents: any[];
@@ -70,6 +74,19 @@ INSTRUCTIONS:
 
 Expected system format: Structured MISSION DATA with Name, Description, Agents, Status.
 Be direct, informative, and ready to guide them.`,
+
+  ANALYSIS_PHASE: `ANALYSIS PHASE - Break down and analyze the mission requirements in detail.
+
+USER REQUEST: "<%= userMessage %>"
+
+INSTRUCTIONS:
+1. Analyze the mission objective and break it into key components
+2. Identify potential challenges and requirements
+3. Suggest resource allocation and agent assignments
+4. Provide detailed breakdown of tasks and dependencies
+5. Recommend prioritization and execution strategy
+
+Focus on thorough analysis, strategic thinking, and actionable insights.`,
 
   CONVERSE_PHASE: `CONVERSE PHASE - Analyze user request and provide mission-focused guidance.
 

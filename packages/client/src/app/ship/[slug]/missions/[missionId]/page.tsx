@@ -48,6 +48,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const [newMessage, setNewMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // WebSocket state
   const { isConnected } = useSocket();
@@ -117,9 +118,20 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
   useEffect(() => {
     scrollToBottom();
+    // Focus input after new messages (slight delay to ensure render)
+    setTimeout(focusInput, 100);
   }, [messages]);
+
+  // Focus input on component mount (chat opened)
+  useEffect(() => {
+    focusInput();
+  }, []);
 
 
   const handleSendMessage = async () => {
@@ -273,6 +285,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Input */}
               <div className="flex space-x-2 lg:space-x-3 pt-4 border-t flex-shrink-0">
                 <Input
+                  ref={inputRef}
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}

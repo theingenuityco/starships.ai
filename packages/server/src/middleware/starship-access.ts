@@ -52,7 +52,7 @@ export async function checkStarshipAccess(
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
         res.status(402).json({ 
           error: 'Payment required. Please update your payment method.',
-          billingPortalUrl: `/api/starships/${starshipId}/billing-portal`,
+          billingPortalUrl: `/api/${starshipId}/billing-portal`,
         });
         return;
       }

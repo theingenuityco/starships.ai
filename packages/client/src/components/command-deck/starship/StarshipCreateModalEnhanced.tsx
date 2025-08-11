@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
+import api from '@/lib/api';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { VisionReviewStep } from '@/components/vision/VisionReviewStep';
 import { cn } from '@/lib/utils';
@@ -43,7 +44,7 @@ interface StarshipCreateModalEnhancedProps {
 
 interface StarshipFormData {
   name: string;
-  class: 'scout' | 'cruiser';
+  class: 'scout' | 'cruiser' | 'draught';
   vision?: string;
 }
 
@@ -53,43 +54,47 @@ interface StarshipFormErrors {
   vision?: string;
 }
 
-const STARSHIP_CLASSES = {
-  scout: {
-    name: 'Scout',
-    icon: '🚀',
-    maxAgents: 3,
-    description: 'Fast and agile, perfect for exploration and reconnaissance missions.',
-    features: [
+// Helper functions to maintain UI consistency
+const getClassIcon = (classId: string) => {
+  const icons = {
+    scout: '🚀',
+    cruiser: '🛸', 
+    draught: '🌌'
+  };
+  return icons[classId as keyof typeof icons] || '🚀';
+};
+
+const getClassFeatures = (classId: string) => {
+  const features = {
+    scout: [
       'Rapid deployment capabilities',
       'Advanced scanning equipment',
       'Stealth technology',
       'Optimal for single-agent operations'
     ],
-    stats: {
-      speed: 90,
-      agility: 85,
-      capacity: 40,
-      efficiency: 80
-    }
-  },
-  cruiser: {
-    name: 'Cruiser',
-    icon: '🛸',
-    maxAgents: 6,
-    description: 'Heavy-duty vessel designed for extended missions and team operations.',
-    features: [
+    cruiser: [
       'Extended operational range',
       'Enhanced power systems',
       'Advanced communication arrays',
       'Ideal for multi-agent coordination'
     ],
-    stats: {
-      speed: 60,
-      agility: 50,
-      capacity: 90,
-      efficiency: 70
-    }
-  }
+    draught: [
+      'Unlimited operational range',
+      'Advanced AI coordination systems',
+      'Enterprise security protocols', 
+      'Massive multi-agent orchestration'
+    ]
+  };
+  return features[classId as keyof typeof features] || [];
+};
+
+const getClassStats = (classId: string) => {
+  const stats = {
+    scout: { speed: 90, agility: 85, capacity: 40, efficiency: 80 },
+    cruiser: { speed: 60, agility: 50, capacity: 90, efficiency: 70 },
+    draught: { speed: 75, agility: 60, capacity: 100, efficiency: 90 }
+  };
+  return stats[classId as keyof typeof stats] || { speed: 50, agility: 50, capacity: 50, efficiency: 50 };
 };
 
 export function StarshipCreateModalEnhanced({ 
@@ -130,6 +135,12 @@ export function StarshipCreateModalEnhanced({
     vision: session?.pendingVision || ''
   });
   const [errors, setErrors] = useState<StarshipFormErrors>({});
+  
+  // New state for API-driven data
+  const [starshipClasses, setStarshipClasses] = useState<Record<string, any>>({});
+  const [classesLoading, setClassesLoading] = useState(true);
+  const [pricingData, setPricingData] = useState<any[]>([]);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   // Update form data if session changes
   useEffect(() => {
@@ -151,6 +162,50 @@ export function StarshipCreateModalEnhanced({
     }
   }, [session, isOnboarding]);
 
+  // Combine pricing and class data from API
+  useEffect(() => {
+    async function fetchStarshipData() {
+      try {
+        setClassesLoading(true);
+        // Use proxy endpoint that routes to backend
+        const response = await fetch('/v1/starships/pricing');
+        if (response.ok) {
+          const pricingData = await response.json();
+          
+          // Transform pricing data into starship classes format
+          const classesFromAPI = pricingData.reduce((acc: any, plan: any) => {
+            acc[plan.id] = {
+              name: plan.name,
+              icon: getClassIcon(plan.id),
+              maxAgents: plan.features.maxAgents,
+              description: plan.description,
+              features: getClassFeatures(plan.id),
+              stats: getClassStats(plan.id),
+              pricing: {
+                monthly: plan.monthly,
+                yearly: plan.yearly
+              }
+            };
+            return acc;
+          }, {});
+          
+          setStarshipClasses(classesFromAPI);
+          setPricingData(pricingData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch starship data:', error);
+        // No fallbacks - subscription feature must work properly
+        setStarshipClasses({});
+      } finally {
+        setClassesLoading(false);
+      }
+    }
+    
+    if (open) {
+      fetchStarshipData();
+    }
+  }, [open]);
+
   const validateStep = (stepNumber: number): boolean => {
     const newErrors: StarshipFormErrors = {};
     
@@ -170,6 +225,15 @@ export function StarshipCreateModalEnhanced({
         newErrors.name = 'Name must be at least 3 characters';
       } else if (formData.name.length > 50) {
         newErrors.name = 'Name must be less than 50 characters';
+      }
+    }
+    
+    // Class step validation
+    const classStepNumber = hasVision ? 3 : 2;
+    if (stepNumber === classStepNumber) {
+      // Validate billing period for paid plans
+      if ((formData.class === 'cruiser' || formData.class === 'draught') && !billingPeriod) {
+        newErrors.class = 'Please select a billing period';
       }
     }
     
@@ -202,32 +266,61 @@ export function StarshipCreateModalEnhanced({
     if (!validateStep(step)) return;
 
     try {
-      // Create starship with vision if available
-      const starshipData: any = {
-        name: formData.name,
-        class: formData.class
-      };
-      
-      if (formData.vision) {
-        starshipData.vision = {
-          statement: formData.vision,
-          confidence: session?.visionAnalysis?.confidence || 0.8,
-          sibilSessionId: session?.sibilSessionId
+      if (formData.class === 'scout') {
+        // Free starship - use existing logic with vision if available
+        const starshipData: any = {
+          name: formData.name,
+          class: formData.class
         };
+        
+        if (formData.vision) {
+          starshipData.vision = {
+            statement: formData.vision,
+            confidence: session?.visionAnalysis?.confidence || 0.8,
+            sibilSessionId: session?.sibilSessionId
+          };
+        }
+        
+        await createStarship(starshipData);
+        
+        // Clear onboarding session if we're in onboarding flow
+        if (isOnboarding) {
+          updateStep('complete');
+          setTimeout(() => clearSession(), 1000); // Clear after a short delay
+        }
+        
+        onSuccess();
+        handleReset();
+      } else {
+        // Paid starship - redirect to Stripe checkout  
+        // Use proxy endpoint that routes to backend
+        const response = await api.post('/api/checkout-session', {
+          starshipName: formData.name,
+          plan: formData.class,
+          billingPeriod: billingPeriod
+        });
+        
+        if (response.data.url) {
+          window.location.href = response.data.url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
       }
-      
-      await createStarship(starshipData);
-      
-      // Clear onboarding session if we're in onboarding flow
-      if (isOnboarding) {
-        updateStep('complete');
-        setTimeout(() => clearSession(), 1000); // Clear after a short delay
-      }
-      
-      onSuccess();
-      handleReset();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create starship:', error);
+      
+      // Handle specific error cases following codebase patterns
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create starship. Please try again.';
+      
+      if (error.response?.status === 400 && error.response?.data?.error?.includes('limit')) {
+        setErrors({ class: error.response.data.error });
+      } else if (error.response?.status === 401) {
+        // Authentication error - redirect to login
+        window.location.href = '/api/auth/login';
+      } else {
+        // Generic error handling following existing codebase patterns
+        setErrors({ class: error.response?.data?.error || errorMessage });
+      }
     }
   };
 
@@ -239,6 +332,7 @@ export function StarshipCreateModalEnhanced({
       vision: ''
     });
     setErrors({});
+    setBillingPeriod('monthly'); // Reset billing period
   };
 
   const renderStepContent = () => {
@@ -348,21 +442,33 @@ export function StarshipCreateModalEnhanced({
             </p>
           </div>
           
-          <div className="grid grid-cols-2 gap-3">
-            {Object.entries(STARSHIP_CLASSES).map(([key, shipClass]) => {
-              // Only show Cruiser as recommended, never Scout
-              const isRecommended = key === 'cruiser' && session?.visionAnalysis?.recommendedClass;
-              
-              return (
-                <div
-                  key={key}
-                  className={cn(
-                    "relative p-4 rounded-lg border cursor-pointer transition-all",
-                    "hover:border-primary/50 hover:bg-muted/30",
-                    formData.class === key ? "border-primary bg-primary/5" : "border-border"
-                  )}
-                  onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' })}
-                >
+          {classesLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
+              <p className="text-muted-foreground mt-2">Loading starship classes...</p>
+            </div>
+          ) : Object.keys(starshipClasses).length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="w-8 h-8 mx-auto text-destructive" />
+              <p className="text-destructive mt-2">Failed to load starship classes.</p>
+              <p className="text-muted-foreground text-sm">Please refresh the page or contact support.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(starshipClasses).map(([key, shipClass]) => {
+                // Only show Cruiser as recommended, never Scout
+                const isRecommended = key === 'cruiser' && session?.visionAnalysis?.recommendedClass;
+                
+                return (
+                  <div
+                    key={key}
+                    className={cn(
+                      "relative p-4 rounded-lg border cursor-pointer transition-all",
+                      "hover:border-primary/50 hover:bg-muted/30",
+                      formData.class === key ? "border-primary bg-primary/5" : "border-border"
+                    )}
+                    onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' | 'draught' })}
+                  >
                   {/* Only show recommended badge for Cruiser */}
                   {isRecommended && (
                     <Badge 
@@ -423,11 +529,67 @@ export function StarshipCreateModalEnhanced({
                         </p>
                       ))}
                     </div>
+                    
+                    {/* Pricing information for paid plans */}
+                    {shipClass.pricing && shipClass.pricing.monthly > 0 && (
+                      <div className="pt-2 border-t border-border/50">
+                        <div className="text-xs text-muted-foreground">
+                          ${shipClass.pricing.monthly}/mo • ${shipClass.pricing.yearly}/yr
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
+          )}
+          
+          {/* Billing period UI for paid plans */}
+          {(formData.class === 'cruiser' || formData.class === 'draught') && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-base font-medium">Billing Period</Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Choose your preferred billing frequency
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div
+                  className={cn(
+                    "p-4 rounded-lg border cursor-pointer transition-all text-center",
+                    "hover:border-primary/50 hover:bg-muted/30",
+                    billingPeriod === 'monthly' ? "border-primary bg-primary/5" : "border-border"
+                  )}
+                  onClick={() => setBillingPeriod('monthly')}
+                >
+                  <div className="space-y-2">
+                    <div className="font-semibold">Monthly</div>
+                    <div className="text-sm text-muted-foreground">
+                      ${starshipClasses[formData.class]?.pricing?.monthly || 0}/month
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={cn(
+                    "p-4 rounded-lg border cursor-pointer transition-all text-center",
+                    "hover:border-primary/50 hover:bg-muted/30",
+                    billingPeriod === 'yearly' ? "border-primary bg-primary/5" : "border-border"
+                  )}
+                  onClick={() => setBillingPeriod('yearly')}
+                >
+                  <div className="space-y-2">
+                    <div className="font-semibold">Yearly</div>
+                    <div className="text-sm text-muted-foreground">
+                      ${starshipClasses[formData.class]?.pricing?.yearly || 0}/year
+                    </div>
+                    <Badge variant="secondary" className="text-xs">Save 17%</Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div className="p-4 bg-muted/50 rounded-lg">
             <p className="text-sm text-muted-foreground">
@@ -442,7 +604,7 @@ export function StarshipCreateModalEnhanced({
     // Review Step
     const reviewStepNumber = hasVision ? 4 : 3;
     if (step === reviewStepNumber) {
-      const selectedClass = STARSHIP_CLASSES[formData.class];
+      const selectedClass = starshipClasses[formData.class];
       return (
         <div className="space-y-5">
           <div>
@@ -510,6 +672,50 @@ export function StarshipCreateModalEnhanced({
                 </div>
               </div>
             </div>
+            
+            {/* Billing Information for Paid Plans */}
+            {(formData.class === 'cruiser' || formData.class === 'draught') && (
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="flex items-start gap-3">
+                  <Zap className="w-4 h-4 text-primary mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Subscription Details</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Plan:</span>
+                        <span className="font-medium">{selectedClass.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Billing:</span>
+                        <span className="font-medium capitalize">{billingPeriod}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Price:</span>
+                        <span className="font-medium">
+                          ${selectedClass.pricing?.[billingPeriod] || 0}
+                          /{billingPeriod === 'monthly' ? 'month' : 'year'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Free Plan Information */}
+            {formData.class === 'scout' && (
+              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-4 h-4 text-green-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Free Plan</p>
+                    <p className="text-sm text-green-700">
+                      No payment required. Limited to 3 scout starships per account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );

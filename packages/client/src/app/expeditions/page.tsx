@@ -26,7 +26,7 @@ export default function ExpeditionsPage() {
           <CardContent className="text-center">
             <p className="text-muted-foreground">
               The Expeditions module will provide comprehensive mission tracking, 
-              outcome analysis, and strategic planning for your starship's 
+              outcome analysis, and strategic planning for your starship&apos;s 
               exploration and operational activities.
             </p>
             <div className="mt-6 p-4 bg-accent/50 rounded-lg">

@@ -2,16 +2,16 @@
 
 import { use, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Target, Users, Clock, Calendar, Send } from 'lucide-react';
+import { ArrowLeft, Target, Users, Clock, Calendar, Send, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { missionApi } from '@/lib/missionApi';
-import { starshipAPI } from '@/lib/api';
+import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
-import type { Mission, MissionStatus, MissionMessage } from '@starships/protocol';
+import type { Mission, MissionStatus, MissionMessage, Agent } from '@starships/protocol';
 
 interface MissionDetailPageProps {
   params: Promise<{
@@ -40,6 +40,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const { slug, missionId } = use(params);
   const router = useRouter();
   const [mission, setMission] = useState<Mission | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -53,6 +55,62 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   // WebSocket state
   const { isConnected } = useSocket();
   const socketClient = SocketClient.getInstance();
+
+  // Collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState({
+    timeline: false,
+    description: false,
+    agents: false,
+    progress: false
+  });
+
+  const toggleSection = (section: keyof typeof collapsedSections) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Function to get agent emoji based on name and category (same logic as AgentCard)
+  const getAgentEmoji = (agent: Agent) => {
+    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
+      return '🎧'; // Headphones emoji
+    } else if (
+      agent.name.toLowerCase().includes('data') ||
+      agent.name.toLowerCase().includes('analyst') ||
+      agent.category === 'analysis'
+    ) {
+      return '📊'; // Bar chart emoji
+    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
+      return '✏️'; // Pencil emoji
+    } else if (
+      agent.name.toLowerCase().includes('code') ||
+      agent.name.toLowerCase().includes('coding') ||
+      agent.category === 'coding'
+    ) {
+      return '🔍'; // Magnifying glass emoji
+    } else {
+      return '🤖'; // Robot emoji as default
+    }
+  };
+
+  // Function to get phase progress information
+  const getPhaseProgress = (currentPhase: string) => {
+    const phases = [
+      { key: 'init', label: 'Init', description: 'Setting up mission context' },
+      { key: 'welcome', label: 'Welcome', description: 'Mission introduction' },
+      { key: 'converse', label: 'Converse', description: 'Active conversation phase' }
+    ];
+
+    const currentIndex = phases.findIndex(phase => phase.key === currentPhase);
+    
+    return phases.map((phase, index) => ({
+      ...phase,
+      isCompleted: index < currentIndex,
+      isCurrent: index === currentIndex,
+      isPending: index > currentIndex
+    }));
+  };
 
   // Central message handler - single source of truth
   const addMessageToUI = (message: MissionMessage) => {
@@ -82,6 +140,21 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     };
   }, [isConnected, missionId, socketClient]);
 
+  // Fetch agent details
+  const loadAgents = async (agentIds: string[]) => {
+    try {
+      setAgentsLoading(true);
+      const agentPromises = agentIds.map(agentId => agentAPI.getById(agentId));
+      const agentResults = await Promise.all(agentPromises);
+      setAgents(agentResults);
+    } catch (error) {
+      console.error('Failed to load agents:', error);
+      setAgents([]);
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
   useEffect(() => {
     const loadMission = async () => {
       try {
@@ -93,6 +166,13 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           setError(response.error);
         } else if (response.data) {
           setMission(response.data.mission);
+          
+          // Load agent details if mission has agents
+          if (response.data.mission.agentIds && response.data.mission.agentIds.length > 0) {
+            loadAgents(response.data.mission.agentIds);
+          } else {
+            setAgentsLoading(false);
+          }
           
           // Load chat history - LangGraph will handle greetings automatically
           const historyResponse = await missionApi.getMessageHistory(missionId);
@@ -302,101 +382,227 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         </div>
 
         {/* Sidebar - Mission Details */}
-        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-muted/30 flex-shrink-0">
-          <div className="p-4 lg:p-6 space-y-4 lg:space-y-6 h-full overflow-y-auto">
-            {/* Status Card */}
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                {statusIcons[mission.status]}
-                <h3 className="font-semibold">Status</h3>
-              </div>
-              <Badge className={`${statusColors[mission.status]} text-xs`}>
-                {mission.status.toUpperCase()}
-              </Badge>
-            </Card>
-
-            {/* Quick Info */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">Quick Info</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Created</p>
-                    <p className="text-muted-foreground text-xs">
-                      {new Date(mission.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Updated</p>
-                    <p className="text-muted-foreground text-xs">
-                      {new Date(mission.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium">Agents</p>
-                    <p className="text-muted-foreground text-xs">
-                      {mission.agentIds?.length || 0} assigned
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Mission Description */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">Description</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {mission.description}
-              </p>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="p-4">
-              <h3 className="font-semibold mb-3">Actions</h3>
+        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-gradient-to-b from-background to-muted/5 flex-shrink-0">
+          {/* Enhanced Content Sections */}
+          <div className="h-full overflow-y-auto p-3 custom-scrollbar">
+            <div className="space-y-4 mt-4">
+              
+              {/* Progress Section */}
               <div className="space-y-2">
-                {mission.status === 'draft' && (
-                  <Button size="sm" className="w-full justify-start">
-                    <Target className="w-4 h-4 mr-2" />
-                    Start Mission
-                  </Button>
-                )}
-                {mission.status === 'active' && (
-                  <Button size="sm" variant="outline" className="w-full justify-start">
-                    <Clock className="w-4 h-4 mr-2" />
-                    Pause Mission
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" className="w-full justify-start">
-                  <Users className="w-4 h-4 mr-2" />
-                  Manage Agents
-                </Button>
-              </div>
-            </Card>
-
-            {/* Agent Status */}
-            {mission.agentIds && mission.agentIds.length > 0 && (
-              <Card className="p-4">
-                <h3 className="font-semibold mb-3">Agent Status</h3>
-                <div className="space-y-2 text-sm">
-                  {mission.agentIds.map((agentId, index) => (
-                    <div key={agentId} className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>Agent {index + 1}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">Online</span>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-2 px-3 group">
+                  <button
+                    onClick={() => toggleSection('progress')}
+                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                  >
+                    {collapsedSections.progress ? (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    )}
+                  </button>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Progress
+                  </h4>
                 </div>
-              </Card>
-            )}
+                {!collapsedSections.progress && (
+                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    {getPhaseProgress(mission.phase).map((phase, index, array) => (
+                      <div key={phase.key} className="relative">
+                        <div className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative flex-shrink-0">
+                              <div className={`p-1.5 rounded-md transition-all duration-300 ${
+                                phase.isCurrent 
+                                  ? 'bg-primary/20' 
+                                  : phase.isCompleted
+                                  ? 'bg-green-500/20'
+                                  : 'bg-muted/30 group-hover:bg-muted/50'
+                              }`}>
+                                {phase.isCompleted ? (
+                                  <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                    <span className="text-xs text-green-600 dark:text-green-400">✓</span>
+                                  </div>
+                                ) : phase.isCurrent ? (
+                                  <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                                  </div>
+                                ) : (
+                                  <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                    <span className="text-xs text-muted-foreground">{index + 1}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className={`font-semibold text-sm truncate block transition-colors leading-tight ${
+                                phase.isCurrent 
+                                  ? 'text-primary' 
+                                  : phase.isCompleted
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-muted-foreground group-hover:text-foreground'
+                              }`}>
+                                {phase.label}
+                              </span>
+                              <span className="text-xs text-muted-foreground leading-tight">
+                                {phase.description}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Timeline connector */}
+                        {index < array.length - 1 && (
+                          <div className="mx-3 pl-2">
+                            <div className="ml-[12px] w-0.5 h-4 bg-border" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Description Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-3 group">
+                  <button
+                    onClick={() => toggleSection('description')}
+                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                  >
+                    {collapsedSections.description ? (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    )}
+                  </button>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Description
+                  </h4>
+                </div>
+                {!collapsedSections.description && (
+                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="group relative mx-3 px-2 py-1.5 rounded-lg bg-muted/20 transition-all duration-300">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {mission.description}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Agents Section */}
+              {mission.agentIds && mission.agentIds.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-3 group">
+                    <button
+                      onClick={() => toggleSection('agents')}
+                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                    >
+                      {collapsedSections.agents ? (
+                        <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      )}
+                    </button>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Agents ({mission.agentIds.length})
+                    </h4>
+                  </div>
+                  {!collapsedSections.agents && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                      {agentsLoading ? (
+                        <div className="mx-3 px-2 py-1.5 flex items-center gap-2.5">
+                          <div className="animate-spin w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full"></div>
+                          <span className="text-sm text-muted-foreground">Loading agents...</span>
+                        </div>
+                      ) : (
+                        agents.map((agent, index) => (
+                          <div key={agent.id} className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="relative flex-shrink-0">
+                                <div className="w-9 h-9 rounded-full bg-background border border-border/40 flex items-center justify-center group-hover:border-border/60 transition-all duration-300">
+                                  <span className="text-sm">
+                                    {getAgentEmoji(agent)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
+                                  {agent.name || `Agent ${index + 1}`}
+                                </span>
+                                <span className="text-xs text-muted-foreground truncate block">
+                                  {agent.description || `ID: ${agent.id}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Timeline Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-3 group">
+                  <button
+                    onClick={() => toggleSection('timeline')}
+                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                  >
+                    {collapsedSections.timeline ? (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    )}
+                  </button>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Timeline
+                  </h4>
+                </div>
+                {!collapsedSections.timeline && (
+                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="p-1.5 rounded-md bg-muted/30 group-hover:bg-muted/50 transition-all duration-300">
+                            <Calendar className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
+                            Created
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(mission.createdAt).toLocaleDateString()} at {new Date(mission.createdAt).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="p-1.5 rounded-md bg-muted/30 group-hover:bg-muted/50 transition-all duration-300">
+                            <Clock className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          </div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
+                            Updated
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(mission.updatedAt).toLocaleDateString()} at {new Date(mission.updatedAt).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+
+            </div>
           </div>
         </div>
       </div>

@@ -14,9 +14,10 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
-    "stripe:setup": "tsx src/scripts/setup-stripe-products.ts",
-    "stripe:setup:dev": "NODE_ENV=development pnpm run stripe:setup",
-    "stripe:setup:prod": "NODE_ENV=production pnpm run stripe:setup"
+    "stripe:setup": "tsx scripts/setup-stripe.ts",
+    "stripe:setup:dev": "NODE_ENV=development tsx scripts/setup-stripe.ts",
+    "stripe:listen": "stripe listen --forward-to localhost:4000/webhooks/stripe",
+    "stripe:trigger": "stripe trigger checkout.session.completed"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",

@@ -30,7 +30,8 @@ import {
   ArrowRight,
   X,
   Brain,
-  Bot
+  Bot,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
@@ -38,6 +39,7 @@ import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { analyzeVisionPreAuth } from '@/lib/sibil/preview-api';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
 
 interface StarshipCreateModalUnifiedProps {
   open: boolean;
@@ -48,7 +50,7 @@ interface StarshipCreateModalUnifiedProps {
 
 interface StarshipFormData {
   name: string;
-  class: 'scout' | 'cruiser';
+  class: 'scout' | 'cruiser' | 'draught';
   vision?: string;
 }
 
@@ -58,43 +60,47 @@ interface StarshipFormErrors {
   vision?: string;
 }
 
-const STARSHIP_CLASSES = {
-  scout: {
-    name: 'Scout',
-    icon: '🚀',
-    maxAgents: 3,
-    description: 'Fast and agile, perfect for exploration and reconnaissance missions.',
-    features: [
+// Helper functions to maintain UI consistency
+const getClassIcon = (classId: string) => {
+  const icons = {
+    scout: '🚀',
+    cruiser: '🛸', 
+    draught: '🌌'
+  };
+  return icons[classId as keyof typeof icons] || '🚀';
+};
+
+const getClassFeatures = (classId: string) => {
+  const features = {
+    scout: [
       'Rapid deployment capabilities',
       'Advanced scanning equipment',
       'Stealth technology',
       'Optimal for single-agent operations'
     ],
-    stats: {
-      speed: 90,
-      agility: 85,
-      capacity: 40,
-      efficiency: 80
-    }
-  },
-  cruiser: {
-    name: 'Cruiser',
-    icon: '🛸',
-    maxAgents: 6,
-    description: 'Heavy-duty vessel designed for extended missions and team operations.',
-    features: [
+    cruiser: [
       'Extended operational range',
       'Enhanced power systems',
       'Advanced communication arrays',
       'Ideal for multi-agent coordination'
     ],
-    stats: {
-      speed: 60,
-      agility: 50,
-      capacity: 90,
-      efficiency: 70
-    }
-  }
+    draught: [
+      'Unlimited operational range',
+      'Advanced AI coordination systems',
+      'Enterprise security protocols', 
+      'Massive multi-agent orchestration'
+    ]
+  };
+  return features[classId as keyof typeof features] || [];
+};
+
+const getClassStats = (classId: string) => {
+  const stats = {
+    scout: { speed: 90, agility: 85, capacity: 40, efficiency: 80 },
+    cruiser: { speed: 60, agility: 50, capacity: 90, efficiency: 70 },
+    draught: { speed: 75, agility: 60, capacity: 100, efficiency: 90 }
+  };
+  return stats[classId as keyof typeof stats] || { speed: 50, agility: 50, capacity: 50, efficiency: 50 };
 };
 
 export function StarshipCreateModalUnified({ 
@@ -109,6 +115,12 @@ export function StarshipCreateModalUnified({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
   const [analyzingVision, setAnalyzingVision] = useState(false);
+  
+  // New state for API-driven pricing data
+  const [starshipClasses, setStarshipClasses] = useState<Record<string, any>>({});
+  const [classesLoading, setClassesLoading] = useState(true);
+  const [pricingData, setPricingData] = useState<any[]>([]);
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   
   // Try to get session from hook or fallback to localStorage for onboarding
   let session = hookSession;
@@ -151,6 +163,50 @@ export function StarshipCreateModalUnified({
     }
   }, [session, isOnboarding]);
 
+  // Combine pricing and class data from API
+  useEffect(() => {
+    async function fetchStarshipData() {
+      try {
+        setClassesLoading(true);
+        // Use proxy endpoint that routes to backend
+        const response = await fetch('/v1/starships/pricing');
+        if (response.ok) {
+          const pricingData = await response.json();
+          
+          // Transform pricing data into starship classes format
+          const classesFromAPI = pricingData.reduce((acc: any, plan: any) => {
+            acc[plan.id] = {
+              name: plan.name,
+              icon: getClassIcon(plan.id),
+              maxAgents: plan.features.maxAgents,
+              description: plan.description,
+              features: getClassFeatures(plan.id),
+              stats: getClassStats(plan.id),
+              pricing: {
+                monthly: plan.monthly,
+                yearly: plan.yearly
+              }
+            };
+            return acc;
+          }, {});
+          
+          setStarshipClasses(classesFromAPI);
+          setPricingData(pricingData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch starship data:', error);
+        // No fallbacks - subscription feature must work properly
+        setStarshipClasses({});
+      } finally {
+        setClassesLoading(false);
+      }
+    }
+    
+    if (open) {
+      fetchStarshipData();
+    }
+  }, [open]);
+
   const validateStep = (stepNumber: number): boolean => {
     const newErrors: StarshipFormErrors = {};
     
@@ -169,6 +225,14 @@ export function StarshipCreateModalUnified({
         newErrors.vision = 'Vision statement is required';
       } else if (formData.vision.length < 20) {
         newErrors.vision = 'Vision should be at least 20 characters';
+      }
+    }
+    
+    // Class step validation
+    if (stepNumber === 2) {
+      // Validate billing period for paid plans
+      if ((formData.class === 'cruiser' || formData.class === 'draught') && !billingPeriod) {
+        newErrors.class = 'Please select a billing period';
       }
     }
     
@@ -224,37 +288,66 @@ export function StarshipCreateModalUnified({
     if (!validateStep(step)) return;
 
     try {
-      // Create starship with vision if available
-      const starshipData: any = {
-        name: formData.name,
-        class: formData.class
-      };
-      
-      if (formData.vision) {
-        starshipData.vision = {
-          statement: formData.vision,
-          confidence: visionAnalysis?.confidence || 0.8,
-          sibilSessionId: session?.sibilSessionId
+      if (formData.class === 'scout') {
+        // Free starship - use existing logic with vision if available
+        const starshipData: any = {
+          name: formData.name,
+          class: formData.class
         };
+        
+        if (formData.vision) {
+          starshipData.vision = {
+            statement: formData.vision,
+            confidence: visionAnalysis?.confidence || 0.8,
+            sibilSessionId: session?.sibilSessionId
+          };
+        }
+        
+        const newStarship = await createStarship(starshipData);
+        
+        // Clear onboarding session if we're in onboarding flow
+        if (isOnboarding) {
+          updateStep('complete');
+          setTimeout(() => clearSession(), 1000);
+        }
+        
+        onSuccess();
+        handleReset();
+        
+        // Navigate to the new starship's vision-chamber
+        if (newStarship && newStarship.slug) {
+          router.push(`/ship/${newStarship.slug}/vision-chamber`);
+        }
+      } else {
+        // Paid starship - redirect to Stripe checkout  
+        // Use proxy endpoint that routes to backend
+        const response = await api.post('/api/checkout-session', {
+          starshipName: formData.name,
+          plan: formData.class,
+          billingPeriod: billingPeriod
+        });
+        
+        if (response.data.url) {
+          window.location.href = response.data.url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
       }
-      
-      const newStarship = await createStarship(starshipData);
-      
-      // Clear onboarding session if we're in onboarding flow
-      if (isOnboarding) {
-        updateStep('complete');
-        setTimeout(() => clearSession(), 1000);
-      }
-      
-      onSuccess();
-      handleReset();
-      
-      // Navigate to the new starship's vision-chamber
-      if (newStarship && newStarship.slug) {
-        router.push(`/ship/${newStarship.slug}/vision-chamber`);
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create starship:', error);
+      
+      // Handle specific error cases following codebase patterns
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create starship. Please try again.';
+      
+      if (error.response?.status === 400 && error.response?.data?.error?.includes('limit')) {
+        setErrors({ class: error.response.data.error });
+      } else if (error.response?.status === 401) {
+        // Authentication error - redirect to login
+        window.location.href = '/api/auth/login';
+      } else {
+        // Generic error handling following existing codebase patterns
+        setErrors({ class: error.response?.data?.error || errorMessage });
+      }
     }
   };
 
@@ -267,6 +360,8 @@ export function StarshipCreateModalUnified({
     });
     setVisionAnalysis(null);
     setErrors({});
+    setBillingPeriod('monthly'); // Reset billing period
+    // starshipClasses and pricingData persist across resets
   };
 
   const handleClose = () => {
@@ -403,13 +498,13 @@ export function StarshipCreateModalUnified({
               <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-3">
-                    <div className="text-2xl">{STARSHIP_CLASSES[formData.class].icon}</div>
+                    <div className="text-2xl">{getClassIcon(formData.class)}</div>
                     <div className="flex-1">
                       <div className="font-medium">
                         {formData.name || '________'}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {STARSHIP_CLASSES[formData.class].name} Class Starship
+                        {starshipClasses[formData.class]?.name || formData.class.charAt(0).toUpperCase() + formData.class.slice(1)} Class Starship
                       </div>
                     </div>
                   </div>
@@ -446,79 +541,162 @@ export function StarshipCreateModalUnified({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(STARSHIP_CLASSES).map(([key, classData]) => {
-              const isRecommended = key === 'cruiser' && visionAnalysis?.recommendedClass === 'cruiser';
-              
-              return (
-                <Card
-                  key={key}
-                  className={cn(
-                    "cursor-pointer transition-all duration-200 bg-card/50 backdrop-blur-sm border-border/50",
-                    formData.class === key && "ring-2 ring-primary/50 bg-primary/5"
-                  )}
-                  onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' })}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="text-2xl">{classData.icon}</div>
-                        <div>
-                          <CardTitle className="text-lg">{classData.name}</CardTitle>
-                          <Badge variant="outline" className="mt-1">
-                            {classData.maxAgents} Agent Slots
-                          </Badge>
+          {classesLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
+              <p className="text-muted-foreground mt-2">Loading starship classes...</p>
+            </div>
+          ) : Object.keys(starshipClasses).length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="w-8 h-8 mx-auto text-destructive" />
+              <p className="text-destructive mt-2">Failed to load starship classes.</p>
+              <p className="text-muted-foreground text-sm">Please refresh the page or contact support.</p>
+              <Button variant="outline" onClick={() => window.location.reload()} className="mt-4">
+                Refresh Page
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(starshipClasses).map(([key, classData]) => {
+                const isRecommended = key === 'cruiser' && visionAnalysis?.recommendedClass === 'cruiser';
+                
+                return (
+                  <Card
+                    key={key}
+                    className={cn(
+                      "cursor-pointer transition-all duration-200 bg-card/50 backdrop-blur-sm border-border/50 h-full",
+                      formData.class === key && "ring-2 ring-primary/50 bg-primary/5"
+                    )}
+                    onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' | 'draught' })}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-3 flex-1">
+                            <div className="text-2xl">{classData.icon}</div>
+                            <div className="flex-1">
+                              <CardTitle className="text-lg">{classData.name}</CardTitle>
+                              <Badge variant="outline" className="mt-1">
+                                {classData.maxAgents} Agent Slots
+                              </Badge>
+                            </div>
+                          </div>
+                          {isRecommended && (
+                            <Badge variant="secondary" className="ml-2">
+                              <Sparkles className="w-3 h-3 mr-1" />
+                              Recommended
+                            </Badge>
+                          )}
                         </div>
+                        
+                        {classData.pricing && classData.pricing.monthly > 0 && (
+                          <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                            <span className="text-sm text-muted-foreground">Pricing:</span>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">
+                                ${classData.pricing.monthly}/mo
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                ${classData.pricing.yearly}/yr
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {isRecommended && (
-                        <Badge variant="secondary">
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          Recommended
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      {classData.description}
-                    </p>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Speed</span>
-                        <span>{classData.stats.speed}%</span>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {classData.description}
+                      </p>
+                      
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Speed</span>
+                          <span>{classData.stats.speed}%</span>
+                        </div>
+                        <Progress value={classData.stats.speed} className="h-1" />
                       </div>
-                      <Progress value={classData.stats.speed} className="h-1" />
-                    </div>
 
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Capacity</span>
-                        <span>{classData.stats.capacity}%</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Capacity</span>
+                          <span>{classData.stats.capacity}%</span>
+                        </div>
+                        <Progress value={classData.stats.capacity} className="h-1" />
                       </div>
-                      <Progress value={classData.stats.capacity} className="h-1" />
-                    </div>
 
-                    <ul className="space-y-1">
-                      {classData.features.slice(0, 2).map((feature, index) => (
-                        <li key={index} className="flex items-center space-x-2 text-xs">
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                      <ul className="space-y-1">
+                        {classData.features.slice(0, 2).map((feature, index) => (
+                          <li key={index} className="flex items-center space-x-2 text-xs">
+                            <CheckCircle className="w-3 h-3 text-green-500" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Add billing period UI after class selection */}
+          {(formData.class === 'cruiser' || formData.class === 'draught') && !classesLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4"
+            >
+              <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center space-x-2">
+                    <Zap className="w-4 h-4 text-primary" />
+                    <span>Billing Period</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant={billingPeriod === 'monthly' ? 'default' : 'outline'}
+                      onClick={() => setBillingPeriod('monthly')}
+                      className="flex flex-col items-center p-3 h-auto space-y-1"
+                    >
+                      <span className="font-medium">Monthly</span>
+                      <span className="text-xs text-muted-foreground">
+                        ${starshipClasses[formData.class]?.pricing?.monthly || 0}/month
+                      </span>
+                    </Button>
+                    <Button
+                      variant={billingPeriod === 'yearly' ? 'default' : 'outline'}
+                      onClick={() => setBillingPeriod('yearly')}
+                      className="flex flex-col items-center p-3 h-auto space-y-1"
+                    >
+                      <span className="font-medium">Yearly</span>
+                      <span className="text-xs text-muted-foreground">
+                        ${starshipClasses[formData.class]?.pricing?.yearly || 0}/year
+                      </span>
+                      <Badge variant="secondary" className="text-xs mt-1">Save 17%</Badge>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
         </motion.div>
       );
     }
 
     // Step 3: Review
     if (step === 3) {
-      const selectedClass = STARSHIP_CLASSES[formData.class];
+      const selectedClass = starshipClasses[formData.class] || {
+        name: formData.class.charAt(0).toUpperCase() + formData.class.slice(1),
+        icon: getClassIcon(formData.class),
+        maxAgents: 3,
+        description: 'Loading...',
+        features: getClassFeatures(formData.class),
+        stats: getClassStats(formData.class),
+        pricing: { monthly: 0, yearly: 0 }
+      };
       return (
         <motion.div
           key="step3"
@@ -600,6 +778,40 @@ export function StarshipCreateModalUnified({
               </div>
             </CardContent>
           </Card>
+          
+          {/* Billing Information for Paid Plans */}
+          {(formData.class === 'cruiser' || formData.class === 'draught') && (
+            <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <h4 className="font-medium text-primary mb-2">Subscription Details</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Plan:</span>
+                  <span className="font-medium">{selectedClass?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Billing:</span>
+                  <span className="font-medium capitalize">{billingPeriod}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Price:</span>
+                  <span className="font-medium">
+                    ${selectedClass?.pricing?.[billingPeriod] || 0}
+                    /{billingPeriod === 'monthly' ? 'month' : 'year'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Free Plan Information */}
+          {formData.class === 'scout' && (
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <h4 className="font-medium text-green-800 mb-2">Free Plan</h4>
+              <p className="text-sm text-green-700">
+                No payment required. Limited to 3 scout starships per account.
+              </p>
+            </div>
+          )}
         </motion.div>
       );
     }
@@ -619,15 +831,15 @@ export function StarshipCreateModalUnified({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl bg-background/95 backdrop-blur-sm border-border/50">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col bg-background/95 backdrop-blur-sm border-border/50">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Create New Starship
             </DialogTitle>
           </DialogHeader>
 
           {/* Progress Bar */}
-          <div className="space-y-2">
+          <div className="space-y-2 flex-shrink-0">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Step {step} of {totalSteps}</span>
               <span>{Math.round((step / totalSteps) * 100)}% Complete</span>
@@ -635,14 +847,14 @@ export function StarshipCreateModalUnified({
             <Progress value={(step / totalSteps) * 100} className="h-2" />
           </div>
 
-          <div className="min-h-[400px]">
+          <div className="flex-1 overflow-y-auto min-h-0 py-4">
             <AnimatePresence mode="wait">
               {renderStepContent()}
             </AnimatePresence>
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between pt-4 border-t border-border/50">
+          <div className="flex justify-between pt-4 border-t border-border/50 flex-shrink-0">
             <Button
               variant="outline"
               onClick={handlePrevious}

@@ -680,6 +680,16 @@ users:
       // Update connector status
       await connectorRepository.updateDockerStatus(connectorId, 'stopped');
       
+      // Check if namespace is now empty and optionally clean it up
+      // In development, always cleanup to avoid clutter
+      // In production, opt-in via K8S_AUTO_CLEANUP_NAMESPACES
+      const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+      const autoCleanEmptyNamespaces = isDevelopment || process.env.K8S_AUTO_CLEANUP_NAMESPACES === 'true';
+      
+      if (autoCleanEmptyNamespaces) {
+        await this.cleanupEmptyNamespace(namespaceName);
+      }
+      
       console.log(`[KubernetesDeployer] Successfully removed connector ${connectorId}`);
       return true;
       
@@ -996,6 +1006,37 @@ users:
     } catch (error) {
       console.error(`[KubernetesDeployer] Failed to list deployments:`, error);
       return [];
+    }
+  }
+
+  /**
+   * Check if namespace is empty and optionally clean it up
+   */
+  private async cleanupEmptyNamespace(namespaceName: string): Promise<void> {
+    try {
+      // Check for any deployments in the namespace
+      const deployments = await this.k8sAppsApi.listNamespacedDeployment(namespaceName);
+      
+      if (deployments.body.items.length === 0) {
+        console.log(`[KubernetesDeployer] Namespace ${namespaceName} is empty, cleaning up...`);
+        
+        try {
+          // Delete the namespace (this will cascade delete PVC and other resources)
+          await this.k8sApi.deleteNamespace(namespaceName);
+          console.log(`[KubernetesDeployer] Deleted empty namespace ${namespaceName} and associated resources`);
+        } catch (error: any) {
+          if (error?.response?.statusCode === 404) {
+            // Already deleted, that's fine
+            console.log(`[KubernetesDeployer] Namespace ${namespaceName} already deleted`);
+          } else {
+            console.warn(`[KubernetesDeployer] Failed to delete empty namespace:`, error);
+          }
+        }
+      } else {
+        console.log(`[KubernetesDeployer] Namespace ${namespaceName} still has ${deployments.body.items.length} deployments, keeping it`);
+      }
+    } catch (error) {
+      console.error(`[KubernetesDeployer] Error checking namespace for cleanup:`, error);
     }
   }
 

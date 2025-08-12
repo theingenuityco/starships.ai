@@ -4,7 +4,7 @@ export interface UpdateStarshipRequest {
   name?: string;
   slug?: string; // Optional - will be auto-generated from name if not provided
   status?: 'active' | 'inactive';
-  class?: 'scout' | 'cruiser';
+  class?: 'scout' | 'cruiser' | 'draught';
   maxActiveExpeditions?: number;
 }
 
@@ -17,20 +17,23 @@ export interface StarshipResponse {
     id: string;
     slug: string;
     ownerId: string;
-    class: 'scout' | 'cruiser';
+    class: 'scout' | 'cruiser' | 'draught';
     name: string;
     maxActiveExpeditions: number;
     maxAgents: number;
-    status: 'active' | 'inactive';
+    status: 'active' | 'inactive' | 'restricted' | 'disabled';
     createdAt: string;
     updatedAt: string;
+    plan?: 'scout' | 'cruiser' | 'draught';
+    subscriptionId?: string;
+    billingPeriod?: 'monthly' | 'yearly';
   };
 }
 
 export interface StarshipAgentsResponse {
   starshipId: string;
   starshipName: string;
-  starshipClass: 'scout' | 'cruiser';
+  starshipClass: 'scout' | 'cruiser' | 'draught';
   maxAgents: number;
   deployedAgents: Array<{
     id: string;
@@ -50,7 +53,7 @@ export interface StarshipAgentsResponse {
     temperature?: number;
     maxTokens?: number;
     customInstructions?: string;
-    allowedStarshipClasses?: ('scout' | 'cruiser')[];
+    allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
     requiredPermissions?: string[];
   }>;
   availableSlots: number;
@@ -68,7 +71,7 @@ export interface StarshipDetailsResponse extends StarshipResponse {
 
 export interface CreateStarshipRequest {
   name: string;
-  class: 'scout' | 'cruiser';
+  class: 'scout' | 'cruiser' | 'draught';
   slug?: string; // Optional - will be auto-generated if not provided
 }
 
@@ -116,7 +119,7 @@ export interface StarshipWithExpeditionsResponse extends StarshipResponse {
  */
 export interface StarshipExpeditionCapacity {
   starshipId: string;
-  starshipClass: 'scout' | 'cruiser';
+  starshipClass: 'scout' | 'cruiser' | 'draught';
   maxConcurrentExpeditions: number; // Based on class: Scout=2, Cruiser=5
   currentActiveExpeditions: number;
   availableExpeditionSlots: number;

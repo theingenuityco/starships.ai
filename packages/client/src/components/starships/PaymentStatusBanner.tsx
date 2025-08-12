@@ -8,7 +8,7 @@ interface PaymentStatusBannerProps {
   starship: {
     id: string;
     name: string;
-    status: 'active' | 'restricted' | 'disabled';
+    status: 'active' | 'restricted' | 'disabled' | 'pending_payment';
     plan: 'scout' | 'cruiser' | 'draught';
   };
 }
@@ -16,7 +16,7 @@ interface PaymentStatusBannerProps {
 export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
   const handleManageSubscription = async () => {
     try {
-      const response = await api.post(`/v1/${starship.id}/billing-portal`);
+      const response = await api.post(`/api/starships/${starship.id}/billing-portal`);
       if (response.data.url) {
         window.location.href = response.data.url;
       }
@@ -25,8 +25,39 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
     }
   };
 
+  const handleRetryPayment = async () => {
+    try {
+      const response = await api.post(`/api/starships/${starship.id}/retry-payment`);
+      if (response.data.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl;
+      }
+    } catch (error) {
+      console.error('Failed to retry payment:', error);
+    }
+  };
+
   if (starship.status === 'active' || starship.plan === 'scout') {
     return null;
+  }
+
+  if (starship.status === 'pending_payment') {
+    return (
+      <Card className="mb-4 border-yellow-200 bg-yellow-50">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <span className="text-sm text-yellow-800">
+                Payment required to activate {starship.name}
+              </span>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleRetryPayment}>
+              Complete Payment
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (starship.status === 'restricted') {

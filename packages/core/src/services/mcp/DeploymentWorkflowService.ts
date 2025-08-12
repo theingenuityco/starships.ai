@@ -7,7 +7,7 @@
 
 import { MCPServerConnector, MCPServerConnectorRepository, MCPServerOptionRepository } from '@starships/models';
 import { MCPDeployer, DeploymentResult, DeploymentStatus } from './MCPDeployer';
-import { DockerComposeDeployer } from './DockerComposeDeployer';
+import { DeployerFactory } from './DeployerFactory';
 import { getDockerServiceTemplate, isHttpBridgeTemplate, getHttpBridgeTemplate, setHttpBridgeEnabled, getTemplateForDeployment } from './DockerServiceTemplate';
 import { serviceRegistry } from './ServiceRegistry';
 import { CapabilitySyncService } from './CapabilitySyncService';
@@ -57,7 +57,7 @@ export class DeploymentWorkflowService {
   ) {
     this.mcpConnectorRepo = mcpConnectorRepo || new MCPServerConnectorRepository();
     this.mcpServerOptionRepo = mcpServerOptionRepo || new MCPServerOptionRepository();
-    this.deployer = deployer || new DockerComposeDeployer();
+    this.deployer = deployer || DeployerFactory.getDeployer();
     this.capabilitySync = new CapabilitySyncService(this.mcpConnectorRepo);
   }
 

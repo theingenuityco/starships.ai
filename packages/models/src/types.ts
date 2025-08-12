@@ -93,6 +93,7 @@ export interface Starship {
   subscriptionId?: string;     // Stripe subscription ID
   plan?: 'scout' | 'cruiser' | 'draught';  // Separate from class for billing
   billingPeriod?: 'monthly' | 'yearly';  // Billing period
+  stripeCustomerId?: string;  // Links to Stripe Customer for portal access
 }
 
 export interface Vision {

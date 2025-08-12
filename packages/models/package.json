@@ -18,6 +18,7 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "migrate": "tsx src/scripts/run-migration.ts",
     "migrate:stripe": "tsx src/scripts/run-stripe-migration.ts",
+    "migrate:stripe-idempotency": "tsx src/scripts/run-stripe-webhook-idempotency-migrations.ts",
     "migrate:http-bridge": "tsx src/scripts/run-http-bridge-migration.ts",
     "validate-migration": "tsx src/scripts/validate-migration.ts",
     "validate-migration:report": "tsx src/scripts/validate-migration.ts --report",

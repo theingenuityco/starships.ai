@@ -1278,4 +1278,70 @@ export class StarshipRepository implements StarshipRepositoryInterface {
       throw error;
     }
   }
+
+  // ============================================================================
+  // WEBHOOK IDEMPOTENCY METHODS
+  // ============================================================================
+
+  /**
+   * Check if a Stripe webhook event has already been processed
+   * @param eventId - The Stripe event ID
+   * @returns true if event was already processed
+   */
+  async isEventProcessed(eventId: string): Promise<boolean> {
+    const connection = getConnection();
+    const result = await connection.executeQuery(
+      'MATCH (e:StripeEvent {eventId: $eventId}) RETURN e LIMIT 1',
+      { eventId }
+    );
+    return result.length > 0;
+  }
+
+  /**
+   * Mark a Stripe webhook event as processed
+   * @param eventId - The Stripe event ID
+   * @param eventType - The type of Stripe event
+   */
+  async markEventProcessed(eventId: string, eventType?: string): Promise<void> {
+    const connection = getConnection();
+    await connection.executeWrite(
+      `CREATE (e:StripeEvent {
+        eventId: $eventId, 
+        eventType: $eventType,
+        processedAt: datetime()
+      })`,
+      { eventId, eventType: eventType || 'unknown' }
+    );
+  }
+
+  /**
+   * Update Starship with Stripe Customer ID
+   * @param starshipId - The Starship ID
+   * @param stripeCustomerId - The Stripe Customer ID
+   */
+  async updateStripeCustomer(
+    starshipId: string, 
+    stripeCustomerId: string
+  ): Promise<void> {
+    const connection = getConnection();
+    await connection.executeWrite(
+      `MATCH (s:Starship {id: $id}) 
+       SET s.stripeCustomerId = $customerId,
+           s.updatedAt = datetime()`,
+      { id: starshipId, customerId: stripeCustomerId }
+    );
+  }
+
+  /**
+   * Find Starship by Stripe Customer ID
+   * @param customerId - The Stripe Customer ID
+   */
+  async findByStripeCustomerId(customerId: string): Promise<Starship | null> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ s: Starship }>(
+      'MATCH (s:Starship {stripeCustomerId: $customerId}) RETURN s LIMIT 1',
+      { customerId }
+    );
+    return result[0]?.s || null;
+  }
 }

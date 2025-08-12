@@ -77,14 +77,40 @@ export class MCPToolGatewayDB {
           const containerName = connector.dockerServiceName || `mcp-${connector.id}`;
           let serviceUrl: string;
           
-          if (deploymentConfig.shouldExposePort()) {
+          // First check if we have an internal URL (Kubernetes deployment)
+          if (connector.internalUrl) {
+            // For Kubernetes deployments in development, we need local access
+            // Allocate a port for port-forwarding
+            const allocatedPort = await portAllocator.allocatePort(connector.id);
+            serviceUrl = `http://localhost:${allocatedPort}`;
+            
+            // Extract namespace and service name from internal URL
+            // Format: http://mcp-firecrawl-service.starship-xxx.svc.cluster.local:8080
+            const urlMatch = connector.internalUrl.match(/http:\/\/([^.]+)\.([^.]+)\./);
+            if (urlMatch) {
+              const [, serviceName, namespace] = urlMatch;
+              console.log(`[MCPToolGatewayDB] Setting up port-forward for ${serviceName} in ${namespace} on port ${allocatedPort}`);
+              
+              // Start port-forward in background (non-blocking)
+              exec(`kubectl port-forward -n ${namespace} svc/${serviceName} ${allocatedPort}:8080`, (error) => {
+                if (error) {
+                  console.error(`[MCPToolGatewayDB] Port-forward error:`, error);
+                }
+              });
+              
+              // Give port-forward a moment to establish
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            
+            console.log(`[MCPToolGatewayDB] Using localhost port ${allocatedPort} for Kubernetes service`);
+          } else if (deploymentConfig.shouldExposePort()) {
             // In development, use allocated port
             const allocatedPort = portAllocator.getAllocatedPort(connector.id);
             if (allocatedPort) {
               serviceUrl = `http://localhost:${allocatedPort}`;
               console.log(`[MCPToolGatewayDB] Using allocated port for development: ${serviceUrl}`);
             } else {
-              // Fallback to dynamic detection
+              // Fallback to dynamic detection (for Docker deployments)
               const exposedPort = await this.getExposedPort(containerName, '8080/tcp');
               if (exposedPort) {
                 serviceUrl = `http://localhost:${exposedPort}`;

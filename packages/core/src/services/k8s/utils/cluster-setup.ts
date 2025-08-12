@@ -36,10 +36,35 @@ function commandExists(command: string): boolean {
  * Check if Docker is running
  */
 export function isDockerRunning(): boolean {
+  // Try regular docker command first
   try {
     execSync('docker info', { stdio: 'ignore' });
     return true;
   } catch {
+    // Check common Docker Desktop paths
+    const dockerPaths = [
+      '/Applications/Docker.app/Contents/Resources/bin/docker', // macOS
+      '/usr/local/bin/docker',
+      '/usr/bin/docker',
+      path.join(process.cwd(), '.docker-bin', 'docker'), // Project wrapper
+      path.join(process.cwd(), 'bin', 'docker') // Alternative project wrapper
+    ];
+    
+    for (const dockerPath of dockerPaths) {
+      if (fs.existsSync(dockerPath)) {
+        try {
+          execSync(`"${dockerPath}" info`, { stdio: 'ignore' });
+          // If found, update PATH for subsequent commands
+          const dir = path.dirname(dockerPath);
+          process.env.PATH = `${dir}:${process.env.PATH}`;
+          return true;
+        } catch {
+          // Docker exists but not running
+          continue;
+        }
+      }
+    }
+    
     return false;
   }
 }
@@ -49,6 +74,8 @@ export function isDockerRunning(): boolean {
  */
 export function kindClusterExists(): boolean {
   try {
+    // Ensure Docker is in PATH first
+    isDockerRunning();
     const clusters = execSync('kind get clusters', { encoding: 'utf8' });
     return clusters.includes(CLUSTER_NAME);
   } catch {

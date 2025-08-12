@@ -4,6 +4,20 @@
 
 set -e
 
+# Add project's Docker wrapper to PATH if it exists
+if [ -d "./.docker-bin" ]; then
+    export PATH="$(pwd)/.docker-bin:$PATH"
+fi
+
+# Also add Docker to PATH if it's in common locations
+if [[ "$OSTYPE" == "darwin"* ]] && [ -f "/Applications/Docker.app/Contents/Resources/bin/docker" ]; then
+    export PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH"
+elif [ -f "/usr/local/bin/docker" ]; then
+    export PATH="/usr/local/bin:$PATH"
+elif [ -f "/usr/bin/docker" ]; then
+    export PATH="/usr/bin:$PATH"
+fi
+
 CLUSTER_NAME="starships"
 REGISTRY_NAME="starships-registry"
 REGISTRY_PORT="5001"
@@ -59,19 +73,7 @@ nodes:
   - containerPort: 443
     hostPort: 443
     protocol: TCP
-  extraMounts:
-  - hostPath: ./data
-    containerPath: /data
-    readOnly: false
-    selinuxRelabel: false
-    propagation: Bidirectional
 - role: worker
-  extraMounts:
-  - hostPath: ./data
-    containerPath: /data
-    readOnly: false
-    selinuxRelabel: false
-    propagation: Bidirectional
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry]

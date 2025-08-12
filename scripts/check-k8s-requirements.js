@@ -10,6 +10,15 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Setup Docker PATH automatically
+const { setupDockerPath } = require('./setup-docker-path');
+try {
+  setupDockerPath();
+} catch (e) {
+  // Docker setup will handle its own error messages
+  process.exit(1);
+}
+
 const CLUSTER_NAME = 'starships';
 const REQUIRED_TOOLS = {
   docker: {
@@ -57,6 +66,17 @@ function checkCommand(command) {
     execSync(command, { stdio: 'ignore' });
     return true;
   } catch {
+    // For Docker on macOS, also check the Docker Desktop app path
+    if (command.includes('docker') && os.platform() === 'darwin') {
+      try {
+        const dockerPath = '/Applications/Docker.app/Contents/Resources/bin/docker';
+        const modifiedCommand = command.replace('docker', dockerPath);
+        execSync(modifiedCommand, { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    }
     return false;
   }
 }
@@ -75,6 +95,16 @@ function checkDocker() {
     execSync('docker info', { stdio: 'ignore' });
     return true;
   } catch {
+    // Try with full Docker Desktop path on macOS
+    if (os.platform() === 'darwin') {
+      try {
+        execSync('/Applications/Docker.app/Contents/Resources/bin/docker info', { stdio: 'ignore' });
+        return true;
+      } catch {
+        log('⚠️  Docker is installed but not running. Please start Docker Desktop.', 'yellow');
+        return false;
+      }
+    }
     log('⚠️  Docker is installed but not running. Please start Docker Desktop.', 'yellow');
     return false;
   }
@@ -180,7 +210,12 @@ async function main() {
   log('\n📋 Checking Docker...', 'cyan');
   if (!checkDocker()) {
     const dockerTool = REQUIRED_TOOLS.docker;
-    if (checkCommand('docker --version')) {
+    // On macOS, check the Docker Desktop app path directly
+    const isDockerInstalled = os.platform() === 'darwin' 
+      ? checkCommand('/Applications/Docker.app/Contents/Resources/bin/docker --version')
+      : checkCommand('docker --version');
+    
+    if (isDockerInstalled) {
       log('❌ Docker Desktop is not running', 'red');
       log('   Docker is required for Kubernetes to run locally', 'yellow');
       log('   Please start Docker Desktop and rerun the build', 'yellow');

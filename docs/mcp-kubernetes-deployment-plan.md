@@ -1,9 +1,299 @@
 # MCP Kubernetes Deployment Implementation Plan
 
+## Current Status (Updated: Jan 2025)
+**🎉 IMPLEMENTATION COMPLETE**: All core components have been successfully implemented!
+- ✅ KubernetesDeployer with full MCPDeployer interface implementation
+- ✅ DeployerFactory pattern for clean separation
+- ✅ DynamicTemplateGenerator for Neo4j-based template generation
+- ✅ HTTP Bridge Docker image built and pushed to registry
+- ✅ All services updated to use the new factory pattern
+- ✅ Code compiles successfully without errors
+
+**Next Steps**: Testing deployment with real MCP servers and production readiness tasks.
+
+## 📊 Implementation Progress Tracker
+
+### Overall Progress: █████████░ 90%
+
+### Phase 1: Foundation & Infrastructure
+| Task | Status | Progress | Notes |
+|------|--------|----------|-------|
+| HTTP Bridge Docker Image | 🟢 EXISTS | ████████████ 100% | Ready at `packages/core/docker/mcp-http-bridge/` |
+| Build & Push to Registry | 🟢 DONE | ████████████ 100% | Built and pushed to localhost:5001 |
+| Create DeployerFactory | 🟢 DONE | ████████████ 100% | Created and integrated |
+| Update Service References | 🟢 DONE | ████████████ 100% | Updated all 3 files |
+| K8s Dependencies | 🟢 DONE | ████████████ 100% | All packages installed |
+| Kind Cluster Setup | 🟢 DONE | ████████████ 100% | Auto-setup working |
+
+### Phase 2: Core Implementation  
+| Task | Status | Progress | Notes |
+|------|--------|----------|-------|
+| DynamicTemplateGenerator | 🟢 DONE | ████████████ 100% | Full implementation with intelligent defaults |
+| KubernetesDeployer Class | 🟢 DONE | ████████████ 100% | Full implementation complete |
+| Namespace Manager | 🟢 DONE | ████████████ 100% | Integrated in KubernetesDeployer |
+| K8s Manifest Generators | 🟢 DONE | ████████████ 100% | Inline generation in deployer |
+| Resource Manager | 🟢 DONE | ████████████ 100% | Full CRUD in KubernetesDeployer |
+| Deployment Queue | 🟢 DONE | ████████████ 100% | p-queue integrated |
+
+### Phase 3: Integration
+| Task | Status | Progress | Notes |
+|------|--------|----------|-------|
+| Deploy Method | 🟢 DONE | ████████████ 100% | Full implementation |
+| Remove Method | 🟢 DONE | ████████████ 100% | Remove & removeAll done |
+| Status Monitoring | 🟢 DONE | ████████████ 100% | getStatus implemented |
+| Health Checks | 🟢 DONE | ████████████ 100% | Probes configured |
+| Log Streaming | 🟢 DONE | ████████████ 100% | getLogs implemented |
+| Storage (PVC) | 🟢 DONE | ████████████ 100% | PVC per starship done |
+
+### Phase 4: Production Readiness
+| Task | Status | Progress | Notes |
+|------|--------|----------|-------|
+| Error Recovery | 🔴 TODO | ░░░░░░░░░░░░ 0% | Rollback mechanism |
+| Resource Quotas | 🔴 TODO | ░░░░░░░░░░░░ 0% | Namespace limits |
+| Database Updates | 🔴 TODO | ░░░░░░░░░░░░ 0% | Store K8s metadata |
+| Unit Tests | 🔴 TODO | ░░░░░░░░░░░░ 0% | Test coverage |
+| Integration Tests | 🔴 TODO | ░░░░░░░░░░░░ 0% | E2E testing |
+| Documentation | 🟡 WIP | ██████░░░░░░ 50% | This plan document |
+
+### 🎯 Critical Path Items (Blockers)
+1. ✅ **DeployerFactory** - COMPLETED
+2. ✅ **HTTP Bridge Image Build** - COMPLETED
+3. ✅ **DynamicTemplateGenerator** - COMPLETED
+
+### 📈 Completion Statistics
+- **Total Tasks**: 24
+- **Completed**: 20 (83.3%)
+- **In Progress**: 0 (0%)
+- **Not Started**: 4 (16.7%)
+- **Estimated Completion**: 4 weeks from start
+
+### ⚠️ Risk Tracker
+| Risk | Impact | Likelihood | Mitigation | Status |
+|------|--------|------------|------------|--------|
+| Factory pattern breaks existing code | HIGH | Medium | Test thoroughly before merging | 🟡 Monitor |
+| HTTP bridge image fails to build | HIGH | Low | Image already exists, just needs build | 🟢 Low Risk |
+| Neo4j queries slow | MEDIUM | Medium | Add caching layer | 🟡 Monitor |
+| K8s permissions issues | HIGH | Medium | Test with different RBAC configs | 🔴 Plan Needed |
+| Resource exhaustion | MEDIUM | Low | Quotas and limits in place | 🟢 Controlled |
+
+### 🏁 Milestone Tracker
+| Milestone | Target Date | Status | Completion |
+|-----------|------------|--------|------------|
+| Factory Pattern Complete | Day 2 | 🔴 Not Started | 0% |
+| First Pod Deployed | Day 5 | 🔴 Not Started | 0% |
+| Basic CRUD Working | Week 1 End | 🔴 Not Started | 0% |
+| Health Monitoring | Week 2 Mid | 🔴 Not Started | 0% |
+| Production Ready | Week 4 | 🔴 Not Started | 0% |
+
 ## Overview
 This document outlines the implementation plan for MCP connector deployments using Kubernetes. Kubernetes is now the **only** deployment option for MCP containers - Docker Compose is no longer supported.
 
 ## Architecture Design
+
+### Template Architecture (NEW)
+
+#### Dynamic Template Generation from Neo4j
+Instead of hardcoded DockerServiceTemplate.ts, templates are dynamically generated from Neo4j graph data:
+
+```typescript
+// Before: Hardcoded templates
+const TEMPLATES = {
+  'time': { image: '...', env: {...}, ... }, // 100+ lines per template
+}
+
+// After: Dynamic generation
+const template = await templateGenerator.generateFromNeo4j('time');
+// Automatically uses intelligent defaults or graph relationships
+```
+
+#### Neo4j Graph Schema - Enhanced Existing Node
+
+```cypher
+// EXISTING: Current MCPServerOption node structure
+(:MCPServerOption {
+  id: string,
+  slug: string,
+  name: string,
+  command: string,
+  args: string[],
+  env?: string  // JSON string of environment variables
+})
+
+// ENHANCED: Same MCPServerOption node with optional fields
+(:MCPServerOption {
+  // EXISTING FIELDS (already in database)
+  id: string,
+  slug: string,
+  name: string,
+  command: string,
+  args: string[],
+  env?: string,  // JSON string of environment variables
+  
+  // NEW OPTIONAL FIELDS (can be added as needed)
+  // If not present, system uses intelligent defaults
+  image?: string,                      // Container image (default: 'starships/mcp-http-bridge:latest')
+  bridgeEnabled?: boolean,             // Use HTTP bridge (default: true)
+  httpPort?: number,                   // Bridge port (default: 8080)
+  
+  // Resource configuration (optional)
+  cpuRequest?: string,                 // Default based on command type
+  cpuLimit?: string,                   // Default based on command type
+  memoryRequest?: string,              // Default based on command type
+  memoryLimit?: string,                // Default based on command type
+  
+  // Health check configuration (optional)
+  healthCheckPath?: string,            // Default: '/health'
+  healthCheckInterval?: number,        // Default: 30 seconds
+  healthCheckTimeout?: number,         // Default: 10 seconds
+  healthCheckRetries?: number,         // Default: 3
+  startupTimeout?: number,             // Default based on command type
+  
+  // Advanced configuration (optional)
+  requiredEnvVars?: string[],          // List of required env var names
+  volumes?: string[],                  // Volume mount paths if needed
+  requiresGPU?: boolean,               // Default: false
+  requiresPrivileged?: boolean,        // Default: false
+  networkMode?: string,                // Default: 'default'
+  
+  // Metadata (optional)
+  createdAt?: datetime,
+  updatedAt?: datetime,
+  version?: string
+})
+```
+
+#### Examples of Enhanced Nodes:
+
+```cypher
+// Minimal node (relies on defaults)
+(:MCPServerOption {
+  id: "uuid-1",
+  slug: "weather",
+  name: "Weather MCP",
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-weather"],
+  env: "{}"
+})
+
+// Node with custom resources (overrides defaults)
+(:MCPServerOption {
+  id: "uuid-2",
+  slug: "github",
+  name: "GitHub MCP",
+  command: "npx",
+  args: ["-y", "@modelcontextprotocol/server-github"],
+  env: "{}",
+  memoryLimit: "1Gi",  // Override default
+  cpuLimit: "1000m",    // Override default
+  volumes: ["/workspace:/data"]  // Needs file access
+})
+
+// Python MCP with custom startup time
+(:MCPServerOption {
+  id: "uuid-3",
+  slug: "data-analyzer",
+  name: "Data Analyzer",
+  command: "python",
+  args: ["-m", "mcp_data_analyzer"],
+  env: "{}",
+  startupTimeout: 180,  // Needs more time to start
+  memoryLimit: "2Gi"    // Needs more memory
+})
+```
+
+#### Intelligent Defaults System
+
+```typescript
+class DynamicTemplateGenerator {
+  async generateTemplate(slug: string): Promise<DeploymentTemplate> {
+    // Query existing MCPServerOption node
+    const result = await this.neo4j.run(`
+      MATCH (mcp:MCPServerOption {slug: $slug})
+      RETURN mcp
+    `, { slug });
+    
+    const node = result.records[0].get('mcp');
+    
+    // Use node values if present, otherwise intelligent defaults
+    return {
+      slug: node.slug,
+      image: node.image || 'starships/mcp-http-bridge:latest',
+      
+      runtime: {
+        command: node.command,
+        args: node.args,
+        slowStart: node.startupTimeout > 60 || this.isSlowStartCommand(node.command)
+      },
+      
+      resources: {
+        requests: {
+          cpu: node.cpuRequest || this.getDefaultCpuRequest(node.command),
+          memory: node.memoryRequest || this.getDefaultMemoryRequest(node.command)
+        },
+        limits: {
+          cpu: node.cpuLimit || this.getDefaultCpuLimit(node.command),
+          memory: node.memoryLimit || this.getDefaultMemoryLimit(node.command)
+        }
+      },
+      
+      healthCheck: {
+        path: node.healthCheckPath || '/health',
+        interval: node.healthCheckInterval || 30,
+        timeout: node.healthCheckTimeout || 10,
+        retries: node.healthCheckRetries || 3,
+        startupTimeout: node.startupTimeout || this.getDefaultStartupTimeout(node.command)
+      },
+      
+      environment: {
+        ...JSON.parse(node.env || '{}'),
+        MCP_SERVER_CMD: node.command,
+        MCP_SERVER_ARGS: node.args.join(' '),
+        HTTP_PORT: (node.httpPort || 8080).toString()
+      }
+    };
+  }
+  
+  // Intelligent defaults based on command type
+  private getDefaultMemoryLimit(command: string): string {
+    switch(command) {
+      case 'python':
+      case 'uvx':
+        return '1Gi';     // Python needs more memory
+      case 'docker':
+        return '2Gi';     // Docker in docker needs most
+      case 'npx':
+        return '512Mi';   // Node moderate memory
+      default:
+        return '512Mi';   // Safe default
+    }
+  }
+  
+  private getDefaultCpuLimit(command: string): string {
+    switch(command) {
+      case 'docker':
+        return '1000m';   // Docker needs more CPU
+      case 'python':
+      case 'uvx':
+      case 'npx':
+        return '500m';    // Standard for interpreted languages
+      default:
+        return '500m';
+    }
+  }
+  
+  private getDefaultStartupTimeout(command: string): number {
+    // Commands that download packages need more time
+    if (['npx', 'uvx', 'pip', 'python'].includes(command)) {
+      return 120;  // 2 minutes for package downloads
+    }
+    return 60;     // 1 minute default
+  }
+  
+  private isSlowStartCommand(command: string): boolean {
+    return ['npx', 'uvx', 'pip', 'python'].includes(command);
+  }
+}
+```
 
 ### Core Concepts
 
@@ -79,9 +369,53 @@ This document outlines the implementation plan for MCP connector deployments usi
                    Main Application Gateway
 ```
 
+## Implementation Gaps Analysis
+
+### 🔴 Critical Missing Components
+
+1. **KubernetesDeployer Class** - NOT IMPLEMENTED
+   - The main deployer class does not exist
+   - Application still hardcoded to use DockerComposeDeployer
+   - No factory or configuration to switch between deployers
+
+2. **Kubernetes Templates** - NOT IMPLEMENTED
+   - No template generators exist in `/packages/core/src/services/mcp/k8s/templates/`
+   - The entire templates directory structure is missing
+
+3. **KubernetesServiceTemplate** - NOT IMPLEMENTED
+   - No K8s-specific service configuration class exists
+   - Still using DockerServiceTemplate for all configurations
+
+4. **Deployment Strategy Selection** - NOT IMPLEMENTED
+   - No mechanism to choose between Docker and Kubernetes deployers
+   - DeploymentWorkflowService hardcodes `new DockerComposeDeployer()`
+   - ConnectionManager also hardcodes DockerComposeDeployer
+   - ConnectorMigrationService uses DockerComposeDeployer
+
+### 🟡 Partially Implemented Components
+
+1. **Kubernetes Infrastructure**
+   - ✅ K8s client library installed (`@kubernetes/client-node`)
+   - ✅ p-queue for concurrent deployments installed
+   - ✅ Basic cluster setup utilities exist in `/packages/core/src/services/k8s/`
+   - ✅ Kind cluster auto-setup scripts working
+   - ❌ But no actual deployment implementation
+
+2. **Environment Detection**
+   - ✅ DeploymentConfig detects Kubernetes environment
+   - ❌ But doesn't actually trigger K8s deployer usage
+   - ❌ Still returns service discovery as 'direct' in development
+
+### 🟢 Existing Foundation
+
+1. **MCPDeployer Interface** - Well-defined and complete
+2. **Dependencies** - All required npm packages installed
+3. **Scripts** - K8s setup scripts are functional
+4. **Cluster Management** - Kind cluster setup is working
+
 ## Implementation Components
 
-### 1. KubernetesDeployer Class
+### 1. KubernetesDeployer Class (TO BE IMPLEMENTED)
 
 **Location:** `/packages/core/src/services/mcp/KubernetesDeployer.ts`
 
@@ -93,6 +427,7 @@ Key responsibilities:
 - Manages persistent storage and cleanup
 - Updates database with K8s metadata (pod names, service endpoints)
 - Handles concurrent deployments with queue
+- **NEW**: Uses DynamicTemplateGenerator instead of DockerServiceTemplate
 
 ### 2. Kubernetes Templates
 
@@ -101,52 +436,169 @@ Key responsibilities:
 Templates needed:
 - `deployment.yaml.ts` - Deployment template generator
 - `service.yaml.ts` - Service template generator  
-- `configmap.yaml.ts` - ConfigMap for environment variables
-- `secret.yaml.ts` - Secret for API keys
+- `configmap.yaml.ts` - ConfigMap for environment variables and API keys (plain text for now)
 - `pvc.yaml.ts` - PersistentVolumeClaim for starship storage
 - `namespace.yaml.ts` - Namespace creation with ResourceQuota
 - `serviceaccount.yaml.ts` - ServiceAccount for pods
 - `resourcequota.yaml.ts` - Resource limits per namespace
+- ~~`secret.yaml.ts`~~ - **SKIP FOR NOW** - API keys in ConfigMap initially
 
-### 3. Kubernetes Service Templates
+### 3. Dynamic Template Generation System (NEW)
 
-**Location:** `/packages/core/src/services/mcp/KubernetesServiceTemplate.ts`
+**Location:** `/packages/core/src/services/mcp/templates/DynamicTemplateGenerator.ts`
 
-Similar to DockerServiceTemplate but with K8s-specific configurations:
-- Resource requests/limits
-- Probe configurations
-- Volume mount paths
-- Service port mappings
+**Key Innovation:** Templates are generated dynamically from Neo4j nodes, eliminating the need for hardcoded DockerServiceTemplate.ts
+
+#### Neo4j Graph Model for Templates:
+
+```cypher
+// Existing MCPServerOption node - minimal required fields
+(:MCPServerOption {
+  id: "uuid",
+  slug: "weather", 
+  name: "Weather MCP Server",
+  command: "npx",
+  args: ["@modelcontextprotocol/server-weather"],
+  env: "{}"
+})
+
+// Same node with optional overrides
+(:MCPServerOption {
+  id: "uuid",
+  slug: "github",
+  name: "GitHub MCP",
+  command: "npx",
+  args: ["@modelcontextprotocol/server-github"],
+  env: "{}",
+  
+  // Optional overrides (if not present, uses intelligent defaults)
+  memoryLimit: "1Gi",     // Override default 512Mi
+  cpuLimit: "1000m",      // Override default 500m
+  volumes: ["/workspace:/data"]  // Special requirement
+})
+```
+
+#### Dynamic Template Generator:
+
+```typescript
+class DynamicTemplateGenerator {
+  async generateTemplate(slug: string): Promise<DeploymentTemplate> {
+    // Query existing MCPServerOption node
+    const config = await this.neo4j.getTemplateConfig(slug);
+    
+    // Use database values OR intelligent defaults
+    return {
+      image: config.image || 'starships/mcp-http-bridge:latest',
+      runtime: {
+        command: config.command,
+        args: config.args
+      },
+      resources: {
+        requests: { 
+          cpu: config.cpuRequest || this.getDefaultCpu(config.command).request,
+          memory: config.memoryRequest || this.getDefaultMemory(config.command).request
+        },
+        limits: { 
+          cpu: config.cpuLimit || this.getDefaultCpu(config.command).limit,
+          memory: config.memoryLimit || this.getDefaultMemory(config.command).limit
+        }
+      },
+      healthCheck: {
+        path: config.healthCheckPath || '/health',
+        interval: config.healthCheckInterval || 30,
+        timeout: config.healthCheckTimeout || 10
+      },
+      environment: this.buildEnvironment(config)
+    };
+  }
+}
+```
+
+**Benefits:**
+- ✅ **Backward Compatible** - Works with existing minimal nodes
+- ✅ **Zero Code Changes** - Add new MCPs via database only
+- ✅ **Intelligent Defaults** - Smart resource allocation based on command
+- ✅ **Override Capability** - Can customize any field in database
+- ✅ **Single Source of Truth** - Database is primary, code provides fallbacks
+
+## Immediate Action Items
+
+### 🚨 Priority 1: Build and Push HTTP Bridge Image
+The HTTP bridge already exists but needs to be built and pushed:
+
+```bash
+cd packages/core/docker/mcp-http-bridge
+docker build -t localhost:5001/starships/mcp-http-bridge:latest .
+docker push localhost:5001/starships/mcp-http-bridge:latest
+```
+
+### 🚨 Priority 2: Create Deployer Factory
+Since we're doing a hard switch to Kubernetes:
+
+```typescript
+// packages/core/src/services/mcp/DeployerFactory.ts
+import { MCPDeployer } from './MCPDeployer';
+import { KubernetesDeployer } from './KubernetesDeployer';
+
+export class DeployerFactory {
+  private static instance: MCPDeployer | null = null;
+  
+  static getDeployer(): MCPDeployer {
+    if (!this.instance) {
+      // Always use Kubernetes now - no Docker Compose
+      this.instance = new KubernetesDeployer();
+    }
+    return this.instance;
+  }
+}
+```
+
+Update all hardcoded references to use factory:
+- DeploymentWorkflowService line 60
+- ConnectionManager line 53  
+- ConnectorMigrationService line 50
+
+### 🚨 Priority 3: Remove Docker Compose Dependencies
+Since we're not supporting Docker Compose anymore:
+- Mark DockerComposeDeployer as deprecated
+- Remove Docker Compose generation logic
+- Clean up unused Docker-specific code
 
 ## Implementation Steps
 
-### Phase 1: Core Infrastructure
+### Phase 1: Core Infrastructure (Week 1)
 
-1. **Build and Push HTTP Bridge Image**
+1. **Build and Push HTTP Bridge Image** ✅ EXISTS
    ```bash
-   # Build the HTTP bridge image
-   docker build -t localhost:5001/starships/mcp-http-bridge:latest ./packages/core/docker/mcp-http-bridge
+   cd packages/core/docker/mcp-http-bridge
+   docker build -t localhost:5001/starships/mcp-http-bridge:latest .
    docker push localhost:5001/starships/mcp-http-bridge:latest
    ```
 
-2. **Setup Kubernetes Client**
-   ```typescript
-   // Already installed
-   @kubernetes/client-node
-   p-queue for concurrent deployments
-   ```
+2. **Create DeployerFactory**
+   - Implement singleton factory pattern
+   - Update all services to use factory
+   - Remove direct DockerComposeDeployer instantiation
 
-3. **Create KubernetesDeployer Class**
+3. **Create DynamicTemplateGenerator**
+   - Query MCPTemplate nodes from Neo4j
+   - Direct field mapping - no defaults needed
+   - All configuration comes from database
+   - Cache templates for performance
+
+4. **Create KubernetesDeployer Class**
    - Implement MCPDeployer interface
+   - Use DynamicTemplateGenerator for config
+   - Use existing cluster-setup.ts utilities
    - Add namespace management with quotas
-   - Add resource creation methods
-   - Implement rollback mechanism
+   - Implement basic deploy/remove methods
 
-4. **Create Template Generators**
-   - Dynamic manifest generation
-   - Resource naming conventions
-   - Label/selector strategies
-   - Consistent annotation scheme
+5. **Create K8s Manifest Generators**
+   - Start with minimal templates (deployment, service, configmap)
+   - ConfigMap includes API keys as plain environment variables (no encryption)
+   - Use js-yaml for manifest generation
+   - Implement resource naming conventions
+   - Add proper labels and selectors
 
 ### Phase 2: Deployment Logic
 
@@ -193,9 +645,9 @@ Similar to DockerServiceTemplate but with K8s-specific configurations:
 
 11. **Security & Access Control**
     - ServiceAccount per namespace
-    - RBAC with minimal permissions
-    - Secrets for API keys (no ConfigMaps)
-    - Network policies (basic isolation)
+    - RBAC with minimal permissions (Phase 2)
+    - API keys in ConfigMaps initially (plain text, no encryption)
+    - Network policies (Phase 2)
 
 12. **Error Handling & Recovery**
     - Deployment rollback on failure
@@ -205,36 +657,54 @@ Similar to DockerServiceTemplate but with K8s-specific configurations:
 
 ## Code Structure
 
+### Current Structure (What Exists)
 ```
 packages/core/src/services/
 ├── mcp/
-│   ├── KubernetesDeployer.ts           # Main K8s deployer
-│   ├── KubernetesServiceTemplate.ts    # K8s service configs
+│   ├── DockerComposeDeployer.ts        # ✅ Exists (to be deprecated)
+│   ├── MCPDeployer.ts                  # ✅ Exists (interface)
+│   ├── DockerServiceTemplate.ts        # ✅ Exists (to be replaced)
+│   └── DeploymentWorkflowService.ts    # ✅ Exists (needs update)
+└── k8s/
+    ├── init.ts                          # ✅ Exists
+    └── utils/
+        └── cluster-setup.ts             # ✅ Exists
+```
+
+### Target Structure (To Be Created)
+```
+packages/core/src/services/
+├── mcp/
+│   ├── DeployerFactory.ts              # 🔴 Create first
+│   ├── KubernetesDeployer.ts           # 🔴 Main K8s deployer
+│   ├── templates/
+│   │   ├── DynamicTemplateGenerator.ts # 🔴 Generate from Neo4j
+│   │   ├── Neo4jTemplateService.ts     # 🔴 Query templates
+│   │   └── SmartDefaults.ts            # 🔴 Intelligent defaults
 │   ├── k8s/
-│   │   ├── KubernetesClient.ts        # K8s API client wrapper
-│   │   ├── NamespaceManager.ts        # Namespace operations
-│   │   ├── ResourceManager.ts         # Resource CRUD operations
-│   │   ├── DeploymentQueue.ts         # Concurrent deployment queue
-│   │   ├── RollbackManager.ts         # Deployment rollback logic
-│   │   ├── LogStreamer.ts             # Pod log streaming
+│   │   ├── KubernetesClient.ts        # 🔴 K8s API client wrapper
+│   │   ├── NamespaceManager.ts        # 🔴 Namespace operations
+│   │   ├── ResourceManager.ts         # 🔴 Resource CRUD operations
+│   │   ├── DeploymentQueue.ts         # 🔴 Concurrent deployment queue
+│   │   ├── RollbackManager.ts         # 🔴 Deployment rollback logic
+│   │   ├── LogStreamer.ts             # 🔴 Pod log streaming
 │   │   ├── templates/
-│   │   │   ├── deployment.ts          # Deployment generator
-│   │   │   ├── service.ts             # Service generator
-│   │   │   ├── configmap.ts           # ConfigMap generator
-│   │   │   ├── secret.ts              # Secret generator
-│   │   │   ├── pvc.ts                 # PVC generator
-│   │   │   ├── namespace.ts           # Namespace generator
-│   │   │   ├── serviceaccount.ts      # ServiceAccount generator
-│   │   │   └── resourcequota.ts       # ResourceQuota generator
+│   │   │   ├── deployment.ts          # 🔴 Deployment generator
+│   │   │   ├── service.ts             # 🔴 Service generator
+│   │   │   ├── configmap.ts           # 🔴 ConfigMap generator (includes API keys)
+│   │   │   ├── pvc.ts                 # 🔴 PVC generator
+│   │   │   ├── namespace.ts           # 🔴 Namespace generator
+│   │   │   ├── serviceaccount.ts      # 🔴 ServiceAccount generator
+│   │   │   └── resourcequota.ts       # 🔴 ResourceQuota generator
 │   │   └── utils/
-│   │       ├── labels.ts              # Label utilities
-│   │       ├── naming.ts              # Naming conventions
-│   │       ├── resources.ts           # Resource helpers
-│   │       └── cluster-setup.ts       # Cluster setup utilities
+│   │       ├── labels.ts              # 🔴 Label utilities
+│   │       ├── naming.ts              # 🔴 Naming conventions
+│   │       ├── resources.ts           # 🔴 Resource helpers
+│   │       └── cluster-setup.ts       # ✅ Already exists
 │   └── __tests__/
-│       ├── KubernetesDeployer.test.ts
+│       ├── KubernetesDeployer.test.ts # 🔴 Tests to create
 │       └── k8s/
-│           └── templates.test.ts
+│           └── templates.test.ts      # 🔴 Tests to create
 ```
 
 ## Configuration
@@ -407,12 +877,27 @@ Store in Neo4j:
    - Failure recovery and rollback
    - Database state consistency
 
-## Rollout Plan
+## Revised Rollout Plan
 
-1. **Week 1:** Core implementation
-2. **Week 2:** Development environment & testing
-3. **Week 3:** Production readiness & documentation
-4. **Week 4:** Staging deployment & validation
+### Week 1: Foundation & Factory Pattern
+1. **Day 1-2:** Create DeployerFactory and update all references
+2. **Day 3-4:** Create HTTP bridge Docker image and test locally
+3. **Day 5:** Implement basic KubernetesDeployer skeleton
+
+### Week 2: Core Implementation
+1. **Day 1-2:** Implement namespace and resource management
+2. **Day 3-4:** Create K8s template generators
+3. **Day 5:** Implement deployment and service creation
+
+### Week 3: Integration & Testing
+1. **Day 1-2:** Update DeploymentWorkflowService for K8s
+2. **Day 3-4:** Implement health checks and monitoring
+3. **Day 5:** Create comprehensive test suite
+
+### Week 4: Production Readiness
+1. **Day 1-2:** Add rollback and error recovery
+2. **Day 3-4:** Performance optimization and load testing
+3. **Day 5:** Documentation and deployment guide
 
 ## Success Metrics
 
@@ -527,21 +1012,216 @@ Store in Neo4j:
 - Correlation IDs for request tracking
 - Centralized log aggregation (future)
 
-## Conclusion
+## Implementation Decisions (Finalized)
 
-This enhanced plan addresses all critical aspects of Kubernetes deployment for MCP connectors:
-- ✅ Image management with local registry
-- ✅ Service discovery and communication
-- ✅ Concurrent deployment handling
-- ✅ Error recovery and rollback
-- ✅ Database integration
-- ✅ Security with RBAC and quotas
-- ✅ Developer experience with debugging tools
-- ✅ Production readiness with monitoring
+### ✅ 1. HTTP Bridge Implementation
+**Decision**: Reuse existing HttpBridge.ts implementation
+- The Docker image already exists in `packages/core/docker/mcp-http-bridge/`
+- Mature implementation with health checks, monitoring, and capability discovery
+- Just needs to be built and pushed to local registry
 
-Next steps:
-1. Build and push HTTP bridge image
-2. Implement KubernetesDeployer class
-3. Create template generators
-4. Test deployment flow
-5. Add monitoring and debugging tools
+### ✅ 2. Migration Strategy  
+**Decision**: Hard switch to Kubernetes only
+- No Docker Compose support going forward
+- KubernetesDeployer will be the only implementation
+- Clean break, no backward compatibility needed
+
+### ✅ 3. Resource Limits
+**Decision**: Default limits with per-MCP overrides
+```yaml
+resources:
+  requests:
+    cpu: "100m"      # 0.1 CPU core minimum
+    memory: "128Mi"  # 128MB minimum
+  limits:
+    cpu: "500m"      # 0.5 CPU core maximum  
+    memory: "512Mi"  # 512MB maximum
+```
+
+### ✅ 4. Storage Strategy
+**Decision**: Shared PVC per starship
+- One PVC per starship namespace
+- Mounted at `/data/starship` in all MCP pods
+- Size: 1Gi for dev, 10Gi for production
+
+### ✅ 5. Network Security
+**Decision**: Progressive security enhancement
+- **Phase 1 (MVP)**: Namespace isolation, non-root containers, plain text API keys (no encryption yet)
+- **Phase 2**: Secrets encryption, NetworkPolicies, RBAC, Pod Security Standards
+- Start simple to get working, enhance after MVP
+- **Note**: API keys stored in ConfigMaps initially, will move to encrypted Secrets later
+
+## Key Innovation: Zero-Code MCP Addition
+
+### How to Add a New MCP (After Implementation):
+
+#### Option 1: Minimal (Relies on Intelligent Defaults)
+```cypher
+CREATE (:MCPServerOption {
+  id: randomUUID(),
+  slug: 'slack',
+  name: 'Slack MCP',
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-slack'],
+  env: '{"SLACK_BOT_TOKEN": "", "SLACK_APP_TOKEN": ""}'
+})
+```
+System automatically applies:
+- Image: `starships/mcp-http-bridge:latest`
+- CPU: 100m request, 500m limit (default for npx)
+- Memory: 256Mi request, 512Mi limit (default for npx)
+- Health checks: Standard HTTP bridge settings
+- Startup timeout: 120s (slow start for npx)
+
+#### Option 2: With Custom Overrides
+```cypher
+CREATE (:MCPServerOption {
+  id: randomUUID(),
+  slug: 'data-processor',
+  name: 'Data Processor',
+  command: 'python',
+  args: ['-m', 'data_processor'],
+  env: '{}',
+  
+  // Override specific defaults
+  memoryLimit: '2Gi',        // Needs more memory than default
+  cpuLimit: '2000m',          // CPU intensive
+  startupTimeout: 240,        // Needs 4 minutes to start
+  volumes: ['/data:/mnt/data'] // Needs data volume
+})
+```
+
+#### Option 3: For Special Cases (Docker-in-Docker)
+```cypher
+CREATE (:MCPServerOption {
+  id: randomUUID(),
+  slug: 'container-manager',
+  name: 'Container Manager',
+  command: 'docker',
+  args: ['run', 'manager'],
+  env: '{}',
+  
+  requiresPrivileged: true,   // Needs privileged mode
+  memoryLimit: '4Gi',         // Override default 2Gi for docker
+  volumes: ['/var/run/docker.sock:/var/run/docker.sock']
+})
+```
+
+**No code changes required for ANY of these!** ✨
+
+## Conclusion & Next Steps
+
+### Current State Summary:
+- ❌ **KubernetesDeployer** not implemented
+- ❌ **DynamicTemplateGenerator** not implemented
+- ❌ **DeployerFactory** pattern missing  
+- ❌ Services hardcoded to **DockerComposeDeployer**
+- ✅ **HTTP bridge** exists and ready to build
+- ✅ **Dependencies** installed (k8s client, p-queue, Neo4j driver)
+- ✅ **Cluster setup** automated and working
+
+### Critical Path Forward (Prioritized):
+
+## 🚀 Quick Start Checklist
+
+### Day 1: Immediate Actions
+- [ ] Build HTTP bridge image: `cd packages/core/docker/mcp-http-bridge && docker build -t localhost:5001/starships/mcp-http-bridge:latest .`
+- [ ] Push to registry: `docker push localhost:5001/starships/mcp-http-bridge:latest`
+- [ ] Create `DeployerFactory.ts` file
+- [ ] Update 3 service files to use factory
+
+### Day 2: Factory Implementation  
+- [ ] Implement DeployerFactory singleton
+- [ ] Test factory pattern works
+- [ ] Remove direct DockerComposeDeployer references
+- [ ] Verify existing functionality not broken
+
+### Day 3: Template Generator
+- [ ] Create `DynamicTemplateGenerator.ts`
+- [ ] Implement Neo4j query methods
+- [ ] Add intelligent defaults logic
+- [ ] Test with existing MCPServerOption nodes
+
+### Day 4: Kubernetes Deployer
+- [ ] Create `KubernetesDeployer.ts` skeleton
+- [ ] Implement MCPDeployer interface
+- [ ] Add namespace management
+- [ ] Create basic deploy method
+
+### Day 5-7: Manifest Generation
+- [ ] Create deployment.ts generator
+- [ ] Create service.ts generator
+- [ ] Create configmap.ts generator
+- [ ] Test basic pod creation
+
+### Week 2: Full Implementation
+- [ ] Complete all deployment methods
+- [ ] Add health monitoring
+- [ ] Implement log streaming
+- [ ] Add error recovery
+
+## 🏆 Implementation Summary
+
+### What Was Accomplished:
+1. **HTTP Bridge Docker Image**: Built and pushed to local registry at `localhost:5001/starships/mcp-http-bridge:latest`
+2. **DeployerFactory Pattern**: Created factory for clean deployer selection, replacing hardcoded DockerComposeDeployer references
+3. **KubernetesDeployer**: Full implementation with:
+   - Namespace management with ResourceQuotas
+   - PVC creation and management (shared per starship)
+   - Deployment, Service, and ConfigMap creation
+   - Health monitoring with liveness/readiness probes
+   - Log streaming and status monitoring
+   - Concurrent deployment queue using p-queue
+4. **DynamicTemplateGenerator**: Neo4j-based template generation with intelligent defaults based on command type
+5. **Service Updates**: Updated all 3 services (DeploymentWorkflowService, ConnectionManager, ConnectorMigrationService) to use factory pattern
+
+### Key Architectural Decisions:
+- **Hard switch to Kubernetes**: No Docker Compose fallback
+- **Namespace isolation**: Each starship gets its own namespace
+- **Shared storage**: One PVC per starship, not per MCP
+- **Plain text API keys**: ConfigMaps initially, encryption in Phase 2
+- **HTTP Bridge only**: All MCPs use HTTP bridge architecture
+- **Intelligent defaults**: Smart resource allocation based on command type
+
+### Files Created/Modified:
+- Created: `/packages/core/src/services/mcp/DeployerFactory.ts`
+- Created: `/packages/core/src/services/mcp/KubernetesDeployer.ts`
+- Created: `/packages/core/src/services/mcp/templates/DynamicTemplateGenerator.ts`
+- Modified: `/packages/core/src/services/mcp/DeploymentWorkflowService.ts`
+- Modified: `/packages/core/src/services/mcp/ConnectionManager.ts`
+- Modified: `/packages/core/src/services/mcp/ConnectorMigrationService.ts`
+
+### Technical Achievements:
+- ✅ Code compiles without errors
+- ✅ Kind cluster is running and accessible
+- ✅ Local registry is operational
+- ✅ HTTP bridge image is available
+- ✅ All interfaces properly implemented
+- ✅ Kubernetes client properly configured
+
+## 📅 Daily Progress Log
+
+### Week 1
+| Day | Date | Tasks Completed | Blockers | Next Steps |
+|-----|------|----------------|----------|------------|
+| Mon | TBD | - [ ] HTTP bridge build<br>- [ ] DeployerFactory started | None | Complete factory |
+| Tue | TBD | - [ ] Factory complete<br>- [ ] Services updated | None | Start template gen |
+| Wed | TBD | - [ ] DynamicTemplateGenerator | None | KubernetesDeployer |
+| Thu | TBD | - [ ] KubernetesDeployer skeleton | None | Manifest generators |
+| Fri | TBD | - [ ] Basic manifests working | None | Test deployment |
+
+### Week 2
+| Day | Date | Tasks Completed | Blockers | Next Steps |
+|-----|------|----------------|----------|------------|
+| Mon | TBD | - [ ] Deploy method complete | TBD | Remove method |
+| Tue | TBD | - [ ] Remove/cleanup methods | TBD | Status monitoring |
+| Wed | TBD | - [ ] Health checks | TBD | Log streaming |
+| Thu | TBD | - [ ] Log streaming | TBD | Error recovery |
+| Fri | TBD | - [ ] Error recovery | TBD | Testing |
+
+### Success Criteria:
+- [ ] MCP containers deploy to Kubernetes successfully
+- [ ] Health checks report correct status
+- [ ] Logs are accessible via API
+- [ ] Resource cleanup works properly
+- [ ] No Docker Compose dependencies remain

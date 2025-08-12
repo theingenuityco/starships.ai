@@ -11,6 +11,9 @@ import {
   Command,
   CheckCircle2,
   Bell,
+  CreditCard,
+  AlertTriangle,
+  XCircle,
 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
@@ -27,6 +30,8 @@ import {
 import { useStarshipStore } from '@/store/starship-store'
 import { cn } from '@/lib/utils'
 import type { Starship } from '@/lib/api'
+import api from '@/lib/api'
+import { toast } from 'sonner'
 
 interface StarshipCardProps {
   starship: Starship
@@ -126,6 +131,32 @@ export function StarshipCard({
     router.push(`/ship/${starship.slug}/command-deck`)
   }
 
+  const handleRetryPayment = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const response = await api.post(`/api/starships/${starship.id}/retry-payment`)
+      if (response.data.checkoutUrl) {
+        window.location.href = response.data.checkoutUrl
+      }
+    } catch (error) {
+      console.error('Failed to retry payment:', error)
+      toast.error('Failed to create checkout session')
+    }
+  }
+
+  const handleManageSubscription = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const response = await api.post(`/api/starships/${starship.id}/billing-portal`)
+      if (response.data.url) {
+        window.location.href = response.data.url
+      }
+    } catch (error) {
+      console.error('Failed to open billing portal:', error)
+      toast.error('Failed to open billing portal')
+    }
+  }
+
   return (
     <motion.div
       whileHover={{ scale: 1.01, y: -1 }}
@@ -160,12 +191,18 @@ export function StarshipCard({
                   variant="outline"
                   className={cn(
                     'mt-1 text-[10px] px-1.5 py-0.5 h-5',
-                    starship.status === 'active'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-slate-50 text-slate-700 border-slate-200'
+                    starship.status === 'active' && 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    starship.status === 'inactive' && 'bg-slate-50 text-slate-700 border-slate-200',
+                    starship.status === 'pending_payment' && 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                    starship.status === 'restricted' && 'bg-orange-50 text-orange-700 border-orange-200',
+                    starship.status === 'disabled' && 'bg-red-50 text-red-700 border-red-200'
                   )}
                 >
-                  {starship.status === 'active' ? 'Active' : 'Inactive'}
+                  {starship.status === 'active' && 'Active'}
+                  {starship.status === 'inactive' && 'Inactive'}
+                  {starship.status === 'pending_payment' && 'Payment Required'}
+                  {starship.status === 'restricted' && 'Payment Issue'}
+                  {starship.status === 'disabled' && 'Subscription Ended'}
                 </Badge>
               </div>
             </div>
@@ -208,6 +245,34 @@ export function StarshipCard({
                     <Activity className="w-4 h-4 mr-2" />
                     Change Status
                   </DropdownMenuItem>
+                  
+                  {/* Payment-related actions */}
+                  {starship.status === 'pending_payment' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleRetryPayment}
+                        className="text-yellow-600"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Complete Payment
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  
+                  {(starship.status === 'restricted' || starship.status === 'disabled') && starship.plan !== 'scout' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={handleManageSubscription}
+                        className="text-orange-600"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Update Payment
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={e => {
@@ -233,8 +298,65 @@ export function StarshipCard({
         </CardHeader>
 
         <CardContent className="pt-3 relative flex-1 flex flex-col justify-between">
+          {/* Payment Required Banner */}
+          {starship.status === 'pending_payment' && (
+            <div className="absolute inset-x-0 top-0 bg-yellow-100/90 border-b border-yellow-200 p-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-yellow-700" />
+                <span className="text-xs font-medium text-yellow-800">Payment required to activate</span>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="h-6 px-2 text-xs text-yellow-700 hover:text-yellow-800"
+                onClick={handleRetryPayment}
+              >
+                Pay Now
+              </Button>
+            </div>
+          )}
+          
+          {/* Payment Issue Banner */}
+          {(starship.status === 'restricted' || starship.status === 'disabled') && starship.plan !== 'scout' && (
+            <div className={cn(
+              "absolute inset-x-0 top-0 p-2 flex items-center justify-between",
+              starship.status === 'restricted' && "bg-orange-100/90 border-b border-orange-200",
+              starship.status === 'disabled' && "bg-red-100/90 border-b border-red-200"
+            )}>
+              <div className="flex items-center gap-2">
+                {starship.status === 'restricted' ? (
+                  <AlertTriangle className="w-4 h-4 text-orange-700" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-700" />
+                )}
+                <span className={cn(
+                  "text-xs font-medium",
+                  starship.status === 'restricted' && "text-orange-800",
+                  starship.status === 'disabled' && "text-red-800"
+                )}>
+                  {starship.status === 'restricted' ? 'Payment issue' : 'Subscription ended'}
+                </span>
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className={cn(
+                  "h-6 px-2 text-xs",
+                  starship.status === 'restricted' && "text-orange-700 hover:text-orange-800",
+                  starship.status === 'disabled' && "text-red-700 hover:text-red-800"
+                )}
+                onClick={handleManageSubscription}
+              >
+                Fix Now
+              </Button>
+            </div>
+          )}
+          
           {/* Agent Deployment */}
-          <div className="flex items-center">
+          <div className={cn(
+            "flex items-center",
+            (starship.status === 'pending_payment' || starship.status === 'restricted' || starship.status === 'disabled') && starship.plan !== 'scout' && "mt-10"
+          )}>
             <div className="relative flex items-center">
               {/* Stacked avatars */}
               {Array.from({ length: Math.min(3, deployedAgents.length) }).map((_, i) => (

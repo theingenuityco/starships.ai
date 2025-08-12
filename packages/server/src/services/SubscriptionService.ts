@@ -89,6 +89,58 @@ export class SubscriptionService {
     return session.url!;
   }
 
+  // Create checkout session for existing starship
+  async createCheckoutSessionForStarship(params: {
+    userId: string;
+    starshipId: string;
+    starshipSlug: string;
+    plan: 'cruiser' | 'draught';
+    billingPeriod: 'monthly' | 'yearly';
+  }): Promise<string> {
+    const customerId = await this.getOrCreateCustomer(params.userId);
+
+    // Get price ID from environment
+    const priceKey = `STRIPE_PRICE_${params.plan.toUpperCase()}_${params.billingPeriod.toUpperCase()}`;
+    const priceId = this.env[priceKey as keyof typeof this.env] as string;
+
+    if (!priceId) {
+      throw new Error(`Price not found for ${params.plan} ${params.billingPeriod}`);
+    }
+
+    // Build URLs - use CLIENT_URL for frontend redirects
+    let baseUrl = process.env.CLIENT_URL;
+    
+    if (!baseUrl) {
+      throw new Error('CLIENT_URL environment variable is required for Stripe checkout');
+    }
+    
+    // Ensure baseUrl has proper scheme and remove trailing slash
+    baseUrl = baseUrl.trim().replace(/\/$/, '');
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = `http://${baseUrl}`;
+    }
+    
+    console.log('[SUBSCRIPTION] Creating checkout for starship:', params.starshipId);
+
+    const session = await this.stripe.checkout.sessions.create({
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      mode: 'subscription',
+      // Redirect to starship-specific page after payment
+      // The vision-chamber is a good landing page for new starships
+      success_url: `${baseUrl}/ship/${params.starshipSlug}/vision-chamber?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/starships/create/cancel`,
+      metadata: {
+        starshipId: params.starshipId, // CRITICAL: Pass starshipId, not name
+        userId: params.userId,
+        plan: params.plan,
+        billingPeriod: params.billingPeriod
+      }
+    });
+
+    return session.url!;
+  }
+
   // Create billing portal session
   async createPortalSession(starshipId: string, userId: string): Promise<string> {
     const starship = await this.starshipRepository.findById(starshipId);

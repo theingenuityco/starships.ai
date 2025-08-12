@@ -179,6 +179,26 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       return;
     }
 
+    // Check Scout plan limit (max 3 starships per user)
+    if (starshipClass === 'scout') {
+      console.log('[STARSHIP-CREATE] Checking Scout plan limit...');
+      const existingStarships = await starshipRepo.findByOwner(userId);
+      const scoutStarships = existingStarships.filter((s: any) => s.class === 'scout');
+      
+      if (scoutStarships.length >= 3) {
+        console.log('[STARSHIP-CREATE] Scout limit reached. User has', scoutStarships.length, 'Scout starships');
+        res.status(403).json({
+          error: 'Scout plan limit reached',
+          details: 'Scout plan allows a maximum of 3 starships. Please upgrade to Cruiser or Draught plan for more starships.',
+          current_count: scoutStarships.length,
+          limit: 3,
+          upgrade_options: ['cruiser', 'draught']
+        });
+        return;
+      }
+      console.log('[STARSHIP-CREATE] Scout limit check passed. User has', scoutStarships.length, 'Scout starships');
+    }
+
     console.log('[STARSHIP-CREATE] Generating unique slug...');
     // Generate unique slug for the starship
     const slug = await starshipRepo.generateUniqueSlug(name, userId);
@@ -213,6 +233,102 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
   } catch (error) {
     console.error('[STARSHIP-CREATE] Error creating starship:', error);
     res.status(500).json({ error: 'Failed to create starship' });
+  }
+});
+
+// POST /api/starships/create-paid - Create starship for paid plan
+// IMPORTANT: Server routes are at /api/, not /api/v1/
+router.post('/starships/create-paid', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { name, plan, billingPeriod } = req.body;
+
+    console.log('[STARSHIP-CREATE-PAID] Starting paid starship creation for user:', userId);
+
+    // Validate required fields
+    if (!name || !plan || !billingPeriod) {
+      res.status(400).json({
+        error: 'Missing required fields',
+        details: 'Name, plan, and billingPeriod are required',
+        required_fields: ['name', 'plan', 'billingPeriod'],
+        provided: { name: !!name, plan: !!plan, billingPeriod: !!billingPeriod }
+      });
+      return;
+    }
+
+    // Validate paid plan only
+    if (!['cruiser', 'draught'].includes(plan)) {
+      res.status(400).json({
+        error: 'Invalid plan',
+        details: 'Plan must be cruiser or draught for paid starships',
+        allowed_values: ['cruiser', 'draught'],
+        provided: plan
+      });
+      return;
+    }
+
+    // Validate billing period
+    if (!['monthly', 'yearly'].includes(billingPeriod)) {
+      res.status(400).json({
+        error: 'Invalid billing period',
+        details: 'Billing period must be monthly or yearly',
+        allowed_values: ['monthly', 'yearly'],
+        provided: billingPeriod
+      });
+      return;
+    }
+
+    console.log('[STARSHIP-CREATE-PAID] Generating unique slug...');
+    const slug = await starshipRepo.generateUniqueSlug(name, userId);
+    console.log('[STARSHIP-CREATE-PAID] Generated slug:', slug);
+
+    console.log('[STARSHIP-CREATE-PAID] Creating starship with pending_payment status...');
+    // Create starship with pending_payment status
+    const starship = await starshipRepo.create({
+      ownerId: userId,
+      name,
+      class: plan, // Plan becomes the class
+      slug,
+      maxActiveExpeditions: plan === 'cruiser' ? 5 : 10,
+      status: 'pending_payment', // CRITICAL: Not active until paid
+      plan, // Store plan for billing
+      billingPeriod // Store billing period
+    });
+    console.log('[STARSHIP-CREATE-PAID] Starship created with ID:', starship.id);
+
+    // CRITICAL: Create empty vision for the starship (REQUIRED for all starships)
+    console.log('[STARSHIP-CREATE-PAID] Creating empty vision...');
+    await visionRepo.create({
+      starshipId: starship.id,
+      statement: '',
+      confidence: 0.5,
+      refinementCount: 0,
+      lastRefined: new Date().toISOString(),
+      isActive: true
+    });
+
+    // Create Stripe checkout session with starshipId
+    console.log('[STARSHIP-CREATE-PAID] Creating Stripe checkout session...');
+    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    
+    const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
+      userId,
+      starshipId: starship.id, // Pass the actual starship ID
+      starshipSlug: starship.slug, // Pass the slug for redirect URL
+      plan,
+      billingPeriod
+    });
+
+    console.log('[STARSHIP-CREATE-PAID] Checkout session created successfully');
+    res.status(201).json({ 
+      starship,
+      checkoutUrl,
+      message: 'Starship created. Redirect to checkout to complete payment.'
+    });
+
+  } catch (error) {
+    console.error('[STARSHIP-CREATE-PAID] Error creating paid starship:', error);
+    res.status(500).json({ error: 'Failed to create paid starship' });
   }
 });
 
@@ -2841,6 +2957,71 @@ router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Res
     res.json({ url: portalUrl });
   } catch (error) {
     handleError(error, res, 'Failed to create billing portal');
+  }
+});
+
+// POST /starships/:id/retry-payment - Retry payment for pending starship
+router.post('/starships/:id/retry-payment', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const starshipId = req.params.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    // Get starship and verify ownership
+    const starship = await starshipRepo.findById(starshipId);
+    
+    if (!starship) {
+      res.status(404).json({ error: 'Starship not found' });
+      return;
+    }
+
+    if (starship.ownerId !== userId) {
+      res.status(403).json({ error: 'Access denied' });
+      return;
+    }
+
+    // Only allow retry for pending_payment status
+    if (starship.status !== 'pending_payment') {
+      res.status(400).json({ 
+        error: 'Invalid status',
+        details: 'Can only retry payment for starships with pending_payment status',
+        currentStatus: starship.status
+      });
+      return;
+    }
+
+    // Verify starship has plan and billing period
+    if (!starship.plan || !starship.billingPeriod) {
+      res.status(400).json({ 
+        error: 'Invalid starship configuration',
+        details: 'Starship is missing plan or billing period'
+      });
+      return;
+    }
+
+    console.log('[RETRY-PAYMENT] Creating new checkout session for starship:', starshipId);
+    
+    // Create new checkout session
+    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
+      userId,
+      starshipId: starship.id,
+      starshipSlug: starship.slug,
+      plan: starship.plan as 'cruiser' | 'draught',
+      billingPeriod: starship.billingPeriod as 'monthly' | 'yearly'
+    });
+
+    res.json({ 
+      checkoutUrl,
+      message: 'New checkout session created. Redirect to complete payment.'
+    });
+
+  } catch (error) {
+    handleError(error, res, 'Failed to create checkout session for retry');
   }
 });
 

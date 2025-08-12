@@ -179,6 +179,26 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
       return;
     }
 
+    // Check Scout plan limit (max 3 starships per user)
+    if (starshipClass === 'scout') {
+      console.log('[STARSHIP-CREATE] Checking Scout plan limit...');
+      const existingStarships = await starshipRepo.findByOwner(userId);
+      const scoutStarships = existingStarships.filter((s: any) => s.class === 'scout');
+      
+      if (scoutStarships.length >= 3) {
+        console.log('[STARSHIP-CREATE] Scout limit reached. User has', scoutStarships.length, 'Scout starships');
+        res.status(403).json({
+          error: 'Scout plan limit reached',
+          details: 'Scout plan allows a maximum of 3 starships. Please upgrade to Cruiser or Draught plan for more starships.',
+          current_count: scoutStarships.length,
+          limit: 3,
+          upgrade_options: ['cruiser', 'draught']
+        });
+        return;
+      }
+      console.log('[STARSHIP-CREATE] Scout limit check passed. User has', scoutStarships.length, 'Scout starships');
+    }
+
     console.log('[STARSHIP-CREATE] Generating unique slug...');
     // Generate unique slug for the starship
     const slug = await starshipRepo.generateUniqueSlug(name, userId);
@@ -2941,7 +2961,7 @@ router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Res
 });
 
 // POST /starships/:id/retry-payment - Retry payment for pending starship
-router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Response) => {
+router.post('/starships/:id/retry-payment', authMiddleware, async (req: Request, res: Response) => {
   try {
     const starshipId = req.params.id;
     const userId = req.user?.id;

@@ -34,6 +34,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { useStarshipStore } from '@/store/starship-store';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { analyzeVisionPreAuth } from '@/lib/sibil/preview-api';
@@ -109,7 +110,7 @@ export function StarshipCreateModalUnified({
   onSuccess,
   isOnboarding = false 
 }: StarshipCreateModalUnifiedProps) {
-  const { createStarship, loading } = useStarshipStore();
+  const { createStarship, loading, starships } = useStarshipStore();
   const { session: hookSession, clearSession, updateStep } = useOnboardingSession();
   const router = useRouter();
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
@@ -290,6 +291,16 @@ export function StarshipCreateModalUnified({
 
     try {
       if (formData.class === 'scout') {
+        // Check Scout limit (max 3 starships)
+        const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
+        if (scoutStarships.length >= 3) {
+          toast.error('Scout plan limit reached', {
+            description: 'You can only create up to 3 Scout starships. Please upgrade to Cruiser or Draught plan for more starships.',
+            duration: 5000,
+          });
+          return;
+        }
+        
         // Free starship - use existing logic with vision if available
         const starshipData: any = {
           name: formData.name,
@@ -568,15 +579,26 @@ export function StarshipCreateModalUnified({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Object.entries(starshipClasses).map(([key, classData]) => {
                 const isRecommended = key === 'cruiser' && visionAnalysis?.recommendedClass === 'cruiser';
+                const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
+                const isScoutLimitReached = key === 'scout' && scoutStarships.length >= 3;
                 
                 return (
                   <Card
                     key={key}
                     className={cn(
                       "cursor-pointer transition-all duration-200 bg-card/50 backdrop-blur-sm border-border/50 h-full",
-                      formData.class === key && "ring-2 ring-primary/50 bg-primary/5"
+                      formData.class === key && "ring-2 ring-primary/50 bg-primary/5",
+                      isScoutLimitReached && "opacity-50 cursor-not-allowed"
                     )}
-                    onClick={() => setFormData({ ...formData, class: key as 'scout' | 'cruiser' | 'draught' })}
+                    onClick={() => {
+                      if (isScoutLimitReached) {
+                        toast.error('Scout limit reached', {
+                          description: 'You already have 3 Scout starships. Upgrade to Cruiser or Draught for more.',
+                        });
+                        return;
+                      }
+                      setFormData({ ...formData, class: key as 'scout' | 'cruiser' | 'draught' })
+                    }}
                   >
                     <CardHeader className="pb-3">
                       <div className="space-y-3">
@@ -585,9 +607,19 @@ export function StarshipCreateModalUnified({
                             <div className="text-2xl">{classData.icon}</div>
                             <div className="flex-1">
                               <CardTitle className="text-lg">{classData.name}</CardTitle>
-                              <Badge variant="outline" className="mt-1">
-                                {classData.maxAgents} Agent Slots
-                              </Badge>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline">
+                                  {classData.maxAgents} Agent Slots
+                                </Badge>
+                                {key === 'scout' && (
+                                  <Badge 
+                                    variant={isScoutLimitReached ? "destructive" : "secondary"}
+                                    className="text-xs"
+                                  >
+                                    {scoutStarships.length}/3 Ships
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
                           {isRecommended && (

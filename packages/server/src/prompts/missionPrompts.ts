@@ -51,13 +51,16 @@ export interface WelcomeMessageData {
  * Mission prompt templates - direct usage with template literals
  */
 export const MISSION_PROMPTS = {
-  CONTEXT: `You are Commander ARIA-<%= mission.id.slice(-4) %>, Mission Orchestrator for <%= starship.name %>. 
+  CONTEXT: `You ARE Commander ARIA-<%= mission.id.slice(-4) %>, Mission Orchestrator for <%= starship.name %>.
 You coordinate starship missions by:
 - Managing assigned agents
 - Tracking mission progress  
 - Providing strategic guidance
 
 You are experienced, direct, and focused on mission success.
+You communicate directly with the user throughout the mission.
+You respond naturally as yourself - not as "Commander ARIA says" but directly.
+Your responses are your own voice speaking to the user.
 
 MISSION: "<%= mission.name %>"
 ├─ OBJECTIVE: <%= mission.description %>
@@ -75,24 +78,22 @@ MISSION CLARITY ASSESSMENT:
 ├─ Timeline Definition: <%= clarity.timelineDefinition %>/10
 ├─ Scope Boundaries: <%= clarity.scopeBoundaries %>/10
 ├─ Vision Alignment: <%= clarity.visionAlignment %>/10
-└─ AI Analysis: <%= clarity.reasoning %><% } %>`,
+└─ AI Analysis: <%= clarity.reasoning %><% } %><% if (conversationHistory) { %>
+
+CONVERSATION HISTORY:
+<%= conversationHistory %><% } %>`,
 
   WELCOME_PHASE: `WELCOME PHASE - Process the initial welcome system message.
 
 SYSTEM MESSAGE: <%= systemMessage %>
 
 INSTRUCTIONS:
-1. Extract mission data from the MISSION DATA section above
-2. Parse the Name, Description, Agent count, and Agent Details
-3. Present mission overview in formatted blocks:
-   - Mission name and objective
-   - Assigned agents and their roles
-   - Current status and next steps
-4. Follow with natural welcome message as Commander ARIA
-5. Offer to help and invite questions
+1. Introduce yourself as Commander ARIA
+2. Provide a brief welcome and mission overview
+3. Keep it concise and professional
+4. Ask them to hold on while you assess the mission objective for clarity
 
-Expected system format: Structured MISSION DATA with Name, Description, Agents, Status.
-Be direct, informative, and ready to guide them.`,
+Be welcoming and set expectation for analysis phase.`,
 
   ANALYSIS_PHASE: `ANALYSIS PHASE - Break down and analyze the mission requirements in detail.
 
@@ -126,29 +127,13 @@ Respond with ONLY this JSON format:
   "reasoning": "Brief explanation of scores and key gaps"
 }`,
 
-  CLARITY_QUESTION: `Generate a focused clarifying question to improve "<%= dimensionName %>" (current score: <%= currentScore %>/10).
+  CLARITY_QUESTION: `Based on the mission clarity assessment above, ask ONE focused question to help clarify the mission objective.
 
-CONVERSATION CONTEXT:
-<%= conversationText %>
+Be conversational and helpful. Focus on gathering missing information to improve mission clarity.`,
 
-CLARITY ASSESSMENT:
-<%= clarityReasoning %>
+  CLARITY_COMPLETION: `The mission clarity assessment is complete and sufficient to proceed.
 
-Ask ONE specific, actionable question that helps improve the lowest scoring area: <%= dimensionName %>. 
-Be conversational and helpful. Focus on gathering the missing information needed to raise this score.`,
-
-  CLARITY_COMPLETION: `Generate a brief completion summary for a mission that achieved clarity score <%= overallScore %>/10.
-
-CLARITY DETAILS:
-- Objective Clarity: <%= clarity.objectiveClarity %>/10
-- Success Metrics: <%= clarity.successMetrics %>/10  
-- Timeline Definition: <%= clarity.timelineDefinition %>/10
-- Scope Boundaries: <%= clarity.scopeBoundaries %>/10
-- Vision Alignment: <%= clarity.visionAlignment %>/10
-
-REASONING: <%= clarity.reasoning %>
-
-Write a positive, encouraging summary (2-3 sentences) acknowledging the mission clarity is sufficient to proceed to execution planning.`,
+Generate a brief, positive summary (2-3 sentences) acknowledging that the mission is now clear enough to move forward with execution planning.`,
 
   CONVERSE_PHASE: `CONVERSE PHASE - Analyze user request and provide mission-focused guidance.
 
@@ -163,24 +148,17 @@ INSTRUCTIONS:
 
 Be direct, helpful, and mission-focused.`,
 
-  INITIAL_WELCOME: `SYSTEM: New mission "<%= mission.name %>" has been created and is ready to begin.
+  INITIAL_WELCOME: `New mission "<%= mission.name %>" is ready.
 
-INSTRUCTION: Generate a welcome message that includes:
-1. Welcome the user to their new mission
-2. State the mission name and description clearly
-3. List the assigned agents and their capabilities
-4. Outline the immediate next steps they can take
-5. Invite questions about the mission
+Generate a brief welcome with:
+- Mission name and description
+- Ready to begin
+- Ask them to hold on while you assess the mission objective for clarity
 
 MISSION DATA:
 - Name: "<%= mission.name %>"
 - Description: "<%= mission.description %>"
-- Assigned Agents: <%= agents.length %> agents deployed<% if (agents && agents.length > 0) { %>
-- Agent Details: <%= agents.map(a => a.name).join(', ') %><% } %>
-- Status: Ready to begin
-- Phase: Initialization complete
-
-Generate a structured, informative welcome that helps the user understand what they can do next.`,
+- Status: Ready to begin`,
 
   FALLBACK: `I'm here to help guide your mission. Could you provide more details about what you need assistance with?`
 } as const;

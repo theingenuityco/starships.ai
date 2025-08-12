@@ -168,6 +168,23 @@ export class MissionOrchestratorAgent {
   }
 
   /**
+   * Create AIMessage with Commander ARIA name
+   */
+  private createAIMessage(content: string, state: MissionChatState): AIMessage {
+    return new AIMessage({ 
+      content,
+      name: `Commander ARIA-${state.missionId.slice(-4)}`
+    });
+  }
+
+  /**
+   * Create HumanMessage
+   */
+  private createHumanMessage(content: string): HumanMessage {
+    return new HumanMessage({ content });
+  }
+
+  /**
    * Build context string from state for use in prompts
    * Now includes clarity data when available
    */
@@ -175,12 +192,16 @@ export class MissionOrchestratorAgent {
     const { metadata, currentPhase, clarity } = state;
     const { mission, starship, vision } = metadata!;
     
+    // Include conversation history using dedicated method
+    const conversationHistory = this.buildConversationHistory(state);
+    
     return renderTemplate(MISSION_PROMPTS.CONTEXT, {
       currentPhase,
       mission,
       starship,
       vision,
-      clarity
+      clarity,
+      conversationHistory
     });
   }
 
@@ -212,8 +233,15 @@ ${welcomePhase}`;
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    const aiMessage = new AIMessage({ content: responseContent });
-    return { messages: [aiMessage] };
+    // After welcome message, transition to analysis phase for clarity assessment
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    await missionRepo.updateMission(state.missionId, { phase: 'analysis' });
+    
+    const aiMessage = this.createAIMessage(responseContent, state);
+    return { 
+      messages: [aiMessage],
+      currentPhase: 'analysis'
+    };
   }
 
   /**
@@ -234,18 +262,17 @@ ${welcomePhase}`;
       const missionRepo = RepositoryFactory.getMissionRepository();
       await missionRepo.updateMission(state.missionId, { phase: 'converse' });
       
-      const summary = await this.generateCompletionSummary(clarity);
+      const summary = await this.generateCompletionSummary(state, clarity);
       return {
         currentPhase: 'converse',
-        messages: [new AIMessage({ content: summary })],
+        messages: [this.createAIMessage(summary, state)],
         clarity
       };
     } else {
       // ASK: Generate next clarifying question using context with clarity data
-      const conversationText = this.buildConversationText(state.messages);
-      const question = await this.generateFocusedQuestion(clarity, conversationText);
+      const question = await this.generateFocusedQuestion(state, clarity);
       return {
-        messages: [new AIMessage({ content: question })],
+        messages: [this.createAIMessage(question, state)],
         clarity // Update state with latest clarity
       };
     }
@@ -271,7 +298,7 @@ ${conversePhase}`;
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    const aiMessage = new AIMessage({ content: responseContent });
+    const aiMessage = this.createAIMessage(responseContent, state);
     return { messages: [aiMessage] };
   }
 
@@ -535,33 +562,21 @@ ${clarityPrompt}`;
   }
 
   /**
-   * Generate focused question based on lowest scoring clarity dimension
+   * Generate focused question based on clarity assessment
    */
-  private async generateFocusedQuestion(clarity: MissionClarity, conversationText: string): Promise<string> {
-    // Find the lowest scoring dimension
-    const dimensions = [
-      { name: 'Objective Clarity', score: clarity.objectiveClarity, key: 'objectiveClarity' },
-      { name: 'Success Metrics', score: clarity.successMetrics, key: 'successMetrics' },
-      { name: 'Timeline Definition', score: clarity.timelineDefinition, key: 'timelineDefinition' },
-      { name: 'Scope Boundaries', score: clarity.scopeBoundaries, key: 'scopeBoundaries' },
-      { name: 'Vision Alignment', score: clarity.visionAlignment, key: 'visionAlignment' }
-    ];
-    
-    const lowestDimension = dimensions.reduce((min, current) => 
-      current.score < min.score ? current : min
-    );
+  private async generateFocusedQuestion(state: MissionChatState, clarity: MissionClarity): Promise<string> {
+    // Build context same as other phases (includes clarity assessment and conversation)
+    const context = this.buildContext(state);
+    const questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {});
 
-    const questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {
-      dimensionName: lowestDimension.name,
-      currentScore: lowestDimension.score,
-      conversationText,
-      clarityReasoning: clarity.reasoning
-    });
+    const systemPrompt = `${context}
+
+${questionPrompt}`;
 
     const prompt: LLMChatPrompt = {
       messages: [{
         role: 'system', 
-        content: questionPrompt
+        content: systemPrompt
       }]
     };
 
@@ -571,16 +586,19 @@ ${clarityPrompt}`;
   /**
    * Generate completion summary when clarity threshold is met
    */
-  private async generateCompletionSummary(clarity: MissionClarity): Promise<string> {
-    const completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {
-      clarity,
-      overallScore: clarity.overallScore.toFixed(1) // Keep formatted version for display
-    });
+  private async generateCompletionSummary(state: MissionChatState, clarity: MissionClarity): Promise<string> {
+    // Build context same as other phases (includes clarity assessment and conversation)
+    const context = this.buildContext(state);
+    const completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {});
+
+    const systemPrompt = `${context}
+
+${completionPrompt}`;
 
     const prompt: LLMChatPrompt = {
       messages: [{
         role: 'system',
-        content: completionPrompt
+        content: systemPrompt
       }]
     };
 
@@ -605,15 +623,38 @@ ${clarityPrompt}`;
   }
 
   /**
-   * Build conversation text from LangChain messages
+   * Build conversation history for context inclusion
+   * Handles filtering, windowing, and formatting for context
    */
-  private buildConversationText(messages: any[]): string {
+  private buildConversationHistory(state: MissionChatState): string {
+    if (state.messages.length === 0) {
+      return '';
+    }
+
+    // Simple windowing - keep last 8 messages to prevent context overflow
+    const recentMessages = state.messages.slice(-8);
+    
+    return this.buildConversationText(recentMessages);
+  }
+
+  /**
+   * Build conversation text from LangChain messages
+   * Simple utility method for formatting messages as text
+   */
+  private buildConversationText(messages: BaseMessage[]): string {
     return messages
       .filter(msg => msg.content && typeof msg.content === 'string')
       .map(msg => {
-        const role = msg instanceof HumanMessage ? 'Human' : 
-                    msg instanceof AIMessage ? 'AI' : 'System';
-        return `${role}: ${msg.content}`;
+        // Use self-ownership language to evoke stronger identity
+        let speaker = '';
+        if (msg instanceof HumanMessage) {
+          speaker = 'User';
+        } else if (msg instanceof AIMessage) {
+          speaker = 'My previous response'; // Creates self-ownership and identity
+        } else {
+          speaker = 'System';
+        }
+        return `${speaker}: ${msg.content}`;
       })
       .join('\n\n');
   }

@@ -7,7 +7,7 @@ import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
 interface UpdateStarshipRequest {
   name?: string;
   status?: 'active' | 'inactive';
-  class?: 'scout' | 'cruiser';
+  class?: 'scout' | 'cruiser' | 'draught';
 }
 
 interface UpdateStarshipStatusRequest {
@@ -17,7 +17,7 @@ interface UpdateStarshipStatusRequest {
 interface StarshipAgentsResponse {
   starshipId: string;
   starshipName: string;
-  starshipClass: 'scout' | 'cruiser';
+  starshipClass: 'scout' | 'cruiser' | 'draught';
   maxAgents: number;
   deployedAgents: Array<{
     id: string;
@@ -37,7 +37,7 @@ interface StarshipAgentsResponse {
     temperature?: number;
     maxTokens?: number;
     customInstructions?: string;
-    allowedStarshipClasses?: ('scout' | 'cruiser')[];
+    allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
     requiredPermissions?: string[];
   }>;
   availableSlots: number;
@@ -84,7 +84,7 @@ interface StarshipState {
   visionError: string | null;
   
   // Legacy fields for backward compatibility (derived from active starship)
-  get class(): 'scout' | 'cruiser';
+  get class(): 'scout' | 'cruiser' | 'draught';
   get powerLevel(): number;
   get activeExpeditions(): number;
   get sibilInsights(): number;
@@ -96,7 +96,7 @@ interface StarshipActions {
   loadUserStarships: () => Promise<void>;
   createStarship: (data: { 
     name: string; 
-    class: 'scout' | 'cruiser';
+    class: 'scout' | 'cruiser' | 'draught';
     vision?: {
       statement: string;
       confidence?: number;
@@ -260,11 +260,15 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               loading: false,
               vision: ''
             });
+            
+            // Return the created starship for navigation
+            return response.starship;
           } catch (error) {
             set({
               error: error instanceof Error ? error.message : 'Failed to create starship',
               loading: false
             });
+            throw error;
           }
         },
 

@@ -46,6 +46,17 @@ export interface ServerEnvironmentConfig {
   
   // MCP Feature Flags
   MCP_HTTP_BRIDGE_ENABLED: boolean;
+  
+  // Stripe Configuration
+  STRIPE_SECRET_KEY: string;
+  STRIPE_PUBLISHABLE_KEY: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  
+  // Stripe Price IDs (populated by setup script)
+  STRIPE_PRICE_CRUISER_MONTHLY?: string;
+  STRIPE_PRICE_CRUISER_YEARLY?: string;
+  STRIPE_PRICE_DRAUGHT_MONTHLY?: string;
+  STRIPE_PRICE_DRAUGHT_YEARLY?: string;
 }
 
 /**

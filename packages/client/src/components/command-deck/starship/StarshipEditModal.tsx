@@ -43,22 +43,41 @@ interface StarshipEditModalProps {
 interface StarshipEditFormData {
   name: string;
   status: 'active' | 'inactive';
-  class: 'scout' | 'cruiser';
+  class: 'scout' | 'cruiser' | 'draught';
 }
 
-const STARSHIP_CLASSES = {
-  scout: {
-    name: 'Scout',
-    icon: '🚀',
-    maxAgents: 3,
-    description: 'Fast and agile, perfect for exploration and reconnaissance missions.'
-  },
-  cruiser: {
-    name: 'Cruiser',
-    icon: '🛸',
-    maxAgents: 6,
-    description: 'Heavy-duty vessel designed for extended missions and team operations.'
-  }
+// Helper functions to maintain UI consistency
+const getClassIcon = (classId: string) => {
+  const icons = {
+    scout: '🚀',
+    cruiser: '🛸', 
+    draught: '🌌'
+  };
+  return icons[classId as keyof typeof icons] || '🚀';
+};
+
+const getClassFeatures = (classId: string) => {
+  const features = {
+    scout: [
+      'Rapid deployment capabilities',
+      'Advanced scanning equipment',
+      'Stealth technology',
+      'Optimal for single-agent operations'
+    ],
+    cruiser: [
+      'Extended operational range',
+      'Enhanced power systems',
+      'Advanced communication arrays',
+      'Ideal for multi-agent coordination'
+    ],
+    draught: [
+      'Unlimited operational range',
+      'Advanced AI coordination systems',
+      'Enterprise security protocols', 
+      'Massive multi-agent orchestration'
+    ]
+  };
+  return features[classId as keyof typeof features] || [];
 };
 
 const STARSHIP_STATUSES = {
@@ -95,6 +114,10 @@ export function StarshipEditModal({
   });
   const [errors, setErrors] = useState<Partial<StarshipEditFormData>>({});
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // New state for API-driven data
+  const [starshipClasses, setStarshipClasses] = useState<Record<string, any>>({});
+  const [classesLoading, setClassesLoading] = useState(true);
 
   const starship = starships.find(s => s.id === starshipId);
 
@@ -128,6 +151,44 @@ export function StarshipEditModal({
       setHasChanges(hasNameChange || hasStatusChange || hasClassChange);
     }
   }, [formData, starship]);
+
+  // Fetch starship classes from API
+  useEffect(() => {
+    async function fetchStarshipData() {
+      try {
+        setClassesLoading(true);
+        // Use proxy endpoint that routes to backend
+        const response = await fetch('/v1/starships/pricing');
+        if (response.ok) {
+          const pricingData = await response.json();
+          
+          // Transform pricing data into starship classes format
+          const classesFromAPI = pricingData.reduce((acc: any, plan: any) => {
+            acc[plan.id] = {
+              name: plan.name,
+              icon: getClassIcon(plan.id),
+              maxAgents: plan.features.maxAgents,
+              description: plan.description,
+              features: getClassFeatures(plan.id)
+            };
+            return acc;
+          }, {});
+          
+          setStarshipClasses(classesFromAPI);
+        }
+      } catch (error) {
+        console.error('Failed to fetch starship data:', error);
+        // No fallbacks - subscription feature must work properly
+        setStarshipClasses({});
+      } finally {
+        setClassesLoading(false);
+      }
+    }
+    
+    if (open) {
+      fetchStarshipData();
+    }
+  }, [open]);
 
   const validateForm = (): boolean => {
     const newErrors: any = {};
@@ -220,7 +281,7 @@ export function StarshipEditModal({
             </CardHeader>
             <CardContent>
               <div className="flex items-center space-x-3">
-                <div className="text-2xl">{STARSHIP_CLASSES[starship.class].icon}</div>
+                <div className="text-2xl">{starshipClasses[starship.class]?.icon || getClassIcon(starship.class)}</div>
                 <div className="flex-1">
                   <div className="font-semibold">{starship.name}</div>
                   <div className="flex items-center space-x-2 mt-1">
@@ -290,31 +351,38 @@ export function StarshipEditModal({
 
             <div className="space-y-2">
               <Label htmlFor="starship-class">Class</Label>
-              <Select
-                value={formData.class}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, class: value as 'scout' | 'cruiser' })
-                }
-              >
-                <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50">
-                  <SelectValue placeholder="Select class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STARSHIP_CLASSES).map(([key, classData]) => (
-                    <SelectItem key={key} value={key}>
-                      <div className="flex items-center space-x-2">
-                        <span>{classData.icon}</span>
-                        <span>{classData.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({classData.maxAgents} agents)
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+{classesLoading ? (
+                <div className="flex items-center justify-center py-2">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <span className="text-sm text-muted-foreground">Loading classes...</span>
+                </div>
+              ) : (
+                <Select
+                  value={formData.class}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, class: value as 'scout' | 'cruiser' | 'draught' })
+                  }
+                >
+                  <SelectTrigger className="bg-background/50 backdrop-blur-sm border-border/50">
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(starshipClasses).map(([key, classData]) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center space-x-2">
+                          <span>{classData.icon}</span>
+                          <span>{classData.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({classData.maxAgents} agents)
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <p className="text-xs text-muted-foreground">
-                {STARSHIP_CLASSES[formData.class].description}
+                {starshipClasses[formData.class]?.description}
               </p>
             </div>
 
@@ -332,7 +400,7 @@ export function StarshipEditModal({
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center space-x-3">
-                    <div className="text-2xl">{STARSHIP_CLASSES[formData.class].icon}</div>
+                    <div className="text-2xl">{starshipClasses[formData.class]?.icon || getClassIcon(formData.class)}</div>
                     <div className="flex-1">
                       <div className="font-semibold">{formData.name}</div>
                       <div className="flex items-center space-x-2 mt-1">

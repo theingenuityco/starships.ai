@@ -127,4 +127,33 @@ export class UserRepository implements UserRepositoryInterface {
       { userId: userId, channelId: channelId, joinedAt: new Date().toISOString(), role: role }
     );
   }
+
+  // Stripe integration methods
+  async findByStripeCustomerId(stripeCustomerId: string): Promise<User | null> {
+    try {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ user: User }>(
+        `MATCH (user:User {stripeCustomerId: $stripeCustomerId})
+         RETURN user`,
+        { stripeCustomerId }
+      );
+      
+      return result[0]?.user || null;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async updateStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
+    try {
+      const connection = getConnection();
+      await connection.executeWrite(
+        `MATCH (user:User {id: $userId})
+         SET user.stripeCustomerId = $stripeCustomerId`,
+        { userId, stripeCustomerId }
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
 } 

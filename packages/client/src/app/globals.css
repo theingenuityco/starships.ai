@@ -342,6 +342,31 @@
     scrollbar-width: none;  /* Firefox */
   }
 
+  /* Animation delay utility for staggered animations */
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  /* Smoother, slower ping animation for info button */
+  @keyframes ping-slow {
+    0% {
+      transform: scale(1);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 0.2;
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+    }
+  }
+
+  .animate-ping-slow {
+    animation: ping-slow 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
   /* Gradient animation for landing page */
   @keyframes gradient {
     0% {

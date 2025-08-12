@@ -16,8 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useStarshipStore } from '@/store/starship-store';
 import { StarshipCard } from './StarshipCard';
-import { StarshipCreateModal } from './StarshipCreateModal';
-import { StarshipCreateModalEnhanced } from './StarshipCreateModalEnhanced';
+import { StarshipCreateModalUnified } from './StarshipCreateModalUnified';
 import { StarshipEditModal } from './StarshipEditModal';
 import { StarshipDeleteDialog } from './StarshipDeleteDialog';
 import { StarshipStatusManager } from './StarshipStatusManager';
@@ -517,20 +516,12 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
       </div>
 
       {/* Modals */}
-      {autoOpenCreate ? (
-        <StarshipCreateModalEnhanced
-          open={showCreateModal}
-          onOpenChange={setShowCreateModal}
-          onSuccess={handleCreateSuccess}
-          isOnboarding={true}
-        />
-      ) : (
-        <StarshipCreateModal
-          open={showCreateModal}
-          onOpenChange={setShowCreateModal}
-          onSuccess={handleCreateSuccess}
-        />
-      )}
+      <StarshipCreateModalUnified
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        onSuccess={handleCreateSuccess}
+        isOnboarding={autoOpenCreate}
+      />
 
       {editingStarship && (
         <StarshipEditModal

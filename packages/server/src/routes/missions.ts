@@ -489,4 +489,50 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
   }
 });
 
+/**
+ * GET /missions/:id/clarity
+ * Get mission clarity assessment
+ */
+router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    validateUUID(id, 'id');
+
+    const clarity = await MissionService.getMissionClarity(id);
+
+    res.json({ 
+      success: true, 
+      data: clarity 
+    });
+
+  } catch (error) {
+    console.error('Error fetching mission clarity:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'MISSION_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 export default router;

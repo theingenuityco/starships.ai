@@ -6,7 +6,7 @@
  */
 
 import { StateGraph, END, START, Annotation, MemorySaver, MessagesAnnotation } from '@langchain/langgraph';
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
@@ -506,8 +506,8 @@ ${conversePhase}`;
       const currentClarity = await this.getClarityFromDB(state.missionId);
       const iteration = (currentClarity?.iteration || 0) + 1;
       
-      // Update state with current clarity for context
-      const stateWithClarity = { ...state, clarity: currentClarity };
+      // Update state with current clarity for context (convert null to undefined)
+      const stateWithClarity = { ...state, clarity: currentClarity || undefined };
       
       // Assess clarity using AI with full context
       const clarityRequest = await this.assessMissionClarity(stateWithClarity, iteration);

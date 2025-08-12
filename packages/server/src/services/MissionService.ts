@@ -14,7 +14,8 @@ import type {
   MissionSort,
   MissionListResponse,
   MissionStatus,
-  MissionPhase
+  MissionPhase,
+  MissionClarity
 } from '@starships/protocol';
 import {
   EnhancedValidationError as ValidationError,
@@ -343,5 +344,26 @@ export class MissionService {
         'status'
       );
     }
+  }
+
+  /**
+   * Get mission clarity assessment
+   */
+  static async getMissionClarity(missionId: string): Promise<MissionClarity | null> {
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+
+    // Verify mission exists first
+    try {
+      await missionRepo.getMissionById(missionId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError('Mission not found', 'Mission', missionId);
+      }
+      throw error;
+    }
+
+    // Get clarity assessment (can be null if not yet assessed)
+    return await clarityRepo.getByMissionId(missionId);
   }
 }

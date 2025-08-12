@@ -42,7 +42,7 @@ export class StarshipRepository implements StarshipRepositoryInterface {
    * Validate starship class
    */
   private validateStarshipClass(starshipClass: Starship['class']): void {
-    const validClasses: Starship['class'][] = ['scout', 'cruiser'];
+    const validClasses: Starship['class'][] = ['scout', 'cruiser', 'draught'];
     if (!validClasses.includes(starshipClass)) {
       throw new ValidationError(
         `Starship class must be one of: ${validClasses.join(', ')}. Got: ${starshipClass}`,
@@ -55,7 +55,7 @@ export class StarshipRepository implements StarshipRepositoryInterface {
    * Validate starship status
    */
   private validateStarshipStatus(status: Starship['status']): void {
-    const validStatuses: Starship['status'][] = ['active', 'inactive'];
+    const validStatuses: Starship['status'][] = ['active', 'inactive', 'restricted', 'disabled'];
     if (!validStatuses.includes(status)) {
       throw new ValidationError(
         `Starship status must be one of: ${validStatuses.join(', ')}. Got: ${status}`,
@@ -165,18 +165,19 @@ export class StarshipRepository implements StarshipRepositoryInterface {
   async create(entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }): Promise<Starship> {
     const connection = getConnection();
 
-    // Set maxAgents based on class
-    const maxAgents = entity.class === 'scout' ? 3 : 6;
+    // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
+    const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
     
-    // Set default maxActiveExpeditions based on class if not provided
-    const maxActiveExpeditions = entity.maxActiveExpeditions ?? (entity.class === 'scout' ? 2 : 4);
+    // Set default maxActiveExpeditions based on class if not provided (Scout: 1, Cruiser: 3, Draught: 5)
+    const maxActiveExpeditions = entity.maxActiveExpeditions ?? 
+      (entity.class === 'scout' ? 1 : entity.class === 'cruiser' ? 3 : 5);
     
     // Generate unique slug if not provided
     const slug = entity.slug || await this.generateUniqueSlug(entity.name, entity.ownerId);
     
-    // Validate status - only allow 'active' | 'inactive'
-    if (entity.status && !['active', 'inactive'].includes(entity.status)) {
-      throw new Error(`Invalid status: ${entity.status}. Must be 'active' or 'inactive'`);
+    // Validate status using the validation method
+    if (entity.status) {
+      this.validateStarshipStatus(entity.status);
     }
     
     const starship: Starship = {
@@ -221,9 +222,9 @@ export class StarshipRepository implements StarshipRepositoryInterface {
       }
     }
     
-    // Validate status - only allow 'active' | 'inactive'
-    if (updates.status && !['active', 'inactive'].includes(updates.status)) {
-      throw new Error(`Invalid status: ${updates.status}. Must be 'active' or 'inactive'`);
+    // Validate status using the validation method
+    if (updates.status) {
+      this.validateStarshipStatus(updates.status);
     }
     
     const updateProps = {
@@ -382,13 +383,11 @@ export class StarshipRepository implements StarshipRepositoryInterface {
     return result[0]?.maxActiveExpeditions ?? null;
   }
 
-  async updateStatus(starshipId: string, status: 'active' | 'inactive'): Promise<boolean> {
+  async updateStatus(starshipId: string, status: Starship['status']): Promise<boolean> {
     const connection = getConnection();
     
-    // Validate status
-    if (!['active', 'inactive'].includes(status)) {
-      throw new Error(`Invalid status: ${status}. Must be 'active' or 'inactive'`);
-    }
+    // Validate status using the validation method
+    this.validateStarshipStatus(status);
     
     const result = await connection.executeWrite<{ count: number }>(
       `MATCH (s:Starship) WHERE s.id = $starshipId
@@ -1219,5 +1218,64 @@ export class StarshipRepository implements StarshipRepositoryInterface {
         successRate: Math.round((Number(agent.tasksCompleted) / Number(agent.totalTasks)) * 10000) / 100
       }))
     };
+  }
+
+  // ============================================================================
+  // STRIPE INTEGRATION METHODS
+  // ============================================================================
+
+  async findBySubscriptionId(subscriptionId: string): Promise<Starship | null> {
+    try {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ starship: Starship }>(
+        `MATCH (starship:Starship {subscriptionId: $subscriptionId})
+         RETURN starship`,
+        { subscriptionId }
+      );
+      
+      return result[0]?.starship || null;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async updateSubscription(
+    starshipId: string, 
+    updates: {
+      subscriptionId?: string;
+      status?: 'active' | 'inactive' | 'restricted' | 'disabled';
+      plan?: 'scout' | 'cruiser' | 'draught';
+      billingPeriod?: 'monthly' | 'yearly';
+    }
+  ): Promise<void> {
+    try {
+      const connection = getConnection();
+      const setClause = Object.entries(updates)
+        .map(([key]) => `starship.${key} = $${key}`)
+        .join(', ');
+        
+      await connection.executeWrite(
+        `MATCH (starship:Starship {id: $starshipId})
+         SET ${setClause}, starship.updatedAt = $timestamp`,
+        { starshipId, ...updates, timestamp: new Date().toISOString() }
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async countFreeStarships(userId: string): Promise<number> {
+    try {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ count: number }>(
+        `MATCH (user:User {id: $userId})-[:OWNS]->(starship:Starship {plan: 'scout'})
+         RETURN count(starship) as count`,
+        { userId }
+      );
+      
+      return result[0]?.count || 0;
+    } catch (error) {
+      throw error;
+    }
   }
 }

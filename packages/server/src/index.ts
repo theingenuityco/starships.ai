@@ -40,8 +40,8 @@ import agentTemplateRoutes from './routes/agent-templates';
 import agentCommunicationRoutes from './routes/agent-communication';
 import missionRoutes from './routes/missions';
 import workflowRoutes from './routes/workflows';
-import subscriptionRoutes from './routes/subscriptions';
 import { AgentService } from './services/AgentService';
+import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
 // Import new error handling and health check routes
 import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
@@ -62,7 +62,6 @@ function validateEnvironmentVariables() {
   const requiredVars = [
     'CLIENT_URL',
     'NEXT_PUBLIC_API_URL',
-    'STRIPE_SECRET_KEY'
   ];
   
   const missingVars = requiredVars.filter(varName => !process.env[varName]);
@@ -137,6 +136,7 @@ const starshipRepository = new StarshipRepository();
 const visionRepository = new VisionRepository();
 // Middleware - Order is important!
 app.use(cors());
+app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 app.use(express.json());
 
 // Add error handling middleware
@@ -150,11 +150,17 @@ app.use('/health', healthRoutes);
 initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
+  userRepository,
   mcpServerOptionRepository,
   mcpServerConnectorRepository,
   connectorConfigTemplateRepository,
   connectorConfigHistoryRepository,
   visionRepository,
+});
+
+// Initialize webhook routes with dependencies
+initializeWebhookRoutes({
+  starshipRepository,
 });
 
 // Initialize vision routes with dependencies
@@ -183,6 +189,19 @@ const deploymentRoutes = createDeploymentApiRoutes({
   authMiddleware
 });
 
+// Public pricing endpoint - must be before auth-protected routes
+app.get('/api/starships/pricing', async (req, res) => {
+  try {
+    const { SubscriptionService } = await import('./services/SubscriptionService');
+    const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
+    const pricing = await subscriptionService.getPricingData();
+    res.json(pricing);
+  } catch (error) {
+    console.error('Failed to fetch pricing:', error);
+    res.status(500).json({ error: 'Failed to fetch pricing' });
+  }
+});
+
 // API Routes
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
@@ -200,7 +219,6 @@ app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
 app.use('/api/missions', missionRoutes);
 app.use('/api/expeditions', workflowRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

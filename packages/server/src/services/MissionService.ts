@@ -5,6 +5,7 @@
 
 import { RepositoryFactory } from '@starships/models';
 import { ServiceFactory } from './index';
+import { MissionEventService } from './MissionEventService';
 import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type {
   Mission,
@@ -166,6 +167,7 @@ export class MissionService {
   ): Promise<Mission> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const agentRepo = RepositoryFactory.getAgentRepository();
+    const missionEventService = MissionEventService.getInstance();
 
     // Get existing mission first
     const existingMission = await missionRepo.getMissionById(id);
@@ -219,7 +221,18 @@ export class MissionService {
       }
     }
 
-    return await missionRepo.updateMission(id, updates);
+    const updatedMission = await missionRepo.updateMission(id, updates);
+
+    // Emit real-time events for specific changes
+    if (updates.status && updates.status !== existingMission.status) {
+      missionEventService.emitStatusChange(id, updates.status, existingMission.status);
+    }
+
+    if (updates.phase && updates.phase !== existingMission.phase) {
+      missionEventService.emitPhaseChange(id, updates.phase, existingMission.phase);
+    }
+
+    return updatedMission;
   }
 
   /**

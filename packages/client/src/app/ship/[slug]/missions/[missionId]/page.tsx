@@ -48,6 +48,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   // Clarity state
   const [clarity, setClarity] = useState<MissionClarity | null>(null);
   const [clarityLoading, setClarityLoading] = useState(true);
+  const [clarityUpdated, setClarityUpdated] = useState(false);
   
   // Chat state
   const [messages, setMessages] = useState<MissionMessage[]>([]);
@@ -103,6 +104,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     const phases = {
       'init': { label: 'Init', description: 'Setting up mission context' },
       'welcome': { label: 'Welcome', description: 'Mission introduction' },
+      'analysis': { label: 'Analysis', description: 'Analyzing mission clarity' },
       'converse': { label: 'Converse', description: 'Active conversation phase' }
     };
 
@@ -114,7 +116,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     setMessages(prev => [...prev, message]);
   };
 
-  // WebSocket setup for mission messages
+  // WebSocket setup for mission messages and real-time updates
   useEffect(() => {
     if (!isConnected || !socketClient) return;
 
@@ -125,14 +127,44 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
       }
     };
 
-    // Listen for mission messages
+    const handleClarityUpdate = (data: any) => {
+      console.log('[MISSION] Received clarity update:', data);
+      if (data.missionId === missionId && data.clarity) {
+        setClarity(data.clarity);
+        setClarityUpdated(true);
+        // Remove the update indicator after 3 seconds
+        setTimeout(() => setClarityUpdated(false), 3000);
+      }
+    };
+
+    const handlePhaseChange = (data: any) => {
+      console.log('[MISSION] Received phase change:', data);
+      if (data.missionId === missionId) {
+        setMission(prev => prev ? { ...prev, phase: data.newPhase } : null);
+      }
+    };
+
+    const handleStatusChange = (data: any) => {
+      console.log('[MISSION] Received status change:', data);
+      if (data.missionId === missionId) {
+        setMission(prev => prev ? { ...prev, status: data.newStatus } : null);
+      }
+    };
+
+    // Listen for mission events
     socketClient.on('mission:message-sent', handleMissionMessage);
+    socketClient.on('mission:clarity-updated', handleClarityUpdate);
+    socketClient.on('mission:phase-changed', handlePhaseChange);
+    socketClient.on('mission:status-changed', handleStatusChange);
 
     // Join mission room for real-time updates
     socketClient.emit('mission:join-room', missionId);
 
     return () => {
       socketClient.off('mission:message-sent', handleMissionMessage);
+      socketClient.off('mission:clarity-updated', handleClarityUpdate);
+      socketClient.off('mission:phase-changed', handlePhaseChange);
+      socketClient.off('mission:status-changed', handleStatusChange);
       socketClient.emit('mission:leave-room', missionId);
     };
   }, [isConnected, missionId, socketClient]);
@@ -448,69 +480,90 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               </div>
 
               {/* Mission Clarity Section */}
-              {clarity && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('clarity')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
-                      {collapsedSections.clarity ? (
-                        <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                      )}
-                    </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Mission Clarity
-                    </h4>
-                    <div className="ml-auto flex items-center gap-1">
-                      <div className={`h-2 w-2 rounded-full ${
-                        clarity.overallScore >= 8 ? 'bg-green-500' :
-                        clarity.overallScore >= 6 ? 'bg-yellow-500' :
-                        'bg-red-500'
-                      }`} />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {clarity.overallScore.toFixed(1)}/10
-                      </span>
-                    </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 px-3 group">
+                  <button
+                    onClick={() => toggleSection('clarity')}
+                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                  >
+                    {collapsedSections.clarity ? (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                    )}
+                  </button>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Mission Clarity
+                  </h4>
+                  <div className="ml-auto flex items-center gap-1">
+                    {clarity ? (
+                      <>
+                        <div className={`h-2 w-2 rounded-full transition-all duration-300 ${
+                          clarityUpdated ? 'animate-pulse ring-2 ring-blue-400' : ''
+                        } ${
+                          clarity.overallScore >= 8 ? 'bg-green-500' :
+                          clarity.overallScore >= 6 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`} />
+                        <span className={`text-xs font-medium transition-colors ${
+                          clarityUpdated ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
+                        }`}>
+                          {clarity.overallScore.toFixed(1)}/10
+                        </span>
+                        {clarityUpdated && (
+                          <span className="text-xs text-blue-600 dark:text-blue-400 animate-fade-in">
+                            ✨ Updated
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="h-2 w-2 rounded-full bg-muted-foreground/30 animate-pulse" />
+                        <span className="text-xs font-medium text-muted-foreground/60">
+                          Pending
+                        </span>
+                      </>
+                    )}
                   </div>
-                  {!collapsedSections.clarity && (
-                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                      {/* Overall Score */}
-                      <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="relative flex-shrink-0">
-                            <div className={`p-1.5 rounded-md transition-all duration-300 ${
-                              clarity.overallScore >= 8 ? 'bg-green-500/20' :
-                              clarity.overallScore >= 6 ? 'bg-yellow-500/20' :
-                              'bg-red-500/20'
-                            }`}>
-                              <div className="w-3.5 h-3.5 flex items-center justify-center">
-                                <span className={`text-xs font-bold ${
-                                  clarity.overallScore >= 8 ? 'text-green-600 dark:text-green-400' :
-                                  clarity.overallScore >= 6 ? 'text-yellow-600 dark:text-yellow-400' :
-                                  'text-red-600 dark:text-red-400'
-                                }`}>
-                                  {clarity.overallScore.toFixed(1)}
-                                </span>
+                </div>
+                {!collapsedSections.clarity && (
+                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    {clarity ? (
+                      <>
+                        {/* Overall Score */}
+                        <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="relative flex-shrink-0">
+                              <div className={`p-1.5 rounded-md transition-all duration-300 ${
+                                clarity.overallScore >= 8 ? 'bg-green-500/20' :
+                                clarity.overallScore >= 6 ? 'bg-yellow-500/20' :
+                                'bg-red-500/20'
+                              }`}>
+                                <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                  <span className={`text-xs font-bold ${
+                                    clarity.overallScore >= 8 ? 'text-green-600 dark:text-green-400' :
+                                    clarity.overallScore >= 6 ? 'text-yellow-600 dark:text-yellow-400' :
+                                    'text-red-600 dark:text-red-400'
+                                  }`}>
+                                    {clarity.overallScore.toFixed(1)}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">
-                              Overall Score
-                            </span>
-                            <span className="text-xs text-muted-foreground leading-tight">
-                              Iteration {clarity.iteration} • {
-                                clarity.overallScore >= 8 ? 'Excellent' :
-                                clarity.overallScore >= 6 ? 'Good' :
-                                'Needs Improvement'
-                              }
-                            </span>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">
+                                Overall Score
+                              </span>
+                              <span className="text-xs text-muted-foreground leading-tight">
+                                Iteration {clarity.iteration} • {
+                                  clarity.overallScore >= 8 ? 'Excellent' :
+                                  clarity.overallScore >= 6 ? 'Good' :
+                                  'Needs Improvement'
+                                }
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
                       {/* 5-Dimension Breakdown */}
                       {[
@@ -552,32 +605,41 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                         </div>
                       ))}
 
-                      {/* AI Reasoning */}
-                      {clarity.reasoning && (
-                        <div className="group relative mx-3 px-2 py-1.5 rounded-lg bg-muted/20 transition-all duration-300">
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <div className="relative flex-shrink-0 mt-0.5">
-                              <div className="p-1 rounded-md bg-blue-500/20 transition-all duration-300">
-                                <div className="w-2.5 h-2.5 flex items-center justify-center">
-                                  <span className="text-xs text-blue-600 dark:text-blue-400">🤖</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="font-medium text-xs block text-blue-600 dark:text-blue-400 leading-tight mb-1">
-                                AI Analysis
+                        {/* AI Reasoning */}
+                        {clarity.reasoning && (
+                          <div className="group relative mx-3 px-3 py-2 rounded-lg bg-muted/20 border-l-2 border-blue-500/30 transition-all duration-300">
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium text-xs text-blue-600 dark:text-blue-400 leading-tight mb-1.5">
+                                Reasoning:
                               </span>
-                              <p className="text-xs text-muted-foreground leading-relaxed">
-                                {clarity.reasoning}
-                              </p>
+                              <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">
+                                "{clarity.reasoning}"
+                              </blockquote>
                             </div>
                           </div>
+                        )}
+                      </>
+                    ) : (
+                      /* Empty State */
+                      <div className="mx-3 px-3 py-4 rounded-lg bg-muted/10 border border-dashed border-muted/30 transition-all duration-300">
+                        <div className="text-center">
+                          <div className="flex justify-center mb-2">
+                            <div className="h-8 w-8 rounded-full bg-muted/20 flex items-center justify-center">
+                              <div className="h-3 w-3 rounded-full bg-muted-foreground/30 animate-pulse" />
+                            </div>
+                          </div>
+                          <span className="text-xs font-medium text-muted-foreground block mb-1">
+                            Clarity Assessment Pending
+                          </span>
+                          <p className="text-xs text-muted-foreground/70 leading-relaxed">
+                            Mission clarity will be evaluated during your conversation with the orchestrator
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Agents Section */}
               {mission.agentIds && mission.agentIds.length > 0 && (

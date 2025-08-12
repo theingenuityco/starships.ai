@@ -10,6 +10,8 @@ import { AIMessage, HumanMessage, SystemMessage, BaseMessage } from '@langchain/
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
+import { MissionEventService } from './MissionEventService';
+import { MissionService } from './MissionService';
 import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type { 
   Mission, 
@@ -156,8 +158,8 @@ export class MissionOrchestratorAgent {
       // For system-initiated messages, auto-transition to welcome if in init
       if (state.isSystemInitiated && metadata.mission.phase === 'init') {
         try {
-          const missionRepo = RepositoryFactory.getMissionRepository();
-          await missionRepo.updateMission(state.missionId, { phase: 'welcome' });
+          // Use MissionService to ensure WebSocket events are emitted
+          await MissionService.updateMission(state.missionId, { phase: 'welcome' });
           updates.currentPhase = 'welcome';
         } catch (error) {
           this.logger.error('Failed to auto-transition phase', error as Error);
@@ -234,8 +236,7 @@ ${welcomePhase}`;
     const responseContent = await this.callLLM(prompt);
     
     // After welcome message, transition to analysis phase for clarity assessment
-    const missionRepo = RepositoryFactory.getMissionRepository();
-    await missionRepo.updateMission(state.missionId, { phase: 'analysis' });
+    await MissionService.updateMission(state.missionId, { phase: 'analysis' });
     
     const aiMessage = this.createAIMessage(responseContent, state);
     return { 
@@ -259,8 +260,7 @@ ${welcomePhase}`;
     // 3. DECISION: Complete or continue
     if (isComplete) {
       // COMPLETE: Transition to converse phase
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      await missionRepo.updateMission(state.missionId, { phase: 'converse' });
+      await MissionService.updateMission(state.missionId, { phase: 'converse' });
       
       const summary = await this.generateCompletionSummary(state, clarity);
       return {
@@ -515,7 +515,13 @@ ${conversePhase}`;
       
       // Save to database
       const clarityRepo = RepositoryFactory.getMissionClarityRepository();
-      return await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
+      const updatedClarity = await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
+      
+      // Emit real-time clarity update
+      const missionEventService = MissionEventService.getInstance();
+      missionEventService.emitClarityUpdate(state.missionId, updatedClarity);
+      
+      return updatedClarity;
     } catch (error) {
       this.logger.error('Failed to assess and save clarity', {
         service: 'MissionOrchestratorAgent',

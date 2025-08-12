@@ -6,6 +6,7 @@
  */
 
 import { MissionOrchestratorAgent } from './MissionOrchestratorAgent';
+import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
@@ -92,7 +93,8 @@ export class MissionOrchestratorService {
       if (mission.phase === 'welcome') {
         // User message after welcome: transition to converse
         try {
-          await missionRepo.updateMission(missionId, { phase: 'converse' });
+          // Use MissionService to ensure WebSocket events are emitted
+          await MissionService.updateMission(missionId, { phase: 'converse' });
           this.logger.info('Transitioned mission from welcome to converse', { missionId });
         } catch (error) {
           this.logger.error('Failed to transition mission phase', { missionId, error });

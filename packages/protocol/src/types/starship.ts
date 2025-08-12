@@ -21,7 +21,7 @@ export interface StarshipResponse {
     name: string;
     maxActiveExpeditions: number;
     maxAgents: number;
-    status: 'active' | 'inactive' | 'restricted' | 'disabled';
+    status: 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
     createdAt: string;
     updatedAt: string;
     plan?: 'scout' | 'cruiser' | 'draught';

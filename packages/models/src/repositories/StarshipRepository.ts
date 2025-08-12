@@ -55,7 +55,7 @@ export class StarshipRepository implements StarshipRepositoryInterface {
    * Validate starship status
    */
   private validateStarshipStatus(status: Starship['status']): void {
-    const validStatuses: Starship['status'][] = ['active', 'inactive', 'restricted', 'disabled'];
+    const validStatuses: Starship['status'][] = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
     if (!validStatuses.includes(status)) {
       throw new ValidationError(
         `Starship status must be one of: ${validStatuses.join(', ')}. Got: ${status}`,
@@ -1243,7 +1243,7 @@ export class StarshipRepository implements StarshipRepositoryInterface {
     starshipId: string, 
     updates: {
       subscriptionId?: string;
-      status?: 'active' | 'inactive' | 'restricted' | 'disabled';
+      status?: 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
       plan?: 'scout' | 'cruiser' | 'draught';
       billingPeriod?: 'monthly' | 'yearly';
     }
@@ -1343,5 +1343,73 @@ export class StarshipRepository implements StarshipRepositoryInterface {
       { customerId }
     );
     return result[0]?.s || null;
+  }
+
+  /**
+   * Find all pending payment starships older than specified hours
+   * @param hours - Number of hours to consider a starship abandoned
+   * @returns Array of abandoned starships
+   */
+  async findAbandonedPendingStarships(hours: number = 24): Promise<Starship[]> {
+    const connection = getConnection();
+    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    
+    const result = await connection.executeQuery<{ s: Starship }>(
+      `MATCH (s:Starship)
+       WHERE s.status = 'pending_payment' 
+       AND s.createdAt < $cutoffTime
+       RETURN s
+       ORDER BY s.createdAt DESC`,
+      { cutoffTime }
+    );
+    
+    return result.map(record => record.s);
+  }
+
+  /**
+   * Clean up abandoned pending starships
+   * @param starshipId - The starship ID to clean up
+   */
+  async cleanupAbandonedStarship(starshipId: string): Promise<void> {
+    const connection = getConnection();
+    
+    // Delete associated vision first
+    await connection.executeWrite(
+      `MATCH (v:Vision {starshipId: $starshipId})
+       DELETE v`,
+      { starshipId }
+    );
+    
+    // Then delete the starship
+    await connection.executeWrite(
+      `MATCH (s:Starship {id: $starshipId})
+       DELETE s`,
+      { starshipId }
+    );
+  }
+
+  /**
+   * Update starship payment status
+   * @param starshipId - The starship ID
+   * @param status - New status
+   * @param additionalFields - Additional fields to update
+   */
+  async updatePaymentStatus(
+    starshipId: string, 
+    status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
+    additionalFields?: Partial<Starship>
+  ): Promise<void> {
+    const connection = getConnection();
+    const updates = {
+      status,
+      ...additionalFields,
+      updatedAt: new Date().toISOString()
+    };
+    
+    await connection.executeWrite(
+      `MATCH (s:Starship {id: $id})
+       SET s += $updates`,
+      { id: starshipId, updates }
+    );
   }
 }

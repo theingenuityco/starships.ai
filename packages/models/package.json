@@ -41,7 +41,9 @@
     "test:backup": "tsx src/scripts/test-backup-restore.ts",
     "migrate:starship-schema": "tsx src/scripts/migrate-starship-schema.ts",
     "migrate:starship-schema:dry-run": "tsx src/scripts/migrate-starship-schema.ts --dry-run",
-    "migrate:starship-schema:rollback": "tsx src/scripts/migrate-starship-schema.ts --rollback"
+    "migrate:starship-schema:rollback": "tsx src/scripts/migrate-starship-schema.ts --rollback",
+    "cleanup:abandoned-starships": "tsx src/scripts/cleanup-abandoned-starships.ts",
+    "cleanup:abandoned-starships:dry": "tsx src/scripts/cleanup-abandoned-starships.ts --dry-run"
   },
   "dependencies": {
     "@starships/protocol": "workspace:*",

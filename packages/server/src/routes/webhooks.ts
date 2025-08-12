@@ -92,14 +92,16 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
         // CRITICAL: Handle payment recovery (including Smart Retries)
         const paidInvoice = event.data.object as Stripe.Invoice;
         
-        if (!paidInvoice.subscription) {
+        // Check if invoice has a subscription field
+        const subscriptionField = (paidInvoice as any).subscription;
+        if (!subscriptionField) {
           console.log('[WEBHOOK] Invoice not related to subscription, skipping');
           break;
         }
         
-        const subscriptionId = typeof paidInvoice.subscription === 'string' 
-          ? paidInvoice.subscription 
-          : paidInvoice.subscription.id;
+        const subscriptionId = typeof subscriptionField === 'string' 
+          ? subscriptionField 
+          : subscriptionField.id;
           
         const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
         
@@ -119,14 +121,16 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
       case 'invoice.payment_failed': {
         const failedInvoice = event.data.object as Stripe.Invoice;
         
-        if (!failedInvoice.subscription) {
+        // Check if invoice has a subscription field
+        const subscriptionField = (failedInvoice as any).subscription;
+        if (!subscriptionField) {
           console.log('[WEBHOOK] Invoice not related to subscription, skipping');
           break;
         }
         
-        const subscriptionId = typeof failedInvoice.subscription === 'string' 
-          ? failedInvoice.subscription 
-          : failedInvoice.subscription.id;
+        const subscriptionId = typeof subscriptionField === 'string' 
+          ? subscriptionField 
+          : subscriptionField.id;
           
         const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
         

@@ -115,6 +115,7 @@ export function StarshipCreateModalUnified({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
   const [analyzingVision, setAnalyzingVision] = useState(false);
+  const [creatingPaidStarship, setCreatingPaidStarship] = useState(false);
   
   // New state for API-driven pricing data
   const [starshipClasses, setStarshipClasses] = useState<Record<string, any>>({});
@@ -319,18 +320,26 @@ export function StarshipCreateModalUnified({
           router.push(`/ship/${newStarship.slug}/vision-chamber`);
         }
       } else {
-        // Paid starship - redirect to Stripe checkout  
-        // Use proxy endpoint that routes to backend
-        const response = await api.post('/api/checkout-session', {
-          starshipName: formData.name,
-          plan: formData.class,
-          billingPeriod: billingPeriod
-        });
+        // Paid starship - create starship first, then redirect to Stripe checkout  
+        // Use new create-paid endpoint that creates starship with pending_payment status
+        setCreatingPaidStarship(true);
         
-        if (response.data.url) {
-          window.location.href = response.data.url;
-        } else {
-          throw new Error('No checkout URL received');
+        try {
+          const response = await api.post('/api/starships/create-paid', {
+            name: formData.name,
+            plan: formData.class,
+            billingPeriod: billingPeriod
+          });
+          
+          if (response.data.checkoutUrl) {
+            // Keep loading state while redirecting to Stripe
+            window.location.href = response.data.checkoutUrl;
+          } else {
+            throw new Error('No checkout URL received');
+          }
+        } catch (error) {
+          setCreatingPaidStarship(false);
+          throw error;
         }
       }
     } catch (error: any) {
@@ -831,7 +840,8 @@ export function StarshipCreateModalUnified({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col bg-background/95 backdrop-blur-sm border-border/50">
+        <DialogContent className="sm:max-w-2xl">
+          <div className="max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Create New Starship
@@ -890,13 +900,13 @@ export function StarshipCreateModalUnified({
               ) : (
                 <Button
                   onClick={handleSubmit}
-                  disabled={loading}
+                  disabled={loading || creatingPaidStarship}
                   className="flex items-center space-x-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 >
-                  {loading ? (
+                  {(loading || creatingPaidStarship) ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Creating...</span>
+                      <span>{creatingPaidStarship ? 'Preparing checkout...' : 'Creating...'}</span>
                     </>
                   ) : (
                     <>
@@ -907,6 +917,20 @@ export function StarshipCreateModalUnified({
                 </Button>
               )}
             </div>
+          </div>
+          
+          {/* Loading Overlay for Paid Starship Creation */}
+          {creatingPaidStarship && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <div className="text-center space-y-2">
+                  <p className="text-lg font-semibold">Preparing your starship...</p>
+                  <p className="text-sm text-muted-foreground">Redirecting to secure checkout</p>
+                </div>
+              </div>
+            </div>
+          )}
           </div>
         </DialogContent>
       </Dialog>

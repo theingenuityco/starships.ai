@@ -86,7 +86,7 @@ export interface Starship {
   name: string;
   maxActiveExpeditions: number;
   maxAgents: number; // Based on class: Scout=3, Cruiser=5, Draught=10
-  status: 'active' | 'inactive' | 'restricted' | 'disabled';  // ADD: billing status
+  status: 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';  // ADD: billing status
   createdAt: string;
   updatedAt: string;
   // Stripe integration

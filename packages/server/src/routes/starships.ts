@@ -13,6 +13,7 @@ import type {
   MCPServerConnectorRepository,
   ConnectorConfigTemplateRepository,
   ConnectorConfigHistoryRepository,
+  UserRepository,
 } from '@starships/models';
 import {
   EnhancedValidationError as ValidationError,
@@ -20,6 +21,7 @@ import {
   EnhancedNotFoundError as NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
+import { SubscriptionService } from '../services/SubscriptionService';
 import { serviceRegistry, DeploymentWorkflowService, connectorMigrationService } from '@starships/core';
 import type { MigrationOptions, MigrationResult } from '@starships/core';
 import { bridgeMonitoringService } from '@starships/core/dist/services/mcp/BridgeMonitoringService';
@@ -41,7 +43,7 @@ const validateUUID = (id: string, fieldName: string): void => {
 };
 
 const validateStarshipClass = (starshipClass: string): void => {
-  const validClasses = ['scout', 'cruiser'];
+  const validClasses = ['scout', 'cruiser', 'draught'];
   if (!validClasses.includes(starshipClass)) {
     throw new ValidationError(
       `Starship class must be one of: ${validClasses.join(', ')}. Got: ${starshipClass}`,
@@ -109,6 +111,7 @@ const router: Router = Router();
 // TODO: Replace with proper dependency injection pattern
 let starshipRepo: StarshipRepository;
 let agentRepo: AgentRepository;
+let userRepo: UserRepository;
 let mcpServerRepo: MCPServerOptionRepository;
 let mcpConnectorRepo: MCPServerConnectorRepository;
 let configTemplateRepo: ConnectorConfigTemplateRepository;
@@ -118,6 +121,7 @@ let visionRepo: VisionRepository;
 export function initializeStarshipRoutes(deps: {
   starshipRepository: StarshipRepository;
   agentRepository: AgentRepository;
+  userRepository: UserRepository;
   mcpServerOptionRepository: MCPServerOptionRepository;
   mcpServerConnectorRepository: MCPServerConnectorRepository;
   connectorConfigTemplateRepository: ConnectorConfigTemplateRepository;
@@ -126,6 +130,7 @@ export function initializeStarshipRoutes(deps: {
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
+  userRepo = deps.userRepository;
   mcpServerRepo = deps.mcpServerOptionRepository;
   mcpConnectorRepo = deps.mcpServerConnectorRepository;
   configTemplateRepo = deps.connectorConfigTemplateRepository;
@@ -164,11 +169,11 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
     }
 
     // Validate starship class
-    if (!['scout', 'cruiser'].includes(starshipClass)) {
+    if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
       res.status(400).json({
         error: 'Invalid starship class',
-        details: 'Starship class must be either scout or cruiser',
-        allowed_values: ['scout', 'cruiser'],
+        details: 'Starship class must be scout, cruiser, or draught',
+        allowed_values: ['scout', 'cruiser', 'draught'],
         provided: starshipClass,
       });
       return;
@@ -2761,6 +2766,81 @@ router.post('/starships/migrate/template/:templateSlug', authMiddleware, async (
   } catch (error) {
     console.error('[STARSHIPS] Error performing batch migration:', error);
     res.status(500).json({ error: 'Failed to perform batch migration' });
+  }
+});
+
+// Get pricing data  
+router.get('/pricing', async (req: Request, res: Response) => {
+  try {
+    const subscriptionService = new SubscriptionService(
+      userRepo, // ✅ FIXED: Use codebase variable name
+      starshipRepo // ✅ FIXED: Use codebase variable name
+    );
+    const pricing = await subscriptionService.getPricingData();
+    res.json(pricing);
+  } catch (error) {
+    handleError(error, res, 'Failed to fetch pricing');
+  }
+});
+
+// Create checkout session
+router.post('/checkout-session', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { starshipName, plan, billingPeriod } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (!starshipName || !plan || !billingPeriod) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    // Validate plan
+    if (!['cruiser', 'draught'].includes(plan)) {
+      res.status(400).json({ error: 'Invalid plan. Must be cruiser or draught' });
+      return;
+    }
+
+    const subscriptionService = new SubscriptionService(
+      userRepo, // ✅ FIXED: Use codebase variable name
+      starshipRepo // ✅ FIXED: Use codebase variable name
+    );
+    const checkoutUrl = await subscriptionService.createCheckoutSession({
+      userId,
+      starshipName,
+      plan,
+      billingPeriod,
+    });
+    
+    res.json({ url: checkoutUrl });
+  } catch (error) {
+    handleError(error, res, 'Failed to create checkout session');
+  }
+});
+
+// Create billing portal session  
+router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const starshipId = req.params.id;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    const subscriptionService = new SubscriptionService(
+      userRepo, // ✅ FIXED: Use codebase variable name
+      starshipRepo // ✅ FIXED: Use codebase variable name
+    );
+    const portalUrl = await subscriptionService.createPortalSession(starshipId, userId);
+    res.json({ url: portalUrl });
+  } catch (error) {
+    handleError(error, res, 'Failed to create billing portal');
   }
 });
 

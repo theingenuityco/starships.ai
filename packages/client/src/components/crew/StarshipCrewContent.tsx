@@ -14,6 +14,7 @@ import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { CrewConsoleFloatingMessage } from '@/components/sibil/CrewConsoleFloatingMessage'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,10 +22,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   ArrowLeft, Users, Plug, Bot, Loader2, Activity,
   Shield, Zap, Brain, MessageSquare, Sparkles,
-  Star, UserCheck, Settings, Network
+  Star, UserCheck, Settings, Network, Info
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
+import { useStarshipStore } from '@/store/starship-store'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -36,12 +38,18 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
   const { toast } = useToast()
+  const { starships } = useStarshipStore()
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
   const [connectorsLoading, setConnectorsLoading] = useState(false)
   const [connectorsError, setConnectorsError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+
+  // Floating message state
+  const [showFloatingMessage, setShowFloatingMessage] = useState(false)
+  const [isManualOpen, setIsManualOpen] = useState(false)
+  const [currentTab, setCurrentTab] = useState('agents')
 
   const handleAgentSelect = (agent: Agent) => {
     setSelectedAgent(agent)
@@ -52,10 +60,43 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     setSessionId(newSessionId)
   }
 
+  // Function to manually show the info modal
+  const handleShowInfo = () => {
+    setIsManualOpen(true)
+    setShowFloatingMessage(true)
+  }
+
+  // State for info button animation
+  const [animateInfoButton, setAnimateInfoButton] = useState(false)
+
+  // Handle dismissing the floating message
+  const handleDismissMessage = () => {
+    setShowFloatingMessage(false)
+    setIsManualOpen(false)
+    // Animate the info button to show where the information is stored
+    setAnimateInfoButton(true)
+    setTimeout(() => setAnimateInfoButton(false), 2000)
+  }
+
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setCurrentTab(value)
+  }
+
   // Fetch starship data on component mount
   useEffect(() => {
     fetchStarship()
   }, [slug])
+
+  // Check if this is the user's first starship and show onboarding
+  useEffect(() => {
+    if (starship && starships && starships.length === 1) {
+      const dismissed = localStorage.getItem('crew-console-message-dismissed')
+      if (!dismissed) {
+        setShowFloatingMessage(true)
+      }
+    }
+  }, [starship, starships])
 
   // Fetch connector instances when starship is loaded
   useEffect(() => {
@@ -243,9 +284,23 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                    Crew Console
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+                      Crew Console
+                    </h1>
+                    <button
+                      onClick={handleShowInfo}
+                      className="rounded-full p-0 hover:opacity-80 transition-all relative"
+                      title="Crew Console Guide"
+                    >
+                      <Info className={`h-6 w-6 text-emerald-500 transition-all ${
+                        animateInfoButton ? 'scale-110' : ''
+                      }`} />
+                      {animateInfoButton && (
+                        <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping-slow" />
+                      )}
+                    </button>
+                  </div>
                   <p className="text-sm text-muted-foreground">Manage your AI agents and connectors</p>
                 </div>
               </div>
@@ -317,7 +372,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
           className="border-r border-border/40 bg-gradient-to-br from-card/60 to-card/40 backdrop-blur-sm shadow-lg flex flex-col min-h-0"
         >
           <div className="p-6 pb-0 flex flex-col h-full min-h-0">
-            <Tabs defaultValue="agents" className="flex flex-col h-full">
+            <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full">
               <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
                 <TabsTrigger 
                   value="agents" 
@@ -463,6 +518,15 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
           )}
         </div>
       </div>
+
+      {/* Crew Console Floating Message */}
+      <CrewConsoleFloatingMessage 
+        show={showFloatingMessage} 
+        onDismiss={handleDismissMessage}
+        isManualOpen={isManualOpen}
+        currentTab={currentTab}
+        onTabChange={handleTabChange}
+      />
     </div>
   )
 }

@@ -7,7 +7,7 @@
 
 import { MCPServerConnector } from '@starships/models';
 import { MCPDeployer } from './MCPDeployer';
-import { DockerComposeDeployer } from './DockerComposeDeployer';
+import { DeployerFactory } from './DeployerFactory';
 import { MCPToolGatewayDB } from './MCPToolGatewayDB';
 import { deploymentConfig } from './DeploymentConfig';
 import { portAllocator } from './PortAllocator';
@@ -50,7 +50,7 @@ export class ConnectionManager extends EventEmitter {
     };
 
     // Initialize components
-    this.deployer = new DockerComposeDeployer();
+    this.deployer = DeployerFactory.getDeployer();
     this.toolGateway = new MCPToolGatewayDB();
 
     // Set up health monitoring

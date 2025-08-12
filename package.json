@@ -7,6 +7,10 @@
     "packages/*"
   ],
   "scripts": {
+    "setup": "bash scripts/developer-setup.sh",
+    "setup:docker": "node scripts/setup-docker-path.js",
+    "setup:verify": "node scripts/verify-build-setup.js",
+    "postinstall": "node scripts/setup-docker-path.js",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "prebuild": "node scripts/check-k8s-requirements.js",

@@ -3,7 +3,8 @@
  */
 
 import { MCPServerConnector, MCPServerConnectorRepository } from '@starships/models';
-import { DockerComposeDeployer } from './DockerComposeDeployer';
+import { MCPDeployer } from './MCPDeployer';
+import { DeployerFactory } from './DeployerFactory';
 import { getTemplateForDeployment, isHttpBridgeTemplate, getLegacyTemplate, getHttpBridgeTemplate, getDockerServiceTemplate } from './DockerServiceTemplate';
 import { serviceRegistry } from './ServiceRegistry';
 import { bridgeMonitoringService } from './BridgeMonitoringService';
@@ -39,15 +40,15 @@ export interface MigrationStatus {
 
 export class ConnectorMigrationService {
   private mcpConnectorRepo: MCPServerConnectorRepository;
-  private deployer: DockerComposeDeployer;
+  private deployer: MCPDeployer;
   private migrationStatus: Map<string, MigrationStatus> = new Map();
 
   constructor(
     mcpConnectorRepo?: MCPServerConnectorRepository,
-    deployer?: DockerComposeDeployer
+    deployer?: MCPDeployer
   ) {
     this.mcpConnectorRepo = mcpConnectorRepo || new MCPServerConnectorRepository();
-    this.deployer = deployer || new DockerComposeDeployer();
+    this.deployer = deployer || DeployerFactory.getDeployer();
   }
 
   /**

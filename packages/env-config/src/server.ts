@@ -58,6 +58,17 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     
     // MCP HTTP Bridge Feature Flag
     MCP_HTTP_BRIDGE_ENABLED: process.env.MCP_HTTP_BRIDGE_ENABLED !== 'false', // Default: true
+    
+    // Stripe Configuration
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    
+    // Stripe Price IDs
+    STRIPE_PRICE_CRUISER_MONTHLY: process.env.STRIPE_PRICE_CRUISER_MONTHLY,
+    STRIPE_PRICE_CRUISER_YEARLY: process.env.STRIPE_PRICE_CRUISER_YEARLY,
+    STRIPE_PRICE_DRAUGHT_MONTHLY: process.env.STRIPE_PRICE_DRAUGHT_MONTHLY,
+    STRIPE_PRICE_DRAUGHT_YEARLY: process.env.STRIPE_PRICE_DRAUGHT_YEARLY,
   };
 
   // Skip validation during linting or when NODE_ENV is not set
@@ -76,6 +87,20 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
       throw new EnvironmentValidationError(
         'ANTHROPIC_API_KEY is required when DEFAULT_LLM_PROVIDER is anthropic',
         ['ANTHROPIC_API_KEY']
+      );
+    }
+
+    // Validate required Stripe variables
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new EnvironmentValidationError(
+        'STRIPE_SECRET_KEY is required',
+        ['STRIPE_SECRET_KEY']
+      );
+    }
+    if (!env.STRIPE_PUBLISHABLE_KEY) {
+      throw new EnvironmentValidationError(
+        'STRIPE_PUBLISHABLE_KEY is required',
+        ['STRIPE_PUBLISHABLE_KEY']
       );
     }
 

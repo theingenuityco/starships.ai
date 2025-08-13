@@ -1,4 +1,5 @@
 import { SocketIOService } from '../services/SocketIOService';
+import { MissionEventService } from '../services/MissionEventService';
 import { setupSibilHandlers } from './sibilHandlers';
 import { setupAgentHandlers } from './agentHandlers';
 import { setupExpeditionHandlers } from './expeditionHandlers';
@@ -10,6 +11,10 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   
   const socketService = SocketIOService.initialize(httpServer);
   const io = socketService.getIO();
+
+  // Initialize Mission Event Service with Socket.IO instance
+  const missionEventService = MissionEventService.getInstance();
+  missionEventService.setSocketIO(io);
 
   // Start health monitoring for connection stability
   socketService.startHealthMonitoring();

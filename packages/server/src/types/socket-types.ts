@@ -37,6 +37,11 @@ export interface ExtendedSocketEvents {
   // Message events
   'message:sent': (data: any) => void;
 
+  // Mission events
+  'mission:clarity-updated': (data: any) => void;
+  'mission:phase-changed': (data: any) => void;
+  'mission:status-changed': (data: any) => void;
+
   // Streaming events
   'expedition:stream-start': (data: any) => void;
   'expedition:stream-chunk': (data: any) => void;

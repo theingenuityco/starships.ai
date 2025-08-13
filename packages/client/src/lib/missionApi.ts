@@ -13,7 +13,8 @@ import type {
   MissionResponse,
   MissionMessage,
   SendMissionMessageRequest,
-  MissionChatResponse
+  MissionChatResponse,
+  MissionClarity
 } from '@starships/protocol';
 import api from './api';
 
@@ -191,5 +192,12 @@ export const missionApi = {
 
   async getMessageHistory(missionId: string): Promise<ApiResponse<{ messages: MissionMessage[] }>> {
     return apiRequest<{ messages: MissionMessage[] }>(`/api/missions/${missionId}/messages`);
+  },
+
+  /**
+   * Get mission clarity assessment
+   */
+  async getMissionClarity(missionId: string): Promise<ApiResponse<MissionClarity | null>> {
+    return apiRequest<MissionClarity | null>(`/api/missions/${missionId}/clarity`);
   }
 };

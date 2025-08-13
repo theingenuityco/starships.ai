@@ -7,6 +7,7 @@ import { mcpToolGatewayDB } from "@starships/core";
 import type { ChatRequest, MemoryEntry } from "@starships/protocol";
 import { AgentExecutor } from "langchain/agents";
 import { createOpenAIFunctionsAgent, createToolCallingAgent } from "langchain/agents";
+import { MCPAgentExecutor } from "./agents/MCPAgentExecutor";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
@@ -84,15 +85,14 @@ When appropriate, use these tools to provide better assistance. You are connecte
       description: t.description.substring(0, 100) + '...' 
     })));
     
-    // Create executor with proper settings
-    const executor = new AgentExecutor({
+    // Create custom executor that fixes parameter passing
+    const executor = MCPAgentExecutor.fromAgentAndTools({
       agent,
       tools: mcpTools,
       verbose: config.debug.verbose,
       maxIterations,
       returnIntermediateSteps: true,
       handleParsingErrors: true,
-      // Add early stopping to prevent infinite loops
       earlyStoppingMethod: "force",
     });
     

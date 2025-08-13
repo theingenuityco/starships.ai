@@ -8,6 +8,7 @@
 import { DynamicTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { MCPToolGateway, MCPToolGatewayDB, MCPTool } from '@starships/core';
+import { ToolInputPatcher } from '../agents/ToolInputPatcher';
 
 export interface MCPToolConfig {
   starshipId: string;
@@ -121,22 +122,72 @@ export class MCPToolWrapper {
     // Convert JSON Schema to Zod schema for validation
     const schema = this.jsonSchemaToZod(mcpTool.inputSchema);
     
-    return new DynamicTool({
-      name: namespacedName,
-      description: this.enhanceDescription(mcpTool),
-      func: async (input: any) => {
+    // Store the tool reference for the closure
+    const toolRef = mcpTool;
+    const gatewayRef = this.config.gateway;
+    const starshipIdRef = this.config.starshipId;
+    
+    // Store references we need in the closure
+    const configRef = this.config;
+    const mapInputParametersFunc = this.mapInputParameters.bind(this);
+    const formatToolResponseFunc = this.formatToolResponse.bind(this);
+    const trackUsageFunc = this.trackUsage.bind(this);
+    
+    // Create the tool function with proper binding
+    const toolFunc = async function(...args: any[]) {
         const startTime = Date.now();
         
         console.log(`[MCPToolWrapper] *** TOOL EXECUTION START: ${namespacedName} ***`);
         
+        // Extract input from various possible locations
+        let input = args[0];
+        let runManager = args[1];
+        
+        console.log(`[MCPToolWrapper] Initial args:`, {
+            argsLength: args.length,
+            arg0Type: typeof args[0],
+            arg0Keys: args[0] ? Object.keys(args[0]).slice(0, 5) : null,
+            hasRunManager: !!runManager
+        });
+        
+        // Check if first argument is actually the tool metadata (happens with DynamicTool)
+        if (input && typeof input === 'object' && input.id && input.name === toolRef.name) {
+            console.log(`[MCPToolWrapper] First arg is tool metadata, looking for actual input`);
+            input = undefined;
+        }
+        
+        // WORKAROUND: Check if input is actually the runManager
+        if (input && typeof input === 'object' && input.handleToolStart) {
+            console.log(`[MCPToolWrapper] Detected runManager as first argument`);
+            runManager = input;
+            input = undefined;
+        }
+        
+        // If input is still undefined, try to extract from global state
+        if (!input || (typeof input === 'object' && Object.keys(input).length === 0)) {
+            console.log(`[MCPToolWrapper] Input is invalid/empty, attempting recovery from global store`);
+            
+            // Try to get from global store
+            const globalStore = (global as any).__mcpToolInputs || {};
+            if (globalStore[namespacedName]) {
+                input = globalStore[namespacedName];
+                console.log(`[MCPToolWrapper] Retrieved input from global store:`, JSON.stringify(input));
+                // Clear it after use
+                delete globalStore[namespacedName];
+            } else {
+                console.log(`[MCPToolWrapper] No input found in global store for ${namespacedName}`);
+                console.log(`[MCPToolWrapper] Available keys in global store:`, Object.keys(globalStore));
+            }
+        }
+        
         try {
           // Log tool usage if enabled
-          if (this.config.enableLogging) {
-            console.log(`[MCPToolWrapper] Agent ${this.config.agentId} calling ${mcpTool.name} with:`, input);
+          if (configRef.enableLogging) {
+            console.log(`[MCPToolWrapper] Agent ${configRef.agentId} calling ${toolRef.name} with:`, input);
           }
 
           // Track usage statistics
-          this.trackUsage(namespacedName);
+          trackUsageFunc(namespacedName);
           
           // Log input for sequential thinking debugging
           if (mcpTool.templateSlug === 'sequentialthinking') {
@@ -146,11 +197,40 @@ export class MCPToolWrapper {
           
           // Map input parameters if needed
           console.log(`[MCPToolWrapper] Raw input before mapping:`, typeof input, JSON.stringify(input));
-          let processedInput = this.mapInputParameters(input, mcpTool);
+          let processedInput = mapInputParametersFunc(input, toolRef);
           console.log(`[MCPToolWrapper] Processed input after mapInputParameters:`, JSON.stringify(processedInput));
           
+          // Special handling for Notion API tools
+          if (toolRef.name === 'API-create-a-comment' && processedInput && typeof processedInput === 'object') {
+            // Fix the parent structure for comments - it should have page_id, not block_id
+            if (processedInput.parent && processedInput.parent.block_id) {
+              processedInput.parent = {
+                page_id: processedInput.parent.block_id
+              };
+            }
+          }
+          
+          // Special handling for Notion API-patch-block-children tool
+          if (toolRef.name === 'API-patch-block-children' && processedInput && typeof processedInput === 'object') {
+            // Fix the structure for block children updates
+            if (processedInput.children && Array.isArray(processedInput.children)) {
+              processedInput.children = processedInput.children.map((child: any) => {
+                // If the child has wrong structure, fix it
+                if (child.object === 'block' && child.type === 'paragraph' && child.paragraph) {
+                  return {
+                    type: 'paragraph',
+                    paragraph: {
+                      rich_text: child.paragraph.text || child.paragraph.rich_text
+                    }
+                  };
+                }
+                return child;
+              });
+            }
+          }
+          
           // Special handling for sequential thinking tool
-          if (mcpTool.templateSlug === 'sequentialthinking') {
+          if (toolRef.templateSlug === 'sequentialthinking') {
             // Handle undefined or empty input for continuation requests
             if (!processedInput || Object.keys(processedInput).length === 0 || 
                 (processedInput.input === undefined && !processedInput.thought)) {
@@ -175,8 +255,8 @@ export class MCPToolWrapper {
             }
           }
           
-          if (this.config.enableLogging || mcpTool.templateSlug === 'searxng') {
-            console.log(`[MCPToolWrapper] Tool ${mcpTool.name} - Input schema:`, JSON.stringify(mcpTool.inputSchema, null, 2));
+          if (configRef.enableLogging || toolRef.templateSlug === 'searxng') {
+            console.log(`[MCPToolWrapper] Tool ${toolRef.name} - Input schema:`, JSON.stringify(toolRef.inputSchema, null, 2));
             console.log(`[MCPToolWrapper] Processed input after mapping:`, processedInput);
           }
           
@@ -185,33 +265,33 @@ export class MCPToolWrapper {
           
           // Execute the tool via gateway
           // Tool ID must be in format "connectorId:toolName"
-          const fullToolId = `${mcpTool.connectorId}:${mcpTool.name}`;
-          const result = await this.config.gateway.invokeTool(
-            this.config.starshipId,
+          const fullToolId = `${toolRef.connectorId}:${toolRef.name}`;
+          const result = await configRef.gateway.invokeTool(
+            configRef.starshipId,
             fullToolId,
             validatedInput
           );
           
           // Log the full result for debugging
-          if (this.config.enableLogging) {
+          if (configRef.enableLogging) {
             console.log(`[MCPToolWrapper] Tool invocation result:`, JSON.stringify(result, null, 2));
           }
           
           // Log execution time
           const executionTime = Date.now() - startTime;
-          if (this.config.enableLogging) {
-            console.log(`[MCPToolWrapper] Tool ${mcpTool.name} completed in ${executionTime}ms`);
+          if (configRef.enableLogging) {
+            console.log(`[MCPToolWrapper] Tool ${toolRef.name} completed in ${executionTime}ms`);
           }
           
           // Format and return the result
           // Note: invokeTool returns the result directly, not wrapped in a success/error object
-          const formattedResponse = this.formatToolResponse(result, mcpTool);
+          const formattedResponse = formatToolResponseFunc(result, toolRef);
           console.log(`[MCPToolWrapper] *** TOOL EXECUTION END: ${namespacedName} - Response: ${formattedResponse.substring(0, 200)}... ***`);
           return formattedResponse;
           
         } catch (error) {
           console.error(`[MCPToolWrapper] *** TOOL EXECUTION ERROR: ${namespacedName} ***`);
-          console.error(`[MCPToolWrapper] Error in ${mcpTool.name}:`, error);
+          console.error(`[MCPToolWrapper] Error in ${toolRef.name}:`, error);
           
           if (error instanceof z.ZodError) {
             return `Input validation failed: ${(error as z.ZodError).errors.map((e: any) => e.message).join(', ')}`;
@@ -219,8 +299,34 @@ export class MCPToolWrapper {
           
           return `Error: ${error instanceof Error ? error.message : String(error)}`;
         }
-      },
+      };
+    
+    // Wrap the tool function to store parameters in global state
+    const wrappedFunc = async function(this: any, ...args: any[]) {
+      const input = args[0];
+      console.log(`[MCPToolWrapper] Storing input for ${namespacedName} in global state:`, JSON.stringify(input));
+      
+      // Store the input in global state before calling the actual function
+      if (!(global as any).__mcpToolInputs) {
+        (global as any).__mcpToolInputs = {};
+      }
+      (global as any).__mcpToolInputs[namespacedName] = input;
+      
+      // Call the original tool function
+      return toolFunc.apply(this, args);
+    };
+    
+    // Create the DynamicTool with our wrapped function
+    const tool = new DynamicTool({
+      name: namespacedName,
+      description: this.enhanceDescription(mcpTool),
+      func: wrappedFunc
     });
+    
+    // Store the MCP tool reference for debugging
+    (tool as any).__mcpTool = mcpTool;
+    
+    return tool;
   }
 
   /**

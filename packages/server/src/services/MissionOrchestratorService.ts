@@ -23,7 +23,7 @@ import type {
  * Configuration for MissionOrchestratorService
  */
 export interface MissionOrchestratorServiceConfig {
-  maxConcurrentOrchestrators?: number;
+  // Future configuration options can be added here
 }
 
 /**
@@ -34,11 +34,8 @@ export class MissionOrchestratorService {
   private logger: Logger;
   private socketService: SocketIOService | null = null;
   
-  // In-memory orchestrator instances (missionId -> agent)
-  private orchestrators: Map<string, MissionOrchestratorAgent> = new Map();
-  
   private readonly config: Required<MissionOrchestratorServiceConfig> = {
-    maxConcurrentOrchestrators: 100 // Limit concurrent orchestrators
+    // Removed maxConcurrentOrchestrators - using stateless agents now
   };
 
   private constructor(config?: Partial<MissionOrchestratorServiceConfig>) {
@@ -98,8 +95,8 @@ export class MissionOrchestratorService {
       this.emitMessageEvent(missionId, savedUserMessage);
     }
 
-    // NEW: Execute graph with real-time callbacks for immediate message saving
-    const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
+    // Create stateless orchestrator agent for this request
+    const orchestrator = this.createOrchestratorAgent();
     const { finalResponse, state } = await orchestrator.executeGraphWithCallbacks(
       missionId, 
       message, 
@@ -258,49 +255,15 @@ export class MissionOrchestratorService {
   }
 
   /**
-   * Get or create orchestrator agent instance (lazy creation)
+   * Create orchestrator agent instance (stateless - new instance per request)
    */
-  private async getOrCreateOrchestratorAgent(missionId: string): Promise<MissionOrchestratorAgent> {
-    let orchestrator = this.orchestrators.get(missionId);
-
-    if (!orchestrator) {
-      // Check limits
-      if (this.orchestrators.size >= this.config.maxConcurrentOrchestrators) {
-        throw ErrorFactory.businessLogic(
-          'RESOURCE_LIMIT_EXCEEDED',
-          'Maximum concurrent orchestrators reached',
-          `Limit: ${this.config.maxConcurrentOrchestrators}`,
-          {
-            service: 'MissionOrchestratorService',
-            operation: 'getOrCreateOrchestratorAgent',
-            resource: 'mission',
-            resourceId: missionId
-          }
-        );
-      }
-
-      // Create new orchestrator agent with shared configuration
-      orchestrator = new MissionOrchestratorAgent({
-        temperature: 0.7,
-        maxTokens: 1000,
-        provider: 'openai',
-        model: 'gpt-4'
-      });
-
-      this.orchestrators.set(missionId, orchestrator);
-
-      this.logger.info('Created new orchestrator agent', {
-        service: 'MissionOrchestratorService',
-        operation: 'getOrCreateOrchestratorAgent',
-        resource: 'mission',
-        resourceId: missionId,
-        metadata: { 
-          totalOrchestrators: this.orchestrators.size 
-        }
-      });
-    }
-
-    return orchestrator;
+  private createOrchestratorAgent(): MissionOrchestratorAgent {
+    return new MissionOrchestratorAgent({
+      temperature: 0.7,
+      maxTokens: 1000,
+      provider: 'openai',
+      model: 'gpt-4'
+    });
   }
 
   /**

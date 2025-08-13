@@ -4,7 +4,7 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
-import { ServiceFactory } from './index';
+import { MissionOrchestratorService } from './MissionOrchestratorService';
 import { MissionEventService } from './MissionEventService';
 import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type {
@@ -88,7 +88,7 @@ export class MissionService {
     // Auto-trigger initial welcome message (graph will handle automatic phase transitions)
     console.log('🚀 Auto-triggering initial welcome message for mission:', mission.id);
     try {
-      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      const missionOrchestratorService = MissionOrchestratorService.getInstance();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
       const welcomeMessage = renderTemplate(MISSION_PROMPTS.INITIAL_WELCOME, {

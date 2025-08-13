@@ -7,7 +7,7 @@ import type { Mission } from '@starships/protocol';
 
 // Template variables interfaces for type safety
 export interface MissionContextData {
-  currentPhase: string;
+  activePhase: string;
   mission: Mission;
   starship?: {
     name: string;
@@ -70,7 +70,7 @@ MISSION: "<%= mission.name %>"
 ├─ VISION: <%= vision.statement %>
 └─ STATUS: <%= mission.status %>
 
-CURRENT PHASE: <%= currentPhase %>
+ACTIVE PHASE: <%= activePhase %>
 PHASES: INIT → WELCOME → CONVERSE → ACTIVE → COMPLETE<% if (clarity) { %>
 
 MISSION CLARITY ASSESSMENT:
@@ -143,7 +143,7 @@ USER REQUEST: "<%= userMessage %>"
 
 INSTRUCTIONS:
 1. Understand what the user is asking for
-2. Consider mission context and current phase
+2. Consider mission context and active phase
 3. Provide specific, actionable response
 4. Include relevant mission details if helpful
 5. Suggest concrete next steps

@@ -51,7 +51,10 @@ interface MissionMetadata {
 const MissionChatStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec, // Standard messages handling
   missionId: Annotation<string>(),
-  currentPhase: Annotation<MissionPhase>(),
+  activePhase: Annotation<MissionPhase | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
+  }),
   isSystemInitiated: Annotation<boolean>({
     value: (x, y) => y ?? x,
     default: () => false
@@ -74,7 +77,7 @@ const MissionChatStateAnnotation = Annotation.Root({
  */
 export type MissionChatState = typeof MessagesAnnotation.State & {
   missionId: string;
-  currentPhase: MissionPhase;
+  activePhase: MissionPhase | undefined;
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
   clarity: MissionClarity | undefined; // ADDED: Mission clarity state
@@ -125,7 +128,7 @@ export class MissionOrchestratorAgent {
           "context_builder",
           this.phaseRouterNode.bind(this),
           {
-            init: "welcome_phase",      // init phase also goes to welcome (fallback)
+            init: "welcome_phase",        // init transitions to welcome
             welcome: "welcome_phase",
             analysis: "analysis_phase",
             converse: "converse_phase"
@@ -153,21 +156,17 @@ export class MissionOrchestratorAgent {
     
     const metadata = await this.loadMissionMetadata(state.missionId);
     updates.metadata = metadata;
-    updates.currentPhase = metadata.mission.phase;
-      
-      // For system-initiated messages, auto-transition to welcome if in init
-      if (state.isSystemInitiated && metadata.mission.phase === 'init') {
-        try {
-          // Use MissionService to ensure WebSocket events are emitted
-          await MissionService.updateMission(state.missionId, { phase: 'welcome' });
-          updates.currentPhase = 'welcome';
-        } catch (error) {
-          this.logger.error('Failed to auto-transition phase', error as Error);
-        }
-      }
+    
+    // Handle init -> welcome transition automatically
+    if (metadata.mission.phase === 'init') {
+      updates.activePhase = 'welcome';
+    } else {
+      updates.activePhase = metadata.mission.phase;
+    }
     
     return updates;
   }
+
 
   /**
    * Create AIMessage with Commander ARIA name
@@ -191,14 +190,14 @@ export class MissionOrchestratorAgent {
    * Now includes clarity data when available
    */
   private buildContext(state: MissionChatState): string {
-    const { metadata, currentPhase, clarity } = state;
+    const { metadata, activePhase, clarity } = state;
     const { mission, starship, vision } = metadata!;
     
     // Include conversation history using dedicated method
     const conversationHistory = this.buildConversationHistory(state);
     
     return renderTemplate(MISSION_PROMPTS.CONTEXT, {
-      currentPhase,
+      activePhase,
       mission,
       starship,
       vision,
@@ -211,7 +210,7 @@ export class MissionOrchestratorAgent {
    * Conditional edge function to determine phase routing
    */
   private phaseRouterNode(state: MissionChatState): string {
-    return state.currentPhase; // Returns 'welcome' or 'converse'
+    return state.activePhase || 'welcome'; // Returns current phase or default to welcome
   }
 
   /**
@@ -235,13 +234,12 @@ ${welcomePhase}`;
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    // After welcome message, transition to analysis phase for clarity assessment
-    await MissionService.updateMission(state.missionId, { phase: 'analysis' });
-    
     const aiMessage = this.createAIMessage(responseContent, state);
+    
+    // Set activePhase to signal transition to analysis after welcome
     return { 
       messages: [aiMessage],
-      currentPhase: 'analysis'
+      activePhase: 'analysis'
     };
   }
 
@@ -259,12 +257,9 @@ ${welcomePhase}`;
     
     // 3. DECISION: Complete or continue
     if (isComplete) {
-      // COMPLETE: Transition to converse phase
-      await MissionService.updateMission(state.missionId, { phase: 'converse' });
-      
       const summary = await this.generateCompletionSummary(state, clarity);
       return {
-        currentPhase: 'converse',
+        activePhase: 'converse',
         messages: [this.createAIMessage(summary, state)],
         clarity
       };
@@ -362,6 +357,45 @@ ${conversePhase}`;
   }
 
   /**
+   * Generate AI response using LangGraph flow - returns both response and final state
+   */
+  async generateResponseWithState(message: string, missionId: string): Promise<{ response: string; state: Partial<MissionChatState> }> {
+    try {
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      // Create user message and let LangGraph handle the flow
+      const userMessage = new HumanMessage({ content: message });
+      
+      // Invoke the graph - it will handle context building, phase routing, and response generation
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [userMessage]
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      // Extract final AI response from the graph result
+      const lastMessage = result.messages[result.messages.length - 1];
+      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : this.getFallbackResponse(missionId);
+
+      return { response, state: result };
+
+    } catch (error) {
+      this.logger.error('Failed to generate orchestrator response', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'generateResponseWithState',
+        missionId
+      }, error as Error);
+      
+      throw error;
+    }
+  }
+
+  /**
    * Generate AI response using LangGraph flow - respects graph state transitions
    */
   async generateResponse(message: string, missionId: string): Promise<string> {
@@ -400,6 +434,40 @@ ${conversePhase}`;
   }
 
 
+
+  /**
+   * Generate system-initiated response with state - returns both response and final state
+   */
+  async generateSystemResponseWithState(missionId: string, message: string): Promise<{ response: string; state: Partial<MissionChatState> }> {
+    try {
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      const systemMessage = new SystemMessage({ 
+        content: message
+      });
+      
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [systemMessage],
+          isSystemInitiated: true
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      const lastMessage = result.messages[result.messages.length - 1];
+      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : this.getFallbackResponse(missionId);
+
+      return { response, state: result };
+
+    } catch (error) {
+      this.logger.error('Failed to generate system response', error as Error);
+      throw error;
+    }
+  }
 
   /**
    * Generate system-initiated response (no user input required)

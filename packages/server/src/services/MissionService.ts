@@ -85,8 +85,8 @@ export class MissionService {
 
     const mission = await missionRepo.createMission(request, userId);
 
-    // Auto-trigger welcome message asynchronously (fire-and-forget)
-    console.log('🚀 Auto-triggering welcome message for mission:', mission.id);
+    // Auto-trigger initial welcome message (graph will handle automatic phase transitions)
+    console.log('🚀 Auto-triggering initial welcome message for mission:', mission.id);
     try {
       const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);

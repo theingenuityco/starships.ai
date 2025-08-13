@@ -112,33 +112,11 @@ export class MissionOrchestratorService {
     
     this.emitMessageEvent(missionId, savedMessage);
 
-    // Auto-trigger analysis phase after welcome phase
-    if (state.activePhase === 'analysis' && state.metadata?.mission?.phase === 'welcome') {
-      await this.triggerAnalysisPhase(missionId, orchestrator);
-    }
-
+    // Note: Graph now handles automatic phase transitions via continuation logic
+    
     return aiResponse;
   }
 
-  /**
-   * Auto-trigger analysis phase after welcome phase
-   */
-  private async triggerAnalysisPhase(missionId: string, orchestrator: MissionOrchestratorAgent): Promise<void> {
-    try {
-      // Trigger analysis phase with empty system message (content not used by analysis node)
-      const analysisResponse = await orchestrator.generateSystemResponseWithState(missionId, "");
-      
-      // Save and emit the analysis message
-      const savedAnalysisMessage = await this.saveSystemMessage(missionId, analysisResponse.response);
-      this.emitMessageEvent(missionId, savedAnalysisMessage);
-      
-      // Sync the final state
-      await this.syncActivePhase(missionId, analysisResponse.state);
-      
-    } catch (error) {
-      this.logger.error('Failed to trigger analysis phase', { missionId }, error as Error);
-    }
-  }
 
   /**
    * Handle user message and generate AI response

@@ -134,8 +134,23 @@ export class MissionOrchestratorAgent {
             converse: "converse_phase"
           }
         )
-        .addEdge("welcome_phase", END)
-        .addEdge("analysis_phase", END)
+        .addConditionalEdges(
+          "welcome_phase",
+          this.shouldContinueFromWelcome.bind(this),
+          {
+            continue: "analysis_phase",
+            end: END
+          }
+        )
+        .addConditionalEdges(
+          "analysis_phase", 
+          this.shouldContinueFromAnalysis.bind(this),
+          {
+            continue: "analysis_phase", // Stay in analysis for iterative questions
+            advance: "converse_phase",   // Move to converse when complete
+            end: END
+          }
+        )
         .addEdge("converse_phase", END)
         .compile({ checkpointer: this.checkpointer });
     }
@@ -214,6 +229,37 @@ export class MissionOrchestratorAgent {
   }
 
   /**
+   * Decide if welcome should auto-continue to analysis
+   */
+  private shouldContinueFromWelcome(state: MissionChatState): string {
+    // Auto-continue from welcome to analysis if it's a system-initiated welcome
+    if (state.isSystemInitiated) {
+      return 'continue';
+    }
+    return 'end';
+  }
+
+  /**
+   * Decide analysis phase continuation
+   */
+  private shouldContinueFromAnalysis(state: MissionChatState): string {
+    const clarity = state.clarity;
+    
+    if (!clarity) {
+      return 'end'; // Something went wrong, stop
+    }
+    
+    // If clarity threshold met, advance to converse
+    if (clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
+        clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS) {
+      return 'advance';
+    }
+    
+    // Continue asking clarifying questions
+    return 'continue';
+  }
+
+  /**
    * Welcome phase node - handles initial mission introduction
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
@@ -255,11 +301,11 @@ ${welcomePhase}`;
     const isComplete = clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
                       clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS;
     
-    // 3. DECISION: Complete or continue
+    // 3. DECISION: Complete or continue (let graph decide next node)
     if (isComplete) {
       const summary = await this.generateCompletionSummary(state, clarity);
       return {
-        activePhase: 'converse',
+        // Don't set activePhase here - let graph handle it via shouldContinueFromAnalysis
         messages: [this.createAIMessage(summary, state)],
         clarity
       };

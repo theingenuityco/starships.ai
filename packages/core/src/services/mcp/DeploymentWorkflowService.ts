@@ -85,17 +85,17 @@ export class DeploymentWorkflowService {
         metadata: { userId, templateId }
       });
 
-      // 3. Get template info and determine deployment type based on feature flag
+      // 3. Get template info
       const template = await this.getTemplate(templateId);
-      const dockerTemplate = getTemplateForDeployment(template.slug);
-      const useHttpBridge = dockerTemplate && isHttpBridgeTemplate(dockerTemplate);
       
-      // Generate service names based on deployment type
-      const serviceName = useHttpBridge ? 
-        `mcp-${starshipId}-${template.slug}-http` : 
-        `mcp-${starshipId}-${template.slug}`;
+      // For KubernetesDeployer, all templates use HTTP bridge by default
+      // The DynamicTemplateGenerator will handle template generation from DB
+      const useHttpBridge = true; // All K8s deployments use HTTP bridge
+      
+      // Generate service names
+      const serviceName = `mcp-${template.slug}-service`;
       const networkName = `starship-${starshipId}`;
-      const internalUrl = useHttpBridge ? `http://${serviceName}:8080` : null;
+      const internalUrl = `http://${serviceName}.${networkName}.svc.cluster.local:8080`;
 
       // 4. Update connector with Docker info and HTTP bridge details
       await this.updateConnectorDockerInfo(connector.id, {
@@ -273,12 +273,9 @@ export class DeploymentWorkflowService {
     
     console.log(`[DeploymentWorkflow] Using template slug: ${slug} for ${template.name}`);
     
-    // Verify we have a Docker service template for this slug
-    const dockerTemplate = getDockerServiceTemplate(slug);
-    if (!dockerTemplate) {
-      throw new Error(`No Docker service template found for slug: ${slug}. Available templates: ${Object.keys(this.getAvailableTemplates()).join(', ')}`);
-    }
-
+    // For Kubernetes deployments, we don't need Docker templates
+    // The DynamicTemplateGenerator will create templates from database
+    // Just return the slug and name
     return {
       slug: slug,
       name: template.name

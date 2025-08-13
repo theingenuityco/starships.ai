@@ -59,15 +59,15 @@ export class MCPToolGatewayDB {
             const template = await serverOptionRepo.findById(connector.templateId);
             if (template) {
               templateSlug = template.slug;
-              // Check if this template uses HTTP bridge
-              const dockerTemplate = await import('./DockerServiceTemplate').then(m => m.getDockerServiceTemplate(templateSlug));
-              isHttpBridgeEnabled = dockerTemplate ? await import('./DockerServiceTemplate').then(m => m.isHttpBridgeTemplate(dockerTemplate)) : false;
+              // For Kubernetes deployments, all templates use HTTP bridge
+              // Check if connector has httpBridgeEnabled flag or internalUrl (indicates K8s deployment)
+              isHttpBridgeEnabled = connector.httpBridgeEnabled || !!connector.internalUrl || true; // Always true for now
             }
           } catch (error) {
             console.warn(`[MCPToolGatewayDB] Could not fetch template info for ${connector.templateId}`);
           }
           
-          // Skip non-HTTP bridge connectors
+          // Skip non-HTTP bridge connectors (should not happen with K8s)
           if (!isHttpBridgeEnabled) {
             console.log(`[MCPToolGatewayDB] Skipping connector ${connector.id} - not HTTP bridge enabled`);
             continue;

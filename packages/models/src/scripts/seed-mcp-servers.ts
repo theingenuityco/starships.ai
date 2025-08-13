@@ -32,6 +32,15 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
       FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}',
     }),
   },
+  {
+    name: 'Notion API',
+    slug: 'notionapi',
+    command: 'npx',
+    args: ['-y', '@notionhq/notion-mcp-server'],
+    env: JSON.stringify({
+      NOTION_TOKEN: '${NOTION_TOKEN}',
+    }),
+  },
 ];
 
 async function seedMCPServers() {

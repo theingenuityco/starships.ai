@@ -176,17 +176,12 @@ MISSION CLARITY ASSESSMENT:
   // ============================================================================
   
   private buildWelcomeInstructions(): string {
-    const latestMessage = this.getLatestMessage();
-    const systemMessage = latestMessage?.content || '';
-    
-    return `WELCOME PHASE - Process the initial welcome system message.
-
-SYSTEM MESSAGE: ${systemMessage}
+    return `WELCOME PHASE - Generate initial welcome message for the new mission.
 
 INSTRUCTIONS:
 1. Introduce yourself as Commander ARIA
 2. Provide a brief welcome and mission overview
-3. Keep it concise and professional
+3. Keep it concise and professional  
 4. Ask them to hold on while you assess the mission objective for clarity
 
 Be welcoming and set expectation for analysis phase.`;

@@ -6,7 +6,6 @@
 import { RepositoryFactory } from '@starships/models';
 import { MissionOrchestratorService } from './MissionOrchestratorService';
 import { MissionEventService } from './MissionEventService';
-import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type {
   Mission,
   CreateMissionRequest,
@@ -91,14 +90,11 @@ export class MissionService {
       const missionOrchestratorService = MissionOrchestratorService.getInstance();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
-      const welcomeMessage = renderTemplate(MISSION_PROMPTS.INITIAL_WELCOME, {
-        mission: mission,
-        agents: assignedAgents
-      });
-      console.log('💬 Sending welcome message:', welcomeMessage);
+      const welcomeTrigger = "WELCOME_TRIGGER";
+      console.log('💬 Triggering welcome sequence for mission:', mission.id);
       
       // Removed await here - fire and forget!
-      missionOrchestratorService.handleSystemMessage(mission.id, welcomeMessage)
+      missionOrchestratorService.handleSystemMessage(mission.id, welcomeTrigger)
         .then(response => {
           console.log('✅ Welcome message sent successfully, response:', response);
         })

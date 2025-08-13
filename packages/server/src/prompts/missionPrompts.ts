@@ -50,23 +50,9 @@ export interface WelcomeMessageData {
 /**
  * Legacy mission prompt templates - DEPRECATED
  * 
- * Most prompts have been migrated to MissionPromptBuilder.
- * Only keeping templates still used by other services.
+ * All prompts have been migrated to MissionPromptBuilder.
+ * This file can be removed once renderTemplate is no longer used elsewhere.
  */
-export const MISSION_PROMPTS = {
-  // Used by MissionService for initial welcome messages
-  INITIAL_WELCOME: `New mission "<%= mission.name %>" is ready.
-
-Generate a brief welcome with:
-- Mission name and description
-- Ready to begin
-- Ask them to hold on while you assess the mission objective for clarity
-
-MISSION DATA:
-- Name: "<%= mission.name %>"
-- Description: "<%= mission.description %>"
-- Status: Ready to begin`
-} as const;
 
 /**
  * Simple helper to render templates with lodash

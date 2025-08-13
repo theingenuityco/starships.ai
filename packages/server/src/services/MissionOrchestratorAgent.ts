@@ -250,7 +250,7 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Decide analysis phase continuation
+   * Decide analysis phase continuation - always end to wait for human response
    */
   private shouldContinueFromAnalysis(state: MissionChatState): string {
     const clarity = state.clarity;
@@ -259,14 +259,14 @@ export class MissionOrchestratorAgent {
       return 'end'; // Something went wrong, stop
     }
     
-    // If clarity threshold met, advance to converse
+    // If clarity threshold met OR max iterations reached, advance to converse
     if (clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
         clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS) {
-      return 'advance';
+      return 'advance'; // Move to converse_phase
     }
     
-    // Continue asking clarifying questions
-    return 'continue';
+    // Always end after generating a question to wait for human response
+    return 'end'; // Wait for user to respond, then they'll send another message
   }
 
   /**
@@ -305,45 +305,46 @@ ${welcomePhase}`;
   }
 
   /**
-   * ENHANCED Analysis phase node - handles mission clarity assessment with iterative questioning
-   * Uses buildContext() which now includes clarity data, and MISSION_PROMPTS for consistency
+   * Interactive Analysis phase node - handles mission clarity assessment with human-in-the-loop Q&A
+   * Processes user responses and generates next question or completion when threshold is met
    */
   private async analysisPhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    // 1. EVALUATE: AI assessment + DB save
+    // Assess current clarity (includes all conversation context including any new user answers)
     const clarity = await this.assessAndSaveClarity(state);
     
-    // 2. CHECK: Threshold evaluation  
+    // Check if analysis is complete
     const isComplete = clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
                       clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS;
     
-    // 3. DECISION: Complete or continue (let graph decide next node)
     if (isComplete) {
+      // Generate completion summary - analysis is done
       const summary = await this.generateCompletionSummary(state, clarity);
       const aiMessage = this.createAIMessage(summary, state);
       
-      // NEW: Save completion message immediately
+      // Save completion message immediately
       if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
-        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_phase_complete', this.currentMissionId);
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_complete', this.currentMissionId);
       }
       
       return {
-        // Don't set activePhase here - let graph handle it via shouldContinueFromAnalysis
         messages: [aiMessage],
-        clarity
+        clarity,
+        activePhase: 'converse' // Transition to converse phase
       };
     } else {
-      // ASK: Generate next clarifying question using context with clarity data
+      // Generate next question and END - wait for human response
       const question = await this.generateFocusedQuestion(state, clarity);
       const aiMessage = this.createAIMessage(question, state);
       
-      // NEW: Save analysis question immediately
+      // Save analysis question immediately
       if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
-        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_phase_question', this.currentMissionId);
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_question', this.currentMissionId);
       }
       
       return {
         messages: [aiMessage],
-        clarity // Update state with latest clarity
+        clarity
+        // Stay in analysis phase - graph will END and wait for user response
       };
     }
   }
@@ -695,7 +696,7 @@ ${conversePhase}`;
   /**
    * Generate fallback response when LLM fails
    */
-  private getFallbackResponse(missionId: string): string {
+  private getFallbackResponse(_missionId: string): string {
     return MISSION_PROMPTS.FALLBACK;
   }
 
@@ -776,7 +777,7 @@ ${clarityPrompt}`;
   /**
    * Generate focused question based on clarity assessment
    */
-  private async generateFocusedQuestion(state: MissionChatState, clarity: MissionClarity): Promise<string> {
+  private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarity): Promise<string> {
     // Build context same as other phases (includes clarity assessment and conversation)
     const context = this.buildContext(state);
     const questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {});
@@ -798,7 +799,7 @@ ${questionPrompt}`;
   /**
    * Generate completion summary when clarity threshold is met
    */
-  private async generateCompletionSummary(state: MissionChatState, clarity: MissionClarity): Promise<string> {
+  private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarity): Promise<string> {
     // Build context same as other phases (includes clarity assessment and conversation)
     const context = this.buildContext(state);
     const completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {});
@@ -843,8 +844,9 @@ ${completionPrompt}`;
       return '';
     }
 
-    // Simple windowing - keep last 8 messages to prevent context overflow
-    const recentMessages = state.messages.slice(-8);
+    // Include more messages during analysis phase to capture user Q&A
+    const messageLimit = state.activePhase === 'analysis' ? 12 : 8;
+    const recentMessages = state.messages.slice(-messageLimit);
     
     return this.buildConversationText(recentMessages);
   }

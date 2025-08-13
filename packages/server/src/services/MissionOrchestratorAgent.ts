@@ -11,7 +11,7 @@ import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-pro
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
-import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
+import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import type { 
   Mission, 
   MissionPhase,
@@ -212,23 +212,10 @@ export class MissionOrchestratorAgent {
 
   /**
    * Build context string from state for use in prompts
-   * Now includes clarity data when available
+   * Now uses MissionPromptBuilder for state-driven prompt generation
    */
   private buildContext(state: MissionChatState): string {
-    const { metadata, activePhase, clarity } = state;
-    const { mission, starship, vision } = metadata!;
-    
-    // Include conversation history using dedicated method
-    const conversationHistory = this.buildConversationHistory(state);
-    
-    return renderTemplate(MISSION_PROMPTS.CONTEXT, {
-      activePhase,
-      mission,
-      starship,
-      vision,
-      clarity,
-      conversationHistory
-    });
+    return new MissionPromptBuilder(state).buildPrompt();
   }
 
   /**
@@ -273,26 +260,15 @@ export class MissionOrchestratorAgent {
    * Welcome phase node - handles initial mission introduction
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const latestMessage = state.messages[state.messages.length - 1];
-    const systemMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
-    
-    // Build complete welcome prompt using template literals
-    const context = this.buildContext(state);
-    const welcomePhase = renderTemplate(MISSION_PROMPTS.WELCOME_PHASE, {
-      systemMessage,
-      isSystemInitiated: !!state.isSystemInitiated
-    });
-    
-    const systemPrompt = `${context}
-
-${welcomePhase}`;
+    // Build complete welcome prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildPrompt();
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
     const aiMessage = this.createAIMessage(responseContent, state);
     
-    // NEW: Save message immediately via callback
+    // Save message immediately via callback
     if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
       await this.currentCallbacks.onMessageGenerated(aiMessage, 'welcome_phase', this.currentMissionId);
     }
@@ -356,25 +332,15 @@ ${welcomePhase}`;
    * Converse phase node - handles ongoing mission conversation
    */
   private async conversePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const latestMessage = state.messages[state.messages.length - 1];
-    const userMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
-    
-    // Build complete converse prompt using template literals
-    const context = this.buildContext(state);
-    const conversePhase = renderTemplate(MISSION_PROMPTS.CONVERSE_PHASE, {
-      userMessage
-    });
-    
-    const systemPrompt = `${context}
-
-${conversePhase}`;
+    // Build complete converse prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildPrompt();
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
     const aiMessage = this.createAIMessage(responseContent, state);
     
-    // NEW: Save converse message immediately
+    // Save converse message immediately
     if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
       await this.currentCallbacks.onMessageGenerated(aiMessage, 'converse_phase', this.currentMissionId);
     }
@@ -700,7 +666,7 @@ ${conversePhase}`;
    * Generate fallback response when LLM fails
    */
   private getFallbackResponse(_missionId: string): string {
-    return MISSION_PROMPTS.FALLBACK;
+    return `I'm here to help guide your mission. Could you provide more details about what you need assistance with?`;
   }
 
   // ============================================================================
@@ -747,13 +713,8 @@ ${conversePhase}`;
    * Uses full context (including existing clarity data) via buildContext
    */
   private async assessMissionClarity(state: MissionChatState, iteration: number): Promise<CreateMissionClarityRequest> {
-    // Build full context including mission, vision, and any existing clarity
-    const context = this.buildContext(state);
-    const clarityPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_ASSESSMENT, {});
-
-    const systemPrompt = `${context}
-
-${clarityPrompt}`;
+    // Build clarity assessment prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityAssessmentPrompt();
 
     const prompt: LLMChatPrompt = {
       messages: [{
@@ -780,22 +741,9 @@ ${clarityPrompt}`;
   /**
    * Generate focused question based on clarity assessment
    */
-  private async generateFocusedQuestion(state: MissionChatState, clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
-    // Build context same as other phases (includes clarity assessment and conversation)
-    const context = this.buildContext(state);
-    
-    let questionPrompt;
-    if (isFirstIteration) {
-      // First iteration: Show clarity summary + focused question
-      questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION_WITH_SUMMARY, {});
-    } else {
-      // Subsequent iterations: Just the focused question
-      questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {});
-    }
-
-    const systemPrompt = `${context}
-
-${questionPrompt}`;
+  private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
+    // Build clarity question prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityQuestionPrompt(isFirstIteration);
 
     const prompt: LLMChatPrompt = {
       messages: [{
@@ -810,22 +758,9 @@ ${questionPrompt}`;
   /**
    * Generate completion summary when clarity threshold is met
    */
-  private async generateCompletionSummary(state: MissionChatState, clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
-    // Build context same as other phases (includes clarity assessment and conversation)
-    const context = this.buildContext(state);
-    
-    let completionPrompt;
-    if (isFirstIteration) {
-      // First iteration: Show clarity summary + completion
-      completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION_WITH_SUMMARY, {});
-    } else {
-      // Subsequent iterations: Just the completion
-      completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {});
-    }
-
-    const systemPrompt = `${context}
-
-${completionPrompt}`;
+  private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
+    // Build clarity completion prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityCompletionPrompt(isFirstIteration);
 
     const prompt: LLMChatPrompt = {
       messages: [{

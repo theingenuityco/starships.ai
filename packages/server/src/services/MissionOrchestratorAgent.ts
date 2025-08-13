@@ -312,13 +312,16 @@ ${welcomePhase}`;
     // Assess current clarity (includes all conversation context including any new user answers)
     const clarity = await this.assessAndSaveClarity(state);
     
+    // Check if this is the first analysis iteration (show transparency)
+    const isFirstIteration = clarity.iteration === 1;
+    
     // Check if analysis is complete
     const isComplete = clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
                       clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS;
     
     if (isComplete) {
       // Generate completion summary - analysis is done
-      const summary = await this.generateCompletionSummary(state, clarity);
+      const summary = await this.generateCompletionSummary(state, clarity, isFirstIteration);
       const aiMessage = this.createAIMessage(summary, state);
       
       // Save completion message immediately
@@ -333,7 +336,7 @@ ${welcomePhase}`;
       };
     } else {
       // Generate next question and END - wait for human response
-      const question = await this.generateFocusedQuestion(state, clarity);
+      const question = await this.generateFocusedQuestion(state, clarity, isFirstIteration);
       const aiMessage = this.createAIMessage(question, state);
       
       // Save analysis question immediately
@@ -777,10 +780,18 @@ ${clarityPrompt}`;
   /**
    * Generate focused question based on clarity assessment
    */
-  private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarity): Promise<string> {
+  private async generateFocusedQuestion(state: MissionChatState, clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
     // Build context same as other phases (includes clarity assessment and conversation)
     const context = this.buildContext(state);
-    const questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {});
+    
+    let questionPrompt;
+    if (isFirstIteration) {
+      // First iteration: Show clarity summary + focused question
+      questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION_WITH_SUMMARY, {});
+    } else {
+      // Subsequent iterations: Just the focused question
+      questionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_QUESTION, {});
+    }
 
     const systemPrompt = `${context}
 
@@ -799,10 +810,18 @@ ${questionPrompt}`;
   /**
    * Generate completion summary when clarity threshold is met
    */
-  private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarity): Promise<string> {
+  private async generateCompletionSummary(state: MissionChatState, clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
     // Build context same as other phases (includes clarity assessment and conversation)
     const context = this.buildContext(state);
-    const completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {});
+    
+    let completionPrompt;
+    if (isFirstIteration) {
+      // First iteration: Show clarity summary + completion
+      completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION_WITH_SUMMARY, {});
+    } else {
+      // Subsequent iterations: Just the completion
+      completionPrompt = renderTemplate(MISSION_PROMPTS.CLARITY_COMPLETION, {});
+    }
 
     const systemPrompt = `${context}
 

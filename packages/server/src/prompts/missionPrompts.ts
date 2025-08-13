@@ -133,9 +133,13 @@ Respond with ONLY this JSON format:
 
 Be conversational and helpful. Focus on gathering missing information to improve mission clarity.`,
 
+  CLARITY_QUESTION_WITH_SUMMARY: `This is the first analysis iteration. Start your response by sharing the mission clarity assessment results with the user in a conversational way, then ask ONE focused question to help improve the lowest-scoring area. Be helpful and encouraging.`,
+
   CLARITY_COMPLETION: `The mission clarity assessment is complete and sufficient to proceed.
 
 Generate a brief, positive summary (2-3 sentences) acknowledging that the mission is now clear enough to move forward with execution planning.`,
+
+  CLARITY_COMPLETION_WITH_SUMMARY: `This is the first analysis iteration and the mission has achieved sufficient clarity. Start your response by sharing the mission clarity assessment results with the user in a conversational way, then provide a brief, positive completion summary (2-3 sentences) acknowledging readiness to move forward with execution planning. Be encouraging and confident.`,
 
   CONVERSE_PHASE: `CONVERSE PHASE - Analyze user request and provide mission-focused guidance.
 

@@ -34,6 +34,16 @@ export class MCPToolWrapper {
       return {};
     }
     
+    // Handle case where agent passes JSON as a string
+    if (typeof input === 'string' && (input.startsWith('{') || input.startsWith('['))) {
+      try {
+        input = JSON.parse(input);
+        console.log(`[MCPToolWrapper] Parsed JSON string input to object:`, input);
+      } catch (e) {
+        console.log(`[MCPToolWrapper] Failed to parse JSON string, treating as regular string`);
+      }
+    }
+    
     // If input is already correctly formatted, return as-is
     if (typeof input === 'object' && !input.hasOwnProperty('input')) {
       return input;
@@ -57,7 +67,19 @@ export class MCPToolWrapper {
     }
     
     // Try to map 'input' to the most likely parameter
-    if (input.input !== undefined && propertyNames.length > 0) {
+    if (input.input !== undefined) {
+      // For Notion search, allow empty query to search all pages
+      if (mcpTool.name.includes('search') && input.input === '') {
+        console.log(`[MCPToolWrapper] Returning empty object for search with empty query`);
+        // Return empty object for search with no query (searches all)
+        return {};
+      }
+      
+      // If there are no properties but we have input.input, still return empty object
+      if (propertyNames.length === 0) {
+        return {};
+      }
+      
       // Common parameter name mappings
       const mappings: Record<string, string[]> = {
         'url': ['url', 'uri', 'link', 'href', 'website', 'address'],
@@ -123,9 +145,9 @@ export class MCPToolWrapper {
           }
           
           // Map input parameters if needed
-          console.log(`[MCPToolWrapper] Raw input before mapping:`, typeof input, input);
+          console.log(`[MCPToolWrapper] Raw input before mapping:`, typeof input, JSON.stringify(input));
           let processedInput = this.mapInputParameters(input, mcpTool);
-          console.log(`[MCPToolWrapper] Processed input after mapInputParameters:`, processedInput);
+          console.log(`[MCPToolWrapper] Processed input after mapInputParameters:`, JSON.stringify(processedInput));
           
           // Special handling for sequential thinking tool
           if (mcpTool.templateSlug === 'sequentialthinking') {

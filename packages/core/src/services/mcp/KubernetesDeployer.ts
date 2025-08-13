@@ -383,6 +383,19 @@ users:
     const namespaceName = this.generateNamespaceName(starshipId);
     const configMapName = this.generateConfigMapName(starshipId, templateSlug);
     
+    // Special handling for Notion MCP server - convert NOTION_TOKEN to OPENAPI_MCP_HEADERS
+    const processedEnv = { ...userEnv };
+    if (templateSlug === 'notionapi' && processedEnv.NOTION_TOKEN) {
+      // Notion MCP server expects the token in OPENAPI_MCP_HEADERS format
+      const notionToken = processedEnv.NOTION_TOKEN;
+      processedEnv.OPENAPI_MCP_HEADERS = JSON.stringify({
+        "Authorization": `Bearer ${notionToken}`,
+        "Notion-Version": "2022-06-28"
+      });
+      // Keep NOTION_TOKEN for backward compatibility
+      console.log(`[KubernetesDeployer] Converted NOTION_TOKEN to OPENAPI_MCP_HEADERS for Notion MCP`);
+    }
+    
     // Build environment variables
     const envData: Record<string, string> = {
       MCP_SERVER_CMD: template.command || 'npx',
@@ -392,7 +405,7 @@ users:
       HEALTH_CHECK_TIMEOUT: '30000',
       MAX_CONCURRENT_REQUESTS: '10',
       INIT_TIMEOUT: '120000',
-      ...userEnv // Include user-provided environment variables (API keys, etc.)
+      ...processedEnv // Include processed user-provided environment variables (API keys, etc.)
     };
     
     const configMap: k8s.V1ConfigMap = {

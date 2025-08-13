@@ -11,11 +11,9 @@ import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-pro
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
-import { MissionService } from './MissionService';
 import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type { 
   Mission, 
-  MissionMessage,
   MissionPhase,
   MissionClarity,
   CreateMissionClarityRequest,
@@ -34,6 +32,14 @@ export interface MissionOrchestratorAgentConfig {
   model?: string;
 }
 
+/**
+ * Callbacks for real-time graph execution
+ */
+export interface GraphExecutionCallbacks {
+  onMessageGenerated: (message: AIMessage, nodeId: string, missionId: string) => Promise<void>;
+  onPhaseChange?: (newPhase: MissionPhase, missionId: string) => Promise<void>;
+  onStateUpdate?: (state: Partial<MissionChatState>) => Promise<void>;
+}
 
 /**
  * Mission metadata for AI response generation
@@ -91,6 +97,10 @@ export class MissionOrchestratorAgent {
   private llmProvider: LLMProvider | null = null;
   private checkpointer = new MemorySaver();
   private compiledGraph: any = null; // Cache compiled graph
+  
+  // Callback storage for real-time execution
+  private currentCallbacks?: GraphExecutionCallbacks;
+  private currentMissionId?: string;
   
   // Clarity assessment configuration constants
   private static readonly CLARITY_THRESHOLD = 7.0;
@@ -282,6 +292,11 @@ ${welcomePhase}`;
     
     const aiMessage = this.createAIMessage(responseContent, state);
     
+    // NEW: Save message immediately via callback
+    if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+      await this.currentCallbacks.onMessageGenerated(aiMessage, 'welcome_phase', this.currentMissionId);
+    }
+    
     // Set activePhase to signal transition to analysis after welcome
     return { 
       messages: [aiMessage],
@@ -304,16 +319,30 @@ ${welcomePhase}`;
     // 3. DECISION: Complete or continue (let graph decide next node)
     if (isComplete) {
       const summary = await this.generateCompletionSummary(state, clarity);
+      const aiMessage = this.createAIMessage(summary, state);
+      
+      // NEW: Save completion message immediately
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_phase_complete', this.currentMissionId);
+      }
+      
       return {
         // Don't set activePhase here - let graph handle it via shouldContinueFromAnalysis
-        messages: [this.createAIMessage(summary, state)],
+        messages: [aiMessage],
         clarity
       };
     } else {
       // ASK: Generate next clarifying question using context with clarity data
       const question = await this.generateFocusedQuestion(state, clarity);
+      const aiMessage = this.createAIMessage(question, state);
+      
+      // NEW: Save analysis question immediately
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_phase_question', this.currentMissionId);
+      }
+      
       return {
-        messages: [this.createAIMessage(question, state)],
+        messages: [aiMessage],
         clarity // Update state with latest clarity
       };
     }
@@ -340,6 +369,12 @@ ${conversePhase}`;
     const responseContent = await this.callLLM(prompt);
     
     const aiMessage = this.createAIMessage(responseContent, state);
+    
+    // NEW: Save converse message immediately
+    if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+      await this.currentCallbacks.onMessageGenerated(aiMessage, 'converse_phase', this.currentMissionId);
+    }
+    
     return { messages: [aiMessage] };
   }
 
@@ -434,6 +469,63 @@ ${conversePhase}`;
       this.logger.error('Failed to generate orchestrator response', {
         service: 'MissionOrchestratorAgent',
         operation: 'generateResponseWithState',
+        missionId
+      }, error as Error);
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Execute graph with real-time callbacks for immediate message saving
+   */
+  async executeGraphWithCallbacks(
+    missionId: string, 
+    input: string, 
+    callbacks: GraphExecutionCallbacks,
+    isSystemMessage: boolean = false
+  ): Promise<{ finalResponse: string; state: Partial<MissionChatState> }> {
+    try {
+      // Store callbacks and missionId for use in nodes
+      this.currentCallbacks = callbacks;
+      this.currentMissionId = missionId;
+
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      const inputMessage = isSystemMessage 
+        ? new SystemMessage({ content: input })
+        : new HumanMessage({ content: input });
+      
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [inputMessage],
+          isSystemInitiated: isSystemMessage
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      // Extract final response
+      const lastMessage = result.messages[result.messages.length - 1];
+      const finalResponse = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : this.getFallbackResponse(missionId);
+
+      // Clear callback storage
+      this.currentCallbacks = undefined;
+      this.currentMissionId = undefined;
+
+      return { finalResponse, state: result };
+
+    } catch (error) {
+      // Clear callback storage on error
+      this.currentCallbacks = undefined;
+      this.currentMissionId = undefined;
+
+      this.logger.error('Failed to execute graph with callbacks', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'executeGraphWithCallbacks',
         missionId
       }, error as Error);
       

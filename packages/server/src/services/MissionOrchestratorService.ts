@@ -5,16 +5,18 @@
  * for real-time mission coordination.
  */
 
-import { MissionOrchestratorAgent, type MissionChatState } from './MissionOrchestratorAgent';
+import { MissionOrchestratorAgent, type MissionChatState, type GraphExecutionCallbacks } from './MissionOrchestratorAgent';
 import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ErrorFactory } from '@starships/protocol';
+import { AIMessage } from '@langchain/core/messages';
 import type { 
   MissionMessage,
   MissionChatResponse,
-  SendMissionMessageRequest
+  SendMissionMessageRequest,
+  MissionPhase
 } from '@starships/protocol';
 
 /**
@@ -96,25 +98,47 @@ export class MissionOrchestratorService {
       this.emitMessageEvent(missionId, savedUserMessage);
     }
 
-    // Generate AI response with state
+    // NEW: Execute graph with real-time callbacks for immediate message saving
     const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
-    const { response: aiResponse, state } = options?.isSystemMessage 
-      ? await orchestrator.generateSystemResponseWithState(missionId, message)
-      : await orchestrator.generateResponseWithState(message, missionId);
+    const { finalResponse, state } = await orchestrator.executeGraphWithCallbacks(
+      missionId, 
+      message, 
+      {
+        onMessageGenerated: async (aiMessage: AIMessage, nodeId: string, missionId: string) => {
+          // Save and emit each message immediately as it's generated
+          const savedMessage = options?.isSystemMessage
+            ? await this.saveSystemMessage(missionId, aiMessage.content as string)
+            : await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
+          
+          this.emitMessageEvent(missionId, savedMessage);
+          
+          this.logger.info('Real-time message saved and emitted', {
+            service: 'MissionOrchestratorService',
+            operation: 'onMessageGenerated',
+            missionId,
+            nodeId,
+            messageLength: (aiMessage.content as string)?.length
+          });
+        },
+        
+        onPhaseChange: async (newPhase: MissionPhase, missionId: string) => {
+          await this.syncActivePhase(missionId, { activePhase: newPhase });
+          
+          this.logger.info('Phase change processed', {
+            service: 'MissionOrchestratorService', 
+            operation: 'onPhaseChange',
+            missionId,
+            newPhase
+          });
+        }
+      },
+      !!options?.isSystemMessage
+    );
     
-    // Handle activePhase synchronization
+    // Sync final state
     await this.syncActivePhase(missionId, state);
 
-    // Save AI response
-    const savedMessage = options?.isSystemMessage
-      ? await this.saveSystemMessage(missionId, aiResponse)
-      : await this.saveOrchestratorMessage(missionId, aiResponse);
-    
-    this.emitMessageEvent(missionId, savedMessage);
-
-    // Note: Graph now handles automatic phase transitions via continuation logic
-    
-    return aiResponse;
+    return finalResponse;
   }
 
 

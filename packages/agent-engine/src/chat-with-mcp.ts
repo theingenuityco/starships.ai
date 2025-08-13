@@ -9,6 +9,7 @@ import { AgentExecutor } from "langchain/agents";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createOpenAIFunctionsAgent, createToolCallingAgent } from "langchain/agents";
+import { MCPAgentExecutor } from "./agents/MCPAgentExecutor";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 
@@ -447,11 +448,15 @@ When appropriate, use these tools to provide better assistance. You are connecte
       prompt,
     });
     
-    // Create the executor
-    const executor = new AgentExecutor({
+    // Create custom executor that fixes parameter passing
+    const executor = MCPAgentExecutor.fromAgentAndTools({
       agent: agentExecutor,
       tools: mcpTools,
       verbose: true,
+      maxIterations: 10,
+      returnIntermediateSteps: true,
+      handleParsingErrors: true,
+      earlyStoppingMethod: "force",
     });
     
     // Format chat history

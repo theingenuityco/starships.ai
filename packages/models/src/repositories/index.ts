@@ -28,6 +28,9 @@ export { ExpeditionResultRepository } from './ExpeditionResultRepository.stub';
 export { WorkflowRepository } from './WorkflowRepository';
 export { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
+// Export mission clarity repository
+export { MissionClarityRepository } from './MissionClarityRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -44,6 +47,9 @@ import { ExpeditionResultRepository } from './ExpeditionResultRepository.stub';
 // Import workflow repositories
 import { WorkflowRepository } from './WorkflowRepository';
 import { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
+
+// Import mission clarity repository
+import { MissionClarityRepository } from './MissionClarityRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -79,6 +85,9 @@ export class RepositoryFactory {
   // Workflow repository instances
   private static workflowRepo: WorkflowRepository | null = null;
   private static workflowRuntimeStateRepo: WorkflowRuntimeStateRepository | null = null;
+
+  // Mission clarity repository instance
+  private static missionClarityRepo: MissionClarityRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -146,6 +155,9 @@ export class RepositoryFactory {
       this.workflowRepo = new WorkflowRepository();
       this.workflowRuntimeStateRepo = new WorkflowRuntimeStateRepository();
 
+      // Initialize mission clarity repository (no dependencies)
+      this.missionClarityRepo = new MissionClarityRepository();
+
       // Initialize repositories with dependencies
       this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
       this.starshipRepo = new StarshipRepository();
@@ -210,6 +222,7 @@ export class RepositoryFactory {
         expeditionResultRepo: this.expeditionResultRepo !== null,
         workflowRepo: this.workflowRepo !== null,
         workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
+        missionClarityRepo: this.missionClarityRepo !== null,
       }
     };
   }
@@ -405,6 +418,17 @@ export class RepositoryFactory {
     return this.missionRepo;
   }
 
+  /**
+   * Get MissionClarityRepository instance (synchronous)
+   */
+  static getMissionClarityRepository(): MissionClarityRepository {
+    this.ensureInitialized();
+    if (!this.missionClarityRepo) {
+      throw new Error('MissionClarityRepository not initialized');
+    }
+    return this.missionClarityRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -432,6 +456,7 @@ export class RepositoryFactory {
     this.expeditionResultRepo = null;
     this.workflowRepo = null;
     this.workflowRuntimeStateRepo = null;
+    this.missionClarityRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

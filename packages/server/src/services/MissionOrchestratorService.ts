@@ -67,104 +67,101 @@ export class MissionOrchestratorService {
 
 
   /**
-   * Handle any message and generate AI response
+   * Core orchestration method - handles different types of mission interactions
    */
-  private async handleMessage(missionId: string, message: string, options?: {
-    userId?: string;
-    isSystemMessage?: boolean;
-  }): Promise<string> {
+  private async executeOrchestration(
+    missionId: string, 
+    operation: 'user-message' | 'system-message' | 'start-mission',
+    input?: {
+      message?: string;
+      userId?: string;
+    }
+  ): Promise<string> {
     // Check if mission exists
     const missionRepo = RepositoryFactory.getMissionRepository();
     await missionRepo.getMissionById(missionId);
 
-    // Validate message content
-    if (!message?.trim()) {
-      throw ErrorFactory.validation([
-        { field: 'message', message: 'Message content is required' }
-      ], {
-        service: 'MissionOrchestratorService',
-        operation: 'handleMessage',
-        resource: 'mission',
-        resourceId: missionId
-      });
-    }
+    const context = {
+      service: 'MissionOrchestratorService',
+      operation,
+      resource: 'mission',
+      resourceId: missionId,
+      metadata: input
+    };
 
-    // Save input message (user only, system messages don't save input)
-    if (options?.userId && !options?.isSystemMessage) {
-      const savedUserMessage = await this.saveUserMessage(missionId, options.userId, message);
-      this.emitMessageEvent(missionId, savedUserMessage);
-    }
-
-    // Create stateless orchestrator agent for this request
-    const orchestrator = this.createOrchestratorAgent();
-    const { finalResponse, state } = await orchestrator.executeGraphWithCallbacks(
-      missionId, 
-      message, 
-      {
-        onMessageGenerated: async (aiMessage: AIMessage, nodeId: string, missionId: string) => {
-          // Save and emit each message immediately as it's generated
-          const savedMessage = options?.isSystemMessage
-            ? await this.saveSystemMessage(missionId, aiMessage.content as string)
-            : await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
-          
-          this.emitMessageEvent(missionId, savedMessage);
-          
-          this.logger.info('Real-time message saved and emitted', {
-            service: 'MissionOrchestratorService',
-            operation: 'onMessageGenerated',
-            missionId,
-            nodeId,
-            messageLength: (aiMessage.content as string)?.length
-          });
-        },
-        
-        onPhaseChange: async (newPhase: MissionPhase, missionId: string) => {
-          await this.syncActivePhase(missionId, { activePhase: newPhase });
-          
-          this.logger.info('Phase change processed', {
-            service: 'MissionOrchestratorService', 
-            operation: 'onPhaseChange',
-            missionId,
-            newPhase
-          });
-        }
-      },
-      !!options?.isSystemMessage
-    );
+    // Handle different orchestration types
+    let aiResponse: string;
     
-    // Sync final state
-    await this.syncActivePhase(missionId, state);
+    if (operation === 'start-mission') {
+      // Direct welcome generation without graph execution
+      const orchestrator = this.createOrchestratorAgent();
+      aiResponse = await orchestrator.generateWelcomeMessage(missionId);
+      
+      // Save and emit welcome message
+      const savedMessage = await this.saveOrchestratorMessage(missionId, aiResponse);
+      this.emitMessageEvent(missionId, savedMessage);
+      
+      // Set mission phase to analysis (auto-progression after welcome)
+      await this.syncActivePhase(missionId, { activePhase: 'analysis' });
+      
+    } else {
+      // Graph-based execution for user/system messages
+      const { message = '', userId } = input || {};
+      
+      // Validate message content
+      if (!message?.trim()) {
+        throw ErrorFactory.validation([
+          { field: 'message', message: 'Message content is required' }
+        ], context);
+      }
 
-    return finalResponse;
+      // Save input message (user only, system messages don't save input)
+      const isSystemMessage = operation === 'system-message';
+      if (userId && !isSystemMessage) {
+        const savedUserMessage = await this.saveUserMessage(missionId, userId, message);
+        this.emitMessageEvent(missionId, savedUserMessage);
+      }
+
+      // Execute graph with callbacks
+      const orchestrator = this.createOrchestratorAgent();
+      const { finalResponse, state } = await orchestrator.executeGraphWithCallbacks(
+        missionId, 
+        message, 
+        {
+          onMessageGenerated: async (aiMessage: AIMessage, nodeId: string, missionId: string) => {
+            const savedMessage = isSystemMessage
+              ? await this.saveSystemMessage(missionId, aiMessage.content as string)
+              : await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
+            
+            this.emitMessageEvent(missionId, savedMessage);
+            
+          },
+          
+          onPhaseChange: async (newPhase: MissionPhase, missionId: string) => {
+            await this.syncActivePhase(missionId, { activePhase: newPhase });
+            
+          }
+        },
+        isSystemMessage
+      );
+      
+      // Sync final state
+      await this.syncActivePhase(missionId, state);
+      aiResponse = finalResponse;
+    }
+
+    return aiResponse;
   }
-
 
   /**
    * Handle user message and generate AI response
    */
   async handleUserMessage(missionId: string, userId: string, message: string): Promise<MissionChatResponse> {
-    const context = {
-      service: 'MissionOrchestratorService',
-      operation: 'handleUserMessage',
-      resource: 'mission',
-      resourceId: missionId,
-      metadata: { userId, messageLength: message?.length }
-    };
-
-    this.logger.info('Handling user message', context);
-
     try {
-      const aiResponse = await this.handleMessage(missionId, message, { userId });
-
-      this.logger.info('Successfully handled user message', {
-        ...context,
-        metadata: { ...context.metadata, responseLength: aiResponse?.length }
-      });
-
+      const aiResponse = await this.executeOrchestration(missionId, 'user-message', { message, userId });
       return { reply: aiResponse };
-
     } catch (error) {
-      this.logger.error('Failed to handle user message', context, error as Error);
+      this.logger.error('Failed to handle user message', { missionId }, error as Error);
       
       if (error instanceof Error && 'code' in error) {
         throw error;
@@ -174,7 +171,7 @@ export class MissionOrchestratorService {
         'MISSION_MESSAGE_SEND_FAILED',
         'Failed to process user message',
         error instanceof Error ? error.message : 'Unknown error',
-        context
+        { service: 'MissionOrchestratorService', operation: 'handleUserMessage', resource: 'mission', resourceId: missionId }
       );
     }
   }
@@ -386,16 +383,6 @@ export class MissionOrchestratorService {
 
       this.socketService.getIO().to(missionRoom).emit('mission:message-sent' as any, eventData);
       
-      this.logger.info('Emitted message event', {
-        service: 'MissionOrchestratorService',
-        operation: 'emitMessageEvent',
-        resource: 'mission',
-        resourceId: missionId,
-        metadata: { 
-          room: missionRoom,
-          messageRole: message.role
-        }
-      });
     }
   }
 
@@ -417,9 +404,21 @@ export class MissionOrchestratorService {
    */
   async handleSystemMessage(missionId: string, message: string): Promise<string> {
     try {
-      return await this.handleMessage(missionId, message, { isSystemMessage: true });
+      return await this.executeOrchestration(missionId, 'system-message', { message });
     } catch (error) {
-      this.logger.error('Failed to handle system message', error as Error);
+      this.logger.error('Failed to handle system message', { missionId }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Start mission orchestration - generates initial welcome and sets up mission session
+   */
+  async startMission(missionId: string): Promise<void> {
+    try {
+      await this.executeOrchestration(missionId, 'start-mission');
+    } catch (error) {
+      this.logger.error('Failed to start mission orchestration', { missionId }, error as Error);
       throw error;
     }
   }

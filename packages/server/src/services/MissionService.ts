@@ -84,27 +84,24 @@ export class MissionService {
 
     const mission = await missionRepo.createMission(request, userId);
 
-    // Auto-trigger initial welcome message (graph will handle automatic phase transitions)
-    console.log('🚀 Auto-triggering initial welcome message for mission:', mission.id);
+    // Start mission orchestration (welcome message generation and setup)
+    console.log('🚀 Starting mission orchestration for mission:', mission.id);
     try {
       const missionOrchestratorService = MissionOrchestratorService.getInstance();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
-      const welcomeTrigger = "WELCOME_TRIGGER";
-      console.log('💬 Triggering welcome sequence for mission:', mission.id);
-      
-      // Removed await here - fire and forget!
-      missionOrchestratorService.handleSystemMessage(mission.id, welcomeTrigger)
-        .then(response => {
-          console.log('✅ Welcome message sent successfully, response:', response);
+      // Fire and forget - start mission orchestration
+      missionOrchestratorService.startMission(mission.id)
+        .then(() => {
+          console.log('✅ Mission orchestration started successfully for mission:', mission.id);
         })
         .catch(error => {
-          console.error('❌ Failed to trigger welcome message:', error);
+          console.error('❌ Failed to start mission orchestration:', error);
         });
       
     } catch (error) {
-      console.error('❌ Failed to trigger welcome message:', error);
-      // Silent fail - welcome can be triggered later
+      console.error('❌ Failed to start mission orchestration:', error);
+      // Silent fail - mission orchestration can be started later
     }
 
     return mission;

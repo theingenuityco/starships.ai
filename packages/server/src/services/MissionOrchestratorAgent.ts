@@ -289,10 +289,13 @@ export class MissionOrchestratorAgent {
     const isComplete = clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
                       clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS;
     
+
+    const updatedState = {...state, clarity};
+
     if (isComplete) {
       // Generate completion summary - analysis is done
-      const summary = await this.generateCompletionSummary(state, clarity, isFirstIteration);
-      const aiMessage = this.createAIMessage(summary, state);
+      const summary = await this.generateCompletionSummary(updatedState, clarity, isFirstIteration);
+      const aiMessage = this.createAIMessage(summary, updatedState);
       
       // Save completion message immediately
       if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
@@ -306,8 +309,8 @@ export class MissionOrchestratorAgent {
       };
     } else {
       // Generate next question and END - wait for human response
-      const question = await this.generateFocusedQuestion(state, clarity, isFirstIteration);
-      const aiMessage = this.createAIMessage(question, state);
+      const question = await this.generateFocusedQuestion(updatedState, clarity, isFirstIteration);
+      const aiMessage = this.createAIMessage(question, updatedState);
       
       // Save analysis question immediately
       if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {

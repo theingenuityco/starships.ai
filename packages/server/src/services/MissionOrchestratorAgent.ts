@@ -619,6 +619,8 @@ export class MissionOrchestratorAgent {
       throw new Error('LLM provider not initialized');
     }
 
+    console.log({ prompt: prompt.messages[0] })
+
     const result = await this.llmProvider.complete(prompt, {
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens

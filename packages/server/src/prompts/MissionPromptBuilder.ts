@@ -12,57 +12,50 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages';
  * System instruction constants - direct instruction strings for different operations
  */
 export const SYSTEM_INSTRUCTIONS = {
-  WELCOME: `WELCOME PHASE - Generate initial welcome message for the new mission.
+  WELCOME: `Generate initial welcome message for the new mission and set expectation for analysis phase.
 
 INSTRUCTIONS:
 1. Introduce yourself as Commander ARIA
 2. Provide a brief welcome and mission overview
-3. Keep it concise and professional  
+3. Keep it concise and professional
 4. Ask them to hold on while you assess the mission objective for clarity
+`,
 
-Be welcoming and set expectation for analysis phase.`,
+  CLARITY_ASSESSMENT: `Assess mission clarity across 5 dimensions (0-10 scale):
 
-  CLARITY_ASSESSMENT: `You are assessing mission clarity. Analyze the conversation context and provide a JSON response with scores 0-10 for each dimension:
-
-Assess these 5 dimensions (0-10 scale):
-1. objectiveClarity: How specific and clear is the mission objective?
-2. successMetrics: Are success criteria well-defined?
-3. timelineDefinition: Is the timeline clear and realistic?
-4. scopeBoundaries: Are the boundaries and limitations defined?
-5. visionAlignment: How well does it align with the vision?
+1. objectiveClarity: Rate 8-10 if specific deliverables/outcomes are stated; 4-7 if general goals mentioned; 0-3 if vague/unclear
+2. successMetrics: Rate 8-10 if measurable criteria provided; 4-7 if some indicators mentioned; 0-3 if no success measures
+3. timelineDefinition: Rate 8-10 if specific dates/milestones given; 4-7 if rough timeframe mentioned; 0-3 if no timeline
+4. scopeBoundaries: Rate 8-10 if clear what's included/excluded; 4-7 if some limitations mentioned; 0-3 if scope undefined
+5. visionAlignment: Rate 8-10 if directly supports vision goals; 4-7 if loosely connected; 0-3 if misaligned/unclear
 
 Respond with ONLY this JSON format:
 {
-  "objectiveClarity": 7,
-  "successMetrics": 5, 
-  "timelineDefinition": 6,
-  "scopeBoundaries": 8,
-  "visionAlignment": 9,
+  "objectiveClarity": X,
+  "successMetrics": X,
+  "timelineDefinition": X,
+  "scopeBoundaries": X,
+  "visionAlignment": X,
   "reasoning": "Brief explanation of scores and key gaps"
 }`,
 
-  CLARITY_QUESTION_FIRST: `This is the first analysis iteration. Start your response by sharing the mission clarity assessment results with the user in a conversational way, then ask ONE focused question to help improve the lowest-scoring area. Be helpful and encouraging.`,
+  CLARITY_QUESTION_FIRST: `Share the clarity assessment results conversationally, include mission clarity overall score from the prev assessment, then ask 2-3 focused questions as numbered bullets targeting the dimensions with the lowest scores (prioritize scores below 7). Be concise, helpful, and encouraging.`,
 
-  CLARITY_QUESTION_SUBSEQUENT: `Based on the mission clarity assessment above, ask ONE focused question to help clarify the mission objective.
+  CLARITY_QUESTION_SUBSEQUENT: `Ask 2-3 focused questions as numbered bullets targeting the dimensions with the lowest scores (prioritize scores below 7). Be concise and build on previous answers to avoid repetition.`,
 
-Be conversational and helpful. Focus on gathering missing information to improve mission clarity.`,
+  CLARITY_COMPLETION_FIRST: `Share the clarity assessment results conversationally, include mission clarity overall score from the prev assessment, then provide a brief, positive summary (2-3 sentences) confirming readiness to proceed with mission execution.`,
 
-  CLARITY_COMPLETION_FIRST: `This is the first analysis iteration and the mission has achieved sufficient clarity. Start your response by sharing the mission clarity assessment results with the user in a conversational way, then provide a brief, positive completion summary (2-3 sentences) acknowledging readiness to move forward with execution planning. Be encouraging and confident.`,
+  CLARITY_COMPLETION_SUBSEQUENT: `Provide a brief, positive summary (2-3 sentences) confirming the mission is clear and ready for execution planning.`,
 
-  CLARITY_COMPLETION_SUBSEQUENT: `The mission clarity assessment is complete and sufficient to proceed.
+  CONVERSE: `Provide mission-focused guidance and support.
 
-Generate a brief, positive summary (2-3 sentences) acknowledging that the mission is now clear enough to move forward with execution planning.`,
+APPROACH:
+- Understand the user's specific request
+- Leverage mission context and current phase
+- Give actionable, practical advice
+- Suggest concrete next steps when appropriate
 
-  CONVERSE: `CONVERSE PHASE - Analyze user request and provide mission-focused guidance.
-
-INSTRUCTIONS:
-1. Understand what the user is asking for
-2. Consider mission context and active phase
-3. Provide specific, actionable response
-4. Include relevant mission details if helpful
-5. Suggest concrete next steps
-
-Be direct, helpful, and mission-focused.`
+Be direct, helpful, and mission-oriented.`
 } as const;
 
 export class MissionPromptBuilder {
@@ -132,7 +125,8 @@ export class MissionPromptBuilder {
     return [
       this.buildIdentitySection(),
       this.buildMissionSection(),
-      this.buildStatusSection()
+      this.buildStatusSection(),
+      this.buildConversationSection(),
     ].filter(Boolean).join('\n');
   }
   
@@ -158,8 +152,8 @@ export class MissionPromptBuilder {
    * Welcome phase context - minimal context for initial setup
    */
   private buildWelcomePhaseContext(): string {
-    // Welcome needs minimal context - just mission setup
-    return '';
+    return `
+WELCOME PHASE: First interaction with user for this mission.`;
   }
   
   /**
@@ -167,16 +161,16 @@ export class MissionPromptBuilder {
    */
   private buildAnalysisPhaseContext(): string {
     return [
+      `ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`,
       this.buildClaritySection(),
-      this.buildConversationSection()
-    ].filter(Boolean).join('\n');
+    ].filter(Boolean).join('\n\n');
   }
   
   /**
    * Converse phase context - recent conversation history
    */
   private buildConversePhaseContext(): string {
-    return this.buildConversationSection();
+    return `CONVERSE PHASE: Ongoing mission guidance and support.`
   }
   
   // ============================================================================
@@ -240,29 +234,88 @@ MISSION CLARITY ASSESSMENT:
   }
 
   private buildConversationSection(): string {
-    const { messages, activePhase } = this.state;
+    const { messages } = this.state;
     if (!messages.length) return '';
     
-    // Include more messages during analysis phase
-    const messageLimit = activePhase === 'analysis' ? 12 : 8;
+    // Separate latest message from conversation history
+    const messageLimit = 8;
     const recentMessages = messages.slice(-messageLimit);
+    const latestMessage = recentMessages[recentMessages.length - 1];
+    const conversationHistory = recentMessages.slice(0, -1); // All except latest
     
-    const conversationText = recentMessages
-      .filter(msg => msg.content && typeof msg.content === 'string')
-      .map(msg => {
-        let speaker = '';
-        if (msg instanceof HumanMessage) {
-          speaker = 'User';
-        } else if (msg instanceof AIMessage) {
-          speaker = 'My previous response';
-        } else {
-          speaker = 'System';
-        }
-        return `${speaker}: ${msg.content}`;
-      })
-      .join('\n\n');
+    let result = '';
     
-    return conversationText ? `\nCONVERSATION HISTORY:\n${conversationText}` : '';
+    // Build conversation history (excluding latest message)
+    if (conversationHistory.length > 0) {
+      const conversationText = conversationHistory
+        .filter(msg => msg.content && typeof msg.content === 'string')
+        .map((msg, index) => {
+          let speaker = '';
+          let prefix = '';
+          
+          if (msg instanceof HumanMessage) {
+            speaker = 'User';
+            prefix = '├─';
+          } else if (msg instanceof AIMessage) {
+            speaker = 'Me';
+            prefix = '└─';
+          } else {
+            speaker = 'System';
+            prefix = '├─';
+          }
+          
+          // Use └─ for the last message in history
+          if (index === conversationHistory.length - 1) {
+            prefix = '└─';
+          }
+          
+          // Encapsulate complex messages with delimiters
+          const content = this.encapsulateMessage(msg.content as string);
+          
+          return `${prefix} ${speaker}: ${content}`;
+        })
+        .join('\n');
+      
+      result += `\nCONVERSATION HISTORY:\n${conversationText}`;
+    }
+    
+    // Highlight latest message separately
+    if (latestMessage && latestMessage.content && typeof latestMessage.content === 'string') {
+      let speaker = '';
+      
+      if (latestMessage instanceof HumanMessage) {
+        speaker = 'User';
+      } else if (latestMessage instanceof AIMessage) {
+        speaker = 'Me';
+      } else {
+        speaker = 'System';
+      }
+      
+      // Encapsulate the latest message content
+      const content = this.encapsulateMessage(latestMessage.content as string);
+      
+      result += `\n\nCURRENT REQUEST:\n>>> ${speaker}: ${content}`;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Encapsulate complex messages with delimiters for better parsing
+   */
+  private encapsulateMessage(content: string): string {
+    // Check if message is complex (contains newlines, special chars, or is long)
+    const isComplex = content.includes('\n') || 
+                     content.includes('```') || 
+                     content.includes('---') || 
+                     content.length > 100 ||
+                     /[{}\[\]<>]/.test(content);
+    
+    if (isComplex) {
+      return `---\n${content}\n---`;
+    }
+    
+    return content;
   }
   
 }

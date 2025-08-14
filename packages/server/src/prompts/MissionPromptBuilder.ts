@@ -12,6 +12,9 @@ export class MissionPromptBuilder {
   // Constants for clarity assessment
   private static readonly CLARITY_THRESHOLD = 7.0;
   private static readonly MAX_CLARITY_ITERATIONS = 10;
+  
+  // Trigger messages for different phases
+  public static readonly WELCOME_TRIGGER = 'WELCOME_TRIGGER';
 
   constructor(private state: MissionChatState) {}
   

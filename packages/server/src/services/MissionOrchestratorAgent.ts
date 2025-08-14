@@ -203,33 +203,6 @@ export class MissionOrchestratorAgent {
     });
   }
 
-  /**
-   * Generate welcome message directly without graph execution
-   */
-  async generateWelcomeMessage(missionId: string): Promise<string> {
-    // Load mission metadata
-    const metadata = await this.loadMissionMetadata(missionId);
-    
-    // Build state similar to how graph execution works
-    const state: MissionChatState = {
-      missionId,
-      messages: [new SystemMessage({ content: "WELCOME_TRIGGER" })],
-      activePhase: 'welcome',
-      isSystemInitiated: true,
-      metadata,
-      clarity: undefined
-    };
-    
-    // Build welcome prompt using MissionPromptBuilder
-    const systemPrompt = new MissionPromptBuilder(state).buildPrompt();
-    
-    // Generate welcome message via LLM
-    const prompt: LLMChatPrompt = { 
-      messages: [{ role: 'system', content: systemPrompt }] 
-    };
-    
-    return await this.callLLM(prompt);
-  }
 
   /**
    * Create HumanMessage

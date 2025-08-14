@@ -103,11 +103,11 @@ export class MissionOrchestratorAgent {
   private currentMissionId?: string;
   
   // Clarity assessment configuration constants
-  private static readonly CLARITY_THRESHOLD = 7.0;
+  private static readonly CLARITY_THRESHOLD = 7.5;
   private static readonly MAX_CLARITY_ITERATIONS = 10;
   
   private readonly config: Required<MissionOrchestratorAgentConfig> = {
-    temperature: 0.7,
+    temperature: 0.9,
     maxTokens: 1000,
     provider: 'openai',
     model: 'gpt-4'

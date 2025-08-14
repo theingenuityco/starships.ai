@@ -21,13 +21,13 @@ INSTRUCTIONS:
 4. Ask them to hold on while you assess the mission objective for clarity
 `,
 
-  CLARITY_ASSESSMENT: `Assess mission clarity across 5 dimensions (0-10 scale):
+  CLARITY_ASSESSMENT: `Assess mission clarity across 5 dimensions (0-10 scale). Use your intelligence to infer reasonable assumptions from context and user intent rather than being overly pedantic:
 
-1. objectiveClarity: Rate 8-10 if specific deliverables/outcomes are stated; 4-7 if general goals mentioned; 0-3 if vague/unclear
-2. successMetrics: Rate 8-10 if measurable criteria provided; 4-7 if some indicators mentioned; 0-3 if no success measures
-3. timelineDefinition: Rate 8-10 if specific dates/milestones given; 4-7 if rough timeframe mentioned; 0-3 if no timeline
-4. scopeBoundaries: Rate 8-10 if clear what's included/excluded; 4-7 if some limitations mentioned; 0-3 if scope undefined
-5. visionAlignment: Rate 8-10 if directly supports vision goals; 4-7 if loosely connected; 0-3 if misaligned/unclear
+1. objectiveClarity: Rate 7-10 if deliverables/outcomes are reasonably clear; 4-6 if general goals mentioned; 0-3 if vague/unclear
+2. successMetrics: Rate 7-10 if success can be evaluated (implicit or explicit measures); 4-6 if some progress indicators exist; 0-3 if no success measures
+3. timelineDefinition: Rate 7-10 if timeframe is workable (stated, inferable, or has natural milestones); 4-6 if rough timeframe mentioned; 0-3 if no timeline
+4. scopeBoundaries: Rate 7-10 if scope is manageable (clear constraints or reasonable defaults); 4-6 if some limitations mentioned; 0-3 if scope unlimited/undefined
+5. visionAlignment: Rate 7-10 if supports vision goals (direct connection or clear pathway); 4-6 if loosely connected; 0-3 if misaligned/unclear
 
 Respond with ONLY this JSON format:
 {
@@ -36,7 +36,7 @@ Respond with ONLY this JSON format:
   "timelineDefinition": X,
   "scopeBoundaries": X,
   "visionAlignment": X,
-  "reasoning": "Brief explanation of scores and key gaps"
+  "reasoning": "Brief explanation of scores and key gaps. Make any reasonable assumptions explicit (e.g., 'Assuming X based on Y context')"
 }`,
 
   CLARITY_QUESTION_FIRST: `Share the clarity assessment results conversationally, include mission clarity overall score from the prev assessment, then ask 2-3 focused questions as numbered bullets targeting the dimensions with the lowest scores (prioritize scores below 7). Be concise, helpful, and encouraging.`,

@@ -211,13 +211,6 @@ export class MissionOrchestratorAgent {
     return new HumanMessage({ content });
   }
 
-  /**
-   * Build context string from state for use in prompts
-   * Now uses MissionPromptBuilder for state-driven prompt generation
-   */
-  private buildContext(state: MissionChatState): string {
-    return new MissionPromptBuilder(state).buildPrompt();
-  }
 
   /**
    * Conditional edge function to determine phase routing
@@ -261,8 +254,8 @@ export class MissionOrchestratorAgent {
    * Welcome phase node - handles initial mission introduction
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    // Build complete welcome prompt using the new builder
-    const systemPrompt = new MissionPromptBuilder(state).buildPrompt();
+    // Build welcome prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildWelcomePrompt();
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
@@ -333,8 +326,8 @@ export class MissionOrchestratorAgent {
    * Converse phase node - handles ongoing mission conversation
    */
   private async conversePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    // Build complete converse prompt using the new builder
-    const systemPrompt = new MissionPromptBuilder(state).buildPrompt();
+    // Build converse prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildConversePrompt();
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
@@ -790,43 +783,6 @@ export class MissionOrchestratorAgent {
     }
   }
 
-  /**
-   * Build conversation history for context inclusion
-   * Handles filtering, windowing, and formatting for context
-   */
-  private buildConversationHistory(state: MissionChatState): string {
-    if (state.messages.length === 0) {
-      return '';
-    }
-
-    // Include more messages during analysis phase to capture user Q&A
-    const messageLimit = state.activePhase === 'analysis' ? 12 : 8;
-    const recentMessages = state.messages.slice(-messageLimit);
-    
-    return this.buildConversationText(recentMessages);
-  }
-
-  /**
-   * Build conversation text from LangChain messages
-   * Simple utility method for formatting messages as text
-   */
-  private buildConversationText(messages: BaseMessage[]): string {
-    return messages
-      .filter(msg => msg.content && typeof msg.content === 'string')
-      .map(msg => {
-        // Use self-ownership language to evoke stronger identity
-        let speaker = '';
-        if (msg instanceof HumanMessage) {
-          speaker = 'User';
-        } else if (msg instanceof AIMessage) {
-          speaker = 'My previous response'; // Creates self-ownership and identity
-        } else {
-          speaker = 'System';
-        }
-        return `${speaker}: ${msg.content}`;
-      })
-      .join('\n\n');
-  }
 
   /**
    * Parse JSON response from LLM with error handling

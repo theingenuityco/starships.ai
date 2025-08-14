@@ -6,7 +6,7 @@
  */
 
 import { MissionOrchestratorAgent, type MissionChatState, type GraphExecutionCallbacks } from './MissionOrchestratorAgent';
-import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
+import { SYSTEM_INSTRUCTIONS } from '../prompts/MissionPromptBuilder';
 import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
@@ -363,7 +363,7 @@ export class MissionOrchestratorService {
    */
   async startMission(missionId: string): Promise<void> {
     try {
-      await this.handleMessage(missionId, MissionPromptBuilder.WELCOME_TRIGGER, { isSystemMessage: true });
+      await this.handleMessage(missionId, SYSTEM_INSTRUCTIONS.WELCOME, { isSystemMessage: true });
     } catch (error) {
       this.logger.error('Failed to start mission orchestration', { missionId }, error as Error);
       throw error;

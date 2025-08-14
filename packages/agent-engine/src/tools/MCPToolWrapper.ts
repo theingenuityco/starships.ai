@@ -163,20 +163,40 @@ export class MCPToolWrapper {
             input = undefined;
         }
         
-        // If input is still undefined, try to extract from global state
-        if (!input || (typeof input === 'object' && Object.keys(input).length === 0)) {
-            console.log(`[MCPToolWrapper] Input is invalid/empty, attempting recovery from global store`);
+        // If input is undefined (not just empty object), try to extract from global state
+        if (input === undefined || input === null) {
+            console.log(`[MCPToolWrapper] Input is undefined/null, attempting recovery from global store`);
             
             // Try to get from global store
             const globalStore = (global as any).__mcpToolInputs || {};
+            
+            // Try exact match first
             if (globalStore[namespacedName]) {
                 input = globalStore[namespacedName];
-                console.log(`[MCPToolWrapper] Retrieved input from global store:`, JSON.stringify(input));
-                // Clear it after use
-                delete globalStore[namespacedName];
+                console.log(`[MCPToolWrapper] Retrieved input from global store using exact key:`, JSON.stringify(input));
+                // Don't delete yet - might need it for retries
             } else {
-                console.log(`[MCPToolWrapper] No input found in global store for ${namespacedName}`);
-                console.log(`[MCPToolWrapper] Available keys in global store:`, Object.keys(globalStore));
+                // Try to find by tool name without namespace
+                const toolBaseName = toolRef.name;
+                if (globalStore[toolBaseName]) {
+                    input = globalStore[toolBaseName];
+                    console.log(`[MCPToolWrapper] Retrieved input from global store using base name ${toolBaseName}:`, JSON.stringify(input));
+                } else {
+                    // Try any key that contains our tool name
+                    const possibleKeys = Object.keys(globalStore);
+                    for (const key of possibleKeys) {
+                        if (key.includes(toolRef.name) || namespacedName.includes(key)) {
+                            input = globalStore[key];
+                            console.log(`[MCPToolWrapper] Retrieved input from global store using partial match ${key}:`, JSON.stringify(input));
+                            break;
+                        }
+                    }
+                    
+                    if (input === undefined || input === null) {
+                        console.log(`[MCPToolWrapper] No input found in global store for ${namespacedName}`);
+                        console.log(`[MCPToolWrapper] Available keys in global store:`, Object.keys(globalStore));
+                    }
+                }
             }
         }
         
@@ -202,11 +222,38 @@ export class MCPToolWrapper {
           
           // Special handling for Notion API tools
           if (toolRef.name === 'API-create-a-comment' && processedInput && typeof processedInput === 'object') {
-            // Fix the parent structure for comments - it should have page_id, not block_id
-            if (processedInput.parent && processedInput.parent.block_id) {
+            // Fix the parent structure - convert string to object with page_id
+            if (processedInput.parent && typeof processedInput.parent === 'string') {
+              console.log(`[MCPToolWrapper] Fixing Notion comment parent structure from string to object`);
+              processedInput.parent = {
+                page_id: processedInput.parent
+              };
+            } else if (processedInput.parent && processedInput.parent.block_id) {
+              // Also handle the case where it has block_id instead of page_id
               processedInput.parent = {
                 page_id: processedInput.parent.block_id
               };
+            }
+            
+            // Fix rich_text structure if needed
+            if (processedInput.rich_text && Array.isArray(processedInput.rich_text)) {
+              processedInput.rich_text = processedInput.rich_text.map((item: any) => {
+                // If the item doesn't have the correct structure, fix it
+                if (item.text && !item.type) {
+                  return {
+                    type: 'text',
+                    text: item.text
+                  };
+                } else if (typeof item === 'string') {
+                  return {
+                    type: 'text',
+                    text: {
+                      content: item
+                    }
+                  };
+                }
+                return item;
+              });
             }
           }
           
@@ -301,19 +348,28 @@ export class MCPToolWrapper {
         }
       };
     
-    // Wrap the tool function to store parameters in global state
-    const wrappedFunc = async function(this: any, ...args: any[]) {
-      const input = args[0];
-      console.log(`[MCPToolWrapper] Storing input for ${namespacedName} in global state:`, JSON.stringify(input));
+    // Wrap the tool function to intercept and fix parameter passing
+    // DynamicTool.call() passes (input, runManager, parentConfig)
+    // But sometimes the input gets lost or is undefined
+    const wrappedFunc = async function(inputArg: any, runManager?: any, parentConfig?: any) {
+      console.log(`[MCPToolWrapper-Wrapper] ${namespacedName} called with:`, {
+        inputArgType: typeof inputArg,
+        inputArgValue: JSON.stringify(inputArg),
+        hasRunManager: !!runManager,
+        hasParentConfig: !!parentConfig
+      });
       
-      // Store the input in global state before calling the actual function
-      if (!(global as any).__mcpToolInputs) {
-        (global as any).__mcpToolInputs = {};
+      // If we got a valid input, store it in global state for recovery
+      if (inputArg !== undefined && inputArg !== null) {
+        if (!(global as any).__mcpToolInputs) {
+          (global as any).__mcpToolInputs = {};
+        }
+        (global as any).__mcpToolInputs[namespacedName] = inputArg;
       }
-      (global as any).__mcpToolInputs[namespacedName] = input;
       
-      // Call the original tool function
-      return toolFunc.apply(this, args);
+      // Call the original tool function with all arguments
+      // The toolFunc will handle recovery if input is undefined
+      return toolFunc(inputArg, runManager, parentConfig);
     };
     
     // Create the DynamicTool with our wrapped function
@@ -323,8 +379,9 @@ export class MCPToolWrapper {
       func: wrappedFunc
     });
     
-    // Store the MCP tool reference for debugging
+    // Store the MCP tool reference and schema for debugging
     (tool as any).__mcpTool = mcpTool;
+    (tool as any).__schema = schema;
     
     return tool;
   }

@@ -87,13 +87,16 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <XCircle className="h-5 w-5 text-red-600" />
-              <span className="text-sm text-red-800">
-                Subscription ended for {starship.name}
-              </span>
+              <div>
+                <span className="text-sm text-red-800">
+                  Subscription ended for {starship.name}
+                </span>
+                <p className="text-xs text-red-600 mt-1">
+                  Create a new starship to start a new subscription
+                </p>
+              </div>
             </div>
-            <Button size="sm" variant="outline" onClick={handleManageSubscription}>
-              Reactivate
-            </Button>
+            {/* No button - disabled is terminal state */}
           </div>
         </CardContent>
       </Card>

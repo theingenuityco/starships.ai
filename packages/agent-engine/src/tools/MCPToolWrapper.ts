@@ -52,6 +52,55 @@ export class MCPToolWrapper {
       }
     }
     
+    // Special handling for Notion database query - CRITICAL FIX
+    if (mcpTool.name === 'API-post-database-query') {
+      // If agent sends just a string (likely a user ID mistaken for database ID)
+      if (typeof input === 'string') {
+        console.warn(`[MCPToolWrapper] WARNING: Agent sent string "${input}" to database-query. This looks like a user ID, not a database ID.`);
+        // Check if it looks like a user ID (not a database ID)
+        if (input.includes('-') && input.length === 36) {
+          console.error(`[MCPToolWrapper] ERROR: "${input}" appears to be a user ID. Database query requires a database ID, not a user ID.`);
+          // Return an error-inducing input to make the agent realize its mistake
+          throw new Error(`Cannot query database with user ID. To list pages, use 'API-post-search' instead of 'API-post-database-query'. User IDs cannot be used as database IDs.`);
+        }
+        return { database_id: input };
+      }
+      // If agent sends {input: "id"} format
+      if (input.input && typeof input.input === 'string') {
+        const id = input.input;
+        if (id.includes('-') && id.length === 36) {
+          console.error(`[MCPToolWrapper] ERROR: "${id}" appears to be a user ID, not a database ID.`);
+          throw new Error(`Cannot query database with user ID "${id}". To list pages, use 'API-post-search' with an empty query {} instead.`);
+        }
+        return { database_id: id };
+      }
+    }
+    
+    // Special handling for Notion search - ensure empty string becomes empty object
+    if (mcpTool.name === 'API-post-search') {
+      // Empty string should become empty object (searches all)
+      if (input === '' || input === '""' || (typeof input === 'string' && input.trim() === '')) {
+        console.log(`[MCPToolWrapper] Converting empty string to empty object for Notion search`);
+        return {};
+      }
+      // If agent sends {input: ""} format
+      if (input.input === '' || input.input === '""') {
+        console.log(`[MCPToolWrapper] Converting {input: ""} to empty object for Notion search`);
+        return {};
+      }
+      // If it's already an empty object, keep it
+      if (typeof input === 'object' && Object.keys(input).length === 0) {
+        return {};
+      }
+      // If there's an actual query string, map it properly
+      if (typeof input === 'string' && input.trim() !== '') {
+        return { query: input };
+      }
+      if (input.input && typeof input.input === 'string' && input.input.trim() !== '') {
+        return { query: input.input };
+      }
+    }
+    
     // If input is already correctly formatted, return as-is
     if (typeof input === 'object' && !input.hasOwnProperty('input')) {
       return input;
@@ -76,13 +125,6 @@ export class MCPToolWrapper {
     
     // Try to map 'input' to the most likely parameter
     if (input.input !== undefined) {
-      // For Notion search, allow empty query to search all pages
-      if (mcpTool.name.includes('search') && input.input === '') {
-        console.log(`[MCPToolWrapper] Returning empty object for search with empty query`);
-        // Return empty object for search with no query (searches all)
-        return {};
-      }
-      
       // If there are no properties but we have input.input, still return empty object
       if (propertyNames.length === 0) {
         return {};
@@ -95,7 +137,9 @@ export class MCPToolWrapper {
         'selector': ['selector', 'element', 'target', 'locator'],
         'thought': ['thought', 'reasoning', 'analysis'],
         'key': ['key', 'name', 'identifier'],
-        'value': ['value', 'data', 'content']
+        'value': ['value', 'data', 'content'],
+        'database_id': ['database_id', 'db_id', 'database'],
+        'page_id': ['page_id', 'parent_id', 'parent']
       };
       
       // Find best match
@@ -109,7 +153,6 @@ export class MCPToolWrapper {
       }
       
       // If no match found but there's only one required parameter, use it
-      const requiredParams = mcpTool.inputSchema?.required || [];
       if (requiredParams.length === 1) {
         return { [requiredParams[0]]: input.input };
       }
@@ -251,16 +294,15 @@ export class MCPToolWrapper {
 Current invalid parent: ${JSON.stringify(processedInput.parent)}
 
 To fix this:
-1. First use the 'API-get-search' tool to search for pages in the user's Notion workspace
-   Example: Use API-get-search with query: "" (empty string to get all pages)
-2. From the search results, find an appropriate parent page and note its 'id' field (should be a UUID like "12345678-1234-1234-1234-123456789012")
-3. Then retry creating the page with the correct structure:
-   parent: { page_id: "actual-uuid-from-search-results" }
+1. Use 'API-post-search' tool with empty object {} to list all pages
+2. From results, find a page to use as parent (look for "id" field)
+3. Create page with: parent: { page_id: "the-actual-page-id" }
 
-Common mistakes to avoid:
-- Don't use 'workspace', 'workspace_id', or any placeholder text
-- The parent must be an actual UUID from the user's Notion workspace
-- You cannot create pages at the workspace root - must be under an existing page`;
+IMPORTANT:
+- DO NOT use 'API-get-users' to find pages (users are not pages)
+- DO NOT use 'API-post-database-query' with user IDs
+- Use 'API-post-search' to find pages
+- The parent.page_id must be from an actual page, not a user`;
                 
                 throw new Error(errorMessage);
               }
@@ -275,6 +317,15 @@ Common mistakes to avoid:
                     content: item.text?.content || "Untitled"
                   }
                 }));
+              }
+              // Handle structure like: {"type": "title", "text": {"content": "Marketing Planning"}}
+              else if (processedInput.properties.title.type === 'title' && processedInput.properties.title.text) {
+                const content = processedInput.properties.title.text.content || "Untitled";
+                processedInput.properties.title = [{
+                  text: {
+                    content: content
+                  }
+                }];
               }
               // If title is not an array, convert it
               else if (!Array.isArray(processedInput.properties.title)) {
@@ -525,6 +576,18 @@ Common mistakes to avoid:
     
     // Get the base description and truncate if needed
     let baseDescription = tool.description || '';
+    
+    // Add critical clarifications for commonly confused Notion tools
+    if (tool.name === 'API-post-database-query') {
+      baseDescription = 'Query a Notion DATABASE (not pages!). Requires database_id. TO LIST PAGES use API-post-search instead. ' + baseDescription;
+    } else if (tool.name === 'API-get-users') {
+      baseDescription = 'Get USERS only (not pages!). TO LIST PAGES use API-post-search with {}. ' + baseDescription;
+    } else if (tool.name === 'API-post-search') {
+      baseDescription = 'Search/list Notion pages and databases. USE {} to list all. Primary tool for finding pages. ' + baseDescription;
+    } else if (tool.name === 'API-post-page') {
+      baseDescription = 'Create page. First use API-post-search to find parent page, then use its ID. ' + baseDescription;
+    }
+    
     if (baseDescription.length > MAX_DESCRIPTION_LENGTH) {
       baseDescription = baseDescription.substring(0, MAX_DESCRIPTION_LENGTH) + '...';
     }

@@ -1,0 +1,17 @@
+# Parameter Overrides Configuration
+# This file contains manual overrides for edge cases that heuristics can't handle
+# Only add entries here when absolutely necessary
+
+# Format:
+# tool_template_slug_tool_name:
+#   match: field_to_match
+#   transform: field_to_transform_to
+#   custom: optional_custom_transformation
+
+overrides:
+  # Example: Special Notion case that heuristics miss
+  # notion_API-special-endpoint:
+  #   match: "weird_field"
+  #   transform: "expected_field"
+  
+  # Currently empty - add overrides as edge cases are discovered

@@ -212,10 +212,20 @@ You coordinate starship missions by:
 
   private buildStatusSection(): string {
     const { activePhase } = this.state;
+    const currentDateTime = new Date().toLocaleString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
     
     return `
 ACTIVE PHASE: ${activePhase}
-PHASES: INIT → WELCOME → ANALYSIS → CONVERSE`;
+PHASES: INIT → WELCOME → ANALYSIS → CONVERSE
+CURRENT TIME: ${currentDateTime}`;
   }
 
   private buildClaritySection(): string {

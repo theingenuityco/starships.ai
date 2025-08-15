@@ -9,6 +9,8 @@ import { DynamicTool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { MCPToolGateway, MCPToolGatewayDB, MCPTool } from '@starships/core';
 import { ToolInputPatcher } from '../agents/ToolInputPatcher';
+import { SmartParameterAdapter } from '../adapters/SmartParameterAdapter';
+import { getConnection } from '@starships/models';
 
 // Helper function to validate UUID format
 function isValidUUID(str: string | undefined): boolean {
@@ -27,15 +29,54 @@ export interface MCPToolConfig {
 export class MCPToolWrapper {
   private config: MCPToolConfig;
   private toolUsageStats: Map<string, number> = new Map();
+  private smartAdapter: SmartParameterAdapter | null = null;
 
   constructor(config: MCPToolConfig) {
     this.config = config;
+    
+    // Initialize smart adapter if feature flag is enabled
+    if (process.env.USE_SMART_ADAPTER === 'true') {
+      this.initializeSmartAdapter();
+    }
+  }
+  
+  private async initializeSmartAdapter() {
+    try {
+      const connection = await getConnection();
+      this.smartAdapter = new SmartParameterAdapter(connection);
+      console.log('[MCPToolWrapper] Smart Parameter Adapter initialized');
+    } catch (error) {
+      console.error('[MCPToolWrapper] Failed to initialize Smart Adapter:', error);
+      // Fall back to legacy system
+      this.smartAdapter = null;
+    }
   }
 
   /**
    * Map input parameters intelligently when LLM sends generic format
    */
-  private mapInputParameters(input: any, mcpTool: MCPTool): any {
+  private async mapInputParameters(input: any, mcpTool: MCPTool): Promise<any> {
+    // Use smart adapter if available
+    if (this.smartAdapter) {
+      const startTime = Date.now();
+      try {
+        const result = await this.smartAdapter.adapt(input, mcpTool);
+        console.log(`[MCPToolWrapper] Smart adaptation took ${Date.now() - startTime}ms`);
+        return result;
+      } catch (error) {
+        console.error(`[MCPToolWrapper] Smart adapter failed, falling back to legacy:`, error);
+        // Fall through to legacy method
+      }
+    }
+    
+    // Legacy method starts here
+    return this.legacyMapInputParameters(input, mcpTool);
+  }
+  
+  /**
+   * Legacy parameter mapping method (to be deprecated)
+   */
+  private legacyMapInputParameters(input: any, mcpTool: MCPTool): any {
     // Guard against undefined or null inputs
     if (input === undefined || input === null) {
       console.warn(`[MCPToolWrapper] Received undefined/null input for tool ${mcpTool.name}, using empty object`);
@@ -306,7 +347,7 @@ export class MCPToolWrapper {
           
           // Map input parameters if needed
           console.log(`[MCPToolWrapper] Raw input before mapping:`, typeof input, JSON.stringify(input));
-          let processedInput = mapInputParametersFunc(input, toolRef);
+          let processedInput = await mapInputParametersFunc(input, toolRef);
           console.log(`[MCPToolWrapper] Processed input after mapInputParameters:`, JSON.stringify(processedInput));
           
           // Special handling for Notion API tools

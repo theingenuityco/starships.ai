@@ -3,8 +3,10 @@
 // Date: 2024-01-15
 // Description: Creates indexes and constraints for parameter pattern storage
 
+// Create unique constraint to prevent duplicate patterns
+CREATE CONSTRAINT pattern_unique_toolhash IF NOT EXISTS FOR (p:ParameterPattern) REQUIRE (p.toolId, p.inputHash) IS UNIQUE;
+
 // Create indexes for fast pattern lookups
-CREATE INDEX pattern_lookup IF NOT EXISTS FOR (p:ParameterPattern) ON (p.toolId, p.inputHash);
 CREATE INDEX pattern_success IF NOT EXISTS FOR (p:ParameterPattern) ON (p.successCount);
 CREATE INDEX pattern_lastused IF NOT EXISTS FOR (p:ParameterPattern) ON (p.lastUsed);
 

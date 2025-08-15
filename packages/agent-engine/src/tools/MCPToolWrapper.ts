@@ -52,6 +52,45 @@ export class MCPToolWrapper {
       }
     }
     
+    // Special handling for Notion API-retrieve-a-page - extract UUID from URL
+    if (mcpTool.name === 'API-retrieve-a-page') {
+      // If agent sends a full Notion URL, extract the UUID
+      if (typeof input === 'string' && input.includes('notion.so/')) {
+        console.log(`[MCPToolWrapper] Extracting page ID from Notion URL: ${input}`);
+        // Extract UUID from URL like: https://www.notion.so/Marketing-Plan-250aed16448d813ebc85e1accd8fde2e
+        const matches = input.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
+        if (matches) {
+          const pageId = matches[1];
+          // Convert 32-char format to UUID format if needed
+          if (pageId.length === 32) {
+            const uuid = `${pageId.slice(0, 8)}-${pageId.slice(8, 12)}-${pageId.slice(12, 16)}-${pageId.slice(16, 20)}-${pageId.slice(20, 32)}`;
+            console.log(`[MCPToolWrapper] Extracted and formatted page ID: ${uuid}`);
+            return { page_id: uuid };
+          } else {
+            console.log(`[MCPToolWrapper] Extracted page ID: ${pageId}`);
+            return { page_id: pageId };
+          }
+        }
+      }
+      // If agent sends {input: "url"} format
+      if (input.input && typeof input.input === 'string' && input.input.includes('notion.so/')) {
+        const url = input.input;
+        console.log(`[MCPToolWrapper] Extracting page ID from Notion URL in input object: ${url}`);
+        const matches = url.match(/([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
+        if (matches) {
+          const pageId = matches[1];
+          if (pageId.length === 32) {
+            const uuid = `${pageId.slice(0, 8)}-${pageId.slice(8, 12)}-${pageId.slice(12, 16)}-${pageId.slice(16, 20)}-${pageId.slice(20, 32)}`;
+            console.log(`[MCPToolWrapper] Extracted and formatted page ID: ${uuid}`);
+            return { page_id: uuid };
+          } else {
+            console.log(`[MCPToolWrapper] Extracted page ID: ${pageId}`);
+            return { page_id: pageId };
+          }
+        }
+      }
+    }
+    
     // Special handling for Notion database query - CRITICAL FIX
     if (mcpTool.name === 'API-post-database-query') {
       // If agent sends just a string (likely a user ID mistaken for database ID)
@@ -402,20 +441,116 @@ IMPORTANT:
           
           // Special handling for Notion API-patch-block-children tool
           if (toolRef.name === 'API-patch-block-children' && processedInput && typeof processedInput === 'object') {
+            console.log(`[MCPToolWrapper] Fixing API-patch-block-children structure`);
+            
             // Fix the structure for block children updates
             if (processedInput.children && Array.isArray(processedInput.children)) {
               processedInput.children = processedInput.children.map((child: any) => {
-                // If the child has wrong structure, fix it
-                if (child.object === 'block' && child.type === 'paragraph' && child.paragraph) {
-                  return {
-                    type: 'paragraph',
-                    paragraph: {
-                      rich_text: child.paragraph.text || child.paragraph.rich_text
-                    }
-                  };
+                console.log(`[MCPToolWrapper] Processing child block:`, JSON.stringify(child));
+                
+                // Remove 'object' field if present (not needed)
+                if (child.object) {
+                  delete child.object;
                 }
+                
+                // Fix paragraph structure
+                if (child.type === 'paragraph' && child.paragraph) {
+                  // If paragraph has 'text' instead of 'rich_text', fix it
+                  if (child.paragraph.text && !child.paragraph.rich_text) {
+                    // Handle array of text items
+                    if (Array.isArray(child.paragraph.text)) {
+                      child.paragraph.rich_text = child.paragraph.text.map((item: any) => {
+                        // If item is already properly structured
+                        if (item.text && item.text.content) {
+                          return item;
+                        }
+                        // If item has content directly
+                        if (item.content) {
+                          return {
+                            type: 'text',
+                            text: {
+                              content: item.content
+                            }
+                          };
+                        }
+                        // If item is a string
+                        if (typeof item === 'string') {
+                          return {
+                            type: 'text',
+                            text: {
+                              content: item
+                            }
+                          };
+                        }
+                        return item;
+                      });
+                    }
+                    // If text is a single string
+                    else if (typeof child.paragraph.text === 'string') {
+                      child.paragraph.rich_text = [{
+                        type: 'text',
+                        text: {
+                          content: child.paragraph.text
+                        }
+                      }];
+                    }
+                    delete child.paragraph.text;
+                  }
+                  
+                  // Ensure rich_text items have proper structure
+                  if (child.paragraph.rich_text && Array.isArray(child.paragraph.rich_text)) {
+                    child.paragraph.rich_text = child.paragraph.rich_text.map((item: any) => {
+                      // If missing type field
+                      if (!item.type && item.text) {
+                        item.type = 'text';
+                      }
+                      return item;
+                    });
+                  }
+                }
+                
+                // Fix bulleted_list_item structure similarly
+                if (child.type === 'bulleted_list_item' && child.bulleted_list_item) {
+                  if (child.bulleted_list_item.text && !child.bulleted_list_item.rich_text) {
+                    if (Array.isArray(child.bulleted_list_item.text)) {
+                      child.bulleted_list_item.rich_text = child.bulleted_list_item.text.map((item: any) => {
+                        if (item.text && item.text.content) {
+                          return item;
+                        }
+                        if (item.content) {
+                          return {
+                            type: 'text',
+                            text: {
+                              content: item.content
+                            }
+                          };
+                        }
+                        if (typeof item === 'string') {
+                          return {
+                            type: 'text',
+                            text: {
+                              content: item
+                            }
+                          };
+                        }
+                        return item;
+                      });
+                    } else if (typeof child.bulleted_list_item.text === 'string') {
+                      child.bulleted_list_item.rich_text = [{
+                        type: 'text',
+                        text: {
+                          content: child.bulleted_list_item.text
+                        }
+                      }];
+                    }
+                    delete child.bulleted_list_item.text;
+                  }
+                }
+                
                 return child;
               });
+              
+              console.log(`[MCPToolWrapper] Fixed children structure:`, JSON.stringify(processedInput.children, null, 2));
             }
           }
           

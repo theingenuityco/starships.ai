@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { ServiceFactory } from '../services';
+import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
 import { MissionService } from '../services/MissionService';
 import type {
   Mission,
@@ -364,7 +364,7 @@ router.post('/:id/messages',
 
       validateUUID(id, 'id');
 
-      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      const missionOrchestratorService = MissionOrchestratorService.getInstance();
       const response = await missionOrchestratorService.handleUserMessage(id, userId, content);
 
       res.json({ 
@@ -452,7 +452,7 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+    const missionOrchestratorService = MissionOrchestratorService.getInstance();
     const result = await missionOrchestratorService.getMessageHistory(id, page, pageSize);
 
     res.json({ 

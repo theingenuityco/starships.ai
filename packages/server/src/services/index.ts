@@ -11,7 +11,6 @@ import { MessageService } from './MessageService';
 import { ResultService } from './ResultService';
 import { ExpeditionService } from './ExpeditionService';
 import { FirstOfficerService } from './FirstOfficerService';
-import { MissionOrchestratorService } from './MissionOrchestratorService';
 
 // Existing comprehensive services
 export { ExpeditionService } from './ExpeditionService';
@@ -68,8 +67,6 @@ export class ServiceFactory {
   private static expeditionService: ExpeditionService;
   private static firstOfficerService: FirstOfficerService;
   
-  // Mission services
-  private static missionOrchestratorService: MissionOrchestratorService;
   
   // Extracted expedition services
   private static expeditionLifecycleService: any;
@@ -127,15 +124,6 @@ export class ServiceFactory {
     return this.firstOfficerService;
   }
 
-  /**
-   * Get MissionOrchestratorService singleton instance
-   */
-  static getMissionOrchestratorService(): MissionOrchestratorService {
-    if (!this.missionOrchestratorService) {
-      this.missionOrchestratorService = MissionOrchestratorService.getInstance();
-    }
-    return this.missionOrchestratorService;
-  }
 
   /**
    * Initialize all services - useful for startup
@@ -166,7 +154,6 @@ export class ServiceFactory {
     
     // Orchestration services (depend on all others)
     this.getFirstOfficerService();
-    this.getMissionOrchestratorService();
     
     console.log('[SERVICE-FACTORY] All specialized services initialized in correct dependency order');
   }
@@ -213,7 +200,6 @@ export class ServiceFactory {
     resultService: boolean;
     expeditionService: boolean;
     firstOfficerService: boolean;
-    missionOrchestratorService: boolean;
     expeditionLifecycleService: boolean;
     taskOrchestrationService: boolean;
     agentCoordinationService: boolean;
@@ -236,7 +222,6 @@ export class ServiceFactory {
       resultService: !!this.resultService,
       expeditionService: !!this.expeditionService,
       firstOfficerService: !!this.firstOfficerService,
-      missionOrchestratorService: !!this.missionOrchestratorService,
       expeditionLifecycleService: !!this.expeditionLifecycleService,
       taskOrchestrationService: !!this.taskOrchestrationService,
       agentCoordinationService: !!this.agentCoordinationService,

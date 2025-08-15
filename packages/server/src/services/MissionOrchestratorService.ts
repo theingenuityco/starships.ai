@@ -5,23 +5,26 @@
  * for real-time mission coordination.
  */
 
-import { MissionOrchestratorAgent, type MissionChatState } from './MissionOrchestratorAgent';
+import { MissionOrchestratorAgent, type MissionChatState, type GraphExecutionCallbacks } from './MissionOrchestratorAgent';
+import { SYSTEM_INSTRUCTIONS } from '../prompts/MissionPromptBuilder';
 import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ErrorFactory } from '@starships/protocol';
+import { AIMessage } from '@langchain/core/messages';
 import type { 
   MissionMessage,
   MissionChatResponse,
-  SendMissionMessageRequest
+  SendMissionMessageRequest,
+  MissionPhase
 } from '@starships/protocol';
 
 /**
  * Configuration for MissionOrchestratorService
  */
 export interface MissionOrchestratorServiceConfig {
-  maxConcurrentOrchestrators?: number;
+  // Future configuration options can be added here
 }
 
 /**
@@ -32,11 +35,8 @@ export class MissionOrchestratorService {
   private logger: Logger;
   private socketService: SocketIOService | null = null;
   
-  // In-memory orchestrator instances (missionId -> agent)
-  private orchestrators: Map<string, MissionOrchestratorAgent> = new Map();
-  
   private readonly config: Required<MissionOrchestratorServiceConfig> = {
-    maxConcurrentOrchestrators: 100 // Limit concurrent orchestrators
+    // Removed maxConcurrentOrchestrators - using stateless agents now
   };
 
   private constructor(config?: Partial<MissionOrchestratorServiceConfig>) {
@@ -68,12 +68,16 @@ export class MissionOrchestratorService {
 
 
   /**
-   * Handle any message and generate AI response
+   * Core message handling method - executes graph with callbacks
    */
-  private async handleMessage(missionId: string, message: string, options?: {
-    userId?: string;
-    isSystemMessage?: boolean;
-  }): Promise<string> {
+  private async handleMessage(
+    missionId: string, 
+    message: string,
+    options: {
+      userId?: string;
+      isSystemMessage?: boolean;
+    } = {}
+  ): Promise<string> {
     // Check if mission exists
     const missionRepo = RepositoryFactory.getMissionRepository();
     await missionRepo.getMissionById(missionId);
@@ -90,82 +94,47 @@ export class MissionOrchestratorService {
       });
     }
 
+    const { userId, isSystemMessage = false } = options;
+
     // Save input message (user only, system messages don't save input)
-    if (options?.userId && !options?.isSystemMessage) {
-      const savedUserMessage = await this.saveUserMessage(missionId, options.userId, message);
+    if (userId && !isSystemMessage) {
+      const savedUserMessage = await this.saveUserMessage(missionId, userId, message);
       this.emitMessageEvent(missionId, savedUserMessage);
     }
 
-    // Generate AI response with state
-    const orchestrator = await this.getOrCreateOrchestratorAgent(missionId);
-    const { response: aiResponse, state } = options?.isSystemMessage 
-      ? await orchestrator.generateSystemResponseWithState(missionId, message)
-      : await orchestrator.generateResponseWithState(message, missionId);
+    // Execute graph with callbacks
+    const orchestrator = this.createOrchestratorAgent();
+    const { finalResponse, state } = await orchestrator.executeGraphWithCallbacks(
+      missionId, 
+      message, 
+      {
+        onMessageGenerated: async (aiMessage: AIMessage) => {
+          const savedMessage = await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
+          this.emitMessageEvent(missionId, savedMessage);
+        },
+        
+        onPhaseChange: async (newPhase: MissionPhase) => {
+          await this.syncActivePhase(missionId, { activePhase: newPhase });
+        }
+      },
+      isSystemMessage
+    );
     
-    // Handle activePhase synchronization
+    // Sync final state
     await this.syncActivePhase(missionId, state);
 
-    // Save AI response
-    const savedMessage = options?.isSystemMessage
-      ? await this.saveSystemMessage(missionId, aiResponse)
-      : await this.saveOrchestratorMessage(missionId, aiResponse);
-    
-    this.emitMessageEvent(missionId, savedMessage);
-
-    // Auto-trigger analysis phase after welcome phase
-    if (state.activePhase === 'analysis' && state.metadata?.mission?.phase === 'welcome') {
-      await this.triggerAnalysisPhase(missionId, orchestrator);
-    }
-
-    return aiResponse;
-  }
-
-  /**
-   * Auto-trigger analysis phase after welcome phase
-   */
-  private async triggerAnalysisPhase(missionId: string, orchestrator: MissionOrchestratorAgent): Promise<void> {
-    try {
-      // Trigger analysis phase with empty system message (content not used by analysis node)
-      const analysisResponse = await orchestrator.generateSystemResponseWithState(missionId, "");
-      
-      // Save and emit the analysis message
-      const savedAnalysisMessage = await this.saveSystemMessage(missionId, analysisResponse.response);
-      this.emitMessageEvent(missionId, savedAnalysisMessage);
-      
-      // Sync the final state
-      await this.syncActivePhase(missionId, analysisResponse.state);
-      
-    } catch (error) {
-      this.logger.error('Failed to trigger analysis phase', { missionId }, error as Error);
-    }
+    return finalResponse;
   }
 
   /**
    * Handle user message and generate AI response
    */
   async handleUserMessage(missionId: string, userId: string, message: string): Promise<MissionChatResponse> {
-    const context = {
-      service: 'MissionOrchestratorService',
-      operation: 'handleUserMessage',
-      resource: 'mission',
-      resourceId: missionId,
-      metadata: { userId, messageLength: message?.length }
-    };
-
-    this.logger.info('Handling user message', context);
-
     try {
       const aiResponse = await this.handleMessage(missionId, message, { userId });
-
-      this.logger.info('Successfully handled user message', {
-        ...context,
-        metadata: { ...context.metadata, responseLength: aiResponse?.length }
-      });
-
       return { reply: aiResponse };
-
     } catch (error) {
-      this.logger.error('Failed to handle user message', context, error as Error);
+      this.logger.error('Failed to handle user message', { missionId }, error as Error);
       
       if (error instanceof Error && 'code' in error) {
         throw error;
@@ -175,7 +144,7 @@ export class MissionOrchestratorService {
         'MISSION_MESSAGE_SEND_FAILED',
         'Failed to process user message',
         error instanceof Error ? error.message : 'Unknown error',
-        context
+        { service: 'MissionOrchestratorService', operation: 'handleUserMessage', resource: 'mission', resourceId: missionId }
       );
     }
   }
@@ -256,49 +225,15 @@ export class MissionOrchestratorService {
   }
 
   /**
-   * Get or create orchestrator agent instance (lazy creation)
+   * Create orchestrator agent instance (stateless - new instance per request)
    */
-  private async getOrCreateOrchestratorAgent(missionId: string): Promise<MissionOrchestratorAgent> {
-    let orchestrator = this.orchestrators.get(missionId);
-
-    if (!orchestrator) {
-      // Check limits
-      if (this.orchestrators.size >= this.config.maxConcurrentOrchestrators) {
-        throw ErrorFactory.businessLogic(
-          'RESOURCE_LIMIT_EXCEEDED',
-          'Maximum concurrent orchestrators reached',
-          `Limit: ${this.config.maxConcurrentOrchestrators}`,
-          {
-            service: 'MissionOrchestratorService',
-            operation: 'getOrCreateOrchestratorAgent',
-            resource: 'mission',
-            resourceId: missionId
-          }
-        );
-      }
-
-      // Create new orchestrator agent with shared configuration
-      orchestrator = new MissionOrchestratorAgent({
-        temperature: 0.7,
-        maxTokens: 1000,
-        provider: 'openai',
-        model: 'gpt-4'
-      });
-
-      this.orchestrators.set(missionId, orchestrator);
-
-      this.logger.info('Created new orchestrator agent', {
-        service: 'MissionOrchestratorService',
-        operation: 'getOrCreateOrchestratorAgent',
-        resource: 'mission',
-        resourceId: missionId,
-        metadata: { 
-          totalOrchestrators: this.orchestrators.size 
-        }
-      });
-    }
-
-    return orchestrator;
+  private createOrchestratorAgent(): MissionOrchestratorAgent {
+    return new MissionOrchestratorAgent({
+      temperature: 0.7,
+      maxTokens: 1000,
+      provider: 'openai',
+      model: 'gpt-4'
+    });
   }
 
   /**
@@ -360,32 +295,6 @@ export class MissionOrchestratorService {
     }
   }
 
-  /**
-   * Save system message to database
-   */
-  private async saveSystemMessage(missionId: string, content: string): Promise<MissionMessage> {
-    try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      
-      const messageData = {
-        missionId,
-        role: 'system' as const,
-        content,
-        timestamp: new Date().toISOString(),
-        senderName: 'System'
-      };
-
-      return await missionRepo.saveMessage(messageData);
-    } catch (error) {
-      this.logger.error('Failed to save system message to database', {
-        service: 'MissionOrchestratorService',
-        operation: 'saveSystemMessage',
-        resource: 'mission',
-        resourceId: missionId
-      }, error as Error);
-      throw error;
-    }
-  }
 
   /**
    * Initialize WebSocket service integration
@@ -421,16 +330,6 @@ export class MissionOrchestratorService {
 
       this.socketService.getIO().to(missionRoom).emit('mission:message-sent' as any, eventData);
       
-      this.logger.info('Emitted message event', {
-        service: 'MissionOrchestratorService',
-        operation: 'emitMessageEvent',
-        resource: 'mission',
-        resourceId: missionId,
-        metadata: { 
-          room: missionRoom,
-          messageRole: message.role
-        }
-      });
     }
   }
 
@@ -454,7 +353,19 @@ export class MissionOrchestratorService {
     try {
       return await this.handleMessage(missionId, message, { isSystemMessage: true });
     } catch (error) {
-      this.logger.error('Failed to handle system message', error as Error);
+      this.logger.error('Failed to handle system message', { missionId }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Initialize welcome sequence for new missions
+   */
+  async startMission(missionId: string): Promise<void> {
+    try {
+      await this.handleMessage(missionId, SYSTEM_INSTRUCTIONS.WELCOME, { isSystemMessage: true });
+    } catch (error) {
+      this.logger.error('Failed to start mission orchestration', { missionId }, error as Error);
       throw error;
     }
   }

@@ -10,6 +10,13 @@ import { z } from 'zod';
 import { MCPToolGateway, MCPToolGatewayDB, MCPTool } from '@starships/core';
 import { ToolInputPatcher } from '../agents/ToolInputPatcher';
 
+// Helper function to validate UUID format
+function isValidUUID(str: string | undefined): boolean {
+  if (!str) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 export interface MCPToolConfig {
   starshipId: string;
   agentId: string;
@@ -221,6 +228,91 @@ export class MCPToolWrapper {
           console.log(`[MCPToolWrapper] Processed input after mapInputParameters:`, JSON.stringify(processedInput));
           
           // Special handling for Notion API tools
+          if (toolRef.name === 'API-post-page' && processedInput && typeof processedInput === 'object') {
+            console.log(`[MCPToolWrapper] Fixing Notion API-post-page structure`);
+            
+            // Fix the parent structure
+            if (processedInput.parent) {
+              // Check for any invalid parent structures
+              const hasInvalidParent = 
+                processedInput.parent.type === 'workspace' || 
+                processedInput.parent.database_id === 'workspace' ||
+                processedInput.parent.database_id === 'workspace_id' ||
+                (processedInput.parent.type === 'database_id' && !isValidUUID(processedInput.parent.database_id)) ||
+                (!processedInput.parent.page_id || !isValidUUID(processedInput.parent.page_id));
+              
+              if (hasInvalidParent) {
+                console.log(`[MCPToolWrapper] Invalid parent structure detected for Notion page creation`);
+                console.log(`[MCPToolWrapper] Parent structure received:`, JSON.stringify(processedInput.parent));
+                
+                // Return a helpful error message to guide the agent
+                const errorMessage = `Cannot create Notion page: Invalid or missing parent page_id.
+
+Current invalid parent: ${JSON.stringify(processedInput.parent)}
+
+To fix this:
+1. First use the 'API-get-search' tool to search for pages in the user's Notion workspace
+   Example: Use API-get-search with query: "" (empty string to get all pages)
+2. From the search results, find an appropriate parent page and note its 'id' field (should be a UUID like "12345678-1234-1234-1234-123456789012")
+3. Then retry creating the page with the correct structure:
+   parent: { page_id: "actual-uuid-from-search-results" }
+
+Common mistakes to avoid:
+- Don't use 'workspace', 'workspace_id', or any placeholder text
+- The parent must be an actual UUID from the user's Notion workspace
+- You cannot create pages at the workspace root - must be under an existing page`;
+                
+                throw new Error(errorMessage);
+              }
+            }
+            
+            // Fix the properties.title structure - it should be an array
+            if (processedInput.properties && processedInput.properties.title) {
+              // If title is in the wrong format (nested object with title array)
+              if (processedInput.properties.title.title && Array.isArray(processedInput.properties.title.title)) {
+                processedInput.properties.title = processedInput.properties.title.title.map((item: any) => ({
+                  text: {
+                    content: item.text?.content || "Untitled"
+                  }
+                }));
+              }
+              // If title is not an array, convert it
+              else if (!Array.isArray(processedInput.properties.title)) {
+                const titleContent = typeof processedInput.properties.title === 'string' 
+                  ? processedInput.properties.title 
+                  : "Untitled";
+                processedInput.properties.title = [{
+                  text: {
+                    content: titleContent
+                  }
+                }];
+              }
+              // Ensure each item in the array has the correct structure
+              else {
+                processedInput.properties.title = processedInput.properties.title.map((item: any) => {
+                  if (typeof item === 'string') {
+                    return {
+                      text: {
+                        content: item
+                      }
+                    };
+                  } else if (item.type === 'text' && item.text) {
+                    // Already in correct format
+                    return item;
+                  } else if (item.text && item.text.content) {
+                    // Has text.content but missing type
+                    return {
+                      text: item.text
+                    };
+                  }
+                  return item;
+                });
+              }
+            }
+            
+            console.log(`[MCPToolWrapper] Fixed Notion API-post-page input:`, JSON.stringify(processedInput, null, 2));
+          }
+          
           if (toolRef.name === 'API-create-a-comment' && processedInput && typeof processedInput === 'object') {
             // Fix the parent structure - convert string to object with page_id
             if (processedInput.parent && typeof processedInput.parent === 'string') {

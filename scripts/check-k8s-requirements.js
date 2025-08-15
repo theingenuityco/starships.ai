@@ -182,24 +182,113 @@ function checkKindCluster() {
 function createKindCluster() {
   log(`\n🚀 Creating Kind cluster '${CLUSTER_NAME}'...`, 'cyan');
   
-  const setupScript = path.join(__dirname, 'setup-kind-cluster.sh');
-  
-  if (!fs.existsSync(setupScript)) {
-    log('❌ setup-kind-cluster.sh not found', 'red');
-    return false;
-  }
+  // Quick cluster creation - no timeout command needed
+  const kindConfig = `/tmp/kind-config-${Date.now()}.yaml`;
+  const configContent = `kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ${CLUSTER_NAME}
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.grpc.v1.cri".registry]
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5001"]
+        endpoint = ["http://starships-registry:5000"]`;
   
   try {
-    execSync(`bash ${setupScript}`, { stdio: 'inherit' });
+    // Write config file
+    fs.writeFileSync(kindConfig, configContent);
+    
+    // Create cluster (kind has its own timeout handling)
+    log('📦 Creating cluster (this may take 1-2 minutes)...', 'cyan');
+    log('   Please be patient while Kind sets up the Kubernetes cluster', 'yellow');
+    
+    // Ensure Docker is in PATH for kind command
+    const dockerPath = os.platform() === 'darwin' 
+      ? '/Applications/Docker.app/Contents/Resources/bin' 
+      : '/usr/local/bin';
+    const enhancedPath = `${dockerPath}:${process.env.PATH}`;
+    
+    execSync(`kind create cluster --config=${kindConfig}`, { 
+      stdio: 'inherit',
+      env: { ...process.env, PATH: enhancedPath },
+      timeout: 120000 // 2 minute timeout using Node.js built-in
+    });
+    
+    // Setup registry
+    log('🐳 Setting up local Docker registry...', 'cyan');
+    try {
+      execSync('docker run -d --restart=always -p 127.0.0.1:5001:5000 --name starships-registry registry:2', { 
+        stdio: 'ignore',
+        env: { ...process.env, PATH: enhancedPath }
+      });
+    } catch {
+      execSync('docker start starships-registry', { 
+        stdio: 'ignore',
+        env: { ...process.env, PATH: enhancedPath }
+      });
+    }
+    
+    // Connect registry to kind network
+    try {
+      execSync('docker network connect kind starships-registry', { 
+        stdio: 'ignore',
+        env: { ...process.env, PATH: enhancedPath }
+      });
+    } catch {
+      // Already connected
+    }
+    
+    // Install ingress
+    log('🔧 Installing NGINX Ingress Controller...', 'cyan');
+    execSync('kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml', { 
+      stdio: 'ignore',
+      env: { ...process.env, PATH: enhancedPath }
+    });
+    
     log(`✅ Kind cluster '${CLUSTER_NAME}' created successfully`, 'green');
+    
+    // Cleanup config file
+    try { fs.unlinkSync(kindConfig); } catch {}
+    
     return true;
   } catch (error) {
     log(`❌ Failed to create Kind cluster: ${error.message}`, 'red');
+    
+    // If it's a timeout, suggest increasing patience
+    if (error.message.includes('ETIMEDOUT') || error.code === 'ETIMEDOUT') {
+      log('   Cluster creation timed out. This can happen on slower machines.', 'yellow');
+      log('   The cluster might still be creating. Check with: kind get clusters', 'yellow');
+    }
+    
+    // Cleanup config file
+    try { fs.unlinkSync(kindConfig); } catch {}
+    
     return false;
   }
 }
 
 async function main() {
+  // Fast mode - skip K8s setup if flag is set
+  if (process.env.SKIP_K8S_CHECK === 'true') {
+    log('\n⚡ Skipping Kubernetes checks (SKIP_K8S_CHECK=true)', 'yellow');
+    process.exit(0);
+  }
+  
   log('\n🔍 Checking Kubernetes development requirements (REQUIRED)...', 'bright');
   log('ℹ️  Kubernetes is now the only deployment option for MCP containers', 'cyan');
   
@@ -323,6 +412,20 @@ async function main() {
     log(`\n📁 Created data directory: ${dataDir}`, 'green');
   }
   
+  // Check and ensure MCP HTTP Bridge image is in registry
+  log('\n🐳 Checking MCP HTTP Bridge image...', 'cyan');
+  try {
+    const { ensureMCPImage } = require('./ensure-mcp-image');
+    await ensureMCPImage();
+  } catch (error) {
+    log(`\n❌ MCP image setup failed: ${error.message}`, 'red');
+    log('   MCP containers will fail to start without the image in registry', 'yellow');
+    log('   To fix manually, run: node scripts/ensure-mcp-image.js', 'yellow');
+    log('\n   Build cannot continue without MCP image ready.', 'red');
+    process.exit(1); // Exit with error code to fail the build
+  }
+  
+  log('\n✅ All prerequisites ready! Build can continue.', 'green');
   process.exit(0);
 }
 

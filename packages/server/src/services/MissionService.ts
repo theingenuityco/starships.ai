@@ -4,9 +4,8 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
-import { ServiceFactory } from './index';
+import { MissionOrchestratorService } from './MissionOrchestratorService';
 import { MissionEventService } from './MissionEventService';
-import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
 import type {
   Mission,
   CreateMissionRequest,
@@ -85,30 +84,24 @@ export class MissionService {
 
     const mission = await missionRepo.createMission(request, userId);
 
-    // Auto-trigger welcome message asynchronously (fire-and-forget)
-    console.log('🚀 Auto-triggering welcome message for mission:', mission.id);
+    // Start mission orchestration (welcome message generation and setup)
+    console.log('🚀 Starting mission orchestration for mission:', mission.id);
     try {
-      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      const missionOrchestratorService = MissionOrchestratorService.getInstance();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
-      const welcomeMessage = renderTemplate(MISSION_PROMPTS.INITIAL_WELCOME, {
-        mission: mission,
-        agents: assignedAgents
-      });
-      console.log('💬 Sending welcome message:', welcomeMessage);
-      
-      // Removed await here - fire and forget!
-      missionOrchestratorService.handleSystemMessage(mission.id, welcomeMessage)
-        .then(response => {
-          console.log('✅ Welcome message sent successfully, response:', response);
+      // Fire and forget - start mission orchestration
+      missionOrchestratorService.startMission(mission.id)
+        .then(() => {
+          console.log('✅ Mission orchestration started successfully for mission:', mission.id);
         })
         .catch(error => {
-          console.error('❌ Failed to trigger welcome message:', error);
+          console.error('❌ Failed to start mission orchestration:', error);
         });
       
     } catch (error) {
-      console.error('❌ Failed to trigger welcome message:', error);
-      // Silent fail - welcome can be triggered later
+      console.error('❌ Failed to start mission orchestration:', error);
+      // Silent fail - mission orchestration can be started later
     }
 
     return mission;

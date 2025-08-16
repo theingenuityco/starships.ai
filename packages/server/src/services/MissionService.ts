@@ -4,8 +4,8 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
-import { ServiceFactory } from './index';
-import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
+import { MissionOrchestratorService } from './MissionOrchestratorService';
+import { MissionEventService } from './MissionEventService';
 import type {
   Mission,
   CreateMissionRequest,
@@ -14,7 +14,8 @@ import type {
   MissionSort,
   MissionListResponse,
   MissionStatus,
-  MissionPhase
+  MissionPhase,
+  MissionClarity
 } from '@starships/protocol';
 import {
   EnhancedValidationError as ValidationError,
@@ -83,30 +84,24 @@ export class MissionService {
 
     const mission = await missionRepo.createMission(request, userId);
 
-    // Auto-trigger welcome message asynchronously (fire-and-forget)
-    console.log('🚀 Auto-triggering welcome message for mission:', mission.id);
+    // Start mission orchestration (welcome message generation and setup)
+    console.log('🚀 Starting mission orchestration for mission:', mission.id);
     try {
-      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      const missionOrchestratorService = MissionOrchestratorService.getInstance();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
       
-      const welcomeMessage = renderTemplate(MISSION_PROMPTS.INITIAL_WELCOME, {
-        mission: mission,
-        agents: assignedAgents
-      });
-      console.log('💬 Sending welcome message:', welcomeMessage);
-      
-      // Removed await here - fire and forget!
-      missionOrchestratorService.handleSystemMessage(mission.id, welcomeMessage)
-        .then(response => {
-          console.log('✅ Welcome message sent successfully, response:', response);
+      // Fire and forget - start mission orchestration
+      missionOrchestratorService.startMission(mission.id)
+        .then(() => {
+          console.log('✅ Mission orchestration started successfully for mission:', mission.id);
         })
         .catch(error => {
-          console.error('❌ Failed to trigger welcome message:', error);
+          console.error('❌ Failed to start mission orchestration:', error);
         });
       
     } catch (error) {
-      console.error('❌ Failed to trigger welcome message:', error);
-      // Silent fail - welcome can be triggered later
+      console.error('❌ Failed to start mission orchestration:', error);
+      // Silent fail - mission orchestration can be started later
     }
 
     return mission;
@@ -165,6 +160,7 @@ export class MissionService {
   ): Promise<Mission> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const agentRepo = RepositoryFactory.getAgentRepository();
+    const missionEventService = MissionEventService.getInstance();
 
     // Get existing mission first
     const existingMission = await missionRepo.getMissionById(id);
@@ -218,7 +214,18 @@ export class MissionService {
       }
     }
 
-    return await missionRepo.updateMission(id, updates);
+    const updatedMission = await missionRepo.updateMission(id, updates);
+
+    // Emit real-time events for specific changes
+    if (updates.status && updates.status !== existingMission.status) {
+      missionEventService.emitStatusChange(id, updates.status, existingMission.status);
+    }
+
+    if (updates.phase && updates.phase !== existingMission.phase) {
+      missionEventService.emitPhaseChange(id, updates.phase, existingMission.phase);
+    }
+
+    return updatedMission;
   }
 
   /**
@@ -343,5 +350,26 @@ export class MissionService {
         'status'
       );
     }
+  }
+
+  /**
+   * Get mission clarity assessment
+   */
+  static async getMissionClarity(missionId: string): Promise<MissionClarity | null> {
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+
+    // Verify mission exists first
+    try {
+      await missionRepo.getMissionById(missionId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError('Mission not found', 'Mission', missionId);
+      }
+      throw error;
+    }
+
+    // Get clarity assessment (can be null if not yet assessed)
+    return await clarityRepo.getByMissionId(missionId);
   }
 }

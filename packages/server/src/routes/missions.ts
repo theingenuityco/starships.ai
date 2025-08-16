@@ -4,7 +4,7 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { ServiceFactory } from '../services';
+import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
 import { MissionService } from '../services/MissionService';
 import type {
   Mission,
@@ -364,7 +364,7 @@ router.post('/:id/messages',
 
       validateUUID(id, 'id');
 
-      const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+      const missionOrchestratorService = MissionOrchestratorService.getInstance();
       const response = await missionOrchestratorService.handleUserMessage(id, userId, content);
 
       res.json({ 
@@ -452,7 +452,7 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const missionOrchestratorService = ServiceFactory.getMissionOrchestratorService();
+    const missionOrchestratorService = MissionOrchestratorService.getInstance();
     const result = await missionOrchestratorService.getMessageHistory(id, page, pageSize);
 
     res.json({ 
@@ -462,6 +462,52 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
 
   } catch (error) {
     console.error('Error fetching message history:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'MISSION_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /missions/:id/clarity
+ * Get mission clarity assessment
+ */
+router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    validateUUID(id, 'id');
+
+    const clarity = await MissionService.getMissionClarity(id);
+
+    res.json({ 
+      success: true, 
+      data: clarity 
+    });
+
+  } catch (error) {
+    console.error('Error fetching mission clarity:', error);
     
     if (error instanceof ValidationError) {
       res.status(400).json({ 

@@ -41,6 +41,7 @@ export type MissionStatus =
 export type MissionPhase = 
   | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
+  | 'analysis'     // Mission analysis and breakdown
   | 'converse';    // General conversation and mission guidance
 
 // ============================================================================
@@ -149,4 +150,54 @@ export interface SendMissionMessageRequest {
  */
 export interface MissionChatResponse {
   reply: string;
+}
+
+// ============================================================================
+// MISSION CLARITY TYPES
+// ============================================================================
+
+/**
+ * Mission clarity assessment - tracks 5-dimension clarity scoring
+ * Used by AI to systematically assess and improve mission understanding
+ */
+export interface MissionClarity {
+  id: string;
+  missionId: string;
+  objectiveClarity: number;        // 0-10: How specific and clear is the mission objective?
+  successMetrics: number;          // 0-10: Are success criteria well-defined?
+  timelineDefinition: number;      // 0-10: Is the timeline clear and realistic?
+  scopeBoundaries: number;         // 0-10: Are the boundaries and limitations defined?
+  visionAlignment: number;         // 0-10: How well does it align with the vision?
+  overallScore: number;            // Calculated average of the 5 dimensions
+  reasoning: string;               // AI qualitative analysis and explanation
+  iteration: number;               // Which evaluation iteration (starts at 1)
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Request to create a new mission clarity assessment
+ */
+export interface CreateMissionClarityRequest {
+  missionId: string;
+  objectiveClarity: number;
+  successMetrics: number;
+  timelineDefinition: number;
+  scopeBoundaries: number;
+  visionAlignment: number;
+  reasoning: string;
+  iteration: number;
+}
+
+/**
+ * Request to update an existing mission clarity assessment
+ */
+export interface UpdateMissionClarityRequest {
+  objectiveClarity?: number;
+  successMetrics?: number;
+  timelineDefinition?: number;
+  scopeBoundaries?: number;
+  visionAlignment?: number;
+  reasoning?: string;
+  iteration?: number;
 }

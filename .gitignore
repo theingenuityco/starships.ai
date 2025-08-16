@@ -41,3 +41,6 @@ node_modules/
 # Misc
 coverage/ 
 .kilocode/
+
+# Docker wrapper created by setup
+.docker-bin/

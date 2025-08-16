@@ -59,9 +59,9 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     // MCP HTTP Bridge Feature Flag
     MCP_HTTP_BRIDGE_ENABLED: process.env.MCP_HTTP_BRIDGE_ENABLED !== 'false', // Default: true
     
-    // Stripe Configuration
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
-    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    // Stripe Configuration - use test keys as defaults for development/CI
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || (process.env.NODE_ENV === 'production' ? '' : 'sk_test_dummy_key_for_development'),
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || (process.env.NODE_ENV === 'production' ? '' : 'pk_test_dummy_key_for_development'),
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     
     // Stripe Price IDs

@@ -20,12 +20,26 @@ For comprehensive documentation, see the [`docs/`](./docs/) directory:
 
 ## 🚀 Quick Start
 
+### Automated Setup (Recommended)
+
+For new developers, we provide an automated setup script that handles all dependencies:
+
+```bash
+git clone https://github.com/your-org/starships.ai.git
+cd starships.ai
+pnpm install
+pnpm run setup  # Installs Docker, Kubernetes tools, and configures everything
+```
+
+See [Developer Setup Guide](./docs/DEVELOPER_SETUP.md) for detailed instructions.
+
 ### Prerequisites
 - Node.js 20+
 - pnpm 8.10.5+
+- Docker Desktop (automatically installed by setup script)
 - Neo4j database (local or cloud)
 
-### Installation
+### Manual Installation
 ```bash
 git clone https://github.com/your-org/starships.ai.git
 cd starships.ai

@@ -8,10 +8,9 @@ const router: ExpressRouter = Router();
 const env = loadServerEnvironment();
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-07-30.basil', // ✅ CONFIRMED: Matches your setup-stripe.ts (line 10)
+  apiVersion: '2025-07-30.basil',
 });
 
-// ⚠️ UPDATED: Add initialization function for dependency injection
 let starshipRepository: StarshipRepository;
 
 export function initializeWebhookRoutes(deps: {
@@ -20,17 +19,18 @@ export function initializeWebhookRoutes(deps: {
   starshipRepository = deps.starshipRepository;
 }
 
-// Webhook endpoint
 router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
   const sig = req.headers['stripe-signature'];
   
   if (!sig) {
+    console.error('Missing Stripe signature header');
     res.status(400).send('No Stripe signature');
     return;
   }
 
   let event: Stripe.Event;
   
+  // Verify webhook signature
   try {
     event = stripe.webhooks.constructEvent(
       req.body,
@@ -39,82 +39,172 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
     );
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
-    res.status(400).send('Webhook Error');
+    res.status(400).send('Webhook Error: Invalid signature');
     return;
   }
 
-  console.log(`Processing webhook: ${event.type}`);
+  // CRITICAL: Idempotency check to prevent duplicate processing
+  try {
+    const isProcessed = await starshipRepository.isEventProcessed(event.id);
+    if (isProcessed) {
+      console.log(`[WEBHOOK] Event ${event.id} already processed, skipping`);
+      res.json({ received: true, skipped: true });
+      return;
+    }
+  } catch (error) {
+    console.error('[WEBHOOK] Error checking idempotency:', error);
+    // Continue processing if check fails (fail-open)
+  }
+
+  console.log(`[WEBHOOK] Processing event: ${event.type} (${event.id})`);
 
   try {
-    // ⚠️ CRITICAL UPDATE: Use dependency injection pattern, not serviceRegistry
-    // These repositories are available via the router initialization
-    // You'll need to pass them via the webhook initialization function
+    let processed = false;
 
     switch (event.type) {
-      case 'checkout.session.completed':
+      case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         
-        // Create starship after payment
-        await starshipRepository.create({
-          name: session.metadata!.starshipName,
-          slug: `${session.metadata!.starshipName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`,
-          ownerId: session.metadata!.userId,
-          class: session.metadata!.plan as 'cruiser' | 'draught',
-          maxActiveExpeditions: session.metadata!.plan === 'cruiser' ? 3 : 5,
-          status: 'active',
-          subscriptionId: session.subscription as string,
-          plan: session.metadata!.plan as 'cruiser' | 'draught',
-          billingPeriod: session.metadata!.billingPeriod as 'monthly' | 'yearly',
-        });
-        console.log(`✅ Created starship: ${session.metadata!.starshipName}`);
-        break;
+        // REQUIRED: starshipId must be in metadata (created before payment)
+        const starshipId = session.metadata?.starshipId;
         
-      case 'customer.subscription.updated':
-        const subscription = event.data.object as Stripe.Subscription;
-        const starship = await starshipRepository.findBySubscriptionId(subscription.id);
+        if (!starshipId) {
+          // This is a critical error - subscription without starship
+          console.error('[WEBHOOK] CRITICAL: No starshipId in checkout metadata');
+          console.error('[WEBHOOK] Metadata received:', session.metadata);
+          // Let it fail - don't process payment without proper setup
+          throw new Error('Invalid checkout session: missing starshipId');
+        }
+        
+        // Get previous status for logging
+        const starship = await starshipRepository.findById(starshipId);
+        const previousStatus = starship?.status || 'unknown';
+        
+        // Update existing Starship with subscription details
+        await starshipRepository.update(starshipId, {
+          stripeCustomerId: session.customer as string,
+          subscriptionId: session.subscription as string,
+          status: 'active'
+        });
+        
+        console.log(`✅ [WEBHOOK] Activated starship: ${starshipId} (${previousStatus} → active)`);
+        processed = true;
+        break;
+      }
+        
+      case 'invoice.paid': {
+        // CRITICAL: Handle payment recovery (including Smart Retries)
+        const paidInvoice = event.data.object as Stripe.Invoice;
+        
+        // Check if invoice has a subscription field
+        const subscriptionField = (paidInvoice as any).subscription;
+        if (!subscriptionField) {
+          console.log('[WEBHOOK] Invoice not related to subscription, skipping');
+          break;
+        }
+        
+        const subscriptionId = typeof subscriptionField === 'string' 
+          ? subscriptionField 
+          : subscriptionField.id;
+          
+        const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
         
         if (starship) {
-          const status = subscription.status === 'active' ? 'active' : 'restricted';
-          await starshipRepository.updateSubscription(starship.id, { status });
-          console.log(`✅ Updated starship ${starship.name} to ${status}`);
-        }
-        break;
-        
-      case 'customer.subscription.deleted':
-        const deletedSub = event.data.object as Stripe.Subscription;
-        const disabledShip = await starshipRepository.findBySubscriptionId(deletedSub.id);
-        
-        if (disabledShip) {
-          await starshipRepository.updateSubscription(disabledShip.id, { status: 'disabled' });
-          console.log(`✅ Disabled starship ${disabledShip.name}`);
-        }
-        break;
-        
-      case 'invoice.payment_failed':
-        const invoice = event.data.object as any; // Use any to bypass strict typing for now
-        if (invoice.subscription) {
-          const subscriptionId = typeof invoice.subscription === 'string' 
-            ? invoice.subscription 
-            : invoice.subscription.id;
-          if (subscriptionId) {
-            const restrictedShip = await starshipRepository.findBySubscriptionId(subscriptionId);
-            if (restrictedShip) {
-              await starshipRepository.updateSubscription(restrictedShip.id, { status: 'restricted' });
-              console.log(`✅ Restricted starship ${restrictedShip.name}`);
-            }
+          const wasRestricted = starship.status === 'restricted';
+          // Reactivate access after successful payment
+          await starshipRepository.updateSubscription(starship.id, { 
+            status: 'active' 
+          });
+          
+          if (wasRestricted) {
+            console.log(`✅ [WEBHOOK] Payment RECOVERED for starship: ${starship.name} (restricted → active)`);
+          } else {
+            console.log(`✅ [WEBHOOK] Payment successful for starship: ${starship.name} (${starship.status} → active)`);
           }
+          processed = true;
+        } else {
+          console.warn(`[WEBHOOK] No starship found for subscription: ${subscriptionId}`);
         }
         break;
+      }
+        
+      case 'invoice.payment_failed': {
+        const failedInvoice = event.data.object as Stripe.Invoice;
+        
+        // Check if invoice has a subscription field
+        const subscriptionField = (failedInvoice as any).subscription;
+        if (!subscriptionField) {
+          console.log('[WEBHOOK] Invoice not related to subscription, skipping');
+          break;
+        }
+        
+        const subscriptionId = typeof subscriptionField === 'string' 
+          ? subscriptionField 
+          : subscriptionField.id;
+          
+        const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
+        
+        if (starship) {
+          // Restrict access due to payment failure
+          await starshipRepository.updateSubscription(starship.id, { 
+            status: 'restricted' 
+          });
+          
+          // Log retry information if available
+          const attemptCount = failedInvoice.attempt_count || 1;
+          const nextAttempt = failedInvoice.next_payment_attempt 
+            ? new Date(failedInvoice.next_payment_attempt * 1000).toISOString()
+            : 'No retry scheduled';
+            
+          console.log(`⚠️ [WEBHOOK] Payment failed for starship: ${starship.name} (${starship.status} → restricted)`);
+          console.log(`   Attempt: ${attemptCount}, Next retry: ${nextAttempt}`);
+          processed = true;
+        } else {
+          console.warn(`[WEBHOOK] No starship found for subscription: ${subscriptionId}`);
+        }
+        break;
+      }
+        
+      case 'customer.subscription.deleted': {
+        const deletedSub = event.data.object as Stripe.Subscription;
+        const starship = await starshipRepository.findBySubscriptionId(deletedSub.id);
+        
+        if (starship) {
+          // Permanently disable access
+          await starshipRepository.updateSubscription(starship.id, { 
+            status: 'disabled'
+            // Note: subscriptionId not cleared here due to type constraints
+          });
+          console.log(`❌ [WEBHOOK] Subscription cancelled for ${starship.name} (${starship.status} → disabled)`);
+          processed = true;
+        } else {
+          console.warn(`[WEBHOOK] No starship found for deleted subscription: ${deletedSub.id}`);
+        }
+        break;
+      }
         
       default:
-        console.log(`Unhandled event: ${event.type}`);
+        console.log(`[WEBHOOK] Unhandled event type: ${event.type}`);
     }
     
-    res.json({ received: true });
+    // Mark event as processed (even if we didn't handle it)
+    await starshipRepository.markEventProcessed(event.id, event.type);
+    
+    res.json({ 
+      received: true, 
+      processed,
+      eventId: event.id,
+      eventType: event.type 
+    });
     
   } catch (error) {
-    console.error('Webhook processing error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    console.error('[WEBHOOK] Processing error:', error);
+    // For subscription webhooks, we want to fail properly
+    // Return 500 to trigger Stripe retries for legitimate failures
+    res.status(500).json({ 
+      received: false, 
+      error: error instanceof Error ? error.message : 'Processing failed'
+    });
   }
 });
 

@@ -6,15 +6,17 @@
  */
 
 import { StateGraph, END, START, Annotation, MemorySaver, MessagesAnnotation } from '@langchain/langgraph';
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
 import { LangChainProvider } from '@starships/agent-engine/src/llm/langchain-provider';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
-import { MISSION_PROMPTS, renderTemplate } from '../prompts/missionPrompts';
+import { MissionEventService } from './MissionEventService';
+import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import type { 
   Mission, 
-  MissionMessage,
   MissionPhase,
+  MissionClarity,
+  CreateMissionClarityRequest,
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
@@ -30,6 +32,14 @@ export interface MissionOrchestratorAgentConfig {
   model?: string;
 }
 
+/**
+ * Callbacks for real-time graph execution
+ */
+export interface GraphExecutionCallbacks {
+  onMessageGenerated: (message: AIMessage, nodeId: string, missionId: string) => Promise<void>;
+  onPhaseChange?: (newPhase: MissionPhase, missionId: string) => Promise<void>;
+  onStateUpdate?: (state: Partial<MissionChatState>) => Promise<void>;
+}
 
 /**
  * Mission metadata for AI response generation
@@ -47,7 +57,10 @@ interface MissionMetadata {
 const MissionChatStateAnnotation = Annotation.Root({
   ...MessagesAnnotation.spec, // Standard messages handling
   missionId: Annotation<string>(),
-  currentPhase: Annotation<MissionPhase>(),
+  activePhase: Annotation<MissionPhase | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
+  }),
   isSystemInitiated: Annotation<boolean>({
     value: (x, y) => y ?? x,
     default: () => false
@@ -55,6 +68,12 @@ const MissionChatStateAnnotation = Annotation.Root({
   metadata: Annotation<MissionMetadata | null>({
     value: (x, y) => y ?? x,
     default: () => null
+  }),
+  
+  // ADDED: Current clarity for context and iteration tracking
+  clarity: Annotation<MissionClarity | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
   })
 });
 
@@ -64,9 +83,10 @@ const MissionChatStateAnnotation = Annotation.Root({
  */
 export type MissionChatState = typeof MessagesAnnotation.State & {
   missionId: string;
-  currentPhase: MissionPhase;
+  activePhase: MissionPhase | undefined;
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
+  clarity: MissionClarity | undefined; // ADDED: Mission clarity state
 };
 
 /**
@@ -78,8 +98,16 @@ export class MissionOrchestratorAgent {
   private checkpointer = new MemorySaver();
   private compiledGraph: any = null; // Cache compiled graph
   
+  // Callback storage for real-time execution
+  private currentCallbacks?: GraphExecutionCallbacks;
+  private currentMissionId?: string;
+  
+  // Clarity assessment configuration constants
+  private static readonly CLARITY_THRESHOLD = 7.5;
+  private static readonly MAX_CLARITY_ITERATIONS = 10;
+  
   private readonly config: Required<MissionOrchestratorAgentConfig> = {
-    temperature: 0.7,
+    temperature: 0.9,
     maxTokens: 1000,
     provider: 'openai',
     model: 'gpt-4'
@@ -103,18 +131,36 @@ export class MissionOrchestratorAgent {
       this.compiledGraph = new StateGraph(MissionChatStateAnnotation)
         .addNode("context_builder", this.contextBuilderNode.bind(this))
         .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
+        .addNode("analysis_phase", this.analysisPhaseNode.bind(this))
         .addNode("converse_phase", this.conversePhaseNode.bind(this))
         .addEdge(START, "context_builder")
         .addConditionalEdges(
           "context_builder",
           this.phaseRouterNode.bind(this),
           {
-            init: "welcome_phase",      // init phase also goes to welcome (fallback)
+            init: "welcome_phase",        // init transitions to welcome
             welcome: "welcome_phase",
+            analysis: "analysis_phase",
             converse: "converse_phase"
           }
         )
-        .addEdge("welcome_phase", END)
+        .addConditionalEdges(
+          "welcome_phase",
+          this.shouldContinueFromWelcome.bind(this),
+          {
+            continue: "analysis_phase",
+            end: END
+          }
+        )
+        .addConditionalEdges(
+          "analysis_phase", 
+          this.shouldContinueFromAnalysis.bind(this),
+          {
+            continue: "analysis_phase", // Stay in analysis for iterative questions
+            advance: "converse_phase",   // Move to converse when complete
+            end: END
+          }
+        )
         .addEdge("converse_phase", END)
         .compile({ checkpointer: this.checkpointer });
     }
@@ -135,90 +181,167 @@ export class MissionOrchestratorAgent {
     
     const metadata = await this.loadMissionMetadata(state.missionId);
     updates.metadata = metadata;
-    updates.currentPhase = metadata.mission.phase;
-      
-      // For system-initiated messages, auto-transition to welcome if in init
-      if (state.isSystemInitiated && metadata.mission.phase === 'init') {
-        try {
-          const missionRepo = RepositoryFactory.getMissionRepository();
-          await missionRepo.updateMission(state.missionId, { phase: 'welcome' });
-          updates.currentPhase = 'welcome';
-        } catch (error) {
-          this.logger.error('Failed to auto-transition phase', error as Error);
-        }
-      }
+    
+    // Handle init -> welcome transition automatically
+    if (metadata.mission.phase === 'init') {
+      updates.activePhase = 'welcome';
+    } else {
+      updates.activePhase = metadata.mission.phase;
+    }
     
     return updates;
   }
 
+
   /**
-   * Build context string from state for use in prompts
+   * Create AIMessage with Commander ARIA name
    */
-  private buildContext(state: MissionChatState): string {
-    const { metadata, currentPhase } = state;
-    const { mission, starship, vision } = metadata!;
-    
-    return renderTemplate(MISSION_PROMPTS.CONTEXT, {
-      currentPhase,
-      mission,
-      starship,
-      vision
+  private createAIMessage(content: string, state: MissionChatState): AIMessage {
+    return new AIMessage({ 
+      content,
+      name: `Commander ARIA-${state.missionId.slice(-4)}`
     });
   }
+
+
+  /**
+   * Create HumanMessage
+   */
+  private createHumanMessage(content: string): HumanMessage {
+    return new HumanMessage({ content });
+  }
+
 
   /**
    * Conditional edge function to determine phase routing
    */
   private phaseRouterNode(state: MissionChatState): string {
-    return state.currentPhase; // Returns 'welcome' or 'converse'
+    return state.activePhase || 'welcome'; // Returns current phase or default to welcome
+  }
+
+  /**
+   * Decide if welcome should auto-continue to analysis
+   */
+  private shouldContinueFromWelcome(state: MissionChatState): string {
+    // Auto-continue from welcome to analysis if it's a system-initiated welcome
+    if (state.isSystemInitiated) {
+      return 'continue';
+    }
+    return 'end';
+  }
+
+  /**
+   * Decide analysis phase continuation - always end to wait for human response
+   */
+  private shouldContinueFromAnalysis(state: MissionChatState): string {
+    const clarity = state.clarity;
+    
+    if (!clarity) {
+      return 'end'; // Something went wrong, stop
+    }
+    
+    // If clarity threshold met OR max iterations reached, advance to converse
+    if (clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
+        clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS) {
+      return 'advance'; // Move to converse_phase
+    }
+    
+    // Always end after generating a question to wait for human response
+    return 'end'; // Wait for user to respond, then they'll send another message
   }
 
   /**
    * Welcome phase node - handles initial mission introduction
    */
   private async welcomePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const latestMessage = state.messages[state.messages.length - 1];
-    const systemMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
-    
-    // Build complete welcome prompt using template literals
-    const context = this.buildContext(state);
-    const welcomePhase = renderTemplate(MISSION_PROMPTS.WELCOME_PHASE, {
-      systemMessage,
-      isSystemInitiated: !!state.isSystemInitiated
-    });
-    
-    const systemPrompt = `${context}
-
-${welcomePhase}`;
+    // Build welcome prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildWelcomePrompt();
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    const aiMessage = new AIMessage({ content: responseContent });
-    return { messages: [aiMessage] };
+    const aiMessage = this.createAIMessage(responseContent, state);
+    
+    // Save message immediately via callback
+    if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+      await this.currentCallbacks.onMessageGenerated(aiMessage, 'welcome_phase', this.currentMissionId);
+    }
+    
+    // Set activePhase to signal transition to analysis after welcome
+    return { 
+      messages: [aiMessage],
+      activePhase: 'analysis'
+    };
+  }
+
+  /**
+   * Interactive Analysis phase node - handles mission clarity assessment with human-in-the-loop Q&A
+   * Processes user responses and generates next question or completion when threshold is met
+   */
+  private async analysisPhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    // Assess current clarity (includes all conversation context including any new user answers)
+    const clarity = await this.assessAndSaveClarity(state);
+    
+    // Check if this is the first analysis iteration (show transparency)
+    const isFirstIteration = clarity.iteration === 1;
+    
+    // Check if analysis is complete
+    const isComplete = clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
+                      clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS;
+    
+
+    const updatedState = {...state, clarity};
+
+    if (isComplete) {
+      // Generate completion summary - analysis is done
+      const summary = await this.generateCompletionSummary(updatedState, clarity, isFirstIteration);
+      const aiMessage = this.createAIMessage(summary, updatedState);
+      
+      // Save completion message immediately
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_complete', this.currentMissionId);
+      }
+      
+      return {
+        messages: [aiMessage],
+        clarity,
+        activePhase: 'converse' // Transition to converse phase
+      };
+    } else {
+      // Generate next question and END - wait for human response
+      const question = await this.generateFocusedQuestion(updatedState, clarity, isFirstIteration);
+      const aiMessage = this.createAIMessage(question, updatedState);
+      
+      // Save analysis question immediately
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'analysis_question', this.currentMissionId);
+      }
+      
+      return {
+        messages: [aiMessage],
+        clarity
+        // Stay in analysis phase - graph will END and wait for user response
+      };
+    }
   }
 
   /**
    * Converse phase node - handles ongoing mission conversation
    */
   private async conversePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
-    const latestMessage = state.messages[state.messages.length - 1];
-    const userMessage = typeof latestMessage.content === 'string' ? latestMessage.content : '';
-    
-    // Build complete converse prompt using template literals
-    const context = this.buildContext(state);
-    const conversePhase = renderTemplate(MISSION_PROMPTS.CONVERSE_PHASE, {
-      userMessage
-    });
-    
-    const systemPrompt = `${context}
-
-${conversePhase}`;
+    // Build converse prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildConversePrompt();
 
     const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     const responseContent = await this.callLLM(prompt);
     
-    const aiMessage = new AIMessage({ content: responseContent });
+    const aiMessage = this.createAIMessage(responseContent, state);
+    
+    // Save converse message immediately
+    if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+      await this.currentCallbacks.onMessageGenerated(aiMessage, 'converse_phase', this.currentMissionId);
+    }
+    
     return { messages: [aiMessage] };
   }
 
@@ -282,6 +405,102 @@ ${conversePhase}`;
   }
 
   /**
+   * Generate AI response using LangGraph flow - returns both response and final state
+   */
+  async generateResponseWithState(message: string, missionId: string): Promise<{ response: string; state: Partial<MissionChatState> }> {
+    try {
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      // Create user message and let LangGraph handle the flow
+      const userMessage = new HumanMessage({ content: message });
+      
+      // Invoke the graph - it will handle context building, phase routing, and response generation
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [userMessage]
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      // Extract final AI response from the graph result
+      const lastMessage = result.messages[result.messages.length - 1];
+      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : this.getFallbackResponse(missionId);
+
+      return { response, state: result };
+
+    } catch (error) {
+      this.logger.error('Failed to generate orchestrator response', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'generateResponseWithState',
+        missionId
+      }, error as Error);
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Execute graph with real-time callbacks for immediate message saving
+   */
+  async executeGraphWithCallbacks(
+    missionId: string, 
+    input: string, 
+    callbacks: GraphExecutionCallbacks,
+    isSystemMessage: boolean = false
+  ): Promise<{ finalResponse: string; state: Partial<MissionChatState> }> {
+    try {
+      // Store callbacks and missionId for use in nodes
+      this.currentCallbacks = callbacks;
+      this.currentMissionId = missionId;
+
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      const inputMessage = isSystemMessage 
+        ? new SystemMessage({ content: input })
+        : new HumanMessage({ content: input });
+      
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [inputMessage],
+          isSystemInitiated: isSystemMessage
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      // Extract final response
+      const lastMessage = result.messages[result.messages.length - 1];
+      const finalResponse = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : this.getFallbackResponse(missionId);
+
+      // Clear callback storage
+      this.currentCallbacks = undefined;
+      this.currentMissionId = undefined;
+
+      return { finalResponse, state: result };
+
+    } catch (error) {
+      // Clear callback storage on error
+      this.currentCallbacks = undefined;
+      this.currentMissionId = undefined;
+
+      this.logger.error('Failed to execute graph with callbacks', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'executeGraphWithCallbacks',
+        missionId
+      }, error as Error);
+      
+      throw error;
+    }
+  }
+
+  /**
    * Generate AI response using LangGraph flow - respects graph state transitions
    */
   async generateResponse(message: string, missionId: string): Promise<string> {
@@ -320,6 +539,40 @@ ${conversePhase}`;
   }
 
 
+
+  /**
+   * Generate system-initiated response with state - returns both response and final state
+   */
+  async generateSystemResponseWithState(missionId: string, message: string): Promise<{ response: string; state: Partial<MissionChatState> }> {
+    try {
+      const graph = await this.getGraph();
+      const threadId = `mission-${missionId}`;
+      
+      const systemMessage = new SystemMessage({ 
+        content: message
+      });
+      
+      const result = await graph.invoke(
+        { 
+          missionId,
+          messages: [systemMessage],
+          isSystemInitiated: true
+        },
+        { configurable: { thread_id: threadId } }
+      );
+
+      const lastMessage = result.messages[result.messages.length - 1];
+      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
+        ? lastMessage.content 
+        : this.getFallbackResponse(missionId);
+
+      return { response, state: result };
+
+    } catch (error) {
+      this.logger.error('Failed to generate system response', error as Error);
+      throw error;
+    }
+  }
 
   /**
    * Generate system-initiated response (no user input required)
@@ -369,6 +622,8 @@ ${conversePhase}`;
       throw new Error('LLM provider not initialized');
     }
 
+    console.log({ prompt: prompt.messages[0] })
+
     const result = await this.llmProvider.complete(prompt, {
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens
@@ -409,7 +664,186 @@ ${conversePhase}`;
   /**
    * Generate fallback response when LLM fails
    */
-  private getFallbackResponse(missionId: string): string {
-    return MISSION_PROMPTS.FALLBACK;
+  private getFallbackResponse(_missionId: string): string {
+    return `I'm here to help guide your mission. Could you provide more details about what you need assistance with?`;
+  }
+
+  // ============================================================================
+  // CLARITY ASSESSMENT METHODS
+  // ============================================================================
+
+  /**
+   * Main orchestrator method - assesses clarity and saves to database
+   */
+  private async assessAndSaveClarity(state: MissionChatState): Promise<MissionClarity> {
+    try {
+      // Get current iteration count
+      const currentClarity = await this.getClarityFromDB(state.missionId);
+      const iteration = (currentClarity?.iteration || 0) + 1;
+      
+      // Update state with current clarity for context (convert null to undefined)
+      const stateWithClarity = { ...state, clarity: currentClarity || undefined };
+      
+      // Assess clarity using AI with full context
+      const clarityRequest = await this.assessMissionClarity(stateWithClarity, iteration);
+      clarityRequest.missionId = state.missionId; // Set the mission ID
+      
+      // Save to database
+      const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+      const updatedClarity = await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
+      
+      // Emit real-time clarity update
+      const missionEventService = MissionEventService.getInstance();
+      missionEventService.emitClarityUpdate(state.missionId, updatedClarity);
+      
+      return updatedClarity;
+    } catch (error) {
+      this.logger.error('Failed to assess and save clarity', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'assessAndSaveClarity',
+        missionId: state.missionId
+      }, error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * AI clarity assessment using LLM - returns structured clarity data
+   * Uses full context (including existing clarity data) via buildContext
+   */
+  private async assessMissionClarity(state: MissionChatState, iteration: number): Promise<CreateMissionClarityRequest> {
+    // Build clarity assessment prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityAssessmentPrompt();
+
+    const prompt: LLMChatPrompt = {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+
+    const response = await this.callLLM(prompt);
+    const clarityData = this.parseJSONResponse(response);
+    
+    return {
+      missionId: '', // Will be set by caller
+      objectiveClarity: clarityData.objectiveClarity,
+      successMetrics: clarityData.successMetrics,
+      timelineDefinition: clarityData.timelineDefinition,
+      scopeBoundaries: clarityData.scopeBoundaries,
+      visionAlignment: clarityData.visionAlignment,
+      reasoning: clarityData.reasoning,
+      iteration
+    };
+  }
+
+  /**
+   * Generate focused question based on clarity assessment
+   */
+  private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
+    // Build clarity question prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityQuestionPrompt(isFirstIteration);
+
+    const prompt: LLMChatPrompt = {
+      messages: [{
+        role: 'system', 
+        content: systemPrompt
+      }]
+    };
+
+    return await this.callLLM(prompt);
+  }
+
+  /**
+   * Generate completion summary when clarity threshold is met
+   */
+  private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
+    // Build clarity completion prompt using the new builder
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityCompletionPrompt(isFirstIteration);
+
+    const prompt: LLMChatPrompt = {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+
+    return await this.callLLM(prompt);
+  }
+
+  /**
+   * Get clarity from database for iteration tracking
+   */
+  private async getClarityFromDB(missionId: string): Promise<MissionClarity | null> {
+    try {
+      const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+      return await clarityRepo.getByMissionId(missionId);
+    } catch (error) {
+      this.logger.error('Failed to get clarity from database', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'getClarityFromDB',
+        missionId
+      }, error as Error);
+      return null;
+    }
+  }
+
+
+  /**
+   * Parse JSON response from LLM with error handling
+   */
+  private parseJSONResponse(response: string): any {
+    try {
+      // Extract JSON from response if wrapped in text
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : response;
+      
+      const parsed = JSON.parse(jsonStr);
+      this.validateClarity(parsed);
+      return parsed;
+    } catch (error) {
+      this.logger.error('Failed to parse JSON response', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'parseJSONResponse',
+        response: response.substring(0, 200)
+      }, error as Error);
+      
+      // Return default scores if parsing fails
+      return {
+        objectiveClarity: 5,
+        successMetrics: 5,
+        timelineDefinition: 5,
+        scopeBoundaries: 5,
+        visionAlignment: 5,
+        reasoning: 'Unable to parse AI assessment, using default scores'
+      };
+    }
+  }
+
+  /**
+   * Validate clarity assessment structure and ranges
+   */
+  private validateClarity(clarity: any): void {
+    const requiredFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment', 'reasoning'];
+    const errors: string[] = [];
+    
+    for (const field of requiredFields) {
+      if (clarity[field] === undefined) {
+        errors.push(`Missing field: ${field}`);
+      }
+    }
+    
+    // Validate score ranges (0-10)
+    const scoreFields = requiredFields.slice(0, 5); // First 5 are scores
+    for (const field of scoreFields) {
+      const score = clarity[field];
+      if (typeof score !== 'number' || score < 0 || score > 10) {
+        errors.push(`Invalid score for ${field}: must be number 0-10, got ${score}`);
+      }
+    }
+    
+    if (errors.length > 0) {
+      throw new Error(`Clarity validation failed: ${errors.join(', ')}`);
+    }
   }
 }

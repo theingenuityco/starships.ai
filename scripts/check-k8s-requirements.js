@@ -179,7 +179,7 @@ function checkKindCluster() {
   }
 }
 
-function createKindCluster() {
+async function createKindCluster() {
   log(`\n🚀 Creating Kind cluster '${CLUSTER_NAME}'...`, 'cyan');
   
   // Quick cluster creation - no timeout command needed
@@ -214,8 +214,9 @@ containerdConfigPatches:
     fs.writeFileSync(kindConfig, configContent);
     
     // Create cluster (kind has its own timeout handling)
-    log('📦 Creating cluster (this may take 1-2 minutes)...', 'cyan');
+    log('📦 Creating cluster (this may take 2-5 minutes)...', 'cyan');
     log('   Please be patient while Kind sets up the Kubernetes cluster', 'yellow');
+    log('   First time setup will download the node image (~400MB)', 'yellow');
     
     // Ensure Docker is in PATH for kind command
     const dockerPath = os.platform() === 'darwin' 
@@ -226,7 +227,7 @@ containerdConfigPatches:
     execSync(`kind create cluster --config=${kindConfig}`, { 
       stdio: 'inherit',
       env: { ...process.env, PATH: enhancedPath },
-      timeout: 120000 // 2 minute timeout using Node.js built-in
+      timeout: 300000 // 5 minute timeout using Node.js built-in
     });
     
     // Setup registry
@@ -269,10 +270,65 @@ containerdConfigPatches:
   } catch (error) {
     log(`❌ Failed to create Kind cluster: ${error.message}`, 'red');
     
-    // If it's a timeout, suggest increasing patience
+    // If it's a timeout, check if cluster was partially created
     if (error.message.includes('ETIMEDOUT') || error.code === 'ETIMEDOUT') {
-      log('   Cluster creation timed out. This can happen on slower machines.', 'yellow');
-      log('   The cluster might still be creating. Check with: kind get clusters', 'yellow');
+      log('   Cluster creation timed out. Checking if cluster was created...', 'yellow');
+      
+      // Wait a bit and check if the cluster exists
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      try {
+        const clusters = execSync('kind get clusters 2>/dev/null', { 
+          encoding: 'utf8',
+          env: { ...process.env, PATH: enhancedPath }
+        });
+        
+        if (clusters.includes(CLUSTER_NAME)) {
+          log(`✅ Cluster '${CLUSTER_NAME}' was created despite timeout!`, 'green');
+          
+          // Setup registry since we're here
+          log('🐳 Setting up local Docker registry...', 'cyan');
+          try {
+            execSync('docker run -d --restart=always -p 127.0.0.1:5001:5000 --name starships-registry registry:2', { 
+              stdio: 'ignore',
+              env: { ...process.env, PATH: enhancedPath }
+            });
+          } catch {
+            execSync('docker start starships-registry', { 
+              stdio: 'ignore',
+              env: { ...process.env, PATH: enhancedPath }
+            });
+          }
+          
+          // Connect registry to kind network
+          try {
+            execSync('docker network connect kind starships-registry', { 
+              stdio: 'ignore',
+              env: { ...process.env, PATH: enhancedPath }
+            });
+          } catch {
+            // Already connected
+          }
+          
+          // Install ingress
+          log('🔧 Installing NGINX Ingress Controller...', 'cyan');
+          execSync('kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml', { 
+            stdio: 'ignore',
+            env: { ...process.env, PATH: enhancedPath }
+          });
+          
+          // Cleanup config file
+          try { fs.unlinkSync(kindConfig); } catch {}
+          
+          return true; // Success despite timeout!
+        }
+      } catch {
+        // Cluster really doesn't exist
+      }
+      
+      log('   The cluster creation truly failed or is still in progress.', 'yellow');
+      log('   Try running: kind create cluster --name starships manually', 'yellow');
+      log('   Or increase your Docker resources (memory/CPU) and retry', 'yellow');
     }
     
     // Cleanup config file
@@ -358,7 +414,7 @@ async function main() {
   if (!checkKindCluster()) {
     log(`⚠️  Kind cluster '${CLUSTER_NAME}' not found`, 'yellow');
     log('   Creating cluster now (this is required for MCP deployment)...', 'cyan');
-    if (!createKindCluster()) {
+    if (!(await createKindCluster())) {
       log('❌ Failed to create Kind cluster - this is required for MCP deployment', 'red');
       log('   Please check the error messages above and fix any issues', 'yellow');
       log('   Then run: pnpm run k8s:setup', 'yellow');

@@ -128,9 +128,15 @@ export class MissionPlanRepository extends BaseRepository implements MissionPlan
       const mp = record.mp;
       const tasks = record.tasks;
       
+      // Extract properties from Neo4j nodes
+      const planProperties = mp?.properties || mp;
+      const taskProperties = tasks ? 
+        tasks.filter((t: unknown) => t !== null)
+             .map((t: any) => t?.properties || t) : [];
+      
       return { 
-        ...mp, 
-        tasks: tasks ? tasks.filter((t: unknown) => t !== null) : []
+        ...planProperties, 
+        tasks: taskProperties
       } as MissionPlan;
     }, 'getPlanByMissionId', 'MissionPlan', missionId);
   }

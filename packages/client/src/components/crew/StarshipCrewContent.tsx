@@ -13,6 +13,7 @@ import {
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
+import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { CrewConsoleFloatingMessage } from '@/components/sibil/CrewConsoleFloatingMessage'
 import { Button } from '@/components/ui/button'
@@ -373,13 +374,13 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         >
           <div className="p-6 pb-0 flex flex-col h-full min-h-0">
             <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
+              <TabsList className="grid w-full grid-cols-3 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
                 <TabsTrigger 
                   value="agents" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Bot className="h-4 w-4" />
-                  AI Agents
+                  Agents
                 </TabsTrigger>
                 <TabsTrigger 
                   value="connectors" 
@@ -387,6 +388,13 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 >
                   <Plug className="h-4 w-4" />
                   Connectors
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="api-keys" 
+                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+                >
+                  <Zap className="h-4 w-4" />
+                  API Keys
                 </TabsTrigger>
               </TabsList>
 
@@ -467,6 +475,27 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
                   </div>
                 {/* </AnimatePresence> */}
+              </TabsContent>
+
+              <TabsContent
+                value="api-keys"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
+              >
+                <div
+                  key="api-keys-content"
+                  className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar"
+                >
+                  {starship?.id ? (
+                    <NativeToolApiKeys starshipId={starship.id} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-sm text-muted-foreground">Loading starship data...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>

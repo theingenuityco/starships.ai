@@ -19,6 +19,7 @@
     "@langchain/core": "^0.3.66",
     "@langchain/langgraph": "^0.3.11",
     "@langchain/openai": "^0.6.2",
+    "@octokit/rest": "^22.0.0",
     "@starships/core": "workspace:*",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",

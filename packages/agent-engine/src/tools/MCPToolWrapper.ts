@@ -103,6 +103,28 @@ export class MCPToolWrapper {
         }
       }
       
+      // Add GitHub tools if API key exists
+      if (apiKeys.github) {
+        try {
+          const { GitHubTools } = await import('./github/GitHubTools');
+          
+          // Create GitHub tools instance
+          const githubTools = new GitHubTools(apiKeys.github);
+          const tools = githubTools.getTools();
+          
+          // Add all GitHub tools
+          tools.forEach(tool => {
+            langchainTools.push(tool);
+            console.log(`[MCPToolWrapper] Added GitHub tool: ${tool.name} for starship ${this.config.starshipId}`);
+          });
+          
+          console.log(`[MCPToolWrapper] Added ${tools.length} GitHub tools for starship ${this.config.starshipId}`);
+          console.log(`[MCPToolWrapper] GitHub tools available - use 'github_my_info' to get user info and 'github_list_my_repos' to list repositories`);
+        } catch (error) {
+          console.error('[MCPToolWrapper] Failed to add GitHub tools:', error);
+        }
+      }
+      
       // Add OpenWeatherMap if API key exists
       // TODO: OpenWeatherMap tool is not available in @langchain/community
       // Will need to implement custom integration or wait for library update

@@ -212,7 +212,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-purple-600">
-                {plan.tasks.reduce((total, task) => total + task.dependencies.length, 0)}
+                {plan.tasks.reduce((total, task) => total + (task.dependencies?.length || 0), 0)}
               </div>
               <div className="text-sm text-gray-600">Dependencies</div>
             </div>
@@ -229,7 +229,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
           <div className="space-y-4">
             <AnimatePresence>
               {plan.tasks.map((task, index) => (
-                <TaskCard key={task.id} task={task} index={index} plan={plan} />
+                <TaskCard key={task.id || `task-${index}`} task={task} index={index} plan={plan} />
               ))}
             </AnimatePresence>
           </div>
@@ -258,10 +258,10 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
                   <div className="text-sm text-gray-600">{taskIds.length} task(s) assigned</div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {taskIds.map(taskId => {
+                  {taskIds.map((taskId, idx) => {
                     const taskIndex = plan.tasks.findIndex(t => t.id === taskId);
                     return (
-                      <Badge key={taskId} variant="outline" className="text-xs">
+                      <Badge key={taskId || `badge-${agentId}-${idx}`} variant="outline" className="text-xs">
                         Task {taskIndex + 1}
                       </Badge>
                     );
@@ -400,6 +400,7 @@ function TaskCard({ task, index, plan }: TaskCardProps) {
   };
 
   const getDependencyTasks = (dependencies: string[]) => {
+    if (!dependencies || dependencies.length === 0) return '';
     return dependencies.map(depId => {
       const depIndex = plan.tasks.findIndex(t => t.id === depId);
       return depIndex >= 0 ? `Task ${depIndex + 1}` : 'Unknown';
@@ -434,7 +435,7 @@ function TaskCard({ task, index, plan }: TaskCardProps) {
           <span className="text-sm text-gray-600">{task.deliverable}</span>
         </div>
         
-        {task.dependencies.length > 0 && (
+        {task.dependencies && task.dependencies.length > 0 && (
           <div>
             <span className="text-sm font-medium text-gray-700">Dependencies: </span>
             <span className="text-sm text-gray-600">{getDependencyTasks(task.dependencies)}</span>

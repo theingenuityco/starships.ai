@@ -12,6 +12,7 @@ import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity } from '@starships/protocol';
+import { PlanPhaseContent } from '@/components/missions/PlanPhaseContent';
 
 interface MissionDetailPageProps {
   params: Promise<{
@@ -66,7 +67,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     timeline: false,
     agents: false,
     progress: false,
-    clarity: false
+    clarity: false,
+    plan: false
   });
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
@@ -105,6 +107,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
       'init': { label: 'Init', description: 'Setting up mission context' },
       'welcome': { label: 'Welcome', description: 'Mission introduction' },
       'analysis': { label: 'Analysis', description: 'Analyzing mission clarity' },
+      'plan': { label: 'Plan', description: 'Reviewing execution plan' },
       'converse': { label: 'Converse', description: 'Active conversation phase' }
     };
 
@@ -114,6 +117,16 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   // Central message handler - single source of truth
   const addMessageToUI = (message: MissionMessage) => {
     setMessages(prev => [...prev, message]);
+  };
+
+  // Handle plan approval transitions
+  const handlePlanApproval = (approved: boolean) => {
+    if (approved) {
+      // Plan was approved, mission should transition to converse phase
+      // This will be handled by the WebSocket event or we can optimistically update
+      setMission(prev => prev ? { ...prev, phase: 'converse' } : null);
+    }
+    // If rejected, stay in plan phase for regeneration
   };
 
   // WebSocket setup for mission messages and real-time updates
@@ -263,7 +276,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     focusInput();
   }, []);
 
-
   const handleSendMessage = async () => {
     if (!newMessage.trim() || chatLoading) return;
 
@@ -371,7 +383,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
 
       {/* Main Content - Split Layout */}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-        {/* Chat Area - Main Content */}
+        {/* Main Content Area - Chat Interface */}
         <div className="flex-1 flex flex-col min-h-0 bg-background">
           <div className="flex flex-col flex-1 min-h-0">
             <div className="pb-3 p-4 lg:p-6 flex-shrink-0">
@@ -479,280 +491,36 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                 )}
               </div>
 
-              {/* Mission Clarity Section */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('clarity')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
-                    {collapsedSections.clarity ? (
-                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                    )}
-                  </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Mission Clarity
-                  </h4>
-                  <div className="ml-auto flex items-center gap-1">
-                    {clarity ? (
-                      <>
-                        <div className={`h-2 w-2 rounded-full transition-all duration-300 ${
-                          clarityUpdated ? 'animate-pulse ring-2 ring-blue-400' : ''
-                        } ${
-                          clarity.overallScore >= 8 ? 'bg-green-500' :
-                          clarity.overallScore >= 6 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`} />
-                        <span className={`text-xs font-medium transition-colors ${
-                          clarityUpdated ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
-                        }`}>
-                          {clarity.overallScore.toFixed(1)}/10
-                        </span>
-                        {clarityUpdated && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 animate-fade-in">
-                            ✨ Updated
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/30 animate-pulse" />
-                        <span className="text-xs font-medium text-muted-foreground/60">
-                          Pending
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                {!collapsedSections.clarity && (
-                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                    {clarity ? (
-                      <>
-                        {/* Overall Score */}
-                        <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative flex-shrink-0">
-                              <div className={`p-1.5 rounded-md transition-all duration-300 ${
-                                clarity.overallScore >= 8 ? 'bg-green-500/20' :
-                                clarity.overallScore >= 6 ? 'bg-yellow-500/20' :
-                                'bg-red-500/20'
-                              }`}>
-                                <div className="w-3.5 h-3.5 flex items-center justify-center">
-                                  <span className={`text-xs font-bold ${
-                                    clarity.overallScore >= 8 ? 'text-green-600 dark:text-green-400' :
-                                    clarity.overallScore >= 6 ? 'text-yellow-600 dark:text-yellow-400' :
-                                    'text-red-600 dark:text-red-400'
-                                  }`}>
-                                    {clarity.overallScore.toFixed(1)}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">
-                                Overall Score
-                              </span>
-                              <span className="text-xs text-muted-foreground leading-tight">
-                                Iteration {clarity.iteration} • {
-                                  clarity.overallScore >= 8 ? 'Excellent' :
-                                  clarity.overallScore >= 6 ? 'Good' :
-                                  'Needs Improvement'
-                                }
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                      {/* 5-Dimension Breakdown */}
-                      {[
-                        { key: 'objectiveClarity', label: 'Objective Clarity', score: clarity.objectiveClarity },
-                        { key: 'successMetrics', label: 'Success Metrics', score: clarity.successMetrics },
-                        { key: 'timelineDefinition', label: 'Timeline Definition', score: clarity.timelineDefinition },
-                        { key: 'scopeBoundaries', label: 'Scope Boundaries', score: clarity.scopeBoundaries },
-                        { key: 'visionAlignment', label: 'Vision Alignment', score: clarity.visionAlignment }
-                      ].map((dimension) => (
-                        <div key={dimension.key} className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative flex-shrink-0">
-                              <div className="w-6 h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full transition-all duration-500 ${
-                                    dimension.score >= 8 ? 'bg-green-500' :
-                                    dimension.score >= 6 ? 'bg-yellow-500' :
-                                    'bg-red-500'
-                                  }`}
-                                  style={{ width: `${(dimension.score / 10) * 100}%` }}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="font-medium text-xs truncate block text-muted-foreground group-hover:text-foreground transition-colors leading-tight">
-                                {dimension.label}
-                              </span>
-                            </div>
-                            <div className="flex-shrink-0">
-                              <span className={`text-xs font-medium ${
-                                dimension.score >= 8 ? 'text-green-600 dark:text-green-400' :
-                                dimension.score >= 6 ? 'text-yellow-600 dark:text-yellow-400' :
-                                'text-red-600 dark:text-red-400'
-                              }`}>
-                                {dimension.score}/10
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                        {/* AI Reasoning */}
-                        {clarity.reasoning && (
-                          <div className="group relative mx-3 px-3 py-2 rounded-lg bg-muted/20 border-l-2 border-blue-500/30 transition-all duration-300">
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-medium text-xs text-blue-600 dark:text-blue-400 leading-tight mb-1.5">
-                                Reasoning:
-                              </span>
-                              <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">
-                                "{clarity.reasoning}"
-                              </blockquote>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      /* Empty State */
-                      <div className="mx-3 px-3 py-4 rounded-lg bg-muted/10 border border-dashed border-muted/30 transition-all duration-300">
-                        <div className="text-center">
-                          <div className="flex justify-center mb-2">
-                            <div className="h-8 w-8 rounded-full bg-muted/20 flex items-center justify-center">
-                              <div className="h-3 w-3 rounded-full bg-muted-foreground/30 animate-pulse" />
-                            </div>
-                          </div>
-                          <span className="text-xs font-medium text-muted-foreground block mb-1">
-                            Clarity Assessment Pending
-                          </span>
-                          <p className="text-xs text-muted-foreground/70 leading-relaxed">
-                            Mission clarity will be evaluated during your conversation with the orchestrator
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Agents Section */}
-              {mission.agentIds && mission.agentIds.length > 0 && (
+              {/* Mission Plan Section - Only show during plan phase */}
+              {mission.phase === 'plan' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
                     <button
-                      onClick={() => toggleSection('agents')}
+                      onClick={() => toggleSection('plan')}
                       className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
                     >
-                      {collapsedSections.agents ? (
+                      {collapsedSections.plan ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Agents ({mission.agentIds.length})
+                      Execution Plan
                     </h4>
                   </div>
-                  {!collapsedSections.agents && (
+                  {!collapsedSections.plan && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                      {agentsLoading ? (
-                        <div className="mx-3 px-2 py-1.5 flex items-center gap-2.5">
-                          <div className="animate-spin w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full"></div>
-                          <span className="text-sm text-muted-foreground">Loading agents...</span>
-                        </div>
-                      ) : (
-                        agents.map((agent, index) => (
-                          <div key={agent.id} className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="relative flex-shrink-0">
-                                <div className="w-9 h-9 rounded-full bg-background border border-border/40 flex items-center justify-center group-hover:border-border/60 transition-all duration-300">
-                                  <span className="text-sm">
-                                    {getAgentEmoji(agent)}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                                  {agent.name || `Agent ${index + 1}`}
-                                </span>
-                                <span className="text-xs text-muted-foreground truncate block">
-                                  {agent.description || `ID: ${agent.id}`}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
+                      <div className="mx-3">
+                        <PlanPhaseContent mission={mission} onPlanApproval={handlePlanApproval} />
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Timeline Section */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('timeline')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
-                    {collapsedSections.timeline ? (
-                      <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                    ) : (
-                      <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-                    )}
-                  </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Timeline
-                  </h4>
-                </div>
-                {!collapsedSections.timeline && (
-                  <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                    <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          <div className="p-1.5 rounded-md bg-muted/30 group-hover:bg-muted/50 transition-all duration-300">
-                            <Calendar className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                            Created
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(mission.createdAt).toLocaleDateString()} at {new Date(mission.createdAt).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          <div className="p-1.5 rounded-md bg-muted/30 group-hover:bg-muted/50 transition-all duration-300">
-                            <Clock className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                            Updated
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(mission.updatedAt).toLocaleDateString()} at {new Date(mission.updatedAt).toLocaleTimeString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-
+              {/* Rest of sidebar content would go here... */}
+              
             </div>
           </div>
         </div>

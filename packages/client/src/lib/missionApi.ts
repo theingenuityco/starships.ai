@@ -14,7 +14,8 @@ import type {
   MissionMessage,
   SendMissionMessageRequest,
   MissionChatResponse,
-  MissionClarity
+  MissionClarity,
+  MissionPlanResponse
 } from '@starships/protocol';
 import api from './api';
 
@@ -199,5 +200,31 @@ export const missionApi = {
    */
   async getMissionClarity(missionId: string): Promise<ApiResponse<MissionClarity | null>> {
     return apiRequest<MissionClarity | null>(`/api/missions/${missionId}/clarity`);
+  },
+
+  /**
+   * Get mission plan details
+   */
+  async getMissionPlan(missionId: string): Promise<ApiResponse<MissionPlanResponse | null>> {
+    return apiRequest<MissionPlanResponse | null>(`/api/missions/${missionId}/plan`);
+  },
+
+  /**
+   * Approve or reject mission plan
+   */
+  async approveMissionPlan(missionId: string, approved: boolean, reason?: string): Promise<ApiResponse<{ approved: boolean; message: string }>> {
+    return apiRequest<{ approved: boolean; message: string }>(`/api/missions/${missionId}/approve-plan`, {
+      method: 'POST',
+      body: JSON.stringify({ approved, reason })
+    });
+  },
+
+  /**
+   * Regenerate mission plan
+   */
+  async regenerateMissionPlan(missionId: string): Promise<ApiResponse<{ message: string }>> {
+    return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-plan`, {
+      method: 'POST'
+    });
   }
 };

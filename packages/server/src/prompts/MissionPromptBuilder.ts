@@ -7,6 +7,9 @@
 
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import type { MissionPlan, LLMChatPrompt } from '@starships/protocol';
+import type { Agent } from '@starships/models';
+import { MissionPlanService } from '../services/MissionPlanService';
 
 /**
  * System instruction constants - direct instruction strings for different operations
@@ -55,7 +58,63 @@ APPROACH:
 - Give actionable, practical advice
 - Suggest concrete next steps when appropriate
 
-Be direct, helpful, and mission-oriented.`
+Be direct, helpful, and mission-oriented.`,
+
+  PLAN_GENERATION: `You are Commander ARIA creating a detailed execution plan for this mission.
+
+INSTRUCTIONS:
+1. Break down the mission into 3-8 concrete, actionable tasks
+2. Assign each task to the most suitable agent based on their capabilities
+3. Identify task dependencies (which tasks must complete before others)
+4. Ensure each task has a clear, measurable deliverable
+5. Set appropriate priority levels
+
+AVAILABLE AGENTS:
+{agentList}
+
+MISSION CONTEXT:
+{missionContext}
+
+CLARITY ASSESSMENT:
+{clarityData}
+
+Respond with ONLY this JSON format:
+{
+  "tasks": [
+    {
+      "title": "Clear, actionable task title (max 100 chars)",
+      "description": "Detailed description of what needs to be done and how",
+      "assignedAgentId": "agent-id-from-available-list", 
+      "dependencies": [0, 1], // Use array indices for dependencies
+      "deliverable": "Specific expected output or result",
+      "priority": "high|medium|low"
+    }
+  ],
+  "reasoning": "Brief explanation of the plan structure and task assignments"
+}
+
+IMPORTANT:
+- Use task array indices (0, 1, 2...) for dependencies, not task IDs
+- Each task must be assignable to ONE agent
+- Dependencies must form a valid sequence (no circular dependencies)
+- Focus on clear, actionable tasks with measurable outcomes`,
+
+  PLAN_PRESENTATION: `Present the generated execution plan to the user for approval.
+
+CURRENT PLAN:
+{planData}
+
+INSTRUCTIONS:
+1. Provide a clear overview of the plan structure
+2. Explain the task sequence and why it makes sense
+3. Highlight the agent assignments and their roles
+4. Show key dependencies and workflow
+5. Ask for user approval to proceed with execution
+
+Be encouraging and explain how this plan achieves their mission goals.
+Use a professional but friendly tone as Commander ARIA.
+
+End with: "Would you like me to proceed with this execution plan? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`
 } as const;
 
 export class MissionPromptBuilder {
@@ -103,6 +162,38 @@ export class MissionPromptBuilder {
       : SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_SUBSEQUENT;
     return this.buildCompletePrompt(instruction);
   }
+
+  /**
+   * Build plan generation prompt
+   */
+  buildPlanGenerationPrompt(agents: Agent[]): LLMChatPrompt {
+    const systemPrompt = SYSTEM_INSTRUCTIONS.PLAN_GENERATION
+      .replace('{agentList}', this.buildAgentListSection(agents))
+      .replace('{missionContext}', this.buildMissionSection())
+      .replace('{clarityData}', this.buildClaritySection());
+
+    return {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+  }
+
+  /**
+   * Build plan presentation prompt
+   */
+  buildPlanPresentationPrompt(plan: MissionPlan): LLMChatPrompt {
+    const systemPrompt = SYSTEM_INSTRUCTIONS.PLAN_PRESENTATION
+      .replace('{planData}', this.buildPlanDataSection(plan));
+
+    return {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+  }
   
   // ============================================================================
   // CORE BUILDING METHODS
@@ -141,6 +232,8 @@ export class MissionPromptBuilder {
         return this.buildWelcomePhaseContext();
       case 'analysis':
         return this.buildAnalysisPhaseContext();
+      case 'plan':
+        return this.buildPlanPhaseContext();
       case 'converse':
         return this.buildConversePhaseContext();
       default:
@@ -164,6 +257,13 @@ WELCOME PHASE: First interaction with user for this mission.`;
       `ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`,
       this.buildClaritySection(),
     ].filter(Boolean).join('\n\n');
+  }
+  
+  /**
+   * Plan phase context - plan data and status
+   */
+  private buildPlanPhaseContext(): string {
+    return `PLAN PHASE: Mission execution planning and approval.`;
   }
   
   /**
@@ -224,7 +324,7 @@ You coordinate starship missions by:
     
     return `
 ACTIVE PHASE: ${activePhase}
-PHASES: INIT → WELCOME → ANALYSIS → CONVERSE
+PHASES: INIT → WELCOME → ANALYSIS → PLAN → CONVERSE
 CURRENT TIME: ${currentDateTime}`;
   }
 
@@ -326,6 +426,51 @@ MISSION CLARITY ASSESSMENT:
     }
     
     return content;
+  }
+
+  /**
+   * Build agent list section for plan generation
+   */
+  private buildAgentListSection(agents: Agent[]): string {
+    return agents.map(agent => {
+      const capabilities = agent.category || 'general';
+      return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;
+    }).join('\n');
+  }
+
+  /**
+   * Build plan data section for presentation
+   */
+  private buildPlanDataSection(plan: MissionPlan): string {
+    const agentAssignments = MissionPlanService.getAgentAssignments(plan);
+    const dependencyCount = plan.tasks.reduce((total, task) => total + task.dependencies.length, 0);
+
+    let planText = `EXECUTION PLAN OVERVIEW:
+├─ Total Tasks: ${plan.tasks.length}
+├─ Total Dependencies: ${dependencyCount}
+└─ Agents Involved: ${Object.keys(agentAssignments).length}
+
+TASK BREAKDOWN:`;
+
+    plan.tasks.forEach((task, index) => {
+      const depText = task.dependencies.length > 0 
+        ? ` (depends on: ${task.dependencies.join(', ')})`
+        : '';
+      
+      planText += `
+${index + 1}. ${task.title}
+   ├─ Agent: ${task.assignedAgentId}
+   ├─ Priority: ${task.priority}
+   ├─ Deliverable: ${task.deliverable}${depText}
+   └─ Description: ${task.description}`;
+    });
+
+    planText += '\n\nAGENT ASSIGNMENTS:';
+    Object.entries(agentAssignments).forEach(([agentId, taskIds]) => {
+      planText += `\n├─ ${agentId}: ${taskIds.length} task(s)`;
+    });
+
+    return planText;
   }
   
 }

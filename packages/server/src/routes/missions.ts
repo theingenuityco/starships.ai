@@ -6,6 +6,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
 import { MissionService } from '../services/MissionService';
+import { MissionPlanService } from '../services/MissionPlanService';
 import type {
   Mission,
   CreateMissionRequest,
@@ -523,6 +524,202 @@ router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> =>
         success: false, 
         error: error.message,
         code: 'MISSION_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /missions/:id/plan
+ * Get mission plan details
+ */
+router.get('/:id/plan', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    validateUUID(id, 'id');
+
+    const planResponse = await MissionPlanService.getPlanResponse(id);
+
+    if (!planResponse) {
+      res.status(404).json({
+        success: false,
+        error: 'Plan not found',
+        code: 'PLAN_NOT_FOUND'
+      });
+      return;
+    }
+
+    res.json({ 
+      success: true, 
+      data: planResponse 
+    });
+
+  } catch (error) {
+    console.error('Error fetching mission plan:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'PLAN_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * POST /missions/:id/approve-plan
+ * Approve or reject mission plan - triggers state transition via orchestrator
+ */
+router.post('/:id/approve-plan', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { approved, reason } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+    
+    validateUUID(id, 'id');
+    
+    if (typeof approved !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: 'approved field must be a boolean',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    // Update plan approval using service
+    await MissionPlanService.updatePlanApproval(id, approved);
+
+    // Let orchestrator handle state transition (not manual database update)
+    const orchestrator = MissionOrchestratorService.getInstance();
+    const message = approved 
+      ? 'I approve this execution plan. Please proceed.'
+      : `I need changes to this plan. ${reason || 'Please revise and present an updated version.'}`;
+    
+    // This will trigger the workflow state transition
+    await orchestrator.handleUserMessage(id, userId, message);
+
+    res.json({ 
+      success: true,
+      data: {
+        approved,
+        message: approved 
+          ? 'Plan approved, transitioning to execution phase' 
+          : 'Plan rejected, generating revised plan'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error approving mission plan:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'PLAN_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * POST /missions/:id/regenerate-plan
+ * Regenerate mission plan - uses orchestrator for state management
+ */
+router.post('/:id/regenerate-plan', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+
+    validateUUID(id, 'id');
+
+    // Delete existing plan
+    await MissionPlanService.deletePlan(id);
+
+    // Let orchestrator handle regeneration (not manual phase update)
+    const orchestrator = MissionOrchestratorService.getInstance();
+    await orchestrator.handleUserMessage(id, userId, 'Please generate a new execution plan for this mission.');
+
+    res.json({ 
+      success: true,
+      data: { message: 'Plan regeneration initiated' }
+    });
+
+  } catch (error) {
+    console.error('Error regenerating mission plan:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'PLAN_NOT_FOUND'
       });
       return;
     }

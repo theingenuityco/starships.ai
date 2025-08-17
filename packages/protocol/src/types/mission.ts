@@ -42,6 +42,7 @@ export type MissionPhase =
   | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
   | 'analysis'     // Mission analysis and breakdown
+  | 'plan'         // Mission execution planning and approval
   | 'converse';    // General conversation and mission guidance
 
 // ============================================================================
@@ -200,4 +201,57 @@ export interface UpdateMissionClarityRequest {
   visionAlignment?: number;
   reasoning?: string;
   iteration?: number;
+}
+
+// ============================================================================
+// MISSION PLAN TYPES
+// ============================================================================
+
+/**
+ * Mission execution plan - contains tasks and approval status
+ */
+export interface MissionPlan {
+  id: string;
+  missionId: string;
+  tasks: MissionTask[];
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  approvalTimestamp?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Individual task within a mission plan
+ */
+export interface MissionTask {
+  id: string;
+  title: string;
+  description: string;
+  assignedAgentId: string;
+  dependencies: string[]; // prerequisite task IDs
+  deliverable: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+/**
+ * Request to create a new mission plan
+ */
+export interface CreateMissionPlanRequest {
+  missionId: string;
+  tasks: Omit<MissionTask, 'id'>[];
+}
+
+/**
+ * Request to update an existing mission plan
+ */
+export interface UpdateMissionPlanRequest {
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvalTimestamp?: string;
+}
+
+/**
+ * Response for mission plan with runtime calculations
+ */
+export interface MissionPlanResponse extends MissionPlan {
+  agentAssignments: Record<string, string[]>; // Runtime calculation
 }

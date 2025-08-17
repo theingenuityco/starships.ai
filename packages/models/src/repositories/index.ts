@@ -31,6 +31,9 @@ export { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository
 // Export mission clarity repository
 export { MissionClarityRepository } from './MissionClarityRepository';
 
+// Export mission plan repository
+export { MissionPlanRepository } from './MissionPlanRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -50,6 +53,9 @@ import { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository
 
 // Import mission clarity repository
 import { MissionClarityRepository } from './MissionClarityRepository';
+
+// Import mission plan repository
+import { MissionPlanRepository } from './MissionPlanRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -88,6 +94,9 @@ export class RepositoryFactory {
 
   // Mission clarity repository instance
   private static missionClarityRepo: MissionClarityRepository | null = null;
+
+  // Mission plan repository instance
+  private static missionPlanRepo: MissionPlanRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -158,6 +167,9 @@ export class RepositoryFactory {
       // Initialize mission clarity repository (no dependencies)
       this.missionClarityRepo = new MissionClarityRepository();
 
+      // Initialize mission plan repository (no dependencies)
+      this.missionPlanRepo = new MissionPlanRepository();
+
       // Initialize repositories with dependencies
       this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
       this.starshipRepo = new StarshipRepository();
@@ -223,6 +235,7 @@ export class RepositoryFactory {
         workflowRepo: this.workflowRepo !== null,
         workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
+        missionPlanRepo: this.missionPlanRepo !== null,
       }
     };
   }
@@ -429,6 +442,17 @@ export class RepositoryFactory {
     return this.missionClarityRepo;
   }
 
+  /**
+   * Get MissionPlanRepository instance (synchronous)
+   */
+  static getMissionPlanRepository(): MissionPlanRepository {
+    this.ensureInitialized();
+    if (!this.missionPlanRepo) {
+      throw new Error('MissionPlanRepository not initialized');
+    }
+    return this.missionPlanRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -457,6 +481,7 @@ export class RepositoryFactory {
     this.workflowRepo = null;
     this.workflowRuntimeStateRepo = null;
     this.missionClarityRepo = null;
+    this.missionPlanRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

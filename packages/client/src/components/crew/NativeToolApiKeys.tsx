@@ -39,6 +39,15 @@ const NATIVE_TOOLS: NativeToolConfig[] = [
     pricing: '2,000 queries/month free',
     icon: '🦁'
   },
+  {
+    name: 'github',
+    displayName: 'GitHub',
+    description: 'Interact with GitHub repos, issues, PRs, and more',
+    apiKeyPlaceholder: 'ghp_xxxxx or github_pat_xxxxx',
+    signupUrl: 'https://github.com/settings/tokens',
+    pricing: '5,000 requests/hour',
+    icon: '🐙'
+  },
   // TODO: Re-enable when OpenWeatherMap tool is available in LangChain
   // {
   //   name: 'openweather',
@@ -140,7 +149,7 @@ export function NativeToolApiKeys({ starshipId }: NativeToolApiKeysProps) {
         )}
 
         <Tabs defaultValue="tavily" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             {NATIVE_TOOLS.map(tool => (
               <TabsTrigger key={tool.name} value={tool.name}>
                 <span className="mr-2">{tool.icon}</span>

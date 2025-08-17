@@ -40,6 +40,7 @@ import agentTemplateRoutes from './routes/agent-templates';
 import agentCommunicationRoutes from './routes/agent-communication';
 import missionRoutes from './routes/missions';
 import workflowRoutes from './routes/workflows';
+import nativeApiKeysRoutes from './routes/native-api-keys';
 import { AgentService } from './services/AgentService';
 import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
@@ -218,6 +219,7 @@ app.use('/api', mcpServerRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
 app.use('/api/missions', missionRoutes);
+app.use('/api', nativeApiKeysRoutes);
 app.use('/api/expeditions', workflowRoutes);
 
 // Add 404 handler for unmatched routes

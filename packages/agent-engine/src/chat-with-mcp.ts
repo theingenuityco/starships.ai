@@ -398,6 +398,23 @@ When appropriate, use these tools to provide better assistance. You are connecte
   systemPrompt += visionContext;
   systemPrompt += expeditionContext;
   
+  // Add dynamic tool usage guidance based on available tools
+  if (mcpTools.length > 0) {
+    const hasNotionTools = mcpTools.some(t => t.name.includes('notion'));
+    const blockRetrievalTool = mcpTools.find(t => 
+      t.name.toLowerCase().includes('block') || 
+      t.name.toLowerCase().includes('children')
+    );
+    
+    if (hasNotionTools && blockRetrievalTool) {
+      systemPrompt += `\n\nCRITICAL TOOL SELECTION GUIDANCE:
+When users ask about page content using words like "stored", "inside", "text", "information", "content":
+- DO NOT use 'API-retrieve-a-page' - it only returns metadata
+- USE '${blockRetrievalTool.name}' to get actual page content
+- If first attempt returns no content, always try the block/children retrieval tool\n`;
+    }
+  }
+  
   // Escape curly braces to prevent LangChain template parsing errors
   systemPrompt = systemPrompt.replace(/\{/g, '{{').replace(/\}/g, '}}');
   

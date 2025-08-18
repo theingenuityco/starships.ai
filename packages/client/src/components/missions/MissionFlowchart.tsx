@@ -71,12 +71,8 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
   // Create a map of task IDs for validation
   const taskIdSet = new Set(plan.tasks.map(task => task.id));
 
-  // Sort tasks by dependencies (topological sort for better visual flow)
-  const sortedTasks = [...plan.tasks].sort((a, b) => {
-    const aDeps = a.dependencies?.length || 0;
-    const bDeps = b.dependencies?.length || 0;
-    return aDeps - bDeps; // Tasks with fewer dependencies come first
-  });
+  // Use original task order from the plan (since dependencies don't match current tasks)
+  const sortedTasks = [...plan.tasks];
 
   // Generate nodes
   sortedTasks.forEach((task, index) => {

@@ -70,10 +70,6 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
 
   // Create a map of task IDs for validation
   const taskIdSet = new Set(plan.tasks.map(task => task.id));
-  
-  console.log('🔍 MissionFlowchart Debug Info:');
-  console.log('📋 Plan tasks:', plan.tasks.length);
-  console.log('🆔 Task IDs:', Array.from(taskIdSet));
 
   // Sort tasks by dependencies (topological sort for better visual flow)
   const sortedTasks = [...plan.tasks].sort((a, b) => {
@@ -88,13 +84,6 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
     const x = 50; // Centered in sidebar
     const y = index * 120; // Vertical spacing between tasks
 
-    console.log(`📌 Task ${index + 1}:`, {
-      id: task.id,
-      title: task.title,
-      dependencies: task.dependencies,
-      position: { x, y }
-    });
-
     nodes.push({
       id: task.id,
       type: 'default',
@@ -108,13 +97,11 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
       style: getNodeStyle(task.priority),
     });
 
-    // Generate edges for dependencies
+    // Generate edges for dependencies that exist in the current task set
     if (task.dependencies && task.dependencies.length > 0) {
-      console.log(`🔗 Processing dependencies for task ${task.id}:`, task.dependencies);
-      
       task.dependencies.forEach((depId) => {
         if (taskIdSet.has(depId)) {
-          const edge = {
+          edges.push({
             id: `${depId}-${task.id}`,
             source: depId,
             target: task.id,
@@ -125,21 +112,29 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
               type: 'arrowclosed',
               color: '#3b82f6',
             },
-          };
-          
-          console.log(`✅ Created edge:`, edge);
-          edges.push(edge);
-        } else {
-          console.log(`❌ Dependency not found in task set: ${depId}`);
+          });
         }
       });
-    } else {
-      console.log(`ℹ️ Task ${task.id} has no dependencies`);
     }
   });
 
-  console.log(`📊 Final result: ${nodes.length} nodes, ${edges.length} edges`);
-  console.log('🔗 All edges:', edges);
+  // If no valid edges were created from dependencies, create a sequential flow
+  if (edges.length === 0 && sortedTasks.length > 1) {
+    for (let i = 0; i < sortedTasks.length - 1; i++) {
+      edges.push({
+        id: `seq-${i}`,
+        source: sortedTasks[i].id,
+        target: sortedTasks[i + 1].id,
+        type: 'smoothstep',
+        animated: true,
+        style: { stroke: '#3b82f6', strokeWidth: 3 },
+        markerEnd: {
+          type: 'arrowclosed',
+          color: '#3b82f6',
+        },
+      });
+    }
+  }
 
   return { nodes, edges };
 };

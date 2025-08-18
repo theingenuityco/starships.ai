@@ -5,9 +5,8 @@
  * Separated from orchestrator agent to follow separation of concerns pattern.
  */
 
-import { MissionWorkflow, Agent, CreateWorkflowRequest } from '@starships/protocol';
+import { Agent, CreateWorkflowRequest } from '@starships/protocol';
 import { Logger } from '../utils/logger';
-import { v4 as uuidv4 } from 'uuid';
 
 export class WorkflowParsingService {
   private static logger = Logger.getInstance();

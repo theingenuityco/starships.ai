@@ -15,7 +15,7 @@ import type {
   SendMissionMessageRequest,
   MissionChatResponse,
   MissionClarity,
-  MissionPlanResponse
+  WorkflowResponse
 } from '@starships/protocol';
 import api from './api';
 
@@ -203,10 +203,10 @@ export const missionApi = {
   },
 
   /**
-   * Get mission plan details
+   * Get mission workflow details
    */
-  async getMissionPlan(missionId: string): Promise<ApiResponse<MissionPlanResponse | null>> {
-    return apiRequest<MissionPlanResponse | null>(`/api/missions/${missionId}/plan`);
+  async getMissionWorkflow(missionId: string): Promise<ApiResponse<WorkflowResponse | null>> {
+    return apiRequest<WorkflowResponse | null>(`/api/missions/${missionId}/workflow`);
   },
 
   /**

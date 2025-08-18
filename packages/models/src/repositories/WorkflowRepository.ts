@@ -1,410 +1,250 @@
+/**
+ * WorkflowRepository - Repository for mission workflow DSL
+ * 
+ * Handles CRUD operations for MissionWorkflow, WorkflowNode, and WorkflowEdge entities
+ * following BaseRepository patterns and Neo4j relationship patterns.
+ */
+
+import { BaseRepository } from './BaseRepository';
 import { getConnection } from '../connection';
-import {
-  WorkflowDSL,
-  WorkflowApprovalStatus,
-  WorkflowValidationResult,
-  ValidationError as WorkflowValidationError,
-  ValidationWarning as WorkflowValidationWarning,
-  ValidationSuggestion as WorkflowValidationSuggestion
+import { 
+  MissionWorkflow, 
+  WorkflowNode,
+  WorkflowEdge,
+  CreateWorkflowRequest, 
+  UpdateWorkflowApprovalRequest 
 } from '@starships/protocol';
 import { v4 as uuidv4 } from 'uuid';
-import { BaseRepository } from './BaseRepository';
 
-/**
- * Neo4j-based workflow repository
- *
- * Handles all database operations for workflow DSL including CRUD operations,
- * approval status management, and validation.
- */
-export class WorkflowRepository extends BaseRepository {
-  
+export interface WorkflowRepositoryInterface {
+  createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow>;
+  getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null>;
+  updateApprovalStatus(workflowId: string, updates: UpdateWorkflowApprovalRequest): Promise<MissionWorkflow>;
+  deleteWorkflow(workflowId: string): Promise<void>;
+}
+
+export class WorkflowRepository extends BaseRepository implements WorkflowRepositoryInterface {
   constructor() {
     super('WorkflowRepository');
   }
 
-  /**
-   * Create a new workflow
-   */
-  async create(workflow: Omit<WorkflowDSL, 'id' | 'createdAt'>): Promise<WorkflowDSL> {
-    try {
-      this.validateRequired(workflow, ['expeditionId', 'nodes', 'edges'], 'create');
+  async createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow> {
+    return this.executeWithErrorHandling(async () => {
+      // Validation following BaseRepository pattern
+      this.validateRequired(request, ['missionId', 'nodes', 'edges'], 'createWorkflow');
       
+      if (!Array.isArray(request.nodes) || request.nodes.length === 0) {
+        this.handleValidationError([{
+          field: 'nodes',
+          message: 'At least one node is required',
+          value: request.nodes
+        }], 'createWorkflow');
+      }
+
+      if (!Array.isArray(request.edges)) {
+        this.handleValidationError([{
+          field: 'edges',
+          message: 'Edges array is required',
+          value: request.edges
+        }], 'createWorkflow');
+      }
+
       const connection = getConnection();
       const workflowId = uuidv4();
-      const createdAt = new Date().toISOString();
+      const now = new Date().toISOString();
 
-      const workflowData = {
+      // Check if mission exists
+      const missionCheck = await connection.executeQuery(
+        'MATCH (m:Mission {id: $missionId}) RETURN m.id as id',
+        { missionId: request.missionId }
+      );
+
+      if (!missionCheck || missionCheck.length === 0) {
+        this.handleNotFound('Mission', request.missionId, 'createWorkflow');
+      }
+
+      // Create workflow using MERGE pattern
+      const workflowCypher = `
+        MATCH (m:Mission {id: $missionId})
+        MERGE (m)-[:HAS_WORKFLOW]->(w:Workflow {missionId: $missionId})
+        ON CREATE SET 
+          w.id = $workflowId,
+          w.approvalStatus = 'pending',
+          w.createdAt = $now
+        RETURN w
+      `;
+
+      await connection.executeWrite(workflowCypher, { 
+        missionId: request.missionId, 
+        workflowId, 
+        now 
+      });
+
+      // Clear existing nodes and edges
+      await connection.executeWrite(`
+        MATCH (w:Workflow {missionId: $missionId})-[:CONTAINS]->(n:WorkflowNode)
+        OPTIONAL MATCH (n)-[r:FLOWS_TO]->()
+        DETACH DELETE n, r
+      `, { missionId: request.missionId });
+
+      // Create nodes with IDs
+      const nodes: WorkflowNode[] = [];
+      const nodeIdMap = new Map<string, string>(); // original temp ID -> actual UUID
+
+      for (const nodeData of request.nodes) {
+        const nodeId = uuidv4();
+        const node: WorkflowNode = {
+          id: nodeId,
+          ...nodeData
+        };
+
+        await connection.executeWrite(`
+          MATCH (w:Workflow {missionId: $missionId})
+          CREATE (w)-[:CONTAINS]->(n:WorkflowNode $nodeProps)
+        `, {
+          missionId: request.missionId,
+          nodeProps: node
+        });
+
+        // Map temporary ID to real ID for edge creation
+        const tempId = `temp-${nodes.length}`;
+        nodeIdMap.set(tempId, nodeId);
+        nodes.push(node);
+      }
+
+      // Create edges between nodes
+      const edges: WorkflowEdge[] = [];
+      for (const edgeData of request.edges) {
+        const edgeId = uuidv4();
+        const edge: WorkflowEdge = {
+          id: edgeId,
+          ...edgeData
+        };
+
+        // Create relationship between nodes
+        await connection.executeWrite(`
+          MATCH (w:Workflow {missionId: $missionId})-[:CONTAINS]->(from:WorkflowNode {id: $fromId})
+          MATCH (w)-[:CONTAINS]->(to:WorkflowNode {id: $toId})
+          CREATE (from)-[:FLOWS_TO {id: $edgeId}]->(to)
+        `, {
+          missionId: request.missionId,
+          fromId: edge.from,
+          toId: edge.to,
+          edgeId: edge.id
+        });
+
+        edges.push(edge);
+      }
+
+      return {
         id: workflowId,
-        expeditionId: workflow.expeditionId,
-        nodes: JSON.stringify(workflow.nodes),
-        edges: JSON.stringify(workflow.edges),
-        visualization: workflow.visualization || '',
-        approvalStatus: workflow.approvalStatus || 'pending',
-        createdAt,
-        approvedAt: workflow.approvedAt || null,
-        rejectedAt: workflow.rejectedAt || null,
-        metadata: JSON.stringify(workflow.metadata || {})
+        missionId: request.missionId,
+        nodes,
+        edges,
+        approvalStatus: 'pending',
+        createdAt: now
+      } as MissionWorkflow;
+    }, 'createWorkflow', 'MissionWorkflow');
+  }
+
+  async getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ missionId }, ['missionId'], 'getWorkflowByMissionId');
+
+      const connection = getConnection();
+      
+      // Get workflow and nodes
+      const workflowResult = await connection.executeQuery(`
+        MATCH (m:Mission {id: $missionId})-[:HAS_WORKFLOW]->(w:Workflow)
+        OPTIONAL MATCH (w)-[:CONTAINS]->(n:WorkflowNode)
+        RETURN w, collect(n) as nodes
+      `, { missionId });
+
+      if (!workflowResult || workflowResult.length === 0) return null;
+
+      const record = workflowResult[0];
+      const w = record.w;
+      const nodes = record.nodes;
+
+      // Get edges
+      const edgeResult = await connection.executeQuery(`
+        MATCH (w:Workflow {missionId: $missionId})-[:CONTAINS]->(from:WorkflowNode)
+        MATCH (from)-[r:FLOWS_TO]->(to:WorkflowNode)
+        RETURN r.id as edgeId, from.id as fromId, to.id as toId
+      `, { missionId });
+
+      // Extract properties from Neo4j nodes
+      const workflowProperties = w?.properties || w;
+      const nodeProperties = nodes ? 
+        nodes.filter((n: unknown) => n !== null)
+             .map((n: any) => n?.properties || n) : [];
+
+      const edgeProperties = edgeResult ? 
+        edgeResult.map((e: any) => ({
+          id: e.edgeId,
+          from: e.fromId,
+          to: e.toId
+        })) : [];
+      
+      return { 
+        ...workflowProperties, 
+        nodes: nodeProperties,
+        edges: edgeProperties
+      } as MissionWorkflow;
+    }, 'getWorkflowByMissionId', 'MissionWorkflow', missionId);
+  }
+
+  async updateApprovalStatus(workflowId: string, updates: UpdateWorkflowApprovalRequest): Promise<MissionWorkflow> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ workflowId }, ['workflowId'], 'updateApprovalStatus');
+      this.validateRequired(updates, ['approvalStatus'], 'updateApprovalStatus');
+
+      const connection = getConnection();
+      const params: any = {
+        workflowId,
+        approvalStatus: updates.approvalStatus
       };
 
-      // Create workflow node
-      const query = `
-        CREATE (w:Workflow {
-          id: $id,
-          expeditionId: $expeditionId,
-          nodes: $nodes,
-          edges: $edges,
-          visualization: $visualization,
-          approvalStatus: $approvalStatus,
-          createdAt: $createdAt,
-          approvedAt: $approvedAt,
-          rejectedAt: $rejectedAt,
-          metadata: $metadata
-        })
-        RETURN w
-      `;
-
-      const result = await connection.executeWrite<{ w: any }>(query, workflowData);
-      
-      if (result.length === 0) {
-        throw new Error('Failed to create workflow');
+      // Add approvedAt timestamp if approving
+      if (updates.approvalStatus === 'approved') {
+        params.approvedAt = new Date().toISOString();
       }
 
-      return this.parseWorkflowFromRecord(result[0].w);
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'create', 'Workflow');
-    }
-  }
-
-  /**
-   * Find workflow by ID
-   */
-  async findById(id: string): Promise<WorkflowDSL | null> {
-    try {
-      this.validateRequired({ id }, ['id'], 'findById');
-      
-      const connection = getConnection();
-      const query = 'MATCH (w:Workflow {id: $id}) RETURN w';
-      const result = await connection.executeQuery<{ w: any }>(query, { id });
-      
-      if (result.length === 0) {
-        return null;
-      }
-
-      return this.parseWorkflowFromRecord(result[0].w);
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'findById', 'Workflow', id);
-    }
-  }
-
-  /**
-   * Find workflows by expedition ID
-   */
-  async findByExpeditionId(expeditionId: string): Promise<WorkflowDSL[]> {
-    try {
-      this.validateRequired({ expeditionId }, ['expeditionId'], 'findByExpeditionId');
-      
-      const connection = getConnection();
-      const query = `
-        MATCH (w:Workflow {expeditionId: $expeditionId}) 
-        RETURN w 
-        ORDER BY w.createdAt DESC
-      `;
-      const result = await connection.executeQuery<{ w: any }>(query, { expeditionId });
-      
-      return result.map(record => this.parseWorkflowFromRecord(record.w));
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'findByExpeditionId', 'Workflow', expeditionId);
-    }
-  }
-
-  /**
-   * Update workflow
-   */
-  async update(id: string, updates: Partial<WorkflowDSL>): Promise<WorkflowDSL | null> {
-    try {
-      this.validateRequired({ id }, ['id'], 'update');
-      
-      const connection = getConnection();
-      
-      // Build dynamic SET clause based on provided updates
-      const setFields: string[] = [];
-      const params: Record<string, any> = { id };
-
-      if (updates.nodes) {
-        setFields.push('w.nodes = $nodes');
-        params.nodes = JSON.stringify(updates.nodes);
-      }
-      
-      if (updates.edges) {
-        setFields.push('w.edges = $edges');
-        params.edges = JSON.stringify(updates.edges);
-      }
-      
-      if (updates.visualization !== undefined) {
-        setFields.push('w.visualization = $visualization');
-        params.visualization = updates.visualization;
-      }
-      
-      if (updates.approvalStatus) {
-        setFields.push('w.approvalStatus = $approvalStatus');
-        params.approvalStatus = updates.approvalStatus;
-      }
-      
-      if (updates.approvedAt) {
-        setFields.push('w.approvedAt = $approvedAt');
-        params.approvedAt = updates.approvedAt;
-      }
-      
-      if (updates.rejectedAt) {
-        setFields.push('w.rejectedAt = $rejectedAt');
-        params.rejectedAt = updates.rejectedAt;
-      }
-      
-      if (updates.metadata) {
-        setFields.push('w.metadata = $metadata');
-        params.metadata = JSON.stringify(updates.metadata);
-      }
-
-      if (setFields.length === 0) {
-        return this.findById(id);
+      const setClauses = ['w.approvalStatus = $approvalStatus'];
+      if (params.approvedAt) {
+        setClauses.push('w.approvedAt = $approvedAt');
       }
 
       const query = `
-        MATCH (w:Workflow {id: $id})
-        SET ${setFields.join(', ')}
-        RETURN w
+        MATCH (w:Workflow {id: $workflowId})
+        SET ${setClauses.join(', ')}
+        RETURN w.missionId as missionId
       `;
 
-      const result = await connection.executeWrite<{ w: any }>(query, params);
-      
-      if (result.length === 0) {
-        return null;
+      const result = await connection.executeWrite(query, params);
+
+      if (!result || result.length === 0) {
+        this.handleNotFound('Workflow', workflowId, 'updateApprovalStatus');
       }
 
-      return this.parseWorkflowFromRecord(result[0].w);
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'update', 'Workflow', id);
-    }
+      // Return full workflow
+      const missionId = result[0].missionId;
+      return this.getWorkflowByMissionId(missionId) as Promise<MissionWorkflow>;
+    }, 'updateApprovalStatus', 'MissionWorkflow', workflowId);
   }
 
-  /**
-   * Update approval status
-   */
-  async updateApprovalStatus(
-    id: string, 
-    status: WorkflowApprovalStatus, 
-    timestamp?: string
-  ): Promise<boolean> {
-    try {
-      this.validateRequired({ id, status }, ['id', 'status'], 'updateApprovalStatus');
-      
-      const connection = getConnection();
-      const now = timestamp || new Date().toISOString();
-      
-      let setClause = 'w.approvalStatus = $status';
-      let params: Record<string, any> = { id, status };
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ workflowId }, ['workflowId'], 'deleteWorkflow');
 
-      if (status === 'approved') {
-        setClause += ', w.approvedAt = $timestamp';
-        params.timestamp = now;
-      } else if (status === 'rejected') {
-        setClause += ', w.rejectedAt = $timestamp';
-        params.timestamp = now;
-      }
-
-      const query = `
-        MATCH (w:Workflow {id: $id})
-        SET ${setClause}
-        RETURN w
-      `;
-
-      const result = await connection.executeWrite<{ w: any }>(query, params);
-      return result.length > 0;
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'updateApprovalStatus', 'Workflow', id);
-    }
-  }
-
-  /**
-   * Delete workflow
-   */
-  async delete(id: string): Promise<boolean> {
-    try {
-      this.validateRequired({ id }, ['id'], 'delete');
-      
       const connection = getConnection();
       
-      // Delete workflow and any related runtime states
-      const query = `
-        MATCH (w:Workflow {id: $id})
-        OPTIONAL MATCH (w)-[:HAS_RUNTIME_STATE]->(wrs:WorkflowRuntimeState)
-        DETACH DELETE w, wrs
-        RETURN COUNT(w) as deletedCount
-      `;
-
-      const result = await connection.executeWrite<{ deletedCount: number }>(query, { id });
-      return result.length > 0 && result[0].deletedCount > 0;
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'delete', 'Workflow', id);
-    }
-  }
-
-  /**
-   * Find workflows by approval status
-   */
-  async findByApprovalStatus(status: WorkflowApprovalStatus): Promise<WorkflowDSL[]> {
-    try {
-      this.validateRequired({ status }, ['status'], 'findByApprovalStatus');
-      
-      const connection = getConnection();
-      const query = `
-        MATCH (w:Workflow {approvalStatus: $status}) 
-        RETURN w 
-        ORDER BY w.createdAt DESC
-      `;
-      const result = await connection.executeQuery<{ w: any }>(query, { status });
-      
-      return result.map(record => this.parseWorkflowFromRecord(record.w));
-    } catch (error) {
-      throw this.handleDatabaseError(error, 'findByApprovalStatus', 'Workflow');
-    }
-  }
-
-  /**
-   * Validate workflow structure
-   */
-  async validateWorkflow(workflow: WorkflowDSL): Promise<WorkflowValidationResult> {
-    const errors: any[] = [];
-    const warnings: any[] = [];
-    const suggestions: any[] = [];
-
-    // Check for required fields
-    if (!workflow.nodes || workflow.nodes.length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Workflow must have at least one node',
-        severity: 'error'
-      });
-    }
-
-    // Check for start and end nodes
-    const startNodes = workflow.nodes.filter((node: any) => node.type === 'start');
-    const endNodes = workflow.nodes.filter((node: any) => node.type === 'end');
-    
-    if (startNodes.length === 0) {
-      errors.push({
-        code: 'MISSING_START_NODE',
-        message: 'Workflow must have a start node',
-        severity: 'error'
-      });
-    }
-    
-    if (endNodes.length === 0) {
-      errors.push({
-        code: 'MISSING_END_NODE',
-        message: 'Workflow must have an end node',
-        severity: 'error'
-      });
-    }
-
-    // Check for duplicate node IDs
-    const nodeIds = new Set();
-    for (const node of workflow.nodes) {
-      if (nodeIds.has(node.id)) {
-        errors.push({
-          code: 'DUPLICATE_NODE_ID',
-          message: `Duplicate node ID found: ${node.id}`,
-          nodeId: node.id,
-          severity: 'error'
-        });
-      }
-      nodeIds.add(node.id);
-    }
-
-    // Check for duplicate edge IDs
-    const edgeIds = new Set();
-    for (const edge of workflow.edges) {
-      if (edgeIds.has(edge.id)) {
-        errors.push({
-          code: 'DUPLICATE_EDGE_ID',
-          message: `Duplicate edge ID found: ${edge.id}`,
-          edgeId: edge.id,
-          severity: 'error'
-        });
-      }
-      edgeIds.add(edge.id);
-    }
-
-    // Check for unreachable nodes
-    const reachableNodes = new Set<string>();
-    const nodeMap = new Map(workflow.nodes.map((node: any) => [node.id, node]));
-    const edgeMap = new Map(workflow.edges.map((edge: any) => [edge.from, edge.to]));
-    
-    if (startNodes.length > 0) {
-      const queue = [startNodes[0].id];
-      while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (reachableNodes.has(currentId)) continue;
-        
-        reachableNodes.add(currentId);
-        
-        // Find all edges from this node
-        workflow.edges
-          .filter((edge: any) => edge.from === currentId)
-          .forEach((edge: any) => queue.push(edge.to));
-      }
-      
-      // Check for unreachable nodes
-      for (const node of workflow.nodes) {
-        if (!reachableNodes.has(node.id)) {
-          warnings.push({
-            code: 'UNBALANCED_WORKLOAD',
-            message: `Node ${node.name} is unreachable`,
-            nodeId: node.id,
-            suggestion: 'Ensure all nodes are connected to the workflow graph'
-          });
-        }
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-      warnings,
-      suggestions
-    };
-  }
-
-  /**
-   * Parse workflow from Neo4j record
-   */
-  private parseWorkflowFromRecord(record: any): WorkflowDSL {
-    return {
-      id: record.id,
-      expeditionId: record.expeditionId,
-      nodes: this.parseJsonField(record.nodes, []),
-      edges: this.parseJsonField(record.edges, []),
-      visualization: record.visualization || '',
-      approvalStatus: record.approvalStatus || 'pending',
-      createdAt: record.createdAt,
-      approvedAt: record.approvedAt || undefined,
-      rejectedAt: record.rejectedAt || undefined,
-      metadata: this.parseJsonField(record.metadata, {})
-    };
-  }
-
-  /**
-   * Parse JSON field with error handling
-   */
-  private parseJsonField(value: string | any, defaultValue: any): any {
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch (error) {
-        console.error('Failed to parse JSON field:', error, 'value:', value);
-        return defaultValue;
-      }
-    }
-    return value || defaultValue;
+      await connection.executeWrite(`
+        MATCH (w:Workflow {id: $workflowId})
+        OPTIONAL MATCH (w)-[:CONTAINS]->(n:WorkflowNode)
+        OPTIONAL MATCH (n)-[r:FLOWS_TO]->()
+        DETACH DELETE w, n, r
+      `, { workflowId });
+    }, 'deleteWorkflow', 'MissionWorkflow', workflowId);
   }
 }

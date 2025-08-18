@@ -6,7 +6,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
 import { MissionService } from '../services/MissionService';
-import { MissionPlanService } from '../services/MissionPlanService';
+import { WorkflowService } from '../services/WorkflowService';
 import type {
   Mission,
   CreateMissionRequest,
@@ -537,32 +537,32 @@ router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> =>
 });
 
 /**
- * GET /missions/:id/plan
- * Get mission plan details
+ * GET /missions/:id/workflow
+ * Get mission workflow details
  */
-router.get('/:id/plan', async (req: Request, res: Response): Promise<void> => {
+router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     validateUUID(id, 'id');
 
-    const planResponse = await MissionPlanService.getPlanResponse(id);
+    const workflow = await WorkflowService.getWorkflowByMissionId(id);
 
-    if (!planResponse) {
+    if (!workflow) {
       res.status(404).json({
         success: false,
-        error: 'Plan not found',
-        code: 'PLAN_NOT_FOUND'
+        error: 'Workflow not found',
+        code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }
 
     res.json({ 
       success: true, 
-      data: planResponse 
+      data: workflow 
     });
 
   } catch (error) {
-    console.error('Error fetching mission plan:', error);
+    console.error('Error fetching mission workflow:', error);
     
     if (error instanceof ValidationError) {
       res.status(400).json({ 
@@ -577,7 +577,7 @@ router.get('/:id/plan', async (req: Request, res: Response): Promise<void> => {
       res.status(404).json({ 
         success: false, 
         error: error.message,
-        code: 'PLAN_NOT_FOUND'
+        code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }
@@ -591,13 +591,13 @@ router.get('/:id/plan', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
- * POST /missions/:id/approve-plan
- * Approve or reject mission plan - triggers state transition via orchestrator
+ * PUT /missions/:id/workflow/approval
+ * Approve or reject mission workflow - triggers state transition via orchestrator
  */
-router.post('/:id/approve-plan', async (req: Request, res: Response): Promise<void> => {
+router.put('/:id/workflow/approval', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { approved, reason } = req.body;
+    const { approvalStatus, rejectionReason } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -611,23 +611,23 @@ router.post('/:id/approve-plan', async (req: Request, res: Response): Promise<vo
     
     validateUUID(id, 'id');
     
-    if (typeof approved !== 'boolean') {
+    if (approvalStatus !== 'approved' && approvalStatus !== 'rejected') {
       res.status(400).json({
         success: false,
-        error: 'approved field must be a boolean',
+        error: 'approvalStatus must be either "approved" or "rejected"',
         code: 'VALIDATION_ERROR'
       });
       return;
     }
 
-    // Update plan approval using service
-    await MissionPlanService.updatePlanApproval(id, approved);
+    // Update workflow approval using service
+    await WorkflowService.updateWorkflowApproval(id, { approvalStatus, rejectionReason });
 
     // Let orchestrator handle state transition (not manual database update)
     const orchestrator = MissionOrchestratorService.getInstance();
-    const message = approved 
-      ? 'I approve this execution plan. Please proceed.'
-      : `I need changes to this plan. ${reason || 'Please revise and present an updated version.'}`;
+    const message = approvalStatus === 'approved'
+      ? 'I approve this execution workflow. Please proceed.'
+      : `I need changes to this workflow. ${rejectionReason || 'Please revise and present an updated version.'}`;
     
     // This will trigger the workflow state transition
     await orchestrator.handleUserMessage(id, userId, message);
@@ -635,15 +635,15 @@ router.post('/:id/approve-plan', async (req: Request, res: Response): Promise<vo
     res.json({ 
       success: true,
       data: {
-        approved,
-        message: approved 
-          ? 'Plan approved, transitioning to execution phase' 
-          : 'Plan rejected, generating revised plan'
+        approvalStatus,
+        message: approvalStatus === 'approved'
+          ? 'Workflow approved, transitioning to execution phase' 
+          : 'Workflow rejected, generating revised workflow'
       }
     });
 
   } catch (error) {
-    console.error('Error approving mission plan:', error);
+    console.error('Error approving mission workflow:', error);
     
     if (error instanceof ValidationError) {
       res.status(400).json({ 
@@ -658,7 +658,7 @@ router.post('/:id/approve-plan', async (req: Request, res: Response): Promise<vo
       res.status(404).json({ 
         success: false, 
         error: error.message,
-        code: 'PLAN_NOT_FOUND'
+        code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }
@@ -672,10 +672,10 @@ router.post('/:id/approve-plan', async (req: Request, res: Response): Promise<vo
 });
 
 /**
- * POST /missions/:id/regenerate-plan
- * Regenerate mission plan - uses orchestrator for state management
+ * POST /missions/:id/regenerate-workflow
+ * Regenerate mission workflow - uses orchestrator for state management
  */
-router.post('/:id/regenerate-plan', async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/regenerate-workflow', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -691,20 +691,20 @@ router.post('/:id/regenerate-plan', async (req: Request, res: Response): Promise
 
     validateUUID(id, 'id');
 
-    // Delete existing plan
-    await MissionPlanService.deletePlan(id);
+    // Delete existing workflow
+    await WorkflowService.deleteWorkflow(id);
 
     // Let orchestrator handle regeneration (not manual phase update)
     const orchestrator = MissionOrchestratorService.getInstance();
-    await orchestrator.handleUserMessage(id, userId, 'Please generate a new execution plan for this mission.');
+    await orchestrator.handleUserMessage(id, userId, 'Please generate a new execution workflow for this mission.');
 
     res.json({ 
       success: true,
-      data: { message: 'Plan regeneration initiated' }
+      data: { message: 'Workflow regeneration initiated' }
     });
 
   } catch (error) {
-    console.error('Error regenerating mission plan:', error);
+    console.error('Error regenerating mission workflow:', error);
     
     if (error instanceof ValidationError) {
       res.status(400).json({ 
@@ -719,7 +719,7 @@ router.post('/:id/regenerate-plan', async (req: Request, res: Response): Promise
       res.status(404).json({ 
         success: false, 
         error: error.message,
-        code: 'PLAN_NOT_FOUND'
+        code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }

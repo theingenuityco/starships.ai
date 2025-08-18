@@ -204,54 +204,62 @@ export interface UpdateMissionClarityRequest {
 }
 
 // ============================================================================
-// MISSION PLAN TYPES
+// MISSION WORKFLOW TYPES
 // ============================================================================
 
 /**
- * Mission execution plan - contains tasks and approval status
+ * Mission workflow - executable workflow DSL for mission execution
  */
-export interface MissionPlan {
+export interface MissionWorkflow {
   id: string;
   missionId: string;
-  tasks: MissionTask[];
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
   approvalStatus: 'pending' | 'approved' | 'rejected';
-  approvalTimestamp?: string;
   createdAt: string;
-  updatedAt: string;
+  approvedAt?: string;
 }
 
 /**
- * Individual task within a mission plan
+ * Individual node in the workflow graph
  */
-export interface MissionTask {
+export interface WorkflowNode {
   id: string;
-  title: string;
+  type: 'start' | 'agent' | 'end';
+  name: string;
   description: string;
-  assignedAgentId: string;
-  dependencies: string[]; // prerequisite task IDs
-  deliverable: string;
-  priority: 'low' | 'medium' | 'high';
+  parameters: Record<string, any>;
 }
 
 /**
- * Request to create a new mission plan
+ * Edge connecting workflow nodes
  */
-export interface CreateMissionPlanRequest {
+export interface WorkflowEdge {
+  id: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * Request to create a new mission workflow
+ */
+export interface CreateWorkflowRequest {
   missionId: string;
-  tasks: Omit<MissionTask, 'id'>[];
+  nodes: Omit<WorkflowNode, 'id'>[];
+  edges: Omit<WorkflowEdge, 'id'>[];
 }
 
 /**
- * Request to update an existing mission plan
+ * Request to update workflow approval status
  */
-export interface UpdateMissionPlanRequest {
-  approvalStatus?: 'pending' | 'approved' | 'rejected';
-  approvalTimestamp?: string;
+export interface UpdateWorkflowApprovalRequest {
+  approvalStatus: 'approved' | 'rejected';
+  rejectionReason?: string;
 }
 
 /**
- * Response for mission plan with runtime calculations
+ * Response containing workflow data
  */
-export interface MissionPlanResponse extends MissionPlan {
-  agentAssignments: Record<string, string[]>; // Runtime calculation
+export interface WorkflowResponse {
+  workflow: MissionWorkflow;
 }

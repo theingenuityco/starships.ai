@@ -12,15 +12,15 @@ import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
-import { MissionPlanService } from './MissionPlanService';
-import { MissionPlanParsingService } from './MissionPlanParsingService';
+import { WorkflowService } from './WorkflowService';
+import { WorkflowParsingService } from './WorkflowParsingService';
 import type { 
   Mission, 
   MissionPhase,
   MissionClarity,
-  MissionPlan,
+  MissionWorkflow,
   CreateMissionClarityRequest,
-  CreateMissionPlanRequest,
+  CreateWorkflowRequest,
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
@@ -80,8 +80,8 @@ const MissionChatStateAnnotation = Annotation.Root({
     default: () => undefined
   }),
   
-  // ADDED: Plan data in state
-  plan: Annotation<MissionPlan | undefined>({
+  // ADDED: Workflow data in state
+  workflow: Annotation<MissionWorkflow | undefined>({
     value: (x, y) => y ?? x,
     default: () => undefined
   })
@@ -97,7 +97,7 @@ export type MissionChatState = typeof MessagesAnnotation.State & {
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
   clarity: MissionClarity | undefined; // ADDED: Mission clarity state
-  plan: MissionPlan | undefined; // ADDED: Mission plan state
+  workflow: MissionWorkflow | undefined; // ADDED: Mission workflow state
 };
 
 /**
@@ -276,15 +276,15 @@ export class MissionOrchestratorAgent {
    * Conditional routing from plan phase
    */
   private shouldContinueFromPlan(state: MissionChatState): string {
-    const plan = state.plan;
+    const workflow = state.workflow;
     
-    if (!plan) return 'end';
+    if (!workflow) return 'end';
     
-    if (plan.approvalStatus === 'approved') {
+    if (workflow.approvalStatus === 'approved') {
       return 'continue'; // → converse_phase
     }
     
-    if (plan.approvalStatus === 'rejected') {
+    if (workflow.approvalStatus === 'rejected') {
       return 'regenerate'; // → plan_phase (regenerate)
     }
     
@@ -375,20 +375,20 @@ export class MissionOrchestratorAgent {
       
       if (!metadata) throw new Error('Missing metadata in state');
       
-      // Get plan from state or generate new one
-      let plan = state.plan;
+      // Get workflow from state or generate new one
+      let workflow = state.workflow;
       
-      if (!plan || state.isSystemInitiated) {
-        // Generate new plan
-        plan = await this.generatePlan(metadata.mission.id, state);
+      if (!workflow || state.isSystemInitiated) {
+        // Generate new workflow
+        workflow = await this.generateWorkflow(metadata.mission.id, state);
         
         // Update mission phase in database to reflect transition
         const missionRepo = RepositoryFactory.getMissionRepository();
         await missionRepo.updateMission(metadata.mission.id, { phase: 'plan' });
       }
       
-      // Present plan to user for approval
-      const prompt = new MissionPromptBuilder({ ...state, plan }).buildPlanPresentationPrompt(plan);
+      // Present workflow to user for approval
+      const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
       const responseContent = await this.callLLM(prompt);
       
       const aiMessage = this.createAIMessage(responseContent, state);
@@ -400,7 +400,7 @@ export class MissionOrchestratorAgent {
       
       return {
         messages: [aiMessage],
-        plan,
+        workflow,
         activePhase: 'plan',
         metadata: {
           ...metadata,
@@ -436,29 +436,21 @@ export class MissionOrchestratorAgent {
   /**
    * Generate plan using dedicated services
    */
-  private async generatePlan(missionId: string, state: MissionChatState): Promise<MissionPlan> {
+  private async generateWorkflow(missionId: string, state: MissionChatState): Promise<MissionWorkflow> {
     // Get available agents
     const agents = await this.getAssignedAgents(missionId);
     
-    // Build planning prompt
-    const prompt = new MissionPromptBuilder(state).buildPlanGenerationPrompt(agents);
+    // Build workflow generation prompt
+    const prompt = new MissionPromptBuilder(state).buildWorkflowGenerationPrompt(agents);
     
-    // Generate plan using AI
+    // Generate workflow using AI
     const aiResponse = await this.callLLM(prompt);
     
     // Parse using dedicated parsing service
-    const parsedPlan = MissionPlanParsingService.parseAIResponse(aiResponse, missionId, agents);
+    const createRequest = WorkflowParsingService.parseAIResponse(aiResponse, missionId, agents);
     
     // Save using service
-    const createRequest: CreateMissionPlanRequest = {
-      missionId,
-      tasks: parsedPlan.tasks.map(task => {
-        const { id, ...taskData } = task;
-        return taskData;
-      })
-    };
-    
-    return await MissionPlanService.createPlan(createRequest);
+    return await WorkflowService.createWorkflow(createRequest);
   }
 
   /**

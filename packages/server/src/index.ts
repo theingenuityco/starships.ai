@@ -39,7 +39,7 @@ import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
 import agentCommunicationRoutes from './routes/agent-communication';
 import missionRoutes from './routes/missions';
-import workflowRoutes from './routes/workflows';
+// Removed old expedition workflow routes - replaced by mission workflow system
 import { AgentService } from './services/AgentService';
 import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
@@ -215,7 +215,7 @@ app.use('/api', mcpServerRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
 app.use('/api/missions', missionRoutes);
-app.use('/api/expeditions', workflowRoutes);
+// Removed expedition workflow routes - missions now use dedicated workflow endpoints
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

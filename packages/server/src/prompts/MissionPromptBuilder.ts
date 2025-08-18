@@ -7,9 +7,8 @@
 
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import type { MissionPlan, LLMChatPrompt } from '@starships/protocol';
+import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
 import type { Agent } from '@starships/models';
-import { MissionPlanService } from '../services/MissionPlanService';
 
 /**
  * System instruction constants - direct instruction strings for different operations
@@ -60,14 +59,14 @@ APPROACH:
 
 Be direct, helpful, and mission-oriented.`,
 
-  PLAN_GENERATION: `You are Commander ARIA creating a detailed execution plan for this mission.
+  WORKFLOW_GENERATION: `You are Commander ARIA creating a detailed execution workflow for this mission.
 
 INSTRUCTIONS:
-1. Break down the mission into 3-8 concrete, actionable tasks
+1. Break down the mission into 3-8 concrete, actionable agent tasks
 2. Assign each task to the most suitable agent based on their capabilities
-3. Identify task dependencies (which tasks must complete before others)
-4. Ensure each task has a clear, measurable deliverable
-5. Set appropriate priority levels
+3. Create a linear workflow: start → agent tasks (sequential) → end
+4. Ensure each task has clear execution parameters
+5. Focus on creating an executable workflow graph
 
 AVAILABLE AGENTS:
 {agentList}
@@ -80,41 +79,63 @@ CLARITY ASSESSMENT:
 
 Respond with ONLY this JSON format:
 {
-  "tasks": [
+  "nodes": [
     {
-      "title": "Clear, actionable task title (max 100 chars)",
+      "type": "start",
+      "name": "Start Mission",
+      "description": "Initialize mission execution",
+      "parameters": {}
+    },
+    {
+      "type": "agent",
+      "name": "Clear, actionable task title (max 100 chars)",
       "description": "Detailed description of what needs to be done and how",
-      "assignedAgentId": "agent-id-from-available-list", 
-      "dependencies": [0, 1], // Use array indices for dependencies
-      "deliverable": "Specific expected output or result",
-      "priority": "high|medium|low"
+      "parameters": {
+        "agentId": "agent-id-from-available-list",
+        "instructions": "Specific instructions for the agent",
+        "expectedOutput": "Specific expected output or result",
+        "priority": "high|medium|low"
+      }
+    },
+    {
+      "type": "end",
+      "name": "Complete Mission",
+      "description": "Mission execution completed",
+      "parameters": {}
     }
   ],
-  "reasoning": "Brief explanation of the plan structure and task assignments"
+  "edges": [
+    {"from": "start-node", "to": "agent-node-1"},
+    {"from": "agent-node-1", "to": "agent-node-2"},
+    {"from": "agent-node-N", "to": "end-node"}
+  ],
+  "reasoning": "Brief explanation of the workflow structure and task assignments"
 }
 
 IMPORTANT:
-- Use task array indices (0, 1, 2...) for dependencies, not task IDs
-- Each task must be assignable to ONE agent
-- Dependencies must form a valid sequence (no circular dependencies)
-- Focus on clear, actionable tasks with measurable outcomes`,
+- Always include start and end nodes
+- Agent nodes represent executable tasks
+- Edges create linear flow: start → agents → end
+- Use descriptive node references in edges (start-node, agent-node-1, etc.)
+- Each agent task must be assignable to ONE agent
+- Focus on clear, actionable workflow with measurable outcomes`,
 
-  PLAN_PRESENTATION: `Present the generated execution plan to the user for approval.
+  WORKFLOW_PRESENTATION: `Present the generated execution workflow to the user for approval.
 
-CURRENT PLAN:
+CURRENT WORKFLOW:
 {planData}
 
 INSTRUCTIONS:
-1. Provide a clear overview of the plan structure
-2. Explain the task sequence and why it makes sense
+1. Provide a clear overview of the workflow structure
+2. Explain the execution flow and why it makes sense
 3. Highlight the agent assignments and their roles
-4. Show key dependencies and workflow
+4. Show the workflow progression from start to completion
 5. Ask for user approval to proceed with execution
 
-Be encouraging and explain how this plan achieves their mission goals.
+Be encouraging and explain how this workflow achieves their mission goals.
 Use a professional but friendly tone as Commander ARIA.
 
-End with: "Would you like me to proceed with this execution plan? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`
+End with: "Would you like me to proceed with this execution workflow? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`
 } as const;
 
 export class MissionPromptBuilder {
@@ -164,10 +185,10 @@ export class MissionPromptBuilder {
   }
 
   /**
-   * Build plan generation prompt
+   * Build workflow generation prompt
    */
-  buildPlanGenerationPrompt(agents: Agent[]): LLMChatPrompt {
-    const systemPrompt = SYSTEM_INSTRUCTIONS.PLAN_GENERATION
+  buildWorkflowGenerationPrompt(agents: Agent[]): LLMChatPrompt {
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION
       .replace('{agentList}', this.buildAgentListSection(agents))
       .replace('{missionContext}', this.buildMissionSection())
       .replace('{clarityData}', this.buildClaritySection());
@@ -181,11 +202,11 @@ export class MissionPromptBuilder {
   }
 
   /**
-   * Build plan presentation prompt
+   * Build workflow presentation prompt
    */
-  buildPlanPresentationPrompt(plan: MissionPlan): LLMChatPrompt {
-    const systemPrompt = SYSTEM_INSTRUCTIONS.PLAN_PRESENTATION
-      .replace('{planData}', this.buildPlanDataSection(plan));
+  buildWorkflowPresentationPrompt(workflow: MissionWorkflow): LLMChatPrompt {
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION
+      .replace('{planData}', this.buildWorkflowDataSection(workflow));
 
     return {
       messages: [{
@@ -439,38 +460,56 @@ MISSION CLARITY ASSESSMENT:
   }
 
   /**
-   * Build plan data section for presentation
+   * Build workflow data section for presentation
    */
-  private buildPlanDataSection(plan: MissionPlan): string {
-    const agentAssignments = MissionPlanService.getAgentAssignments(plan);
-    const dependencyCount = plan.tasks.reduce((total, task) => total + task.dependencies.length, 0);
+  private buildWorkflowDataSection(workflow: MissionWorkflow): string {
+    const agentNodes = workflow.nodes.filter(node => node.type === 'agent');
+    const agentAssignments = agentNodes.reduce((assignments, node) => {
+      const agentId = node.parameters.agentId;
+      if (!assignments[agentId]) {
+        assignments[agentId] = [];
+      }
+      assignments[agentId].push(node.id);
+      return assignments;
+    }, {} as Record<string, string[]>);
 
-    let planText = `EXECUTION PLAN OVERVIEW:
-├─ Total Tasks: ${plan.tasks.length}
-├─ Total Dependencies: ${dependencyCount}
+    let workflowText = `EXECUTION WORKFLOW OVERVIEW:
+├─ Total Nodes: ${workflow.nodes.length}
+├─ Agent Tasks: ${agentNodes.length}
+├─ Workflow Edges: ${workflow.edges.length}
 └─ Agents Involved: ${Object.keys(agentAssignments).length}
 
-TASK BREAKDOWN:`;
+WORKFLOW STRUCTURE:`;
 
-    plan.tasks.forEach((task, index) => {
-      const depText = task.dependencies.length > 0 
-        ? ` (depends on: ${task.dependencies.join(', ')})`
-        : '';
-      
-      planText += `
-${index + 1}. ${task.title}
-   ├─ Agent: ${task.assignedAgentId}
-   ├─ Priority: ${task.priority}
-   ├─ Deliverable: ${task.deliverable}${depText}
-   └─ Description: ${task.description}`;
+    workflow.nodes.forEach((node, index) => {
+      if (node.type === 'start') {
+        workflowText += `\n${index + 1}. [START] ${node.name}
+   └─ ${node.description}`;
+      } else if (node.type === 'agent') {
+        workflowText += `\n${index + 1}. [AGENT] ${node.name}
+   ├─ Agent: ${node.parameters.agentId}
+   ├─ Priority: ${node.parameters.priority || 'medium'}
+   ├─ Expected Output: ${node.parameters.expectedOutput}
+   └─ Instructions: ${node.parameters.instructions}`;
+      } else if (node.type === 'end') {
+        workflowText += `\n${index + 1}. [END] ${node.name}
+   └─ ${node.description}`;
+      }
     });
 
-    planText += '\n\nAGENT ASSIGNMENTS:';
-    Object.entries(agentAssignments).forEach(([agentId, taskIds]) => {
-      planText += `\n├─ ${agentId}: ${taskIds.length} task(s)`;
+    workflowText += '\n\nEXECUTION FLOW:';
+    workflow.edges.forEach((edge, index) => {
+      const fromNode = workflow.nodes.find(n => n.id === edge.from);
+      const toNode = workflow.nodes.find(n => n.id === edge.to);
+      workflowText += `\n├─ ${fromNode?.name || edge.from} → ${toNode?.name || edge.to}`;
     });
 
-    return planText;
+    workflowText += '\n\nAGENT ASSIGNMENTS:';
+    Object.entries(agentAssignments).forEach(([agentId, nodeIds]) => {
+      workflowText += `\n├─ ${agentId}: ${nodeIds.length} task(s)`;
+    });
+
+    return workflowText;
   }
   
 }

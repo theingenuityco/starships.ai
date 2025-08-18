@@ -25,10 +25,10 @@ export class WorkflowService {
    */
   static async getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null> {
     try {
-      const workflowRepository = await RepositoryFactory.getWorkflowRepository();
+      const workflowRepository = RepositoryFactory.getWorkflowRepository();
       return await workflowRepository.getWorkflowByMissionId(missionId);
     } catch (error) {
-      this.logger.error('Error getting workflow by mission ID:', error);
+      this.logger.error('Error getting workflow by mission ID', { error });
       throw error;
     }
   }
@@ -38,10 +38,10 @@ export class WorkflowService {
    */
   static async createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow> {
     try {
-      const workflowRepository = await RepositoryFactory.getWorkflowRepository();
+      const workflowRepository = RepositoryFactory.getWorkflowRepository();
       return await workflowRepository.createWorkflow(request);
     } catch (error) {
-      this.logger.error('Error creating workflow:', error);
+      this.logger.error('Error creating workflow', { error });
       throw error;
     }
   }
@@ -57,10 +57,10 @@ export class WorkflowService {
         throw new Error(`Workflow not found for mission ${missionId}`);
       }
 
-      const workflowRepository = await RepositoryFactory.getWorkflowRepository();
+      const workflowRepository = RepositoryFactory.getWorkflowRepository();
       return await workflowRepository.updateApprovalStatus(workflow.id, updates);
     } catch (error) {
-      this.logger.error('Error updating workflow approval:', error);
+      this.logger.error('Error updating workflow approval', { error });
       throw error;
     }
   }
@@ -77,10 +77,10 @@ export class WorkflowService {
         return;
       }
 
-      const workflowRepository = await RepositoryFactory.getWorkflowRepository();
+      const workflowRepository = RepositoryFactory.getWorkflowRepository();
       await workflowRepository.deleteWorkflow(workflow.id);
     } catch (error) {
-      this.logger.error('Error deleting workflow:', error);
+      this.logger.error('Error deleting workflow', { error });
       throw error;
     }
   }

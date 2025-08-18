@@ -11,6 +11,7 @@ import { MCPToolGateway, MCPToolGatewayDB, MCPTool } from '@starships/core';
 import { ToolInputPatcher } from '../agents/ToolInputPatcher';
 import { SmartParameterAdapter } from '../adapters/SmartParameterAdapter';
 import { getConnection, RepositoryFactory } from '@starships/models';
+// import { ToolSandbox, ApiKeyValidator } from './security/ToolSandbox'; // TODO: Re-enable when adding native tools
 
 // Helper function to validate UUID format
 function isValidUUID(str: string | undefined): boolean {
@@ -30,9 +31,11 @@ export class MCPToolWrapper {
   private config: MCPToolConfig;
   private toolUsageStats: Map<string, number> = new Map();
   private smartAdapter: SmartParameterAdapter | null = null;
+  // private sandbox: ToolSandbox; // TODO: Re-enable when adding native tools
 
   constructor(config: MCPToolConfig) {
     this.config = config;
+    // this.sandbox = new ToolSandbox(); // TODO: Re-enable when adding native tools
     
     // Initialize smart adapter if feature flag is enabled
     if (process.env.USE_SMART_ADAPTER === 'true') {
@@ -49,33 +52,8 @@ export class MCPToolWrapper {
       const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
       const apiKeys = await apiKeyRepo.getAllApiKeys(this.config.starshipId);
       
-      // Add Tavily if API key exists
-      if (apiKeys.tavily) {
-        try {
-          const { TavilySearchResults } = await import('@langchain/community/tools/tavily_search');
-          
-          const tavilyTool = new TavilySearchResults({
-            apiKey: apiKeys.tavily,
-            maxResults: 5
-          });
-          
-          // Wrap in DynamicTool to match our interface
-          const wrappedTavily = new DynamicTool({
-            name: 'tavily_web_search',
-            description: 'Search the web for current information using Tavily',
-            func: async (input: string) => {
-              console.log(`[Tavily] Starship ${this.config.starshipId} searching: ${input}`);
-              const result = await tavilyTool.invoke(input);
-              return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-            }
-          });
-          
-          langchainTools.push(wrappedTavily);
-          console.log(`[MCPToolWrapper] Added Tavily search for starship ${this.config.starshipId}`);
-        } catch (error) {
-          console.error('[MCPToolWrapper] Failed to add Tavily tool:', error);
-        }
-      }
+      // TODO: Add Tavily support in future
+      // if (apiKeys.tavily) { ... }
       
       // Add Brave Search if API key exists
       if (apiKeys.brave) {
@@ -103,25 +81,35 @@ export class MCPToolWrapper {
         }
       }
       
-      // Add GitHub tools if API key exists
+      // Add Firecrawl if API key exists
+      if (apiKeys.firecrawl) {
+        try {
+          const { FirecrawlTool } = await import('./native/FirecrawlTool');
+          
+          const firecrawlTool = new FirecrawlTool(apiKeys.firecrawl);
+          langchainTools.push(firecrawlTool.toDynamicTool());
+          
+          console.log(`[MCPToolWrapper] Added Firecrawl for starship ${this.config.starshipId}`);
+        } catch (error) {
+          console.error('[MCPToolWrapper] Failed to add Firecrawl tool:', error);
+        }
+      }
+      
+      // Add GitHub if API key exists
       if (apiKeys.github) {
         try {
-          const { GitHubTools } = await import('./github/GitHubTools');
+          const { GitHubTool } = await import('./native/GitHubTool');
           
-          // Create GitHub tools instance
-          const githubTools = new GitHubTools(apiKeys.github);
-          const tools = githubTools.getTools();
+          // For now, we don't have a way to get user's default repo config
+          // This would need to be fetched from native_tool_configs table
+          const defaultRepo = undefined; // TODO: Fetch from database
           
-          // Add all GitHub tools
-          tools.forEach(tool => {
-            langchainTools.push(tool);
-            console.log(`[MCPToolWrapper] Added GitHub tool: ${tool.name} for starship ${this.config.starshipId}`);
-          });
+          const githubTool = new GitHubTool(apiKeys.github, defaultRepo);
+          langchainTools.push(githubTool.toDynamicTool());
           
-          console.log(`[MCPToolWrapper] Added ${tools.length} GitHub tools for starship ${this.config.starshipId}`);
-          console.log(`[MCPToolWrapper] GitHub tools available - use 'github_my_info' to get user info and 'github_list_my_repos' to list repositories`);
+          console.log(`[MCPToolWrapper] Added GitHub for starship ${this.config.starshipId}`);
         } catch (error) {
-          console.error('[MCPToolWrapper] Failed to add GitHub tools:', error);
+          console.error('[MCPToolWrapper] Failed to add GitHub tool:', error);
         }
       }
       

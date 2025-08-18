@@ -38,6 +38,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
+  const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { starships } = useStarshipStore()
 
@@ -69,6 +70,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // State for info button animation
   const [animateInfoButton, setAnimateInfoButton] = useState(false)
+  
+  // State for tools count
+  const [configuredToolsCount, setConfiguredToolsCount] = useState(0)
 
   // Handle dismissing the floating message
   const handleDismissMessage = () => {
@@ -315,8 +319,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     <div className="flex items-center gap-2">
                       <Bot className="h-3.5 w-3.5 text-primary" />
                       <div>
-                        <p className="text-[10px] text-muted-foreground">Active Agents</p>
-                        <p className="text-sm font-bold">{selectedAgent ? 1 : 0}</p>
+                        <p className="text-[10px] text-muted-foreground">Agents</p>
+                        <p className="text-sm font-bold">{agentsCount}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -328,6 +332,17 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                       <div>
                         <p className="text-[10px] text-muted-foreground">Connectors</p>
                         <p className="text-sm font-bold">{connectorInstances.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                  <CardContent className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Tools</p>
+                        <p className="text-sm font-bold">{configuredToolsCount}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -394,7 +409,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Zap className="h-4 w-4" />
-                  API Keys
+                  Tools
                 </TabsTrigger>
               </TabsList>
 
@@ -426,6 +441,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                         showCreateButton={true}
                         showFilters={true}
                         starshipId={starship?.id}
+                        onAgentsCountChange={setAgentsCount}
                       />
                     )}
                   </div>
@@ -486,7 +502,10 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar"
                 >
                   {starship?.id ? (
-                    <NativeToolApiKeys starshipId={starship.id} />
+                    <NativeToolApiKeys 
+                      starshipId={starship.id} 
+                      onConfiguredCountChange={setConfiguredToolsCount}
+                    />
                   ) : (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">

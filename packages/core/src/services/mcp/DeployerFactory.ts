@@ -8,6 +8,7 @@
 
 import { MCPDeployer } from './MCPDeployer';
 import { KubernetesDeployer } from './KubernetesDeployer';
+import { MockDeployer } from './MockDeployer';
 
 /**
  * Factory class for creating and managing MCP deployer instances
@@ -22,9 +23,18 @@ export class DeployerFactory {
    */
   static getDeployer(): MCPDeployer {
     if (!this.instance) {
-      // Always use Kubernetes now - no Docker Compose fallback
-      console.log('[DeployerFactory] Creating KubernetesDeployer instance');
-      this.instance = new KubernetesDeployer();
+      // Check if we should skip K8s/Docker operations (dev mode)
+      const skipK8s = process.env.SKIP_K8S_CHECK === 'true';
+      console.log(`[DeployerFactory] SKIP_K8S_CHECK=${process.env.SKIP_K8S_CHECK}`);
+      
+      if (skipK8s) {
+        console.log('[DeployerFactory] Creating MockDeployer instance (SKIP_K8S_CHECK=true)');
+        this.instance = new MockDeployer();
+      } else {
+        // Use Kubernetes for production/staging
+        console.log('[DeployerFactory] Creating KubernetesDeployer instance');
+        this.instance = new KubernetesDeployer();
+      }
     }
     return this.instance;
   }
@@ -40,6 +50,9 @@ export class DeployerFactory {
    * Get the deployer type currently in use
    */
   static getDeployerType(): string {
+    if (process.env.SKIP_K8S_CHECK === 'true') {
+      return 'mock';
+    }
     return 'kubernetes';
   }
 }

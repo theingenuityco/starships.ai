@@ -54,7 +54,7 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
 router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req, res) => {
   try {
     const { starshipId } = req.params;
-    const { toolName, apiKey } = req.body;
+    const { toolName, apiKey, config } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -79,6 +79,11 @@ router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req
     // Save the API key (it will be encrypted)
     const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
     await apiKeyRepo.saveApiKey(starshipId, toolName, apiKey);
+    
+    // Save additional config if provided (e.g., default repo for GitHub)
+    if (config && Object.keys(config).length > 0) {
+      await apiKeyRepo.saveToolConfig(starshipId, toolName, config);
+    }
 
     res.json({ success: true });
   } catch (error) {

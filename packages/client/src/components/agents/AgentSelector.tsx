@@ -20,6 +20,7 @@ interface AgentSelectorProps {
   showCreateButton?: boolean
   showFilters?: boolean
   starshipId?: string
+  onAgentsCountChange?: (count: number) => void
 }
 
 interface FilterState {
@@ -35,6 +36,7 @@ export function AgentSelector({
   showCreateButton = true,
   showFilters = true,
   starshipId,
+  onAgentsCountChange,
 }: AgentSelectorProps) {
   const [agents, setAgents] = useState<Agent[]>([])
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
@@ -70,6 +72,13 @@ export function AgentSelector({
   useEffect(() => {
     applyFilters()
   }, [agents, filters])
+  
+  // Notify parent of agents count change
+  useEffect(() => {
+    if (onAgentsCountChange) {
+      onAgentsCountChange(agents.length)
+    }
+  }, [agents.length, onAgentsCountChange])
 
   // Shared function to handle agent creation from template
   const handleCreateFromTemplate = async (templateId: string, agentName: string) => {

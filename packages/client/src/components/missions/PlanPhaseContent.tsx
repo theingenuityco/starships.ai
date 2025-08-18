@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
+import { MissionFlowchart } from './MissionFlowchart';
 import type { Mission, MissionPlanResponse, MissionTask } from '@starships/protocol';
 
 interface PlanPhaseContentProps {
@@ -180,98 +181,13 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="space-y-6"
+      className="space-y-4"
     >
-      {/* Plan Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-3">
-            <Target className="w-6 h-6 text-blue-600" />
-            <span>Mission Execution Plan</span>
-            <Badge 
-              variant={
-                plan.approvalStatus === 'approved' ? 'default' : 
-                plan.approvalStatus === 'rejected' ? 'destructive' : 'secondary'
-              }
-            >
-              {plan.approvalStatus}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-6 mb-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-blue-600">{plan.tasks.length}</div>
-              <div className="text-sm text-gray-600">Tasks</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-600">
-                {Object.keys(plan.agentAssignments).length}
-              </div>
-              <div className="text-sm text-gray-600">Agents</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-purple-600">
-                {plan.tasks.reduce((total, task) => total + (task.dependencies?.length || 0), 0)}
-              </div>
-              <div className="text-sm text-gray-600">Dependencies</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Task Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Task Breakdown</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <AnimatePresence>
-              {plan.tasks.map((task, index) => (
-                <TaskCard key={task.id || `task-${index}`} task={task} index={index} plan={plan} />
-              ))}
-            </AnimatePresence>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Agent Assignments */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-3">
-            <Users className="w-6 h-6 text-gray-600" />
-            <span>Agent Assignments</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {Object.entries(plan.agentAssignments).map(([agentId, taskIds]) => (
-              <motion.div 
-                key={agentId}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
-              >
-                <div>
-                  <div className="font-medium text-gray-900">{agentId}</div>
-                  <div className="text-sm text-gray-600">{taskIds.length} task(s) assigned</div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {taskIds.map((taskId, idx) => {
-                    const taskIndex = plan.tasks.findIndex(t => t.id === taskId);
-                    return (
-                      <Badge key={taskId || `badge-${agentId}-${idx}`} variant="outline" className="text-xs">
-                        Task {taskIndex + 1}
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Mission Flowchart */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Execution Flow</h3>
+        <MissionFlowchart plan={plan} />
+      </div>
 
       {/* Action Buttons */}
       {plan.approvalStatus === 'pending' && (
@@ -378,70 +294,6 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
           </motion.div>
         </motion.div>
       )}
-    </motion.div>
-  );
-}
-
-// Task Card Component
-interface TaskCardProps {
-  task: MissionTask;
-  index: number;
-  plan: MissionPlanResponse;
-}
-
-function TaskCard({ task, index, plan }: TaskCardProps) {
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getDependencyTasks = (dependencies: string[]) => {
-    if (!dependencies || dependencies.length === 0) return '';
-    return dependencies.map(depId => {
-      const depIndex = plan.tasks.findIndex(t => t.id === depId);
-      return depIndex >= 0 ? `Task ${depIndex + 1}` : 'Unknown';
-    }).join(', ');
-  };
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1 }}
-      className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center space-x-3">
-          <span className="font-medium text-blue-600 text-lg">Task {index + 1}</span>
-          <Badge className={`text-xs px-2 py-1 ${getPriorityColor(task.priority)}`}>
-            {task.priority}
-          </Badge>
-        </div>
-        <Badge variant="outline" className="text-xs">
-          {task.assignedAgentId}
-        </Badge>
-      </div>
-      
-      <h4 className="font-semibold text-gray-900 mb-2">{task.title}</h4>
-      <p className="text-sm text-gray-600 mb-4">{task.description}</p>
-      
-      <div className="space-y-2">
-        <div>
-          <span className="text-sm font-medium text-gray-700">Deliverable: </span>
-          <span className="text-sm text-gray-600">{task.deliverable}</span>
-        </div>
-        
-        {task.dependencies && task.dependencies.length > 0 && (
-          <div>
-            <span className="text-sm font-medium text-gray-700">Dependencies: </span>
-            <span className="text-sm text-gray-600">{getDependencyTasks(task.dependencies)}</span>
-          </div>
-        )}
-      </div>
     </motion.div>
   );
 }

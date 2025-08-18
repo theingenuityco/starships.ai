@@ -391,6 +391,8 @@ export class MissionOrchestratorAgent {
       const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
       const responseContent = await this.callLLM(prompt);
       
+      console.log('[Workflow Presentation] LLM Response:', responseContent);
+      
       const aiMessage = this.createAIMessage(responseContent, state);
       
       // Save message via callback
@@ -445,6 +447,8 @@ export class MissionOrchestratorAgent {
     
     // Generate workflow using AI
     const aiResponse = await this.callLLM(prompt);
+    
+    console.log('[Workflow Generation] LLM Response:', aiResponse);
     
     // Parse using dedicated parsing service
     const createRequest = WorkflowParsingService.parseAIResponse(aiResponse, missionId, agents);
@@ -776,6 +780,8 @@ export class MissionOrchestratorAgent {
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens
     });
+
+    console.log('[LLM Response]:', result.reply);
 
     return result.reply;
   }

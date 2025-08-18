@@ -12,7 +12,7 @@ import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity } from '@starships/protocol';
-import { PlanPhaseContent } from '@/components/missions/PlanPhaseContent';
+import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
 
 interface MissionDetailPageProps {
   params: Promise<{
@@ -107,7 +107,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
       'init': { label: 'Init', description: 'Setting up mission context' },
       'welcome': { label: 'Welcome', description: 'Mission introduction' },
       'analysis': { label: 'Analysis', description: 'Analyzing mission clarity' },
-      'plan': { label: 'Plan', description: 'Reviewing execution plan' },
+      'plan': { label: 'Workflow', description: 'Reviewing execution workflow' },
       'converse': { label: 'Converse', description: 'Active conversation phase' }
     };
 
@@ -119,10 +119,10 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     setMessages(prev => [...prev, message]);
   };
 
-  // Handle plan approval transitions
-  const handlePlanApproval = (approved: boolean) => {
+  // Handle workflow approval transitions
+  const handleWorkflowApproval = (approved: boolean) => {
     if (approved) {
-      // Plan was approved, mission should transition to converse phase
+      // Workflow was approved, mission should transition to converse phase
       // This will be handled by the WebSocket event or we can optimistically update
       setMission(prev => prev ? { ...prev, phase: 'converse' } : null);
     }
@@ -491,7 +491,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                 )}
               </div>
 
-              {/* Mission Plan Section - Only show during plan phase */}
+              {/* Mission Workflow Section - Only show during plan phase */}
               {mission.phase === 'plan' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
@@ -506,13 +506,13 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                       )}
                     </button>
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Execution Plan
+                      Execution Workflow
                     </h4>
                   </div>
                   {!collapsedSections.plan && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
                       <div className="mx-3">
-                        <PlanPhaseContent mission={mission} onPlanApproval={handlePlanApproval} />
+                        <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} />
                       </div>
                     </div>
                   )}

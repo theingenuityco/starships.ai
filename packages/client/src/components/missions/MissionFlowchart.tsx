@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use WorkflowVisualization from @/components/workflow instead
+ * This component is for the legacy plan system and will be removed in future versions.
+ * Migration: Replace MissionFlowchart with WorkflowVisualization and pass MissionWorkflow instead of MissionPlanResponse.
+ */
+
 'use client';
 
 import React, { useCallback, useMemo } from 'react';

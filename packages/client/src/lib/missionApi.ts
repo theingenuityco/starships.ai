@@ -220,7 +220,26 @@ export const missionApi = {
   },
 
   /**
-   * Regenerate mission plan
+   * Approve or reject mission workflow
+   */
+  async approveMissionWorkflow(missionId: string, approved: boolean, reason?: string): Promise<ApiResponse<{ approved: boolean; message: string }>> {
+    return apiRequest<{ approved: boolean; message: string }>(`/api/missions/${missionId}/workflow/approval`, {
+      method: 'PUT',
+      body: JSON.stringify({ approved, rejectionReason: reason })
+    });
+  },
+
+  /**
+   * Regenerate mission workflow
+   */
+  async regenerateMissionWorkflow(missionId: string): Promise<ApiResponse<{ message: string }>> {
+    return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-workflow`, {
+      method: 'POST'
+    });
+  },
+
+  /**
+   * Regenerate mission plan (legacy - deprecated)
    */
   async regenerateMissionPlan(missionId: string): Promise<ApiResponse<{ message: string }>> {
     return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-plan`, {

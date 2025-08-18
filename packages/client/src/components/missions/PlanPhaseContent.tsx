@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use WorkflowPhaseContent instead
+ * This component is for the legacy plan system. Use WorkflowPhaseContent which integrates with the new workflow system.
+ * Migration: Replace PlanPhaseContent with WorkflowPhaseContent
+ */
+
 'use client';
 
 import React, { useState, useEffect } from 'react';

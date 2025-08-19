@@ -81,21 +81,14 @@ const NATIVE_TOOLS: NativeToolConfig[] = [
     icon: '🔥'
   },
   {
-    name: 'github',
-    displayName: 'GitHub',
-    description: 'Manage GitHub repositories - create/update files, wikis, issues, and pull requests',
-    apiKeyPlaceholder: 'ghp_xxxxx or github_pat_xxxxx',
-    signupUrl: 'https://github.com/settings/tokens?scopes=repo,read:user',
-    helpText: 'Required scopes: repo (for private repos) or public_repo (for public only), read:user',
-    pricing: '5,000 requests/hour free',
-    icon: '🐙',
-    configFields: [{
-      name: 'defaultRepo',
-      label: 'Default Repository',
-      placeholder: 'owner/repository',
-      description: 'Optional: Set a default repository (e.g., myusername/my-repo)',
-      type: 'text'
-    }]
+    name: 'notion',
+    displayName: 'Notion',
+    description: 'Manage your Notion workspace - create, read, and update pages and databases',
+    apiKeyPlaceholder: 'secret_xxxxx',
+    signupUrl: 'https://www.notion.so/my-integrations',
+    helpText: 'Create an integration at notion.so/my-integrations and share pages with it',
+    pricing: 'Free with Notion account',
+    icon: '📝'
   },
 ];
 

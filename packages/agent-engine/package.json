@@ -19,6 +19,7 @@
     "@langchain/core": "^0.3.66",
     "@langchain/langgraph": "^0.3.11",
     "@langchain/openai": "^0.6.2",
+    "@notionhq/client": "^4.0.2",
     "@octokit/rest": "^22.0.0",
     "@starships/core": "workspace:*",
     "@starships/models": "workspace:*",
@@ -32,7 +33,7 @@
     "rxjs": "^7.8.2",
     "tavily": "^1.0.2",
     "uuid": "^11.1.0",
-    "zod": "^3.22.4"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

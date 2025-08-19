@@ -72,9 +72,9 @@ export function CrewConsoleFloatingMessage({
       console.log('Updating step from', prevStep, 'to', 2);
       return 2;
     });
-    // Navigate to Connectors tab
-    onTabChange('connectors');
-    console.log('Called onTabChange with connectors');
+    // Navigate to Tools tab instead of Connectors (which is hidden)
+    onTabChange('api-keys');
+    console.log('Called onTabChange with api-keys');
   };
 
   const handleDismiss = () => {
@@ -137,7 +137,7 @@ export function CrewConsoleFloatingMessage({
                     
                     <div>
                       <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
-                        {currentStep === 1 ? 'AI Agents' : 'Connectors'}
+                        {currentStep === 1 ? 'AI Agents' : 'Tools'}
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
@@ -164,13 +164,13 @@ export function CrewConsoleFloatingMessage({
                   <p className="text-sm leading-relaxed text-foreground/90">
                     {currentStep === 1 
                       ? 'Create powerful AI agents from templates to automate your workflows.'
-                      : 'Connect your favorite tools and services to supercharge your agents.'}
+                      : 'Configure API keys for external tools to enhance your agents capabilities.'}
                   </p>
                   
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {currentStep === 1
                       ? 'Each agent is specialized for specific tasks like code reviews, documentation, or testing.'
-                      : 'Browse and install connectors for GitHub, Slack, Jira, and more.'}
+                      : 'Add tools like Brave Search, Firecrawl, and more to power your AI agents.'}
                   </p>
 
                   {/* Action buttons */}

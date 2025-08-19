@@ -95,21 +95,19 @@ export class MCPToolWrapper {
         }
       }
       
-      // Add GitHub if API key exists
-      if (apiKeys.github) {
+      
+      // Add Notion if API key exists
+      if (apiKeys.notion) {
         try {
-          const { GitHubTool } = await import('./native/GitHubTool');
+          const { NotionTool } = await import('./native/NotionTool');
           
-          // For now, we don't have a way to get user's default repo config
-          // This would need to be fetched from native_tool_configs table
-          const defaultRepo = undefined; // TODO: Fetch from database
+          const notionTool = new NotionTool(apiKeys.notion);
+          const notionDynamicTool = notionTool.toDynamicTool();
+          langchainTools.push(notionDynamicTool);
           
-          const githubTool = new GitHubTool(apiKeys.github, defaultRepo);
-          langchainTools.push(githubTool.toDynamicTool());
-          
-          console.log(`[MCPToolWrapper] Added GitHub for starship ${this.config.starshipId}`);
+          console.log(`[MCPToolWrapper] Added Notion tool for starship ${this.config.starshipId}`);
         } catch (error) {
-          console.error('[MCPToolWrapper] Failed to add GitHub tool:', error);
+          console.error('[MCPToolWrapper] Failed to add Notion tool:', error);
         }
       }
       

@@ -14,7 +14,8 @@ import type {
   MissionMessage,
   SendMissionMessageRequest,
   MissionChatResponse,
-  MissionClarity
+  MissionClarity,
+  WorkflowResponse
 } from '@starships/protocol';
 import api from './api';
 
@@ -199,5 +200,50 @@ export const missionApi = {
    */
   async getMissionClarity(missionId: string): Promise<ApiResponse<MissionClarity | null>> {
     return apiRequest<MissionClarity | null>(`/api/missions/${missionId}/clarity`);
+  },
+
+  /**
+   * Get mission workflow details
+   */
+  async getMissionWorkflow(missionId: string): Promise<ApiResponse<WorkflowResponse | null>> {
+    return apiRequest<WorkflowResponse | null>(`/api/missions/${missionId}/workflow`);
+  },
+
+  /**
+   * Approve or reject mission plan
+   */
+  async approveMissionPlan(missionId: string, approved: boolean, reason?: string): Promise<ApiResponse<{ approved: boolean; message: string }>> {
+    return apiRequest<{ approved: boolean; message: string }>(`/api/missions/${missionId}/approve-plan`, {
+      method: 'POST',
+      body: JSON.stringify({ approved, reason })
+    });
+  },
+
+  /**
+   * Approve or reject mission workflow
+   */
+  async approveMissionWorkflow(missionId: string, approved: boolean, reason?: string): Promise<ApiResponse<{ approved: boolean; message: string }>> {
+    return apiRequest<{ approved: boolean; message: string }>(`/api/missions/${missionId}/workflow/approval`, {
+      method: 'PUT',
+      body: JSON.stringify({ approved, rejectionReason: reason })
+    });
+  },
+
+  /**
+   * Regenerate mission workflow
+   */
+  async regenerateMissionWorkflow(missionId: string): Promise<ApiResponse<{ message: string }>> {
+    return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-workflow`, {
+      method: 'POST'
+    });
+  },
+
+  /**
+   * Regenerate mission plan (legacy - deprecated)
+   */
+  async regenerateMissionPlan(missionId: string): Promise<ApiResponse<{ message: string }>> {
+    return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-plan`, {
+      method: 'POST'
+    });
   }
 };

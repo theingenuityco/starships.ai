@@ -5,6 +5,8 @@
  * Starting with just the essentials for a blank canvas approach.
  */
 
+import type { Agent } from '../index';
+
 // ============================================================================
 // CORE MISSION TYPES
 // ============================================================================
@@ -42,6 +44,7 @@ export type MissionPhase =
   | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
   | 'analysis'     // Mission analysis and breakdown
+  | 'plan'         // Mission execution planning and approval
   | 'converse';    // General conversation and mission guidance
 
 // ============================================================================
@@ -200,4 +203,66 @@ export interface UpdateMissionClarityRequest {
   visionAlignment?: number;
   reasoning?: string;
   iteration?: number;
+}
+
+// ============================================================================
+// MISSION WORKFLOW TYPES
+// ============================================================================
+
+/**
+ * Mission workflow - executable workflow DSL for mission execution
+ */
+export interface MissionWorkflow {
+  id: string;
+  missionId: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  approvalStatus: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  approvedAt?: string;
+}
+
+/**
+ * Individual node in the workflow graph
+ */
+export interface WorkflowNode {
+  id: string;
+  type: 'start' | 'agent' | 'end';
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+}
+
+/**
+ * Edge connecting workflow nodes
+ */
+export interface WorkflowEdge {
+  id: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * Request to create a new mission workflow
+ */
+export interface CreateWorkflowRequest {
+  missionId: string;
+  nodes: (Omit<WorkflowNode, 'id'> & { aiId?: string })[];
+  edges: Omit<WorkflowEdge, 'id'>[];
+}
+
+/**
+ * Request to update workflow approval status
+ */
+export interface UpdateWorkflowApprovalRequest {
+  approvalStatus: 'approved' | 'rejected';
+  rejectionReason?: string;
+}
+
+/**
+ * Response containing workflow data with associated agent details
+ */
+export interface WorkflowResponse {
+  workflow: MissionWorkflow;
+  agents: Record<string, Agent>; // agentId -> Agent details
 }

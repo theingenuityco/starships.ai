@@ -7,6 +7,8 @@
 
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
+import type { Agent } from '@starships/models';
 
 /**
  * System instruction constants - direct instruction strings for different operations
@@ -55,7 +57,87 @@ APPROACH:
 - Give actionable, practical advice
 - Suggest concrete next steps when appropriate
 
-Be direct, helpful, and mission-oriented.`
+Be direct, helpful, and mission-oriented.`,
+
+  WORKFLOW_GENERATION: `You are Commander ARIA creating a detailed execution workflow for this mission.
+
+INSTRUCTIONS:
+1. Break down the mission into 3-8 concrete, actionable agent tasks
+2. Assign each task to the most suitable agent based on their capabilities
+3. Create a linear workflow: start → agent tasks (sequential) → end
+4. Ensure each task has clear execution parameters
+5. Focus on creating an executable workflow graph
+
+AVAILABLE AGENTS:
+{agentList}
+
+MISSION CONTEXT:
+{missionContext}
+
+CLARITY ASSESSMENT:
+{clarityData}
+
+Respond with ONLY this JSON format:
+{
+  "nodes": [
+    {
+      "id": "start-node",
+      "type": "start", 
+      "name": "Start Mission",
+      "description": "Initialize mission execution",
+      "parameters": {}
+    },
+    {
+      "id": "agent-node-1",
+      "type": "agent",
+      "name": "Clear, actionable task title (max 100 chars)",
+      "description": "Detailed description of what needs to be done and how",
+      "parameters": {
+        "agentId": "agent-id-from-available-list",
+        "instructions": "Specific instructions for the agent",
+        "expectedOutput": "Specific expected output or result", 
+        "priority": "high|medium|low"
+      }
+    },
+    {
+      "id": "end-node",
+      "type": "end",
+      "name": "Complete Mission", 
+      "description": "Mission execution completed",
+      "parameters": {}
+    }
+  ],
+  "edges": [
+    {"from": "start-node", "to": "agent-node-1"},
+    {"from": "agent-node-1", "to": "end-node"}
+  ],
+  "reasoning": "Brief explanation of the workflow structure and task assignments"
+}
+
+IMPORTANT:
+- Always include start and end nodes with consistent IDs
+- Agent nodes need sequential IDs (agent-node-1, agent-node-2, etc.)
+- Edges must reference the exact node IDs from the nodes array
+- Create linear flow: start-node → agent-node-X → end-node
+- Each agent task must be assignable to ONE available agent
+- Focus on clear, actionable workflow with measurable outcomes`,
+
+  WORKFLOW_PRESENTATION: `Present the generated execution workflow to the user for approval.
+
+CURRENT WORKFLOW:
+{planData}
+
+INSTRUCTIONS:
+1. Provide a clear overview of the workflow structure
+2. Explain the execution flow and why it makes sense
+3. Highlight the agent assignments and their roles
+4. Show the workflow progression from start to completion
+5. Ask for user approval to proceed with execution
+
+Be encouraging and explain how this workflow achieves their mission goals.
+Use a professional but friendly tone as Commander ARIA.
+
+End with: "Would you like me to proceed with this execution workflow? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`
 } as const;
 
 export class MissionPromptBuilder {
@@ -103,6 +185,38 @@ export class MissionPromptBuilder {
       : SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_SUBSEQUENT;
     return this.buildCompletePrompt(instruction);
   }
+
+  /**
+   * Build workflow generation prompt
+   */
+  buildWorkflowGenerationPrompt(agents: Agent[]): LLMChatPrompt {
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION
+      .replace('{agentList}', this.buildAgentListSection(agents))
+      .replace('{missionContext}', this.buildMissionSection())
+      .replace('{clarityData}', this.buildClaritySection());
+
+    return {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+  }
+
+  /**
+   * Build workflow presentation prompt
+   */
+  buildWorkflowPresentationPrompt(workflow: MissionWorkflow): LLMChatPrompt {
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION
+      .replace('{planData}', this.buildWorkflowDataSection(workflow));
+
+    return {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+  }
   
   // ============================================================================
   // CORE BUILDING METHODS
@@ -141,6 +255,8 @@ export class MissionPromptBuilder {
         return this.buildWelcomePhaseContext();
       case 'analysis':
         return this.buildAnalysisPhaseContext();
+      case 'plan':
+        return this.buildPlanPhaseContext();
       case 'converse':
         return this.buildConversePhaseContext();
       default:
@@ -164,6 +280,13 @@ WELCOME PHASE: First interaction with user for this mission.`;
       `ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`,
       this.buildClaritySection(),
     ].filter(Boolean).join('\n\n');
+  }
+  
+  /**
+   * Plan phase context - plan data and status
+   */
+  private buildPlanPhaseContext(): string {
+    return `PLAN PHASE: Mission execution planning and approval.`;
   }
   
   /**
@@ -224,7 +347,7 @@ You coordinate starship missions by:
     
     return `
 ACTIVE PHASE: ${activePhase}
-PHASES: INIT → WELCOME → ANALYSIS → CONVERSE
+PHASES: INIT → WELCOME → ANALYSIS → PLAN → CONVERSE
 CURRENT TIME: ${currentDateTime}`;
   }
 
@@ -326,6 +449,69 @@ MISSION CLARITY ASSESSMENT:
     }
     
     return content;
+  }
+
+  /**
+   * Build agent list section for plan generation
+   */
+  private buildAgentListSection(agents: Agent[]): string {
+    return agents.map(agent => {
+      const capabilities = agent.category || 'general';
+      return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;
+    }).join('\n');
+  }
+
+  /**
+   * Build workflow data section for presentation
+   */
+  private buildWorkflowDataSection(workflow: MissionWorkflow): string {
+    const agentNodes = workflow.nodes.filter(node => node.type === 'agent');
+    const agentAssignments = agentNodes.reduce((assignments, node) => {
+      const agentId = node.parameters.agentId;
+      if (!assignments[agentId]) {
+        assignments[agentId] = [];
+      }
+      assignments[agentId].push(node.id);
+      return assignments;
+    }, {} as Record<string, string[]>);
+
+    let workflowText = `EXECUTION WORKFLOW OVERVIEW:
+├─ Total Nodes: ${workflow.nodes.length}
+├─ Agent Tasks: ${agentNodes.length}
+├─ Workflow Edges: ${workflow.edges.length}
+└─ Agents Involved: ${Object.keys(agentAssignments).length}
+
+WORKFLOW STRUCTURE:`;
+
+    workflow.nodes.forEach((node, index) => {
+      if (node.type === 'start') {
+        workflowText += `\n${index + 1}. [START] ${node.name}
+   └─ ${node.description}`;
+      } else if (node.type === 'agent') {
+        workflowText += `\n${index + 1}. [AGENT] ${node.name}
+   ├─ Agent: ${node.parameters.agentId}
+   ├─ Priority: ${node.parameters.priority || 'medium'}
+   ├─ Expected Output: ${node.parameters.expectedOutput}
+   └─ Instructions: ${node.parameters.instructions}`;
+      } else if (node.type === 'end') {
+        workflowText += `\n${index + 1}. [END] ${node.name}
+   └─ ${node.description}`;
+      }
+    });
+
+    workflowText += '\n\nEXECUTION FLOW:';
+    workflow.edges.forEach((edge, index) => {
+      const fromNode = workflow.nodes.find(n => n.id === edge.from);
+      const toNode = workflow.nodes.find(n => n.id === edge.to);
+      workflowText += `\n├─ ${fromNode?.name || edge.from} → ${toNode?.name || edge.to}`;
+    });
+
+    workflowText += '\n\nAGENT ASSIGNMENTS:';
+    Object.entries(agentAssignments).forEach(([agentId, nodeIds]) => {
+      workflowText += `\n├─ ${agentId}: ${nodeIds.length} task(s)`;
+    });
+
+    return workflowText;
   }
   
 }

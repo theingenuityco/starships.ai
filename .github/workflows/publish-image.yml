@@ -1,46 +1,133 @@
-name: Publish Docker Image to GHCR
+name: Build and Publish Docker Image
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    types: [closed]
   workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
-  publish:
-    name: Build and Push to GitHub Container Registry
+  build-and-push:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    env:
-      RUNPOD_ENDPOINT: ${{ secrets.RUNPOD_WEBHOOK_URL }}
-      AUTH_HEADER: ${{ secrets.RUNPOD_AUTH_HEADER }}
-
+    # Only run on main branch pushes or merged PRs
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
+    
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set Up Docker Buildx
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
 
-      - name: Log in to GitHub Container Registry (GHCR)
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           [DEFAULT-PASSWORD]: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Docker Image
+      # Convert repository name to lowercase (GHCR requires lowercase)
+      - name: Convert IMAGE_NAME to lowercase
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/starships.ai:latest .
+          echo "IMAGE_NAME_LOWER=$(echo ${{ env.IMAGE_NAME }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Push Image to GHCR
-        run: |
-          docker push ghcr.io/${{ github.repository_owner }}/starships.ai:latest
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value={{date 'YYYYMMDD-HHmmss' tz='UTC'}},enable={{is_default_branch}}
 
-      - name: (Optional) Ping RunPod to Redeploy
-        if: ${{ success() && env.RUNPOD_ENDPOINT != '' }}
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            REVISION=${{ github.sha }}
+
+      - name: Generate image digest
+        id: digest
         run: |
-          curl -s -X POST "$RUNPOD_ENDPOINT" \
-            -H "Authorization: $AUTH_HEADER" 
+          echo "digest=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest --format '{{.Manifest.Digest}}')" >> $GITHUB_OUTPUT
+
+      - name: Image scan with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Docker Image Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.IMAGE_NAME_LOWER }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.digest.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pull Command" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Size" >> $GITHUB_STEP_SUMMARY
+          echo "Multi-platform image for linux/amd64 and linux/arm64" >> $GITHUB_STEP_SUMMARY
+
+      - name: (Optional) Trigger RunPod Redeploy
+        if: ${{ success() && vars.RUNPOD_WEBHOOK_URL != '' }}
+        run: |
+          curl -s -X POST "${{ vars.RUNPOD_WEBHOOK_URL }}" \
+            -H "Authorization: ${{ secrets.RUNPOD_AUTH_HEADER }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "image": "${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest",
+              "digest": "${{ steps.digest.outputs.digest }}"
+            }'
+        continue-on-error: true

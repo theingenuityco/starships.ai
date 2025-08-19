@@ -12,6 +12,7 @@ import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity } from '@starships/protocol';
+import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
 
 interface MissionDetailPageProps {
   params: Promise<{
@@ -66,7 +67,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     timeline: false,
     agents: false,
     progress: false,
-    clarity: false
+    clarity: false,
+    plan: false
   });
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
@@ -105,6 +107,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
       'init': { label: 'Init', description: 'Setting up mission context' },
       'welcome': { label: 'Welcome', description: 'Mission introduction' },
       'analysis': { label: 'Analysis', description: 'Analyzing mission clarity' },
+      'plan': { label: 'Workflow', description: 'Reviewing execution workflow' },
       'converse': { label: 'Converse', description: 'Active conversation phase' }
     };
 
@@ -114,6 +117,16 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   // Central message handler - single source of truth
   const addMessageToUI = (message: MissionMessage) => {
     setMessages(prev => [...prev, message]);
+  };
+
+  // Handle workflow approval transitions
+  const handleWorkflowApproval = (approved: boolean) => {
+    if (approved) {
+      // Workflow was approved, mission should transition to converse phase
+      // This will be handled by the WebSocket event or we can optimistically update
+      setMission(prev => prev ? { ...prev, phase: 'converse' } : null);
+    }
+    // If rejected, stay in plan phase for regeneration
   };
 
   // WebSocket setup for mission messages and real-time updates
@@ -263,7 +276,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     focusInput();
   }, []);
 
-
   const handleSendMessage = async () => {
     if (!newMessage.trim() || chatLoading) return;
 
@@ -371,7 +383,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
 
       {/* Main Content - Split Layout */}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0">
-        {/* Chat Area - Main Content */}
+        {/* Main Content Area - Chat Interface */}
         <div className="flex-1 flex flex-col min-h-0 bg-background">
           <div className="flex flex-col flex-1 min-h-0">
             <div className="pb-3 p-4 lg:p-6 flex-shrink-0">
@@ -478,6 +490,34 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                   </div>
                 )}
               </div>
+
+              {/* Mission Workflow Section - Only show during plan phase */}
+              {mission.phase === 'plan' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-3 group">
+                    <button
+                      onClick={() => toggleSection('plan')}
+                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                    >
+                      {collapsedSections.plan ? (
+                        <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      )}
+                    </button>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Execution Workflow
+                    </h4>
+                  </div>
+                  {!collapsedSections.plan && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                      <div className="mx-3">
+                        <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Mission Clarity Section */}
               <div className="space-y-2">
@@ -751,8 +791,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                   </div>
                 )}
               </div>
-
-
             </div>
           </div>
         </div>

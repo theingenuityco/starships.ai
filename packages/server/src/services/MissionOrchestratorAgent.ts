@@ -12,15 +12,19 @@ import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
+import { WorkflowService } from './WorkflowService';
+import { WorkflowParsingService } from './WorkflowParsingService';
 import type { 
   Mission, 
   MissionPhase,
   MissionClarity,
+  MissionWorkflow,
   CreateMissionClarityRequest,
+  CreateWorkflowRequest,
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
-import type { LLM, Starship, Vision } from '@starships/models';
+import type { LLM, Starship, Vision, Agent } from '@starships/models';
 
 /**
  * Configuration for MissionOrchestratorAgent
@@ -74,6 +78,12 @@ const MissionChatStateAnnotation = Annotation.Root({
   clarity: Annotation<MissionClarity | undefined>({
     value: (x, y) => y ?? x,
     default: () => undefined
+  }),
+  
+  // ADDED: Workflow data in state
+  workflow: Annotation<MissionWorkflow | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
   })
 });
 
@@ -87,6 +97,7 @@ export type MissionChatState = typeof MessagesAnnotation.State & {
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
   clarity: MissionClarity | undefined; // ADDED: Mission clarity state
+  workflow: MissionWorkflow | undefined; // ADDED: Mission workflow state
 };
 
 /**
@@ -132,6 +143,7 @@ export class MissionOrchestratorAgent {
         .addNode("context_builder", this.contextBuilderNode.bind(this))
         .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
         .addNode("analysis_phase", this.analysisPhaseNode.bind(this))
+        .addNode("plan_phase", this.planPhaseNode.bind(this))  // NEW
         .addNode("converse_phase", this.conversePhaseNode.bind(this))
         .addEdge(START, "context_builder")
         .addConditionalEdges(
@@ -141,6 +153,7 @@ export class MissionOrchestratorAgent {
             init: "welcome_phase",        // init transitions to welcome
             welcome: "welcome_phase",
             analysis: "analysis_phase",
+            plan: "plan_phase",          // NEW
             converse: "converse_phase"
           }
         )
@@ -157,7 +170,16 @@ export class MissionOrchestratorAgent {
           this.shouldContinueFromAnalysis.bind(this),
           {
             continue: "analysis_phase", // Stay in analysis for iterative questions
-            advance: "converse_phase",   // Move to converse when complete
+            advance: "plan_phase",      // NEW: Move to plan when analysis complete
+            end: END
+          }
+        )
+        .addConditionalEdges(
+          "plan_phase",
+          this.shouldContinueFromPlan.bind(this),
+          {
+            continue: "converse_phase",  // Plan approved → converse
+            regenerate: "plan_phase",    // Plan rejected → stay in plan
             end: END
           }
         )
@@ -240,14 +262,33 @@ export class MissionOrchestratorAgent {
       return 'end'; // Something went wrong, stop
     }
     
-    // If clarity threshold met OR max iterations reached, advance to converse
+    // If clarity threshold met OR max iterations reached, advance to plan
     if (clarity.overallScore >= MissionOrchestratorAgent.CLARITY_THRESHOLD || 
         clarity.iteration >= MissionOrchestratorAgent.MAX_CLARITY_ITERATIONS) {
-      return 'advance'; // Move to converse_phase
+      return 'advance'; // Move to plan_phase
     }
     
     // Always end after generating a question to wait for human response
     return 'end'; // Wait for user to respond, then they'll send another message
+  }
+
+  /**
+   * Conditional routing from plan phase
+   */
+  private shouldContinueFromPlan(state: MissionChatState): string {
+    const workflow = state.workflow;
+    
+    if (!workflow) return 'end';
+    
+    if (workflow.approvalStatus === 'approved') {
+      return 'continue'; // → converse_phase
+    }
+    
+    if (workflow.approvalStatus === 'rejected') {
+      return 'regenerate'; // → plan_phase (regenerate)
+    }
+    
+    return 'end'; // pending - wait for user input
   }
 
   /**
@@ -305,7 +346,7 @@ export class MissionOrchestratorAgent {
       return {
         messages: [aiMessage],
         clarity,
-        activePhase: 'converse' // Transition to converse phase
+        activePhase: 'plan' // Transition to plan phase
       };
     } else {
       // Generate next question and END - wait for human response
@@ -322,6 +363,55 @@ export class MissionOrchestratorAgent {
         clarity
         // Stay in analysis phase - graph will END and wait for user response
       };
+    }
+  }
+
+  /**
+   * Plan phase node - handles plan generation and presentation
+   */
+  private async planPhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    try {
+      const { metadata, clarity } = state;
+      
+      if (!metadata) throw new Error('Missing metadata in state');
+      
+      // Get workflow from state or generate new one
+      let workflow = state.workflow;
+      
+      if (!workflow || state.isSystemInitiated) {
+        // Generate new workflow
+        workflow = await this.generateWorkflow(metadata.mission.id, state);
+        
+        // Update mission phase in database to reflect transition
+        const missionRepo = RepositoryFactory.getMissionRepository();
+        await missionRepo.updateMission(metadata.mission.id, { phase: 'plan' });
+      }
+      
+      // Present workflow to user for approval
+      const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
+      const responseContent = await this.callLLM(prompt);
+      
+      console.log('[Workflow Presentation] LLM Response:', responseContent);
+      
+      const aiMessage = this.createAIMessage(responseContent, state);
+      
+      // Save message via callback
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(aiMessage, 'plan_phase', this.currentMissionId);
+      }
+      
+      return {
+        messages: [aiMessage],
+        workflow,
+        activePhase: 'plan',
+        metadata: {
+          ...metadata,
+          mission: { ...metadata.mission, phase: 'plan' }
+        }
+      };
+    } catch (error) {
+      this.logger.error('Plan phase failed', { error });
+      return { activePhase: 'analysis', isSystemInitiated: true };
     }
   }
 
@@ -343,6 +433,68 @@ export class MissionOrchestratorAgent {
     }
     
     return { messages: [aiMessage] };
+  }
+
+  /**
+   * Generate plan using dedicated services
+   */
+  private async generateWorkflow(missionId: string, state: MissionChatState): Promise<MissionWorkflow> {
+    // Get available agents
+    const agents = await this.getAssignedAgents(missionId);
+    
+    // Build workflow generation prompt
+    const prompt = new MissionPromptBuilder(state).buildWorkflowGenerationPrompt(agents);
+    
+    // Generate workflow using AI
+    const aiResponse = await this.callLLM(prompt);
+    
+    console.log('[Workflow Generation] LLM Response:', aiResponse);
+    
+    // Parse using dedicated parsing service
+    const createRequest = WorkflowParsingService.parseAIResponse(aiResponse, missionId, agents);
+    
+    // Save using service
+    return await WorkflowService.createWorkflow(createRequest);
+  }
+
+  /**
+   * Get agents assigned to mission with proper error handling
+   */
+  private async getAssignedAgents(missionId: string): Promise<Agent[]> {
+    try {
+      const missionRepo = RepositoryFactory.getMissionRepository();
+      const mission = await missionRepo.getMissionById(missionId);
+      
+      if (!mission.agentIds || mission.agentIds.length === 0) {
+        throw new Error('No agents assigned to mission');
+      }
+
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agents: Agent[] = [];
+      
+      for (const agentId of mission.agentIds) {
+        const agent = await agentRepo.findById(agentId);
+        if (agent) {
+          agents.push(agent);
+        } else {
+          this.logger.warn('Agent not found', { agentId, missionId });
+        }
+      }
+      
+      if (agents.length === 0) {
+        throw new Error('No valid agents found for mission');
+      }
+      
+      return agents;
+    } catch (error) {
+      this.logger.error('Failed to get assigned agents', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'getAssignedAgents',
+        missionId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
   }
 
   /**
@@ -628,6 +780,8 @@ export class MissionOrchestratorAgent {
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens
     });
+
+    console.log('[LLM Response]:', result.reply);
 
     return result.reply;
   }

@@ -179,15 +179,15 @@ jobs:
             echo "⚠️ ALB URL not yet available, skipping smoke tests"
           fi
 
-      - name: Slack notification (optional)
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: |
-            Deployment to EKS ${{ job.status }}
-            Environment: ${{ github.event.inputs.environment || 'production' }}
-            Commit: ${{ github.sha }}
-            Author: ${{ github.actor }}
-          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
-        continue-on-error: true
+      # - name: Slack notification (optional)
+      #   if: always()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: ${{ job.status }}
+      #     text: |
+      #       Deployment to EKS ${{ job.status }}
+      #       Environment: ${{ github.event.inputs.environment || 'production' }}
+      #       Commit: ${{ github.sha }}
+      #       Author: ${{ github.actor }}
+      #     webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #   continue-on-error: true

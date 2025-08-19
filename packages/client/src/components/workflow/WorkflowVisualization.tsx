@@ -386,6 +386,12 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
         panOnScroll={true}
         panOnDrag={true}
       >
+        <Controls 
+          showZoom={true}
+          showFitView={true}
+          showInteractive={false}
+          position="bottom-right"
+        />
         <Background 
           color="#e5e7eb" 
           gap={20} 

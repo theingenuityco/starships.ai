@@ -84,7 +84,24 @@ jobs:
       - name: Generate image digest
         id: digest
         run: |
-          echo "digest=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest --format '{{.Manifest.Digest}}')" >> $GITHUB_OUTPUT
+          # Wait a moment for the image to be fully available
+          sleep 5
+          
+          # Try to get the digest, filtering out any extra output
+          DIGEST=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest 2>/dev/null | grep -oP 'Digest:\s*\K[^\s]+' | head -1 || echo "")
+          
+          # If that didn't work, try the format approach
+          if [ -z "$DIGEST" ]; then
+            DIGEST=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest --format '{{.Manifest.Digest}}' 2>/dev/null | head -1 || echo "")
+          fi
+          
+          # Default to unknown if we still don't have it
+          if [ -z "$DIGEST" ]; then
+            DIGEST="unknown"
+          fi
+          
+          echo "digest=${DIGEST}" >> $GITHUB_OUTPUT
+          echo "Found digest: ${DIGEST}"
 
       - name: Image scan with Trivy
         uses: aquasecurity/trivy-action@master
@@ -110,15 +127,19 @@ jobs:
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Digest:** \`${{ steps.digest.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.digest.outputs.digest }}" != "unknown" ]; then
+            echo "**Digest:** \`${{ steps.digest.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Pull Command" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Image Size" >> $GITHUB_STEP_SUMMARY
-          echo "Multi-platform image for linux/amd64 and linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Info" >> $GITHUB_STEP_SUMMARY
+          echo "- Multi-platform image: linux/amd64 and linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- Contains: Frontend, Backend, and Neo4j database" >> $GITHUB_STEP_SUMMARY
+          echo "- Flexible Neo4j: Supports internal or external (Aura)" >> $GITHUB_STEP_SUMMARY
 
       - name: (Optional) Trigger RunPod Redeploy
         if: ${{ success() && vars.RUNPOD_WEBHOOK_URL != '' }}

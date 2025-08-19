@@ -7,6 +7,7 @@ import type { Request, Response } from 'express';
 import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
 import { MissionService } from '../services/MissionService';
 import { WorkflowService } from '../services/WorkflowService';
+import { AgentService } from '../services/AgentService';
 import type {
   Mission,
   CreateMissionRequest,
@@ -547,11 +548,33 @@ router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> =
 
     const workflow = await WorkflowService.getWorkflowByMissionId(id);
 
+    // Extract agent IDs from workflow nodes and fetch agent details
+    const agents: Record<string, any> = {};
+    if (workflow && workflow.nodes) {
+      const agentIds = workflow.nodes
+        .filter(node => node.type === 'agent' && node.parameters?.agentId)
+        .map(node => node.parameters.agentId)
+        .filter((id, index, array) => array.indexOf(id) === index); // Remove duplicates
+
+      // Fetch agent details for all unique agent IDs
+      for (const agentId of agentIds) {
+        try {
+          const agent = await AgentService.getAgent(agentId);
+          if (agent) {
+            agents[agentId] = agent;
+          }
+        } catch (agentError) {
+          console.warn(`Failed to fetch agent ${agentId}:`, agentError);
+          // Continue processing other agents even if one fails
+        }
+      }
+    }
+
     // Return null workflow when not found instead of 404 error
     // This allows the UI to display "No workflow data available" gracefully
     res.json({ 
       success: true, 
-      data: { workflow } 
+      data: { workflow, agents } 
     });
 
   } catch (error) {

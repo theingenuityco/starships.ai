@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
-import { WorkflowVisualization, WorkflowTaskList } from '@/components/workflow';
+import { WorkflowVisualization } from '@/components/workflow';
 import type { Mission, WorkflowResponse, MissionWorkflow } from '@starships/protocol';
 
 interface WorkflowPhaseContentProps {
@@ -27,6 +27,7 @@ interface WorkflowPhaseContentProps {
 
 export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPhaseContentProps) {
   const [workflow, setWorkflow] = useState<MissionWorkflow | null>(null);
+  const [agents, setAgents] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
       }
       
       setWorkflow(response.data.workflow);
+      setAgents(response.data.agents || {});
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load workflow';
       setError(errorMessage);
@@ -239,12 +241,7 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
       {/* Workflow Visualization */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-gray-700 mb-2">Execution Flow</h3>
-        <WorkflowVisualization workflow={workflow} />
-      </div>
-
-      {/* Task List */}
-      <div className="mt-6">
-        <WorkflowTaskList workflow={workflow} />
+        <WorkflowVisualization workflow={workflow} agents={agents} />
       </div>
 
       

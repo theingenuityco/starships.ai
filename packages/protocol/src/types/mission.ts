@@ -5,6 +5,8 @@
  * Starting with just the essentials for a blank canvas approach.
  */
 
+import type { Agent } from '../index';
+
 // ============================================================================
 // CORE MISSION TYPES
 // ============================================================================
@@ -258,8 +260,9 @@ export interface UpdateWorkflowApprovalRequest {
 }
 
 /**
- * Response containing workflow data
+ * Response containing workflow data with associated agent details
  */
 export interface WorkflowResponse {
   workflow: MissionWorkflow;
+  agents: Record<string, Agent>; // agentId -> Agent details
 }

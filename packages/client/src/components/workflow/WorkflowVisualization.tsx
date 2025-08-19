@@ -26,10 +26,11 @@ import {
   Eye, 
   Clock 
 } from 'lucide-react';
-import type { MissionWorkflow, WorkflowDSLNode } from '@starships/protocol';
+import type { MissionWorkflow, WorkflowDSLNode, Agent } from '@starships/protocol';
 
 export interface WorkflowVisualizationProps {
   workflow: MissionWorkflow;
+  agents?: Record<string, Agent>;
   currentNodeId?: string;
   onNodeClick?: (nodeId: string) => void;
   className?: string;
@@ -39,6 +40,7 @@ interface FlowNode extends Node {
   data: {
     label: string;
     node: WorkflowDSLNode;
+    agent?: Agent;
     icon: React.ReactNode;
     isActive: boolean;
   };
@@ -69,7 +71,7 @@ const getNodeStyle = () => {
   return {
     padding: '0', // Remove default padding - we'll handle it in classes
     margin: '0',
-    minWidth: '200px',
+    minWidth: '280px', // Increased from 200px for better agent info display
     fontSize: '14px',
     fontWeight: '400',
     transition: 'all 0.2s ease',
@@ -153,6 +155,23 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
           </div>
         )}
         
+        {/* Agent details for agent nodes */}
+        {data.node.type === 'agent' && data.agent && (
+          <div className="flex flex-col gap-1 text-left border-t border-current/10 pt-2 mt-1">
+            <div className="flex items-center gap-1 text-xs">
+              <User className="w-3 h-3 text-purple-500" />
+              <span className="font-medium text-purple-600 dark:text-purple-400">
+                {data.agent.name}
+              </span>
+            </div>
+            {data.agent.category && (
+              <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 text-xs rounded w-fit">
+                {data.agent.category}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Simple metadata - left aligned */}
         <div className="flex flex-col gap-1 text-left">
           <span className="px-2 py-1 bg-current/5 rounded text-xs inline-block w-fit">
@@ -187,8 +206,21 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
 const calculateVerticalPositions = (nodes: any[]) => {
   return nodes.map((_node, index) => ({
     x: 400, // Center horizontally
-    y: 50 + (index * 250) // Increased vertical spacing
+    y: 50 + (index * 320) // Increased from 250px to 320px for more space
   }));
+};
+
+// Calculate canvas height based on workflow size
+const calculateCanvasHeight = (nodeCount: number) => {
+  const baseHeight = 100; // Top padding
+  const nodeHeight = 160; // Estimated height per node including content
+  const nodeSpacing = 320; // Vertical spacing between nodes
+  const bottomPadding = 100; // Bottom padding
+  
+  const totalHeight = baseHeight + (nodeCount * nodeSpacing) + bottomPadding;
+  
+  // Minimum height to ensure good UX, maximum to prevent excessive height
+  return Math.max(400, Math.min(totalHeight, 1200));
 };
 
 // Traverse workflow graph starting from start node to determine execution order
@@ -245,7 +277,7 @@ const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: 
 };
 
 // Convert workflow to React Flow format
-const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) => {
+const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string, agents?: Record<string, Agent>) => {
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
 
@@ -260,6 +292,11 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
     const isActive = node.id === currentNodeId;
     const position = positions[index] || { x: 200, y: index * 200 };
     
+    // Get agent data if this is an agent node
+    const agent = node.type === 'agent' && node.parameters?.agentId 
+      ? agents?.[node.parameters.agentId] 
+      : undefined;
+    
     nodes.push({
       id: node.id,
       type: 'default',
@@ -267,6 +304,7 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
       data: {
         label: node.name,
         node,
+        agent,
         icon: getNodeIcon(node.type),
         isActive,
       },
@@ -322,13 +360,18 @@ const nodeTypes = {
   default: CustomNode,
 };
 
-function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualizationProps) {
+function FlowContent({ workflow, agents, currentNodeId, onNodeClick }: WorkflowVisualizationProps) {
   const { fitView } = useReactFlow();
   
   const { nodes: computedNodes, edges: computedEdges } = useMemo(
-    () => convertToFlowData(workflow, currentNodeId),
-    [workflow, currentNodeId]
+    () => convertToFlowData(workflow, currentNodeId, agents),
+    [workflow, currentNodeId, agents]
   );
+
+  // Calculate dynamic height based on number of nodes
+  const canvasHeight = useMemo(() => {
+    return calculateCanvasHeight(computedNodes.length);
+  }, [computedNodes.length]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(computedEdges);
@@ -362,7 +405,7 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
   );
 
   return (
-    <div className="h-[600px] w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900" style={{ pointerEvents: 'none' }}>
+    <div className="w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900" style={{ pointerEvents: 'none', height: `${canvasHeight}px` }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -404,6 +447,7 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
  */
 export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({
   workflow,
+  agents,
   currentNodeId,
   onNodeClick,
   className = ''
@@ -421,6 +465,7 @@ export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({
       <div className={className}>
         <FlowContent 
           workflow={workflow} 
+          agents={agents}
           currentNodeId={currentNodeId} 
           onNodeClick={onNodeClick} 
         />

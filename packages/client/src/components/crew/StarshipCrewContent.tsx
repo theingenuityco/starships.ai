@@ -13,6 +13,7 @@ import {
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
 import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
+import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { CrewConsoleFloatingMessage } from '@/components/sibil/CrewConsoleFloatingMessage'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
+  const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { starships } = useStarshipStore()
 
@@ -68,6 +70,9 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // State for info button animation
   const [animateInfoButton, setAnimateInfoButton] = useState(false)
+  
+  // State for tools count
+  const [configuredToolsCount, setConfiguredToolsCount] = useState(0)
 
   // Handle dismissing the floating message
   const handleDismissMessage = () => {
@@ -80,6 +85,10 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // Handle tab change
   const handleTabChange = (value: string) => {
+    // Skip connectors tab since it's hidden
+    if (value === 'connectors') {
+      return;
+    }
     setCurrentTab(value)
   }
 
@@ -314,8 +323,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     <div className="flex items-center gap-2">
                       <Bot className="h-3.5 w-3.5 text-primary" />
                       <div>
-                        <p className="text-[10px] text-muted-foreground">Active Agents</p>
-                        <p className="text-sm font-bold">{selectedAgent ? 1 : 0}</p>
+                        <p className="text-[10px] text-muted-foreground">Agents</p>
+                        <p className="text-sm font-bold">{agentsCount}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -327,6 +336,17 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                       <div>
                         <p className="text-[10px] text-muted-foreground">Connectors</p>
                         <p className="text-sm font-bold">{connectorInstances.length}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                  <CardContent className="p-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Tools</p>
+                        <p className="text-sm font-bold">{configuredToolsCount}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -379,14 +399,21 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Bot className="h-4 w-4" />
-                  AI Agents
+                  Agents
                 </TabsTrigger>
-                <TabsTrigger 
+                {/* <TabsTrigger 
                   value="connectors" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Plug className="h-4 w-4" />
                   Connectors
+                </TabsTrigger> */}
+                <TabsTrigger 
+                  value="api-keys" 
+                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
+                >
+                  <Zap className="h-4 w-4" />
+                  Tools
                 </TabsTrigger>
               </TabsList>
 
@@ -418,17 +445,18 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                         showCreateButton={true}
                         showFilters={true}
                         starshipId={starship?.id}
+                        onAgentsCountChange={setAgentsCount}
                       />
                     )}
                   </div>
                 {/* </AnimatePresence> */}
               </TabsContent>
 
-              <TabsContent
+              {/* <TabsContent
                 value="connectors"
                 className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
               >
-                {/* <AnimatePresence mode="wait"> */}
+                <AnimatePresence mode="wait">
                   <div
                     key="connectors-content"
                     className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-4 min-h-0 custom-scrollbar"
@@ -452,7 +480,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                       </div>
                     )}
 
-                    {/* Enhanced Status Dashboard */}
                     {connectorInstances.length > 0 && (
                       <div
                         className="mt-3"
@@ -466,7 +493,31 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     )}
 
                   </div>
-                {/* </AnimatePresence> */}
+                </AnimatePresence>
+              </TabsContent> */}
+
+              <TabsContent
+                value="api-keys"
+                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
+              >
+                <div
+                  key="api-keys-content"
+                  className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar"
+                >
+                  {starship?.id ? (
+                    <NativeToolApiKeys 
+                      starshipId={starship.id} 
+                      onConfiguredCountChange={setConfiguredToolsCount}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-sm text-muted-foreground">Loading starship data...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>

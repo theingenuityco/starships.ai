@@ -31,6 +31,9 @@ export { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository
 // Export mission clarity repository
 export { MissionClarityRepository } from './MissionClarityRepository';
 
+// Export native tool API key repository
+export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -50,6 +53,9 @@ import { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository
 
 // Import mission clarity repository
 import { MissionClarityRepository } from './MissionClarityRepository';
+
+// Import native tool API key repository
+import { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -88,6 +94,9 @@ export class RepositoryFactory {
 
   // Mission clarity repository instance
   private static missionClarityRepo: MissionClarityRepository | null = null;
+
+  // Native tool API key repository instance
+  private static nativeToolApiKeyRepo: NativeToolApiKeyRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -158,6 +167,9 @@ export class RepositoryFactory {
       // Initialize mission clarity repository (no dependencies)
       this.missionClarityRepo = new MissionClarityRepository();
 
+      // Initialize native tool API key repository (no dependencies)
+      this.nativeToolApiKeyRepo = new NativeToolApiKeyRepository();
+
       // Initialize repositories with dependencies
       this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
       this.starshipRepo = new StarshipRepository();
@@ -223,6 +235,7 @@ export class RepositoryFactory {
         workflowRepo: this.workflowRepo !== null,
         workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
+        nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
       }
     };
   }
@@ -429,6 +442,17 @@ export class RepositoryFactory {
     return this.missionClarityRepo;
   }
 
+  /**
+   * Get NativeToolApiKeyRepository instance (synchronous)
+   */
+  static getNativeToolApiKeyRepository(): NativeToolApiKeyRepository {
+    this.ensureInitialized();
+    if (!this.nativeToolApiKeyRepo) {
+      throw new Error('NativeToolApiKeyRepository not initialized');
+    }
+    return this.nativeToolApiKeyRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -457,6 +481,7 @@ export class RepositoryFactory {
     this.workflowRepo = null;
     this.workflowRuntimeStateRepo = null;
     this.missionClarityRepo = null;
+    this.nativeToolApiKeyRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

@@ -13,7 +13,8 @@
     "NEO4J_USERNAME",
     "NEO4J_PASSWORD",
     "STRIPE_SECRET_KEY",
-    "STRIPE_PUBLISHABLE_KEY"
+    "STRIPE_PUBLISHABLE_KEY",
+    "SKIP_K8S_CHECK"
   ],
   "tasks": {
     "build": {

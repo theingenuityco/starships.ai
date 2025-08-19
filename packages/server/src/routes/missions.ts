@@ -6,6 +6,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
 import { MissionService } from '../services/MissionService';
+import { WorkflowService } from '../services/WorkflowService';
+import { AgentService } from '../services/AgentService';
 import type {
   Mission,
   CreateMissionRequest,
@@ -523,6 +525,217 @@ router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> =>
         success: false, 
         error: error.message,
         code: 'MISSION_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /missions/:id/workflow
+ * Get mission workflow details
+ */
+router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    validateUUID(id, 'id');
+
+    const workflow = await WorkflowService.getWorkflowByMissionId(id);
+
+    // Extract agent IDs from workflow nodes and fetch agent details
+    const agents: Record<string, any> = {};
+    if (workflow && workflow.nodes) {
+      const agentIds = workflow.nodes
+        .filter(node => node.type === 'agent' && node.parameters?.agentId)
+        .map(node => node.parameters.agentId)
+        .filter((id, index, array) => array.indexOf(id) === index); // Remove duplicates
+
+      // Fetch agent details for all unique agent IDs
+      for (const agentId of agentIds) {
+        try {
+          const agent = await AgentService.getAgent(agentId);
+          if (agent) {
+            agents[agentId] = agent;
+          }
+        } catch (agentError) {
+          console.warn(`Failed to fetch agent ${agentId}:`, agentError);
+          // Continue processing other agents even if one fails
+        }
+      }
+    }
+
+    // Return null workflow when not found instead of 404 error
+    // This allows the UI to display "No workflow data available" gracefully
+    res.json({ 
+      success: true, 
+      data: { workflow, agents } 
+    });
+
+  } catch (error) {
+    console.error('Error fetching mission workflow:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'WORKFLOW_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * PUT /missions/:id/workflow/approval
+ * Approve or reject mission workflow - triggers state transition via orchestrator
+ */
+router.put('/:id/workflow/approval', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { approvalStatus, rejectionReason } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+    
+    validateUUID(id, 'id');
+    
+    if (approvalStatus !== 'approved' && approvalStatus !== 'rejected') {
+      res.status(400).json({
+        success: false,
+        error: 'approvalStatus must be either "approved" or "rejected"',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    // Update workflow approval using service
+    await WorkflowService.updateWorkflowApproval(id, { approvalStatus, rejectionReason });
+
+    // Let orchestrator handle state transition (not manual database update)
+    const orchestrator = MissionOrchestratorService.getInstance();
+    const message = approvalStatus === 'approved'
+      ? 'I approve this execution workflow. Please proceed.'
+      : `I need changes to this workflow. ${rejectionReason || 'Please revise and present an updated version.'}`;
+    
+    // This will trigger the workflow state transition
+    await orchestrator.handleUserMessage(id, userId, message);
+
+    res.json({ 
+      success: true,
+      data: {
+        approvalStatus,
+        message: approvalStatus === 'approved'
+          ? 'Workflow approved, transitioning to execution phase' 
+          : 'Workflow rejected, generating revised workflow'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error approving mission workflow:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'WORKFLOW_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * POST /missions/:id/regenerate-workflow
+ * Regenerate mission workflow - uses orchestrator for state management
+ */
+router.post('/:id/regenerate-workflow', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+
+    validateUUID(id, 'id');
+
+    // Delete existing workflow
+    await WorkflowService.deleteWorkflow(id);
+
+    // Let orchestrator handle regeneration (not manual phase update)
+    const orchestrator = MissionOrchestratorService.getInstance();
+    await orchestrator.handleUserMessage(id, userId, 'Please generate a new execution workflow for this mission.');
+
+    res.json({ 
+      success: true,
+      data: { message: 'Workflow regeneration initiated' }
+    });
+
+  } catch (error) {
+    console.error('Error regenerating mission workflow:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({ 
+        success: false, 
+        error: error.message,
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message,
+        code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }

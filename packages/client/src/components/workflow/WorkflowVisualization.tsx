@@ -14,6 +14,8 @@ import {
   ReactFlowProvider,
   MarkerType,
   Position,
+  Handle,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { 
@@ -157,34 +159,117 @@ const getNodeStyle = (nodeType: string, isActive: boolean) => {
   };
 };
 
-// Custom node component
+// Custom node component with proper handles
 const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
+  const { node } = data;
+  
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        {data.icon}
-        <span className="font-semibold">{data.node.name}</span>
-      </div>
-      
-      {data.node.description && (
-        <div className="text-xs opacity-75 line-clamp-2">
-          {data.node.description}
-        </div>
+    <>
+      {/* Input handle - all nodes except start can receive connections */}
+      {node.type !== 'start' && (
+        <Handle
+          type="target"
+          position={Position.Top}
+          style={{ background: '#555' }}
+        />
       )}
       
-      <div className="flex items-center justify-between text-xs">
-        <span className="px-2 py-1 bg-black/10 rounded-full">
-          {data.node.type}
-        </span>
-        {data.node.estimatedTime && (
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span>{data.node.estimatedTime}min</span>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          {data.icon}
+          <span className="font-semibold">{data.node.name}</span>
+        </div>
+        
+        {data.node.description && (
+          <div className="text-xs opacity-75 line-clamp-2">
+            {data.node.description}
           </div>
         )}
+        
+        <div className="flex items-center justify-between text-xs">
+          <span className="px-2 py-1 bg-black/10 rounded-full">
+            {data.node.type}
+          </span>
+          {data.node.estimatedTime && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>{data.node.estimatedTime}min</span>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Output handle - all nodes except end can send connections */}
+      {node.type !== 'end' && (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          style={{ background: '#555' }}
+        />
+      )}
+    </>
   );
+};
+
+// Simple vertical layout following execution order
+const calculateVerticalPositions = (nodes: any[]) => {
+  return nodes.map((_node, index) => ({
+    x: 400, // Center horizontally
+    y: 50 + (index * 250) // Increased vertical spacing
+  }));
+};
+
+// Traverse workflow graph starting from start node to determine execution order
+const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: Array<{from: string, to: string}>) => {
+  // Find start node
+  const startNode = workflowNodes.find(node => node.type === 'start');
+  if (!startNode) {
+    console.warn('No start node found, falling back to original order');
+    return workflowNodes;
+  }
+
+  // Build adjacency map for traversal
+  const adjacencyMap = new Map<string, string[]>();
+  workflowEdges.forEach(edge => {
+    if (!adjacencyMap.has(edge.from)) {
+      adjacencyMap.set(edge.from, []);
+    }
+    adjacencyMap.get(edge.from)!.push(edge.to);
+  });
+
+  // Traverse graph using BFS to maintain proper execution order
+  const visited = new Set<string>();
+  const orderedNodes: WorkflowDSLNode[] = [];
+  const queue = [startNode.id];
+  visited.add(startNode.id);
+
+  while (queue.length > 0) {
+    const currentNodeId = queue.shift()!;
+    const currentNode = workflowNodes.find(n => n.id === currentNodeId);
+    
+    if (currentNode) {
+      orderedNodes.push(currentNode);
+      
+      // Add connected nodes to queue
+      const connectedNodes = adjacencyMap.get(currentNodeId) || [];
+      connectedNodes.forEach(nodeId => {
+        if (!visited.has(nodeId)) {
+          visited.add(nodeId);
+          queue.push(nodeId);
+        }
+      });
+    }
+  }
+
+  // Add any unvisited nodes (shouldn't happen in well-formed workflows)
+  workflowNodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      console.warn(`Orphaned node found: ${node.id}`);
+      orderedNodes.push(node);
+    }
+  });
+
+  return orderedNodes;
 };
 
 // Convert workflow to React Flow format
@@ -192,18 +277,21 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
 
-  // Create nodes
-  workflow.nodes.forEach((node, index) => {
+  // Get nodes in proper execution order using graph traversal
+  const orderedNodes = traverseWorkflowGraph(workflow.nodes, workflow.edges);
+
+  // Calculate vertical positions following execution order
+  const positions = calculateVerticalPositions(orderedNodes);
+
+  // Create nodes with calculated positions
+  orderedNodes.forEach((node, index) => {
     const isActive = node.id === currentNodeId;
-    
-    // Calculate position - use a simple grid layout
-    const x = (index % 3) * 280; // 3 columns with wider spacing
-    const y = Math.floor(index / 3) * 150; // Row height
+    const position = positions[index] || { x: 200, y: index * 200 };
     
     nodes.push({
       id: node.id,
       type: 'default',
-      position: { x, y },
+      position: { x: position.x, y: position.y },
       data: {
         label: node.name,
         node,
@@ -211,13 +299,26 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
         isActive,
       },
       style: getNodeStyle(node.type, isActive),
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
     });
   });
 
-  // Create edges
+  // Create node ID set for validation
+  const nodeIds = new Set(nodes.map(n => n.id));
+  
+  // Create edges with validation
   workflow.edges.forEach((edge) => {
+    // Validate edge references
+    if (!nodeIds.has(edge.from)) {
+      console.warn(`Edge references invalid source node: ${edge.from}`);
+      return;
+    }
+    if (!nodeIds.has(edge.to)) {
+      console.warn(`Edge references invalid target node: ${edge.to}`);
+      return;
+    }
+
     edges.push({
       id: edge.id,
       source: edge.from,
@@ -225,15 +326,21 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
       type: 'smoothstep',
       animated: true,
       style: { 
-        stroke: '#3b82f6', 
-        strokeWidth: 2 
+        stroke: '#0f172a', 
+        strokeWidth: 3 
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: '#3b82f6',
+        color: '#0f172a',
+        width: 20,
+        height: 20,
       },
     });
   });
+
+  console.log(`[Workflow Visualization] Converted ${nodes.length} nodes, ${edges.length} edges`);
+  console.log(`[Workflow Visualization] Node IDs:`, nodes.map(n => n.id));
+  console.log(`[Workflow Visualization] Edges:`, edges.map(e => `${e.source} → ${e.target}`));
 
   return { nodes, edges };
 };
@@ -244,13 +351,29 @@ const nodeTypes = {
 };
 
 function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualizationProps) {
-  const { nodes: initialNodes, edges: initialEdges } = useMemo(
+  const { fitView } = useReactFlow();
+  
+  const { nodes: computedNodes, edges: computedEdges } = useMemo(
     () => convertToFlowData(workflow, currentNodeId),
     [workflow, currentNodeId]
   );
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(computedEdges);
+
+  // Update nodes and fit view when workflow changes
+  React.useEffect(() => {
+    setNodes(computedNodes);
+    // Fit view with a small delay to ensure nodes are positioned
+    setTimeout(() => {
+      fitView({ padding: 0.2, duration: 300 });
+    }, 50);
+  }, [computedNodes, setNodes, fitView]);
+
+  // Update edges separately when they change
+  React.useEffect(() => {
+    setEdges(computedEdges);
+  }, [computedEdges, setEdges]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -267,7 +390,7 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
   );
 
   return (
-    <div className="h-[500px] w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+    <div className="h-[600px] w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
       <ReactFlow
         nodes={nodes}
         edges={edges}

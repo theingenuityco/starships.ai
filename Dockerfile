@@ -10,15 +10,30 @@ WORKDIR /app
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
     openjdk11-jre-headless \
-    supervisor
+    supervisor \
+    ca-certificates
 
 # Download and install Neo4j Community Edition
 ENV NEO4J_VERSION=5.13.0
 ENV NEO4J_HOME=/opt/neo4j
-RUN wget -q https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz && \
-    tar -xzf neo4j-community-${NEO4J_VERSION}-unix.tar.gz && \
+
+# Download Neo4j with multiple fallback URLs and proper error handling
+RUN set -eux && \
+    echo "Downloading Neo4j ${NEO4J_VERSION}..." && \
+    (wget --progress=dot:giga --timeout=300 --tries=3 \
+        -O neo4j.tar.gz \
+        "https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz" || \
+    wget --progress=dot:giga --timeout=300 --tries=3 \
+        -O neo4j.tar.gz \
+        "https://neo4j.com/artifact.php?name=neo4j-community-${NEO4J_VERSION}-unix.tar.gz" || \
+    curl -L --progress-bar --retry 3 --retry-delay 5 \
+        -o neo4j.tar.gz \
+        "https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz") && \
+    echo "Download complete. Extracting Neo4j..." && \
+    tar -xzf neo4j.tar.gz && \
     mv neo4j-community-${NEO4J_VERSION} ${NEO4J_HOME} && \
-    rm neo4j-community-${NEO4J_VERSION}-unix.tar.gz
+    rm neo4j.tar.gz && \
+    echo "Neo4j ${NEO4J_VERSION} installed successfully at ${NEO4J_HOME}"
 
 # Configure Neo4j
 RUN echo "server.default_listen_address=0.0.0.0" >> ${NEO4J_HOME}/conf/neo4j.conf && \
@@ -28,7 +43,9 @@ RUN echo "server.default_listen_address=0.0.0.0" >> ${NEO4J_HOME}/conf/neo4j.con
     echo "dbms.security.auth_enabled=false" >> ${NEO4J_HOME}/conf/neo4j.conf && \
     echo "dbms.memory.heap.initial_size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf && \
     echo "dbms.memory.heap.max_size=1G" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.memory.pagecache.size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf
+    echo "dbms.memory.pagecache.size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.connector.bolt.enabled=true" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.connector.http.enabled=true" >> ${NEO4J_HOME}/conf/neo4j.conf
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate

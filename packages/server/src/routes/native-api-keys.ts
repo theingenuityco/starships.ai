@@ -80,10 +80,10 @@ router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req
     const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
     await apiKeyRepo.saveApiKey(starshipId, toolName, apiKey);
     
-    // Save additional config if provided (e.g., default repo for GitHub)
-    if (config && Object.keys(config).length > 0) {
-      await apiKeyRepo.saveToolConfig(starshipId, toolName, config);
-    }
+    // Save additional config if provided - commented out since GitHub was removed
+    // if (config && Object.keys(config).length > 0) {
+    //   await apiKeyRepo.saveToolConfig(starshipId, toolName, config);
+    // }
 
     res.json({ success: true });
   } catch (error) {

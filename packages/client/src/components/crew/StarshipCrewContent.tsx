@@ -85,6 +85,10 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // Handle tab change
   const handleTabChange = (value: string) => {
+    // Skip connectors tab since it's hidden
+    if (value === 'connectors') {
+      return;
+    }
     setCurrentTab(value)
   }
 
@@ -389,7 +393,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         >
           <div className="p-6 pb-0 flex flex-col h-full min-h-0">
             <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full">
-              <TabsList className="grid w-full grid-cols-3 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
+              <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
                 <TabsTrigger 
                   value="agents" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
@@ -397,13 +401,13 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   <Bot className="h-4 w-4" />
                   Agents
                 </TabsTrigger>
-                <TabsTrigger 
+                {/* <TabsTrigger 
                   value="connectors" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Plug className="h-4 w-4" />
                   Connectors
-                </TabsTrigger>
+                </TabsTrigger> */}
                 <TabsTrigger 
                   value="api-keys" 
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
@@ -448,11 +452,11 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 {/* </AnimatePresence> */}
               </TabsContent>
 
-              <TabsContent
+              {/* <TabsContent
                 value="connectors"
                 className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
               >
-                {/* <AnimatePresence mode="wait"> */}
+                <AnimatePresence mode="wait">
                   <div
                     key="connectors-content"
                     className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 space-y-4 min-h-0 custom-scrollbar"
@@ -476,7 +480,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                       </div>
                     )}
 
-                    {/* Enhanced Status Dashboard */}
                     {connectorInstances.length > 0 && (
                       <div
                         className="mt-3"
@@ -490,8 +493,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                     )}
 
                   </div>
-                {/* </AnimatePresence> */}
-              </TabsContent>
+                </AnimatePresence>
+              </TabsContent> */}
 
               <TabsContent
                 value="api-keys"

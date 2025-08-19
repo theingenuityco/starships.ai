@@ -5,7 +5,6 @@ import {
   ReactFlow,
   Node,
   Edge,
-  Controls,
   Background,
   useNodesState,
   useEdgesState,
@@ -363,7 +362,7 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
   );
 
   return (
-    <div className="h-[600px] w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+    <div className="h-[600px] w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900" style={{ pointerEvents: 'none' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -380,18 +379,15 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
         }}
         nodesDraggable={false}
         nodesConnectable={false}
-        elementsSelectable={true}
-        zoomOnScroll={true}
-        zoomOnPinch={true}
-        panOnScroll={true}
-        panOnDrag={true}
+        elementsSelectable={false}
+        zoomOnScroll={false}
+        zoomOnPinch={false}
+        panOnScroll={false}
+        panOnDrag={false}
+        zoomOnDoubleClick={false}
+        preventScrolling={true}
+        proOptions={{ hideAttribution: true }}
       >
-        <Controls 
-          showZoom={true}
-          showFitView={true}
-          showInteractive={false}
-          position="bottom-right"
-        />
         <Background 
           color="#e5e7eb" 
           gap={20} 

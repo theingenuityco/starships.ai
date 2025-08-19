@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
-import { WorkflowVisualization } from '@/components/workflow';
+import { WorkflowVisualization, WorkflowTaskList } from '@/components/workflow';
 import type { Mission, WorkflowResponse, MissionWorkflow } from '@starships/protocol';
 
 interface WorkflowPhaseContentProps {
@@ -204,11 +204,34 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
     >
       {/* Workflow Summary */}
       {workflow && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>{summary.totalTasks} tasks</span>
-            <span>{summary.uniqueAgents} agents</span>
-            <span>Status: {workflow.approvalStatus}</span>
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {summary.totalTasks} tasks
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {summary.uniqueAgents} agents
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              workflow.approvalStatus === 'approved' ? 'bg-green-500' :
+              workflow.approvalStatus === 'rejected' ? 'bg-red-500' :
+              'bg-yellow-500'
+            }`}></div>
+            <span className={`text-sm font-medium capitalize ${
+              workflow.approvalStatus === 'approved' ? 'text-green-600 dark:text-green-400' :
+              workflow.approvalStatus === 'rejected' ? 'text-red-600 dark:text-red-400' :
+              'text-yellow-600 dark:text-yellow-400'
+            }`}>
+              {workflow.approvalStatus}
+            </span>
           </div>
         </div>
       )}
@@ -217,6 +240,11 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-gray-700 mb-2">Execution Flow</h3>
         <WorkflowVisualization workflow={workflow} />
+      </div>
+
+      {/* Task List */}
+      <div className="mt-6">
+        <WorkflowTaskList workflow={workflow} />
       </div>
 
       

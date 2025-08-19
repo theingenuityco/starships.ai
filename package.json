@@ -11,7 +11,7 @@
     "setup:docker": "node scripts/setup-docker-path.js",
     "setup:verify": "node scripts/verify-build-setup.js",
     "postinstall": "node scripts/setup-docker-path.js",
-    "dev": "turbo run dev",
+    "dev": "SKIP_K8S_CHECK=true turbo run dev",
     "lint": "turbo run lint",
     "prebuild": "node scripts/check-k8s-requirements.js",
     "build": "turbo run build",

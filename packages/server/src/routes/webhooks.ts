@@ -76,6 +76,10 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
           throw new Error('Invalid checkout session: missing starshipId');
         }
         
+        // Get previous status for logging
+        const starship = await starshipRepository.findById(starshipId);
+        const previousStatus = starship?.status || 'unknown';
+        
         // Update existing Starship with subscription details
         await starshipRepository.update(starshipId, {
           stripeCustomerId: session.customer as string,
@@ -83,7 +87,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
           status: 'active'
         });
         
-        console.log(`✅ [WEBHOOK] Activated starship: ${starshipId}`);
+        console.log(`✅ [WEBHOOK] Activated starship: ${starshipId} (${previousStatus} → active)`);
         processed = true;
         break;
       }
@@ -106,11 +110,17 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
         const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
         
         if (starship) {
+          const wasRestricted = starship.status === 'restricted';
           // Reactivate access after successful payment
           await starshipRepository.updateSubscription(starship.id, { 
             status: 'active' 
           });
-          console.log(`✅ [WEBHOOK] Payment recovered for starship: ${starship.name}`);
+          
+          if (wasRestricted) {
+            console.log(`✅ [WEBHOOK] Payment RECOVERED for starship: ${starship.name} (restricted → active)`);
+          } else {
+            console.log(`✅ [WEBHOOK] Payment successful for starship: ${starship.name} (${starship.status} → active)`);
+          }
           processed = true;
         } else {
           console.warn(`[WEBHOOK] No starship found for subscription: ${subscriptionId}`);
@@ -146,7 +156,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
             ? new Date(failedInvoice.next_payment_attempt * 1000).toISOString()
             : 'No retry scheduled';
             
-          console.log(`⚠️ [WEBHOOK] Payment failed for starship: ${starship.name}`);
+          console.log(`⚠️ [WEBHOOK] Payment failed for starship: ${starship.name} (${starship.status} → restricted)`);
           console.log(`   Attempt: ${attemptCount}, Next retry: ${nextAttempt}`);
           processed = true;
         } else {
@@ -165,7 +175,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
             status: 'disabled'
             // Note: subscriptionId not cleared here due to type constraints
           });
-          console.log(`✅ [WEBHOOK] Disabled starship: ${starship.name}`);
+          console.log(`❌ [WEBHOOK] Subscription cancelled for ${starship.name} (${starship.status} → disabled)`);
           processed = true;
         } else {
           console.warn(`[WEBHOOK] No starship found for deleted subscription: ${deletedSub.id}`);

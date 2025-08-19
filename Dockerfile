@@ -1,38 +1,86 @@
-# ---- Base Stage ----
-FROM node:20-alpine AS base
+# ==========================================
+# Starships.ai - All-in-One Fat Container
+# Contains: Frontend + Backend + Neo4j Database
+# ==========================================
+
+FROM node:20-alpine
 WORKDIR /app
 
-# Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install system dependencies including Java for Neo4j
+RUN apk add --no-cache \
+    python3 make g++ git bash wget curl netcat-openbsd \
+    openjdk11-jre-headless \
+    supervisor \
+    ca-certificates
 
-# Copy project files into the container
-COPY . .
+# Download and install Neo4j Community Edition
+ENV NEO4J_VERSION=5.13.0
+ENV NEO4J_HOME=/opt/neo4j
 
-# Install dependencies with a frozen lockfile
-RUN pnpm install --frozen-lockfile
+# Download Neo4j with multiple fallback URLs and proper error handling
+RUN set -eux && \
+    echo "Downloading Neo4j ${NEO4J_VERSION}..." && \
+    (wget --progress=dot:giga --timeout=300 --tries=3 \
+        -O neo4j.tar.gz \
+        "https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz" || \
+    wget --progress=dot:giga --timeout=300 --tries=3 \
+        -O neo4j.tar.gz \
+        "https://neo4j.com/artifact.php?name=neo4j-community-${NEO4J_VERSION}-unix.tar.gz" || \
+    curl -L --progress-bar --retry 3 --retry-delay 5 \
+        -o neo4j.tar.gz \
+        "https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz") && \
+    echo "Download complete. Extracting Neo4j..." && \
+    tar -xzf neo4j.tar.gz && \
+    mv neo4j-community-${NEO4J_VERSION} ${NEO4J_HOME} && \
+    rm neo4j.tar.gz && \
+    echo "Neo4j ${NEO4J_VERSION} installed successfully at ${NEO4J_HOME}"
 
-# Build only the server package using turborepo
-RUN pnpm turbo run build --filter=server...
+# Configure Neo4j
+RUN echo "server.default_listen_address=0.0.0.0" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "server.bolt.listen_address=:7687" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "server.http.listen_address=:7474" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "server.https.listen_address=:7473" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.security.auth_enabled=false" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.memory.heap.initial_size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.memory.heap.max_size=1G" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.memory.pagecache.size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.connector.bolt.enabled=true" >> ${NEO4J_HOME}/conf/neo4j.conf && \
+    echo "dbms.connector.http.enabled=true" >> ${NEO4J_HOME}/conf/neo4j.conf
 
-# ---- Runtime Stage ----
-FROM node:20-alpine AS runtime
-WORKDIR /app
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
 
-# Enable pnpm via corepack
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Install concurrently globally
+RUN npm install -g concurrently
 
-# Copy built server artifacts and dependencies
-COPY --from=base /app/packages/server/dist ./dist
-COPY --from=base /app/packages/server/package.json ./package.json
+# Create user for running services
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
-# Copy bridge-core package needed at runtime
-COPY --from=base /app/packages/bridge-core ./packages/bridge-core
+# Copy application files
+COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
+COPY --chown=nodejs:nodejs . .
+RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
-# Copy node_modules from the build stage
-COPY --from=base /app/node_modules ./node_modules
+# Create necessary directories
+RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \
+    mkdir -p /var/lib/neo4j/data /var/lib/neo4j/logs && \
+    chown -R nodejs:nodejs data && \
+    chown -R nodejs:nodejs /var/lib/neo4j && \
+    chown -R nodejs:nodejs ${NEO4J_HOME}
 
-# Expose the application port
-EXPOSE 4000
+# Supervisor config will be created dynamically by supervisor-entrypoint.sh
+# based on whether NEO4J_EXTERNAL_URI is set
 
-# Start the application
-CMD ["node", "dist/index.js"] 
+# Expose all ports
+EXPOSE 3000 4000 7474 7687
+
+# Health check for all services
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000 && \
+      wget --no-verbose --tries=1 --spider http://localhost:4000/health && \
+      wget --no-verbose --tries=1 --spider http://localhost:7474
+
+# Start supervisor to manage all services
+CMD ["/app/supervisor-entrypoint.sh"]

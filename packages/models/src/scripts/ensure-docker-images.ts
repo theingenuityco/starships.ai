@@ -21,6 +21,12 @@ function dockerImageExists(imageName: string): boolean {
  * Builds the MCP HTTP Bridge Docker image if it doesn't exist
  */
 export async function ensureDockerImages() {
+  // Skip Docker checks in dev mode
+  if (process.env.SKIP_K8S_CHECK === 'true') {
+    console.log('⚡ Skipping Docker image checks (SKIP_K8S_CHECK=true)');
+    return;
+  }
+  
   console.log('🐳 Checking required Docker images...');
 
   const requiredImages = [

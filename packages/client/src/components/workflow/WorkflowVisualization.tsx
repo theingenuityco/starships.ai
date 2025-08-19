@@ -65,103 +65,58 @@ const getNodeIcon = (nodeType: string) => {
   }
 };
 
-// Get node colors and styling
-const getNodeStyle = (nodeType: string, isActive: boolean) => {
-  const baseStyles = {
-    start: { 
-      background: '#dcfce7', 
-      border: '2px solid #16a34a', 
-      color: '#14532d' 
-    },
-    end: { 
-      background: '#dbeafe', 
-      border: '2px solid #2563eb', 
-      color: '#1e3a8a' 
-    },
-    agent: { 
-      background: '#f3e8ff', 
-      border: '2px solid #9333ea', 
-      color: '#581c87' 
-    },
-    user_prompt: { 
-      background: '#fef3c7', 
-      border: '2px solid #d97706', 
-      color: '#92400e' 
-    },
-    conditional: { 
-      background: '#fed7aa', 
-      border: '2px solid #ea580c', 
-      color: '#9a3412' 
-    },
-    output: { 
-      background: '#e0e7ff', 
-      border: '2px solid #4f46e5', 
-      color: '#3730a3' 
-    },
-    default: { 
-      background: '#f3f4f6', 
-      border: '2px solid #6b7280', 
-      color: '#374151' 
-    }
-  };
-
-  const activeStyles = {
-    start: { 
-      background: '#bbf7d0', 
-      border: '3px solid #16a34a', 
-      boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.2)' 
-    },
-    end: { 
-      background: '#bfdbfe', 
-      border: '3px solid #2563eb', 
-      boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.2)' 
-    },
-    agent: { 
-      background: '#e9d5ff', 
-      border: '3px solid #9333ea', 
-      boxShadow: '0 0 0 3px rgba(147, 51, 234, 0.2)' 
-    },
-    user_prompt: { 
-      background: '#fde68a', 
-      border: '3px solid #d97706', 
-      boxShadow: '0 0 0 3px rgba(217, 119, 6, 0.2)' 
-    },
-    conditional: { 
-      background: '#fdba74', 
-      border: '3px solid #ea580c', 
-      boxShadow: '0 0 0 3px rgba(234, 88, 12, 0.2)' 
-    },
-    output: { 
-      background: '#c7d2fe', 
-      border: '3px solid #4f46e5', 
-      boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.2)' 
-    },
-    default: { 
-      background: '#e5e7eb', 
-      border: '3px solid #6b7280', 
-      boxShadow: '0 0 0 3px rgba(107, 114, 128, 0.2)' 
-    }
-  };
-
-  const baseStyle = baseStyles[nodeType as keyof typeof baseStyles] || baseStyles.default;
-  const activeStyle = isActive ? 
-    (activeStyles[nodeType as keyof typeof activeStyles] || activeStyles.default) : {};
-
+// Minimal node styling
+const getNodeStyle = () => {
   return {
-    ...baseStyle,
-    ...activeStyle,
-    borderRadius: '12px',
-    padding: '12px 16px',
+    padding: '0', // Remove default padding - we'll handle it in classes
+    margin: '0',
     minWidth: '200px',
     fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.2s ease-in-out',
+    fontWeight: '400',
+    transition: 'all 0.2s ease',
+    background: 'transparent', // Ensure no background from React Flow
+    border: 'none', // Remove React Flow default border
   };
 };
 
-// Custom node component with proper handles
+// Custom node component with dark mode support
 const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
   const { node } = data;
+  
+  const getHandleColor = (nodeType: string) => {
+    const colors = {
+      start: '#22c55e',
+      end: '#3b82f6', 
+      agent: '#a855f7',
+      user_prompt: '#f59e0b',
+      conditional: '#f97316',
+      output: '#6366f1',
+      default: '#64748b'
+    };
+    return colors[nodeType as keyof typeof colors] || colors.default;
+  };
+
+  const getNodeClasses = (nodeType: string, isActive: boolean) => {
+    const baseClasses = "border rounded-lg p-3";
+    
+    const typeClasses = {
+      start: "bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-600 dark:text-green-300",
+      end: "bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300",
+      agent: "bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-900/20 dark:border-purple-600 dark:text-purple-300",
+      user_prompt: "bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:border-amber-600 dark:text-amber-300",
+      conditional: "bg-orange-50 border-orange-300 text-orange-700 dark:bg-orange-900/20 dark:border-orange-600 dark:text-orange-300",
+      output: "bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-600 dark:text-indigo-300",
+      default: "bg-gray-50 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
+    };
+
+    const activeClasses = isActive ? "ring-1 ring-current/50" : '';
+    const nodeTypeClass = typeClasses[nodeType as keyof typeof typeClasses] || typeClasses.default;
+    
+    return `${baseClasses} ${nodeTypeClass} ${activeClasses}`;
+  };
+
+  const handleColor = getHandleColor(node.type);
+  const nodeClasses = getNodeClasses(node.type, data.isActive);
   
   return (
     <>
@@ -170,28 +125,42 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
         <Handle
           type="target"
           position={Position.Top}
-          style={{ background: '#555' }}
+          className="!w-2 !h-2"
+          style={{ 
+            background: handleColor,
+            border: 'none',
+          }}
         />
       )}
       
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          {data.icon}
-          <span className="font-semibold">{data.node.name}</span>
+      <div className={`flex flex-col gap-2 ${nodeClasses}`}>
+        {/* Simple header with icon and title - left aligned */}
+        <div className="flex items-start gap-2">
+          <div className="mt-0.5 flex-shrink-0">
+            {data.icon}
+          </div>
+          <div className="text-left flex-1">
+            <div className="font-medium text-sm leading-tight">
+              {data.node.name}
+            </div>
+          </div>
         </div>
         
+
+        {/* Description if present - left aligned */}
         {data.node.description && (
-          <div className="text-xs opacity-75 line-clamp-2">
+          <div className="text-xs opacity-70 text-left">
             {data.node.description}
           </div>
         )}
         
-        <div className="flex items-center justify-between text-xs">
-          <span className="px-2 py-1 bg-black/10 rounded-full">
+        {/* Simple metadata - left aligned */}
+        <div className="flex flex-col gap-1 text-left">
+          <span className="px-2 py-1 bg-current/5 rounded text-xs inline-block w-fit">
             {data.node.type}
           </span>
           {data.node.estimatedTime && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 opacity-60 text-xs">
               <Clock className="w-3 h-3" />
               <span>{data.node.estimatedTime}min</span>
             </div>
@@ -204,7 +173,11 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
         <Handle
           type="source"
           position={Position.Bottom}
-          style={{ background: '#555' }}
+          className="!w-2 !h-2"
+          style={{ 
+            background: handleColor,
+            border: 'none',
+          }}
         />
       )}
     </>
@@ -298,7 +271,7 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
         icon: getNodeIcon(node.type),
         isActive,
       },
-      style: getNodeStyle(node.type, isActive),
+      style: getNodeStyle(),
       sourcePosition: Position.Bottom,
       targetPosition: Position.Top,
     });
@@ -326,12 +299,12 @@ const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) =>
       type: 'smoothstep',
       animated: true,
       style: { 
-        stroke: '#0f172a', 
+        stroke: '#64748b', 
         strokeWidth: 3 
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: '#0f172a',
+        color: '#64748b',
         width: 20,
         height: 20,
       },
@@ -390,7 +363,7 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
   );
 
   return (
-    <div className="h-[600px] w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+    <div className="h-[600px] w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -405,7 +378,7 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
           minZoom: 0.1,
           maxZoom: 2.0,
         }}
-        nodesDraggable={true}
+        nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={true}
         zoomOnScroll={true}
@@ -413,16 +386,11 @@ function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualiza
         panOnScroll={true}
         panOnDrag={true}
       >
-        <Controls 
-          showZoom={true}
-          showFitView={true}
-          showInteractive={false}
-          position="bottom-right"
-        />
         <Background 
-          color="#e2e8f0" 
+          color="#e5e7eb" 
           gap={20} 
           size={1}
+          className="dark:opacity-30"
         />
       </ReactFlow>
     </div>
@@ -440,8 +408,8 @@ export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({
 }) => {
   if (!workflow?.nodes || workflow.nodes.length === 0) {
     return (
-      <div className={`h-[200px] flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 ${className}`}>
-        <p className="text-gray-500">No workflow nodes to display</p>
+      <div className={`h-[200px] flex items-center justify-center border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 ${className}`}>
+        <p className="text-gray-400 dark:text-gray-500 text-sm">No workflow nodes to display</p>
       </div>
     );
   }

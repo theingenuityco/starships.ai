@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # All-in-One Container: Frontend + Backend + Neo4j (configurable)
+  starships:
+    image: [DOCKER-REGISTRY-URL]:latest
+    container_name: starships-all-in-one
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Frontend (Next.js)
+      - "4000:4000"  # Backend (Express)
+      - "7474:7474"  # Neo4j Browser (only if using internal Neo4j)
+      - "7687:7687"  # Neo4j Bolt (only if using internal Neo4j)
+    environment:
+      NODE_ENV: production
+      
+      # Frontend URLs
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXT_PUBLIC_WS_URL: ws://localhost:4000
+      
+      # Neo4j Configuration - Choose ONE of the following options:
+      
+      # Option 1: Use INTERNAL Neo4j (default - runs Neo4j inside container)
+      # Leave NEO4J_EXTERNAL_URI unset or empty
+      NEO4J_URI: [NEO4J-LOCAL-URL]  # Will be auto-set if using internal
+      
+      # Option 2: Use EXTERNAL Neo4j (e.g., Neo4j Aura)
+      # Uncomment and set the following to use external Neo4j:
+      # NEO4J_EXTERNAL_URI: neo4j+s://xxxxxxxx.databases.neo4j.io
+      # NEO4J_EXTERNAL_URI: bolt://your-neo4j-host:7687
+      
+      # Neo4j Credentials (for both internal and external)
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-[DEFAULT-PASSWORD]}
+      NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      
+      # API Keys
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PORTAL_ENDPOINT: ${STRIPE_PORTAL_ENDPOINT}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+    volumes:
+      # Application data
+      - starships-data:/app/data
+      - starships-sessions:/app/data/sessions
+      - starships-faiss:/app/data/faiss_index
+      
+      # Neo4j data (only used if internal Neo4j is active)
+      - neo4j-data:/var/lib/neo4j/data
+      - neo4j-logs:/var/lib/neo4j/logs
+      
+      # Cache for faster restarts
+      - node-modules:/app/node_modules
+      - client-next-cache:/app/packages/client/.next
+      - server-dist-cache:/app/packages/server/dist
+      
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000 && wget -q --spider http://localhost:4000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 300s  # 5 minutes for Neo4j startup + build
+      
+    networks:
+      - starships-network
+
+volumes:
+  # Application volumes
+  starships-data:
+    driver: local
+  starships-sessions:
+    driver: local
+  starships-faiss:
+    driver: local
+  
+  # Neo4j volumes (only used with internal Neo4j)
+  neo4j-data:
+    driver: local
+  neo4j-logs:
+    driver: local
+  
+  # Cache volumes
+  node-modules:
+    driver: local
+  client-next-cache:
+    driver: local
+  server-dist-cache:
+    driver: local
+
+networks:
+  starships-network:
+    driver: bridge

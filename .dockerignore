@@ -1,5 +1,67 @@
-node_modules
-dist
-.env
+# Git
 .git
-*.log 
+.gitignore
+
+# Node modules (will be installed fresh in container)
+node_modules
+**/node_modules
+
+# Build outputs (will be built fresh in container)
+**/dist
+**/.next
+**/build
+**/*.tsbuildinfo
+
+# Development files
+.env.local
+.env.development
+.env.test
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage
+.nyc_output
+jest.config.js
+**/*.test.js
+**/*.spec.js
+**/*.test.ts
+**/*.spec.ts
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Docker files (except entrypoint)
+Dockerfile*
+docker-compose*.yml
+!docker-entrypoint.sh
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Data directories (will be created fresh)
+data/sessions/*
+data/starships/*
+data/docker/*
+data/faiss_index/*

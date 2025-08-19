@@ -2,7 +2,7 @@ name: Redeploy to RunPod
 
 on:
   workflow_run:
-    workflows: ["Publish Docker Image to GHCR"]
+    workflows: ["Build and Publish Docker Image"]
     types:
       - completed
   workflow_dispatch:

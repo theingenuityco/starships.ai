@@ -1,0 +1,1 @@
+- The project is not in production yet and there are no users. This is the very first iteration. So, please don't do backward compatiabilty, feature flags or migrations

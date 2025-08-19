@@ -53,35 +53,18 @@ export class WorkflowParsingService {
         throw new Error('Workflow must have an end node');
       }
 
-      // Create node ID mapping for edges
-      const nodeReferenceMap = new Map<string, string>();
-      let nodeIndex = 0;
-
-      // Process nodes and create IDs
+      // Process nodes and preserve AI IDs for mapping
       const processedNodes = parsed.nodes.map((node: any) => {
-        let nodeRef: string;
-        
-        if (node.type === 'start') {
-          nodeRef = 'start-node';
-        } else if (node.type === 'end') {
-          nodeRef = 'end-node';
-        } else if (node.type === 'agent') {
-          nodeRef = `agent-node-${++nodeIndex}`;
-        } else {
-          throw new Error(`Unknown node type: ${node.type}`);
-        }
-
-        nodeReferenceMap.set(nodeRef, nodeRef);
-
         return {
           type: node.type,
           name: node.name || '',
           description: node.description || '',
-          parameters: node.parameters || {}
+          parameters: node.parameters || {},
+          aiId: node.id // Preserve AI-provided ID for mapping
         };
       });
 
-      // Process edges with proper node references
+      // Process edges directly - they reference AI IDs
       const processedEdges = parsed.edges.map((edge: any) => {
         return {
           from: edge.from,

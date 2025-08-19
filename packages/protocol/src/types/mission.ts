@@ -245,7 +245,7 @@ export interface WorkflowEdge {
  */
 export interface CreateWorkflowRequest {
   missionId: string;
-  nodes: Omit<WorkflowNode, 'id'>[];
+  nodes: (Omit<WorkflowNode, 'id'> & { aiId?: string })[];
   edges: Omit<WorkflowEdge, 'id'>[];
 }
 

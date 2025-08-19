@@ -547,18 +547,11 @@ router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> =
 
     const workflow = await WorkflowService.getWorkflowByMissionId(id);
 
-    if (!workflow) {
-      res.status(404).json({
-        success: false,
-        error: 'Workflow not found',
-        code: 'WORKFLOW_NOT_FOUND'
-      });
-      return;
-    }
-
+    // Return null workflow when not found instead of 404 error
+    // This allows the UI to display "No workflow data available" gracefully
     res.json({ 
       success: true, 
-      data: workflow 
+      data: { workflow } 
     });
 
   } catch (error) {

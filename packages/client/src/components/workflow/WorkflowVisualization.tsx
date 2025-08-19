@@ -1,285 +1,339 @@
-'use client'
+'use client';
 
-import React from 'react'
-import { motion } from 'motion/react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import React, { useCallback, useMemo } from 'react';
 import {
-  Play,
-  Pause,
-  CheckCircle2,
-  AlertTriangle,
-  Clock,
-  User,
-  Zap,
-  ArrowRight,
-  Eye
-} from 'lucide-react'
-import type { WorkflowDSL, WorkflowDSLNode } from '@starships/protocol'
+  ReactFlow,
+  Node,
+  Edge,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  ReactFlowProvider,
+  MarkerType,
+  Position,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { 
+  Play, 
+  CheckCircle2, 
+  Zap, 
+  User, 
+  AlertTriangle, 
+  Eye, 
+  Clock 
+} from 'lucide-react';
+import type { MissionWorkflow, WorkflowDSLNode } from '@starships/protocol';
 
 export interface WorkflowVisualizationProps {
-  workflow: WorkflowDSL
-  currentNodeId?: string
-  onNodeClick?: (nodeId: string) => void
-  showControls?: boolean
-  className?: string
+  workflow: MissionWorkflow;
+  currentNodeId?: string;
+  onNodeClick?: (nodeId: string) => void;
+  className?: string;
 }
 
-/**
- * Get appropriate icon for node type
- */
+interface FlowNode extends Node {
+  data: {
+    label: string;
+    node: WorkflowDSLNode;
+    icon: React.ReactNode;
+    isActive: boolean;
+  };
+}
+
+// Get icon for node type
 const getNodeIcon = (nodeType: string) => {
   switch (nodeType) {
     case 'start':
-      return <Play className="w-4 h-4" />
+      return <Play className="w-4 h-4" />;
     case 'end':
-      return <CheckCircle2 className="w-4 h-4" />
+      return <CheckCircle2 className="w-4 h-4" />;
     case 'agent':
-      return <Zap className="w-4 h-4" />
+      return <Zap className="w-4 h-4" />;
     case 'user_prompt':
-      return <User className="w-4 h-4" />
+      return <User className="w-4 h-4" />;
     case 'conditional':
-      return <AlertTriangle className="w-4 h-4" />
+      return <AlertTriangle className="w-4 h-4" />;
     case 'output':
-      return <Eye className="w-4 h-4" />
+      return <Eye className="w-4 h-4" />;
     default:
-      return <Clock className="w-4 h-4" />
+      return <Clock className="w-4 h-4" />;
   }
-}
+};
 
-/**
- * Get appropriate color for node type
- */
-const getNodeColor = (nodeType: string, isActive: boolean) => {
-  const baseColors = {
-    start: 'bg-green-100 border-green-300 text-green-800',
-    end: 'bg-blue-100 border-blue-300 text-blue-800',
-    agent: 'bg-purple-100 border-purple-300 text-purple-800',
-    user_prompt: 'bg-yellow-100 border-yellow-300 text-yellow-800',
-    conditional: 'bg-orange-100 border-orange-300 text-orange-800',
-    output: 'bg-indigo-100 border-indigo-300 text-indigo-800',
-    default: 'bg-gray-100 border-gray-300 text-gray-800'
-  }
-  
-  const activeColors = {
-    start: 'bg-green-200 border-green-500 text-green-900 ring-2 ring-green-400',
-    end: 'bg-blue-200 border-blue-500 text-blue-900 ring-2 ring-blue-400',
-    agent: 'bg-purple-200 border-purple-500 text-purple-900 ring-2 ring-purple-400',
-    user_prompt: 'bg-yellow-200 border-yellow-500 text-yellow-900 ring-2 ring-yellow-400',
-    conditional: 'bg-orange-200 border-orange-500 text-orange-900 ring-2 ring-orange-400',
-    output: 'bg-indigo-200 border-indigo-500 text-indigo-900 ring-2 ring-indigo-400',
-    default: 'bg-gray-200 border-gray-500 text-gray-900 ring-2 ring-gray-400'
-  }
+// Get node colors and styling
+const getNodeStyle = (nodeType: string, isActive: boolean) => {
+  const baseStyles = {
+    start: { 
+      background: '#dcfce7', 
+      border: '2px solid #16a34a', 
+      color: '#14532d' 
+    },
+    end: { 
+      background: '#dbeafe', 
+      border: '2px solid #2563eb', 
+      color: '#1e3a8a' 
+    },
+    agent: { 
+      background: '#f3e8ff', 
+      border: '2px solid #9333ea', 
+      color: '#581c87' 
+    },
+    user_prompt: { 
+      background: '#fef3c7', 
+      border: '2px solid #d97706', 
+      color: '#92400e' 
+    },
+    conditional: { 
+      background: '#fed7aa', 
+      border: '2px solid #ea580c', 
+      color: '#9a3412' 
+    },
+    output: { 
+      background: '#e0e7ff', 
+      border: '2px solid #4f46e5', 
+      color: '#3730a3' 
+    },
+    default: { 
+      background: '#f3f4f6', 
+      border: '2px solid #6b7280', 
+      color: '#374151' 
+    }
+  };
 
-  return isActive 
-    ? (activeColors[nodeType as keyof typeof activeColors] || activeColors.default)
-    : (baseColors[nodeType as keyof typeof baseColors] || baseColors.default)
-}
+  const activeStyles = {
+    start: { 
+      background: '#bbf7d0', 
+      border: '3px solid #16a34a', 
+      boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.2)' 
+    },
+    end: { 
+      background: '#bfdbfe', 
+      border: '3px solid #2563eb', 
+      boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.2)' 
+    },
+    agent: { 
+      background: '#e9d5ff', 
+      border: '3px solid #9333ea', 
+      boxShadow: '0 0 0 3px rgba(147, 51, 234, 0.2)' 
+    },
+    user_prompt: { 
+      background: '#fde68a', 
+      border: '3px solid #d97706', 
+      boxShadow: '0 0 0 3px rgba(217, 119, 6, 0.2)' 
+    },
+    conditional: { 
+      background: '#fdba74', 
+      border: '3px solid #ea580c', 
+      boxShadow: '0 0 0 3px rgba(234, 88, 12, 0.2)' 
+    },
+    output: { 
+      background: '#c7d2fe', 
+      border: '3px solid #4f46e5', 
+      boxShadow: '0 0 0 3px rgba(79, 70, 229, 0.2)' 
+    },
+    default: { 
+      background: '#e5e7eb', 
+      border: '3px solid #6b7280', 
+      boxShadow: '0 0 0 3px rgba(107, 114, 128, 0.2)' 
+    }
+  };
 
-/**
- * Render individual workflow node
- */
-const WorkflowNode: React.FC<{
-  node: WorkflowDSLNode
-  isActive: boolean
-  onClick?: () => void
-}> = ({ node, isActive, onClick }) => {
-  const colorClasses = getNodeColor(node.type, isActive)
-  
+  const baseStyle = baseStyles[nodeType as keyof typeof baseStyles] || baseStyles.default;
+  const activeStyle = isActive ? 
+    (activeStyles[nodeType as keyof typeof activeStyles] || activeStyles.default) : {};
+
+  return {
+    ...baseStyle,
+    ...activeStyle,
+    borderRadius: '12px',
+    padding: '12px 16px',
+    minWidth: '200px',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease-in-out',
+  };
+};
+
+// Custom node component
+const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.2 }}
-      className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${colorClasses}`}
-      onClick={onClick}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        {getNodeIcon(node.type)}
-        <span className="font-medium text-sm">{node.name}</span>
-        <Badge variant="outline" className="text-xs">
-          {node.type}
-        </Badge>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        {data.icon}
+        <span className="font-semibold">{data.node.name}</span>
       </div>
       
-      {node.description && (
-        <p className="text-xs opacity-80 line-clamp-2">{node.description}</p>
-      )}
-      
-      {node.estimatedTime && (
-        <div className="flex items-center gap-1 mt-2">
-          <Clock className="w-3 h-3" />
-          <span className="text-xs opacity-75">{node.estimatedTime}min</span>
+      {data.node.description && (
+        <div className="text-xs opacity-75 line-clamp-2">
+          {data.node.description}
         </div>
       )}
       
-      {isActive && (
-        <motion.div
-          className="absolute -top-1 -right-1 bg-green-500 rounded-full w-3 h-3"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ repeat: Infinity, duration: 1.5 }}
+      <div className="flex items-center justify-between text-xs">
+        <span className="px-2 py-1 bg-black/10 rounded-full">
+          {data.node.type}
+        </span>
+        {data.node.estimatedTime && (
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            <span>{data.node.estimatedTime}min</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Convert workflow to React Flow format
+const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string) => {
+  const nodes: FlowNode[] = [];
+  const edges: Edge[] = [];
+
+  // Create nodes
+  workflow.nodes.forEach((node, index) => {
+    const isActive = node.id === currentNodeId;
+    
+    // Calculate position - use a simple grid layout
+    const x = (index % 3) * 280; // 3 columns with wider spacing
+    const y = Math.floor(index / 3) * 150; // Row height
+    
+    nodes.push({
+      id: node.id,
+      type: 'default',
+      position: { x, y },
+      data: {
+        label: node.name,
+        node,
+        icon: getNodeIcon(node.type),
+        isActive,
+      },
+      style: getNodeStyle(node.type, isActive),
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+    });
+  });
+
+  // Create edges
+  workflow.edges.forEach((edge) => {
+    edges.push({
+      id: edge.id,
+      source: edge.from,
+      target: edge.to,
+      type: 'smoothstep',
+      animated: true,
+      style: { 
+        stroke: '#3b82f6', 
+        strokeWidth: 2 
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#3b82f6',
+      },
+    });
+  });
+
+  return { nodes, edges };
+};
+
+// Node types for React Flow
+const nodeTypes = {
+  default: CustomNode,
+};
+
+function FlowContent({ workflow, currentNodeId, onNodeClick }: WorkflowVisualizationProps) {
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(
+    () => convertToFlowData(workflow, currentNodeId),
+    [workflow, currentNodeId]
+  );
+
+  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  const onConnect = useCallback(
+    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
+
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (onNodeClick) {
+        onNodeClick(node.id);
+      }
+    },
+    [onNodeClick]
+  );
+
+  return (
+    <div className="h-[500px] w-full border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={handleNodeClick}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{
+          padding: 0.2,
+          minZoom: 0.1,
+          maxZoom: 2.0,
+        }}
+        nodesDraggable={true}
+        nodesConnectable={false}
+        elementsSelectable={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        panOnScroll={true}
+        panOnDrag={true}
+      >
+        <Controls 
+          showZoom={true}
+          showFitView={true}
+          showInteractive={false}
+          position="bottom-right"
         />
-      )}
-    </motion.div>
-  )
+        <Background 
+          color="#e2e8f0" 
+          gap={20} 
+          size={1}
+        />
+      </ReactFlow>
+    </div>
+  );
 }
 
 /**
- * Render ASCII visualization fallback
- */
-const AsciiVisualization: React.FC<{ 
-  visualization: string 
-  className?: string 
-}> = ({ visualization, className }) => (
-  <ScrollArea className={className}>
-    <pre className="text-xs font-mono whitespace-pre-wrap p-4 bg-slate-50 rounded-lg border">
-      {visualization || 'No visualization available'}
-    </pre>
-  </ScrollArea>
-)
-
-/**
- * Main workflow visualization component
+ * Main workflow visualization component using React Flow
  */
 export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({
   workflow,
   currentNodeId,
   onNodeClick,
-  showControls = false,
   className = ''
 }) => {
-  const [viewMode, setViewMode] = React.useState<'visual' | 'ascii'>('visual')
-  
-  // Sort nodes by position for proper layout
-  const sortedNodes = [...workflow.nodes].sort((a, b) => {
-    if (a.position && b.position) {
-      return a.position.x - b.position.x
-    }
-    return 0
-  })
-
-  const handleNodeClick = (node: WorkflowDSLNode) => {
-    if (onNodeClick) {
-      onNodeClick(node.id)
-    }
+  if (!workflow?.nodes || workflow.nodes.length === 0) {
+    return (
+      <div className={`h-[200px] flex items-center justify-center border border-gray-200 rounded-lg bg-gray-50 ${className}`}>
+        <p className="text-gray-500">No workflow nodes to display</p>
+      </div>
+    );
   }
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-lg">Workflow Visualization</CardTitle>
-            <CardDescription>
-              {workflow.nodes.length} nodes • Estimated duration: {workflow.metadata?.estimatedDuration || 'Unknown'} minutes
-            </CardDescription>
-          </div>
-          
-          {showControls && (
-            <div className="flex gap-2">
-              <Button
-                variant={viewMode === 'visual' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('visual')}
-              >
-                Visual
-              </Button>
-              <Button
-                variant={viewMode === 'ascii' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('ascii')}
-              >
-                ASCII
-              </Button>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        {viewMode === 'visual' ? (
-          <div className="space-y-4">
-            {/* Workflow metadata */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              <Badge variant="secondary">
-                {workflow.metadata?.complexity || 'unknown'} complexity
-              </Badge>
-              <Badge variant="outline">
-                {workflow.approvalStatus}
-              </Badge>
-              {workflow.metadata?.tags?.map((tag, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-            
-            {/* Node flow visualization */}
-            <div className="relative">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {sortedNodes.map((node, index) => (
-                  <React.Fragment key={node.id}>
-                    <WorkflowNode
-                      node={node}
-                      isActive={node.id === currentNodeId}
-                      onClick={() => handleNodeClick(node)}
-                    />
-                    
-                    {/* Arrow between nodes */}
-                    {index < sortedNodes.length - 1 && (
-                      <div className="hidden lg:flex items-center justify-center col-span-1">
-                        <ArrowRight className="w-6 h-6 text-gray-400" />
-                      </div>
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-              
-              {/* Mobile flow arrows */}
-              <div className="lg:hidden space-y-2 mt-4">
-                {sortedNodes.slice(0, -1).map((_, index) => (
-                  <div key={index} className="flex justify-center">
-                    <ArrowRight className="w-5 h-5 text-gray-400 rotate-90" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <AsciiVisualization 
-            visualization={workflow.visualization}
-            className="h-64 md:h-96"
-          />
-        )}
-        
-        {/* Workflow statistics */}
-        <div className="mt-6 pt-4 border-t grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div className="text-center">
-            <div className="font-medium text-lg">{workflow.nodes.length}</div>
-            <div className="text-gray-600">Total Nodes</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium text-lg">{workflow.edges.length}</div>
-            <div className="text-gray-600">Connections</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium text-lg">
-              {workflow.nodes.filter(n => n.type === 'agent').length}
-            </div>
-            <div className="text-gray-600">Agent Tasks</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium text-lg">
-              {workflow.nodes.filter(n => n.type === 'user_prompt').length}
-            </div>
-            <div className="text-gray-600">User Prompts</div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    <ReactFlowProvider>
+      <div className={className}>
+        <FlowContent 
+          workflow={workflow} 
+          currentNodeId={currentNodeId} 
+          onNodeClick={onNodeClick} 
+        />
+      </div>
+    </ReactFlowProvider>
+  );
+};
 
-export default WorkflowVisualization
+export default WorkflowVisualization;

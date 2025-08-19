@@ -81,43 +81,45 @@ Respond with ONLY this JSON format:
 {
   "nodes": [
     {
-      "type": "start",
+      "id": "start-node",
+      "type": "start", 
       "name": "Start Mission",
       "description": "Initialize mission execution",
       "parameters": {}
     },
     {
+      "id": "agent-node-1",
       "type": "agent",
       "name": "Clear, actionable task title (max 100 chars)",
       "description": "Detailed description of what needs to be done and how",
       "parameters": {
         "agentId": "agent-id-from-available-list",
         "instructions": "Specific instructions for the agent",
-        "expectedOutput": "Specific expected output or result",
+        "expectedOutput": "Specific expected output or result", 
         "priority": "high|medium|low"
       }
     },
     {
+      "id": "end-node",
       "type": "end",
-      "name": "Complete Mission",
+      "name": "Complete Mission", 
       "description": "Mission execution completed",
       "parameters": {}
     }
   ],
   "edges": [
     {"from": "start-node", "to": "agent-node-1"},
-    {"from": "agent-node-1", "to": "agent-node-2"},
-    {"from": "agent-node-N", "to": "end-node"}
+    {"from": "agent-node-1", "to": "end-node"}
   ],
   "reasoning": "Brief explanation of the workflow structure and task assignments"
 }
 
 IMPORTANT:
-- Always include start and end nodes
-- Agent nodes represent executable tasks
-- Edges create linear flow: start → agents → end
-- Use descriptive node references in edges (start-node, agent-node-1, etc.)
-- Each agent task must be assignable to ONE agent
+- Always include start and end nodes with consistent IDs
+- Agent nodes need sequential IDs (agent-node-1, agent-node-2, etc.)
+- Edges must reference the exact node IDs from the nodes array
+- Create linear flow: start-node → agent-node-X → end-node
+- Each agent task must be assignable to ONE available agent
 - Focus on clear, actionable workflow with measurable outcomes`,
 
   WORKFLOW_PRESENTATION: `Present the generated execution workflow to the user for approval.

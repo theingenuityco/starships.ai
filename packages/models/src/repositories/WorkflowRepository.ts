@@ -16,6 +16,26 @@ import {
 } from '@starships/protocol';
 import { v4 as uuidv4 } from 'uuid';
 
+// Inline ID mapper utilities for this repository
+class WorkflowIdMapper {
+  private aiToRealMap = new Map<string, string>();
+  
+  addMapping(aiId: string, realId: string): void {
+    this.aiToRealMap.set(aiId, realId);
+  }
+  
+  getRealId(aiId: string): string | undefined {
+    return this.aiToRealMap.get(aiId);
+  }
+  
+  convertEdgesToReal(edges: Array<{ from: string; to: string }>): Array<{ from: string; to: string }> {
+    return edges.map(edge => ({
+      from: this.getRealId(edge.from) || edge.from,
+      to: this.getRealId(edge.to) || edge.to
+    }));
+  }
+}
+
 export interface WorkflowRepositoryInterface {
   createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow>;
   getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null>;
@@ -87,15 +107,22 @@ export class WorkflowRepository extends BaseRepository implements WorkflowReposi
         DETACH DELETE n, r
       `, { missionId: request.missionId });
 
-      // Create nodes with IDs
+      // Create ID mapper and nodes
+      const idMapper = new WorkflowIdMapper();
       const nodes: WorkflowNode[] = [];
-      const nodeIdMap = new Map<string, string>(); // original temp ID -> actual UUID
 
       for (const nodeData of request.nodes) {
         const nodeId = uuidv4();
+        const { aiId, ...nodeWithoutAiId } = nodeData as any;
         const node: WorkflowNode = {
           id: nodeId,
-          ...nodeData
+          ...nodeWithoutAiId
+        };
+
+        // Serialize parameters as JSON string for Neo4j storage
+        const nodeProps = {
+          ...node,
+          parameters: JSON.stringify(node.parameters || {})
         };
 
         await connection.executeWrite(`
@@ -103,22 +130,28 @@ export class WorkflowRepository extends BaseRepository implements WorkflowReposi
           CREATE (w)-[:CONTAINS]->(n:WorkflowNode $nodeProps)
         `, {
           missionId: request.missionId,
-          nodeProps: node
+          nodeProps
         });
 
-        // Map temporary ID to real ID for edge creation
-        const tempId = `temp-${nodes.length}`;
-        nodeIdMap.set(tempId, nodeId);
+        // Map AI-provided ID to real UUID for edge creation
+        if (aiId) {
+          idMapper.addMapping(aiId, nodeId);
+        }
         nodes.push(node);
       }
 
-      // Create edges between nodes
+      // Create edges between nodes using ID mapper
       const edges: WorkflowEdge[] = [];
-      for (const edgeData of request.edges) {
+      const mappedEdges = idMapper.convertEdgesToReal(request.edges);
+      
+      for (let i = 0; i < mappedEdges.length; i++) {
+        const edgeData = mappedEdges[i];
         const edgeId = uuidv4();
+        
         const edge: WorkflowEdge = {
           id: edgeId,
-          ...edgeData
+          from: edgeData.from,
+          to: edgeData.to
         };
 
         // Create relationship between nodes
@@ -177,7 +210,19 @@ export class WorkflowRepository extends BaseRepository implements WorkflowReposi
       const workflowProperties = w?.properties || w;
       const nodeProperties = nodes ? 
         nodes.filter((n: unknown) => n !== null)
-             .map((n: any) => n?.properties || n) : [];
+             .map((n: any) => {
+               const nodeProps = n?.properties || n;
+               // Deserialize parameters from JSON string
+               if (nodeProps.parameters && typeof nodeProps.parameters === 'string') {
+                 try {
+                   nodeProps.parameters = JSON.parse(nodeProps.parameters);
+                 } catch (error) {
+                   console.warn('Failed to parse node parameters JSON:', nodeProps.id, error);
+                   nodeProps.parameters = {};
+                 }
+               }
+               return nodeProps;
+             }) : [];
 
       const edgeProperties = edgeResult ? 
         edgeResult.map((e: any) => ({

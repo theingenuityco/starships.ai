@@ -12,6 +12,7 @@ export type {
 } from './MCPDeployer';
 
 export { DockerComposeDeployer } from './DockerComposeDeployer';
+export { MockDeployer } from './MockDeployer';
 
 export { 
   DockerServiceTemplate,
@@ -52,3 +53,4 @@ export * from './DeploymentConfig';
 export * from './PortAllocator';
 export * from './HealthMonitor';
 export * from './ConnectionManager';
+export * from './DeployerFactory';

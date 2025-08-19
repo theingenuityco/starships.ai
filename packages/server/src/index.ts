@@ -40,6 +40,7 @@ import agentTemplateRoutes from './routes/agent-templates';
 import agentCommunicationRoutes from './routes/agent-communication';
 import missionRoutes from './routes/missions';
 import workflowRoutes from './routes/workflows';
+import nativeApiKeysRoutes from './routes/native-api-keys';
 import { AgentService } from './services/AgentService';
 import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
@@ -218,6 +219,7 @@ app.use('/api', mcpServerRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/agent-communication', agentCommunicationRoutes);
 app.use('/api/missions', missionRoutes);
+app.use('/api', nativeApiKeysRoutes);
 app.use('/api/expeditions', workflowRoutes);
 
 // Add 404 handler for unmatched routes
@@ -235,23 +237,30 @@ const socketService = initializeSocketIO(httpServer);
 // Start server
 httpServer.listen(PORT, async () => {
   try {
-    // Initialize Kubernetes environment (required)
-    const k8sReady = await initializeK8sEnvironment({
-      skipSetup: process.env.SKIP_K8S_SETUP === 'true',
-      requireCluster: true, // K8s is required now
-      environment: process.env.NODE_ENV as 'development' | 'staging' | 'production'
-    });
-    
-    if (!k8sReady) {
-      console.error('❌ Kubernetes environment is required for MCP deployment');
-      console.error('   Please ensure Docker Desktop is running and try again');
-      console.error('   Or run: pnpm run k8s:setup');
-      process.exit(1);
+    // Check if we should skip K8s initialization (dev mode)
+    if (process.env.SKIP_K8S_CHECK === 'true') {
+      console.log('⚡ Skipping Kubernetes initialization (SKIP_K8S_CHECK=true)');
+      console.log('🚢 Using mock deployer for MCP containers in development mode');
+      process.env.K8S_AVAILABLE = 'false';
+    } else {
+      // Initialize Kubernetes environment (required for production/staging)
+      const k8sReady = await initializeK8sEnvironment({
+        skipSetup: process.env.SKIP_K8S_SETUP === 'true',
+        requireCluster: true, // K8s is required now
+        environment: process.env.NODE_ENV as 'development' | 'staging' | 'production'
+      });
+      
+      if (!k8sReady) {
+        console.error('❌ Kubernetes environment is required for MCP deployment');
+        console.error('   Please ensure Docker Desktop is running and try again');
+        console.error('   Or run: pnpm run k8s:setup');
+        process.exit(1);
+      }
+      
+      const deployerType = getDeployerType();
+      console.log(`🚢 Using ${deployerType} deployer for MCP containers`);
+      process.env.K8S_AVAILABLE = 'true';
     }
-    
-    const deployerType = getDeployerType();
-    console.log(`🚢 Using ${deployerType} deployer for MCP containers`);
-    process.env.K8S_AVAILABLE = 'true';
     
     // Initialize database connection
     await dbConnection.connect();

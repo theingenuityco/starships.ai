@@ -10,7 +10,8 @@ import { z } from 'zod';
 import { MCPToolGateway, MCPToolGatewayDB, MCPTool } from '@starships/core';
 import { ToolInputPatcher } from '../agents/ToolInputPatcher';
 import { SmartParameterAdapter } from '../adapters/SmartParameterAdapter';
-import { getConnection } from '@starships/models';
+import { getConnection, RepositoryFactory } from '@starships/models';
+// import { ToolSandbox, ApiKeyValidator } from './security/ToolSandbox'; // TODO: Re-enable when adding native tools
 
 // Helper function to validate UUID format
 function isValidUUID(str: string | undefined): boolean {
@@ -30,13 +31,119 @@ export class MCPToolWrapper {
   private config: MCPToolConfig;
   private toolUsageStats: Map<string, number> = new Map();
   private smartAdapter: SmartParameterAdapter | null = null;
+  // private sandbox: ToolSandbox; // TODO: Re-enable when adding native tools
 
   constructor(config: MCPToolConfig) {
     this.config = config;
+    // this.sandbox = new ToolSandbox(); // TODO: Re-enable when adding native tools
     
     // Initialize smart adapter if feature flag is enabled
     if (process.env.USE_SMART_ADAPTER === 'true') {
       this.initializeSmartAdapter();
+    }
+  }
+  
+  /**
+   * Add native LangChain tools based on user's stored API keys
+   */
+  private async addNativeTools(langchainTools: DynamicTool[]): Promise<void> {
+    try {
+      // Get user's API keys from database
+      const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+      const apiKeys = await apiKeyRepo.getAllApiKeys(this.config.starshipId);
+      
+      // TODO: Add Tavily support in future
+      // if (apiKeys.tavily) { ... }
+      
+      // Add Brave Search if API key exists
+      if (apiKeys.brave) {
+        try {
+          const { BraveSearch } = await import('@langchain/community/tools/brave_search');
+          
+          const braveTool = new BraveSearch({
+            apiKey: apiKeys.brave
+          });
+          
+          const wrappedBrave = new DynamicTool({
+            name: 'brave_web_search',
+            description: 'Privacy-focused web search using Brave',
+            func: async (input: string) => {
+              console.log(`[Brave] Starship ${this.config.starshipId} searching: ${input}`);
+              const result = await braveTool.invoke(input);
+              return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            }
+          });
+          
+          langchainTools.push(wrappedBrave);
+          console.log(`[MCPToolWrapper] Added Brave search for starship ${this.config.starshipId}`);
+        } catch (error) {
+          console.error('[MCPToolWrapper] Failed to add Brave tool:', error);
+        }
+      }
+      
+      // Add Firecrawl if API key exists
+      if (apiKeys.firecrawl) {
+        try {
+          const { FirecrawlTool } = await import('./native/FirecrawlTool');
+          
+          const firecrawlTool = new FirecrawlTool(apiKeys.firecrawl);
+          langchainTools.push(firecrawlTool.toDynamicTool());
+          
+          console.log(`[MCPToolWrapper] Added Firecrawl for starship ${this.config.starshipId}`);
+        } catch (error) {
+          console.error('[MCPToolWrapper] Failed to add Firecrawl tool:', error);
+        }
+      }
+      
+      
+      // Add Notion if API key exists
+      if (apiKeys.notion) {
+        try {
+          const { NotionTool } = await import('./native/NotionTool');
+          
+          const notionTool = new NotionTool(apiKeys.notion);
+          const notionDynamicTool = notionTool.toDynamicTool();
+          langchainTools.push(notionDynamicTool);
+          
+          console.log(`[MCPToolWrapper] Added Notion tool for starship ${this.config.starshipId}`);
+        } catch (error) {
+          console.error('[MCPToolWrapper] Failed to add Notion tool:', error);
+        }
+      }
+      
+      // Add OpenWeatherMap if API key exists
+      // TODO: OpenWeatherMap tool is not available in @langchain/community
+      // Will need to implement custom integration or wait for library update
+      /*
+      if (apiKeys.openweather) {
+        try {
+          const { OpenWeatherMapQueryRun } = await import('@langchain/community/tools/openweathermap');
+          
+          const weatherTool = new OpenWeatherMapQueryRun({
+            apiKey: apiKeys.openweather
+          });
+          
+          const wrappedWeather = new DynamicTool({
+            name: 'weather_query',
+            description: 'Get current weather for any location',
+            func: async (input: string) => {
+              console.log(`[Weather] Starship ${this.config.starshipId} querying: ${input}`);
+              const result = await weatherTool.invoke(input);
+              return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+            }
+          });
+          
+          langchainTools.push(wrappedWeather);
+          console.log(`[MCPToolWrapper] Added OpenWeatherMap for starship ${this.config.starshipId}`);
+        } catch (error) {
+          console.error('[MCPToolWrapper] Failed to add OpenWeatherMap tool:', error);
+        }
+      }
+      */
+      
+    } catch (error) {
+      console.error('[MCPToolWrapper] Error loading native tools:', error);
+      // Continue without native tools if there's an error
     }
   }
   
@@ -729,6 +836,9 @@ IMPORTANT:
           // Continue with other tools
         }
       }
+      
+      // Add native LangChain tools based on user's API keys
+      await this.addNativeTools(langchainTools);
       
       if (this.config.enableLogging) {
         const toolNames = langchainTools.map(t => t.name).join(', ');

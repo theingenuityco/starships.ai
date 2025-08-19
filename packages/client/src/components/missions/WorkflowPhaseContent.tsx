@@ -219,43 +219,6 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
         <WorkflowVisualization workflow={workflow} />
       </div>
 
-      {/* Action Buttons */}
-      {workflow.approvalStatus === 'pending' && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex justify-center space-x-4"
-        >
-          <Button
-            onClick={() => handleApproval(true)}
-            disabled={actionLoading}
-            className="bg-green-600 hover:bg-green-700 text-white px-8"
-          >
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Approve Workflow & Start Execution
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={() => setShowRejectionDialog(true)}
-            disabled={actionLoading}
-            className="px-6"
-          >
-            <X className="w-4 h-4 mr-2" />
-            Request Changes
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={handleRegenerate}
-            disabled={actionLoading}
-            className="px-6"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Regenerate Workflow
-          </Button>
-        </motion.div>
-      )}
       
       {/* Status Messages */}
       {workflow.approvalStatus === 'approved' && (

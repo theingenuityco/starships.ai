@@ -11,7 +11,6 @@ import { MissionPhase } from '../types/mission';
  * Mission phase constants - use these instead of string literals
  */
 export const MISSION_PHASES = {
-  INIT: 'init' as const,
   WELCOME: 'welcome' as const,
   ANALYSIS: 'analysis' as const,
   PLAN: 'plan' as const,
@@ -36,19 +35,9 @@ export interface MissionPhaseConfig {
  * Complete mission phase configuration mapping
  */
 export const MISSION_PHASE_CONFIG: Record<MissionPhase, MissionPhaseConfig> = {
-  [MISSION_PHASES.INIT]: {
-    label: 'Initializing',
-    description: 'Setting up mission context and preparing systems',
-    icon: '⚙️',
-    color: {
-      background: 'bg-slate-100',
-      border: 'border-slate-200',
-      text: 'text-slate-800',
-    },
-  },
   [MISSION_PHASES.WELCOME]: {
     label: 'Welcome',
-    description: 'Mission introduction and greeting',
+    description: 'Mission introduction and getting started',
     icon: '👋',
     color: {
       background: 'bg-blue-100',
@@ -116,7 +105,6 @@ export function isValidMissionPhase(phase: string): phase is MissionPhase {
  */
 export function getMissionPhasesInOrder(): MissionPhase[] {
   return [
-    MISSION_PHASES.INIT,
     MISSION_PHASES.WELCOME,
     MISSION_PHASES.ANALYSIS,
     MISSION_PHASES.PLAN,

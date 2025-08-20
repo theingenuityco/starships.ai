@@ -151,10 +151,9 @@ export class MissionOrchestratorAgent {
           "context_builder",
           this.phaseRouterNode.bind(this),
           {
-            init: "welcome_phase",        // init transitions to welcome
             welcome: "welcome_phase",
             analysis: "analysis_phase",
-            plan: "plan_phase",          // NEW
+            plan: "plan_phase",
             converse: "converse_phase"
           }
         )
@@ -205,12 +204,8 @@ export class MissionOrchestratorAgent {
     const metadata = await this.loadMissionMetadata(state.missionId);
     updates.metadata = metadata;
     
-    // Handle init -> welcome transition automatically
-    if (metadata.mission.phase === MISSION_PHASES.INIT) {
-      updates.activePhase = MISSION_PHASES.WELCOME;
-    } else {
-      updates.activePhase = metadata.mission.phase;
-    }
+    // Set active phase from mission phase
+    updates.activePhase = metadata.mission.phase;
     
     return updates;
   }

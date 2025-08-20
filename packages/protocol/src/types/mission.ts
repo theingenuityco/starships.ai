@@ -41,7 +41,6 @@ export type MissionStatus =
  * Mission phase - controls chat behavior and UI sections
  */
 export type MissionPhase = 
-  | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
   | 'analysis'     // Mission analysis and breakdown
   | 'plan'         // Mission execution planning and approval

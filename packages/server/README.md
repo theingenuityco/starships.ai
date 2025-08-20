@@ -1,16 +1,19 @@
 # @starships/server
 
-Express.js HTTP API server for the Starships platform. Provides RESTful endpoints for chat processing, agent management, and memory operations with comprehensive middleware and error handling.
+Production-ready Express.js HTTP API server powering the Starships mission control platform. Features mission orchestration, multi-agent expedition management, real-time communication, MCP tool integration, vision refinement, and Stripe billing with comprehensive security and monitoring.
 
 ## 🚀 Features
 
-- **RESTful API**: Complete HTTP API with standardized endpoints
-- **Express.js 5**: Modern Express with enhanced performance
-- **CORS Support**: Cross-origin resource sharing configuration
-- **Error Handling**: Comprehensive error middleware
-- **Request Validation**: Input validation and sanitization
-- **Health Checks**: System health monitoring endpoints
-- **Docker Support**: Production-ready containerization
+- **Mission Orchestration**: Advanced mission planning and execution with AI-powered orchestrators
+- **Multi-Agent Expeditions**: Complex expedition management with real-time agent coordination
+- **Workflow DSL**: Complete workflow definition and execution system with approval workflows
+- **Real-time Communication**: Socket.IO integration for live updates and progress tracking
+- **MCP Tool Integration**: HTTP bridge for Model Context Protocol tool discovery and execution
+- **Vision Refinement**: AI-powered vision statement improvement with quality metrics
+- **Stripe Integration**: Complete subscription billing with webhook idempotency
+- **Enterprise Security**: JWT authentication, rate limiting, and comprehensive audit logging
+- **Production Monitoring**: Health checks, metrics, and performance monitoring
+- **Docker & Kubernetes**: Container orchestration with automated deployment
 
 ## 📦 Installation
 
@@ -34,74 +37,204 @@ pnpm start
 
 ```
 src/
-├── index.ts                 # Main server entry point
+├── index.ts                     # Main server with Socket.IO integration
 ├── config/
-│   └── environment.ts      # Environment configuration
+│   └── environment.ts          # Environment configuration
 ├── routes/
-│   ├── agents.ts          # Agent management endpoints
-│   ├── starships.ts       # Starship management endpoints
-│   ├── chat.ts            # Chat processing endpoints
-│   ├── memory.ts          # Memory management endpoints
-│   ├── vision.ts          # Vision chamber endpoints
-│   └── redeploy.ts        # Deployment webhook
-└── services/
-    └── AgentService.ts    # Business logic services
+│   ├── agents.ts              # Agent marketplace with analytics
+│   ├── agent-templates.ts     # Agent template marketplace
+│   ├── starships.ts          # Starship CRUD operations
+│   ├── starships-enhanced.ts # Enhanced starship creation with vision
+│   ├── missions.ts           # Mission orchestration endpoints
+│   ├── expeditions.ts        # Multi-agent expedition management
+│   ├── workflows.ts          # Workflow DSL execution
+│   ├── chat.ts              # Basic chat processing
+│   ├── sibil.ts             # AI assistant for onboarding
+│   ├── vision.ts            # Vision refinement and analysis
+│   ├── mcp-servers.ts       # MCP server template management
+│   ├── native-api-keys.ts   # Encrypted tool API key management
+│   ├── agent-communication.ts # Bidirectional agent communication
+│   ├── webhooks.ts          # Stripe webhook handling
+│   ├── users.ts             # User management and Kinde sync
+│   ├── memory.ts            # Memory management endpoints
+│   └── health.ts            # Comprehensive health monitoring
+├── services/
+│   ├── ExpeditionService.ts           # Multi-agent expedition orchestration
+│   ├── MissionService.ts             # Mission lifecycle management
+│   ├── WorkflowExecutionService.ts   # Workflow DSL execution
+│   ├── FirstOfficerService.ts        # AI expedition coordinator
+│   ├── VisionRefinementService.ts    # AI-powered vision improvement
+│   ├── VisionMetricsCalculator.ts    # Vision quality analysis
+│   ├── SocketIOService.ts            # Real-time communication
+│   ├── BidirectionalCommunicationService.ts # Agent-to-First Officer communication
+│   ├── SubscriptionService.ts        # Stripe subscription management
+│   └── AgentService.ts               # Agent marketplace operations
+├── socket/
+│   ├── expeditionHandlers.ts         # Real-time expedition events
+│   ├── missionHandlers.ts           # Mission chat and updates
+│   ├── agentHandlers.ts             # Agent communication events
+│   └── sibilHandlers.ts             # Sibil assistant events
+└── middleware/
+    ├── auth.ts                      # JWT authentication with Kinde
+    ├── starship-access.ts           # Resource ownership validation
+    ├── expedition.ts                # Expedition access control
+    └── validation.ts                # Request validation
 ```
 
 ## 🔧 API Endpoints
 
-### Chat Endpoints
+### Mission Orchestration
 
-#### Send Message
+#### Create Mission
 ```http
-POST /v1/chat
+POST /missions
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "agent_id": "agent-123",
-  "user_id": "user-456", 
-  "channel_id": "channel-789",
-  "message": "Hello, how are you?",
-  "stream": false
+  "starshipId": "starship-123",
+  "title": "Market Research Mission",
+  "objective": "Research competitive landscape for AI productivity tools",
+  "phase": "init"
 }
 ```
 
 **Response:**
 ```json
 {
-  "reply": "Hello! I'm doing well, thank you for asking. How can I help you today?",
-  "usage": {
-    "prompt_tokens": 15,
-    "completion_tokens": 20
+  "id": "mission-456",
+  "title": "Market Research Mission",
+  "objective": "Research competitive landscape for AI productivity tools",
+  "phase": "init",
+  "status": "active",
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+#### Mission Chat with Orchestrator
+```http
+POST /missions/:id/chat
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "message": "Let's start with the top 10 AI productivity tools",
+  "role": "user"
+}
+```
+
+**Response:**
+```json
+{
+  "message": {
+    "id": "msg-789",
+    "content": "I'll help you research the top AI productivity tools. Let me break this down into phases...",
+    "role": "orchestrator",
+    "timestamp": "2024-01-15T10:35:00Z"
   }
+}
+```
+
+### Multi-Agent Expeditions
+
+#### Start Expedition
+```http
+POST /starships/:starshipId/expeditions
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Competitive Analysis", 
+  "objective": "Analyze top 10 AI productivity tools and create comparison report",
+  "selectedAgents": ["research-agent", "analysis-agent"],
+  "approvalRequired": true
+}
+```
+
+**Response:**
+```json
+{
+  "expeditionId": "exp-123",
+  "title": "Competitive Analysis",
+  "phase": "plan",
+  "status": "planning",
+  "agents": ["research-agent", "analysis-agent"],
+  "createdAt": "2024-01-15T10:30:00Z"
 }
 ```
 
 ### Starship Endpoints
 
-#### List User's Starships
+### Enhanced Starship Management
+
+#### Create Starship with Vision
 ```http
-GET /starships
+POST /starships/enhanced
 Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Enterprise",
+  "class": "cruiser",
+  "vision": "To revolutionize AI-powered productivity through intelligent automation"
+}
 ```
 
 **Response:**
 ```json
 {
-  "starships": [
-    {
-      "id": "starship-123",
-      "slug": "enterprise",
-      "ownerId": "user-456",
-      "class": "cruiser",
-      "name": "Enterprise",
-      "maxActiveExpeditions": 5,
-      "maxAgents": 6,
-      "status": "active",
-      "createdAt": "2024-01-15T10:30:00Z",
-      "updatedAt": "2024-01-15T10:30:00Z"
+  "starship": {
+    "id": "starship-123",
+    "slug": "enterprise",
+    "name": "Enterprise",
+    "class": "cruiser",
+    "maxActiveExpeditions": 5,
+    "maxAgents": 6,
+    "status": "active",
+    "subscriptionStatus": "trial",
+    "vision": {
+      "id": "vision-456",
+      "statement": "To revolutionize AI-powered productivity through intelligent automation",
+      "metrics": {
+        "clarity": 0.8,
+        "specificity": 0.7,
+        "actionability": 0.9
+      }
     }
-  ]
+  }
+}
+```
+
+#### AI-Powered Vision Refinement
+```http
+PUT /starships/:id/vision
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "statement": "To build better AI tools"
+}
+```
+
+**Response:**
+```json
+{
+  "vision": {
+    "statement": "To build better AI tools",
+    "metrics": {
+      "clarity": 0.6,
+      "specificity": 0.4,
+      "actionability": 0.5,
+      "inspirational": 0.3
+    },
+    "suggestions": [
+      {
+        "type": "specificity",
+        "suggestion": "Consider specifying which types of AI tools and for what specific use cases",
+        "improvedVersion": "To develop AI-powered productivity tools that streamline workflow automation for knowledge workers"
+      }
+    ]
+  }
 }
 ```
 
@@ -161,29 +294,61 @@ Content-Type: application/json
 }
 ```
 
-### Agent Endpoints
+### Agent Marketplace
 
-#### List Agents
+#### List Agents with Filtering
 ```http
-GET /agents
+GET /agents?category=research&tags=analysis&public=true&page=1&limit=10
 Authorization: Bearer <token>
 ```
 
 **Response:**
 ```json
-[
-  {
-    "id": "agent-123",
-    "name": "Assistant",
-    "model": "gpt-4",
-    "systemPrompt": "You are a helpful assistant",
-    "starshipId": "starship-123",
-    "category": "general",
-    "tags": ["assistant", "general"],
-    "isPublic": false,
-    "authorId": "user-456"
+{
+  "agents": [
+    {
+      "id": "agent-123",
+      "name": "Research Analyst",
+      "model": "gpt-4",
+      "category": "research",
+      "tags": ["analysis", "research", "data"],
+      "isPublic": true,
+      "authorId": "user-456",
+      "rating": 4.8,
+      "usageCount": 1250,
+      "starshipId": "starship-123"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 45,
+    "totalPages": 5
   }
-]
+}
+```
+
+#### Agent Analytics
+```http
+GET /agents/:id/analytics
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "usage": {
+    "totalInvocations": 1250,
+    "last30Days": 89,
+    "averageRating": 4.8,
+    "totalRatings": 156
+  },
+  "performance": {
+    "averageResponseTime": 2.3,
+    "successRate": 0.97,
+    "errorRate": 0.03
+  }
+}
 ```
 
 #### Create Agent
@@ -289,20 +454,123 @@ POST /v1/memory/reset
 }
 ```
 
-### Administrative Endpoints
+### MCP Tool Integration
 
-#### Health Check
+#### List MCP Server Templates
 ```http
-GET /health
+GET /mcp-servers
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "mcp-github",
+    "name": "GitHub",
+    "slug": "github",
+    "description": "GitHub repository management and code analysis",
+    "category": "development",
+    "dockerImage": "starships/mcp-github:latest",
+    "requiredApiKeys": ["GITHUB_TOKEN"],
+    "tools": ["list_repos", "read_file", "create_issue"]
+  }
+]
+```
+
+#### Manage Native Tool API Keys
+```http
+PUT /starships/:starshipId/native-api-keys
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "apiKeys": {
+    "firecrawl": "fc-api-key-12345",
+    "notion": "secret_notion-key-67890"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "message": "API keys updated successfully",
+  "encryptedKeys": {
+    "firecrawl": "encrypted:AES256:...",
+    "notion": "encrypted:AES256:..."
+  }
+}
+```
+
+### Real-Time Communication
+
+**Socket.IO Events:**
+- `expedition:progress` - Real-time expedition updates
+- `mission:message` - Mission chat messages
+- `vision:refinement` - Live vision improvement suggestions
+- `agent:activity` - Agent status and activity
+- `workflow:status` - Workflow execution progress
+
+### Stripe Billing Integration
+
+#### Stripe Webhook
+```http
+POST /webhooks/stripe
+Stripe-Signature: <webhook-signature>
+Content-Type: application/json
+
+{
+  "type": "checkout.session.completed",
+  "data": {
+    "object": {
+      "subscription": "sub_1234567890",
+      "customer": "cus_1234567890"
+    }
+  }
+}
+```
+
+**Features:**
+- Idempotency protection for webhook events
+- Automatic subscription status updates
+- Payment failure handling and retries
+- Billing portal integration
+
+### Comprehensive Health Monitoring
+
+#### Detailed Health Check
+```http
+GET /health/detailed
 ```
 
 **Response:**
 ```json
 {
   "status": "healthy",
-  "timestamp": "2024-01-15T10:30:00Z",
-  "uptime": 3600,
-  "version": "1.0.0"
+  "services": {
+    "database": {
+      "status": "healthy",
+      "latency": 12
+    },
+    "socketio": {
+      "status": "healthy", 
+      "connectedClients": 45
+    },
+    "stripe": {
+      "status": "healthy",
+      "lastWebhook": "2024-01-15T10:25:00Z"
+    }
+  },
+  "metrics": {
+    "memory": {
+      "used": 234567890,
+      "total": 1073741824
+    },
+    "cpu": {
+      "usage": 0.23
+    }
+  }
 }
 ```
 
@@ -338,14 +606,45 @@ NEO4J_PASSWORD=[DEFAULT-PASSWORD]
 # LLM Provider Configuration
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
+DEFAULT_LLM_PROVIDER=openai
 
-# Security
+# Authentication (Kinde)
+KINDE_DOMAIN=your-domain.kinde.com
+KINDE_CLIENT_ID=your_client_id
+KINDE_CLIENT_SECRET=your_client_secret
+KINDE_REDIRECT_URI=http://localhost:3000/api/auth/kinde_callback
+KINDE_LOGOUT_REDIRECT_URI=http://localhost:3000
+
+# Stripe Payment Integration
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRODUCT_SCOUT_ID=prod_scout_...
+STRIPE_PRODUCT_CRUISER_ID=prod_cruiser_...
+STRIPE_PRODUCT_DRAUGHT_ID=prod_draught_...
+
+# MCP Integration
+MCP_HTTP_BRIDGE_PORT=3001
+MCP_DOCKER_NETWORK=starships-mcp
+MCP_DOCKER_REGISTRY=starships
+
+# Native Tool APIs
+FIRECRAWL_API_KEY=your_firecrawl_key
+NOTION_API_KEY=your_notion_key
+BRAVE_SEARCH_API_KEY=your_brave_key
+
+# Security & Encryption
 WEBHOOK_SECRET=your_webhook_secret
-API_KEY=your_api_key
+ENCRYPTION_KEY=your_32_byte_encryption_key
 
-# Logging
+# Socket.IO Configuration
+SOCKET_IO_CORS_ORIGIN=http://localhost:3000
+SOCKET_IO_TRANSPORTS=websocket,polling
+
+# Logging & Monitoring
 LOG_LEVEL=info
 LOG_FORMAT=json
+PROMETHEUS_METRICS_PORT=9090
 ```
 
 ### Server Configuration
@@ -695,12 +994,14 @@ node --inspect-brk dist/index.js
 ## 📚 Dependencies
 
 ### Core Dependencies
-- **express**: Web framework for Node.js
-- **cors**: Cross-origin resource sharing
-- **dotenv**: Environment variable loading
-- **@starships/agent-engine**: Core AI processing
-- **@starships/models**: Database layer
-- **@starships/protocol**: Shared types
+- **express**: Web framework for Node.js with Socket.IO integration
+- **socket.io**: Real-time bidirectional communication
+- **stripe**: Payment processing and subscription management
+- **@kinde-oss/kinde-node-express**: JWT authentication
+- **@starships/agent-engine**: Advanced AI orchestration with MCP tools
+- **@starships/models**: Neo4j database with migration system
+- **@starships/protocol**: Shared types for missions, workflows, and Socket.IO events
+- **@starships/core**: MCP HTTP bridge services
 
 ### Development Dependencies
 - **jest**: Testing framework

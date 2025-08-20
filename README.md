@@ -1,8 +1,8 @@
-# starships.ai – Multi-Channel AI Agent Platform
+# starships.ai – AI-Powered Starship Mission Control Platform
 
-starships.ai is a TypeScript monorepo that provides a flexible HTTP API for AI agents with persistent memory and Neo4j-backed storage. The platform supports multiple AI agents with customizable personalities and can be integrated with any chat platform through adapters.
+starships.ai is a sophisticated TypeScript monorepo that orchestrates multi-agent AI expeditions through an advanced mission control platform. Built for complex mission planning and execution, it features workflow DSL, MCP tool integration, real-time communication, vision refinement, and enterprise-grade billing.
 
-> **Project status:** Core platform ready. Adapters for Discord, Slack, and other platforms are planned.
+> **Project status:** Production-ready platform with advanced mission orchestration, workflow execution, and payment processing. Continuous development of expedition features.
 
 ## 📚 Documentation
 
@@ -70,10 +70,13 @@ For detailed development workflow, see the [Development Guide](./docs/developmen
 
 | Package | Description |
 |---------|-------------|
-| `@starships/server` | Express.js HTTP API server with routing and middleware |
-| `@starships/agent-engine` | Core AI chat logic with memory management and LLM integration |
-| `@starships/models` | Neo4j database models and repositories |
-| `@starships/protocol` | Shared TypeScript interfaces and API contracts |
+| `@starships/server` | Express.js HTTP API server with mission orchestration, expeditions, workflows, and real-time communication |
+| `@starships/agent-engine` | Advanced AI orchestration with MCP tool integration, First Officer system, and workflow execution |
+| `@starships/models` | Neo4j graph database with mission system, MCP connectors, vision management, and Stripe integration |
+| `@starships/protocol` | TypeScript interfaces for missions, workflows, Socket.IO events, and MCP protocols |
+| `@starships/client` | Next.js frontend for mission control, expeditions, vision chambers, and starship management |
+| `@starships/core` | HTTP bridge services for MCP integration and Docker deployment orchestration |
+| `@starships/env-config` | Centralized environment configuration with validation for all services |
 
 ---
 
@@ -81,28 +84,66 @@ For detailed development workflow, see the [Development Guide](./docs/developmen
 
 - **Monorepo:** pnpm Workspaces + Turborepo
 - **Language:** TypeScript 5 (strict) with project references
-- **Database:** Neo4j graph database with Cypher queries
-- **AI:** LangChain + OpenAI/Anthropic with FAISS vector storage
-- **Server:** Express.js 5 with CORS and JSON middleware
+- **Database:** Neo4j graph database with Cypher queries and migration system
+- **AI & LLM:** LangChain + LangGraph, OpenAI/Anthropic with FAISS vector storage
+- **Server:** Express.js 5 with Socket.IO real-time communication
+- **Orchestration:** Kubernetes + Docker with automated MCP connector deployment
+- **Payments:** Stripe integration with subscription management and webhook handling
+- **Tools:** MCP (Model Context Protocol) with HTTP bridge and tool discovery
+- **Frontend:** Next.js with real-time UI and mission control interfaces
 
 ---
 
 ## 🌐 API Overview
 
-### Core Endpoints
-- `GET /v1/agents` - List all available agents
-- `POST /v1/chat` - Send message to agent and get response
-- `POST /v1/memory/reset` - Clear conversation memory
-- `POST /redeploy` - Administrative webhook (requires auth)
+### Core Feature APIs
+
+**Mission & Expedition Management:**
+- `POST /missions` - Create and manage mission orchestration
+- `POST /starships/:id/expeditions` - Multi-agent expedition execution
+- `GET /missions/:id/chat` - Mission chat and orchestrator communication
+
+**Agent & Starship Operations:**
+- `GET /agents` - List agents with marketplace filtering
+- `POST /starships/enhanced` - Create starships with vision integration
+- `PUT /starships/:id/vision` - AI-powered vision refinement
+
+**MCP Tool Integration:**
+- `GET /mcp-servers` - Available MCP server templates
+- `PUT /starships/:id/native-api-keys` - Encrypted tool API key management
+
+**Real-time Communication:**
+- Socket.IO endpoints for expeditions, missions, and chat
+- WebSocket-based progress tracking and status updates
+
+**Workflow Execution:**
+- Workflow DSL execution with approval workflows
+- Real-time workflow visualization and monitoring
+
+**Payment & Billing:**
+- `POST /webhooks/stripe` - Stripe subscription management
+- Automated billing for different starship classes
 
 ### Example Chat Request
 ```bash
-curl -X POST http://localhost:4000/v1/chat \
+# Create a mission
+curl -X POST http://localhost:4000/missions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
   -d '{
-    "agent_id": "agent-1",
-    "user_id": "user-123",
-    "message": "Hello!"
+    "starshipId": "starship-123",
+    "title": "Market Research Mission",
+    "objective": "Research competitive landscape for AI tools"
+  }'
+
+# Start an expedition
+curl -X POST http://localhost:4000/starships/starship-123/expeditions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "title": "Competitive Analysis",
+    "objective": "Analyze top 10 AI productivity tools",
+    "selectedAgents": ["research-agent", "analysis-agent"]
   }'
 ```
 
@@ -112,13 +153,30 @@ For complete API documentation with examples, see [API Design](./docs/api-design
 
 ## 🐳 Docker Deployment
 
-```bash
-# Build image
-docker build -t starships.ai .
+### Docker Deployment
 
-# Run container
+```bash
+# Build and run the platform
+docker build -t starships.ai .
 docker run -p 4000:4000 --env-file .env starships.ai
 ```
+
+### Kubernetes Deployment
+
+```bash
+# Setup development cluster
+pnpm k8s:setup
+
+# Deploy to staging/production
+pnpm deploy:staging
+pnpm deploy:production
+
+# Monitor deployments
+pnpm deployment:health-check
+pnpm k8s:status
+```
+
+For complete deployment guide, see [Deployment Documentation](./docs/deployment-guide.md).
 
 ---
 
@@ -130,9 +188,21 @@ GitHub Actions automatically builds and pushes Docker images to GHCR on every pu
 
 ## 🗺️ Roadmap
 
-- Slash-command support for persona & memory management
-- Automated tests (unit + integration)
-- Helm chart / Terraform module for cloud-native deploys
-- Additional LLM provider integrations
+**Current Platform Features:**
+- ✅ Mission orchestration with AI-powered planning
+- ✅ Multi-agent expedition execution with real-time coordination
+- ✅ Workflow DSL with approval workflows and quality validation
+- ✅ MCP tool integration with Docker deployment
+- ✅ Vision refinement with AI-powered improvement suggestions
+- ✅ Stripe billing with subscription management
+- ✅ Real-time Socket.IO communication
+- ✅ Enterprise-grade backup and disaster recovery
+
+**Roadmap:**
+- Enhanced expedition orchestration with advanced agent coordination
+- Advanced workflow templates and marketplace
+- Additional MCP connectors and tool integrations
+- Mobile applications for mission monitoring
+- Enterprise SSO and advanced security features
 
 Contributions are welcome 🛸

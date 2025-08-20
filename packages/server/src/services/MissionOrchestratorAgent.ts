@@ -13,6 +13,7 @@ import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import { WorkflowService } from './WorkflowService';
+import { MISSION_PHASES } from '@starships/protocol';
 import { WorkflowParsingService } from './WorkflowParsingService';
 import type { 
   Mission, 
@@ -205,8 +206,8 @@ export class MissionOrchestratorAgent {
     updates.metadata = metadata;
     
     // Handle init -> welcome transition automatically
-    if (metadata.mission.phase === 'init') {
-      updates.activePhase = 'welcome';
+    if (metadata.mission.phase === MISSION_PHASES.INIT) {
+      updates.activePhase = MISSION_PHASES.WELCOME;
     } else {
       updates.activePhase = metadata.mission.phase;
     }
@@ -238,7 +239,7 @@ export class MissionOrchestratorAgent {
    * Conditional edge function to determine phase routing
    */
   private phaseRouterNode(state: MissionChatState): string {
-    return state.activePhase || 'welcome'; // Returns current phase or default to welcome
+    return state.activePhase || MISSION_PHASES.WELCOME; // Returns current phase or default to welcome
   }
 
   /**
@@ -311,7 +312,7 @@ export class MissionOrchestratorAgent {
     // Set activePhase to signal transition to analysis after welcome
     return { 
       messages: [aiMessage],
-      activePhase: 'analysis'
+      activePhase: MISSION_PHASES.ANALYSIS
     };
   }
 
@@ -346,7 +347,7 @@ export class MissionOrchestratorAgent {
       return {
         messages: [aiMessage],
         clarity,
-        activePhase: 'plan' // Transition to plan phase
+        activePhase: MISSION_PHASES.PLAN // Transition to plan phase
       };
     } else {
       // Generate next question and END - wait for human response
@@ -384,7 +385,7 @@ export class MissionOrchestratorAgent {
         
         // Update mission phase in database to reflect transition
         const missionRepo = RepositoryFactory.getMissionRepository();
-        await missionRepo.updateMission(metadata.mission.id, { phase: 'plan' });
+        await missionRepo.updateMission(metadata.mission.id, { phase: MISSION_PHASES.PLAN });
       }
       
       // Present workflow to user for approval
@@ -403,15 +404,15 @@ export class MissionOrchestratorAgent {
       return {
         messages: [aiMessage],
         workflow,
-        activePhase: 'plan',
+        activePhase: MISSION_PHASES.PLAN,
         metadata: {
           ...metadata,
-          mission: { ...metadata.mission, phase: 'plan' }
+          mission: { ...metadata.mission, phase: MISSION_PHASES.PLAN }
         }
       };
     } catch (error) {
       this.logger.error('Plan phase failed', { error });
-      return { activePhase: 'analysis', isSystemInitiated: true };
+      return { activePhase: MISSION_PHASES.ANALYSIS, isSystemInitiated: true };
     }
   }
 

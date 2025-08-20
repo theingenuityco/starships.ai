@@ -11,7 +11,8 @@ import { missionApi } from '@/lib/missionApi';
 import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
-import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity } from '@starships/protocol';
+import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity, MissionPhase } from '@starships/protocol';
+import { getMissionPhaseConfig, MISSION_PHASES, isValidMissionPhase } from '@starships/protocol';
 import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
 
 interface MissionDetailPageProps {
@@ -101,17 +102,22 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     }
   };
 
-  // Function to get current phase information
+  // Function to get current phase information using centralized config
   const getCurrentPhase = (currentPhase: string) => {
-    const phases = {
-      'init': { label: 'Init', description: 'Setting up mission context' },
-      'welcome': { label: 'Welcome', description: 'Mission introduction' },
-      'analysis': { label: 'Analysis', description: 'Analyzing mission clarity' },
-      'plan': { label: 'Workflow', description: 'Reviewing execution workflow' },
-      'converse': { label: 'Converse', description: 'Active conversation phase' }
+    if (isValidMissionPhase(currentPhase)) {
+      return getMissionPhaseConfig(currentPhase);
+    }
+    // Fallback for invalid phases
+    return {
+      label: currentPhase,
+      description: 'Unknown phase',
+      icon: '❓',
+      color: {
+        background: 'bg-gray-100',
+        border: 'border-gray-200',
+        text: 'text-gray-800',
+      },
     };
-
-    return phases[currentPhase as keyof typeof phases] || { label: currentPhase, description: 'Current phase' };
   };
 
   // Central message handler - single source of truth
@@ -124,7 +130,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     if (approved) {
       // Workflow was approved, mission should transition to converse phase
       // This will be handled by the WebSocket event or we can optimistically update
-      setMission(prev => prev ? { ...prev, phase: 'converse' } : null);
+      setMission(prev => prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null);
     }
     // If rejected, stay in plan phase for regeneration
   };
@@ -471,9 +477,11 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                     <div className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="relative flex-shrink-0">
-                          <div className="p-1.5 rounded-md bg-primary/20 transition-all duration-300">
+                          <div className={`p-1.5 rounded-md ${getCurrentPhase(mission.phase).color.background} transition-all duration-300`}>
                             <div className="w-3.5 h-3.5 flex items-center justify-center">
-                              <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                              <span className={`text-xs ${getCurrentPhase(mission.phase).color.text}`}>
+                                {getCurrentPhase(mission.phase).icon}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -492,7 +500,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               </div>
 
               {/* Mission Workflow Section - Only show during plan phase */}
-              {mission.phase === 'plan' && (
+              {mission.phase === MISSION_PHASES.PLAN && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
                     <button

@@ -8,6 +8,7 @@
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
+import { MISSION_PHASES } from '@starships/protocol';
 import type { Agent } from '@starships/models';
 
 /**
@@ -251,13 +252,13 @@ export class MissionPromptBuilder {
     const { activePhase } = this.state;
     
     switch (activePhase) {
-      case 'welcome':
+      case MISSION_PHASES.WELCOME:
         return this.buildWelcomePhaseContext();
-      case 'analysis':
+      case MISSION_PHASES.ANALYSIS:
         return this.buildAnalysisPhaseContext();
-      case 'plan':
+      case MISSION_PHASES.PLAN:
         return this.buildPlanPhaseContext();
-      case 'converse':
+      case MISSION_PHASES.CONVERSE:
         return this.buildConversePhaseContext();
       default:
         return '';

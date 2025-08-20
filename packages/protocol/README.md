@@ -1,14 +1,18 @@
 # @starships/protocol
 
-Shared TypeScript interfaces and API contracts for the Starships platform. Provides type safety and consistency across all packages in the monorepo.
+Comprehensive TypeScript interfaces and type definitions for the Starships mission control platform. Provides type safety for missions, workflows, expeditions, Socket.IO events, MCP integration, and all platform features.
 
 ## 🚀 Features
 
-- **Type Safety**: Comprehensive TypeScript interfaces
-- **API Contracts**: Standardized request/response formats
-- **Cross-Package Consistency**: Shared types across all services
-- **Zero Dependencies**: Pure TypeScript definitions
-- **Extensible**: Easy to extend with new types and interfaces
+- **Mission Types**: Complete mission orchestration with phase management and clarity assessment
+- **Workflow DSL**: Full workflow definition language with execution state types
+- **Socket.IO Events**: Real-time communication types for expeditions, missions, and vision refinement
+- **MCP Integration**: Model Context Protocol types for tool integration and connector management
+- **Expedition System**: Multi-agent expedition coordination types (stubbed for compilation)
+- **Vision Refinement**: AI-powered vision improvement with quality metrics
+- **Stripe Integration**: Payment and subscription management types
+- **Error Handling**: Standardized error classes with HTTP status mapping
+- **Agent Marketplace**: Enhanced agent types with ratings, categories, and analytics
 
 ## 📦 Installation
 
@@ -22,99 +26,369 @@ pnpm build
 
 ## 🏗️ Type Definitions
 
-### Core API Types
+### Mission Orchestration Types
 
-#### Chat Interface
+#### Mission Management
 ```typescript
-interface ChatRequest {
-  agent_id: string;       // Agent identifier
-  user_id: string;        // User identifier
-  channel_id?: string;    // Optional channel context
-  message: string;        // User message content
-  stream?: boolean;       // Enable streaming response
+interface Mission {
+  id: string;
+  title: string;
+  objective: string;
+  starshipId: string;
+  phase: 'init' | 'welcome' | 'analysis' | 'plan' | 'converse';
+  status: 'active' | 'completed' | 'paused' | 'error';
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface ChatResponse {
-  reply: string;          // Agent's response
-  usage?: UsageStats;     // Token usage statistics
-}
-```
-
-#### Usage Statistics
-```typescript
-interface UsageStats {
-  prompt_tokens: number;      // Input tokens consumed
-  completion_tokens: number;  // Output tokens generated
-}
-```
-
-### Agent Configuration
-
-```typescript
-interface AgentConfig {
-  id: string;                        // Unique agent identifier
-  name: string;                      // Display name
-  model: string;                     // LLM model identifier
-  provider?: 'openai' | 'anthropic'; // LLM provider
-  systemPrompt?: string;             // System instructions
-}
-```
-
-### Memory System Types
-
-#### Memory Entries
-```typescript
-interface MemoryEntry {
-  role: "user" | "assistant" | "system";
+interface MissionMessage {
+  id: string;
+  missionId: string;
   content: string;
-  timestamp?: number;
+  role: 'user' | 'orchestrator' | 'system';
+  timestamp: Date;
+  metadata?: Record<string, any>;
 }
 
-interface EnhancedMemoryEntry extends MemoryEntry {
-  embedding?: number[];    // Vector embedding
-  importance?: number;     // Relevance score (0-1)
-  summary?: string;        // Content summary
-}
-```
-
-#### Memory Search
-```typescript
-interface MemorySearchResult {
-  entries: EnhancedMemoryEntry[];
-  relevanceScores: number[];
-}
-
-type SessionKey = string;  // Format: "agent_id:user_id:channel_id"
-```
-
-### LLM Provider Interface
-
-#### Provider Contract
-```typescript
-interface LLMProvider {
-  complete(
-    prompt: LLMChatPrompt, 
-    opts?: {
-      stream?: boolean;
-      temperature?: number;
-      maxTokens?: number;
-    }
-  ): Promise<LLMResult>;
+interface MissionClarity {
+  id: string;
+  missionId: string;
+  clarity: number;      // 0-1 scale
+  specificity: number;
+  feasibility: number;
+  measurability: number;
+  timebound: number;
+  overallScore: number;
+  suggestions?: string[];
 }
 ```
 
-#### LLM Types
+#### Starship Management
 ```typescript
-interface LLMChatPrompt {
-  messages: Array<{
-    role: "system" | "assistant" | "user";
-    content: string;
-  }>;
+interface Starship {
+  id: string;
+  name: string;
+  slug: string;
+  class: 'scout' | 'cruiser' | 'draught';
+  ownerId: string;
+  maxActiveExpeditions: number;
+  maxAgents: number;
+  subscriptionStatus: 'trial' | 'active' | 'past_due' | 'canceled';
+  stripeCustomerId?: string;
+  vision?: Vision;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Workflow DSL Types
+
+#### Workflow Definition
+```typescript
+interface WorkflowDSL {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+  metadata?: {
+    name?: string;
+    description?: string;
+    version?: string;
+    expeditionId?: string;
+  };
 }
 
-interface LLMResult {
-  reply: string;
-  usage?: UsageStats;
+interface WorkflowNode {
+  id: string;
+  type: 'start' | 'end' | 'agent' | 'conditional' | 'user_prompt' | 'output';
+  data: WorkflowNodeData;
+  position?: { x: number; y: number };
+}
+
+interface WorkflowEdge {
+  id: string;
+  from: string;
+  to: string;
+  condition?: string;
+  label?: string;
+}
+
+interface WorkflowExecutionContext {
+  workflowId: string;
+  expeditionId?: string;
+  userId: string;
+  starshipId: string;
+  variables: Record<string, any>;
+  services: {
+    agentService?: any;
+    missionService?: any;
+    socketService?: any;
+  };
+}
+
+interface WorkflowRuntimeState {
+  id: string;
+  workflowId: string;
+  currentNode: string;
+  state: Record<string, any>;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused';
+  history: WorkflowExecutionStep[];
+}
+```
+
+### Enhanced Agent Types
+
+```typescript
+interface Agent {
+  id: string;
+  name: string;
+  model: string;
+  systemPrompt: string;
+  starshipId: string;
+  category: string;
+  tags: string[];
+  isPublic: boolean;
+  authorId: string;
+  rating: number;
+  usageCount: number;
+  deploymentSettings?: {
+    maxConcurrentTasks?: number;
+    timeoutMs?: number;
+    retryAttempts?: number;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  systemPrompt: string;
+  model: string;
+  isPublic: boolean;
+  authorId: string;
+  usageCount: number;
+  rating: number;
+}
+
+interface AgentAnalytics {
+  agentId: string;
+  totalInvocations: number;
+  averageResponseTime: number;
+  successRate: number;
+  errorRate: number;
+  last30DaysUsage: number;
+  ratings: {
+    average: number;
+    total: number;
+    distribution: Record<number, number>;
+  };
+}
+```
+
+### Vision Refinement Types
+
+#### Vision Management
+```typescript
+interface Vision {
+  id: string;
+  starshipId: string;
+  statement: string;
+  clarity: number;
+  specificity: number;
+  actionability: number;
+  inspirational: number;
+  confidence: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface VisionMetrics {
+  clarity: number;
+  specificity: number;
+  actionability: number;
+  inspirational: number;
+  measurability: number;
+  confidence: number;
+  overallScore: number;
+}
+
+interface VisionRefinementProposal {
+  type: 'clarity' | 'specificity' | 'actionability' | 'inspirational' | 'measurability';
+  currentScore: number;
+  suggestion: string;
+  improvedVersion: string;
+  confidenceScore: number;
+  reasoning: string;
+}
+
+interface VisionRefinementSession {
+  id: string;
+  visionId: string;
+  userId: string;
+  proposals: VisionRefinementProposal[];
+  acceptedProposals: string[];
+  status: 'active' | 'completed' | 'abandoned';
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### MCP Integration Types
+
+#### MCP Server Management
+```typescript
+interface MCPServerOption {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  category: string;
+  dockerImage: string;
+  version: string;
+  requiredApiKeys: string[];
+  optionalApiKeys: string[];
+  tools: MCPTool[];
+  supportedPlatforms: string[];
+  documentation?: string;
+}
+
+interface MCPServerConnector {
+  id: string;
+  mcpServerId: string;
+  starshipId: string;
+  dockerStatus: 'pending' | 'building' | 'running' | 'stopped' | 'error';
+  httpBridgeEnabled: boolean;
+  httpBridgeUrl?: string;
+  port?: number;
+  environmentVariables: Record<string, string>;
+  lastHealthCheck?: Date;
+  errorMessage?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, any>;
+  outputSchema?: Record<string, any>;
+  category?: string;
+  examples?: MCPToolExample[];
+}
+
+interface NativeToolApiKey {
+  id: string;
+  starshipId: string;
+  tool: string;
+  encryptedKey: string;
+  isConfigured: boolean;
+  lastUsed?: Date;
+}
+```
+
+### Socket.IO Event Types
+
+#### Real-time Communication
+```typescript
+// Mission events
+interface MissionChatEvent {
+  missionId: string;
+  message: MissionMessage;
+  timestamp: Date;
+}
+
+interface MissionPhaseUpdateEvent {
+  missionId: string;
+  phase: Mission['phase'];
+  timestamp: Date;
+}
+
+// Expedition events (stubbed)
+interface ExpeditionProgressEvent {
+  expeditionId: string;
+  phase: 'plan' | 'workflow' | 'execute' | 'review';
+  progress: number;
+  message?: string;
+  timestamp: Date;
+}
+
+interface ExpeditionActivityEvent {
+  expeditionId: string;
+  agentId: string;
+  activity: string;
+  timestamp: Date;
+}
+
+// Vision refinement events
+interface VisionRefinementEvent {
+  visionId: string;
+  sessionId: string;
+  proposals: VisionRefinementProposal[];
+  timestamp: Date;
+}
+
+// Agent communication events
+interface AgentCommunicationEvent {
+  expeditionId: string;
+  fromAgentId: string;
+  toAgentId?: string;
+  message: string;
+  messageType: 'status' | 'request' | 'response' | 'broadcast';
+  timestamp: Date;
+}
+
+// Connection and presence
+interface UserJoinedEvent {
+  userId: string;
+  starshipId: string;
+  timestamp: Date;
+}
+
+interface TypingIndicatorEvent {
+  userId: string;
+  location: string; // missionId, expeditionId, etc.
+  isTyping: boolean;
+}
+```
+
+### Expedition Types (Stubbed)
+
+#### Expedition Coordination
+```typescript
+// Note: Expedition system is intentionally stubbed for development focus
+interface ExpeditionStub {
+  id: string;
+  title: string;
+  objective: string;
+  starshipId: string;
+  selectedAgents: string[];
+  phase: 'plan' | 'workflow' | 'execute' | 'review';
+  status: 'planning' | 'active' | 'completed' | 'failed';
+  approvalRequired: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface ExpeditionTaskStub {
+  id: string;
+  expeditionId: string;
+  title: string;
+  description: string;
+  assignedAgentId?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  dependencies: string[];
+  result?: any;
+}
+
+interface ExpeditionMessageStub {
+  id: string;
+  expeditionId: string;
+  agentId?: string;
+  content: string;
+  role: 'user' | 'agent' | 'first_officer' | 'system';
+  timestamp: Date;
 }
 ```
 
@@ -122,71 +396,153 @@ interface LLMResult {
 
 ### In Server Package
 ```typescript
-import type { ChatRequest, ChatResponse } from '@starships/protocol';
+import type { 
+  Mission, 
+  MissionMessage, 
+  Starship, 
+  VisionRefinementProposal 
+} from '@starships/protocol';
 
-app.post('/v1/chat', async (req: Request, res: Response) => {
-  const chatRequest: ChatRequest = req.body;
-  const response: ChatResponse = await processChat(chatRequest);
-  res.json(response);
+// Mission orchestration
+app.post('/missions', async (req: Request, res: Response) => {
+  const mission: Mission = await missionService.create(req.body);
+  res.json(mission);
+});
+
+// Vision refinement
+app.put('/starships/:id/vision', async (req: Request, res: Response) => {
+  const proposals: VisionRefinementProposal[] = await visionService.refine(
+    req.params.id, 
+    req.body.statement
+  );
+  res.json({ proposals });
 });
 ```
 
 ### In Agent Engine
 ```typescript
 import type { 
-  ChatRequest, 
-  ChatResponse, 
-  MemoryEntry,
-  LLMProvider 
+  ExpeditionStub,
+  WorkflowDSL,
+  WorkflowExecutionContext,
+  MCPTool,
+  Agent
 } from '@starships/protocol';
 
-export async function chat(
-  req: ChatRequest, 
-  provider: LLMProvider
-): Promise<ChatResponse> {
-  // Implementation using shared types
+// First Officer expedition orchestration
+export class FirstOfficerAgent {
+  async executeExpedition(
+    expedition: ExpeditionStub,
+    context: WorkflowExecutionContext
+  ): Promise<ExpeditionResult> {
+    // Implementation using shared types
+  }
+
+  async executeWorkflow(
+    workflow: WorkflowDSL,
+    context: WorkflowExecutionContext
+  ): Promise<WorkflowResult> {
+    // Workflow execution implementation
+  }
 }
 ```
 
 ### In Client Package
 ```typescript
-import type { ChatRequest, ChatResponse } from '@starships/protocol';
+import type { 
+  Mission, 
+  MissionMessage, 
+  VisionRefinementEvent,
+  ExpeditionProgressEvent 
+} from '@starships/protocol';
+import { io, Socket } from 'socket.io-client';
 
-const sendMessage = async (message: string): Promise<ChatResponse> => {
-  const request: ChatRequest = {
-    agent_id: 'agent-123',
-    user_id: 'user-456',
-    message
-  };
-  
-  const response = await fetch('/api/chat', {
+// Mission chat interface
+const sendMissionMessage = async (missionId: string, content: string): Promise<MissionMessage> => {
+  const response = await fetch(`/api/missions/${missionId}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request)
+    body: JSON.stringify({ message: content, role: 'user' })
   });
   
-  return response.json() as ChatResponse;
+  return response.json() as MissionMessage;
 };
+
+// Real-time Socket.IO integration
+const socket: Socket = io();
+
+socket.on('mission:message', (event: MissionChatEvent) => {
+  console.log('New mission message:', event.message);
+});
+
+socket.on('vision:refinement', (event: VisionRefinementEvent) => {
+  console.log('Vision refinement proposals:', event.proposals);
+});
+
+socket.on('expedition:progress', (event: ExpeditionProgressEvent) => {
+  console.log('Expedition progress:', event.progress);
+});
 ```
 
 ## 📊 Type Validation
 
-### Runtime Type Checking
+### Error Handling Types
+
 ```typescript
-// Type guards for runtime validation
-export function isChatRequest(obj: any): obj is ChatRequest {
+// Standardized error classes
+export enum ErrorType {
+  VALIDATION = 'validation',
+  AUTHENTICATION = 'authentication',
+  AUTHORIZATION = 'authorization',
+  NOT_FOUND = 'not_found',
+  CONFLICT = 'conflict',
+  DATABASE = 'database',
+  NETWORK = 'network',
+  BUSINESS_LOGIC = 'business_logic'
+}
+
+export interface ErrorDetails {
+  type: ErrorType;
+  message: string;
+  code?: string;
+  statusCode: number;
+  context?: Record<string, any>;
+  timestamp: Date;
+}
+
+export class StarshipsError extends Error {
+  readonly type: ErrorType;
+  readonly statusCode: number;
+  readonly code?: string;
+  readonly context?: Record<string, any>;
+  readonly timestamp: Date;
+
+  constructor(details: ErrorDetails) {
+    super(details.message);
+    this.type = details.type;
+    this.statusCode = details.statusCode;
+    this.code = details.code;
+    this.context = details.context;
+    this.timestamp = details.timestamp;
+  }
+}
+
+// Runtime type checking
+export function isMission(obj: any): obj is Mission {
   return (
     typeof obj === 'object' &&
-    typeof obj.agent_id === 'string' &&
-    typeof obj.user_id === 'string' &&
-    typeof obj.message === 'string'
+    typeof obj.id === 'string' &&
+    typeof obj.title === 'string' &&
+    typeof obj.objective === 'string' &&
+    typeof obj.starshipId === 'string'
   );
 }
 
-export function isChatResponse(obj: any): obj is ChatResponse {
+export function isWorkflowDSL(obj: any): obj is WorkflowDSL {
   return (
     typeof obj === 'object' &&
-    typeof obj.reply === 'string'
+    Array.isArray(obj.nodes) &&
+    Array.isArray(obj.edges)
   );
 }
 ```
@@ -214,57 +570,115 @@ export const ChatResponseSchema = z.object({
 
 ## 🔀 API Contracts
 
-### RESTful Endpoints
+### API Endpoint Contracts
 
-#### Chat Endpoints
+#### Mission Management Endpoints
 ```typescript
-// POST /v1/chat
-type ChatEndpoint = {
+// POST /missions
+type CreateMissionEndpoint = {
   method: 'POST';
-  path: '/v1/chat';
-  request: ChatRequest;
-  response: ChatResponse;
+  path: '/missions';
+  request: Partial<Mission>;
+  response: Mission;
 };
 
-// DELETE /v1/chat/:sessionKey/memory
-type ClearMemoryEndpoint = {
-  method: 'DELETE';
-  path: '/v1/chat/:sessionKey/memory';
-  response: { success: boolean };
+// GET /missions/:id
+type GetMissionEndpoint = {
+  method: 'GET';
+  path: '/missions/:id';
+  response: Mission;
+};
+
+// POST /missions/:id/chat
+type MissionChatEndpoint = {
+  method: 'POST';
+  path: '/missions/:id/chat';
+  request: { message: string; role: 'user' | 'orchestrator' };
+  response: MissionMessage;
 };
 ```
 
-#### Agent Endpoints
+#### Enhanced Agent Endpoints
 ```typescript
-// GET /v1/agents
+// GET /agents
 type ListAgentsEndpoint = {
   method: 'GET';
-  path: '/v1/agents';
-  response: AgentConfig[];
+  path: '/agents';
+  query?: {
+    category?: string;
+    tags?: string;
+    public?: boolean;
+    page?: number;
+    limit?: number;
+  };
+  response: {
+    agents: Agent[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
+  };
 };
 
-// GET /v1/agents/:id
-type GetAgentEndpoint = {
+// GET /agents/:id/analytics
+type AgentAnalyticsEndpoint = {
   method: 'GET';
-  path: '/v1/agents/:id';
-  response: AgentConfig;
+  path: '/agents/:id/analytics';
+  response: AgentAnalytics;
+};
+
+// PUT /starships/:id/vision
+type VisionRefinementEndpoint = {
+  method: 'PUT';
+  path: '/starships/:id/vision';
+  request: { statement: string };
+  response: {
+    vision: Vision;
+    proposals: VisionRefinementProposal[];
+  };
 };
 ```
 
-### WebSocket Events
+### Stripe Integration Types
+
 ```typescript
-interface WebSocketMessage {
-  type: 'chat_message' | 'agent_typing' | 'error';
-  payload: any;
-  timestamp: number;
+interface StripeSubscription {
+  id: string;
+  starshipId: string;
+  stripeSubscriptionId: string;
+  stripeCustomerId: string;
+  status: 'active' | 'past_due' | 'canceled' | 'unpaid';
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  plan: 'scout' | 'cruiser' | 'draught';
+  billingCycle: 'monthly' | 'yearly';
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface ChatStreamEvent extends WebSocketMessage {
-  type: 'chat_message';
-  payload: {
-    sessionKey: string;
-    delta: string;        // Incremental content
-    done: boolean;        // Stream completion flag
+interface StripeWebhookEvent {
+  id: string;
+  type: string;
+  data: {
+    object: any;
+  };
+  created: number;
+  idempotencyKey?: string;
+}
+
+interface PaymentStatus {
+  starshipId: string;
+  subscriptionStatus: 'trial' | 'active' | 'past_due' | 'canceled';
+  currentPlan: 'scout' | 'cruiser' | 'draught';
+  billingPortalUrl?: string;
+  nextBillingDate?: Date;
+  paymentMethod?: {
+    type: string;
+    last4?: string;
+    expiryMonth?: number;
+    expiryYear?: number;
   };
 }
 ```
@@ -310,17 +724,45 @@ interface ModelInfo {
 
 ### Utility Types
 ```typescript
-// Partial update types
-type PartialChatRequest = Partial<ChatRequest>;
-type AgentUpdate = Partial<Omit<AgentConfig, 'id'>>;
+// Update types for entities
+type MissionUpdate = Partial<Omit<Mission, 'id' | 'createdAt' | 'updatedAt'>>;
+type StarshipUpdate = Partial<Omit<Starship, 'id' | 'createdAt' | 'updatedAt'>>;
+type AgentUpdate = Partial<Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>>;
+type VisionUpdate = Partial<Omit<Vision, 'id' | 'starshipId' | 'createdAt' | 'updatedAt'>>;
 
-// Key extraction
-type ChatRequestKeys = keyof ChatRequest;
-type RequiredChatFields = Required<Pick<ChatRequest, 'agent_id' | 'user_id' | 'message'>>;
+// Workflow types
+type WorkflowNodeType = WorkflowNode['type'];
+type WorkflowStatus = WorkflowRuntimeState['status'];
+type MissionPhase = Mission['phase'];
+type StarshipClass = Starship['class'];
 
-// Union types
-type MessageRole = MemoryEntry['role'];
-type SupportedProvider = NonNullable<AgentConfig['provider']>;
+// Socket event types
+type SocketEventType = 
+  | 'mission:message'
+  | 'mission:phase_update'
+  | 'expedition:progress'
+  | 'expedition:activity'
+  | 'vision:refinement'
+  | 'agent:communication'
+  | 'user:joined'
+  | 'typing:indicator';
+
+// MCP types
+type MCPConnectorStatus = MCPServerConnector['dockerStatus'];
+type NativeToolType = 'firecrawl' | 'notion' | 'brave_search' | 'github';
+
+// Error union types
+type ValidationError = StarshipsError & { type: ErrorType.VALIDATION };
+type AuthenticationError = StarshipsError & { type: ErrorType.AUTHENTICATION };
+type NotFoundError = StarshipsError & { type: ErrorType.NOT_FOUND };
+
+// Branded ID types for better type safety
+type MissionId = string & { __brand: 'MissionId' };
+type StarshipId = string & { __brand: 'StarshipId' };
+type AgentId = string & { __brand: 'AgentId' };
+type UserId = string & { __brand: 'UserId' };
+type ExpeditionId = string & { __brand: 'ExpeditionId' };
+type WorkflowId = string & { __brand: 'WorkflowId' };
 ```
 
 ### Type Branding
@@ -338,28 +780,71 @@ export const createChannelId = (id: string): ChannelId => id as ChannelId;
 
 ## 🧪 Testing Support
 
-### Mock Types
+### Mock Types for Testing
 ```typescript
-export const mockChatRequest: ChatRequest = {
-  agent_id: 'test-agent',
-  user_id: 'test-user',
-  message: 'Hello, world!'
+export const mockMission: Mission = {
+  id: 'mission-123',
+  title: 'Test Mission',
+  objective: 'Test objective for development',
+  starshipId: 'starship-456',
+  phase: 'init',
+  status: 'active',
+  createdAt: new Date(),
+  updatedAt: new Date()
 };
 
-export const mockChatResponse: ChatResponse = {
-  reply: 'Hello! How can I help you?',
-  usage: {
-    prompt_tokens: 10,
-    completion_tokens: 8
-  }
+export const mockStarship: Starship = {
+  id: 'starship-123',
+  name: 'Test Starship',
+  slug: 'test-starship',
+  class: 'cruiser',
+  ownerId: 'user-456',
+  maxActiveExpeditions: 5,
+  maxAgents: 6,
+  subscriptionStatus: 'trial',
+  createdAt: new Date(),
+  updatedAt: new Date()
 };
 
-export const mockAgentConfig: AgentConfig = {
-  id: 'test-agent',
-  name: 'Test Agent',
-  model: 'gpt-3.5-turbo',
-  provider: 'openai',
-  systemPrompt: 'You are a helpful test assistant.'
+export const mockAgent: Agent = {
+  id: 'agent-123',
+  name: 'Test Research Agent',
+  model: 'gpt-4',
+  systemPrompt: 'You are a helpful research assistant',
+  starshipId: 'starship-456',
+  category: 'research',
+  tags: ['analysis', 'research'],
+  isPublic: false,
+  authorId: 'user-789',
+  rating: 4.5,
+  usageCount: 150,
+  createdAt: new Date(),
+  updatedAt: new Date()
+};
+
+export const mockWorkflowDSL: WorkflowDSL = {
+  nodes: [
+    { id: 'start', type: 'start', data: {} },
+    { id: 'research', type: 'agent', data: { agentId: 'research-agent' } },
+    { id: 'end', type: 'end', data: {} }
+  ],
+  edges: [
+    { id: 'edge1', from: 'start', to: 'research' },
+    { id: 'edge2', from: 'research', to: 'end' }
+  ]
+};
+
+export const mockVision: Vision = {
+  id: 'vision-123',
+  starshipId: 'starship-456',
+  statement: 'To revolutionize AI-powered productivity',
+  clarity: 0.8,
+  specificity: 0.7,
+  actionability: 0.9,
+  inspirational: 0.85,
+  confidence: 0.82,
+  createdAt: new Date(),
+  updatedAt: new Date()
 };
 ```
 

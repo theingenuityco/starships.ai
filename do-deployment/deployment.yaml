@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starships-app
+  namespace: starships-prod
+  labels:
+    app: starships-ai
+spec:
+  replicas: 1  # Single replica for MVP
+  selector:
+    matchLabels:
+      app: starships-ai
+  template:
+    metadata:
+      labels:
+        app: starships-ai
+    spec:
+      containers:
+      - name: starships
+        image: ghcr.io/theingenuityco/starships.ai:latest
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args: ["-c", "mkdir -p /etc/supervisor/conf.d && mkdir -p /root/.cache/node/corepack/v1/pnpm && chmod -R 777 /root/.cache && /app/supervisor-entrypoint.sh"]
+        ports:
+        - containerPort: 3000
+          name: frontend
+        - containerPort: 4000
+          name: backend
+        - containerPort: 7474
+          name: neo4j-http
+        - containerPort: 7687
+          name: neo4j-bolt
+        envFrom:
+        - secretRef:
+            name: starships-secrets
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEO4J_EXTERNAL_URI
+          value: "neo4j+s://demo.neo4jlabs.com:7687"  # Use demo Neo4j for testing
+        - name: NEO4J_USERNAME
+          value: "movies"
+        - name: NEO4J_PASSWORD
+          value: "movies"
+        - name: SKIP_INSTALL
+          value: "true"
+        resources:
+          requests:
+            memory: "1Gi"    # Minimum guaranteed
+            cpu: "500m"      
+          limits:
+            memory: "3Gi"    # Increased for Neo4j
+            cpu: "1500m"     
+        livenessProbe:
+          httpGet:
+            path: /health/live  # Correct endpoint
+            port: 4000
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/ready  # Correct endpoint
+            port: 4000
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: neo4j-data
+          mountPath: /var/lib/neo4j/data
+        - name: app-sessions
+          mountPath: /app/data/sessions
+      imagePullSecrets:
+      - name: ghcr-pull-secret
+      volumes:
+      - name: neo4j-data
+        persistentVolumeClaim:
+          claimName: neo4j-data-pvc
+      - name: app-sessions
+        persistentVolumeClaim:
+          claimName: sessions-pvc

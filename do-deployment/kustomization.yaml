@@ -1,0 +1,20 @@
+# Kustomization for production deployment
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: starships-prod
+
+resources:
+  - all-in-one-optimized.yaml
+  - kinde-secret.yaml
+
+images:
+  - name: ghcr.io/theingenuityco/starships.ai
+    newTag: latest
+
+configMapGenerator:
+  - name: app-config
+    literals:
+      - NODE_ENV=production
+      - CLIENT_URL=http://129.212.197.153
+      - NEXT_PUBLIC_API_URL=http://129.212.197.153:4000

@@ -106,5 +106,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
       wget --no-verbose --tries=1 --spider http://localhost:4000/health && \
       wget --no-verbose --tries=1 --spider http://localhost:7474
 
-# Start supervisor to manage all services
-CMD ["/app/supervisor-entrypoint.sh"]
+# Default startup script for production
+COPY do-deployment/all-in-one-optimized.yaml /deployment/
+CMD ["/bin/sh", "-c", "cd /app/packages/client && npx next start"]

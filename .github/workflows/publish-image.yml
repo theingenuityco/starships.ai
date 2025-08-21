@@ -24,6 +24,10 @@ jobs:
     # Only run on main branch pushes or merged PRs
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
     
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-latest: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LOWER }}:latest
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -152,3 +156,68 @@ jobs:
               "digest": "${{ steps.digest.outputs.digest }}"
             }'
         continue-on-error: true
+
+  # NEW: Deploy to DigitalOcean
+  deploy-to-digitalocean:
+    name: Deploy to DigitalOcean Kubernetes
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Only deploy on main branch
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      
+      - name: Save DigitalOcean kubeconfig
+        run: doctl kubernetes cluster kubeconfig save starships-prod
+      
+      - name: Update deployment with new image
+        run: |
+          # Update the deployment with the new image
+          kubectl set image deployment/starships-all \
+            starships=${{ needs.build-and-push.outputs.image-latest }} \
+            -n starships-prod
+          
+          echo "Updated deployment to use image: ${{ needs.build-and-push.outputs.image-latest }}"
+      
+      - name: Wait for rollout to complete
+        run: |
+          kubectl rollout status deployment/starships-all \
+            -n starships-prod \
+            --timeout=600s
+      
+      - name: Verify deployment
+        run: |
+          echo "## 🚢 DigitalOcean Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get pod status
+          kubectl get pods -n starships-prod -l app=starships-all
+          
+          # Get the load balancer IP
+          LB_IP=$(kubectl get service starships-lb -n starships-prod -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          
+          echo "**Application URL:** http://$LB_IP" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend Health:** http://$LB_IP:4000/health" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Test the health endpoint
+          sleep 30
+          if curl -f http://$LB_IP:4000/health -m 10; then
+            echo "✅ Health check passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Health check failed (may need more time to start)" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed, rolling back..."
+          kubectl rollout undo deployment/starships-all -n starships-prod
+          kubectl rollout status deployment/starships-all -n starships-prod --timeout=300s

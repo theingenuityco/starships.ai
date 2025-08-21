@@ -1,0 +1,54 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies for building
+RUN apk add --no-cache python3 make g++ git bash
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
+
+# Copy package files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/server/package.json ./packages/server/
+COPY packages/env-config/package.json ./packages/env-config/
+COPY packages/protocol/package.json ./packages/protocol/
+COPY packages/models/package.json ./packages/models/
+COPY packages/core/package.json ./packages/core/
+COPY packages/agent-engine/package.json ./packages/agent-engine/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source code and configs
+COPY packages/server ./packages/server
+COPY packages/env-config ./packages/env-config
+COPY packages/protocol ./packages/protocol
+COPY packages/models ./packages/models
+COPY packages/core ./packages/core
+COPY packages/agent-engine ./packages/agent-engine
+COPY tsconfig.json ./
+COPY .env.example ./.env
+
+# Build all packages
+RUN pnpm --filter @starships/env-config run build && \
+    pnpm --filter @starships/protocol run build && \
+    pnpm --filter @starships/models run build && \
+    pnpm --filter @starships/core run build && \
+    pnpm --filter @starships/agent-engine run build && \
+    pnpm --filter @starships/server run build
+
+# Fix import paths in compiled JavaScript
+RUN find packages -name "*.js" -type f ! -path "*/node_modules/*" \
+    -exec sed -i 's|@starships/\([^/]*\)/src/|@starships/\1/dist/|g' {} +
+
+# Create startup script
+RUN echo '#!/bin/sh\n\
+cd /app/packages/server\n\
+export NODE_PATH="/app/node_modules:/app/packages/server/node_modules"\n\
+exec node dist/index.js' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+EXPOSE 4000
+
+CMD ["/app/start.sh"]

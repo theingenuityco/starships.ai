@@ -5,8 +5,7 @@ echo "Starting Starships.ai in production mode..."
 
 # Start backend server
 echo "Starting backend server..."
-cd /app/packages/server
-node dist/index.js &
+/app/backend-startup.sh &
 BACKEND_PID=$!
 
 # Give backend a moment to start

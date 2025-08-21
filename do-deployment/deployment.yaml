@@ -19,7 +19,8 @@ spec:
       - name: starships
         image: ghcr.io/theingenuityco/starships.ai:fix-docker-build
         imagePullPolicy: Always
-        command: ["/app/startup.sh"]
+        command: ["/bin/sh"]
+        args: ["-c", "cd /app/packages/client && NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR=true npx next start"]
         ports:
         - containerPort: 3000
           name: frontend
@@ -37,14 +38,34 @@ spec:
           value: "production"
         - name: SKIP_BUILD
           value: "true"
-        - name: NEO4J_EXTERNAL_URI
-          value: "neo4j+s://demo.neo4jlabs.com:7687"  # Use demo Neo4j for testing
+        - name: NEO4J_URI
+          value: "bolt://localhost:7687"
         - name: NEO4J_USERNAME
-          value: "movies"
+          value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "movies"
+          value: "password"
         - name: SKIP_INSTALL
           value: "true"
+        - name: CLIENT_URL
+          value: "http://134.199.179.240"
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://134.199.179.240:4000"
+        - name: SERVER_URL
+          value: "http://localhost:4000"
+        - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
+          value: "true"
+        - name: KINDE_CLIENT_ID
+          value: "test_client_id"
+        - name: KINDE_CLIENT_SECRET
+          value: "test_client_secret"
+        - name: KINDE_ISSUER_URL
+          value: "https://test.kinde.com"
+        - name: KINDE_SITE_URL
+          value: "http://134.199.179.240"
+        - name: KINDE_POST_LOGIN_REDIRECT_URL
+          value: "http://134.199.179.240/fleet"
+        - name: KINDE_POST_LOGOUT_REDIRECT_URL
+          value: "http://134.199.179.240"
         resources:
           requests:
             memory: "1Gi"    # Minimum guaranteed

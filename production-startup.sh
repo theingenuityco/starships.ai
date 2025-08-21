@@ -1,0 +1,87 @@
+#!/bin/sh
+set -e
+
+echo "==============================================="
+echo "Starting Starships.ai Production Environment"
+echo "==============================================="
+
+# Fix all module imports in compiled JavaScript
+echo "🔧 Fixing module imports..."
+find /app/packages -name "*.js" -type f ! -path "*/node_modules/*" ! -path "*/.next/*" -exec sed -i 's|@starships/\([^/]*\)/src/|@starships/\1/dist/|g' {} + 2>/dev/null || true
+
+# Start Neo4j database
+echo "🗄️  Starting Neo4j database..."
+/opt/neo4j/bin/neo4j start
+echo "   Waiting for Neo4j to be ready..."
+for i in $(seq 1 30); do
+  if curl -s http://localhost:7474/ > /dev/null 2>&1; then
+    echo "   ✅ Neo4j is ready!"
+    break
+  fi
+  sleep 1
+done
+
+# Start backend server
+echo "🚀 Starting backend server..."
+cd /app/packages/server
+export NODE_PATH="/app/node_modules:/app/packages/server/node_modules"
+export PORT=4000
+export SKIP_VECTOR_STORE=true
+export SKIP_K8S_CHECK=true
+export NEO4J_URI=bolt://localhost:7687
+export NEO4J_USERNAME=neo4j
+export NEO4J_PASSWORD=password
+export CLIENT_URL=http://134.199.179.240
+export NEXT_PUBLIC_API_URL=http://134.199.179.240:4000
+export SERVER_URL=http://localhost:4000
+
+nohup node dist/index.js > /tmp/backend.log 2>&1 &
+BACKEND_PID=$!
+echo "   Backend started with PID: $BACKEND_PID"
+
+# Wait for backend to be ready
+echo "   Waiting for backend to be ready..."
+for i in $(seq 1 30); do
+  if curl -s http://localhost:4000/health > /dev/null 2>&1; then
+    echo "   ✅ Backend is ready!"
+    break
+  fi
+  sleep 1
+done
+
+# Start frontend
+echo "🌐 Starting frontend..."
+cd /app/packages/client
+export NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR=true
+export NEXT_PUBLIC_API_URL=http://134.199.179.240:4000
+npx next start &
+FRONTEND_PID=$!
+echo "   Frontend started with PID: $FRONTEND_PID"
+
+echo "==============================================="
+echo "✅ All services started successfully!"
+echo "   Frontend: http://134.199.179.240"
+echo "   Backend:  http://134.199.179.240:4000"
+echo "   Neo4j:    http://localhost:7474"
+echo "==============================================="
+
+# Monitor processes
+while true; do
+  # Check if backend is still running
+  if ! kill -0 $BACKEND_PID 2>/dev/null; then
+    echo "⚠️  Backend crashed, restarting..."
+    cd /app/packages/server
+    nohup node dist/index.js > /tmp/backend.log 2>&1 &
+    BACKEND_PID=$!
+  fi
+  
+  # Check if frontend is still running
+  if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+    echo "⚠️  Frontend crashed, restarting..."
+    cd /app/packages/client
+    npx next start &
+    FRONTEND_PID=$!
+  fi
+  
+  sleep 10
+done

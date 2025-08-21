@@ -74,6 +74,15 @@ RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 RUN SKIP_POSTINSTALL=1 pnpm install --ignore-scripts
 
 # Build the application (bypass prebuild script entirely)
+# Provide dummy env vars for build time only (real ones come from K8s secrets at runtime)
+ENV STRIPE_SECRET_KEY=sk_test_dummy_build_only \
+    STRIPE_WEBHOOK_SECRET=whsec_dummy_build_only \
+    STRIPE_PUBLISHABLE_KEY=pk_test_dummy_build_only \
+    NEO4J_URI=bolt://localhost:7687 \
+    NEO4J_USERNAME=neo4j \
+    NEO4J_PASSWORD=password \
+    OPENAI_API_KEY=sk-dummy_build_only \
+    ANTHROPIC_API_KEY=sk-ant-dummy_build_only
 RUN npx turbo run build
 
 # Create necessary directories

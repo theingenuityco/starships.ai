@@ -13,9 +13,5 @@ spec:
     targetPort: 3000
     protocol: TCP
     name: http
-  - port: 4000
-    targetPort: 4000
-    protocol: TCP
-    name: api
   selector:
     app: starships-ai

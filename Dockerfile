@@ -67,6 +67,8 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy all application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
+COPY --chown=nodejs:nodejs startup.sh /app/startup.sh
+RUN chmod +x /app/startup.sh
 COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 

@@ -17,10 +17,9 @@ spec:
     spec:
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:latest
+        image: ghcr.io/theingenuityco/starships.ai:fix-docker-build
         imagePullPolicy: Always
-        command: ["/bin/sh"]
-        args: ["-c", "mkdir -p /etc/supervisor/conf.d && mkdir -p /root/.cache/node/corepack/v1/pnpm && chmod -R 777 /root/.cache && /app/supervisor-entrypoint.sh"]
+        command: ["/app/startup.sh"]
         ports:
         - containerPort: 3000
           name: frontend
@@ -36,6 +35,8 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
+        - name: SKIP_BUILD
+          value: "true"
         - name: NEO4J_EXTERNAL_URI
           value: "neo4j+s://demo.neo4jlabs.com:7687"  # Use demo Neo4j for testing
         - name: NEO4J_USERNAME
@@ -51,20 +52,6 @@ spec:
           limits:
             memory: "3Gi"    # Increased for Neo4j
             cpu: "1500m"     
-        livenessProbe:
-          httpGet:
-            path: /health/live  # Correct endpoint
-            port: 4000
-          initialDelaySeconds: 180
-          periodSeconds: 30
-          timeoutSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health/ready  # Correct endpoint
-            port: 4000
-          initialDelaySeconds: 120
-          periodSeconds: 10
-          timeoutSeconds: 5
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data

@@ -64,18 +64,14 @@ RUN npm install -g concurrently
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy package files first for better caching
-COPY --chown=nodejs:nodejs package.json pnpm-workspace.yaml ./
-COPY --chown=nodejs:nodejs packages/*/package.json ./packages/*/
-
-# Install dependencies without lockfile (will generate fresh lockfile)
-RUN pnpm install
-
-# Copy application files
+# Copy all application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
 COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
+
+# Install dependencies (this will use the lockfile if present, or generate one)
+RUN pnpm install
 
 # Build the application
 RUN pnpm run build

@@ -71,6 +71,8 @@ COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
 # Install dependencies (this will use the lockfile if present, or generate one)
+# Set DOCKER_BUILD=true to skip Docker checks in postinstall
+ENV DOCKER_BUILD=true
 RUN pnpm install
 
 # Build the application

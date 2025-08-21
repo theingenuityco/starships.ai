@@ -70,12 +70,22 @@ COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.s
 COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
+# Build arguments for required environment variables
+ARG STRIPE_SECRET_KEY
+ARG STRIPE_PUBLISHABLE_KEY
+ARG STRIPE_WEBHOOK_SECRET
+
+# Set build-time environment variables
+ENV STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+ENV STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+ENV STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+
 # Install dependencies (this will use the lockfile if present, or generate one)
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
 RUN pnpm install
 
-# Build the application
+# Build the application with environment variables
 RUN pnpm run build
 
 # Create necessary directories

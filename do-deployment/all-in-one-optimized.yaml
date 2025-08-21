@@ -100,28 +100,16 @@ spec:
         - name: NODE_ENV
           value: "production"
         - name: CLIENT_URL
-          value: "http://134.199.179.240"
+          value: "http://129.212.197.153"
         - name: NEXT_PUBLIC_API_URL
-          value: "http://134.199.179.240:4000"
+          value: "http://129.212.197.153:4000"
         - name: SERVER_URL
           value: "http://localhost:4000"
-        - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
-          value: "true"
-        - name: KINDE_CLIENT_ID
-          value: "test_client_id"
-        - name: KINDE_CLIENT_SECRET
-          value: "test_client_secret"
-        - name: KINDE_ISSUER_URL
-          value: "https://test.kinde.com"
-        - name: KINDE_SITE_URL
-          value: "http://134.199.179.240"
-        - name: KINDE_POST_LOGIN_REDIRECT_URL
-          value: "http://134.199.179.240/fleet"
-        - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          value: "http://134.199.179.240"
         envFrom:
         - secretRef:
             name: starships-secrets
+        - secretRef:
+            name: kinde-auth-secret
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data

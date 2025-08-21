@@ -3,6 +3,22 @@ set -e
 
 echo "Starting Starships.ai application..."
 
+# Runtime environment variables - Industry standard approach
+# Secrets are injected at container runtime, not stored in the image
+echo "Configuring runtime environment..."
+
+# These secrets should be provided when running the container:
+# docker run -e STRIPE_SECRET_KEY=xxx image:tag
+# or via Kubernetes secrets, Docker Compose, or cloud provider secret managers
+
+if [ -z "$STRIPE_SECRET_KEY" ]; then
+    echo "WARNING: STRIPE_SECRET_KEY not provided. Payment functionality may not work."
+    echo "Please provide it as an environment variable when running the container."
+fi
+
+# Export runtime secrets for the application
+export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-}"
+
 # Check if we should use external Neo4j (e.g., Neo4j Aura)
 if [ -n "$NEO4J_EXTERNAL_URI" ]; then
     echo "Using external Neo4j database at: $NEO4J_EXTERNAL_URI"

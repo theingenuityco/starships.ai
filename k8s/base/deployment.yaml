@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starships-app
+  namespace: starships-ai
+  labels:
+    app: starships-ai
+    component: application
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: starships-ai
+      component: application
+  template:
+    metadata:
+      labels:
+        app: starships-ai
+        component: application
+    spec:
+      serviceAccountName: starships-sa
+      containers:
+      - name: starships
+        image: [DOCKER-REGISTRY-URL]:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: frontend
+          protocol: TCP
+        - containerPort: 4000
+          name: backend
+          protocol: TCP
+        - containerPort: 7474
+          name: neo4j-http
+          protocol: TCP
+        - containerPort: 7687
+          name: neo4j-bolt
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: starships-config
+        - secretRef:
+            name: starships-secrets
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: app-data
+          mountPath: /app/data
+        - name: neo4j-data
+          mountPath: /var/lib/neo4j/data
+        - name: sessions
+          mountPath: /app/data/sessions
+      volumes:
+      - name: app-data
+        persistentVolumeClaim:
+          claimName: starships-data-pvc
+      - name: neo4j-data
+        persistentVolumeClaim:
+          claimName: neo4j-data-pvc
+      - name: sessions
+        emptyDir: {}
+      imagePullSecrets:
+      - name: ghcr-pull-secret

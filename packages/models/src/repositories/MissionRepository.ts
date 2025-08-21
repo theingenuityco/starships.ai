@@ -114,7 +114,8 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         agentIds: request.agentIds,
         createdAt: now,
         updatedAt: now,
-        createdBy: userId
+        createdBy: userId,
+        executionState: undefined
       };
 
       await connection.executeWrite(
@@ -140,7 +141,8 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         this.handleNotFound('Mission', id, 'findById');
       }
 
-      return result[0].m;
+      const mission = result[0].m;
+      return this.parseMissionFromRecord(mission);
     }, 'findById', 'Mission', id);
   }
 
@@ -183,7 +185,7 @@ export class MissionRepository extends BaseRepository implements MissionReposito
 
       const result = await connection.executeQuery<{ m: Mission }>(query, params);
 
-      const missions: Mission[] = result?.map(record => record.m) || [];
+      const missions: Mission[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
 
       return {
         missions,
@@ -236,7 +238,7 @@ export class MissionRepository extends BaseRepository implements MissionReposito
 
       const result = await connection.executeQuery<{ m: Mission }>(query, params);
 
-      const missions: Mission[] = result?.map(record => record.m) || [];
+      const missions: Mission[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
 
       return {
         missions,
@@ -322,6 +324,11 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         params.agentIds = updates.agentIds;
       }
 
+      if (updates.executionState !== undefined) {
+        setClause.push('m.executionState = $executionState');
+        params.executionState = updates.executionState ? JSON.stringify(updates.executionState) : null;
+      }
+
       const query = `
         MATCH (m:Mission {id: $id})
         SET ${setClause.join(', ')}
@@ -334,7 +341,7 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         throw new Error('Failed to update mission');
       }
 
-      return result[0].m;
+      return this.parseMissionFromRecord(result[0].m);
     }, 'update', 'Mission', id);
   }
 
@@ -555,5 +562,24 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         totalPages
       };
     }, 'getMessagesByMissionWithPagination', 'MissionMessage');
+  }
+
+  /**
+   * Parse mission from Neo4j record, handling JSON fields
+   */
+  private parseMissionFromRecord(record: any): Mission {
+    return {
+      id: record.id,
+      starshipId: record.starshipId,
+      name: record.name,
+      description: record.description,
+      status: record.status,
+      phase: record.phase,
+      agentIds: record.agentIds || [],
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      createdBy: record.createdBy,
+      executionState: record.executionState ? JSON.parse(record.executionState) : undefined
+    };
   }
 }

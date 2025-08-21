@@ -14,6 +14,7 @@ export const MISSION_PHASES = {
   WELCOME: 'welcome' as const,
   ANALYSIS: 'analysis' as const,
   PLAN: 'plan' as const,
+  EXECUTE: 'execute' as const,
   CONVERSE: 'converse' as const,
 } as const;
 
@@ -65,6 +66,16 @@ export const MISSION_PHASE_CONFIG: Record<MissionPhase, MissionPhaseConfig> = {
       text: 'text-purple-800',
     },
   },
+  [MISSION_PHASES.EXECUTE]: {
+    label: 'Execution',
+    description: 'Running mission workflow tasks',
+    icon: '⚡',
+    color: {
+      background: 'bg-orange-100',
+      border: 'border-orange-200',
+      text: 'text-orange-800',
+    },
+  },
   [MISSION_PHASES.CONVERSE]: {
     label: 'Active',
     description: 'Mission guidance and ongoing conversation',
@@ -108,6 +119,7 @@ export function getMissionPhasesInOrder(): MissionPhase[] {
     MISSION_PHASES.WELCOME,
     MISSION_PHASES.ANALYSIS,
     MISSION_PHASES.PLAN,
+    MISSION_PHASES.EXECUTE,
     MISSION_PHASES.CONVERSE,
   ];
 }

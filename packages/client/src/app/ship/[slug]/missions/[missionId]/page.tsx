@@ -14,6 +14,7 @@ import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity, MissionPhase } from '@starships/protocol';
 import { getMissionPhaseConfig, MISSION_PHASES, isValidMissionPhase } from '@starships/protocol';
 import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
+import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent';
 
 interface MissionDetailPageProps {
   params: Promise<{
@@ -69,7 +70,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     agents: false,
     progress: false,
     clarity: false,
-    plan: false
+    plan: false,
+    execution: false
   });
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
@@ -128,11 +130,16 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   // Handle workflow approval transitions
   const handleWorkflowApproval = (approved: boolean) => {
     if (approved) {
-      // Workflow was approved, mission should transition to converse phase
+      // Workflow was approved, mission should transition to execute phase
       // This will be handled by the WebSocket event or we can optimistically update
-      setMission(prev => prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null);
+      setMission(prev => prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null);
     }
     // If rejected, stay in plan phase for regeneration
+  };
+
+  const handleExecutionComplete = () => {
+    // Execution completed, mission should transition to converse phase
+    setMission(prev => prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null);
   };
 
   // WebSocket setup for mission messages and real-time updates
@@ -521,6 +528,34 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
                       <div className="mx-3">
                         <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mission Execution Section - Only show during execute phase */}
+              {mission.phase === MISSION_PHASES.EXECUTE && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-3 group">
+                    <button
+                      onClick={() => toggleSection('execution')}
+                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                    >
+                      {collapsedSections.execution ? (
+                        <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      )}
+                    </button>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Mission Execution
+                    </h4>
+                  </div>
+                  {!collapsedSections.execution && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                      <div className="mx-3">
+                        <ExecutePhaseContent mission={mission} onExecutionComplete={handleExecutionComplete} />
                       </div>
                     </div>
                   )}

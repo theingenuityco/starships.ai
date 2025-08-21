@@ -13,6 +13,8 @@ import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import { WorkflowService } from './WorkflowService';
+import { MissionExecutionEngine } from './MissionExecutionEngine';
+import { MissionService } from './MissionService';
 import { MISSION_PHASES } from '@starships/protocol';
 import { WorkflowParsingService } from './WorkflowParsingService';
 import type { 
@@ -144,7 +146,8 @@ export class MissionOrchestratorAgent {
         .addNode("context_builder", this.contextBuilderNode.bind(this))
         .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
         .addNode("analysis_phase", this.analysisPhaseNode.bind(this))
-        .addNode("plan_phase", this.planPhaseNode.bind(this))  // NEW
+        .addNode("plan_phase", this.planPhaseNode.bind(this))
+        .addNode("execute_phase", this.executePhaseNode.bind(this))
         .addNode("converse_phase", this.conversePhaseNode.bind(this))
         .addEdge(START, "context_builder")
         .addConditionalEdges(
@@ -154,6 +157,7 @@ export class MissionOrchestratorAgent {
             welcome: "welcome_phase",
             analysis: "analysis_phase",
             plan: "plan_phase",
+            execute: "execute_phase",
             converse: "converse_phase"
           }
         )
@@ -178,11 +182,12 @@ export class MissionOrchestratorAgent {
           "plan_phase",
           this.shouldContinueFromPlan.bind(this),
           {
-            continue: "converse_phase",  // Plan approved → converse
+            execute: "execute_phase",    // Plan approved → execute
             regenerate: "plan_phase",    // Plan rejected → stay in plan
             end: END
           }
         )
+        .addEdge("execute_phase", "converse_phase")  // Execute → converse
         .addEdge("converse_phase", END)
         .compile({ checkpointer: this.checkpointer });
     }
@@ -277,7 +282,7 @@ export class MissionOrchestratorAgent {
     if (!workflow) return 'end';
     
     if (workflow.approvalStatus === 'approved') {
-      return 'continue'; // → converse_phase
+      return 'execute'; // → execute_phase
     }
     
     if (workflow.approvalStatus === 'rejected') {
@@ -408,6 +413,83 @@ export class MissionOrchestratorAgent {
     } catch (error) {
       this.logger.error('Plan phase failed', { error });
       return { activePhase: MISSION_PHASES.ANALYSIS, isSystemInitiated: true };
+    }
+  }
+
+  /**
+   * Execute phase node - runs the approved workflow
+   */
+  private async executePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    const { workflow, missionId } = state;
+    
+    if (!workflow || workflow.approvalStatus !== 'approved') {
+      const message = "⚠️ Workflow must be approved before execution can begin.";
+      return { 
+        messages: [this.createAIMessage(message, state)],
+        activePhase: MISSION_PHASES.PLAN 
+      };
+    }
+
+    try {
+      const agentTaskCount = workflow.nodes.filter(n => n.type === 'agent').length;
+      const message = `🚀 Starting mission execution with ${agentTaskCount} tasks...\n\nI'll run each task sequentially and keep you updated on the progress. This may take a few minutes depending on the complexity of the tasks.`;
+      
+      // Save initial message
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(
+          this.createAIMessage(message, state), 
+          'execute_start', 
+          this.currentMissionId
+        );
+      }
+
+      // Start execution in background (don't await - let it run async)
+      this.startMissionExecution(missionId, workflow);
+      
+      return { 
+        messages: [this.createAIMessage(message, state)],
+        activePhase: MISSION_PHASES.EXECUTE
+      };
+    } catch (error) {
+      const message = `❌ Failed to start mission execution: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      return { 
+        messages: [this.createAIMessage(message, state)],
+        activePhase: MISSION_PHASES.PLAN
+      };
+    }
+  }
+
+  /**
+   * Start mission execution in background
+   */
+  private async startMissionExecution(missionId: string, workflow: MissionWorkflow): Promise<void> {
+    try {
+      const executionEngine = new MissionExecutionEngine();
+      const result = await executionEngine.executeWorkflow(missionId, workflow);
+      
+      // Update mission phase to converse after execution
+      await MissionService.updateMission(missionId, {
+        phase: MISSION_PHASES.CONVERSE
+      });
+      
+      // Send completion message
+      const completionMessage = result.success
+        ? `✅ **Mission execution completed successfully!**\n\n${result.summary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`
+        : `❌ **Mission execution encountered issues**\n\n${result.summary}\n\n🔧 **Next steps:**\n- Review the failed tasks above\n- Consider modifying the plan to address the issues\n- Or ask me to regenerate the workflow\n\nWhat would you like to do?`;
+        
+      // Send system message via orchestrator service
+      const { MissionOrchestratorService } = await import('./MissionOrchestratorService');
+      const orchestratorService = MissionOrchestratorService.getInstance();
+      await orchestratorService.handleSystemMessage(missionId, completionMessage);
+      
+    } catch (error) {
+      this.logger.error('Background mission execution failed', { missionId }, error as Error);
+      
+      const errorMessage = `❌ **Mission execution encountered a critical error**\n\nError: ${error instanceof Error ? error.message : 'Unknown system error'}\n\n🔧 **Recovery options:**\n- Try regenerating the workflow plan\n- Check agent assignments and availability\n- Contact support if the issue persists\n\nHow would you like to proceed?`;
+      
+      const { MissionOrchestratorService } = await import('./MissionOrchestratorService');
+      const orchestratorService = MissionOrchestratorService.getInstance();
+      await orchestratorService.handleSystemMessage(missionId, errorMessage);
     }
   }
 

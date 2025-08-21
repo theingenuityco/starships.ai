@@ -119,7 +119,6 @@ jobs:
           tags: |
             type=raw,value=${{ needs.version.outputs.new_release_version }}
             type=raw,value=latest
-            type=raw,value=${{ needs.version.outputs.new_release_version }}-{{sha}}
 
       - name: Build and push Docker image
         id: push
@@ -228,7 +227,7 @@ jobs:
                 "failComment": false,
                 "releasedLabels": false,
                 "addReleases": "top",
-                "releaseBodyTemplate": "## Docker Image\n\n🐳 **Docker Image Published to GHCR**\n\n```bash\ndocker pull ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}\n```\n\n**Image Digest:** `${{ needs.docker.outputs.image_digest }}`\n\n## Release Notes\n\n<%= nextRelease.notes %>\n\n## Container Platform\n- linux/amd64"
+                "releaseBodyTemplate": "## Docker Image\n\n🐳 **Docker Image Published to GHCR**\n\n```bash\ndocker pull ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}\n```\n\n## Release Notes\n\n<%= nextRelease.notes %>"
               }]
             ]
           }
@@ -249,15 +248,3 @@ jobs:
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-      - name: (Optional) Trigger RunPod Redeploy
-        if: ${{ success() && vars.RUNPOD_WEBHOOK_URL != '' }}
-        run: |
-          curl -s -X POST "${{ vars.RUNPOD_WEBHOOK_URL }}" \
-            -H "Authorization: ${{ secrets.RUNPOD_AUTH_HEADER }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "image": "ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}",
-              "digest": "${{ needs.docker.outputs.image_digest }}"
-            }'
-        continue-on-error: true

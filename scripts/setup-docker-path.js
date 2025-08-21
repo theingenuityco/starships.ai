@@ -10,6 +10,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// Skip Docker check when running inside Docker container
+if (process.env.DOCKER_BUILD === 'true' || fs.existsSync('/.dockerenv')) {
+  console.log('🐳 Running inside Docker container, skipping Docker setup');
+  process.exit(0);
+}
+
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',

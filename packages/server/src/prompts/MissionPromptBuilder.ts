@@ -138,7 +138,37 @@ INSTRUCTIONS:
 Be encouraging and explain how this workflow achieves their mission goals.
 Use a professional but friendly tone as Commander ARIA.
 
-End with: "Would you like me to proceed with this execution workflow? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`
+End with: "Would you like me to proceed with this execution workflow? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`,
+
+  WORKFLOW_APPROVAL_INTENT: `You are an expert at understanding user intentions regarding workflow approval in a mission context.
+
+User message: "{userMessage}"
+
+MISSION CONTEXT:
+{missionContext}
+
+Analyze the user's intent and respond with a JSON object containing:
+{
+  "intent": "approve|reject|discussion|unclear",
+  "confidence": 0.0-1.0,
+  "reasoning": "brief explanation"
+}
+
+Intent definitions:
+- "approve": User clearly wants to approve/execute the workflow (e.g., "yes", "looks good", "let's do it", "proceed", "execute", "go ahead")
+- "reject": User clearly wants to reject/change the workflow (e.g., "no", "change this", "revise", "not good", "different approach")  
+- "discussion": User is asking questions, seeking clarification, or discussing details without clear approval/rejection
+- "unclear": Intent is ambiguous, unrelated, or cannot be determined
+
+Guidelines:
+- Confidence should be high (0.8+) only for very clear intent
+- Consider context and nuance, not just keywords
+- "Looks good but..." should be discussion/unclear, not approve
+- Questions about the workflow are discussion
+- Generic responses without clear action are unclear
+- Focus on the primary intent of the message
+
+Respond with only the JSON object:`
 } as const;
 
 export class MissionPromptBuilder {
@@ -210,6 +240,23 @@ export class MissionPromptBuilder {
   buildWorkflowPresentationPrompt(workflow: MissionWorkflow): LLMChatPrompt {
     const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION
       .replace('{planData}', this.buildWorkflowDataSection(workflow));
+
+    return {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+  }
+
+  /**
+   * Build workflow approval intent classification prompt
+   */
+  buildWorkflowApprovalIntentPrompt(userMessage: string): LLMChatPrompt {
+    const missionContext = this.buildMissionSection();
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_APPROVAL_INTENT
+      .replace('{userMessage}', userMessage)
+      .replace('{missionContext}', missionContext);
 
     return {
       messages: [{

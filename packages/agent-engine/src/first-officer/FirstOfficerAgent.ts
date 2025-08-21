@@ -1379,9 +1379,10 @@ Help coordinate and provide guidance as needed.`;
 
       const workflow = workflowResult.workflow;
 
-      // Save the workflow to the database
-      const workflowRepo = RepositoryFactory.getWorkflowRepository();
-      const savedWorkflow = await workflowRepo.create(workflow);
+      // TODO: Legacy expedition workflow saving - disabled to prevent interference with mission system
+      // const workflowRepo = RepositoryFactory.getWorkflowRepository();
+      // const savedWorkflow = await workflowRepo.createWorkflow(workflowRequest);
+      const savedWorkflow = workflow; // Use the generated workflow directly for now
 
       console.log(`✅ [FIRST-OFFICER] Workflow DSL generated successfully. Confidence: ${workflowResult.confidence.toFixed(2)}`);
       console.log(`📊 [WORKFLOW-DSL] Nodes: ${workflow.nodes.length}, Edges: ${workflow.edges.length}`);

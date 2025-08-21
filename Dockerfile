@@ -6,12 +6,19 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Install system dependencies including Java for Neo4j
+# Install system dependencies including Java 17 for Neo4j
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
-    openjdk11-jre-headless \
+    openjdk17-jre-headless \
     supervisor \
     ca-certificates
+
+# Create supervisor config directory
+RUN mkdir -p /etc/supervisor/conf.d
+
+# Fix pnpm cache permissions
+RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
+    chmod -R 777 /root/.cache
 
 # Download and install Neo4j Community Edition
 ENV NEO4J_VERSION=5.13.0
@@ -57,11 +64,21 @@ RUN npm install -g concurrently
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
+# Copy package files first for better caching
+COPY --chown=nodejs:nodejs package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=nodejs:nodejs packages/*/package.json ./packages/*/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
 # Copy application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
 COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
+
+# Build the application
+RUN pnpm run build
 
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \

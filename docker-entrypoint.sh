@@ -87,16 +87,19 @@ echo "  Username: ${NEO4J_USERNAME:-neo4j}"
 echo "  Database: ${NEO4J_DATABASE:-neo4j}"
 echo "========================================="
 
-# Check if node_modules exists, if not install dependencies
-if [ ! -d "node_modules" ]; then
-    echo "Installing dependencies..."
-    pnpm install --frozen-lockfile
-fi
+# Skip installation and building in production since it's done in Dockerfile
+if [ "$NODE_ENV" != "production" ]; then
+    # Check if node_modules exists, if not install dependencies
+    if [ ! -d "node_modules" ]; then
+        echo "Installing dependencies..."
+        pnpm install --frozen-lockfile
+    fi
 
-# Check if packages are built, if not build them
-if [ ! -d "packages/server/dist" ] || [ ! -d "packages/client/.next" ]; then
-    echo "Building all packages (frontend and backend)..."
-    pnpm run build
+    # Check if packages are built, if not build them
+    if [ ! -d "packages/server/dist" ] || [ ! -d "packages/client/.next" ]; then
+        echo "Building all packages (frontend and backend)..."
+        pnpm run build
+    fi
 fi
 
 # Run any database migrations if needed

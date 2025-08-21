@@ -1,0 +1,18 @@
+FROM node:20-alpine
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 make g++ git bash
+
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
+
+# Copy all application files
+COPY . .
+
+# Test: Install dependencies with --ignore-scripts flag
+RUN pnpm install --ignore-scripts
+
+# If this works, we're good!
+CMD ["echo", "Build successful!"]

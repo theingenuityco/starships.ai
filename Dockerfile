@@ -70,12 +70,6 @@ COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.s
 COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
-# Build arguments for non-sensitive data only
-ARG STRIPE_PUBLISHABLE_KEY
-
-# Only set the publishable key as ENV (it's public, safe to expose)
-ENV STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
-
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
 ENV SKIP_K8S_CHECK=true
@@ -86,7 +80,9 @@ RUN pnpm install --frozen-lockfile
 # Build the application with secrets mounted (not stored in layers)
 # Secrets are only available during this RUN command, not in the final image
 RUN --mount=type=secret,id=stripe_secret_key \
+    --mount=type=secret,id=stripe_publishable_key \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
+    STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
     pnpm run build
 
 # Create necessary directories

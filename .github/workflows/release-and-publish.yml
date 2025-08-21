@@ -136,9 +136,9 @@ jobs:
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VERSION=${{ needs.version.outputs.new_release_version }}
             REVISION=${{ github.sha }}
-            STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
+            stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
 
       - name: Generate image digest
         id: digest

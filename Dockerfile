@@ -73,8 +73,8 @@ RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 # Install dependencies (skip postinstall script which tries to detect Docker)
 RUN SKIP_POSTINSTALL=1 pnpm install --ignore-scripts
 
-# Build the application
-RUN pnpm run build
+# Build the application (skip k8s requirements check)
+RUN SKIP_K8S_CHECK=true pnpm run build
 
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \

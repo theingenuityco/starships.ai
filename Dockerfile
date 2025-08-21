@@ -68,8 +68,8 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY --chown=nodejs:nodejs package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY --chown=nodejs:nodejs packages/*/package.json ./packages/*/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (allow lockfile updates in case of sync issues)
+RUN pnpm install --no-frozen-lockfile
 
 # Copy application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh

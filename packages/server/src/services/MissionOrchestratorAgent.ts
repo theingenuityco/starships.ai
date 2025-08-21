@@ -267,7 +267,12 @@ export class MissionOrchestratorAgent {
    * Conditional edge function to determine phase routing
    */
   private phaseRouterNode(state: MissionChatState): string {
-    return state.activePhase || MISSION_PHASES.WELCOME; // Returns current phase or default to welcome
+    const currentPhase = state.activePhase || MISSION_PHASES.WELCOME;
+    
+    // Special handling for execute phase to prevent re-execution of completed workflows
+    // Note: Execution status is tracked in the mission's executionState and handled in executePhaseNode
+    
+    return currentPhase;
   }
 
   /**
@@ -308,6 +313,8 @@ export class MissionOrchestratorAgent {
     const workflow = state.workflow;
     
     if (!workflow) return 'end';
+    
+    // Note: Execution status is checked within the execution engine itself
     
     // Check explicit approval status first
     if (workflow.approvalStatus === 'approved') {

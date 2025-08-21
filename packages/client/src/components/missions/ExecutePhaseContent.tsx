@@ -6,14 +6,17 @@ import { Play, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { missionApi } from '@/lib/missionApi';
-import type { Mission, MissionExecutionState, MissionNodeResult } from '@starships/protocol';
+import { WorkflowVisualization } from '@/components/workflow';
+import type { Mission, MissionExecutionState, MissionNodeResult, MissionWorkflow, Agent } from '@starships/protocol';
 
 interface ExecutePhaseContentProps {
   mission: Mission;
+  workflow?: MissionWorkflow;
+  agents?: Record<string, Agent>;
   onExecutionComplete?: () => void;
 }
 
-export function ExecutePhaseContent({ mission, onExecutionComplete }: ExecutePhaseContentProps) {
+export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComplete }: ExecutePhaseContentProps) {
   const [executionState, setExecutionState] = useState<MissionExecutionState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +174,20 @@ export function ExecutePhaseContent({ mission, onExecutionComplete }: ExecutePha
           </div>
         </CardContent>
       </Card>
+
+      {/* Workflow Visualization */}
+      {workflow && (
+        <Card>
+          <CardContent className="p-6">
+            <h4 className="font-medium text-gray-900 mb-4">Mission Workflow</h4>
+            <WorkflowVisualization 
+              workflow={workflow} 
+              agents={agents}
+              currentNodeId={executionState?.nodeResults[executionState.currentNodeIndex]?.nodeId}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Task Execution List */}
       <Card>

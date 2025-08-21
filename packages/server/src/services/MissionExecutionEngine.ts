@@ -57,6 +57,8 @@ export class MissionExecutionEngine {
     const success = results.every(r => r.success);
     if (success) {
       await this.markExecutionCompleted(missionId, results);
+    } else {
+      await this.markExecutionFailed(missionId, results);
     }
     
     return {
@@ -116,7 +118,7 @@ export class MissionExecutionEngine {
   /**
    * Call agent to execute task - placeholder for now
    */
-  private async callMissionAgent(agentId: string, instructions: string, missionId: string): Promise<string> {
+  private async callMissionAgent(agentId: string, instructions: string, _missionId: string): Promise<string> {
     // Get agent details
     const agentRepo = RepositoryFactory.getAgentRepository();
     const agent = await agentRepo.findById(agentId);

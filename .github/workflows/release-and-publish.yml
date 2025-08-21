@@ -78,7 +78,7 @@ jobs:
     if: needs.version.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
     outputs:
-      image_pushed: ${{ steps.push.outputs.pushed }}
+      image_pushed: ${{ steps.digest.outputs.pushed }}
       image_digest: ${{ steps.digest.outputs.digest }}
     steps:
       - name: Checkout repository

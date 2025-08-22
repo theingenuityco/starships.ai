@@ -298,7 +298,7 @@ router.post('/starships/create-paid', authMiddleware, async (req: Request, res: 
     console.log('[STARSHIP-CREATE-PAID] Creating empty vision...');
     await visionRepo.create({
       starshipId: starship.id,
-      statement: '',
+      statement: 'Initial Vision Statement',
       confidence: 0.5,
       refinementCount: 0,
       lastRefined: new Date().toISOString(),

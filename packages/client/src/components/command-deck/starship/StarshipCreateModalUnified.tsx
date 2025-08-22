@@ -22,6 +22,7 @@ import {
   Users, 
   Zap, 
   Navigation,
+  Check,
   CheckCircle,
   Loader2,
   Eye,
@@ -176,21 +177,24 @@ export function StarshipCreateModalUnified({
           const pricingData = await response.json();
           
           // Transform pricing data into starship classes format
-          const classesFromAPI = pricingData.reduce((acc: any, plan: any) => {
-            acc[plan.id] = {
-              name: plan.name,
-              icon: getClassIcon(plan.id),
-              maxAgents: plan.features.maxAgents,
-              description: plan.description,
-              features: getClassFeatures(plan.id),
-              stats: getClassStats(plan.id),
-              pricing: {
-                monthly: plan.monthly,
-                yearly: plan.yearly
-              }
-            };
-            return acc;
-          }, {});
+          // Temporarily filter out draught plan
+          const classesFromAPI = pricingData
+            .filter((plan: any) => plan.id !== 'draught') // Comment out draught for now
+            .reduce((acc: any, plan: any) => {
+              acc[plan.id] = {
+                name: plan.name,
+                icon: getClassIcon(plan.id),
+                maxAgents: plan.features.maxAgents,
+                description: plan.description,
+                features: getClassFeatures(plan.id),
+                stats: getClassStats(plan.id),
+                pricing: {
+                  monthly: plan.monthly,
+                  yearly: plan.yearly
+                }
+              };
+              return acc;
+            }, {});
           
           setStarshipClasses(classesFromAPI);
           setPricingData(pricingData);
@@ -551,7 +555,7 @@ export function StarshipCreateModalUnified({
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
-          className="space-y-6"
+          className="space-y-6 overflow-visible"
         >
           <div className="text-center space-y-2">
             <Users className="w-12 h-12 mx-auto text-primary" />
@@ -576,152 +580,227 @@ export function StarshipCreateModalUnified({
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(starshipClasses).map(([key, classData]) => {
-                const isRecommended = key === 'cruiser' && visionAnalysis?.recommendedClass === 'cruiser';
-                const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
-                const isScoutLimitReached = key === 'scout' && scoutStarships.length >= 3;
-                
-                return (
-                  <Card
-                    key={key}
-                    className={cn(
-                      "cursor-pointer transition-all duration-200 bg-card/50 backdrop-blur-sm border-border/50 h-full",
-                      formData.class === key && "ring-2 ring-primary/50 bg-primary/5",
-                      isScoutLimitReached && "opacity-50 cursor-not-allowed"
-                    )}
-                    onClick={() => {
-                      if (isScoutLimitReached) {
-                        toast.error('Scout limit reached', {
-                          description: 'You already have 3 Scout starships. Upgrade to Cruiser or Draught for more.',
-                        });
-                        return;
-                      }
-                      setFormData({ ...formData, class: key as 'scout' | 'cruiser' | 'draught' })
-                    }}
-                  >
-                    <CardHeader className="pb-3">
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center space-x-3 flex-1">
-                            <div className="text-2xl">{classData.icon}</div>
-                            <div className="flex-1">
-                              <CardTitle className="text-lg">{classData.name}</CardTitle>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline">
-                                  {classData.maxAgents} Agent Slots
-                                </Badge>
-                                {key === 'scout' && (
-                                  <Badge 
-                                    variant={isScoutLimitReached ? "destructive" : "secondary"}
-                                    className="text-xs"
-                                  >
-                                    {scoutStarships.length}/3 Ships
-                                  </Badge>
+            <div className="space-y-6">
+              {/* Modern Billing Toggle with Animation */}
+              {Object.values(starshipClasses).some((c: any) => c.pricing?.monthly > 0) && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col items-center gap-2"
+                >
+                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Billing Period</span>
+                  <div className="relative bg-gradient-to-r from-muted/20 to-muted/30 backdrop-blur-xl rounded-full p-0.5 shadow-inner">
+                    <div className="relative flex items-center">
+                      {/* Sliding Background */}
+                      <motion.div
+                        className="absolute h-full bg-gradient-to-r from-primary to-primary/80 rounded-full shadow-lg"
+                        initial={false}
+                        animate={{
+                          x: billingPeriod === 'monthly' ? 0 : '100%',
+                          width: billingPeriod === 'monthly' ? '50%' : '50%',
+                        }}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      />
+                      
+                      {/* Monthly Option */}
+                      <button
+                        onClick={() => setBillingPeriod('monthly')}
+                        className={cn(
+                          "relative z-10 px-8 py-2.5 rounded-full text-sm font-semibold transition-colors duration-200",
+                          billingPeriod === 'monthly' 
+                            ? "text-primary-foreground" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Monthly
+                      </button>
+                      
+                      {/* Yearly Option */}
+                      <button
+                        onClick={() => setBillingPeriod('yearly')}
+                        className={cn(
+                          "relative z-10 px-8 py-2.5 rounded-full text-sm font-semibold transition-colors duration-200",
+                          billingPeriod === 'yearly' 
+                            ? "text-primary-foreground" 
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Yearly
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Modern Card Grid with padding for badges */}
+              <div className="grid grid-cols-1 gap-4 px-1 py-3">
+                {Object.entries(starshipClasses).map(([key, classData], index) => {
+                  const isRecommended = key === 'cruiser' && visionAnalysis?.recommendedClass === 'cruiser';
+                  const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
+                  const isScoutLimitReached = key === 'scout' && scoutStarships.length >= 3;
+                  const isSelected = formData.class === key;
+                  const isPaid = classData.pricing?.monthly > 0;
+                  const displayPrice = billingPeriod === 'monthly' ? classData.pricing?.monthly : classData.pricing?.yearly;
+                  
+                  return (
+                    <motion.div
+                      key={key}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="px-2"
+                    >
+                      <div
+                        className={cn(
+                          "relative group cursor-pointer",
+                          isScoutLimitReached && "pointer-events-none"
+                        )}
+                        onClick={() => {
+                          if (isScoutLimitReached) {
+                            toast.error('Scout limit reached', {
+                              description: 'You already have 3 Scout starships. Upgrade to Cruiser for more.',
+                            });
+                            return;
+                          }
+                          setFormData({ ...formData, class: key as 'scout' | 'cruiser' | 'draught' })
+                        }}
+                      >
+                        {/* Background Glow Effect */}
+                        <div className={cn(
+                          "absolute inset-0 rounded-2xl transition-all duration-500",
+                          isSelected && "bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 blur-xl"
+                        )} />
+                        
+                        {/* Main Card */}
+                        <div className={cn(
+                          "relative rounded-2xl border transition-all duration-300",
+                          isSelected 
+                            ? "border-primary bg-gradient-to-br from-card via-background to-card shadow-2xl" 
+                            : "border-border/60 bg-card/40 hover:border-border hover:bg-card/60 hover:shadow-xl",
+                          isScoutLimitReached && "opacity-50"
+                        )}>
+                          {/* AI Recommended Badge */}
+                          {isRecommended && (
+                            <motion.div
+                              initial={{ y: -20, opacity: 0 }}
+                              animate={{ y: 0, opacity: 1 }}
+                              className="absolute -top-3 left-4 z-10"
+                            >
+                              <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg">
+                                <Sparkles className="w-3 h-3 text-white" />
+                                <span className="text-xs font-bold text-white">AI Pick</span>
+                              </div>
+                            </motion.div>
+                          )}
+
+                          {/* Selection Checkmark */}
+                          <AnimatePresence>
+                            {isSelected && (
+                              <motion.div
+                                initial={{ scale: 0, rotate: -180 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                exit={{ scale: 0, rotate: 180 }}
+                                className="absolute -top-2 -right-2 z-10"
+                              >
+                                <div className="relative">
+                                  <div className="absolute inset-0 bg-primary blur-md" />
+                                  <div className="relative bg-primary rounded-full p-1.5 shadow-lg">
+                                    <Check className="w-4 h-4 text-primary-foreground" />
+                                  </div>
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+
+                          <div className="p-6">
+                            <div className="flex items-start justify-between mb-4">
+                              {/* Left: Icon and Title */}
+                              <div className="flex items-start gap-4">
+                                <motion.div
+                                  whileHover={{ rotate: 5 }}
+                                  className={cn(
+                                    "relative p-3 rounded-xl transition-all duration-300",
+                                    isSelected 
+                                      ? "bg-gradient-to-br from-primary/20 to-primary/10 shadow-lg shadow-primary/20" 
+                                      : "bg-gradient-to-br from-muted/80 to-muted/40"
+                                  )}
+                                >
+                                  <span className="text-2xl">{classData.icon}</span>
+                                </motion.div>
+                                
+                                <div>
+                                  <h3 className="text-xl font-bold mb-1">{classData.name}</h3>
+                                  <p className="text-sm text-muted-foreground">{classData.description}</p>
+                                  
+                                  {/* Agent Slots */}
+                                  <div className="flex items-center gap-2 mt-3">
+                                    <Bot className={cn(
+                                      "w-4 h-4",
+                                      isSelected ? "text-primary" : "text-muted-foreground"
+                                    )} />
+                                    <span className="text-sm font-medium">
+                                      {classData.maxAgents} Agent Slots
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right: Price */}
+                              <div className="text-right">
+                                {isPaid ? (
+                                  <div>
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="text-3xl font-bold tracking-tight">
+                                        ${displayPrice}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      per {billingPeriod === 'monthly' ? 'month' : 'year'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="text-2xl font-bold text-green-500">Free</span>
+                                    {key === 'scout' && (
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        {scoutStarships.length}/3 used
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          </div>
-                          {isRecommended && (
-                            <Badge variant="secondary" className="ml-2">
-                              <Sparkles className="w-3 h-3 mr-1" />
-                              Recommended
-                            </Badge>
-                          )}
-                        </div>
-                        
-                        {classData.pricing && classData.pricing.monthly > 0 && (
-                          <div className="flex justify-between items-center pt-2 border-t border-border/50">
-                            <span className="text-sm text-muted-foreground">Pricing:</span>
-                            <div className="text-right">
-                              <div className="text-sm font-medium">
-                                ${classData.pricing.monthly}/mo
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                ${classData.pricing.yearly}/yr
-                              </div>
+
+                            {/* Features */}
+                            <div className="space-y-2 mt-4 pt-4 border-t border-border/50">
+                              {classData.features.slice(0, 2).map((feature, idx) => (
+                                <motion.div
+                                  key={idx}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: index * 0.1 + idx * 0.05 }}
+                                  className="flex items-center gap-2 text-sm"
+                                >
+                                  <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isSelected ? "bg-primary" : "bg-muted-foreground/50"
+                                  )} />
+                                  <span className={cn(
+                                    isSelected ? "text-foreground" : "text-muted-foreground"
+                                  )}>
+                                    {feature}
+                                  </span>
+                                </motion.div>
+                              ))}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        {classData.description}
-                      </p>
-                      
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Speed</span>
-                          <span>{classData.stats.speed}%</span>
                         </div>
-                        <Progress value={classData.stats.speed} className="h-1" />
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Capacity</span>
-                          <span>{classData.stats.capacity}%</span>
-                        </div>
-                        <Progress value={classData.stats.capacity} className="h-1" />
-                      </div>
-
-                      <ul className="space-y-1">
-                        {classData.features.slice(0, 2).map((feature, index) => (
-                          <li key={index} className="flex items-center space-x-2 text-xs">
-                            <CheckCircle className="w-3 h-3 text-green-500" />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
-          )}
-          
-          {/* Add billing period UI after class selection */}
-          {(formData.class === 'cruiser' || formData.class === 'draught') && !classesLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4"
-            >
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center space-x-2">
-                    <Zap className="w-4 h-4 text-primary" />
-                    <span>Billing Period</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-2">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      variant={billingPeriod === 'monthly' ? 'default' : 'outline'}
-                      onClick={() => setBillingPeriod('monthly')}
-                      className="flex flex-col items-center p-3 h-auto space-y-1"
-                    >
-                      <span className="font-medium">Monthly</span>
-                      <span className="text-xs text-muted-foreground">
-                        ${starshipClasses[formData.class]?.pricing?.monthly || 0}/month
-                      </span>
-                    </Button>
-                    <Button
-                      variant={billingPeriod === 'yearly' ? 'default' : 'outline'}
-                      onClick={() => setBillingPeriod('yearly')}
-                      className="flex flex-col items-center p-3 h-auto space-y-1"
-                    >
-                      <span className="font-medium">Yearly</span>
-                      <span className="text-xs text-muted-foreground">
-                        ${starshipClasses[formData.class]?.pricing?.yearly || 0}/year
-                      </span>
-                      <Badge variant="secondary" className="text-xs mt-1">Save 17%</Badge>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
           )}
         </motion.div>
       );
@@ -872,7 +951,7 @@ export function StarshipCreateModalUnified({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl overflow-visible">
           <div className="max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">

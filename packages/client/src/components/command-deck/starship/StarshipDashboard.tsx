@@ -124,14 +124,19 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     setActiveStarship(starshipId);
   };
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = async () => {
     setShowCreateModal(false);
-    // Refresh the starships list after creation
-    loadUserStarships();
-    // Call the parent's success handler if provided (for onboarding cleanup)
+    // Call the parent's success handler first if provided (for onboarding cleanup)
     if (onCreateSuccess) {
       onCreateSuccess();
     }
+    // Refresh the starships list after creation with a small delay to avoid race conditions
+    // This ensures the modal close animation completes and avoids conflicting with auto-refresh
+    setTimeout(() => {
+      if (!loading) {
+        loadUserStarships();
+      }
+    }, 300);
   };
 
   const handleEditSuccess = () => {

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 // Define types locally based on protocol package
 interface UpdateStarshipRequest {
@@ -374,12 +375,8 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               // Could trigger a toast notification here to warn the user
             }
           } catch (error: any) {
-            // Check if it's a subscription cancellation failure
-            const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete starship';
-            const errorDetails = error?.response?.data?.details || '';
-            
-            // Combine error and details for better user feedback
-            const fullError = errorDetails ? `${errorMessage}\n${errorDetails}` : errorMessage;
+            // Use centralized error handling
+            const fullError = extractErrorMessage(error, 'Failed to delete starship');
             
             set({
               deleteError: fullError,

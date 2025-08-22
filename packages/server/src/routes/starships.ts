@@ -298,7 +298,7 @@ router.post('/starships/create-paid', authMiddleware, async (req: Request, res: 
     console.log('[STARSHIP-CREATE-PAID] Creating empty vision...');
     await visionRepo.create({
       starshipId: starship.id,
-      statement: '',
+      statement: 'Initial Vision Statement',
       confidence: 0.5,
       refinementCount: 0,
       lastRefined: new Date().toISOString(),
@@ -519,11 +519,13 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
   }
 });
 
-// DELETE /starships/:id - Delete starship
+// DELETE /starships/:id - Cancel subscription first, then delete starship
 router.delete('/starships/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const starshipId = req.params.id;
     const userId = req.user!.id;
+
+    console.log(`[STARSHIPS] Delete request for starship ${starshipId} by user ${userId}`);
 
     // Verify starship exists and ownership
     const starship = await starshipRepo.findById(starshipId);
@@ -537,19 +539,61 @@ router.delete('/starships/:id', authMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    // Note: activeExpeditions field removed - business logic can be implemented later
-    // if expedition tracking is needed in the future
+    // STEP 1: Cancel subscription FIRST (if it exists)
+    let subscriptionCancelled = true; // Default to true for free plans
+    
+    if (starship.subscriptionId && starship.plan !== 'scout') {
+      console.log(`[STARSHIPS] Attempting to cancel subscription ${starship.subscriptionId} for starship ${starshipId}`);
+      console.log(`[STARSHIPS] Starship plan: ${starship.plan}, billing: ${starship.billingPeriod}`);
+      
+      const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+      subscriptionCancelled = await subscriptionService.cancelSubscription(starship.subscriptionId);
+      
+      if (!subscriptionCancelled) {
+        // Subscription cancellation failed with a real error - DO NOT delete the starship
+        console.error(`[STARSHIPS] Failed to cancel subscription ${starship.subscriptionId} - aborting starship deletion`);
+        res.status(400).json({ 
+          error: 'Could not cancel subscription. Please contact support or try again later.',
+          details: 'There was an error cancelling your subscription. To prevent continued charges, we cannot delete the starship at this time.',
+          subscriptionId: starship.subscriptionId
+        });
+        return;
+      }
+      
+      console.log(`[STARSHIPS] Subscription ${starship.subscriptionId} handled successfully (cancelled or already cancelled)`);
+    } else if (!starship.subscriptionId && starship.plan !== 'scout') {
+      console.log(`[STARSHIPS] Warning: Paid starship ${starshipId} has no subscription ID`);
+    }
 
+    // STEP 2: Only delete starship if subscription was cancelled (or doesn't exist)
+    console.log(`[STARSHIPS] Proceeding to delete starship ${starshipId} after successful subscription handling`);
     const deleted = await starshipRepo.delete(starshipId);
+    
     if (!deleted) {
-      res.status(500).json({ error: 'Failed to delete starship' });
+      // Starship deletion failed but subscription was already cancelled
+      console.error(`[STARSHIPS] Critical: Subscription cancelled but starship deletion failed for ${starshipId}`);
+      res.status(500).json({ 
+        error: 'Subscription was cancelled but starship deletion failed. Please contact support.',
+        warning: 'Your subscription has been cancelled and you will not be charged further.',
+        subscriptionCancelled: true
+      });
       return;
     }
 
-    res.json({ message: 'Starship deleted successfully' });
+    console.log(`[STARSHIPS] Successfully deleted starship ${starshipId}`);
+
+    // Return success response
+    res.json({ 
+      message: 'Starship deleted successfully',
+      starshipId,
+      subscriptionCancelled,
+      refundInfo: starship.subscriptionId && starship.plan !== 'scout'
+        ? 'Subscription cancelled immediately. No refund will be issued for the remaining billing period.' 
+        : null
+    });
   } catch (error) {
     console.error('Error deleting starship:', error);
-    res.status(500).json({ error: 'Failed to delete starship' });
+    res.status(500).json({ error: 'Failed to process starship deletion' });
   }
 });
 

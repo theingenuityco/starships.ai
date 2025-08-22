@@ -71,14 +71,31 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     progress: false,
     clarity: false,
     plan: false,
-    execution: false
+    execution: false,
+    summary: false,
+    agentResults: false
   });
+
+  // Track expanded task outputs
+  const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(new Set());
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
     setCollapsedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const toggleOutputExpansion = (nodeId: string) => {
+    setExpandedOutputs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId);
+      } else {
+        newSet.add(nodeId);
+      }
+      return newSet;
+    });
   };
 
   // Function to get agent emoji based on name and category (same logic as AgentCard)
@@ -163,10 +180,24 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
       }
     };
 
-    const handlePhaseChange = (data: any) => {
+    const handlePhaseChange = async (data: any) => {
       console.log('[MISSION] Received phase change:', data);
       if (data.missionId === missionId) {
-        setMission(prev => prev ? { ...prev, phase: data.newPhase } : null);
+        // Phase changes (especially to CONVERSE) might include new mission data like execution results
+        // So we need to refetch the mission to get the complete updated state
+        try {
+          const response = await missionApi.getMissionById(missionId);
+          if (response.data) {
+            setMission(response.data.mission);
+          } else {
+            // Fallback to just updating the phase if refetch fails
+            setMission(prev => prev ? { ...prev, phase: data.newPhase } : null);
+          }
+        } catch (error) {
+          console.error('Failed to refetch mission after phase change:', error);
+          // Fallback to just updating the phase if refetch fails
+          setMission(prev => prev ? { ...prev, phase: data.newPhase } : null);
+        }
       }
     };
 
@@ -559,6 +590,228 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Agent Execution Results - Always show if execution results exist */}
+              {(mission.executionResult || mission.executionState?.nodeResults || mission.phase === MISSION_PHASES.CONVERSE) && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 px-3 group">
+                    <button
+                      onClick={() => toggleSection('agentResults')}
+                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                    >
+                      {collapsedSections.agentResults ? (
+                        <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                      )}
+                    </button>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Agent Execution Results
+                    </h4>
+                    <div className="ml-auto">
+                      <Badge className={
+                        mission.executionResult?.success || 
+                        (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every(r => r.success))
+                          ? "bg-green-100 text-green-800" 
+                          : mission.phase === MISSION_PHASES.CONVERSE
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                      }>
+                        {mission.executionResult?.success || 
+                         (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every(r => r.success))
+                          ? "✅ Completed" 
+                          : mission.phase === MISSION_PHASES.CONVERSE
+                            ? "✅ Completed"
+                            : "❌ Failed"}
+                      </Badge>
+                    </div>
+                  </div>
+                  {!collapsedSections.agentResults && (
+                    <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+                      {/* Agent Task Results */}
+                      {(() => {
+                        const nodeResults = mission.executionResult?.nodeResults || mission.executionState?.nodeResults || [];
+                        return nodeResults.length > 0 ? (
+                        <div className="mx-3 space-y-3">
+                          <div className="text-xs font-medium text-muted-foreground mb-2">
+                            Agent Task Outputs:
+                          </div>
+                          {nodeResults.map((result, index) => (
+                            <div key={result.nodeId} className="p-3 rounded-lg bg-muted/10 border border-muted/30">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
+                                  <span className="text-xs">
+                                    {result.success ? '✅' : '❌'}
+                                  </span>
+                                  <span className="text-sm font-semibold text-foreground">
+                                    {result.nodeName}
+                                  </span>
+                                  <div className="ml-auto text-xs text-muted-foreground">
+                                    {new Date(result.timestamp).toLocaleTimeString()}
+                                  </div>
+                                </div>
+                                
+                                {result.output && (
+                                  <div className="text-xs text-muted-foreground">
+                                    <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-24 overflow-hidden'}>
+                                      <div className="whitespace-pre-wrap break-words leading-relaxed">
+                                        {expandedOutputs.has(result.nodeId) 
+                                          ? result.output 
+                                          : result.output.length > 300 
+                                            ? result.output.substring(0, 300) + '...' 
+                                            : result.output
+                                        }
+                                      </div>
+                                    </div>
+                                    {result.output.length > 300 && (
+                                      <button
+                                        onClick={() => toggleOutputExpansion(result.nodeId)}
+                                        className="text-blue-600 dark:text-blue-400 hover:underline mt-2 text-xs font-medium"
+                                      >
+                                        {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {result.error && (
+                                  <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                                    <span className="font-medium">Error:</span> {result.error}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mx-3 px-3 py-4 rounded-lg bg-muted/10 border border-dashed border-muted/30">
+                          <div className="text-center">
+                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                              No Agent Results Available
+                            </div>
+                            <p className="text-xs text-muted-foreground/70 leading-relaxed">
+                              Agent execution results will appear here once the workflow completes
+                            </p>
+                          </div>
+                        </div>
+                      );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mission Summary Section - Show all artifacts during converse phase */}
+              {mission.phase === MISSION_PHASES.CONVERSE && (
+                <div className="space-y-4">
+                  {/* Mission Summary Header */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 px-3 group">
+                      <button
+                        onClick={() => toggleSection('summary')}
+                        className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
+                      >
+                        {collapsedSections.summary ? (
+                          <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+                        )}
+                      </button>
+                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                        Mission Summary
+                      </h4>
+                      <div className="ml-auto">
+                        <Badge className={
+                          mission.executionResult?.success 
+                            ? "bg-green-100 text-green-800" 
+                            : mission.phase === MISSION_PHASES.CONVERSE
+                              ? "bg-green-100 text-green-800"  // If in converse phase, assume success
+                              : "bg-red-100 text-red-800"
+                        }>
+                          {mission.executionResult?.success 
+                            ? "✅ Completed" 
+                            : mission.phase === MISSION_PHASES.CONVERSE
+                              ? "✅ Completed"  // If in converse phase, assume success
+                              : "❌ Failed"}
+                        </Badge>
+                      </div>
+                    </div>
+                    {!collapsedSections.summary && (
+                      <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
+                        
+                        {/* Execution Results */}
+                        {mission.executionResult && (
+                          <div className="mx-3 p-3 rounded-lg bg-muted/10 border border-muted/30">
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
+                                <span className="text-sm font-semibold text-foreground">
+                                  {mission.executionResult.success ? '✅ Execution Completed' : '❌ Execution Failed'}
+                                </span>
+                                <div className="ml-auto text-xs text-muted-foreground">
+                                  {new Date(mission.executionResult.executedAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                              
+                              <div className="text-xs text-muted-foreground mb-2">
+                                {mission.executionResult.summary}
+                              </div>
+                              
+                              {/* Task Results */}
+                              <div className="space-y-2">
+                                <div className="text-xs font-medium text-muted-foreground">Task Results:</div>
+                                {mission.executionResult.nodeResults.map((result, index) => (
+                                  <div key={result.nodeId} className="flex items-start gap-2 p-2 rounded bg-background/50">
+                                    <span className="text-xs mt-0.5">
+                                      {result.success ? '✅' : '❌'}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs font-medium text-foreground">
+                                        {result.nodeName}
+                                      </div>
+                                      {result.output && (
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                          <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-16 overflow-hidden'}>
+                                            <div className="whitespace-pre-wrap break-words">
+                                              {expandedOutputs.has(result.nodeId) 
+                                                ? result.output 
+                                                : result.output.length > 200 
+                                                  ? result.output.substring(0, 200) + '...' 
+                                                  : result.output
+                                              }
+                                            </div>
+                                          </div>
+                                          {result.output.length > 200 && (
+                                            <button
+                                              onClick={() => toggleOutputExpansion(result.nodeId)}
+                                              className="text-blue-600 dark:text-blue-400 hover:underline mt-1 text-xs"
+                                            >
+                                              {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                      {result.error && (
+                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                                          Error: {result.error}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Workflow Summary */}
+                        <div className="mx-3">
+                          <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} readonly={true} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

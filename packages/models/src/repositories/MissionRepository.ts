@@ -329,6 +329,11 @@ export class MissionRepository extends BaseRepository implements MissionReposito
         params.executionState = updates.executionState ? JSON.stringify(updates.executionState) : null;
       }
 
+      if (updates.executionResult !== undefined) {
+        setClause.push('m.executionResult = $executionResult');
+        params.executionResult = updates.executionResult ? JSON.stringify(updates.executionResult) : null;
+      }
+
       const query = `
         MATCH (m:Mission {id: $id})
         SET ${setClause.join(', ')}
@@ -579,7 +584,8 @@ export class MissionRepository extends BaseRepository implements MissionReposito
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       createdBy: record.createdBy,
-      executionState: record.executionState ? JSON.parse(record.executionState) : undefined
+      executionState: record.executionState ? JSON.parse(record.executionState) : undefined,
+      executionResult: record.executionResult ? JSON.parse(record.executionResult) : undefined
     };
   }
 }

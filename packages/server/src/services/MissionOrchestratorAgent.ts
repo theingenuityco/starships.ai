@@ -107,6 +107,12 @@ const MissionChatStateAnnotation = Annotation.Root({
   workflow: Annotation<MissionWorkflow | undefined>({
     value: (x, y) => y ?? x,
     default: () => undefined
+  }),
+  
+  // ADDED: Execution results in state for converse phase
+  executionResult: Annotation<MissionExecutionResult | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
   })
 });
 
@@ -121,6 +127,7 @@ export type MissionChatState = typeof MessagesAnnotation.State & {
   metadata: MissionMetadata | null;
   clarity: MissionClarity | undefined; // ADDED: Mission clarity state
   workflow: MissionWorkflow | undefined; // ADDED: Mission workflow state
+  executionResult: MissionExecutionResult | undefined; // ADDED: Mission execution results state
 };
 
 /**
@@ -238,6 +245,19 @@ export class MissionOrchestratorAgent {
       if (existingWorkflow) {
         updates.workflow = existingWorkflow;
       }
+    }
+    
+    // Load mission clarity if not already in state
+    if (!state.clarity) {
+      const existingClarity = await this.getClarityFromDB(state.missionId);
+      if (existingClarity) {
+        updates.clarity = existingClarity;
+      }
+    }
+    
+    // Load execution results if not already in state
+    if (!state.executionResult && metadata.mission.executionResult) {
+      updates.executionResult = metadata.mission.executionResult;
     }
     
     return updates;
@@ -561,22 +581,50 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Start mission execution in background
+   * Start mission execution in background with real-time progress updates
    */
   private async startMissionExecution(missionId: string, workflow: MissionWorkflow): Promise<void> {
     try {
       const executionEngine = new MissionExecutionEngine();
+      
+      // Execute workflow with enhanced logging and progress tracking
+      this.logger.info('Starting mission execution with real agent system', {
+        missionId,
+        workflowId: workflow.id,
+        agentNodesCount: workflow.nodes.filter(n => n.type === 'agent').length
+      });
+      
       const result = await executionEngine.executeWorkflow(missionId, workflow);
+      
+      this.logger.info('Mission execution completed', {
+        missionId,
+        success: result.success,
+        nodeResults: result.nodeResults?.length || 0,
+        summary: result.summary
+      });
       
       // Update mission phase to converse after execution
       await MissionService.updateMission(missionId, {
         phase: MISSION_PHASES.CONVERSE
       });
       
-      // Send completion message
-      const completionMessage = result.success
-        ? `✅ **Mission execution completed successfully!**\n\n${result.summary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`
-        : `❌ **Mission execution encountered issues**\n\n${result.summary}\n\n🔧 **Next steps:**\n- Review the failed tasks above\n- Consider modifying the plan to address the issues\n- Or ask me to regenerate the workflow\n\nWhat would you like to do?`;
+      // Send detailed completion message with execution details
+      let completionMessage: string;
+      
+      if (result.success) {
+        const nodeResultsSummary = result.nodeResults?.map((nodeResult, index) => 
+          `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.success ? '✅ Completed' : '❌ Failed'}\n   ${nodeResult.output ? nodeResult.output.substring(0, 150) + (nodeResult.output.length > 150 ? '...' : '') : 'No output'}`
+        ).join('\n') || 'No detailed results available.';
+        
+        completionMessage = `✅ **Mission execution completed successfully!**\n\n${result.summary}\n\n📋 **Execution Details:**\n${nodeResultsSummary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`;
+      } else {
+        const failedNodes = result.nodeResults?.filter(nr => !nr.success) || [];
+        const failureDetails = failedNodes.map((nodeResult, index) => 
+          `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.error || 'Unknown error'}`
+        ).join('\n') || 'No specific error details available.';
+        
+        completionMessage = `❌ **Mission execution encountered issues**\n\n${result.summary}\n\n🚨 **Failed Tasks:**\n${failureDetails}\n\n🔧 **Next steps:**\n- Review the failed tasks above\n- Consider modifying the plan to address the issues\n- Or ask me to regenerate the workflow\n\nWhat would you like to do?`;
+      }
         
       // Send system message via orchestrator service
       const { MissionOrchestratorService } = await import('./MissionOrchestratorService');
@@ -584,7 +632,11 @@ export class MissionOrchestratorAgent {
       await orchestratorService.handleSystemMessage(missionId, completionMessage);
       
     } catch (error) {
-      this.logger.error('Background mission execution failed', { missionId }, error as Error);
+      this.logger.error('Background mission execution failed', { 
+        missionId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
       const errorMessage = `❌ **Mission execution encountered a critical error**\n\nError: ${error instanceof Error ? error.message : 'Unknown system error'}\n\n🔧 **Recovery options:**\n- Try regenerating the workflow plan\n- Check agent assignments and availability\n- Contact support if the issue persists\n\nHow would you like to proceed?`;
       

@@ -26,6 +26,7 @@ export interface Mission {
   updatedAt: string;
   createdBy: string; // User ID
   executionState?: MissionExecutionState; // Workflow execution progress
+  executionResult?: MissionExecutionResult; // Final execution results for persistence
 }
 
 /**
@@ -111,6 +112,7 @@ export interface UpdateMissionRequest {
   phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
   executionState?: MissionExecutionState; // Update execution progress
+  executionResult?: MissionExecutionResult; // Update final execution results
 }
 
 /**

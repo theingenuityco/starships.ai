@@ -50,15 +50,22 @@ Respond with ONLY this JSON format:
 
   CLARITY_COMPLETION_SUBSEQUENT: `Provide a brief, positive summary (2-3 sentences) confirming the mission is clear and ready for execution planning.`,
 
-  CONVERSE: `Provide mission-focused guidance and support.
+  CONVERSE: `Provide mission-focused guidance and support based on complete mission context.
+
+AVAILABLE CONTEXT:
+- Mission clarity assessment from analysis phase
+- Approved workflow plan with task breakdown  
+- Execution results with detailed task outcomes
+- Full conversation history and user intent
 
 APPROACH:
-- Understand the user's specific request
-- Leverage mission context and current phase
-- Give actionable, practical advice
-- Suggest concrete next steps when appropriate
+- Reference specific mission artifacts when relevant
+- Provide insights based on execution results
+- Help analyze outcomes and suggest improvements
+- Answer questions about completed tasks and their results
+- Guide next steps based on mission completion status
 
-Be direct, helpful, and mission-oriented.`,
+Be direct, knowledgeable, and leverage the rich mission context available.`,
 
   WORKFLOW_GENERATION: `You are Commander ARIA creating a detailed execution workflow for this mission.
 
@@ -338,10 +345,17 @@ WELCOME PHASE: First interaction with user for this mission.`;
   }
   
   /**
-   * Converse phase context - recent conversation history
+   * Converse phase context - includes all mission artifacts
    */
   private buildConversePhaseContext(): string {
-    return `CONVERSE PHASE: Ongoing mission guidance and support.`
+    const sections = [
+      `CONVERSE PHASE: Ongoing mission guidance and support.`,
+      this.buildClaritySection(),
+      this.buildWorkflowSection(),
+      this.buildExecutionResultsSection()
+    ];
+    
+    return sections.filter(Boolean).join('\n\n');
   }
   
   // ============================================================================
@@ -412,6 +426,50 @@ MISSION CLARITY ASSESSMENT:
 ├─ Scope Boundaries: ${clarity.scopeBoundaries}/10
 ├─ Vision Alignment: ${clarity.visionAlignment}/10
 └─ AI Analysis: ${clarity.reasoning}`;
+  }
+
+  private buildWorkflowSection(): string {
+    const { workflow } = this.state;
+    if (!workflow) return '';
+    
+    const agentNodes = workflow.nodes.filter(n => n.type === 'agent');
+    const workflowStatus = workflow.approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' : 
+                          workflow.approvalStatus === 'rejected' ? '❌ REJECTED' : 
+                          '⏳ PENDING APPROVAL';
+    
+    const taskList = agentNodes.map((node, index) => 
+      `├─ Task ${index + 1}: ${node.name}`
+    ).join('\n');
+    
+    return `
+MISSION WORKFLOW:
+├─ Status: ${workflowStatus}
+├─ Total Tasks: ${agentNodes.length}
+${taskList}
+└─ Created: ${new Date(workflow.createdAt).toLocaleDateString()}`;
+  }
+
+  private buildExecutionResultsSection(): string {
+    const { executionResult } = this.state;
+    if (!executionResult) return '';
+    
+    const successfulTasks = executionResult.nodeResults.filter(r => r.success).length;
+    const failedTasks = executionResult.nodeResults.filter(r => !r.success).length;
+    const statusIcon = executionResult.success ? '✅' : '❌';
+    
+    const taskResults = executionResult.nodeResults.map((result, index) => {
+      const icon = result.success ? '✅' : '❌';
+      const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
+      return `├─ ${icon} ${result.nodeName}${output}`;
+    }).join('\n');
+    
+    return `
+MISSION EXECUTION RESULTS:
+├─ Status: ${statusIcon} ${executionResult.success ? 'COMPLETED SUCCESSFULLY' : 'FAILED'}
+├─ Summary: ${executionResult.summary}
+├─ Tasks Completed: ${successfulTasks}/${executionResult.nodeResults.length}
+${taskResults}
+└─ Executed: ${new Date(executionResult.executedAt).toLocaleDateString()}`;
   }
 
   private buildConversationSection(): string {

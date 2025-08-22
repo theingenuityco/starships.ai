@@ -185,9 +185,9 @@ export function StarshipDeleteDialog({
                     <div className="text-center">
                       <div className="flex items-center justify-center space-x-1 text-muted-foreground">
                         <Navigation className="w-3 h-3" />
-                        <span className="text-xs">Active Expeditions</span>
+                        <span className="text-xs">Missions</span>
                       </div>
-                      <div className="text-lg font-semibold">{starship.maxActiveExpeditions}</div>
+                      <div className="text-lg font-semibold">0</div>
                     </div>
                   </div>
                 </CardContent>
@@ -225,17 +225,6 @@ export function StarshipDeleteDialog({
                       </div>
                     )}
                     
-                    {starship.maxActiveExpeditions > 0 && (
-                      <div className="flex items-start space-x-3">
-                        <div className="w-2 h-2 bg-destructive rounded-full mt-2" />
-                        <div>
-                          <div className="font-medium">Active Expeditions</div>
-                          <div className="text-sm text-muted-foreground">
-                            {starship.maxActiveExpeditions} active expedition{starship.maxActiveExpeditions > 1 ? 's' : ''} will be terminated
-                          </div>
-                        </div>
-                      </div>
-                    )}
                     
                     {isActiveStarship && (
                       <div className="flex items-start space-x-3">

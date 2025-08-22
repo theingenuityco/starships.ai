@@ -8,8 +8,7 @@
 import express from 'express';
 import { getConnection } from '@starships/models';
 import { RepositoryFactory } from '@starships/models';
-import { logger, LogContext } from '@starships/models/src/logging';
-import { ErrorUtils } from '@starships/models/src/errors';
+import { logger, LogContext, ErrorUtils } from '@starships/models';
 
 const router: express.Router = express.Router();
 
@@ -85,10 +84,10 @@ router.get('/', async (req, res) => {
     // Check repository health
     try {
       const repoStart = Date.now();
-      const expeditionRepo = RepositoryFactory.getExpeditionRepository();
+      const starshipRepo = RepositoryFactory.getStarshipRepository();
       
       // Test basic repository functionality
-      await expeditionRepo.findAll();
+      await starshipRepo.findAll();
       
       healthCheck.services.repositories = {
         status: 'healthy',
@@ -225,13 +224,10 @@ router.get('/detailed', async (req, res) => {
 
     // Check all repository types
     const repositoryTypes = [
-      'ExpeditionRepository',
       'StarshipRepository',
       'UserRepository',
       'AgentRepository',
-      'ExpeditionTaskRepository',
-      'ExpeditionMessageRepository',
-      'ExpeditionResultRepository',
+      'VisionRepository',
     ];
 
     for (const repoType of repositoryTypes) {
@@ -344,8 +340,8 @@ router.get('/ready', async (req, res) => {
     await connection.executeQuery('RETURN 1 as readiness_check');
     
     // Check if essential repositories are available
-    const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-    await expeditionRepo.findAll();
+    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    await starshipRepo.findAll();
 
     res.status(200).json({
       status: 'ready',

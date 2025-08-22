@@ -16,7 +16,6 @@ interface ProductConfig {
   metadata: {
     plan_type: string;
     max_agents: string;
-    max_expeditions: string;
   };
 }
 
@@ -32,8 +31,7 @@ const PRODUCTS: Record<string, ProductConfig> = {
     description: 'Advanced starship with enhanced capabilities for growing teams',
     metadata: {
       plan_type: 'cruiser',
-      max_agents: '5', // 5 + First Officer
-      max_expeditions: '3', // 3 parallel expeditions
+      max_agents: '5',
     },
   },
   draught: {
@@ -41,8 +39,7 @@ const PRODUCTS: Record<string, ProductConfig> = {
     description: 'Enterprise-grade starship with unlimited potential',
     metadata: {
       plan_type: 'draught',
-      max_agents: '10', // 10 + First Officer  
-      max_expeditions: '5', // 5 parallel expeditions
+      max_agents: '10',
     },
   },
 };

@@ -34,7 +34,6 @@ const mockStarship = {
   ownerId: 'user-1',
   status: 'active' as const,
   maxAgents: 3,
-  activeExpeditions: 0,
   sibilInsights: 0,
   createdAt: '2023-01-01T00:00:00Z',
   updatedAt: '2023-01-01T00:00:00Z',
@@ -83,7 +82,7 @@ describe('Enhanced Starship Store', () => {
       statusUpdateError: null,
       agentsError: null,
       starshipAgents: {},
-      vision: '',
+      vision: { statement: '', confidence: 0.8, lastUpdated: new Date().toISOString() },
       visionLoading: false,
       visionError: null,
       currentRoute: '/',
@@ -143,16 +142,16 @@ describe('Enhanced Starship Store', () => {
     });
 
     it('should update starship status', async () => {
-      const mockResponse = { starship: { ...mockStarship, status: 'docked' as const } };
+      const mockResponse = { starship: { ...mockStarship, status: 'inactive' as const } };
       vi.mocked(starshipAPI.updateStarshipStatus).mockResolvedValue(mockResponse);
 
       const store = useStarshipStore.getState();
       store.starships = [mockStarship];
 
-      await store.updateStarshipStatus('starship-1', 'docked');
+      await store.updateStarshipStatus('starship-1', 'inactive');
 
-      expect(starshipAPI.updateStarshipStatus).toHaveBeenCalledWith('starship-1', 'docked');
-      expect(useStarshipStore.getState().starships[0].status).toBe('docked');
+      expect(starshipAPI.updateStarshipStatus).toHaveBeenCalledWith('starship-1', 'inactive');
+      expect(useStarshipStore.getState().starships[0].status).toBe('inactive');
       expect(useStarshipStore.getState().loadingStatusUpdate).toBe(false);
     });
 
@@ -269,7 +268,6 @@ describe('Enhanced Starship Store', () => {
 
       expect(store.class).toBe('scout');
       expect(store.powerLevel).toBe(85);
-      expect(store.activeExpeditions).toBe(0);
       expect(store.sibilInsights).toBe(0);
     });
 
@@ -280,7 +278,6 @@ describe('Enhanced Starship Store', () => {
 
       expect(store.class).toBe('scout'); // Default value
       expect(store.powerLevel).toBe(85); // Default value
-      expect(store.activeExpeditions).toBe(0); // Default value
       expect(store.sibilInsights).toBe(0); // Default value
     });
   });

@@ -1,7 +1,7 @@
 import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
-import { RepositoryFactory, AgentExpeditionContextService } from "@starships/models";
+import { RepositoryFactory } from "@starships/models";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 
 /**
@@ -90,92 +90,16 @@ You should be helpful, professional, and focused on delivering high-quality resu
   }
   
   let visionContext = "";
-  let expeditionContext = "";
-  let starshipLookupStrategies: string[] = [];
   let starshipSlugFromChannel: string | null = null;
   
-  // Load expedition context for agent awareness
-  try {
-    // Check if channel_id contains expedition ID or starship ID
-    let expeditionIdFromChannel: string | null = null;
-    
-    if (req.channel_id) {
-      if (req.channel_id.startsWith('expedition-') || req.channel_id.startsWith('expedition:')) {
-        // Handle multiple formats: 
-        // - expedition-{expeditionId} (old format with dash)
-        // - expedition:{expeditionId}:starship:{starshipId} (new format with colons)
-        
-        if (req.channel_id.includes(':')) {
-          // New format with colons
-          const parts = req.channel_id.split(':');
-          if (parts.length >= 2) {
-            expeditionIdFromChannel = parts[1];
-            console.log('🔍 [AGENT-ENGINE] Extracted expedition ID from channel:', expeditionIdFromChannel);
-            
-            // Check if starship ID is also included
-            if (parts.length >= 4 && parts[2] === 'starship') {
-              const starshipId = parts[3];
-              console.log('🔍 [AGENT-ENGINE] Found starship ID in channel:', starshipId);
-              // Add it to lookup strategies for direct use
-              starshipLookupStrategies.push(`direct-starship:${starshipId}`);
-            }
-          }
-        } else {
-          // Old format with dashes
-          const parts = req.channel_id.split('-');
-          if (parts.length >= 2) {
-            expeditionIdFromChannel = parts[1];
-            console.log('🔍 [AGENT-ENGINE] Extracted expedition ID from channel (old format):', expeditionIdFromChannel);
-          }
-        }
-      } else if (req.channel_id.startsWith('starship-')) {
-        // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
-        const colonIndex = req.channel_id.indexOf(':');
-        if (colonIndex > 0) {
-          starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
-          console.log('🔍 [AGENT-ENGINE] Extracted starship slug from channel:', starshipSlugFromChannel);
-        }
-      }
+  // Handle starship channel format for vision loading
+  if (req.channel_id && req.channel_id.startsWith('starship-')) {
+    // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
+    const colonIndex = req.channel_id.indexOf(':');
+    if (colonIndex > 0) {
+      starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
+      console.log('🔍 [AGENT-ENGINE] Extracted starship slug from channel:', starshipSlugFromChannel);
     }
-
-    const contextService = AgentExpeditionContextService.getInstance();
-    expeditionContext = await contextService.getAgentExpeditionContext(req.agent_id);
-    
-    if (expeditionContext) {
-      console.log('🚢 [AGENT-ENGINE] Expedition context loaded for agent:', {
-        agentId: req.agent_id,
-        contextLength: expeditionContext.length,
-        hasExpedition: true
-      });
-    }
-
-    // If we found an expedition ID in the channel but no expedition context, add basic context
-    if (expeditionIdFromChannel && !expeditionContext) {
-      console.log('🔍 [AGENT-ENGINE] Adding basic expedition context for ID:', expeditionIdFromChannel);
-      expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.\n`;
-      
-      // Also try to get the starship from the expedition
-      try {
-        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-        const expedition = await expeditionRepo.findById(expeditionIdFromChannel);
-        if (expedition && expedition.starshipId) {
-          console.log('🔍 [AGENT-ENGINE] Found starship ID from expedition:', expedition.starshipId);
-          // We'll use this later for vision loading if user starships aren't found
-          starshipLookupStrategies.push(`expedition-starship:${expedition.starshipId}`);
-        } else {
-          console.log('⚠️ [AGENT-ENGINE] Expedition found but no starshipId:', {
-            expeditionId: expeditionIdFromChannel,
-            expeditionFound: !!expedition,
-            starshipId: expedition?.starshipId
-          });
-        }
-      } catch (expError) {
-        console.log('⚠️ [AGENT-ENGINE] Could not load expedition details:', expError);
-      }
-    }
-  } catch (contextError) {
-    console.log('⚠️ [AGENT-ENGINE] Could not load expedition context:', contextError);
-    // Continue without expedition context
   }
   
   // Step 2: Load the agent's assigned starship for proper isolation
@@ -289,7 +213,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
           lastRefined: vision.lastRefined
         });
         
-        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
+        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on missions that align with this vision\n- If a mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this mission support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
         console.log('✅ [AGENT-ENGINE] Vision context prepared successfully, length:', visionContext.length);
       } else {
         console.log('📝 [AGENT-ENGINE] Vision exists but has no usable statement');
@@ -474,8 +398,6 @@ You should be helpful, professional, and focused on delivering high-quality resu
     hasVisionContext: !!visionContext,
     visionContextLength: visionContext.length,
     visionPreview: visionContext ? visionContext.substring(0, 100) + '...' : 'none',
-    hasExpeditionContext: !!expeditionContext,
-    expeditionContextLength: expeditionContext.length,
     channelId: req.channel_id,
     agentId: req.agent_id,
     agentName: agent.name
@@ -486,8 +408,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
     memory,
     req.message,
     relevantContext,
-    visionContext,
-    expeditionContext
+    visionContext
   );
 
   console.log('✅ [AGENT-ENGINE] Prompt built:', {
@@ -641,92 +562,16 @@ You should be helpful, professional, and focused on delivering high-quality resu
   }
   
   let visionContext = "";
-  let expeditionContext = "";
-  let starshipLookupStrategies: string[] = [];
   let starshipSlugFromChannel: string | null = null;
   
-  // Load expedition context for agent awareness (STREAMING)
-  try {
-    // Check if channel_id contains expedition ID or starship ID
-    let expeditionIdFromChannel: string | null = null;
-    
-    if (req.channel_id) {
-      if (req.channel_id.startsWith('expedition-') || req.channel_id.startsWith('expedition:')) {
-        // Handle multiple formats: 
-        // - expedition-{expeditionId} (old format with dash)
-        // - expedition:{expeditionId}:starship:{starshipId} (new format with colons)
-        
-        if (req.channel_id.includes(':')) {
-          // New format with colons
-          const parts = req.channel_id.split(':');
-          if (parts.length >= 2) {
-            expeditionIdFromChannel = parts[1];
-            console.log('🔍 [AGENT-ENGINE-STREAM] Extracted expedition ID from channel:', expeditionIdFromChannel);
-            
-            // Check if starship ID is also included
-            if (parts.length >= 4 && parts[2] === 'starship') {
-              const starshipId = parts[3];
-              console.log('🔍 [AGENT-ENGINE-STREAM] Found starship ID in channel:', starshipId);
-              // Add it to lookup strategies for direct use
-              starshipLookupStrategies.push(`direct-starship:${starshipId}`);
-            }
-          }
-        } else {
-          // Old format with dashes
-          const parts = req.channel_id.split('-');
-          if (parts.length >= 2) {
-            expeditionIdFromChannel = parts[1];
-            console.log('🔍 [AGENT-ENGINE-STREAM] Extracted expedition ID from channel (old format):', expeditionIdFromChannel);
-          }
-        }
-      } else if (req.channel_id.startsWith('starship-')) {
-        // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
-        const colonIndex = req.channel_id.indexOf(':');
-        if (colonIndex > 0) {
-          starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
-          console.log('🔍 [AGENT-ENGINE-STREAM] Extracted starship slug from channel:', starshipSlugFromChannel);
-        }
-      }
+  // Handle starship channel format for vision loading
+  if (req.channel_id && req.channel_id.startsWith('starship-')) {
+    // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
+    const colonIndex = req.channel_id.indexOf(':');
+    if (colonIndex > 0) {
+      starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
+      console.log('🔍 [AGENT-ENGINE-STREAM] Extracted starship slug from channel:', starshipSlugFromChannel);
     }
-
-    const contextService = AgentExpeditionContextService.getInstance();
-    expeditionContext = await contextService.getAgentExpeditionContext(req.agent_id);
-    
-    if (expeditionContext) {
-      console.log('🚢 [AGENT-ENGINE-STREAM] Expedition context loaded for agent:', {
-        agentId: req.agent_id,
-        contextLength: expeditionContext.length,
-        hasExpedition: true
-      });
-    }
-
-    // If we found an expedition ID in the channel but no expedition context, add basic context
-    if (expeditionIdFromChannel && !expeditionContext) {
-      console.log('🔍 [AGENT-ENGINE-STREAM] Adding basic expedition context for ID:', expeditionIdFromChannel);
-      expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.\n`;
-      
-      // Also try to get the starship from the expedition
-      try {
-        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-        const expedition = await expeditionRepo.findById(expeditionIdFromChannel);
-        if (expedition && expedition.starshipId) {
-          console.log('🔍 [AGENT-ENGINE-STREAM] Found starship ID from expedition:', expedition.starshipId);
-          // We'll use this later for vision loading if user starships aren't found
-          starshipLookupStrategies.push(`expedition-starship:${expedition.starshipId}`);
-        } else {
-          console.log('⚠️ [AGENT-ENGINE-STREAM] Expedition found but no starshipId:', {
-            expeditionId: expeditionIdFromChannel,
-            expeditionFound: !!expedition,
-            starshipId: expedition?.starshipId
-          });
-        }
-      } catch (expError) {
-        console.log('⚠️ [AGENT-ENGINE-STREAM] Could not load expedition details:', expError);
-      }
-    }
-  } catch (contextError) {
-    console.log('⚠️ [AGENT-ENGINE-STREAM] Could not load expedition context:', contextError);
-    // Continue without expedition context
   }
   
   // Step 2: Load the agent's assigned starship for proper isolation
@@ -838,7 +683,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
           lastRefined: vision.lastRefined
         });
         
-        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
+        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on missions that align with this vision\n- If a mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this mission support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
         console.log('✅ [AGENT-ENGINE-STREAM] Vision context prepared successfully, length:', visionContext.length);
       } else {
         console.log('📝 [AGENT-ENGINE-STREAM] Vision exists but has no usable statement');
@@ -971,7 +816,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
               preview: vision.statement.substring(0, 150) + '...'
             });
             
-            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
+            visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on missions that align with this vision\n- If a mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this mission support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
             console.log('✅ [AGENT-ENGINE-STREAM] Vision context prepared from agent starship');
           }
         } else {
@@ -1023,9 +868,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
     memoryEntries: memory.length,
     hasRelevantContext: !!relevantContext,
     hasVisionContext: !!visionContext,
-    visionContextLength: visionContext.length,
-    hasExpeditionContext: !!expeditionContext,
-    expeditionContextLength: expeditionContext.length
+    visionContextLength: visionContext.length
   });
 
   const prompt = buildPrompt(
@@ -1033,8 +876,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
     memory,
     req.message,
     relevantContext,
-    visionContext,
-    expeditionContext
+    visionContext
   );
 
   console.log('✅ [AGENT-ENGINE-STREAM] Prompt built:', {
@@ -1120,8 +962,3 @@ export { chatWithMCPStream } from './chat-with-mcp-stream';
 // Export LLM Provider Factory
 export { ProviderFactory } from './llm/provider-factory';
 
-// Export First Officer Agent functionality
-export * from './first-officer';
-
-// Export specific types that might be needed
-export { ExpeditionProgress } from './first-officer/types';

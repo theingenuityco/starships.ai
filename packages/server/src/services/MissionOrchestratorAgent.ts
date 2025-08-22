@@ -13,6 +13,9 @@ import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import { WorkflowService } from './WorkflowService';
+import { MissionExecutionEngine } from './MissionExecutionEngine';
+import { MissionService } from './MissionService';
+import { MISSION_PHASES } from '@starships/protocol';
 import { WorkflowParsingService } from './WorkflowParsingService';
 import type { 
   Mission, 
@@ -55,6 +58,26 @@ interface MissionMetadata {
 }
 
 /**
+ * Intent classification result for workflow approval
+ */
+interface WorkflowApprovalIntent {
+  intent: 'approve' | 'reject' | 'discussion' | 'unclear';
+  confidence: number;
+  reasoning: string;
+}
+
+/**
+ * Result of processing workflow approval intent
+ */
+interface WorkflowApprovalResult {
+  shouldUpdate: boolean;
+  newStatus?: 'approved' | 'rejected';
+  rejectionReason?: string;
+  responseMessage?: string;
+}
+
+
+/**
  * Standard MessagesAnnotation pattern with mission context
  * Extends MessagesAnnotation to include mission-specific metadata caching
  */
@@ -84,6 +107,12 @@ const MissionChatStateAnnotation = Annotation.Root({
   workflow: Annotation<MissionWorkflow | undefined>({
     value: (x, y) => y ?? x,
     default: () => undefined
+  }),
+  
+  // ADDED: Execution results in state for converse phase
+  executionResult: Annotation<MissionExecutionResult | undefined>({
+    value: (x, y) => y ?? x,
+    default: () => undefined
   })
 });
 
@@ -98,6 +127,7 @@ export type MissionChatState = typeof MessagesAnnotation.State & {
   metadata: MissionMetadata | null;
   clarity: MissionClarity | undefined; // ADDED: Mission clarity state
   workflow: MissionWorkflow | undefined; // ADDED: Mission workflow state
+  executionResult: MissionExecutionResult | undefined; // ADDED: Mission execution results state
 };
 
 /**
@@ -143,17 +173,18 @@ export class MissionOrchestratorAgent {
         .addNode("context_builder", this.contextBuilderNode.bind(this))
         .addNode("welcome_phase", this.welcomePhaseNode.bind(this))
         .addNode("analysis_phase", this.analysisPhaseNode.bind(this))
-        .addNode("plan_phase", this.planPhaseNode.bind(this))  // NEW
+        .addNode("plan_phase", this.planPhaseNode.bind(this))
+        .addNode("execute_phase", this.executePhaseNode.bind(this))
         .addNode("converse_phase", this.conversePhaseNode.bind(this))
         .addEdge(START, "context_builder")
         .addConditionalEdges(
           "context_builder",
           this.phaseRouterNode.bind(this),
           {
-            init: "welcome_phase",        // init transitions to welcome
             welcome: "welcome_phase",
             analysis: "analysis_phase",
-            plan: "plan_phase",          // NEW
+            plan: "plan_phase",
+            execute: "execute_phase",
             converse: "converse_phase"
           }
         )
@@ -178,11 +209,12 @@ export class MissionOrchestratorAgent {
           "plan_phase",
           this.shouldContinueFromPlan.bind(this),
           {
-            continue: "converse_phase",  // Plan approved → converse
+            execute: "execute_phase",    // Plan approved → execute
             regenerate: "plan_phase",    // Plan rejected → stay in plan
             end: END
           }
         )
+        .addEdge("execute_phase", "converse_phase")  // Execute → converse
         .addEdge("converse_phase", END)
         .compile({ checkpointer: this.checkpointer });
     }
@@ -204,11 +236,28 @@ export class MissionOrchestratorAgent {
     const metadata = await this.loadMissionMetadata(state.missionId);
     updates.metadata = metadata;
     
-    // Handle init -> welcome transition automatically
-    if (metadata.mission.phase === 'init') {
-      updates.activePhase = 'welcome';
-    } else {
-      updates.activePhase = metadata.mission.phase;
+    // Set active phase from mission phase
+    updates.activePhase = metadata.mission.phase;
+    
+    // Load existing workflow from database if not already in state
+    if (!state.workflow) {
+      const existingWorkflow = await WorkflowService.getWorkflowByMissionId(state.missionId);
+      if (existingWorkflow) {
+        updates.workflow = existingWorkflow;
+      }
+    }
+    
+    // Load mission clarity if not already in state
+    if (!state.clarity) {
+      const existingClarity = await this.getClarityFromDB(state.missionId);
+      if (existingClarity) {
+        updates.clarity = existingClarity;
+      }
+    }
+    
+    // Load execution results if not already in state
+    if (!state.executionResult && metadata.mission.executionResult) {
+      updates.executionResult = metadata.mission.executionResult;
     }
     
     return updates;
@@ -238,7 +287,12 @@ export class MissionOrchestratorAgent {
    * Conditional edge function to determine phase routing
    */
   private phaseRouterNode(state: MissionChatState): string {
-    return state.activePhase || 'welcome'; // Returns current phase or default to welcome
+    const currentPhase = state.activePhase || MISSION_PHASES.WELCOME;
+    
+    // Special handling for execute phase to prevent re-execution of completed workflows
+    // Note: Execution status is tracked in the mission's executionState and handled in executePhaseNode
+    
+    return currentPhase;
   }
 
   /**
@@ -273,22 +327,28 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Conditional routing from plan phase
+   * Conditional routing from plan phase - uses LLM-based intent classification
    */
   private shouldContinueFromPlan(state: MissionChatState): string {
     const workflow = state.workflow;
     
     if (!workflow) return 'end';
     
+    // Note: Execution status is checked within the execution engine itself
+    
+    // Check explicit approval status first
     if (workflow.approvalStatus === 'approved') {
-      return 'continue'; // → converse_phase
+      return 'execute'; // → execute_phase
     }
     
     if (workflow.approvalStatus === 'rejected') {
       return 'regenerate'; // → plan_phase (regenerate)
     }
     
-    return 'end'; // pending - wait for user input
+    // For pending workflows, the LLM-based intent classification 
+    // will be handled in planPhaseNode, which updates the workflow status
+    // This routing method just checks the final status
+    return 'end'; // pending - wait for user input and intent classification
   }
 
   /**
@@ -311,7 +371,7 @@ export class MissionOrchestratorAgent {
     // Set activePhase to signal transition to analysis after welcome
     return { 
       messages: [aiMessage],
-      activePhase: 'analysis'
+      activePhase: MISSION_PHASES.ANALYSIS
     };
   }
 
@@ -346,7 +406,7 @@ export class MissionOrchestratorAgent {
       return {
         messages: [aiMessage],
         clarity,
-        activePhase: 'plan' // Transition to plan phase
+        activePhase: MISSION_PHASES.PLAN // Transition to plan phase
       };
     } else {
       // Generate next question and END - wait for human response
@@ -378,40 +438,211 @@ export class MissionOrchestratorAgent {
       // Get workflow from state or generate new one
       let workflow = state.workflow;
       
-      if (!workflow || state.isSystemInitiated) {
-        // Generate new workflow
+      if (!workflow || state.isSystemInitiated || workflow.approvalStatus === 'rejected') {
+        // Generate new workflow (first time, system-initiated, or after rejection)
         workflow = await this.generateWorkflow(metadata.mission.id, state);
         
         // Update mission phase in database to reflect transition
         const missionRepo = RepositoryFactory.getMissionRepository();
-        await missionRepo.updateMission(metadata.mission.id, { phase: 'plan' });
+        await missionRepo.updateMission(metadata.mission.id, { phase: MISSION_PHASES.PLAN });
+      } else if (workflow.approvalStatus === 'pending') {
+        // Use internal workflow approval methods for natural language detection
+        const recentMessage = state.messages[state.messages.length - 1];
+        if (recentMessage && recentMessage.content && typeof recentMessage.content === 'string') {
+          // Classify user intent using internal method
+          const intent = await this.classifyWorkflowApprovalIntent(recentMessage.content, state);
+          
+          // Process the intent and get required actions
+          const taskCount = workflow.nodes.filter(n => n.type === 'agent').length;
+          const approvalResult = await this.processWorkflowApprovalIntent(intent, recentMessage.content, taskCount);
+          
+          // Update workflow status if required
+          if (approvalResult.shouldUpdate && approvalResult.newStatus) {
+            const workflowService = await import('./WorkflowService');
+            await workflowService.WorkflowService.updateWorkflowApproval(metadata.mission.id, {
+              approvalStatus: approvalResult.newStatus,
+              ...(approvalResult.rejectionReason && { rejectionReason: approvalResult.rejectionReason })
+            });
+            workflow = { ...workflow, approvalStatus: approvalResult.newStatus };
+          }
+          
+          // Only return early for clarification messages (when status is NOT updated)
+          // For approval/rejection, let LangGraph routing handle phase transitions
+          if (approvalResult.responseMessage && !approvalResult.shouldUpdate) {
+            const aiMessage = this.createAIMessage(approvalResult.responseMessage, state);
+            
+            // Save message via callback
+            if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+              await this.currentCallbacks.onMessageGenerated(aiMessage, 'plan_approval_processing', this.currentMissionId);
+            }
+            
+            return {
+              messages: [aiMessage],
+              workflow,
+              activePhase: MISSION_PHASES.PLAN,
+              metadata: {
+                ...metadata,
+                mission: { ...metadata.mission, phase: MISSION_PHASES.PLAN }
+              }
+            };
+          }
+          
+          // If workflow was approved/rejected, don't send message here - let routing handle it
+          if (approvalResult.shouldUpdate) {
+            // Update the workflow in state and continue to routing logic
+            // The routing will see the updated status and transition to appropriate phase
+          }
+        }
       }
       
-      // Present workflow to user for approval
-      const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
-      const responseContent = await this.callLLM(prompt);
-      
-      console.log('[Workflow Presentation] LLM Response:', responseContent);
-      
-      const aiMessage = this.createAIMessage(responseContent, state);
-      
-      // Save message via callback
-      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
-        await this.currentCallbacks.onMessageGenerated(aiMessage, 'plan_phase', this.currentMissionId);
+      // Present workflow for approval (only for pending workflows)
+      // Approved workflows will be handled by execute phase routing
+      if (workflow.approvalStatus === 'pending') {
+        const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
+        const responseContent = await this.callLLM(prompt);
+        
+        console.log('[Workflow Presentation] LLM Response:', responseContent);
+        
+        const aiMessage = this.createAIMessage(responseContent, state);
+        
+        // Save message via callback
+        if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+          await this.currentCallbacks.onMessageGenerated(aiMessage, 'plan_phase', this.currentMissionId);
+        }
+        
+        return {
+          messages: [aiMessage],
+          workflow,
+          activePhase: MISSION_PHASES.PLAN,
+          metadata: {
+            ...metadata,
+            mission: { ...metadata.mission, phase: MISSION_PHASES.PLAN }
+          }
+        };
       }
       
+      // For approved/rejected workflows, return minimal state and let routing handle transitions
       return {
-        messages: [aiMessage],
+        messages: [],
         workflow,
-        activePhase: 'plan',
+        activePhase: MISSION_PHASES.PLAN,
         metadata: {
           ...metadata,
-          mission: { ...metadata.mission, phase: 'plan' }
+          mission: { ...metadata.mission, phase: MISSION_PHASES.PLAN }
         }
       };
     } catch (error) {
       this.logger.error('Plan phase failed', { error });
-      return { activePhase: 'analysis', isSystemInitiated: true };
+      return { activePhase: MISSION_PHASES.ANALYSIS, isSystemInitiated: true };
+    }
+  }
+
+  /**
+   * Execute phase node - runs the approved workflow
+   */
+  private async executePhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
+    const { workflow, missionId } = state;
+    
+    if (!workflow || workflow.approvalStatus !== 'approved') {
+      const message = "⚠️ Workflow must be approved before execution can begin.";
+      return { 
+        messages: [this.createAIMessage(message, state)],
+        activePhase: MISSION_PHASES.PLAN 
+      };
+    }
+
+    try {
+      const agentTaskCount = workflow.nodes.filter(n => n.type === 'agent').length;
+      const message = `🚀 Starting mission execution with ${agentTaskCount} tasks...\n\nI'll run each task sequentially and keep you updated on the progress. This may take a few minutes depending on the complexity of the tasks.`;
+      
+      // Save initial message
+      if (this.currentCallbacks?.onMessageGenerated && this.currentMissionId) {
+        await this.currentCallbacks.onMessageGenerated(
+          this.createAIMessage(message, state), 
+          'execute_start', 
+          this.currentMissionId
+        );
+      }
+
+      // Start execution in background (don't await - let it run async)
+      this.startMissionExecution(missionId, workflow);
+      
+      return { 
+        messages: [this.createAIMessage(message, state)],
+        activePhase: MISSION_PHASES.EXECUTE
+      };
+    } catch (error) {
+      const message = `❌ Failed to start mission execution: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      return { 
+        messages: [this.createAIMessage(message, state)],
+        activePhase: MISSION_PHASES.PLAN
+      };
+    }
+  }
+
+  /**
+   * Start mission execution in background with real-time progress updates
+   */
+  private async startMissionExecution(missionId: string, workflow: MissionWorkflow): Promise<void> {
+    try {
+      const executionEngine = new MissionExecutionEngine();
+      
+      // Execute workflow with enhanced logging and progress tracking
+      this.logger.info('Starting mission execution with real agent system', {
+        missionId,
+        workflowId: workflow.id,
+        agentNodesCount: workflow.nodes.filter(n => n.type === 'agent').length
+      });
+      
+      const result = await executionEngine.executeWorkflow(missionId, workflow);
+      
+      this.logger.info('Mission execution completed', {
+        missionId,
+        success: result.success,
+        nodeResults: result.nodeResults?.length || 0,
+        summary: result.summary
+      });
+      
+      // Update mission phase to converse after execution
+      await MissionService.updateMission(missionId, {
+        phase: MISSION_PHASES.CONVERSE
+      });
+      
+      // Send detailed completion message with execution details
+      let completionMessage: string;
+      
+      if (result.success) {
+        const nodeResultsSummary = result.nodeResults?.map((nodeResult, index) => 
+          `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.success ? '✅ Completed' : '❌ Failed'}\n   ${nodeResult.output ? nodeResult.output.substring(0, 150) + (nodeResult.output.length > 150 ? '...' : '') : 'No output'}`
+        ).join('\n') || 'No detailed results available.';
+        
+        completionMessage = `✅ **Mission execution completed successfully!**\n\n${result.summary}\n\n📋 **Execution Details:**\n${nodeResultsSummary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`;
+      } else {
+        const failedNodes = result.nodeResults?.filter(nr => !nr.success) || [];
+        const failureDetails = failedNodes.map((nodeResult, index) => 
+          `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.error || 'Unknown error'}`
+        ).join('\n') || 'No specific error details available.';
+        
+        completionMessage = `❌ **Mission execution encountered issues**\n\n${result.summary}\n\n🚨 **Failed Tasks:**\n${failureDetails}\n\n🔧 **Next steps:**\n- Review the failed tasks above\n- Consider modifying the plan to address the issues\n- Or ask me to regenerate the workflow\n\nWhat would you like to do?`;
+      }
+        
+      // Send system message via orchestrator service
+      const { MissionOrchestratorService } = await import('./MissionOrchestratorService');
+      const orchestratorService = MissionOrchestratorService.getInstance();
+      await orchestratorService.handleSystemMessage(missionId, completionMessage);
+      
+    } catch (error) {
+      this.logger.error('Background mission execution failed', { 
+        missionId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      const errorMessage = `❌ **Mission execution encountered a critical error**\n\nError: ${error instanceof Error ? error.message : 'Unknown system error'}\n\n🔧 **Recovery options:**\n- Try regenerating the workflow plan\n- Check agent assignments and availability\n- Contact support if the issue persists\n\nHow would you like to proceed?`;
+      
+      const { MissionOrchestratorService } = await import('./MissionOrchestratorService');
+      const orchestratorService = MissionOrchestratorService.getInstance();
+      await orchestratorService.handleSystemMessage(missionId, errorMessage);
     }
   }
 
@@ -820,6 +1051,145 @@ export class MissionOrchestratorAgent {
    */
   private getFallbackResponse(_missionId: string): string {
     return `I'm here to help guide your mission. Could you provide more details about what you need assistance with?`;
+  }
+
+
+  // ============================================================================
+  // WORKFLOW APPROVAL METHODS
+  // ============================================================================
+
+  /**
+   * Classify user intent regarding workflow approval using LLM
+   */
+  private async classifyWorkflowApprovalIntent(message: string, state: MissionChatState): Promise<WorkflowApprovalIntent> {
+    try {
+      // Use MissionPromptBuilder to build the prompt with proper context
+      const promptBuilder = new MissionPromptBuilder(state);
+      const prompt = promptBuilder.buildWorkflowApprovalIntentPrompt(message);
+      
+      const response = await this.callLLM(prompt);
+      const result = this.parseWorkflowApprovalResponse(response);
+      
+      this.logger.debug('Workflow approval intent classified', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'classifyWorkflowApprovalIntent',
+        message: message.substring(0, 100),
+        result
+      });
+
+      return result;
+
+    } catch (error) {
+      this.logger.error('Failed to classify workflow approval intent', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'classifyWorkflowApprovalIntent',
+        message: message.substring(0, 100)
+      }, error as Error);
+
+      // Fallback to unclear with low confidence
+      return {
+        intent: 'unclear',
+        confidence: 0.0,
+        reasoning: 'Error during intent classification'
+      };
+    }
+  }
+
+  /**
+   * Process workflow approval intent and determine necessary actions
+   */
+  private async processWorkflowApprovalIntent(
+    intent: WorkflowApprovalIntent,
+    message: string,
+    taskCount: number
+  ): Promise<WorkflowApprovalResult> {
+    const confidenceThreshold = 0.6;
+    const isHighConfidence = intent.confidence >= confidenceThreshold;
+
+    switch (intent.intent) {
+      case 'approve':
+        if (isHighConfidence) {
+          return {
+            shouldUpdate: true,
+            newStatus: 'approved',
+            responseMessage: `✅ **Workflow Approved!**\n\nPerfect! I understand you've approved the execution plan. I'm now preparing to execute the workflow with ${taskCount} tasks.\n\n🚀 **Starting Execution...**\nI'll begin executing each task sequentially and keep you updated on the progress.`
+          };
+        } else {
+          return {
+            shouldUpdate: false,
+            responseMessage: `I think you might want to approve this workflow, but I want to make sure. Could you please confirm:\n\n**To proceed with execution**, please respond with "yes" or "approve"\n**To make changes**, please respond with "no" or "revise"\n\nWhat would you like to do?`
+          };
+        }
+
+      case 'reject':
+        if (isHighConfidence) {
+          return {
+            shouldUpdate: true,
+            newStatus: 'rejected',
+            rejectionReason: `Rejected via natural language: ${message}`,
+            responseMessage: `🔄 **Workflow Revision Requested**\n\nI understand you'd like me to revise the execution plan. Let me regenerate the workflow based on your feedback.\n\n⚙️ **Generating Updated Plan...**\nI'll create a new workflow that better addresses your requirements.`
+          };
+        } else {
+          return {
+            shouldUpdate: false,
+            responseMessage: `I think you might want to revise this workflow, but I want to make sure. Could you please confirm:\n\n**To approve and execute**, please respond with "yes" or "approve"\n**To request changes**, please respond with "no" or "revise"\n\nWhat would you like to do?`
+          };
+        }
+
+      case 'discussion':
+        return {
+          shouldUpdate: false,
+          responseMessage: undefined // Let normal conversation flow handle this
+        };
+
+      case 'unclear':
+      default:
+        return {
+          shouldUpdate: false,
+          responseMessage: `I'm not sure whether you want to approve this workflow or request changes. To help me understand:\n\n**To approve and execute**, please respond with "approve", "yes", or "let's do it"\n**To request changes**, please respond with "reject", "no", or "revise"\n**To discuss details**, feel free to ask specific questions\n\nWhat would you like to do?`
+        };
+    }
+  }
+
+  /**
+   * Parse intent classification response from LLM
+   */
+  private parseWorkflowApprovalResponse(response: string): WorkflowApprovalIntent {
+    try {
+      // Extract JSON from response if wrapped in text
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : response;
+      
+      const parsed = JSON.parse(jsonStr);
+      
+      // Validate structure
+      if (!parsed.intent || !['approve', 'reject', 'discussion', 'unclear'].includes(parsed.intent)) {
+        throw new Error('Invalid intent value');
+      }
+      
+      const confidence = typeof parsed.confidence === 'number' ? 
+        Math.max(0, Math.min(1, parsed.confidence)) : 0.0;
+      
+      return {
+        intent: parsed.intent,
+        confidence,
+        reasoning: parsed.reasoning || 'No reasoning provided'
+      };
+      
+    } catch (error) {
+      this.logger.error('Failed to parse workflow approval response', {
+        service: 'MissionOrchestratorAgent',
+        operation: 'parseWorkflowApprovalResponse',
+        response: response.substring(0, 200)
+      }, error as Error);
+      
+      // Return unclear with low confidence on parse failure
+      return {
+        intent: 'unclear',
+        confidence: 0.0,
+        reasoning: 'Failed to parse intent classification response'
+      };
+    }
   }
 
   // ============================================================================

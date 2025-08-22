@@ -18,8 +18,6 @@ import {
 } from '@starships/protocol';
 import { workflowNodeRegistry, WorkflowNodeRegistry } from './WorkflowNodeRegistry';
 import { AgentService } from './AgentService';
-import { TaskService } from './TaskService';
-import { UserPromptNodeHandler } from './UserPromptNodeHandler';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,7 +29,7 @@ export interface WorkflowExecutionEvent {
   type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' | 
         'workflow_paused' | 'workflow_resumed' | 'workflow_completed' | 'workflow_failed';
   workflowId: string;
-  expeditionId: string;
+  contextId: string; // Migration note: was expeditionId
   nodeId?: string;
   data?: any;
   timestamp: string;
@@ -73,7 +71,7 @@ export class WorkflowExecutionService {
     const executionId = uuidv4();
     const logContext = {
       workflowId: workflow.id,
-      expeditionId: workflow.expeditionId,
+      contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
       executionId
     };
 
@@ -107,7 +105,7 @@ export class WorkflowExecutionService {
       await this.emitEvent({
         type: 'workflow_started',
         workflowId: workflow.id,
-        expeditionId: workflow.expeditionId,
+        contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
         timestamp: new Date().toISOString()
       });
 
@@ -128,7 +126,7 @@ export class WorkflowExecutionService {
         await this.emitEvent({
           type: 'workflow_completed',
           workflowId: workflow.id,
-          expeditionId: workflow.expeditionId,
+          contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
           timestamp: new Date().toISOString()
         });
       }
@@ -155,7 +153,7 @@ export class WorkflowExecutionService {
       await this.emitEvent({
         type: 'workflow_failed',
         workflowId: workflow.id,
-        expeditionId: workflow.expeditionId,
+        contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
         data: { error: errorMessage },
         timestamp: new Date().toISOString()
       });
@@ -184,14 +182,14 @@ export class WorkflowExecutionService {
     
     // Build execution context
     const context: WorkflowExecutionContext = {
-      expeditionId: workflow.expeditionId,
+      expeditionId: workflow.expeditionId, // Migration note: keeping for backward compatibility
       workflowId: workflow.id,
       userId: contextData.userId || 'system',
       previousResults: runtimeState.executionResults,
-      expeditionState: contextData.expeditionState || {},
+      expeditionState: contextData.expeditionState || {}, // Migration note: keeping for backward compatibility
       services: {
         agentService: contextData.services?.agentService || AgentService,
-        userPromptService: contextData.services?.userPromptService || new UserPromptNodeHandler(),
+        userPromptService: contextData.services?.userPromptService || {},
         dataService: contextData.services?.dataService || {}
       }
     };
@@ -213,7 +211,7 @@ export class WorkflowExecutionService {
         await this.emitEvent({
           type: 'node_started',
           workflowId: workflow.id,
-          expeditionId: workflow.expeditionId,
+          contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
           nodeId: currentNode.id,
           data: { nodeName: currentNode.name, nodeType: currentNode.type },
           timestamp: new Date().toISOString()
@@ -230,7 +228,7 @@ export class WorkflowExecutionService {
           await this.emitEvent({
             type: 'node_completed',
             workflowId: workflow.id,
-            expeditionId: workflow.expeditionId,
+            contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
             nodeId: currentNode.id,
             data: { result: result.data },
             timestamp: new Date().toISOString()
@@ -254,7 +252,7 @@ export class WorkflowExecutionService {
           await this.emitEvent({
             type: 'node_failed',
             workflowId: workflow.id,
-            expeditionId: workflow.expeditionId,
+            contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
             nodeId: currentNode.id,
             data: { error: result.error },
             timestamp: new Date().toISOString()
@@ -448,7 +446,7 @@ export class WorkflowExecutionService {
     this.emitEvent({
       type: 'workflow_paused',
       workflowId: runtimeState.workflowId,
-      expeditionId: '', // Would need to get this from context
+      contextId: '', // Migration note: Would need to get this from context
       timestamp: new Date().toISOString()
     });
 
@@ -471,7 +469,7 @@ export class WorkflowExecutionService {
     this.emitEvent({
       type: 'workflow_resumed',
       workflowId: runtimeState.workflowId,
-      expeditionId: '', // Would need to get this from context
+      contextId: '', // Migration note: Would need to get this from context
       timestamp: new Date().toISOString()
     });
 

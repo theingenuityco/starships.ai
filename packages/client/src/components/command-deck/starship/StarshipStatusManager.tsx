@@ -47,7 +47,7 @@ const STARSHIP_STATUSES = {
       'Full mission capability',
       'All systems operational',
       'Agents can be deployed',
-      'Expeditions can be launched'
+      'Missions can be launched'
     ],
     requirements: [
       'Sufficient power reserves',
@@ -353,7 +353,7 @@ export function StarshipStatusManager({
                       <div className="text-sm">
                         <div className="font-medium">Status Change Impact</div>
                         <div className="text-muted-foreground">
-                          Changing status may affect ongoing expeditions and agent deployments. 
+                          Changing status may affect ongoing missions and agent deployments. 
                           Ensure all critical operations are completed before proceeding.
                         </div>
                       </div>

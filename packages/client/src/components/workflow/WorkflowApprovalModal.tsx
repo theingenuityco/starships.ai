@@ -216,7 +216,7 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({
             Workflow Approval Required
           </DialogTitle>
           <DialogDescription>
-            Review the proposed workflow for expedition <strong>{workflow.expeditionId}</strong> before execution begins.
+            Review the proposed workflow <strong>{workflow.id}</strong> before execution begins.
           </DialogDescription>
         </DialogHeader>
 

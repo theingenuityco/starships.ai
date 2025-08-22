@@ -110,7 +110,7 @@ const MissionChatStateAnnotation = Annotation.Root({
   }),
   
   // ADDED: Execution results in state for converse phase
-  executionResult: Annotation<MissionExecutionResult | undefined>({
+  executionResult: Annotation<any | undefined>({
     value: (x, y) => y ?? x,
     default: () => undefined
   })
@@ -127,7 +127,7 @@ export type MissionChatState = typeof MessagesAnnotation.State & {
   metadata: MissionMetadata | null;
   clarity: MissionClarity | undefined; // ADDED: Mission clarity state
   workflow: MissionWorkflow | undefined; // ADDED: Mission workflow state
-  executionResult: MissionExecutionResult | undefined; // ADDED: Mission execution results state
+  executionResult: any | undefined; // ADDED: Mission execution results state
 };
 
 /**

@@ -1,23 +1,33 @@
 import { getConnection } from '../connection';
 import { Channel, ChannelRepository as ChannelRepositoryInterface } from '../types';
+import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
-export class ChannelRepository implements ChannelRepositoryInterface {
+export class ChannelRepository extends BaseRepository implements ChannelRepositoryInterface {
+  constructor() {
+    super('ChannelRepository');
+  }
   async findAll(): Promise<Channel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ c: Channel }>(
-      'MATCH (c:Channel) RETURN c ORDER BY c.createdAt DESC'
-    );
-    return result.map(record => record.c);
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ c: Channel }>(
+        'MATCH (c:Channel) RETURN c ORDER BY c.createdAt DESC'
+      );
+      return result.map(record => record.c);
+    }, 'findAll', 'Channel');
   }
 
   async findById(id: string): Promise<Channel | null> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ c: Channel }>(
-      'MATCH (c:Channel) WHERE c.id = $id RETURN c',
-      { id: id }
-    );
-    return result.length > 0 ? result[0].c : null;
+    this.validateRequired({ id }, ['id'], 'findById');
+    
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ c: Channel }>(
+        'MATCH (c:Channel) WHERE c.id = $id RETURN c',
+        { id: id }
+      );
+      return result.length > 0 ? result[0].c : null;
+    }, 'findById', 'Channel', id);
   }
 
   async findByGuild(guildId: string): Promise<Channel[]> {

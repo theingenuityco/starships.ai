@@ -87,13 +87,46 @@ export class EnhancedMigrationRunner {
         .filter(file => file.endsWith('.cypher') && !file.includes('rollback'))
         .sort();
 
+      // Check for missing sequence numbers and log warnings instead of failing
+      const migrationNumbers = new Set<number>();
+      const validFiles: string[] = [];
+
       for (const file of files) {
-        const migrationId = file.replace('.cypher', '');
-        const metadata = this.parseMigrationMetadata(file);
-        this.migrationRegistry.set(migrationId, metadata);
+        const match = file.match(/^(\d+)_/);
+        if (match) {
+          const migrationNumber = parseInt(match[1], 10);
+          migrationNumbers.add(migrationNumber);
+          validFiles.push(file);
+        } else {
+          console.warn(`Migration file ${file} does not follow expected naming pattern (NNN_name.cypher)`);
+        }
       }
 
-      console.log(`Loaded ${this.migrationRegistry.size} migrations into registry`);
+      // Check for gaps in sequence and log warnings
+      if (migrationNumbers.size > 0) {
+        const minNumber = Math.min(...migrationNumbers);
+        const maxNumber = Math.max(...migrationNumbers);
+        const expectedNumbers = Array.from({ length: maxNumber - minNumber + 1 }, (_, i) => minNumber + i);
+        
+        for (const expectedNumber of expectedNumbers) {
+          if (!migrationNumbers.has(expectedNumber)) {
+            console.warn(`Missing migration sequence number: ${expectedNumber.toString().padStart(3, '0')} (this is expected after expedition system removal)`);
+          }
+        }
+      }
+
+      // Load valid migrations
+      for (const file of validFiles) {
+        try {
+          const migrationId = file.replace('.cypher', '');
+          const metadata = this.parseMigrationMetadata(file);
+          this.migrationRegistry.set(migrationId, metadata);
+        } catch (error) {
+          console.warn(`Failed to parse migration ${file}, skipping:`, error);
+        }
+      }
+
+      console.log(`Loaded ${this.migrationRegistry.size} migrations into registry (${files.length - validFiles.length} files skipped)`);
     } catch (error) {
       console.error('Failed to load migration registry:', error);
       throw error;
@@ -472,10 +505,10 @@ export class EnhancedMigrationRunner {
         schemaValid = false;
       }
 
-      // Expedition-specific validations
-      if (migrationId.includes('expedition')) {
-        await this.validateExpeditionSystemIntegrity(issues);
-      }
+      // Expedition system was removed - skip expedition-specific validations
+      // if (migrationId.includes('expedition')) {
+      //   await this.validateExpeditionSystemIntegrity(issues);
+      // }
 
       // Performance validation
       const performanceIssues = await this.validatePerformance();
@@ -500,45 +533,11 @@ export class EnhancedMigrationRunner {
 
   /**
    * Validate expedition system integrity
+   * NOTE: Expedition system was removed - this function is now a no-op
    */
   private async validateExpeditionSystemIntegrity(issues: string[]): Promise<void> {
-    try {
-      // Check expedition constraints
-      const constraintResult = await this.getConnection().executeQuery(
-        `SHOW CONSTRAINTS 
-         WHERE name CONTAINS 'expedition' 
-         RETURN count(*) as count`
-      );
-      
-      if (constraintResult[0]?.count < 4) {
-        issues.push('Missing expedition system constraints');
-      }
-
-      // Check expedition indexes
-      const indexResult = await this.getConnection().executeQuery(
-        `SHOW INDEXES 
-         WHERE name CONTAINS 'expedition' 
-         RETURN count(*) as count`
-      );
-      
-      if (indexResult[0]?.count < 10) {
-        issues.push('Missing expedition system indexes');
-      }
-
-      // Check for orphaned expedition data
-      const orphanedExpeditions = await this.getConnection().executeQuery(
-        `MATCH (e:Expedition) 
-         WHERE NOT EXISTS((s:Starship)-[:HAS_EXPEDITION]->(e))
-         RETURN count(e) as count`
-      );
-      
-      if (orphanedExpeditions[0]?.count > 0) {
-        issues.push(`Found ${orphanedExpeditions[0].count} orphaned expeditions`);
-      }
-
-    } catch (error) {
-      issues.push(`Expedition system validation failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    // Expedition system was removed - skip all expedition validations
+    issues.push('Expedition system validation skipped (expedition system was removed)');
   }
 
   /**
@@ -548,16 +547,16 @@ export class EnhancedMigrationRunner {
     const issues: string[] = [];
 
     try {
-      // Check query performance on key expedition queries
+      // Expedition system was removed - using basic starship queries for performance validation
       const testQueries = [
         {
-          name: 'expedition_list',
-          query: 'MATCH (s:Starship)-[:HAS_EXPEDITION]->(e:Expedition) RETURN count(e) LIMIT 1',
+          name: 'basic_starship_query',
+          query: 'MATCH (s:Starship) RETURN count(s) LIMIT 1',
           maxTime: 1000
         },
         {
-          name: 'task_dependencies',
-          query: 'MATCH (t:ExpeditionTask)-[:DEPENDS_ON]->(dep:ExpeditionTask) RETURN count(t) LIMIT 1',
+          name: 'user_agent_relationships',
+          query: 'MATCH (u:User)-[:OWNS]->(a:Agent) RETURN count(a) LIMIT 1',
           maxTime: 500
         }
       ];

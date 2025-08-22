@@ -7,7 +7,6 @@
 
 import { MCPToolGateway, ServiceRegistry, MCPServiceEndpoint } from '@starships/core';
 import { MCPToolWrapper } from '../tools/MCPToolWrapper';
-import { createMCPEnabledFirstOfficerAgent } from '../first-officer';
 import { LangChainMemoryStore } from '../memory/langchain-memory';
 import { DynamicTool } from '@langchain/core/tools';
 

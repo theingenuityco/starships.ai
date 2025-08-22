@@ -23,7 +23,6 @@ import {
   EnhancedNotFoundError as NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
-import { validateSendMissionMessage } from '../middleware/validation';
 
 const router: Router = Router();
 
@@ -349,7 +348,6 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
  * Send message to mission orchestrator and get AI response
  */
 router.post('/:id/messages', 
-  validateSendMissionMessage,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;

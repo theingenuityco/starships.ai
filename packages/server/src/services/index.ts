@@ -1,20 +1,10 @@
 /**
  * Services Index - Centralized Service Exports
  *
- * Exports all services for the expedition system including specialized services
- * for focused operations and existing comprehensive services.
+ * Exports all services for the starships system.
  */
 
-// Import services for internal use
-import { TaskService } from './TaskService';
-import { MessageService } from './MessageService';
-import { ResultService } from './ResultService';
-import { ExpeditionService } from './ExpeditionService';
-import { FirstOfficerService } from './FirstOfficerService';
-
 // Existing comprehensive services
-export { ExpeditionService } from './ExpeditionService';
-export { FirstOfficerService } from './FirstOfficerService';
 export { SocketIOService } from './SocketIOService';
 export { AgentService } from './AgentService';
 export { UserService } from './UserService';
@@ -26,234 +16,22 @@ export { AffirmationDetector } from './AffirmationDetector';
 export { VisionMetricsCalculator } from './VisionMetricsCalculator';
 export { VisionRefinementSessionManager } from './VisionRefinementSessionManager';
 
-// New specialized services
-export { TaskService } from './TaskService';
-export { MessageService } from './MessageService';
-export { ResultService } from './ResultService';
-export { WorkflowGenerationService } from './WorkflowGenerationService';
-export { WorkflowEventService } from './WorkflowEventService';
-
 // Mission services
 export { MissionOrchestratorService } from './MissionOrchestratorService';
 
-// Extracted expedition services (Phase 1 decomposition)
-export { ExpeditionLifecycleService } from './ExpeditionLifecycleService';
-export { TaskOrchestrationService } from './TaskOrchestrationService';
-export { AgentCoordinationService } from './AgentCoordinationService';
-export { ExpeditionValidationService } from './ExpeditionValidationService';
-
-// Workflow execution engine
+// Workflow execution engine (if needed for other purposes)
 export { 
   WorkflowNodeRegistry, 
   workflowNodeRegistry,
   BaseWorkflowNodeHandler,
   type WorkflowNodeHandler
 } from './WorkflowNodeRegistry';
-export { AgentNodeHandler } from './AgentNodeHandler';
-export { ConditionalNodeHandler } from './ConditionalNodeHandler';
-export { UserPromptNodeHandler } from './UserPromptNodeHandler';
 export { StartNodeHandler, EndNodeHandler, OutputNodeHandler } from './BasicNodeHandlers';
 export { 
   WorkflowExecutionService,
   type WorkflowExecutionEvent,
   type WorkflowExecutionEventCallback
 } from './WorkflowExecutionService';
-
-// Service factory for centralized service management
-export class ServiceFactory {
-  private static taskService: TaskService;
-  private static messageService: MessageService;
-  private static resultService: ResultService;
-  private static expeditionService: ExpeditionService;
-  private static firstOfficerService: FirstOfficerService;
-  
-  
-  // Extracted expedition services
-  private static expeditionLifecycleService: any;
-  private static taskOrchestrationService: any;
-  private static agentCoordinationService: any;
-  private static expeditionValidationService: any;
-
-  /**
-   * Get TaskService singleton instance
-   */
-  static getTaskService(): TaskService {
-    if (!this.taskService) {
-      this.taskService = TaskService.getInstance();
-    }
-    return this.taskService;
-  }
-
-  /**
-   * Get MessageService singleton instance
-   */
-  static getMessageService(): MessageService {
-    if (!this.messageService) {
-      this.messageService = MessageService.getInstance();
-    }
-    return this.messageService;
-  }
-
-  /**
-   * Get ResultService singleton instance
-   */
-  static getResultService(): ResultService {
-    if (!this.resultService) {
-      this.resultService = ResultService.getInstance();
-    }
-    return this.resultService;
-  }
-
-  /**
-   * Get ExpeditionService singleton instance
-   */
-  static getExpeditionService(): ExpeditionService {
-    if (!this.expeditionService) {
-      this.expeditionService = ExpeditionService.getInstance();
-    }
-    return this.expeditionService;
-  }
-
-  /**
-   * Get FirstOfficerService singleton instance
-   */
-  static getFirstOfficerService(): FirstOfficerService {
-    if (!this.firstOfficerService) {
-      this.firstOfficerService = FirstOfficerService.getInstance();
-    }
-    return this.firstOfficerService;
-  }
-
-
-  /**
-   * Initialize all services - useful for startup
-   * Services are initialized in dependency order to ensure proper integration
-   */
-  static initializeServices(): void {
-    console.log('[SERVICE-FACTORY] Initializing specialized services...');
-    
-    // Initialize services in dependency order:
-    // 1. Core services first (no dependencies)
-    // 2. Extracted expedition services (domain-specific)
-    // 3. Services that depend on core services
-    // 4. Orchestration services last (depend on all others)
-    
-    // Core services (no socket dependencies initially)
-    this.getTaskService();
-    this.getMessageService();
-    this.getResultService();
-    
-    // Initialize extracted expedition services
-    this.getExpeditionLifecycleService();
-    this.getTaskOrchestrationService();
-    this.getAgentCoordinationService();
-    this.getExpeditionValidationService();
-    
-    // Business logic services (may use socket service)
-    this.getExpeditionService();
-    
-    // Orchestration services (depend on all others)
-    this.getFirstOfficerService();
-    
-    console.log('[SERVICE-FACTORY] All specialized services initialized in correct dependency order');
-  }
-
-  // Getters for extracted expedition services
-  static getExpeditionLifecycleService() {
-    if (!this.expeditionLifecycleService) {
-      const { ExpeditionLifecycleService } = require('./ExpeditionLifecycleService');
-      this.expeditionLifecycleService = ExpeditionLifecycleService.getInstance();
-    }
-    return this.expeditionLifecycleService;
-  }
-
-  static getTaskOrchestrationService() {
-    if (!this.taskOrchestrationService) {
-      const { TaskOrchestrationService } = require('./TaskOrchestrationService');
-      this.taskOrchestrationService = TaskOrchestrationService.getInstance();
-    }
-    return this.taskOrchestrationService;
-  }
-
-  static getAgentCoordinationService() {
-    if (!this.agentCoordinationService) {
-      const { AgentCoordinationService } = require('./AgentCoordinationService');
-      this.agentCoordinationService = AgentCoordinationService.getInstance();
-    }
-    return this.agentCoordinationService;
-  }
-
-  static getExpeditionValidationService() {
-    if (!this.expeditionValidationService) {
-      const { ExpeditionValidationService } = require('./ExpeditionValidationService');
-      this.expeditionValidationService = ExpeditionValidationService.getInstance();
-    }
-    return this.expeditionValidationService;
-  }
-
-  /**
-   * Health check for all services
-   */
-  static async healthCheck(): Promise<{
-    taskService: boolean;
-    messageService: boolean;
-    resultService: boolean;
-    expeditionService: boolean;
-    firstOfficerService: boolean;
-    expeditionLifecycleService: boolean;
-    taskOrchestrationService: boolean;
-    agentCoordinationService: boolean;
-    expeditionValidationService: boolean;
-    socketIntegration: boolean;
-  }> {
-    // Check if SocketIOService is available for integration
-    let socketIntegration = false;
-    try {
-      const { SocketIOService } = await import('./SocketIOService');
-      SocketIOService.getInstance();
-      socketIntegration = true;
-    } catch (error) {
-      console.warn('[SERVICE-FACTORY] SocketIOService not available for health check');
-    }
-
-    return {
-      taskService: !!this.taskService,
-      messageService: !!this.messageService,
-      resultService: !!this.resultService,
-      expeditionService: !!this.expeditionService,
-      firstOfficerService: !!this.firstOfficerService,
-      expeditionLifecycleService: !!this.expeditionLifecycleService,
-      taskOrchestrationService: !!this.taskOrchestrationService,
-      agentCoordinationService: !!this.agentCoordinationService,
-      expeditionValidationService: !!this.expeditionValidationService,
-      socketIntegration
-    };
-  }
-}
-
-// Type exports for service interfaces
-export type {
-  UpdateTaskRequest,
-  TaskAssignmentRequest,
-  TaskFilters,
-  TaskWorkloadInfo
-} from './TaskService';
-
-export type {
-  UpdateMessageRequest,
-  MessageFilters,
-  MessageThread,
-  MessageSearchResult,
-  FileAttachment
-} from './MessageService';
-
-export type {
-  UpdateResultRequest,
-  QualityAssessmentRequest,
-  ResultFilters,
-  ResultAnalytics,
-  ResultInsight
-} from './ResultService';
 
 // Vision refinement types
 export type {

@@ -2,7 +2,6 @@ import { SocketIOService } from '../services/SocketIOService';
 import { MissionEventService } from '../services/MissionEventService';
 import { setupSibilHandlers } from './sibilHandlers';
 import { setupAgentHandlers } from './agentHandlers';
-import { setupExpeditionHandlers } from './expeditionHandlers';
 import { setupMissionHandlers } from './missionHandlers';
 import type { Server as HTTPServer } from 'http';
 
@@ -25,8 +24,6 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   // Setup Agent-specific handlers
   setupAgentHandlers(io);
 
-  // Setup Expedition-specific handlers
-  setupExpeditionHandlers(io);
 
   // Setup Mission-specific handlers
   setupMissionHandlers(io);

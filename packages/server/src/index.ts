@@ -37,7 +37,6 @@ import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
-import agentCommunicationRoutes from './routes/agent-communication';
 import missionRoutes from './routes/missions';
 import nativeApiKeysRoutes from './routes/native-api-keys';
 import { AgentService } from './services/AgentService';
@@ -216,7 +215,6 @@ app.use('/api', visionRoutes);
 app.use('/api', mcpServerRoutes);
 // app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
-app.use('/api/agent-communication', agentCommunicationRoutes);
 app.use('/api/missions', missionRoutes);
 app.use('/api', nativeApiKeysRoutes);
 

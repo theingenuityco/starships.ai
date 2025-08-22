@@ -5,8 +5,6 @@
  * between agents and the Virtual First Officer
  */
 
-import { MessageType } from './expedition';
-
 // ============================================================================
 // AGENT-TO-OFFICER MESSAGE TYPES
 // ============================================================================

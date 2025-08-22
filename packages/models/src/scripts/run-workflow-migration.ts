@@ -77,16 +77,17 @@ async function runWorkflowMigration() {
     });
 
     // Test basic workflow creation to validate schema
+    // Expedition system was removed - using basic starship query instead
     console.log('🧪 Testing workflow schema...');
     const testQuery = `
-      MATCH (e:Expedition) 
-      WHERE e.id = 'test-expedition' OR e.id IS NULL
-      WITH HEAD(COLLECT(e)) as testExp
-      RETURN testExp IS NOT NULL as expeditionExists
+      MATCH (s:Starship) 
+      WHERE s.id = 'test-starship' OR s.id IS NULL
+      WITH HEAD(COLLECT(s)) as testStarship
+      RETURN testStarship IS NOT NULL as starshipExists
     `;
     
     const testResult = await connection.executeQuery(testQuery);
-    console.log('✅ Workflow schema validation completed');
+    console.log('✅ Workflow schema validation completed (expedition query replaced with starship query)');
 
   } catch (error) {
     console.error('❌ Workflow migration failed:', error);

@@ -2,7 +2,7 @@
 // Description: Seed LLM models for agent configuration
 // Date: 2025-07-31
 // Author: System
-// Dependencies: 006_expedition_seed_data
+// Dependencies: None
 
 // ============================================================================
 // LLM MODELS SEED DATA
@@ -106,7 +106,7 @@ CREATE (m:Migration {
   name: 'LLM Models Seed Data',
   description: 'Seed data for LLM models used by agents',
   version: '1.0.0',
-  dependencies: ['006_expedition_seed_data'],
+  dependencies: [],
   appliedAt: datetime().epochMillis,
   appliedBy: 'system',
   llmModelsCount: 6,

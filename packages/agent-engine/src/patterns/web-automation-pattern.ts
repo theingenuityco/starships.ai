@@ -268,12 +268,12 @@ export class WebAutomationPatterns {
   ): Promise<AsyncGenerator<any>> {
     let previousContent: string | null = null;
 
-    const self = this;
-    async function* monitor() {
+    const automation = this.automation;
+    const monitor = async function* () {
       while (true) {
-        await self.automation.navigate(url);
+        await automation.navigate(url);
         
-        const currentContent = await self.automation.evaluate(`
+        const currentContent = await automation.evaluate(`
           document.querySelector('${selector}')?.textContent || ''
         `);
 

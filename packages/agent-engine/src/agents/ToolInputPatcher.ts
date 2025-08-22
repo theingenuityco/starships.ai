@@ -13,7 +13,7 @@ declare global {
 }
 
 export class ToolInputPatcher {
-  private static originalCallMethods = new WeakMap<DynamicTool, Function>();
+  private static originalCallMethods = new WeakMap<DynamicTool, (...args: any[]) => any>();
   
   /**
    * Patch a tool to intercept and fix parameter passing

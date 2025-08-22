@@ -59,7 +59,9 @@ export class AgentToolInterceptor {
    */
   wrapTool(tool: DynamicTool): DynamicTool {
     const originalFunc = tool.func.bind(tool);
-    const interceptor = this;
+    const analyzeInput = this.analyzeInput.bind(this);
+    const recoverParameters = this.recoverParameters.bind(this);
+    const getToolInput = this.getToolInput.bind(this);
     const toolName = tool.name;
     
     // Create a new function that tries to recover missing parameters
@@ -75,7 +77,7 @@ export class AgentToolInterceptor {
       });
       
       // Check if we have cached input for this tool
-      const cachedInput = interceptor.getToolInput(toolName);
+      const cachedInput = getToolInput(toolName);
       if (cachedInput && (!input || Object.keys(input).length === 0)) {
         console.log(`[AgentToolInterceptor] Using cached input for ${toolName}`);
         input = cachedInput;

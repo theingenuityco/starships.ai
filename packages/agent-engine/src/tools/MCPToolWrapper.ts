@@ -289,7 +289,7 @@ export class MCPToolWrapper {
     }
     
     // If input is already correctly formatted, return as-is
-    if (typeof input === 'object' && !input.hasOwnProperty('input')) {
+    if (typeof input === 'object' && !Object.prototype.hasOwnProperty.call(input, 'input')) {
       return input;
     }
     
@@ -930,12 +930,13 @@ IMPORTANT:
             zodType = z.boolean();
             break;
             
-          case 'array':
+          case 'array': {
             const itemSchema = prop.items ? this.jsonSchemaToZod(prop.items) : z.any();
             zodType = z.array(itemSchema);
             if (prop.minItems) zodType = zodType.min(prop.minItems);
             if (prop.maxItems) zodType = zodType.max(prop.maxItems);
             break;
+          }
             
           case 'object':
             zodType = this.jsonSchemaToZod(prop);

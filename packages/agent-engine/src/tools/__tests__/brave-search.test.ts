@@ -57,7 +57,7 @@ describe('Brave Search Native Tool Integration', () => {
 
     it('should not add Brave Search tool when API key is missing', async () => {
       // Mock no API keys
-      const { RepositoryFactory } = require('@starships/models');
+      const { RepositoryFactory } = jest.requireMock('@starships/models');
       RepositoryFactory.getNativeToolApiKeyRepository.mockReturnValue({
         getAllApiKeys: jest.fn().mockResolvedValue({})
       });
@@ -92,7 +92,7 @@ describe('Brave Search Native Tool Integration', () => {
 
     it('should handle string responses from Brave API', async () => {
       // Mock string response
-      const { BraveSearch } = require('@langchain/community/tools/brave_search');
+      const { BraveSearch } = jest.requireMock('@langchain/community/tools/brave_search');
       BraveSearch.mockImplementation((config: any) => ({
         apiKey: config.apiKey,
         invoke: jest.fn().mockResolvedValue('Simple string response')
@@ -119,7 +119,7 @@ describe('Brave Search Native Tool Integration', () => {
   describe('Error Handling', () => {
     it('should handle API errors gracefully', async () => {
       // Mock API error
-      const { BraveSearch } = require('@langchain/community/tools/brave_search');
+      const { BraveSearch } = jest.requireMock('@langchain/community/tools/brave_search');
       BraveSearch.mockImplementation((config: any) => ({
         apiKey: config.apiKey,
         invoke: jest.fn().mockRejectedValue(new Error('API rate limit exceeded'))
@@ -143,14 +143,14 @@ describe('Brave Search Native Tool Integration', () => {
 
     it('should handle invalid API key format', async () => {
       // Mock invalid key format
-      const { RepositoryFactory } = require('@starships/models');
+      const { RepositoryFactory } = jest.requireMock('@starships/models');
       RepositoryFactory.getNativeToolApiKeyRepository.mockReturnValue({
         getAllApiKeys: jest.fn().mockResolvedValue({
           brave: 'invalid_key_format'
         })
       });
 
-      const { BraveSearch } = require('@langchain/community/tools/brave_search');
+      const { BraveSearch } = jest.requireMock('@langchain/community/tools/brave_search');
       BraveSearch.mockImplementation(() => {
         throw new Error('Invalid API key format');
       });

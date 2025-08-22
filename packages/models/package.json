@@ -49,7 +49,8 @@
     "@starships/protocol": "workspace:*",
     "fs-extra": "^11.3.0",
     "neo4j-driver": "^5.28.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "zod": "^4.0.17"
   },
   "devDependencies": {
     "@testcontainers/neo4j": "^11.2.1",

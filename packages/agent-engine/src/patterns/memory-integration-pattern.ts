@@ -167,15 +167,15 @@ export class AgentMemoryPatterns {
   }
 
   /**
-   * Store expedition context
+   * Store context
    */
-  async storeExpeditionContext(
-    expeditionId: string,
+  async storeContext(
+    contextId: string,
     context: any
   ): Promise<boolean> {
-    const key = `expedition:${expeditionId}:context`;
+    const key = `context:${contextId}:data`;
     const contextData: MemoryContext = {
-      expeditionId,
+      expeditionId: contextId, // keeping for backward compatibility
       agentId: context.agentId || 'unknown',
       timestamp: new Date().toISOString(),
       data: context
@@ -185,10 +185,10 @@ export class AgentMemoryPatterns {
   }
 
   /**
-   * Retrieve expedition context
+   * Retrieve context
    */
-  async getExpeditionContext(expeditionId: string): Promise<MemoryContext | null> {
-    const key = `expedition:${expeditionId}:context`;
+  async getContext(contextId: string): Promise<MemoryContext | null> {
+    const key = `context:${contextId}:data`;
     return this.memory.retrieve(key);
   }
 

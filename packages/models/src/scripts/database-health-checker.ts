@@ -1,14 +1,13 @@
 import { getConnection } from '../connection';
 
 /**
- * Comprehensive Database Health Checker for Expedition System
+ * Comprehensive Database Health Checker
  * 
  * Provides detailed health monitoring and validation for:
  * - Schema integrity and constraints
  * - Index performance and usage
  * - Data consistency and relationships
  * - Query performance benchmarks
- * - Expedition-specific validations
  * - System resource utilization
  */
 
@@ -23,7 +22,7 @@ export interface HealthCheckResult {
     constraints: HealthCheck;
     dataIntegrity: HealthCheck;
     performance: HealthCheck;
-    expeditionSystem: HealthCheck;
+    workflowSystem: HealthCheck;
     resources: HealthCheck;
   };
   recommendations: string[];
@@ -83,7 +82,7 @@ export class DatabaseHealthChecker {
         constraints: await this.checkConstraints(),
         dataIntegrity: await this.checkDataIntegrity(),
         performance: await this.checkPerformance(),
-        expeditionSystem: await this.checkExpeditionSystem(),
+        workflowSystem: await this.checkWorkflowSystem(),
         resources: await this.checkResources()
       },
       recommendations: [],
@@ -158,9 +157,8 @@ export class DatabaseHealthChecker {
 
     try {
       // Check for required node labels
-      const requiredLabels = [
-        'User', 'Agent', 'Starship', 'Expedition', 
-        'ExpeditionTask', 'ExpeditionMessage', 'ExpeditionResult'
+      const requiredLabels: string[] = [
+        'User', 'Agent', 'Starship', 'Workflow', 'WorkflowExecution'
       ];
 
       const labelResult = await this.getConnection().executeQuery(
@@ -176,9 +174,8 @@ export class DatabaseHealthChecker {
       }
 
       // Check for required relationship types
-      const requiredRelationships = [
-        'OWNS', 'DEPLOYED_ON', 'HAS_EXPEDITION', 'HAS_TASK', 
-        'HAS_MESSAGE', 'HAS_RESULT', 'ASSIGNED_TO', 'DEPENDS_ON'
+      const requiredRelationships: string[] = [
+        'OWNS', 'DEPLOYED_ON', 'HAS_WORKFLOW', 'EXECUTES'
       ];
 
       const relResult = await this.getConnection().executeQuery(
@@ -253,13 +250,13 @@ export class DatabaseHealthChecker {
         score -= lowPopulationIndexes.length * 10;
       }
 
-      // Check for missing critical indexes
-      const expeditionIndexes = indexes.filter((idx: any) => 
-        idx.name && idx.name.includes('expedition')
+      // Check for workflow system indexes
+      const workflowIndexes = indexes.filter((idx: any) => 
+        idx.name && (idx.name.includes('workflow') || idx.name.includes('starship') || idx.name.includes('agent'))
       );
 
-      if (expeditionIndexes.length < 10) {
-        issues.push('Missing critical expedition system indexes');
+      if (workflowIndexes.length < 5) {
+        issues.push('Missing critical workflow system indexes');
         score -= 30;
       }
 
@@ -275,7 +272,7 @@ export class DatabaseHealthChecker {
         details: { 
           totalIndexes: indexes.length,
           offlineIndexes: offlineIndexes.length,
-          expeditionIndexes: expeditionIndexes.length,
+          workflowIndexes: workflowIndexes.length,
           issues 
         },
         executionTime: Date.now() - startTime
@@ -310,12 +307,10 @@ export class DatabaseHealthChecker {
 
       const constraints = constraintResult || [];
       
-      // Check for required unique constraints
-      const requiredUniqueConstraints = [
-        'expedition_id_unique',
-        'expedition_task_id_unique',
-        'expedition_message_id_unique',
-        'expedition_result_id_unique'
+      // Check for workflow system constraints
+      const requiredUniqueConstraints: string[] = [
+        'workflow_id_unique',
+        'workflow_execution_id_unique'
       ];
 
       const existingConstraintNames = new Set(
@@ -378,27 +373,26 @@ export class DatabaseHealthChecker {
     const violations: string[] = [];
 
     try {
-      // Check for duplicate expedition IDs
-      const duplicateExpeditions = await this.getConnection().executeQuery(
-        `MATCH (e:Expedition)
-         WITH e.id as id, count(e) as count
+      // Check for workflow constraint violations
+      const duplicateWorkflows = await this.getConnection().executeQuery(
+        `MATCH (w:Workflow)
+         WITH w.id as id, count(w) as count
          WHERE count > 1
          RETURN count(*) as duplicates`
       );
 
-      if (duplicateExpeditions[0]?.duplicates > 0) {
-        violations.push('Duplicate expedition IDs found');
+      if (duplicateWorkflows[0]?.duplicates > 0) {
+        violations.push('Duplicate workflow IDs found');
       }
 
-      // Check for orphaned tasks
-      const orphanedTasks = await this.getConnection().executeQuery(
-        `MATCH (t:ExpeditionTask)
-         WHERE NOT EXISTS((e:Expedition)-[:HAS_TASK]->(t))
-         RETURN count(t) as orphaned`
+      const orphanedExecutions = await this.getConnection().executeQuery(
+        `MATCH (we:WorkflowExecution)
+         WHERE NOT EXISTS((w:Workflow)-[:EXECUTES]->(we))
+         RETURN count(we) as orphaned`
       );
 
-      if (orphanedTasks[0]?.orphaned > 0) {
-        violations.push(`${orphanedTasks[0].orphaned} orphaned tasks found`);
+      if (orphanedExecutions[0]?.orphaned > 0) {
+        violations.push(`${orphanedExecutions[0].orphaned} orphaned workflow executions found`);
       }
 
     } catch (error) {
@@ -417,45 +411,27 @@ export class DatabaseHealthChecker {
     let score = 100;
 
     try {
-      // Define integrity checks
-      const integrityChecks = [
+      // Check workflow system integrity
+      const integrityChecks: Array<{
+        checkName: string;
+        description: string;
+        query: string;
+        expectedResult: any;
+      }> = [
         {
-          checkName: 'expedition_starship_relationship',
-          description: 'All expeditions must belong to a starship',
-          query: `MATCH (e:Expedition) 
-                  WHERE NOT EXISTS((s:Starship)-[:HAS_EXPEDITION]->(e))
-                  RETURN count(e) as orphaned`,
+          checkName: 'workflow_starship_relationship',
+          description: 'All workflows must belong to a starship',
+          query: `MATCH (w:Workflow) 
+                  WHERE NOT EXISTS((s:Starship)-[:HAS_WORKFLOW]->(w))
+                  RETURN count(w) as orphaned`,
           expectedResult: 0
         },
         {
-          checkName: 'task_expedition_relationship',
-          description: 'All tasks must belong to an expedition',
-          query: `MATCH (t:ExpeditionTask) 
-                  WHERE NOT EXISTS((e:Expedition)-[:HAS_TASK]->(t))
-                  RETURN count(t) as orphaned`,
-          expectedResult: 0
-        },
-        {
-          checkName: 'message_expedition_relationship',
-          description: 'All messages must belong to an expedition',
-          query: `MATCH (m:ExpeditionMessage) 
-                  WHERE NOT EXISTS((e:Expedition)-[:HAS_MESSAGE]->(m))
-                  RETURN count(m) as orphaned`,
-          expectedResult: 0
-        },
-        {
-          checkName: 'result_expedition_relationship',
-          description: 'All results must belong to an expedition',
-          query: `MATCH (r:ExpeditionResult) 
-                  WHERE NOT EXISTS((e:Expedition)-[:HAS_RESULT]->(r))
-                  RETURN count(r) as orphaned`,
-          expectedResult: 0
-        },
-        {
-          checkName: 'task_dependency_cycles',
-          description: 'Task dependencies should not have cycles',
-          query: `MATCH path = (t:ExpeditionTask)-[:DEPENDS_ON*]->(t)
-                  RETURN count(path) as cycles`,
+          checkName: 'agent_starship_relationship',
+          description: 'All agents must be deployed on a starship',
+          query: `MATCH (a:Agent) 
+                  WHERE NOT EXISTS((a)-[:DEPLOYED_ON]->(s:Starship))
+                  RETURN count(a) as orphaned`,
           expectedResult: 0
         }
       ];
@@ -527,38 +503,31 @@ export class DatabaseHealthChecker {
     let score = 100;
 
     try {
-      // Define performance benchmarks
+      // Workflow system performance tests
       const performanceTests = [
         {
-          queryName: 'expedition_list_by_starship',
-          query: `MATCH (s:Starship {id: 'test-starship'})-[:HAS_EXPEDITION]->(e:Expedition) 
-                  RETURN count(e) LIMIT 1`,
+          queryName: 'basic_starship_query',
+          query: `MATCH (s:Starship) 
+                  RETURN count(s) LIMIT 1`,
           expectedMaxTime: 100
         },
         {
-          queryName: 'task_dependencies_check',
-          query: `MATCH (t:ExpeditionTask)-[:DEPENDS_ON]->(dep:ExpeditionTask) 
-                  RETURN count(t) LIMIT 1`,
+          queryName: 'user_starship_query',
+          query: `MATCH (u:User)-[:OWNS]->(s:Starship) 
+                  RETURN count(s) LIMIT 1`,
           expectedMaxTime: 200
         },
         {
-          queryName: 'message_thread_traversal',
-          query: `MATCH (m:ExpeditionMessage)-[:REPLIES_TO*]->(root:ExpeditionMessage) 
-                  RETURN count(m) LIMIT 1`,
-          expectedMaxTime: 300
+          queryName: 'workflow_list_by_starship',
+          query: `MATCH (s:Starship)-[:HAS_WORKFLOW]->(w:Workflow) 
+                  RETURN count(w) LIMIT 1`,
+          expectedMaxTime: 150
         },
         {
-          queryName: 'expedition_full_text_search',
-          query: `CALL db.index.fulltext.queryNodes('expeditionAdvancedSearch', 'test') 
-                  YIELD node RETURN count(node) LIMIT 1`,
-          expectedMaxTime: 500
-        },
-        {
-          queryName: 'agent_performance_aggregation',
-          query: `MATCH (a:Agent)-[:ASSIGNED_TO]->(t:ExpeditionTask) 
-                  WITH a, count(t) as taskCount 
-                  RETURN avg(taskCount) LIMIT 1`,
-          expectedMaxTime: 400
+          queryName: 'agent_deployment_query',
+          query: `MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) 
+                  RETURN count(a) LIMIT 1`,
+          expectedMaxTime: 200
         }
       ];
 
@@ -630,94 +599,54 @@ export class DatabaseHealthChecker {
   }
 
   /**
-   * Check expedition system specific health
+   * Check workflow system specific health
    */
-  private async checkExpeditionSystem(): Promise<HealthCheck> {
+  private async checkWorkflowSystem(): Promise<HealthCheck> {
     const startTime = Date.now();
     const issues: string[] = [];
     let score = 100;
-
+    
     try {
-      // Check expedition system components
-      const systemChecks = [
-        {
-          name: 'expedition_workflow_states',
-          query: `MATCH (e:Expedition)
-                  WITH count(CASE WHEN e.status IN ['draft', 'planning', 'in-progress', 'review', 'completed', 'failed', 'cancelled'] THEN 1 END) as valid,
-                       count(e) as total
-                  RETURN valid, total`,
-          validator: (result: any) => result.valid === result.total
-        },
-        {
-          name: 'task_status_consistency',
-          query: `MATCH (t:ExpeditionTask)
-                  WITH count(CASE WHEN t.status IN ['pending', 'assigned', 'in-progress', 'blocked', 'review', 'completed', 'failed'] THEN 1 END) as valid,
-                       count(t) as total
-                  RETURN valid, total`,
-          validator: (result: any) => result.valid === result.total
-        },
-        {
-          name: 'message_role_consistency',
-          query: `MATCH (m:ExpeditionMessage)
-                  WITH count(CASE WHEN m.role IN ['user', 'first-officer', 'agent', 'system'] THEN 1 END) as valid,
-                       count(m) as total
-                  RETURN valid, total`,
-          validator: (result: any) => result.valid === result.total
-        },
-        {
-          name: 'result_quality_scores',
-          query: `MATCH (r:ExpeditionResult)
-                  WITH count(CASE WHEN r.quality.overall >= 0 AND r.quality.overall <= 100 THEN 1 END) as valid,
-                       count(r) as total
-                  RETURN valid, total`,
-          validator: (result: any) => result.valid === result.total
-        }
-      ];
-
-      for (const check of systemChecks) {
-        try {
-          const result = await this.getConnection().executeQuery(check.query);
-          const data = result[0];
-          
-          if (!check.validator(data)) {
-            issues.push(`${check.name}: validation failed`);
-            score -= 20;
-          }
-
-        } catch (error) {
-          issues.push(`${check.name}: check failed - ${error instanceof Error ? error.message : String(error)}`);
-          score -= 25;
-        }
-      }
-
-      // Check for expedition system cache nodes
-      const cacheNodes = await this.getConnection().executeQuery(
-        'MATCH (cache:QueryCache) RETURN count(cache) as count'
+      // Check workflow node count
+      const workflowCount = await this.getConnection().executeQuery(
+        'MATCH (w:Workflow) RETURN count(w) as count'
       );
-
-      if (cacheNodes[0]?.count < 3) {
-        issues.push('Missing expedition system cache nodes');
-        score -= 15;
+      
+      // Check workflow execution count
+      const executionCount = await this.getConnection().executeQuery(
+        'MATCH (we:WorkflowExecution) RETURN count(we) as count'
+      );
+      
+      const workflows = workflowCount[0]?.count || 0;
+      const executions = executionCount[0]?.count || 0;
+      
+      if (workflows === 0) {
+        issues.push('No workflows found in the system');
+        score -= 20;
       }
-
+      
       const status = score >= 90 ? 'pass' : score >= 70 ? 'warning' : 'fail';
       const message = issues.length === 0 
-        ? 'Expedition system is healthy'
-        : `Expedition system issues: ${issues.join('; ')}`;
+        ? `Workflow system healthy: ${workflows} workflows, ${executions} executions`
+        : `Workflow system issues: ${issues.join('; ')}`;
 
       return {
         status,
         score: Math.max(0, score),
         message,
-        details: { issues, cacheNodes: cacheNodes[0]?.count || 0 },
+        details: { 
+          workflowCount: workflows,
+          executionCount: executions,
+          issues 
+        },
         executionTime: Date.now() - startTime
       };
-
+      
     } catch (error) {
       return {
         status: 'fail',
         score: 0,
-        message: `Expedition system check failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Workflow system check failed: ${error instanceof Error ? error.message : String(error)}`,
         details: { error: error instanceof Error ? error.message : String(error) },
         executionTime: Date.now() - startTime
       };
@@ -765,13 +694,13 @@ export class DatabaseHealthChecker {
         score -= 20;
       }
 
-      // Check for expedition data presence
-      const expeditionNodes = nodeCounts.find((item: any) => 
-        item.labels && item.labels.includes('Expedition')
+      // Check for workflow data presence
+      const workflowNodes = nodeCounts.find((item: any) => 
+        item.labels && item.labels.includes('Workflow')
       );
 
-      if (!expeditionNodes || expeditionNodes.count === 0) {
-        issues.push('No expedition data found');
+      if (!workflowNodes || workflowNodes.count === 0) {
+        issues.push('No workflow data found');
         score -= 30;
       }
 
@@ -846,7 +775,7 @@ ${result.recommendations.length > 0
 - Constraints: ${result.checks.constraints.status}
 - Data Integrity: ${result.checks.dataIntegrity.status}
 - Performance: ${result.checks.performance.status}
-- Expedition System: ${result.checks.expeditionSystem.status}
+- Workflow System: ${result.checks.workflowSystem.status}
 - Resources: ${result.checks.resources.status}
 
 ${result.overall === 'critical' 
@@ -879,13 +808,21 @@ ${result.overall === 'critical'
         issues.push('Missing database constraints');
       }
 
-      // Quick data check
-      const expeditions = await this.getConnection().executeQuery(
-        'MATCH (e:Expedition) RETURN count(e) as count LIMIT 1'
+      // Check basic starship and workflow data
+      const starships = await this.getConnection().executeQuery(
+        'MATCH (s:Starship) RETURN count(s) as count LIMIT 1'
       );
 
-      if (expeditions[0]?.count === 0) {
-        issues.push('No expedition data found');
+      const workflows = await this.getConnection().executeQuery(
+        'MATCH (w:Workflow) RETURN count(w) as count LIMIT 1'
+      );
+
+      if (starships[0]?.count === 0) {
+        issues.push('No starship data found');
+      }
+
+      if (workflows[0]?.count === 0) {
+        issues.push('No workflow data found');
       }
 
     } catch (error) {

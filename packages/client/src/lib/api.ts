@@ -170,17 +170,37 @@ api.interceptors.response.use(
   }
 )
 
-// Import Agent and related types from protocol package
+// Import Agent and Starship related types from protocol package
 import {
   Agent,
   AgentConfig,
   CreateAgentRequest,
   UpdateAgentRequest,
   AgentTemplate,
+  UpdateStarshipRequest,
+  UpdateStarshipStatusRequest,
+  StarshipResponse,
+  StarshipAgentsResponse,
+  StarshipListResponse,
+  StarshipDetailsResponse,
+  CreateStarshipRequest,
 } from '@starships/protocol'
 
-// Re-export Agent types for use in other client components
-export type { Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest, AgentTemplate }
+// Re-export types for use in other client components
+export type { 
+  Agent, 
+  AgentConfig, 
+  CreateAgentRequest, 
+  UpdateAgentRequest, 
+  AgentTemplate,
+  UpdateStarshipRequest,
+  UpdateStarshipStatusRequest,
+  StarshipResponse,
+  StarshipAgentsResponse,
+  StarshipListResponse,
+  StarshipDetailsResponse,
+  CreateStarshipRequest
+}
 
 // MCP Server Option interface (matching backend model)
 export interface MCPServerOption {
@@ -293,19 +313,8 @@ export interface SyncedUser {
   createdAt: string
 }
 
-// NEW: Starship interfaces
-export interface Starship {
-  id: string
-  slug: string
-  name: string
-  class: 'scout' | 'cruiser' | 'draught'
-  ownerId: string
-  status: 'active' | 'inactive'
-  maxAgents: number
-  maxActiveExpeditions: number
-  createdAt: string
-  updatedAt: string
-}
+// Export Starship type for backward compatibility
+export type Starship = StarshipResponse['starship']
 
 export interface Vision {
   id: string
@@ -612,56 +621,9 @@ export const chatAPI = {
       .then((res: AxiosResponse<{ message: string }>) => res.data),
 }
 
-// Define starship API types locally since they're not exported from protocol
-interface UpdateStarshipRequest {
-  name?: string
-  status?: 'active' | 'inactive'
-  class?: 'scout' | 'cruiser' | 'draught'
-  maxActiveExpeditions?: number
-}
-
-interface UpdateStarshipStatusRequest {
-  status: 'active' | 'inactive'
-}
-
-interface StarshipResponse {
-  starship: Starship
-}
-
-interface StarshipAgentsResponse {
-  starshipId: string
-  starshipName: string
-  starshipClass: 'scout' | 'cruiser' | 'draught'
-  maxAgents: number
-  deployedAgents: Array<{
-    id: string
-    name: string
-    model: string
-    systemPrompt?: string
-    createdAt: string
-    description?: string
-    tags: string[]
-    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
-    authorId: string
-    isPublic: boolean
-    version: string
-    updatedAt: string
-    usageCount: number
-    rating?: number
-    temperature?: number
-    maxTokens?: number
-    customInstructions?: string
-    allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[]
-    requiredPermissions?: string[]
-  }>
-  availableSlots: number
-  deployedCount: number
-}
-
-interface StarshipDetailsResponse extends StarshipResponse {
-  agents: StarshipAgentsResponse['deployedAgents']
-  availableSlots: number
-}
+// Starship types are now imported from protocol package above
+// Local Starship interface for backward compatibility
+type Starship = StarshipResponse['starship']
 
 // NEW: Enhanced Starship API
 export const starshipAPI = {
@@ -686,8 +648,7 @@ export const starshipAPI = {
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser' | 'draught'
-    maxActiveExpeditions?: number
-    vision?: {
+      vision?: {
       statement: string
       confidence?: number
       sibilSessionId?: string

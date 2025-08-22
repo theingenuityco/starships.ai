@@ -1,12 +1,11 @@
 import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
-import { RepositoryFactory, AgentExpeditionContextService } from "@starships/models";
+import { RepositoryFactory } from "@starships/models";
 import { MCPToolWrapper } from "./tools/MCPToolWrapper";
 import { mcpToolGatewayDB } from "@starships/core";
 import type { ChatRequest, MemoryEntry } from "@starships/protocol";
-import { AgentExecutor } from "langchain/agents";
-import { createOpenAIFunctionsAgent, createToolCallingAgent } from "langchain/agents";
+import { createToolCallingAgent } from "langchain/agents";
 import { MCPAgentExecutor } from "./agents/MCPAgentExecutor";
 import { ChatPromptTemplate, MessagesPlaceholder } from "@langchain/core/prompts";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
@@ -275,108 +274,16 @@ export async function* chatWithMCPStream(
   }
   
   let visionContext = "";
-  let expeditionContext = "";
-  let starshipLookupStrategies: string[] = [];
   let starshipSlugFromChannel: string | null = null;
   
-  // Load expedition context for agent awareness (STREAMING)
-  try {
-    // Check if channel_id contains expedition ID or starship ID
-    let expeditionIdFromChannel: string | null = null;
-    
-    if (req.channel_id) {
-      if (req.channel_id.startsWith('expedition-') || req.channel_id.startsWith('expedition:')) {
-        // Handle multiple formats: 
-        // - expedition-{expeditionId} (old format with dash)
-        // - expedition:{expeditionId}:starship:{starshipId} (new format with colons)
-        
-        if (req.channel_id.includes(':')) {
-          // New format with colons
-          const parts = req.channel_id.split(':');
-          if (parts.length >= 2) {
-            expeditionIdFromChannel = parts[1];
-            console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Extracted expedition ID from channel:', expeditionIdFromChannel);
-            
-            // Check if starship ID is also included
-            if (parts.length >= 4 && parts[2] === 'starship') {
-              const starshipId = parts[3];
-              console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Found starship ID in channel:', starshipId);
-              // Add it to lookup strategies for direct use
-              starshipLookupStrategies.push(`direct-starship:${starshipId}`);
-            }
-          }
-        } else {
-          // Old format with dashes
-          const parts = req.channel_id.split('-');
-          if (parts.length >= 2) {
-            expeditionIdFromChannel = parts[1];
-            console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Extracted expedition ID from channel (old format):', expeditionIdFromChannel);
-          }
-        }
-      } else if (req.channel_id.startsWith('starship-')) {
-        // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
-        const colonIndex = req.channel_id.indexOf(':');
-        if (colonIndex > 0) {
-          starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
-          console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Extracted starship slug from channel:', starshipSlugFromChannel);
-        }
-      }
+  // Handle starship channel format for vision loading  
+  if (req.channel_id && req.channel_id.startsWith('starship-')) {
+    // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
+    const colonIndex = req.channel_id.indexOf(':');
+    if (colonIndex > 0) {
+      starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
+      console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Extracted starship slug from channel:', starshipSlugFromChannel);
     }
-
-    const contextService = AgentExpeditionContextService.getInstance();
-    expeditionContext = await contextService.getAgentExpeditionContext(req.agent_id);
-    
-    if (expeditionContext) {
-      console.log('🚢 [AGENT-ENGINE-MCP-STREAM] Expedition context loaded for agent:', {
-        agentId: req.agent_id,
-        contextLength: expeditionContext.length,
-        hasExpedition: true
-      });
-    }
-
-    // If we found an expedition ID in the channel but no expedition context, add basic context
-    if (expeditionIdFromChannel && !expeditionContext) {
-      console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Adding basic expedition context for ID:', expeditionIdFromChannel);
-      expeditionContext = `\n\nCURRENT EXPEDITION CONTEXT:\nYou are currently participating in expedition ${expeditionIdFromChannel}. Coordinate with other agents and the First Officer to complete the mission objectives.
-
-🔍 WEB SEARCH GUIDANCE FOR EXPEDITIONS:
-- When you need current information, market data, or external research, use web search tools
-- Keep search queries SIMPLE and FOCUSED (e.g., "best food delivery apps 2024" instead of complex multi-part queries)  
-- Use ONE search query at a time instead of multiple bulk requests
-- Start with broad searches, then narrow down based on results
-- For complex research, break it into multiple simple searches rather than one complex query
-
-Example good search patterns:
-✅ "food delivery market size 2024"
-✅ "top food delivery apps comparison"
-✅ "food delivery trends 2024"
-
-Avoid complex queries like:
-❌ "comprehensive analysis of food delivery market including market size, growth trends, competitor analysis, customer preferences, and future projections for 2024-2025"
-\n`;
-      
-      // Also try to get the starship from the expedition
-      try {
-        const expeditionRepo = RepositoryFactory.getExpeditionRepository();
-        const expedition = await expeditionRepo.findById(expeditionIdFromChannel);
-        if (expedition && expedition.starshipId) {
-          console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Found starship ID from expedition:', expedition.starshipId);
-          // We'll use this later for vision loading if user starships aren't found
-          starshipLookupStrategies.push(`expedition-starship:${expedition.starshipId}`);
-        } else {
-          console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] Expedition found but no starshipId:', {
-            expeditionId: expeditionIdFromChannel,
-            expeditionFound: !!expedition,
-            starshipId: expedition?.starshipId
-          });
-        }
-      } catch (expError) {
-        console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] Could not load expedition details:', expError);
-      }
-    }
-  } catch (contextError) {
-    console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] Could not load expedition context:', contextError);
-    // Continue without expedition context
   }
   
   // Step 2: Load the agent's assigned starship for proper isolation
@@ -463,7 +370,7 @@ Avoid complex queries like:
           lastRefined: vision.lastRefined
         });
         
-        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n\n⚠️ STRICT VISION ALIGNMENT POLICY:\n- You can ONLY work on expeditions that align with this vision\n- If an expedition's mission doesn't align with the vision, you MUST NOT proceed\n- Always check: "Does this expedition support our vision of ${vision.statement}?"\n- If NO: Inform the user they have two options:\n  1. Adjust the expedition mission to align with the current vision\n  2. Visit the Vision Chamber to update the company vision for strategic pivots\n- If YES: Proceed with enthusiasm while keeping the vision in mind\n\n💡 Remember: The Vision Chamber exists for strategic evolution. If the company is pivoting to new markets or products, the vision should be updated there first.\n`;
+        visionContext = `\n\nCOMPANY/STARSHIP VISION:\n${vision.statement}\n\nIMPORTANT: This is YOUR company's vision. ALL work must align with this vision.\n`;
         console.log('✅ [AGENT-ENGINE-MCP-STREAM] Vision context prepared successfully, length:', visionContext.length);
       } else {
         console.log('📝 [AGENT-ENGINE-MCP-STREAM] Vision exists but has no usable statement');
@@ -552,21 +459,7 @@ Avoid complex queries like:
   // Build system prompt
   let systemPrompt = agent.systemPrompt || "You are a helpful AI assistant.";
   
-  // For expedition agents, emphasize web search capabilities
-  if (req.channel_id?.includes('expedition')) {
-    systemPrompt += `\n\n🔍 WEB RESEARCH CAPABILITIES:
-You have access to web search tools that allow you to gather current information, research trends, and find real-time data. When users ask for information that requires current knowledge:
-
-1. Use web search tools to gather current information
-2. Search for specific data points, reports, and insights
-3. Combine web research with your expertise
-4. Provide informed responses based on current information
-
-Don't limit yourself to historical knowledge - actively use web search to provide the most current and relevant information.`;
-  }
-  
   systemPrompt += visionContext;
-  systemPrompt += expeditionContext;
   
   // Load environment config and merge with defaults
   const envConfig = loadAgentExecutorConfig();

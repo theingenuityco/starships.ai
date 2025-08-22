@@ -59,7 +59,8 @@ export interface AuditResult {
 
 export interface AuditContext {
   taskId?: string;
-  expeditionId?: string;
+  contextId?: string; // Migration note: was expeditionId
+  expeditionId?: string; // TODO: deprecated - use contextId instead
   sessionId?: string;
   correlationId: string;
   environment: string;

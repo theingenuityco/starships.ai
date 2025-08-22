@@ -25,7 +25,7 @@ export class StartNodeHandler extends BaseWorkflowNodeHandler {
     return this.createSuccessResult(node, {
       message: 'Workflow started successfully',
       startedAt: new Date().toISOString(),
-      expeditionId: context.expeditionId
+      contextId: context.expeditionId // Migration note: using expeditionId as contextId
     });
   }
 
@@ -74,7 +74,7 @@ export class EndNodeHandler extends BaseWorkflowNodeHandler {
     return this.createSuccessResult(node, {
       message: 'Workflow completed successfully',
       completedAt: new Date().toISOString(),
-      expeditionId: context.expeditionId,
+      contextId: context.expeditionId, // Migration note: using expeditionId as contextId
       totalResults: context.previousResults.size
     });
   }
@@ -222,8 +222,9 @@ export class OutputNodeHandler extends BaseWorkflowNodeHandler {
     node: WorkflowDSLNode
   ): string {
     switch (template) {
-      case 'expedition-summary':
-        return this.generateExpeditionSummary(sourceData, format);
+      case 'expedition-summary': // Migration note: keeping for backward compatibility
+      case 'context-summary':
+        return this.generateContextSummary(sourceData, format);
       case 'report':
         return this.generateReport(sourceData, format);
       case 'simple':
@@ -234,9 +235,9 @@ export class OutputNodeHandler extends BaseWorkflowNodeHandler {
     }
   }
 
-  private generateExpeditionSummary(sourceData: any[], format: string): string {
+  private generateContextSummary(sourceData: any[], format: string): string { // Migration note: was generateExpeditionSummary
     const summary = {
-      title: 'Expedition Results Summary',
+      title: 'Workflow Results Summary', // Migration note: was 'Expedition Results Summary'
       completedAt: new Date().toISOString(),
       sourceCount: sourceData.length,
       results: sourceData.map(source => ({

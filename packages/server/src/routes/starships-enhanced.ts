@@ -123,7 +123,6 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
         class: starshipClass,
         status: 'active',
         ownerId: userId,
-        maxActiveExpeditions: starshipClass === 'scout' ? 2 : 5,
       });
 
       console.log('[STARSHIP-CREATE-ENHANCED] Starship created successfully:', createdStarship.id);
@@ -153,7 +152,6 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
           class: createdStarship.class,
           status: createdStarship.status,
           ownerId: createdStarship.ownerId,
-          maxActiveExpeditions: createdStarship.maxActiveExpeditions,
           maxAgents: createdStarship.maxAgents,
           createdAt: createdStarship.createdAt,
           updatedAt: createdStarship.updatedAt,

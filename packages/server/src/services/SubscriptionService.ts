@@ -185,7 +185,6 @@ export class SubscriptionService {
           yearly: yearlyPrice ? yearlyPrice.unit_amount! / 100 : 0,
           features: {
             maxAgents: parseInt(product.metadata.max_agents || '0'),
-            maxExpeditions: parseInt(product.metadata.max_expeditions || '0'),
           },
         };
       });
@@ -199,7 +198,6 @@ export class SubscriptionService {
       yearly: 0,
       features: {
         maxAgents: 3,
-        maxExpeditions: 2,
       },
     });
 

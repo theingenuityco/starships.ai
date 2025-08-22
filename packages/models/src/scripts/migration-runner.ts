@@ -1,5 +1,5 @@
 import { getConnection } from '../connection';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -192,34 +192,54 @@ export class MigrationRunner {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map(m => m.id));
     
-    // This would need to be enhanced to scan the migrations directory
-    const allMigrations = [
-      '003_database_optimizations',
-      '004_expedition_specific_optimizations'
-    ];
+    // Scan the migrations directory for .cypher files (not rollback files)
+    const migrationFiles = readdirSync(this.migrationsPath)
+      .filter(file => file.endsWith('.cypher') && !file.includes('rollback'))
+      .map(file => file.replace('.cypher', ''))
+      .sort();
     
-    return allMigrations.filter(id => !appliedIds.has(id));
+    return migrationFiles.filter(id => !appliedIds.has(id));
   }
 
   /**
    * Validate migration dependencies
+   * Updated to handle gaps in migration numbering gracefully
    */
   private async validateDependencies(migrationId: string): Promise<{
     valid: boolean;
     missing?: string[];
   }> {
-    // This would need to parse the migration file to extract dependencies
-    // For now, we'll use a simple mapping
-    const dependencies: Record<string, string[]> = {
-      '003_database_optimizations': ['002_expedition_system'],
-      '004_expedition_specific_optimizations': ['003_database_optimizations']
-    };
+    // Extract the migration number from the ID (e.g., "003" from "003_database_optimizations")
+    const migrationNumber = parseInt(migrationId.split('_')[0]);
+    
+    if (isNaN(migrationNumber)) {
+      // No dependency validation for non-numbered migrations
+      return { valid: true };
+    }
 
-    const migrationDeps = dependencies[migrationId] || [];
     const appliedMigrations = await this.getAppliedMigrations();
-    const appliedIds = new Set(appliedMigrations.map(m => m.id));
+    const appliedNumbers = appliedMigrations
+      .map(m => parseInt(m.id.split('_')[0]))
+      .filter(num => !isNaN(num));
 
-    const missing = migrationDeps.filter(dep => !appliedIds.has(dep));
+    // Get all available migration files to understand which ones actually exist
+    const availableMigrationFiles = readdirSync(this.migrationsPath)
+      .filter(file => file.endsWith('.cypher') && !file.includes('rollback'))
+      .map(file => file.replace('.cypher', ''));
+    
+    const availableNumbers = availableMigrationFiles
+      .map(id => parseInt(id.split('_')[0]))
+      .filter(num => !isNaN(num) && num < migrationNumber)
+      .sort((a, b) => a - b);
+
+    // Check if all available previous numbered migrations are applied
+    // This handles gaps in numbering by only checking for migrations that actually exist
+    const missing: string[] = [];
+    for (const availableNumber of availableNumbers) {
+      if (!appliedNumbers.includes(availableNumber)) {
+        missing.push(`${availableNumber.toString().padStart(3, '0')}_*`);
+      }
+    }
     
     return {
       valid: missing.length === 0,
@@ -308,10 +328,6 @@ export class MigrationRunner {
         await this.verifyConstraintsAndIndexes(errors);
       }
 
-      if (migrationId.includes('expedition_specific_optimizations')) {
-        await this.verifyExpeditionOptimizations(errors);
-      }
-
     } catch (error) {
       errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -327,21 +343,21 @@ export class MigrationRunner {
    */
   private async verifyConstraintsAndIndexes(errors: string[]): Promise<void> {
     try {
-      // Check constraints
+      // Check basic constraints exist
       const constraints = await this.getConnection().executeQuery(
-        'SHOW CONSTRAINTS YIELD name WHERE name CONTAINS "expedition" RETURN count(*) as count'
+        'SHOW CONSTRAINTS YIELD name RETURN count(*) as count'
       );
       
-      if (constraints[0]?.count < 10) {
+      if (constraints[0]?.count < 5) {
         errors.push('Expected constraints not found');
       }
 
-      // Check indexes
+      // Check basic indexes exist
       const indexes = await this.getConnection().executeQuery(
-        'SHOW INDEXES YIELD name WHERE name CONTAINS "expedition" RETURN count(*) as count'
+        'SHOW INDEXES YIELD name RETURN count(*) as count'
       );
       
-      if (indexes[0]?.count < 20) {
+      if (indexes[0]?.count < 5) {
         errors.push('Expected indexes not found');
       }
 
@@ -350,33 +366,6 @@ export class MigrationRunner {
     }
   }
 
-  /**
-   * Verify expedition-specific optimizations
-   */
-  private async verifyExpeditionOptimizations(errors: string[]): Promise<void> {
-    try {
-      // Check full-text indexes
-      const fullTextIndexes = await this.getConnection().executeQuery(
-        'CALL db.index.fulltext.listAvailableAnalyzers() YIELD analyzer RETURN count(*) as count'
-      );
-      
-      if (fullTextIndexes[0]?.count === 0) {
-        errors.push('Full-text search indexes not properly configured');
-      }
-
-      // Check cache nodes
-      const cacheNodes = await this.getConnection().executeQuery(
-        'MATCH (c:QueryCache) RETURN count(c) as count'
-      );
-      
-      if (cacheNodes[0]?.count < 3) {
-        errors.push('Query cache nodes not created');
-      }
-
-    } catch (error) {
-      errors.push(`Expedition optimization verification failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
 
   /**
    * Run all pending migrations

@@ -23,9 +23,10 @@ import type { Mission, WorkflowResponse, MissionWorkflow } from '@starships/prot
 interface WorkflowPhaseContentProps {
   mission: Mission;
   onWorkflowApproval?: (approved: boolean) => void;
+  readonly?: boolean;
 }
 
-export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPhaseContentProps) {
+export function WorkflowPhaseContent({ mission, onWorkflowApproval, readonly = false }: WorkflowPhaseContentProps) {
   const [workflow, setWorkflow] = useState<MissionWorkflow | null>(null);
   const [agents, setAgents] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);

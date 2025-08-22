@@ -335,6 +335,9 @@ export * from './types/expedition-stubs';
 // Export mission-related types
 export * from './types/mission';
 
+// Export mission phase constants
+export * from './constants/mission-phases';
+
 // Export workflow DSL types
 export * from './types/workflow';
 

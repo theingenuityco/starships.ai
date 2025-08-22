@@ -8,6 +8,7 @@
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
+import { MISSION_PHASES } from '@starships/protocol';
 import type { Agent } from '@starships/models';
 
 /**
@@ -49,15 +50,22 @@ Respond with ONLY this JSON format:
 
   CLARITY_COMPLETION_SUBSEQUENT: `Provide a brief, positive summary (2-3 sentences) confirming the mission is clear and ready for execution planning.`,
 
-  CONVERSE: `Provide mission-focused guidance and support.
+  CONVERSE: `Provide mission-focused guidance and support based on complete mission context.
+
+AVAILABLE CONTEXT:
+- Mission clarity assessment from analysis phase
+- Approved workflow plan with task breakdown  
+- Execution results with detailed task outcomes
+- Full conversation history and user intent
 
 APPROACH:
-- Understand the user's specific request
-- Leverage mission context and current phase
-- Give actionable, practical advice
-- Suggest concrete next steps when appropriate
+- Reference specific mission artifacts when relevant
+- Provide insights based on execution results
+- Help analyze outcomes and suggest improvements
+- Answer questions about completed tasks and their results
+- Guide next steps based on mission completion status
 
-Be direct, helpful, and mission-oriented.`,
+Be direct, knowledgeable, and leverage the rich mission context available.`,
 
   WORKFLOW_GENERATION: `You are Commander ARIA creating a detailed execution workflow for this mission.
 
@@ -137,7 +145,37 @@ INSTRUCTIONS:
 Be encouraging and explain how this workflow achieves their mission goals.
 Use a professional but friendly tone as Commander ARIA.
 
-End with: "Would you like me to proceed with this execution workflow? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`
+End with: "Would you like me to proceed with this execution workflow? You can approve it to begin execution, or ask me to modify any aspects you'd like changed."`,
+
+  WORKFLOW_APPROVAL_INTENT: `You are an expert at understanding user intentions regarding workflow approval in a mission context.
+
+User message: "{userMessage}"
+
+MISSION CONTEXT:
+{missionContext}
+
+Analyze the user's intent and respond with a JSON object containing:
+{
+  "intent": "approve|reject|discussion|unclear",
+  "confidence": 0.0-1.0,
+  "reasoning": "brief explanation"
+}
+
+Intent definitions:
+- "approve": User clearly wants to approve/execute the workflow (e.g., "yes", "looks good", "let's do it", "proceed", "execute", "go ahead")
+- "reject": User clearly wants to reject/change the workflow (e.g., "no", "change this", "revise", "not good", "different approach")  
+- "discussion": User is asking questions, seeking clarification, or discussing details without clear approval/rejection
+- "unclear": Intent is ambiguous, unrelated, or cannot be determined
+
+Guidelines:
+- Confidence should be high (0.8+) only for very clear intent
+- Consider context and nuance, not just keywords
+- "Looks good but..." should be discussion/unclear, not approve
+- Questions about the workflow are discussion
+- Generic responses without clear action are unclear
+- Focus on the primary intent of the message
+
+Respond with only the JSON object:`
 } as const;
 
 export class MissionPromptBuilder {
@@ -217,6 +255,23 @@ export class MissionPromptBuilder {
       }]
     };
   }
+
+  /**
+   * Build workflow approval intent classification prompt
+   */
+  buildWorkflowApprovalIntentPrompt(userMessage: string): LLMChatPrompt {
+    const missionContext = this.buildMissionSection();
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_APPROVAL_INTENT
+      .replace('{userMessage}', userMessage)
+      .replace('{missionContext}', missionContext);
+
+    return {
+      messages: [{
+        role: 'system',
+        content: systemPrompt
+      }]
+    };
+  }
   
   // ============================================================================
   // CORE BUILDING METHODS
@@ -251,13 +306,13 @@ export class MissionPromptBuilder {
     const { activePhase } = this.state;
     
     switch (activePhase) {
-      case 'welcome':
+      case MISSION_PHASES.WELCOME:
         return this.buildWelcomePhaseContext();
-      case 'analysis':
+      case MISSION_PHASES.ANALYSIS:
         return this.buildAnalysisPhaseContext();
-      case 'plan':
+      case MISSION_PHASES.PLAN:
         return this.buildPlanPhaseContext();
-      case 'converse':
+      case MISSION_PHASES.CONVERSE:
         return this.buildConversePhaseContext();
       default:
         return '';
@@ -290,10 +345,17 @@ WELCOME PHASE: First interaction with user for this mission.`;
   }
   
   /**
-   * Converse phase context - recent conversation history
+   * Converse phase context - includes all mission artifacts
    */
   private buildConversePhaseContext(): string {
-    return `CONVERSE PHASE: Ongoing mission guidance and support.`
+    const sections = [
+      `CONVERSE PHASE: Ongoing mission guidance and support.`,
+      this.buildClaritySection(),
+      this.buildWorkflowSection(),
+      this.buildExecutionResultsSection()
+    ];
+    
+    return sections.filter(Boolean).join('\n\n');
   }
   
   // ============================================================================
@@ -364,6 +426,50 @@ MISSION CLARITY ASSESSMENT:
 ├─ Scope Boundaries: ${clarity.scopeBoundaries}/10
 ├─ Vision Alignment: ${clarity.visionAlignment}/10
 └─ AI Analysis: ${clarity.reasoning}`;
+  }
+
+  private buildWorkflowSection(): string {
+    const { workflow } = this.state;
+    if (!workflow) return '';
+    
+    const agentNodes = workflow.nodes.filter(n => n.type === 'agent');
+    const workflowStatus = workflow.approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' : 
+                          workflow.approvalStatus === 'rejected' ? '❌ REJECTED' : 
+                          '⏳ PENDING APPROVAL';
+    
+    const taskList = agentNodes.map((node, index) => 
+      `├─ Task ${index + 1}: ${node.name}`
+    ).join('\n');
+    
+    return `
+MISSION WORKFLOW:
+├─ Status: ${workflowStatus}
+├─ Total Tasks: ${agentNodes.length}
+${taskList}
+└─ Created: ${new Date(workflow.createdAt).toLocaleDateString()}`;
+  }
+
+  private buildExecutionResultsSection(): string {
+    const { executionResult } = this.state;
+    if (!executionResult) return '';
+    
+    const successfulTasks = executionResult.nodeResults.filter(r => r.success).length;
+    const failedTasks = executionResult.nodeResults.filter(r => !r.success).length;
+    const statusIcon = executionResult.success ? '✅' : '❌';
+    
+    const taskResults = executionResult.nodeResults.map((result, index) => {
+      const icon = result.success ? '✅' : '❌';
+      const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
+      return `├─ ${icon} ${result.nodeName}${output}`;
+    }).join('\n');
+    
+    return `
+MISSION EXECUTION RESULTS:
+├─ Status: ${statusIcon} ${executionResult.success ? 'COMPLETED SUCCESSFULLY' : 'FAILED'}
+├─ Summary: ${executionResult.summary}
+├─ Tasks Completed: ${successfulTasks}/${executionResult.nodeResults.length}
+${taskResults}
+└─ Executed: ${new Date(executionResult.executedAt).toLocaleDateString()}`;
   }
 
   private buildConversationSection(): string {

@@ -351,7 +351,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
         deleteStarship: async (id) => {
           set({ loadingDelete: true, deleteError: null });
           try {
-            await starshipAPI.deleteStarship(id);
+            const response = await starshipAPI.deleteStarship(id);
             
             // Remove starship from the array
             const currentStarships = get().starships;
@@ -363,11 +363,31 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               // If we deleted the active starship, clear the selection
               activeStarshipId: get().activeStarshipId === id ? null : get().activeStarshipId
             });
-          } catch (error) {
+            
+            // Log subscription cancellation status for debugging
+            if (response.subscriptionCancelled) {
+              console.log('[STARSHIP] Subscription cancelled successfully for starship:', id);
+            }
+            
+            if (response.cancellationError) {
+              console.error('[STARSHIP] Subscription cancellation failed:', response.cancellationError);
+              // Could trigger a toast notification here to warn the user
+            }
+          } catch (error: any) {
+            // Check if it's a subscription cancellation failure
+            const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete starship';
+            const errorDetails = error?.response?.data?.details || '';
+            
+            // Combine error and details for better user feedback
+            const fullError = errorDetails ? `${errorMessage}\n${errorDetails}` : errorMessage;
+            
             set({
-              deleteError: error instanceof Error ? error.message : 'Failed to delete starship',
+              deleteError: fullError,
               loadingDelete: false
             });
+            
+            // Don't remove the starship from the list if deletion failed
+            console.error('[STARSHIP] Delete failed:', fullError);
           }
         },
 

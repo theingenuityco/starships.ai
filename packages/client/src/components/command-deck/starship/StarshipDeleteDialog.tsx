@@ -68,8 +68,13 @@ export function StarshipDeleteDialog({
     }
   }, [open, clearError]);
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout' ? '🚀' : '🛸';
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return '🚀';
+      case 'cruiser': return '🛸';
+      case 'draught': return '🚢';
+      default: return '🚀';
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -226,6 +231,19 @@ export function StarshipDeleteDialog({
                     )}
                     
                     
+                    {/* Subscription Cancellation Warning */}
+                    {starship.plan !== 'scout' && starship.subscriptionId && (
+                      <div className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-destructive rounded-full mt-2" />
+                        <div>
+                          <div className="font-medium">Subscription Cancellation</div>
+                          <div className="text-sm text-muted-foreground">
+                            Your {starship.plan === 'cruiser' ? 'Cruiser' : 'Draught'} subscription will be cancelled immediately.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     {isActiveStarship && (
                       <div className="flex items-start space-x-3">
                         <div className="w-2 h-2 bg-destructive rounded-full mt-2" />
@@ -309,9 +327,25 @@ export function StarshipDeleteDialog({
               animate={{ opacity: 1, y: 0 }}
               className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg"
             >
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 text-destructive" />
-                <span className="text-sm text-destructive">{deleteError}</span>
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="text-sm text-destructive whitespace-pre-wrap">{deleteError}</div>
+                  {deleteError.includes('subscription') && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      You can cancel your subscription manually in the{' '}
+                      <a 
+                        href="https://dashboard.stripe.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="underline hover:text-primary"
+                      >
+                        Stripe Dashboard
+                      </a>
+                      {' '}before deleting this starship.
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}

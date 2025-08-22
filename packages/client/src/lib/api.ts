@@ -623,7 +623,6 @@ export const chatAPI = {
 
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
-type Starship = StarshipResponse['starship']
 
 // NEW: Enhanced Starship API
 export const starshipAPI = {
@@ -693,7 +692,13 @@ export const starshipAPI = {
   },
 
   // Delete starship with cache invalidation
-  deleteStarship: async (id: string): Promise<{ message: string }> => {
+  deleteStarship: async (id: string): Promise<{ 
+    message: string;
+    starshipId?: string;
+    subscriptionCancelled?: boolean;
+    cancellationError?: string | null;
+    refundInfo?: string | null;
+  }> => {
     const data = await api.delete(`/api/starships/${id}`).then(res => res.data)
     // Invalidate all starship caches
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))

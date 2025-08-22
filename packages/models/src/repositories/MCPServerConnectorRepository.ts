@@ -6,6 +6,7 @@ import {
   ConstraintViolationError,
   NotFoundError,
 } from '../types';
+import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -15,7 +16,10 @@ import { v4 as uuidv4 } from 'uuid';
  * connectors on specific starships. Each connector instance is created from a
  * template (MCPServerOption) and maintains its own lifecycle and status.
  */
-export class MCPServerConnectorRepository implements MCPServerConnectorRepositoryInterface {
+export class MCPServerConnectorRepository extends BaseRepository implements MCPServerConnectorRepositoryInterface {
+  constructor() {
+    super('MCPServerConnectorRepository');
+  }
   /**
    * Validate UUID format
    */

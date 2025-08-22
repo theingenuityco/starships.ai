@@ -6,15 +6,22 @@
  */
 
 import {
-  StandardError,
+  BaseError,
   DatabaseError,
   NotFoundError,
   ConflictError,
   ValidationError,
-  ErrorFactory,
-  StandardErrorCode,
-  ErrorContext
-} from '@starships/protocol';
+  ErrorFactory
+} from '../errors';
+
+// Local error context interface
+interface ErrorContext {
+  service: string;
+  operation: string;
+  resource?: string;
+  resourceId?: string;
+  metadata?: Record<string, any>;
+}
 
 // ============================================================================
 // BASE REPOSITORY CLASS
@@ -56,46 +63,56 @@ export abstract class BaseRepository {
 
     // Handle specific database error types
     if (this.isConstraintViolationError(error)) {
-      throw ErrorFactory.conflict(
-        resource || 'Resource',
+      throw new ConflictError(
         'Database constraint violation',
-        context
+        'database_constraint',
+        { resource: resource || 'Resource', originalError: error.message },
+        context.operation,
+        `${context.service}/${context.operation}`
       );
     }
 
     if (this.isConnectionError(error)) {
-      throw ErrorFactory.businessLogic(
-        'DATABASE_CONNECTION_FAILED',
+      throw new DatabaseError(
         'Database connection failed',
-        error.message,
-        context
+        'connection',
+        undefined,
+        { originalError: error.message },
+        context.operation,
+        `${context.service}/${context.operation}`
       );
     }
 
     if (this.isTimeoutError(error)) {
-      throw ErrorFactory.businessLogic(
-        'DATABASE_TIMEOUT',
+      throw new DatabaseError(
         'Database operation timeout',
-        error.message,
-        context
+        'timeout',
+        undefined,
+        { originalError: error.message },
+        context.operation,
+        `${context.service}/${context.operation}`
       );
     }
 
     if (this.isQueryError(error)) {
-      throw ErrorFactory.businessLogic(
-        'DATABASE_QUERY_FAILED',
+      throw new DatabaseError(
         'Database query failed',
-        error.message,
-        context
+        'query',
+        undefined,
+        { originalError: error.message },
+        context.operation,
+        `${context.service}/${context.operation}`
       );
     }
 
     // Generic database error
-    throw ErrorFactory.businessLogic(
-      'DATABASE_ERROR',
+    throw new DatabaseError(
       'Database operation failed',
-      error.message || 'Unknown database error',
-      context
+      context.operation,
+      undefined,
+      { originalError: error.message || 'Unknown database error' },
+      context.operation,
+      `${context.service}/${context.operation}`
     );
   }
 
@@ -107,10 +124,13 @@ export abstract class BaseRepository {
     resourceId?: string,
     operation?: string
   ): never {
-    throw ErrorFactory.notFound(
+    throw new NotFoundError(
+      `${resource} ${resourceId ? `with ID ${resourceId}` : ''} not found`,
       resource,
-      resourceId,
-      this.createContext(operation || 'find', resource, resourceId)
+      resourceId || 'unknown',
+      undefined,
+      operation || 'find',
+      `${this.serviceName}/${operation || 'find'}`
     );
   }
 
@@ -122,9 +142,13 @@ export abstract class BaseRepository {
     operation?: string,
     resource?: string
   ): never {
-    throw ErrorFactory.validation(
-      fieldErrors,
-      this.createContext(operation || 'validate', resource)
+    const message = fieldErrors.map(e => `${e.field}: ${e.message}`).join(', ');
+    throw new ValidationError(
+      message,
+      fieldErrors[0]?.field,
+      { fieldErrors },
+      operation || 'validate',
+      `${this.serviceName}/${operation || 'validate'}`
     );
   }
 
@@ -137,10 +161,12 @@ export abstract class BaseRepository {
     operation?: string,
     resourceId?: string
   ): never {
-    throw ErrorFactory.conflict(
-      resource,
+    throw new ConflictError(
       conflictReason,
-      this.createContext(operation || 'create', resource, resourceId)
+      'resource_conflict',
+      { resource, resourceId },
+      operation || 'create',
+      `${this.serviceName}/${operation || 'create'}`
     );
   }
 
@@ -156,8 +182,8 @@ export abstract class BaseRepository {
     try {
       return await operation();
     } catch (error: any) {
-      // If it's already a StandardError, re-throw
-      if (error instanceof StandardError) {
+      // If it's already a BaseError, re-throw
+      if (error instanceof BaseError) {
         throw error;
       }
 
@@ -178,8 +204,8 @@ export abstract class BaseRepository {
     try {
       return operation();
     } catch (error: any) {
-      // If it's already a StandardError, re-throw
-      if (error instanceof StandardError) {
+      // If it's already a BaseError, re-throw
+      if (error instanceof BaseError) {
         throw error;
       }
 
@@ -424,17 +450,19 @@ export abstract class BaseRepository {
    * Create a standardized error for business logic violations
    */
   protected createBusinessLogicError(
-    code: StandardErrorCode,
+    code: string,
     message: string,
     operation?: string,
     resource?: string,
     resourceId?: string
   ): never {
-    throw ErrorFactory.businessLogic(
-      code,
+    throw new DatabaseError(
       message,
-      message,
-      this.createContext(operation || 'unknown', resource, resourceId)
+      operation || 'unknown',
+      undefined,
+      { code, resource, resourceId },
+      operation || 'unknown',
+      `${this.serviceName}/${operation || 'unknown'}`
     );
   }
 }

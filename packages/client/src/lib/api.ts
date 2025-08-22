@@ -694,10 +694,9 @@ export const starshipAPI = {
   // Delete starship with cache invalidation
   deleteStarship: async (id: string): Promise<{ 
     message: string;
-    starshipId?: string;
-    subscriptionCancelled?: boolean;
-    cancellationError?: string | null;
-    refundInfo?: string | null;
+    starshipId: string;
+    subscriptionCancelled: boolean;
+    refundInfo: string | null;
   }> => {
     const data = await api.delete(`/api/starships/${id}`).then(res => res.data)
     // Invalidate all starship caches

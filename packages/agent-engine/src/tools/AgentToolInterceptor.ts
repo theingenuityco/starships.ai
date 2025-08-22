@@ -59,8 +59,6 @@ export class AgentToolInterceptor {
    */
   wrapTool(tool: DynamicTool): DynamicTool {
     const originalFunc = tool.func.bind(tool);
-    const analyzeInput = this.analyzeInput.bind(this);
-    const recoverParameters = this.recoverParameters.bind(this);
     const getToolInput = this.getToolInput.bind(this);
     const toolName = tool.name;
     

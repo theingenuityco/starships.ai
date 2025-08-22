@@ -49,7 +49,6 @@ export class AgentTemplateService {
     return this.templateRepository.create({
       ...templateData,
       usageCount: 0,
-      updatedAt: new Date().toISOString(),
     });
   }
 

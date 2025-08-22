@@ -140,7 +140,9 @@ export async function seedLLMModels() {
 if (require.main === module) {
   async function runSeedScript() {
     // Load environment variables from project root
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require('path');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('fs');
     
     // Look for .env file in project root (two levels up from this script)

@@ -150,6 +150,7 @@ class DatabaseIntegrationTester {
         class: 'scout',
         slug: 'integration-test-ship',
         status: 'active',
+        _aggregateRoot: true,
       });
       this.testStarshipId = testStarship.id;
       await this.assert(testStarship.id !== undefined, 'Should create starship with ID');

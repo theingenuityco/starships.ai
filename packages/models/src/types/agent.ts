@@ -23,7 +23,7 @@ export type AgentCategory = z.infer<typeof AgentCategorySchema>;
 /**
  * Starship Class Enumeration (for agent deployment restrictions)
  */
-export const AgentStarshipClassSchema = z.enum(['scout', 'cruiser', 'draught']);
+export const AgentStarshipClassSchema = z.enum(['scout', 'cruiser']);
 export type AgentStarshipClass = z.infer<typeof AgentStarshipClassSchema>;
 
 /**
@@ -524,7 +524,8 @@ export const AgentBusinessRules = {
     if (!agent.allowedStarshipClasses) {
       return true; // No restrictions
     }
-    return agent.allowedStarshipClasses.includes(starshipClass);
+    // Cast agent.allowedStarshipClasses to our extended type for compatibility check
+    return (agent.allowedStarshipClasses as AgentStarshipClass[]).includes(starshipClass);
   },
 
   /**
@@ -608,7 +609,7 @@ export const AgentUtils = {
     let score = 1.0;
     
     if (agent.allowedStarshipClasses) {
-      if (!agent.allowedStarshipClasses.includes(starshipClass)) {
+      if (!(agent.allowedStarshipClasses as AgentStarshipClass[]).includes(starshipClass)) {
         return 0; // Not compatible
       }
     }

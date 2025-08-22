@@ -8,13 +8,14 @@ import { Starship, User } from '../types';
 /**
  * Test users to create for starship ownership
  */
-const TEST_USERS: Omit<User, 'id' | 'createdAt'>[] = [
+const TEST_USERS: Omit<User, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     kindeId: 'test-captain-kinde',
     username: 'test-captain',
     email: 'captain@starships.test',
     displayName: 'Test Captain',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=captain',
+    _aggregateRoot: true,
   },
   {
     kindeId: 'test-commander-kinde',
@@ -22,6 +23,7 @@ const TEST_USERS: Omit<User, 'id' | 'createdAt'>[] = [
     email: 'commander@starships.test',
     displayName: 'Test Commander',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=commander',
+    _aggregateRoot: true,
   },
   {
     kindeId: 'test-user-1',
@@ -29,6 +31,7 @@ const TEST_USERS: Omit<User, 'id' | 'createdAt'>[] = [
     email: 'test@starships.ai',
     displayName: 'Test User',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=testuser',
+    _aggregateRoot: true,
   },
 ];
 
@@ -42,6 +45,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     class: 'scout',
     name: 'USS Discovery',
     status: 'active',
+    _aggregateRoot: true,
   },
   {
     ownerUsername: 'test-captain',
@@ -49,6 +53,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     class: 'cruiser',
     name: 'USS Enterprise',
     status: 'active',
+    _aggregateRoot: true,
   },
   {
     ownerUsername: 'test-commander',
@@ -56,6 +61,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     class: 'scout',
     name: 'USS Voyager',
     status: 'active',
+    _aggregateRoot: true,
   },
   {
     ownerUsername: 'test-commander',
@@ -63,6 +69,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     class: 'cruiser',
     name: 'USS Defiant',
     status: 'inactive',
+    _aggregateRoot: true,
   },
   {
     ownerUsername: 'test-captain',
@@ -70,6 +77,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     class: 'scout',
     name: 'USS Prometheus',
     status: 'active',
+    _aggregateRoot: true,
   },
   {
     ownerUsername: 'test-user',
@@ -77,6 +85,7 @@ const TEST_STARSHIPS: Array<Omit<Starship, 'id' | 'createdAt' | 'updatedAt' | 'm
     class: 'cruiser',
     name: 'API Test Ship',
     status: 'active',
+    _aggregateRoot: true,
   },
 ];
 
@@ -106,7 +115,7 @@ async function seedStarships() {
     for (const userData of TEST_USERS) {
       try {
         // Check if user already exists
-        let existingUser = await userRepo.findByUsername(userData.username);
+        const existingUser = await userRepo.findByUsername(userData.username);
         
         if (existingUser) {
           console.log(`  ✅ User already exists: ${existingUser.username} (${existingUser.id})`);

@@ -202,7 +202,8 @@ class VisionFileMigration {
           confidence: 0.0,
           refinementCount: 0,
           lastRefined: new Date().toISOString(),
-          isActive: true
+          isActive: true,
+          _aggregateRoot: true
         });
         return true;
       }
@@ -214,7 +215,8 @@ class VisionFileMigration {
         confidence: this.calculateInitialConfidence(visionContent),
         refinementCount: 0,
         lastRefined: new Date().toISOString(),
-        isActive: true
+        isActive: true,
+        _aggregateRoot: true
       });
 
       console.log(`💾 [VISION-MIGRATION] Created vision record:`, {

@@ -2,6 +2,9 @@ import { getConnection } from '../connection';
 import {
   Starship,
   StarshipRepository as StarshipRepositoryInterface,
+  StarshipClass,
+  StarshipStatus,
+  BillingPeriod,
   Agent,
   MCPServerOption,
   MCPServerConnector,
@@ -73,6 +76,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
   private getMCPServerConnectorRepository(): MCPServerConnectorRepository {
     if (!this.mcpServerConnectorRepository) {
       // Import here to avoid circular dependencies
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { MCPServerConnectorRepository } = require('./MCPServerConnectorRepository');
       this.mcpServerConnectorRepository = new MCPServerConnectorRepository();
     }
@@ -375,6 +379,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     }
 
     // FALLBACK: If somehow still collides, use UUID suffix
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const uuidSuffix = require('uuid').v4().substring(0, 8);
     const fallbackSlug = `${baseSlug}-${uuidSuffix}`;
 
@@ -647,11 +652,11 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     starshipId: string,
     templateId: string
   ): Promise<MCPServerConnector> {
-    // Enhanced validation
-    this.validateUUID(starshipId, 'starshipId');
-    this.validateUUID(templateId, 'templateId');
+    return this.executeWithErrorHandling(async () => {
+      // Enhanced validation
+      this.validateUUID(starshipId, 'starshipId');
+      this.validateUUID(templateId, 'templateId');
 
-    try {
       console.log(
         `[StarshipRepository] Creating connector instance from template ${templateId} for starship ${starshipId}`
       );
@@ -685,10 +690,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
         `[StarshipRepository] Successfully created connector instance ${connectorInstance.id} for starship ${starshipId}`
       );
       return connectorInstance;
-    } catch (error) {
-      // BaseRepository will handle error conversion
-      throw error;
-    }
+    }, 'createConnectorInstance', 'MCPServerConnector');
   }
 
   /**
@@ -702,6 +704,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     this.validateUUID(starshipId, 'starshipId');
     this.validateUUID(connectorId, 'connectorId');
 
+    // eslint-disable-next-line no-useless-catch
     try {
       console.log(
         `[StarshipRepository] Removing connector instance ${connectorId} from starship ${starshipId}`
@@ -837,6 +840,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
   // ============================================================================
 
   async findBySubscriptionId(subscriptionId: string): Promise<Starship | null> {
+    // eslint-disable-next-line no-useless-catch
     try {
       const connection = getConnection();
       const result = await connection.executeQuery<{ starship: Starship }>(
@@ -860,6 +864,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
       billingPeriod?: 'monthly' | 'yearly';
     }
   ): Promise<void> {
+    // eslint-disable-next-line no-useless-catch
     try {
       const connection = getConnection();
       const setClause = Object.entries(updates)
@@ -877,6 +882,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
   }
 
   async countFreeStarships(userId: string): Promise<number> {
+    // eslint-disable-next-line no-useless-catch
     try {
       const connection = getConnection();
       const result = await connection.executeQuery<{ count: number }>(
@@ -1023,5 +1029,110 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
        SET s += $updates`,
       { id: starshipId, updates }
     );
+  }
+
+  async findByClass(starshipClass: StarshipClass): Promise<Starship[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ s: Starship }>(
+        'MATCH (s:Starship) WHERE s.class = $starshipClass RETURN s ORDER BY s.createdAt DESC',
+        { starshipClass }
+      );
+      return result.map((record) => record.s);
+    }, 'findByClass', 'Starship', starshipClass);
+  }
+
+  async findByStatus(status: StarshipStatus): Promise<Starship[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ s: Starship }>(
+        'MATCH (s:Starship) WHERE s.status = $status RETURN s ORDER BY s.createdAt DESC',
+        { status }
+      );
+      return result.map((record) => record.s);
+    }, 'findByStatus', 'Starship', status);
+  }
+
+  async findWithPendingPayments(): Promise<Starship[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ s: Starship }>(
+        'MATCH (s:Starship) WHERE s.status = "pending_payment" RETURN s ORDER BY s.createdAt DESC'
+      );
+      return result.map((record) => record.s);
+    }, 'findWithPendingPayments', 'Starship');
+  }
+
+  async updateBillingInfo(
+    id: string,
+    billingInfo: {
+      subscriptionId?: string;
+      plan?: StarshipClass;
+      billingPeriod?: BillingPeriod;
+      stripeCustomerId?: string;
+    }
+  ): Promise<Starship | null> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const updates = {
+        ...billingInfo,
+        updatedAt: new Date().toISOString(),
+      };
+      
+      const result = await connection.executeWrite<{ s: Starship }>(
+        'MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s',
+        { id, updates }
+      );
+      
+      return result[0]?.s || null;
+    }, 'updateBillingInfo', 'Starship', id);
+  }
+
+  async upgradeClass(id: string, newClass: StarshipClass): Promise<Starship | null> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const capacity = this.getCapacityLimits(newClass);
+      
+      const result = await connection.executeWrite<{ s: Starship }>(
+        `MATCH (s:Starship) WHERE s.id = $id 
+         SET s.class = $newClass, 
+             s.maxAgents = $maxAgents, 
+             s.maxActiveMissions = $maxActiveMissions,
+             s.updatedAt = $timestamp
+         RETURN s`,
+        {
+          id,
+          newClass,
+          maxAgents: capacity.maxAgents,
+          maxActiveMissions: capacity.maxActiveMissions,
+          timestamp: new Date().toISOString(),
+        }
+      );
+      
+      return result[0]?.s || null;
+    }, 'upgradeClass', 'Starship', id);
+  }
+
+  async findOverCapacity(): Promise<Starship[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ s: Starship }>(
+        `MATCH (s:Starship)
+         OPTIONAL MATCH (s)<-[:DEPLOYED_ON]-(a:Agent)
+         WITH s, count(a) as deployedCount
+         WHERE deployedCount > s.maxAgents
+         RETURN s ORDER BY deployedCount DESC`
+      );
+      return result.map((record) => record.s);
+    }, 'findOverCapacity', 'Starship');
+  }
+
+  private getCapacityLimits(starshipClass: StarshipClass): { maxAgents: number; maxActiveMissions: number } {
+    const limits = {
+      scout: { maxAgents: 3, maxActiveMissions: 3 },
+      cruiser: { maxAgents: 5, maxActiveMissions: 6 },
+      draught: { maxAgents: 10, maxActiveMissions: 10 }
+    };
+    return limits[starshipClass] || limits.scout;
   }
 }

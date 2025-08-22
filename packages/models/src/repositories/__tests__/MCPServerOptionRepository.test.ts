@@ -32,6 +32,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
           slug,
           command: 'docker',
           args: ['run', 'test'],
+          createdAt: '2024-01-01T00:00:00.000Z',
         };
 
         await expect(repository.create(serverData)).resolves.toBeDefined();
@@ -53,6 +54,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
           slug,
           command: 'docker',
           args: ['run', 'test'],
+          createdAt: '2024-01-01T00:00:00.000Z',
         };
 
         await expect(repository.create(serverData)).rejects.toThrow(
@@ -67,6 +69,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
         slug: '', // empty
         command: 'docker',
         args: ['run', 'test'],
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       await expect(repository.create(serverData)).rejects.toThrow(
@@ -82,6 +85,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
         command: 'docker',
         args: ['run', 'test'],
         env: '{}',
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       // Mock findBySlug to return existing server
@@ -92,6 +96,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
         slug: 'github', // Same slug as existing
         command: 'docker',
         args: ['run', 'test'],
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       await expect(repository.create(serverData)).rejects.toThrow(
@@ -105,6 +110,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
         // slug: missing
         command: 'docker',
         args: ['run', 'test'],
+        createdAt: '2024-01-01T00:00:00.000Z',
       } as any;
 
       await expect(repository.create(serverData)).rejects.toThrow(
@@ -122,6 +128,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
         command: 'docker',
         args: ['run', 'github'],
         env: '{}',
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ m: mockServer }]);
@@ -166,6 +173,7 @@ describe('MCPServerOptionRepository - Slug System', () => {
         command: 'docker',
         args: ['run', 'github'],
         env: '{}',
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       // Mock successful creation

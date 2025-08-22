@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Repository,
   BaseEntity,
@@ -6,8 +7,7 @@ import {
   AggregateRoot,
   UuidSchema,
   SlugSchema,
-  DateTimeSchema,
-  EntityStatusSchema
+  DateTimeSchema
 } from './shared';
 
 /**
@@ -134,13 +134,13 @@ export const StarshipSchema = z.object({
   updatedAt: DateTimeSchema,
   subscriptionId: z.string()
     .min(1, 'Subscription ID cannot be empty')
-    .startsWith('sub_', 'Subscription ID must start with "sub_"')
+    .startsWith('sub_', { message: 'Subscription ID must start with "sub_"' })
     .optional(),
   plan: StarshipClassSchema.optional(),
   billingPeriod: BillingPeriodSchema.optional(),
   stripeCustomerId: z.string()
     .min(1, 'Stripe customer ID cannot be empty')
-    .startsWith('cus_', 'Stripe customer ID must start with "cus_"')
+    .startsWith('cus_', { message: 'Stripe customer ID must start with "cus_"' })
     .optional(),
   _aggregateRoot: z.literal(true),
 }).strict().superRefine((data: any, ctx: any) => {
@@ -148,7 +148,7 @@ export const StarshipSchema = z.object({
   const expectedCapacity = STARSHIP_CAPACITY_LIMITS[data.class as keyof typeof STARSHIP_CAPACITY_LIMITS];
   if (data.maxAgents !== expectedCapacity.maxAgents) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['maxAgents'],
       message: `Max agents for ${data.class} class must be ${expectedCapacity.maxAgents}`,
     });
@@ -157,7 +157,7 @@ export const StarshipSchema = z.object({
   // Validate that maxActiveMissions matches the class capacity
   if (data.maxActiveMissions !== expectedCapacity.maxActiveMissions) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['maxActiveMissions'],
       message: `Max active missions for ${data.class} class must be ${expectedCapacity.maxActiveMissions}`,
     });
@@ -166,7 +166,7 @@ export const StarshipSchema = z.object({
   // Validate billing consistency
   if (data.subscriptionId && !data.plan) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['plan'],
       message: 'Plan is required when subscription ID is provided',
     });
@@ -174,7 +174,7 @@ export const StarshipSchema = z.object({
   
   if (data.subscriptionId && !data.billingPeriod) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       path: ['billingPeriod'],
       message: 'Billing period is required when subscription ID is provided',
     });
@@ -215,10 +215,7 @@ export const UpdateStarshipSchema = StarshipSchema.partial().omit({
  * Repository interface for managing Starship entities with domain-specific
  * query methods for deployment, capacity management, and billing operations.
  */
-export interface StarshipRepository {
-  findAll(): Promise<Starship[]>;
-  findById(id: string): Promise<Starship | null>;
-  
+export interface StarshipRepository extends Repository<Starship> {
   /**
    * Find a starship by slug and owner
    * @param slug - The starship slug
@@ -237,9 +234,6 @@ export interface StarshipRepository {
       slug?: string;
     }
   ): Promise<Starship>;
-  
-  update(id: string, updates: Partial<Starship>): Promise<Starship | null>;
-  delete(id: string): Promise<boolean>;
   
   /**
    * Find all starships owned by a specific user
@@ -477,7 +471,7 @@ export const StarshipUtils = {
     
     const starship: Starship = {
       ...input,
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       slug,
       maxAgents: capacity.maxAgents,
       maxActiveMissions: capacity.maxActiveMissions,

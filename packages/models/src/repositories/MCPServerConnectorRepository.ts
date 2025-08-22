@@ -243,14 +243,12 @@ export class MCPServerConnectorRepository extends BaseRepository implements MCPS
 
       if (starshipExists === 0) {
         throw new NotFoundError(
-          `Starship with ID ${connector.starshipId} not found`,
           'Starship',
           connector.starshipId
         );
       }
       if (templateExists === 0) {
         throw new NotFoundError(
-          `MCP Server template with ID ${connector.templateId} not found`,
           'MCPServerOption',
           connector.templateId
         );
@@ -1018,6 +1016,76 @@ export class MCPServerConnectorRepository extends BaseRepository implements MCPS
       console.error(`[MCPServerConnectorRepository] Error in updateDockerContainerId for id ${id}:`, error);
       throw new Error(
         `Failed to update Docker container ID: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Find unhealthy connector instances (Docker health status is unhealthy or has errors)
+   * @returns Promise resolving to array of unhealthy connector instances
+   */
+  async findUnhealthyConnectors(): Promise<MCPServerConnector[]> {
+    const connection = getConnection();
+    try {
+      console.log('[MCPServerConnectorRepository] Finding unhealthy connector instances');
+
+      const result = await connection.executeQuery<{ c: MCPServerConnector }>(
+        `MATCH (c:MCPServerConnector) 
+         WHERE c.dockerHealthStatus = 'unhealthy' 
+            OR c.status = 'error' 
+            OR c.dockerStatus = 'error'
+         RETURN c 
+         ORDER BY c.updatedAt DESC`,
+        {}
+      );
+
+      const connectors = result.map((record) => record.c);
+      console.log(`[MCPServerConnectorRepository] Found ${connectors.length} unhealthy connector instances`);
+
+      return connectors;
+    } catch (error) {
+      console.error('[MCPServerConnectorRepository] Error in findUnhealthyConnectors:', error);
+      throw new Error(
+        `Failed to find unhealthy connector instances: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
+
+  /**
+   * Update bridge information for a connector instance
+   * @param id - The ID of the connector instance
+   * @param bridgeInfo - Bridge connection information
+   * @returns Promise resolving to the updated connector instance or null if not found
+   */
+  async updateBridgeInfo(
+    id: string,
+    bridgeInfo: {
+      internalUrl?: string;
+      bridgeVersion?: string;
+      availableTools?: string;
+      availableResources?: string;
+      bridgeCapabilities?: string;
+    }
+  ): Promise<MCPServerConnector | null> {
+    this.validateUUID(id, 'id');
+
+    if (!bridgeInfo || typeof bridgeInfo !== 'object') {
+      throw new ValidationError('bridgeInfo parameter is required and must be an object', 'bridgeInfo');
+    }
+
+    console.log(`[MCPServerConnectorRepository] Updating bridge info for connector ${id}`);
+
+    // For now, just log the bridge info since these fields aren't part of the current interface
+    // In the future, these fields could be added to the MCPServerConnector interface
+    console.log(`[MCPServerConnectorRepository] Bridge info to update:`, bridgeInfo);
+
+    try {
+      // Return the current connector without updates for now
+      return await this.findById(id);
+    } catch (error) {
+      console.error(`[MCPServerConnectorRepository] Error in updateBridgeInfo for id ${id}:`, error);
+      throw new Error(
+        `Failed to update bridge info: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

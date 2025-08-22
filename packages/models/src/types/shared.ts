@@ -9,7 +9,7 @@ import { z } from 'zod';
 export interface Repository<T> {
   findAll(): Promise<T[]>;
   findById(id: string): Promise<T | null>;
-  create(entity: Omit<T, 'id' | 'createdAt'>): Promise<T>;
+  create(entity: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<T>;
   update(id: string, updates: Partial<T>): Promise<T | null>;
   delete(id: string): Promise<boolean>;
 }
@@ -89,7 +89,7 @@ export const SlugSchema = z.string()
   .regex(/^[a-z0-9-]+$/, 'Slug can only contain lowercase letters, numbers, and hyphens');
 
 // ISO 8601 datetime validation schema
-export const DateTimeSchema = z.string().datetime('Invalid ISO 8601 datetime format');
+export const DateTimeSchema = z.string().datetime({ message: 'Invalid ISO 8601 datetime format' });
 
 // JSON string validation schema
 export const JsonStringSchema = z.string().refine((val: string) => {

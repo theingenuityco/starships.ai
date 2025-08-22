@@ -242,4 +242,217 @@ export class VisionRepository extends BaseRepository implements VisionRepository
   async updateVision(starshipId: string, newVision: string): Promise<Vision | null> {
     return this.updateStatement(starshipId, newVision);
   }
+
+  async findAllByStarship(starshipId: string): Promise<Vision[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ starshipId }, ['starshipId'], 'findAllByStarship');
+      
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ v: Vision }>(
+        'MATCH (v:Vision) WHERE v.starshipId = $starshipId RETURN v ORDER BY v.createdAt DESC',
+        { starshipId }
+      );
+      
+      return result.map((record) => record.v);
+    }, 'findAllByStarship', 'Vision', starshipId);
+  }
+
+  async findByQualityRange(minScore: number, maxScore: number): Promise<Vision[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ minScore, maxScore }, ['minScore', 'maxScore'], 'findByQualityRange');
+      
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ v: Vision }>(
+        'MATCH (v:Vision) WHERE v.overallQuality >= $minScore AND v.overallQuality <= $maxScore RETURN v ORDER BY v.overallQuality DESC',
+        { minScore, maxScore }
+      );
+      
+      return result.map((record) => record.v);
+    }, 'findByQualityRange', 'Vision');
+  }
+
+  async findNeedingRefinement(confidenceThreshold: number = 0.7, qualityThreshold: number = 0.6): Promise<Vision[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ v: Vision }>(
+        `MATCH (v:Vision) 
+         WHERE v.confidence < $confidenceThreshold OR v.overallQuality < $qualityThreshold 
+         RETURN v ORDER BY v.confidence ASC, v.overallQuality ASC`,
+        { confidenceThreshold, qualityThreshold }
+      );
+      
+      return result.map((record) => record.v);
+    }, 'findNeedingRefinement', 'Vision');
+  }
+
+  async getRefinementHistory(starshipId: string, limit: number = 10): Promise<Vision[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ starshipId }, ['starshipId'], 'getRefinementHistory');
+      
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ v: Vision }>(
+        'MATCH (v:Vision) WHERE v.starshipId = $starshipId AND v.refinementCount > 0 RETURN v ORDER BY v.lastRefined DESC LIMIT $limit',
+        { starshipId, limit }
+      );
+      
+      return result.map((record) => record.v);
+    }, 'getRefinementHistory', 'Vision', starshipId);
+  }
+
+  async updateQualityMetrics(
+    id: string,
+    metrics: {
+      clarityScore?: number;
+      specificityScore?: number;
+      actionabilityScore?: number;
+      inspirationalScore?: number;
+      hasObjectives?: boolean;
+      hasTimeframe?: boolean;
+      hasMeasurables?: boolean;
+    }
+  ): Promise<Vision | null> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ id }, ['id'], 'updateQualityMetrics');
+      
+      const connection = getConnection();
+      const updates = {
+        ...metrics,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const result = await connection.executeWrite<{ v: Vision }>(
+        'MATCH (v:Vision) WHERE v.id = $id SET v += $updates RETURN v',
+        { id, updates }
+      );
+      
+      return result[0]?.v || null;
+    }, 'updateQualityMetrics', 'Vision', id);
+  }
+
+  async incrementRefinementCount(id: string): Promise<Vision | null> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ id }, ['id'], 'incrementRefinementCount');
+      
+      const connection = getConnection();
+      const result = await connection.executeWrite<{ v: Vision }>(
+        `MATCH (v:Vision) WHERE v.id = $id 
+         SET v.refinementCount = v.refinementCount + 1,
+             v.lastRefined = $timestamp,
+             v.updatedAt = $timestamp
+         RETURN v`,
+        { id, timestamp: new Date().toISOString() }
+      );
+      
+      return result[0]?.v || null;
+    }, 'incrementRefinementCount', 'Vision', id);
+  }
+
+  async setAsActive(id: string): Promise<Vision | null> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ id }, ['id'], 'setAsActive');
+      
+      const connection = getConnection();
+      
+      // First get the starship ID of this vision
+      const visionResult = await connection.executeQuery<{ starshipId: string }>(
+        'MATCH (v:Vision) WHERE v.id = $id RETURN v.starshipId as starshipId',
+        { id }
+      );
+      
+      const starshipId = visionResult[0]?.starshipId;
+      if (!starshipId) {
+        return null;
+      }
+      
+      // Deactivate all other visions for this starship
+      await connection.executeWrite(
+        'MATCH (v:Vision) WHERE v.starshipId = $starshipId SET v.isActive = false',
+        { starshipId }
+      );
+      
+      // Activate this vision
+      const result = await connection.executeWrite<{ v: Vision }>(
+        `MATCH (v:Vision) WHERE v.id = $id 
+         SET v.isActive = true, v.updatedAt = $timestamp
+         RETURN v`,
+        { id, timestamp: new Date().toISOString() }
+      );
+      
+      return result[0]?.v || null;
+    }, 'setAsActive', 'Vision', id);
+  }
+
+  async findWithComponents(flags: {
+    hasObjectives?: boolean;
+    hasTimeframe?: boolean;
+    hasMeasurables?: boolean;
+  }): Promise<Vision[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const conditions: string[] = [];
+      const params: any = {};
+      
+      if (flags.hasObjectives !== undefined) {
+        conditions.push('v.hasObjectives = $hasObjectives');
+        params.hasObjectives = flags.hasObjectives;
+      }
+      if (flags.hasTimeframe !== undefined) {
+        conditions.push('v.hasTimeframe = $hasTimeframe');
+        params.hasTimeframe = flags.hasTimeframe;
+      }
+      if (flags.hasMeasurables !== undefined) {
+        conditions.push('v.hasMeasurables = $hasMeasurables');
+        params.hasMeasurables = flags.hasMeasurables;
+      }
+      
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const query = `MATCH (v:Vision) ${whereClause} RETURN v ORDER BY v.overallQuality DESC`;
+      
+      const result = await connection.executeQuery<{ v: Vision }>(query, params);
+      return result.map((record) => record.v);
+    }, 'findWithComponents', 'Vision');
+  }
+
+  async getAverageQualityMetrics(): Promise<{
+    clarity: number;
+    specificity: number;
+    actionability: number;
+    inspirational: number;
+    overall: number;
+  }> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{
+        clarity: number;
+        specificity: number;
+        actionability: number;
+        inspirational: number;
+        overall: number;
+      }>(
+        `MATCH (v:Vision) 
+         WHERE v.clarityScore IS NOT NULL AND v.specificityScore IS NOT NULL 
+           AND v.actionabilityScore IS NOT NULL AND v.inspirationalScore IS NOT NULL
+           AND v.overallQuality IS NOT NULL
+         RETURN avg(v.clarityScore) as clarity,
+                avg(v.specificityScore) as specificity,
+                avg(v.actionabilityScore) as actionability,
+                avg(v.inspirationalScore) as inspirational,
+                avg(v.overallQuality) as overall`
+      );
+      
+      return result[0] || { clarity: 0, specificity: 0, actionability: 0, inspirational: 0, overall: 0 };
+    }, 'getAverageQualityMetrics', 'Vision');
+  }
+
+  async findTopQuality(limit: number = 10): Promise<Vision[]> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ v: Vision }>(
+        'MATCH (v:Vision) WHERE v.overallQuality IS NOT NULL RETURN v ORDER BY v.overallQuality DESC LIMIT $limit',
+        { limit }
+      );
+      
+      return result.map((record) => record.v);
+    }, 'findTopQuality', 'Vision');
+  }
 }

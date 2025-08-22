@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Repository,
   BaseEntity,
@@ -128,7 +129,7 @@ export const VisionSchema = z.object({
       
       if (Math.abs(data.overallQuality - expectedOverall) > tolerance) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['overallQuality'],
           message: `Overall quality score should be approximately ${expectedOverall.toFixed(2)} based on component scores`,
         });
@@ -140,7 +141,7 @@ export const VisionSchema = z.object({
   if (data.confidence !== undefined && data.overallQuality !== undefined) {
     if (data.confidence > data.overallQuality + 0.2) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['confidence'],
         message: 'Confidence level should not significantly exceed overall quality score',
       });
@@ -177,12 +178,7 @@ export const UpdateVisionSchema = VisionSchema.partial().omit({
  * Repository interface for managing Vision entities with domain-specific
  * query methods for vision statement management and quality tracking.
  */
-export interface VisionRepository {
-  findAll(): Promise<Vision[]>;
-  findById(id: string): Promise<Vision | null>;
-  create(entity: Omit<Vision, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vision>;
-  update(id: string, updates: Partial<Vision>): Promise<Vision | null>;
-  delete(id: string): Promise<boolean>;
+export interface VisionRepository extends Repository<Vision> {
   
   /**
    * Find the active vision for a specific starship
@@ -460,7 +456,7 @@ export const VisionUtils = {
   create: (input: CreateVisionInput): Vision => {
     const vision: Vision = {
       ...input,
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       _aggregateRoot: true,

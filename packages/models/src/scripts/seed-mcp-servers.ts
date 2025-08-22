@@ -15,6 +15,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'uvx',
     args: ['mcp-server-time', '--local-timezone=America/New_York'],
     env: JSON.stringify({}),
+    createdAt: '2024-01-01T00:00:00.000Z',
   },
   {
     name: 'Sequential Thinking',
@@ -22,6 +23,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     command: 'npx',
     args: ['-y', '@modelcontextprotocol/server-sequential-thinking'],
     env: JSON.stringify({}),
+    createdAt: '2024-01-01T00:00:00.000Z',
   },
   {
     name: 'Firecrawl',
@@ -31,6 +33,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     env: JSON.stringify({
       FIRECRAWL_API_KEY: '${FIRECRAWL_API_KEY}',
     }),
+    createdAt: '2024-01-01T00:00:00.000Z',
   },
   {
     name: 'Notion API',
@@ -40,6 +43,7 @@ const DEFAULT_MCP_SERVERS: Omit<MCPServerOption, 'id'>[] = [
     env: JSON.stringify({
       NOTION_TOKEN: '${NOTION_TOKEN}',
     }),
+    createdAt: '2024-01-01T00:00:00.000Z',
   },
 ];
 

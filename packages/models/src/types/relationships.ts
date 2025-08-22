@@ -33,6 +33,8 @@ export interface BaseRelationship {
 export interface OwnsRelationship extends BaseRelationship {
   type: 'OWNS';
   properties?: {
+    /** Timestamp when relationship was created */
+    createdAt?: string;
     /** Timestamp when ownership was established */
     ownedSince?: string;
     /** Ownership type (primary, shared, etc.) */
@@ -117,6 +119,8 @@ export interface ChangedConfigRelationship extends BaseRelationship {
 export interface DeployedOnRelationship extends BaseRelationship {
   type: 'DEPLOYED_ON';
   properties?: {
+    /** Timestamp when relationship was created */
+    createdAt?: string;
     /** Timestamp when deployment occurred */
     deployedAt?: string;
     /** Whether the deployment is currently active */
@@ -437,6 +441,7 @@ export interface ContributesToRelationship extends BaseRelationship {
 export const OwnsRelationshipSchema = z.object({
   type: z.literal('OWNS'),
   properties: z.object({
+    createdAt: DateTimeSchema.optional(),
     ownedSince: DateTimeSchema.optional(),
     ownershipType: z.enum(['primary', 'shared', 'inherited']).optional(),
     isActive: z.boolean().optional(),
@@ -446,6 +451,7 @@ export const OwnsRelationshipSchema = z.object({
 export const DeployedOnRelationshipSchema = z.object({
   type: z.literal('DEPLOYED_ON'),
   properties: z.object({
+    createdAt: DateTimeSchema.optional(),
     deployedAt: DateTimeSchema.optional(),
     isActive: z.boolean().optional(),
     deploymentConfig: z.string().optional(),
@@ -469,6 +475,79 @@ export const RatedRelationshipSchema = z.object({
     ratedAt: DateTimeSchema.optional(),
     review: z.string().optional(),
     isVerified: z.boolean().optional(),
+  }).optional()
+}).strict();
+
+export const HasVisionRelationshipSchema = z.object({
+  type: z.literal('HAS_VISION'),
+  properties: z.object({
+    assignedAt: DateTimeSchema.optional(),
+    isActive: z.boolean().optional(),
+    visionVersion: z.number().optional(),
+  }).optional()
+}).strict();
+
+export const HasConnectorInstanceRelationshipSchema = z.object({
+  type: z.literal('HAS_CONNECTOR_INSTANCE'),
+  properties: z.object({
+    createdAt: DateTimeSchema.optional(),
+    installationSource: z.enum(['marketplace', 'template', 'custom']).optional(),
+    priority: z.number().optional(),
+  }).optional()
+}).strict();
+
+export const CreatedFromTemplateRelationshipSchema = z.object({
+  type: z.literal('CREATED_FROM'),
+  properties: z.object({
+    createdAt: DateTimeSchema.optional(),
+    templateVersion: z.string().optional(),
+    customizations: z.string().optional(),
+  }).optional()
+}).strict();
+
+export const BelongsToStarshipRelationshipSchema = z.object({
+  type: z.literal('BELONGS_TO'),
+  properties: z.object({
+    createdAt: DateTimeSchema.optional(),
+    lifecycleStage: z.enum(['draft', 'active', 'archived', 'deprecated']).optional(),
+    priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+  }).optional()
+}).strict();
+
+export const RefinedFromRelationshipSchema = z.object({
+  type: z.literal('REFINED_FROM'),
+  properties: z.object({
+    refinedAt: DateTimeSchema.optional(),
+    refinementType: z.enum(['clarity', 'scope', 'timeline', 'metrics', 'comprehensive']).optional(),
+    qualityImprovement: z.number().optional(),
+    refinementNotes: z.string().optional(),
+  }).optional()
+}).strict();
+
+export const AuthorsRelationshipSchema = z.object({
+  type: z.literal('AUTHORED'),
+  properties: z.object({
+    createdAt: DateTimeSchema.optional(),
+    version: z.string().optional(),
+    isMaintainer: z.boolean().optional(),
+  }).optional()
+}).strict();
+
+export const UsesConfigRelationshipSchema = z.object({
+  type: z.literal('USES_CONFIG'),
+  properties: z.object({
+    appliedAt: DateTimeSchema.optional(),
+    configOverrides: z.string().optional(),
+    isLatestVersion: z.boolean().optional(),
+  }).optional()
+}).strict();
+
+export const BelongsToConnectorRelationshipSchema = z.object({
+  type: z.literal('BELONGS_TO'),
+  properties: z.object({
+    sequenceNumber: z.number().optional(),
+    isCurrent: z.boolean().optional(),
+    changeDiff: z.string().optional(),
   }).optional()
 }).strict();
 

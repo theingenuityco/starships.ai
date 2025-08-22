@@ -72,7 +72,6 @@ export {
 
 // Explicit re-exports for clarity (Agent is imported from protocol)
 export type {
-  Agent, // Re-exported from @starships/protocol
   AgentCategory,
   AgentTemplate,
   AgentRepository,
@@ -317,7 +316,7 @@ export const BUILTIN_CONFIG_TEMPLATES = [
   {
     name: 'Development',
     description: 'Optimized for development with debug logging and relaxed timeouts',
-    category: 'development',
+    category: 'development' as 'development' | 'production' | 'testing' | 'monitoring' | 'custom',
     tags: ['development', 'debug', 'local'],
     isPublic: true,
     config: {
@@ -333,7 +332,7 @@ export const BUILTIN_CONFIG_TEMPLATES = [
         exponentialBackoff: false,
       },
       logging: {
-        level: 'debug',
+        level: 'debug' as const,
         enableDebug: true,
         logRequests: true,
         logMetrics: true,
@@ -349,7 +348,7 @@ export const BUILTIN_CONFIG_TEMPLATES = [
   {
     name: 'Production',
     description: 'Optimized for production with conservative settings and monitoring',
-    category: 'production',
+    category: 'production' as 'development' | 'production' | 'testing' | 'monitoring' | 'custom',
     tags: ['production', 'stable', 'monitoring'],
     isPublic: true,
     config: {
@@ -365,7 +364,7 @@ export const BUILTIN_CONFIG_TEMPLATES = [
         exponentialBackoff: true,
       },
       logging: {
-        level: 'warn',
+        level: 'warn' as const,
         enableDebug: false,
         logRequests: false,
         logMetrics: true,
@@ -386,7 +385,7 @@ export const BUILTIN_CONFIG_TEMPLATES = [
   {
     name: 'Testing',
     description: 'Optimized for testing with fast timeouts and detailed logging',
-    category: 'testing',
+    category: 'testing' as 'development' | 'production' | 'testing' | 'monitoring' | 'custom',
     tags: ['testing', 'ci', 'fast'],
     isPublic: true,
     config: {
@@ -402,7 +401,7 @@ export const BUILTIN_CONFIG_TEMPLATES = [
         exponentialBackoff: false,
       },
       logging: {
-        level: 'info',
+        level: 'info' as const,
         enableDebug: false,
         logRequests: true,
         logMetrics: false,

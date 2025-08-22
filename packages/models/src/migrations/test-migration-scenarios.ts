@@ -82,12 +82,15 @@ export class MigrationTestDataSetup {
    */
   async createTestUser(userId: string = `test-user-${uuidv4()}`): Promise<User> {
     const session = this.connection.getSession();
+    const now = new Date().toISOString();
     const user: User = {
       id: userId,
       username: `testuser-${Date.now()}`,
       email: `test-${Date.now()}@example.com`,
       displayName: 'Test User',
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
+      _aggregateRoot: true,
     };
 
     try {
@@ -114,6 +117,7 @@ export class MigrationTestDataSetup {
         command: i % 2 === 0 ? 'npx' : 'docker',
         args: [`@test/server-${i + 1}`],
         env: JSON.stringify({ TEST_VAR: `value-${i + 1}` }),
+        createdAt: new Date().toISOString(),
       };
 
       const createdServer = await this.mcpServerRepo.create({
@@ -122,6 +126,7 @@ export class MigrationTestDataSetup {
         command: server.command,
         args: server.args,
         env: server.env,
+        createdAt: server.createdAt,
       });
 
       servers.push({ ...server, id: createdServer.id });
@@ -159,6 +164,7 @@ export class MigrationTestDataSetup {
           class: i % 2 === 0 ? 'scout' : 'cruiser',
           name: `Test Starship ${i + 1}`,
           status: 'active',
+          _aggregateRoot: true,
         });
 
         starships.push(starship);

@@ -61,13 +61,13 @@ export class UserRepository extends BaseRepository implements UserRepositoryInte
     }, 'findByKindeId', 'User', kindeId);
   }
 
-  async create(entity: Omit<User, 'id' | 'createdAt'>): Promise<User> {
+  async create(entity: Omit<User, 'id' | 'createdAt' | 'updatedAt'>): Promise<User> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(entity, ['kindeId', 'email'], 'create');
       
       const connection = getConnection();
       const id = uuidv4();
-      const createdAt = new Date().toISOString();
+      const now = new Date().toISOString();
       
       const result = await connection.executeWrite<{ u: User }>(
         `CREATE (u:User {
@@ -77,11 +77,13 @@ export class UserRepository extends BaseRepository implements UserRepositoryInte
           email: $email,
           displayName: $displayName,
           avatar: $avatar,
-          createdAt: $createdAt
+          createdAt: $createdAt,
+          updatedAt: $updatedAt
         }) RETURN u`,
         { 
           id: id, 
-          createdAt: createdAt, 
+          createdAt: now,
+          updatedAt: now,
           kindeId: entity.kindeId,
           username: entity.username, 
           email: entity.email,
@@ -172,16 +174,109 @@ export class UserRepository extends BaseRepository implements UserRepositoryInte
     }, 'findByStripeCustomerId', 'User', stripeCustomerId);
   }
 
-  async updateStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
+  async updateStripeCustomerId(userId: string, stripeCustomerId: string): Promise<User | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ userId, stripeCustomerId }, ['userId', 'stripeCustomerId'], 'updateStripeCustomerId');
       
       const connection = getConnection();
-      await connection.executeWrite(
+      const result = await connection.executeWrite<{ user: User }>(
         `MATCH (user:User {id: $userId})
-         SET user.stripeCustomerId = $stripeCustomerId`,
+         SET user.stripeCustomerId = $stripeCustomerId
+         RETURN user`,
         { userId, stripeCustomerId }
       );
+      
+      return result[0]?.user || null;
     }, 'updateStripeCustomerId', 'User', userId);
+  }
+
+  async isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ username }, ['username'], 'isUsernameAvailable');
+      
+      const connection = getConnection();
+      let query = 'MATCH (u:User) WHERE u.username = $username';
+      const params: any = { username };
+      
+      if (excludeUserId) {
+        query += ' AND u.id <> $excludeUserId';
+        params.excludeUserId = excludeUserId;
+      }
+      
+      query += ' RETURN count(u) as count';
+      
+      const result = await connection.executeQuery<{ count: number }>(query, params);
+      return result[0]?.count === 0;
+    }, 'isUsernameAvailable', 'User', username);
+  }
+
+  async isEmailAvailable(email: string, excludeUserId?: string): Promise<boolean> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ email }, ['email'], 'isEmailAvailable');
+      
+      const connection = getConnection();
+      let query = 'MATCH (u:User) WHERE u.email = $email';
+      const params: any = { email };
+      
+      if (excludeUserId) {
+        query += ' AND u.id <> $excludeUserId';
+        params.excludeUserId = excludeUserId;
+      }
+      
+      query += ' RETURN count(u) as count';
+      
+      const result = await connection.executeQuery<{ count: number }>(query, params);
+      return result[0]?.count === 0;
+    }, 'isEmailAvailable', 'User', email);
+  }
+
+  async updateKindeId(userId: string, kindeId: string): Promise<User | null> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ userId, kindeId }, ['userId', 'kindeId'], 'updateKindeId');
+      
+      const connection = getConnection();
+      const result = await connection.executeWrite<{ user: User }>(
+        `MATCH (user:User {id: $userId})
+         SET user.kindeId = $kindeId, user.updatedAt = $updatedAt
+         RETURN user`,
+        { userId, kindeId, updatedAt: new Date().toISOString() }
+      );
+      
+      return result[0]?.user || null;
+    }, 'updateKindeId', 'User', userId);
+  }
+
+  async findByDateRange(startDate: string, endDate: string): Promise<User[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ startDate, endDate }, ['startDate', 'endDate'], 'findByDateRange');
+      
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ user: User }>(
+        'MATCH (user:User) WHERE user.createdAt >= $startDate AND user.createdAt <= $endDate RETURN user ORDER BY user.createdAt DESC',
+        { startDate, endDate }
+      );
+      
+      return result.map((record) => record.user);
+    }, 'findByDateRange', 'User');
+  }
+
+  async searchUsers(query: string, limit: number = 50): Promise<User[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ query }, ['query'], 'searchUsers');
+      
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ user: User }>(
+        `MATCH (user:User) 
+         WHERE toLower(user.username) CONTAINS toLower($query) 
+            OR toLower(user.displayName) CONTAINS toLower($query)
+            OR toLower(user.email) CONTAINS toLower($query)
+         RETURN user 
+         ORDER BY user.username ASC 
+         LIMIT $limit`,
+        { query, limit }
+      );
+      
+      return result.map((record) => record.user);
+    }, 'searchUsers', 'User');
   }
 } 

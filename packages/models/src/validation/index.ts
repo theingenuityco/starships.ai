@@ -55,6 +55,14 @@ import {
   DeployedOnRelationshipSchema,
   CreatedFromRelationshipSchema,
   RatedRelationshipSchema,
+  HasVisionRelationshipSchema,
+  HasConnectorInstanceRelationshipSchema,
+  CreatedFromTemplateRelationshipSchema,
+  BelongsToStarshipRelationshipSchema,
+  RefinedFromRelationshipSchema,
+  AuthorsRelationshipSchema,
+  UsesConfigRelationshipSchema,
+  BelongsToConnectorRelationshipSchema,
   RelationshipUtils
 } from '../types/relationships';
 
@@ -96,30 +104,84 @@ const _schemaRegistry: Record<string, z.ZodSchema<any>> = {
   DeployedOnRelationship: DeployedOnRelationshipSchema,
   CreatedFromRelationship: CreatedFromRelationshipSchema,
   RatedRelationship: RatedRelationshipSchema,
+  HasVisionRelationship: HasVisionRelationshipSchema,
+  HasConnectorInstanceRelationship: HasConnectorInstanceRelationshipSchema,
+  CreatedFromTemplateRelationship: CreatedFromTemplateRelationshipSchema,
+  BelongsToStarshipRelationship: BelongsToStarshipRelationshipSchema,
+  RefinedFromRelationship: RefinedFromRelationshipSchema,
+  AuthorsRelationship: AuthorsRelationshipSchema,
+  UsesConfigRelationship: UsesConfigRelationshipSchema,
+  BelongsToConnectorRelationship: BelongsToConnectorRelationshipSchema,
 };
 
 export const SchemaRegistry = {
   ..._schemaRegistry,
 
   /**
-   * Get a schema by name with type safety
+   * Get a schema by name with optional versioning
+   * @param name - Schema name
+   * @param version - Optional version (defaults to latest/current)
+   * @returns Schema or undefined if not found
    */
-  getSchema(name: string): z.ZodSchema<any> | undefined {
+  getSchema(name: string, version?: string): z.ZodSchema<any> | undefined {
+    if (version) {
+      const versionedKey = `${name}@${version}`;
+      return _schemaRegistry[versionedKey] || _schemaRegistry[name];
+    }
     return _schemaRegistry[name];
   },
 
   /**
-   * Check if a schema exists in the registry
+   * Register a schema with optional versioning
+   * @param name - Schema name
+   * @param schema - Zod schema
+   * @param version - Optional version
    */
-  hasSchema(name: string): boolean {
+  registerSchema(name: string, schema: z.ZodSchema<any>, version?: string): void {
+    const key = version ? `${name}@${version}` : name;
+    _schemaRegistry[key] = schema;
+  },
+
+  /**
+   * Check if a schema exists in the registry (with optional version)
+   * @param name - Schema name
+   * @param version - Optional version
+   * @returns Whether the schema exists
+   */
+  hasSchema(name: string, version?: string): boolean {
+    if (version) {
+      const versionedKey = `${name}@${version}`;
+      return versionedKey in _schemaRegistry || name in _schemaRegistry;
+    }
     return name in _schemaRegistry;
   },
 
   /**
-   * Get all available schema names
+   * Get all available schema names (including versioned ones)
    */
   getSchemaNames(): string[] {
     return Object.keys(_schemaRegistry);
+  },
+
+  /**
+   * Get all versions of a specific schema
+   * @param name - Schema name
+   * @returns Array of version strings
+   */
+  getSchemaVersions(name: string): string[] {
+    const versions: string[] = [];
+    const keys = Object.keys(_schemaRegistry);
+    
+    for (const key of keys) {
+      if (key === name) {
+        versions.push('default'); // Base version without explicit version
+      } else if (key.startsWith(`${name}@`)) {
+        const version = key.split('@')[1];
+        versions.push(version);
+      }
+    }
+    
+    return versions;
   }
 };
 
@@ -146,21 +208,21 @@ export interface ValidationErrorDetail {
  * 
  * Provides detailed validation error information compatible with BaseRepository patterns.
  */
-export class ValidationError extends Error {
+export class SchemaValidationError extends Error {
   public readonly errors: ValidationErrorDetail[];
   public readonly code: string = 'VALIDATION_ERROR';
 
   constructor(errors: ValidationErrorDetail[], message?: string) {
     const errorMessage = message || `Validation failed: ${errors.map(e => e.message).join(', ')}`;
     super(errorMessage);
-    this.name = 'ValidationError';
+    this.name = 'SchemaValidationError';
     this.errors = errors;
   }
 
   /**
-   * Create ValidationError from Zod error
+   * Create SchemaValidationError from Zod error
    */
-  static fromZodError(zodError: z.ZodError, context?: string): ValidationError {
+  static fromZodError(zodError: z.ZodError, context?: string): SchemaValidationError {
     const errors: ValidationErrorDetail[] = zodError.issues.map((issue: any) => ({
       path: issue.path.join('.') || 'root',
       message: issue.message,
@@ -173,7 +235,7 @@ export class ValidationError extends Error {
       ? `Validation failed for ${context}: ${errors.map(e => e.message).join(', ')}`
       : undefined;
 
-    return new ValidationError(errors, message);
+    return new SchemaValidationError(errors, message);
   }
 
   /**
@@ -235,7 +297,7 @@ export function validateEntity<T>(
         data: result.data as T
       };
     } else {
-      const validationError = ValidationError.fromZodError(result.error, entityName);
+      const validationError = SchemaValidationError.fromZodError(result.error, entityName);
       return {
         success: false,
         errors: validationError.errors
@@ -263,7 +325,7 @@ export function validateEntityStrict<T>(
   const result = validateEntity<T>(entityName, data);
   
   if (!result.success) {
-    throw new ValidationError(result.errors!, `Validation failed for ${entityName}`);
+    throw new SchemaValidationError(result.errors!, `Validation failed for ${entityName}`);
   }
   
   return result.data!;
@@ -341,18 +403,26 @@ export function createValidationMiddleware<T>(entityName: string) {
       // Fallback to partial validation of main schema
       const schema = SchemaRegistry.getSchema(entityName);
       if (!schema) {
-        throw new ValidationError([{
+        throw new SchemaValidationError([{
           path: 'root',
           message: `Schema not found for entity: ${entityName}`,
           code: 'SCHEMA_NOT_FOUND'
         }]);
       }
       
-      const partialSchema = schema.partial();
+      // Check if schema has partial method, if not allow any partial updates
+      let partialSchema: z.ZodSchema<any>;
+      if ('partial' in schema && typeof schema.partial === 'function') {
+        partialSchema = (schema as any).partial();
+      } else {
+        // For schemas without partial method, just validate as-is
+        partialSchema = schema;
+      }
+      
       const result = partialSchema.safeParse(data);
       
       if (!result.success) {
-        throw ValidationError.fromZodError(result.error, `Update${entityName}`);
+        throw SchemaValidationError.fromZodError(result.error, `Update${entityName}`);
       }
       
       return result.data as Partial<T>;
@@ -432,7 +502,7 @@ export const CustomValidationRules = {
   /**
    * Validates email uniqueness (for use in repositories)
    */
-  validateEmailUniqueness: async (email: string, excludeUserId?: string): Promise<boolean> => {
+  validateEmailUniqueness: async (_email: string, _excludeUserId?: string): Promise<boolean> => {
     // This would be implemented by the repository layer
     // Return true for now as a placeholder
     return true;
@@ -441,7 +511,7 @@ export const CustomValidationRules = {
   /**
    * Validates username uniqueness (for use in repositories)
    */
-  validateUsernameUniqueness: async (username: string, excludeUserId?: string): Promise<boolean> => {
+  validateUsernameUniqueness: async (_username: string, _excludeUserId?: string): Promise<boolean> => {
     // This would be implemented by the repository layer
     // Return true for now as a placeholder
     return true;
@@ -501,24 +571,24 @@ export function formatValidationErrors(errors: ValidationErrorDetail[]): string 
 /**
  * Check if an error is a validation error
  */
-export function isValidationError(error: any): error is ValidationError {
-  return error instanceof ValidationError || 
-         (error && error.name === 'ValidationError' && Array.isArray(error.errors));
+export function isValidationError(error: any): error is SchemaValidationError {
+  return error instanceof SchemaValidationError || 
+         (error && error.name === 'SchemaValidationError' && Array.isArray(error.errors));
 }
 
 /**
  * Convert any error to a validation error format
  */
-export function toValidationError(error: any, context?: string): ValidationError {
+export function toValidationError(error: any, context?: string): SchemaValidationError {
   if (isValidationError(error)) {
     return error;
   }
 
   if (error instanceof z.ZodError) {
-    return ValidationError.fromZodError(error, context);
+    return SchemaValidationError.fromZodError(error, context);
   }
 
-  return new ValidationError([{
+  return new SchemaValidationError([{
     path: 'root',
     message: error.message || 'Unknown error',
     code: 'UNKNOWN_ERROR'

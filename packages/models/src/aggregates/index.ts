@@ -11,7 +11,6 @@
 import { 
   AggregateRoot, 
   AggregateBoundary, 
-  ConsistencyRule,
   DomainEvent 
 } from '../types/shared';
 

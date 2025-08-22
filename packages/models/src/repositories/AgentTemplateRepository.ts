@@ -279,4 +279,20 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
     });
     return convertNeo4jIntsInObject(results[0].t);
   }
+
+  async findPopular(limit: number = 10): Promise<AgentTemplate[]> {
+    const result = await this.connection.executeQuery<{ t: AgentTemplate }>(
+      'MATCH (t:AgentTemplate) WHERE t.usageCount > 0 RETURN t ORDER BY t.usageCount DESC, t.rating DESC LIMIT $limit',
+      { limit: int(limit) }
+    );
+    return convertNeo4jIntsInArray(result.map((record) => record.t));
+  }
+
+  async findRecent(limit: number = 10): Promise<AgentTemplate[]> {
+    const result = await this.connection.executeQuery<{ t: AgentTemplate }>(
+      'MATCH (t:AgentTemplate) RETURN t ORDER BY t.createdAt DESC LIMIT $limit',
+      { limit: int(limit) }
+    );
+    return convertNeo4jIntsInArray(result.map((record) => record.t));
+  }
 }

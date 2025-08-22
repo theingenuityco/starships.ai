@@ -321,4 +321,31 @@ export class AgentRepository extends BaseRepository implements AgentRepositoryIn
     const result = await connection.executeQuery<{ a: Agent }>(query, params);
     return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
+
+  async findCompatibleWithStarshipClass(starshipClass: 'scout' | 'cruiser' | 'draught'): Promise<Agent[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ a: Agent }>(
+      'MATCH (a:Agent) WHERE $starshipClass IN a.allowedStarshipClasses OR a.allowedStarshipClasses IS NULL RETURN a ORDER BY a.name',
+      { starshipClass }
+    );
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
+  }
+
+  async findTrending(limit: number = 10): Promise<Agent[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ a: Agent }>(
+      'MATCH (a:Agent) WHERE a.usageCount > 0 RETURN a ORDER BY a.usageCount DESC, a.updatedAt DESC LIMIT $limit',
+      { limit: int(limit) }
+    );
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
+  }
+
+  async findTopRated(limit: number = 10): Promise<Agent[]> {
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ a: Agent }>(
+      'MATCH (a:Agent) WHERE a.rating IS NOT NULL RETURN a ORDER BY a.rating DESC, a.usageCount DESC LIMIT $limit',
+      { limit: int(limit) }
+    );
+    return convertNeo4jIntsInArray(result.map((record) => record.a));
+  }
 }

@@ -247,4 +247,22 @@ export class MCPServerOptionRepository implements MCPServerOptionRepositoryInter
       );
     }
   }
+
+  async findPopular(limit: number = 10): Promise<MCPServerOption[]> {
+    const connection = getConnection();
+    try {
+      // For now, return all options ordered by name since we don't have usage tracking yet
+      // In the future, this could be ordered by usage count or popularity metrics
+      const result = await connection.executeQuery<{ m: MCPServerOption }>(
+        'MATCH (m:MCPServerOption) RETURN m ORDER BY m.name ASC LIMIT $limit',
+        { limit }
+      );
+      return result.map((record) => record.m);
+    } catch (error) {
+      console.error('[MCPServerOptionRepository] Error in findPopular:', error);
+      throw new Error(
+        `Failed to find popular MCP server options: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  }
 }

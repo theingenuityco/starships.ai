@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Repository,
   BaseEntity,
@@ -17,7 +18,7 @@ import {
  * This is an aggregate root that manages user identity, authentication state,
  * and billing relationships with Stripe and Kinde.
  */
-export interface User extends BaseEntity, AggregateRoot {
+export interface User extends BaseEntity, TemporalFields, AggregateRoot {
   /** Unique identifier for the user */
   id: string;
   
@@ -38,6 +39,9 @@ export interface User extends BaseEntity, AggregateRoot {
   
   /** Timestamp when the user was created */
   createdAt: string;
+  
+  /** Timestamp when the user was last updated */
+  updatedAt: string;
   
   // Stripe integration fields
   /** Stripe customer ID for billing integration */
@@ -64,9 +68,10 @@ export const UserSchema = z.object({
     .optional(),
   avatar: z.string().url('Avatar must be a valid URL').optional(),
   createdAt: DateTimeSchema,
+  updatedAt: DateTimeSchema,
   stripeCustomerId: z.string()
     .min(1, 'Stripe customer ID cannot be empty')
-    .startsWith('cus_', 'Stripe customer ID must start with "cus_"')
+    .startsWith('cus_', { message: 'Stripe customer ID must start with "cus_"' })
     .optional(),
   _aggregateRoot: z.literal(true),
 }).strict();
@@ -79,6 +84,7 @@ export const UserSchema = z.object({
 export const CreateUserSchema = UserSchema.omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
   _aggregateRoot: true,
 });
 
@@ -90,6 +96,7 @@ export const CreateUserSchema = UserSchema.omit({
 export const UpdateUserSchema = UserSchema.partial().omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
   _aggregateRoot: true,
 });
 
@@ -272,10 +279,12 @@ export const UserUtils = {
    * Creates a new User entity with validation
    */
   create: (input: CreateUserInput): User => {
+    const now = new Date().toISOString();
     const user: User = {
       ...input,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
+      id: uuidv4(),
+      createdAt: now,
+      updatedAt: now,
       _aggregateRoot: true,
     };
     

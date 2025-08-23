@@ -2,6 +2,9 @@
 export { createConnection, getConnection, Neo4jConnection } from './connection';
 export type { Neo4jConfig } from './connection';
 
+// Utils
+export { convertNeo4jInt, convertNeo4jIntsInObject } from './utils/neo4j-helpers';
+
 // Types (interfaces only)
 export * from './types';
 

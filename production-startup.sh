@@ -14,7 +14,25 @@ echo "🗄️  Starting Neo4j database..."
 # Ensure Java 17 is being used
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
 export PATH="${JAVA_HOME}/bin:${PATH}"
-echo "   Using Java version: $(java -version 2>&1 | head -1)"
+
+# Debug: Check all Java installations
+echo "   Checking Java installations:"
+echo "   - which java: $(which java)"
+echo "   - java location: $(readlink -f $(which java))"
+echo "   - JAVA_HOME: $JAVA_HOME"
+echo "   - Java version: $(java -version 2>&1 | head -1)"
+
+# Check if Neo4j has its own Java
+if [ -f /opt/neo4j/bin/java ]; then
+  echo "   WARNING: Neo4j has bundled Java at /opt/neo4j/bin/java"
+  echo "   Removing bundled Java..."
+  rm -f /opt/neo4j/bin/java
+fi
+
+# Force Neo4j to use our Java 17
+export NEO4J_JAVA_HOME=$JAVA_HOME
+echo "   NEO4J_JAVA_HOME set to: $NEO4J_JAVA_HOME"
+
 /opt/neo4j/bin/neo4j start
 echo "   Waiting for Neo4j to be ready..."
 for i in $(seq 1 30); do

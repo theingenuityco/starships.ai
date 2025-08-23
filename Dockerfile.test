@@ -1,18 +1,28 @@
+# Test Dockerfile to verify Java 17 installation
 FROM node:20-alpine
-WORKDIR /app
 
-# Install system dependencies
-RUN apk add --no-cache \
-    python3 make g++ git bash
+# Test what Java version comes with node:20-alpine
+RUN echo "=== Checking default Java ===" && \
+    which java 2>/dev/null || echo "No java found" && \
+    java -version 2>&1 || echo "Java not installed"
 
-# Enable pnpm
-RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
+# Install Java 17
+RUN echo "=== Installing Java 17 ===" && \
+    apk add --no-cache openjdk17-jre-headless && \
+    echo "=== Java after install ===" && \
+    which java && \
+    java -version 2>&1
 
-# Copy all application files
-COPY . .
+# Set JAVA_HOME and PATH
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-# Test: Install dependencies with --ignore-scripts flag
-RUN pnpm install --ignore-scripts
+# Verify final Java version
+RUN echo "=== Final Java version ===" && \
+    java -version 2>&1 && \
+    echo "=== JAVA_HOME ===" && \
+    echo $JAVA_HOME && \
+    echo "=== PATH ===" && \
+    echo $PATH
 
-# If this works, we're good!
-CMD ["echo", "Build successful!"]
+CMD ["java", "-version"]

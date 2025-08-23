@@ -7,7 +7,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Cache bust argument to force rebuild
-ARG CACHE_BUST=1
+ARG CACHE_BUST=2
 
 # Install system dependencies including Java 17 for Neo4j
 # Remove any existing Java first, then install Java 17
@@ -15,11 +15,21 @@ RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
     supervisor \
     ca-certificates && \
-    apk del openjdk11-jre-headless 2>/dev/null || true && \
+    # Remove any possible Java installations
+    apk del openjdk11-jre-headless openjdk11 openjdk8-jre openjdk8 2>/dev/null || true && \
+    # Clean APK cache
+    rm -rf /var/cache/apk/* && \
+    # Install only Java 17
     apk add --no-cache openjdk17-jre-headless && \
-    rm -f /usr/bin/java && \
+    # Ensure Java 17 is the default
+    rm -f /usr/bin/java /usr/lib/jvm/default-jvm && \
+    ln -sf /usr/lib/jvm/java-17-openjdk /usr/lib/jvm/default-jvm && \
     ln -sf /usr/lib/jvm/java-17-openjdk/bin/java /usr/bin/java && \
-    java -version
+    # Verify installation
+    echo "Java installation check:" && \
+    which java && \
+    java -version 2>&1 && \
+    echo "JAVA_HOME will be: /usr/lib/jvm/java-17-openjdk"
 
 # Set Java 17 as default
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk

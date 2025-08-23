@@ -99,10 +99,6 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
-        - name: CLIENT_URL
-          value: "http://129.212.197.153"
-        - name: NEXT_PUBLIC_API_URL
-          value: "http://129.212.197.153:4000"
         - name: SERVER_URL
           value: "http://localhost:4000"
         envFrom:
@@ -110,6 +106,8 @@ spec:
             name: starships-secrets
         - secretRef:
             name: kinde-auth-secret
+        - secretRef:
+            name: domain-config
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data

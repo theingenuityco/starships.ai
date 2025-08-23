@@ -4,6 +4,7 @@
 
 // Main MCP services
 export { MCPDeployer } from './services/mcp/MCPDeployer';
+export { initializeFeatureFlags, getFeatureFlags, toggleHttpBridge } from './services/mcp/FeatureFlagService';
 export { DockerComposeDeployer } from './services/mcp/DockerComposeDeployer';
 export { DockerComposeGenerator } from './services/mcp/DockerComposeGenerator';
 export { ComposeFileManager } from './services/mcp/ComposeFileManager';
@@ -18,6 +19,8 @@ export { VolumeManager } from './services/mcp/VolumeManager';
 export { SecurityManager } from './services/mcp/SecurityManager';
 export { NetworkCleanupService } from './services/mcp/NetworkCleanupService';
 export { ConnectorMigrationService, connectorMigrationService } from './services/mcp/ConnectorMigrationService';
+export { BridgeMonitoringService, bridgeMonitoringService } from './services/mcp/BridgeMonitoringService';
+export { isHttpBridgeEnabled } from './services/mcp/DockerServiceTemplate';
 
 // Agent-MCP Integration Services
 export { MCPToolGateway, mcpToolGateway } from './services/mcp/MCPToolGateway';
@@ -93,3 +96,9 @@ export type {
   ToolExecutionOptions,
   ToolExecutionResult
 } from './services/mcp/MCPNetworkClient';
+
+export type {
+  BridgeMetrics,
+  ContainerResourceUsage,
+  BridgeLogEntry
+} from './services/mcp/BridgeMonitoringService';

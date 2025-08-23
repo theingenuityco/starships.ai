@@ -16,8 +16,10 @@ RUN apk add --no-cache \
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d
 
-# Fix pnpm cache permissions for both root and nodejs user
-RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
+# Create nodejs user and fix pnpm cache permissions
+RUN addgroup -g 1000 nodejs && \
+    adduser -D -u 1000 -G nodejs nodejs && \
+    mkdir -p /root/.cache/node/corepack/v1/pnpm && \
     chmod -R 777 /root/.cache && \
     mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
     chown -R nodejs:nodejs /home/nodejs/.cache && \

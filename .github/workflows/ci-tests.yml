@@ -17,6 +17,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: universal
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: dev
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -33,10 +42,6 @@ jobs:
         run: pnpm run lint
 
       - name: Run type checking
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
         run: pnpm run build
 
       - name: Run tests
@@ -59,6 +64,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Load secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: universal
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: dev
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -73,17 +87,10 @@ jobs:
 
       - name: Build all packages
         env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           SKIP_K8S_CHECK: true
         run: pnpm run build
 
       - name: Check client build
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
         run: pnpm --filter @starships/client run build
 
   integration-tests:
@@ -109,6 +116,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Load secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: universal
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: dev
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -141,6 +157,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Load secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: universal
+          client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+          env-slug: dev
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4

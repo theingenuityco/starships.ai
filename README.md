@@ -47,6 +47,19 @@ pnpm install
 ```
 
 ### Configuration
+
+#### Option 1: Using Infisical (Recommended)
+Pull secrets automatically from Infisical:
+```bash
+pnpm sync:secrets  # Pulls development secrets from Infisical
+```
+
+For first-time setup:
+1. Install Infisical CLI: `npm install -g @infisical/cli`
+2. Login: `infisical login`
+3. Run: `pnpm sync:secrets`
+
+#### Option 2: Manual Configuration
 Create a `.env` file with your configuration:
 ```bash
 cp .env.example .env
@@ -57,9 +70,10 @@ See [Environment Variables](./docs/environment.md) for complete configuration op
 
 ### Development
 ```bash
-pnpm dev    # Start all packages in watch mode
-pnpm build  # Build all packages
-pnpm lint   # Run ESLint
+pnpm dev       # Start all packages in watch mode
+pnpm dev:sync  # Sync secrets from Infisical and start dev server
+pnpm build     # Build all packages
+pnpm lint      # Run ESLint
 ```
 
 For detailed development workflow, see the [Development Guide](./docs/development-guide.md).

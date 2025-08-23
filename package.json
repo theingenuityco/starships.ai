@@ -10,6 +10,7 @@
     "setup": "bash scripts/developer-setup.sh",
     "setup:docker": "node scripts/setup-docker-path.js",
     "setup:verify": "node scripts/verify-build-setup.js",
+    "sync:secrets": "bash scripts/setup-infisical.sh",
     "postinstall": "node scripts/setup-docker-path.js",
     "dev": "SKIP_K8S_CHECK=true turbo run dev",
     "lint": "turbo run lint",

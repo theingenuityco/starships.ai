@@ -69,9 +69,7 @@ RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
 # Install concurrently globally
 RUN npm install -g concurrently
 
-# Create user for running services
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# The nodejs user was already created earlier for pnpm cache permissions
 
 # Copy all application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh

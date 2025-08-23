@@ -68,7 +68,7 @@ spec:
             cpu: "250m"      
           limits:
             memory: "2Gi"    # For Neo4j
-            cpu: "1000m"     
+            cpu: "1000m"
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data

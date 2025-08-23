@@ -16,9 +16,12 @@ RUN apk add --no-cache \
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d
 
-# Fix pnpm cache permissions
+# Fix pnpm cache permissions for both root and nodejs user
 RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
-    chmod -R 777 /root/.cache
+    chmod -R 777 /root/.cache && \
+    mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
+    chown -R nodejs:nodejs /home/nodejs/.cache && \
+    chmod -R 777 /home/nodejs/.cache
 
 # Download and install Neo4j Community Edition
 ENV NEO4J_VERSION=5.13.0

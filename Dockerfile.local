@@ -12,13 +12,17 @@ RUN apk add --no-cache \
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d
 
-# Create nodejs user and cache directory for pnpm
-RUN addgroup -g 1000 nodejs && \
-    adduser -D -u 1000 -G nodejs nodejs && \
-    mkdir -p /root/.cache/node/corepack/v1/pnpm && \
+# Fix pnpm cache permissions for all users
+# The node:20-alpine image already has a 'node' user with uid 1000
+RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
     chmod -R 777 /root/.cache && \
+    mkdir -p /home/node/.cache/node/corepack/v1/pnpm && \
+    chown -R node:node /home/node/.cache && \
+    chmod -R 777 /home/node/.cache && \
+    # Also create a nodejs user as an alias for compatibility
+    adduser -D -u 1001 -G node nodejs && \
     mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
-    chown -R nodejs:nodejs /home/nodejs/.cache && \
+    chown -R nodejs:node /home/nodejs/.cache && \
     chmod -R 777 /home/nodejs/.cache
 
 # Download and install Neo4j (same version as production)

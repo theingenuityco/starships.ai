@@ -1,0 +1,28 @@
+# Test Dockerfile to verify Java 17 installation
+FROM node:20-alpine
+
+# Test what Java version comes with node:20-alpine
+RUN echo "=== Checking default Java ===" && \
+    which java 2>/dev/null || echo "No java found" && \
+    java -version 2>&1 || echo "Java not installed"
+
+# Install Java 17
+RUN echo "=== Installing Java 17 ===" && \
+    apk add --no-cache openjdk17-jre-headless && \
+    echo "=== Java after install ===" && \
+    which java && \
+    java -version 2>&1
+
+# Set JAVA_HOME and PATH
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+# Verify final Java version
+RUN echo "=== Final Java version ===" && \
+    java -version 2>&1 && \
+    echo "=== JAVA_HOME ===" && \
+    echo $JAVA_HOME && \
+    echo "=== PATH ===" && \
+    echo $PATH
+
+CMD ["java", "-version"]

@@ -139,6 +139,12 @@ jobs:
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+            kinde_client_id=${{ secrets.KINDE_CLIENT_ID }}
+            kinde_client_secret=${{ secrets.KINDE_CLIENT_SECRET }}
+            kinde_issuer_url=${{ secrets.KINDE_ISSUER_URL }}
+            kinde_site_url=${{ secrets.KINDE_SITE_URL }}
+            kinde_post_login_redirect_url=${{ secrets.KINDE_POST_LOGIN_REDIRECT_URL }}
+            kinde_post_logout_redirect_url=${{ secrets.KINDE_POST_LOGOUT_REDIRECT_URL }}
 
       - name: Generate image digest
         id: digest

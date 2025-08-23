@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: starships-prod
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-size-unit: "1"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    name: http
+  - port: 4000
+    targetPort: 4000
+    name: backend-proxy
+  selector:
+    app: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: starships-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      initContainers:
+      - name: wait-for-backend
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z backend-service 4000; do echo waiting for backend; sleep 2; done']
+      containers:
+      - name: frontend
+        image: [DOCKER-REGISTRY-URL]:fix-docker-build
+        command: ['/bin/sh', '-c']
+        args:
+        - |
+          cd /app/packages/client
+          npx next start
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://[HARDCODED-IP]:4000"
+        - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
+          value: "true"
+        - name: KINDE_CLIENT_ID
+          value: "test_client_id"
+        - name: KINDE_CLIENT_SECRET
+          value: "test_client_secret"
+        - name: KINDE_ISSUER_URL
+          value: "https://[KINDE-TEST-DOMAIN]"
+        - name: KINDE_SITE_URL
+          value: "http://[HARDCODED-IP]"
+        - name: KINDE_POST_LOGIN_REDIRECT_URL
+          value: "http://[HARDCODED-IP]/fleet"
+        - name: KINDE_POST_LOGOUT_REDIRECT_URL
+          value: "http://[HARDCODED-IP]"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 5

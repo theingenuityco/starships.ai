@@ -84,7 +84,13 @@ ENV STRIPE_SECRET_KEY=sk_test_dummy_build_only \
     NEO4J_USERNAME=neo4j \
     NEO4J_PASSWORD=password \
     OPENAI_API_KEY=sk-dummy_build_only \
-    ANTHROPIC_API_KEY=sk-ant-dummy_build_only
+    ANTHROPIC_API_KEY=sk-ant-dummy_build_only \
+    KINDE_CLIENT_ID=64a7c9db757e4a91ac54d003b6e869ef \
+    KINDE_CLIENT_SECRET=UmmaePjv0Grt4OrYNHNAheA51NMyv3FPJ4Erh3VnfCaaGbhldWsjS \
+    KINDE_ISSUER_URL=https://starshipsai.kinde.com \
+    KINDE_SITE_URL=http://starships.ai \
+    KINDE_POST_LOGIN_REDIRECT_URL=http://starships.ai/fleet \
+    KINDE_POST_LOGOUT_REDIRECT_URL=http://starships.ai
 RUN npx turbo run build
 
 # Create necessary directories

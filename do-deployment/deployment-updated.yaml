@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starships-app
+  namespace: starships-prod
+  labels:
+    app: starships-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: starships-ai
+  template:
+    metadata:
+      labels:
+        app: starships-ai
+    spec:
+      containers:
+      - name: starships
+        image: [DOCKER-REGISTRY-URL]:latest  # Use latest built image
+        imagePullPolicy: Always
+        # Use the default CMD from Dockerfile (supervisor-entrypoint.sh)
+        # No custom command/args needed since image has correct env vars baked in
+        ports:
+        - containerPort: 3000
+          name: frontend
+        - containerPort: 4000
+          name: backend
+        - containerPort: 7474
+          name: neo4j-http
+        - containerPort: 7687
+          name: neo4j-bolt
+        env:
+        # Only runtime-specific vars that might change per environment
+        - name: NODE_ENV
+          value: "production"
+        - name: NEO4J_URI
+          value: "[NEO4J-LOCAL-URL]"
+        - name: NEO4J_USERNAME
+          value: "neo4j"
+        - name: NEO4J_PASSWORD
+          value: "[DEFAULT-PASSWORD]"
+        # Override the baked-in URLs if needed for this specific deployment
+        - name: KINDE_SITE_URL
+          value: "[PROD-DOMAIN-URL]"  # Or your actual domain
+        - name: KINDE_POST_LOGIN_REDIRECT_URL
+          value: "[PROD-DOMAIN-URL]/fleet"
+        - name: KINDE_POST_LOGOUT_REDIRECT_URL
+          value: "[PROD-DOMAIN-URL]"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "3Gi"
+            cpu: "1500m"
+        volumeMounts:
+        - name: neo4j-data
+          mountPath: /var/lib/neo4j/data
+        - name: app-sessions
+          mountPath: /app/data/sessions
+      imagePullSecrets:
+      - name: ghcr-pull-secret
+      volumes:
+      - name: neo4j-data
+        persistentVolumeClaim:
+          claimName: neo4j-data-pvc
+      - name: app-sessions
+        persistentVolumeClaim:
+          claimName: sessions-pvc

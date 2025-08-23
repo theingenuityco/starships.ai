@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: domain-config
+  namespace: starships-prod
+type: Opaque
+stringData:
+  # Update Kinde URLs to use domain
+  KINDE_SITE_URL: "[INSECURE-PROD-URL]"
+  KINDE_POST_LOGIN_REDIRECT_URL: "[INSECURE-PROD-URL]/fleet"
+  KINDE_POST_LOGOUT_REDIRECT_URL: "[INSECURE-PROD-URL]"
+  # Update API URLs
+  CLIENT_URL: "[INSECURE-PROD-URL]"
+  NEXT_PUBLIC_API_URL: "[INSECURE-PROD-URL]"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: starships-lb
+  namespace: starships-prod
+  annotations:
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "http"
+    service.beta.kubernetes.io/do-loadbalancer-algorithm: "round_robin"
+    service.beta.kubernetes.io/do-loadbalancer-tls-ports: "443"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "pending-cert-id"
+    service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https: "true"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    name: http
+  - port: 443
+    targetPort: 3000
+    name: https
+  - port: 4000
+    targetPort: 4000
+    name: backend
+  selector:
+    app: starships-all

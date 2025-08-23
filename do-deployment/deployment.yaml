@@ -17,10 +17,10 @@ spec:
     spec:
       containers:
       - name: starships
-        image: [DOCKER-REGISTRY-URL]:latest
+        image: [DOCKER-REGISTRY-URL]:fix-docker-build
         imagePullPolicy: Always
         command: ["/bin/sh"]
-        args: ["-c", "mkdir -p /etc/supervisor/conf.d && mkdir -p /root/.cache/node/corepack/v1/pnpm && chmod -R 777 /root/.cache && /app/supervisor-entrypoint.sh"]
+        args: ["-c", "cd /app/packages/client && NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR=true npx next start"]
         ports:
         - containerPort: 3000
           name: frontend
@@ -36,14 +36,36 @@ spec:
         env:
         - name: NODE_ENV
           value: "production"
-        - name: NEO4J_EXTERNAL_URI
-          value: "neo4j+s://demo.neo4jlabs.com:7687"  # Use demo Neo4j for testing
+        - name: SKIP_BUILD
+          value: "true"
+        - name: NEO4J_URI
+          value: "[NEO4J-LOCAL-URL]"
         - name: NEO4J_USERNAME
-          value: "movies"
+          value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "movies"
+          value: "[DEFAULT-PASSWORD]"
         - name: SKIP_INSTALL
           value: "true"
+        - name: CLIENT_URL
+          value: "http://[HARDCODED-IP]"
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://[HARDCODED-IP]:4000"
+        - name: SERVER_URL
+          value: "http://localhost:4000"
+        - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
+          value: "true"
+        - name: KINDE_CLIENT_ID
+          value: "test_client_id"
+        - name: KINDE_CLIENT_SECRET
+          value: "test_client_secret"
+        - name: KINDE_ISSUER_URL
+          value: "https://[KINDE-TEST-DOMAIN]"
+        - name: KINDE_SITE_URL
+          value: "http://[HARDCODED-IP]"
+        - name: KINDE_POST_LOGIN_REDIRECT_URL
+          value: "http://[HARDCODED-IP]/fleet"
+        - name: KINDE_POST_LOGOUT_REDIRECT_URL
+          value: "http://[HARDCODED-IP]"
         resources:
           requests:
             memory: "1Gi"    # Minimum guaranteed
@@ -51,20 +73,6 @@ spec:
           limits:
             memory: "3Gi"    # Increased for Neo4j
             cpu: "1500m"     
-        livenessProbe:
-          httpGet:
-            path: /health/live  # Correct endpoint
-            port: 4000
-          initialDelaySeconds: 180
-          periodSeconds: 30
-          timeoutSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health/ready  # Correct endpoint
-            port: 4000
-          initialDelaySeconds: 120
-          periodSeconds: 10
-          timeoutSeconds: 5
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data

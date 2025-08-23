@@ -15,10 +15,32 @@ const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
 
 // JWT verification function for Socket.IO
 async function verifySocketJWT(token: string) {
-  const { payload } = await jwtVerify(token, JWKS, {
-    issuer: kindeIssuerUrl,
-  });
-  return payload;
+  try {
+    // Decode token without verification first to check its structure
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`);
+    }
+    
+    // Decode header and payload for debugging
+    const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    
+    console.log('[SOCKET.IO] JWT Debug - Header:', header);
+    console.log('[SOCKET.IO] JWT Debug - Issuer:', payload.iss);
+    console.log('[SOCKET.IO] JWT Debug - Expected Issuer:', kindeIssuerUrl);
+    console.log('[SOCKET.IO] JWT Debug - Kid:', header.kid);
+    
+    // Now verify the token
+    const result = await jwtVerify(token, JWKS, {
+      issuer: kindeIssuerUrl,
+    });
+    
+    return result.payload;
+  } catch (error) {
+    console.error('[SOCKET.IO] JWT verification error details:', error);
+    throw error;
+  }
 }
 
 /**

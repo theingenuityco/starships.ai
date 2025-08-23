@@ -1,5 +1,5 @@
 import { getServerConfig, ServerEnvironmentConfig } from '@starships/env-config';
-import { initializeFeatureFlags } from '@starships/core/src/services/mcp/FeatureFlagService';
+import { initializeFeatureFlags } from '@starships/core';
 
 /**
  * Validated environment configuration

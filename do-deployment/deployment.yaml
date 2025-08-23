@@ -32,7 +32,7 @@ spec:
           name: neo4j-bolt
         envFrom:
         - secretRef:
-            name: starships-secrets
+            name: kinde-auth-secret
         env:
         - name: NODE_ENV
           value: "production"

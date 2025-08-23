@@ -114,7 +114,7 @@ jobs:
           method: universal
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          env-slug: development
+          env-slug: dev
           project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG }}
           # Note: Removed export-type and file-output-path to load as env vars instead
 
@@ -144,7 +144,7 @@ If you prefer to load secrets directly as environment variables instead of a fil
           method: universal
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          env-slug: development
+          env-slug: dev
           project-slug: starships-ai
           # Secrets will be available as environment variables for all subsequent steps
 ```
@@ -407,7 +407,7 @@ Here's the exact change needed for your `ci-tests.yml` file. Add this step right
           method: universal
           client-id: ${{ secrets.INFISICAL_CLIENT_ID }}
           client-secret: ${{ secrets.INFISICAL_CLIENT_SECRET }}
-          env-slug: development
+          env-slug: dev
           project-slug: starships-ai  # Update with your actual project slug
           export-type: file
           file-output-path: .env

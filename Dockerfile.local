@@ -12,9 +12,12 @@ RUN apk add --no-cache \
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d
 
-# Create cache directory for pnpm
+# Create cache directory for pnpm for both root and nodejs user
 RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
-    chmod -R 777 /root/.cache
+    chmod -R 777 /root/.cache && \
+    mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
+    chown -R nodejs:nodejs /home/nodejs/.cache && \
+    chmod -R 777 /home/nodejs/.cache
 
 # Download and install Neo4j (same version as production)
 RUN set -eux && \

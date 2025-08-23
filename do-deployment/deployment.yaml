@@ -17,18 +17,10 @@ spec:
     spec:
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:2.0.0
+        image: ghcr.io/theingenuityco/starships.ai:3.0.0  # Will update after build
         imagePullPolicy: Always
-        command: ["/bin/sh"]
-        args: 
-        - "-c"
-        - |
-          echo "Starting production services (frontend only for MVP)..."
-          # Start Neo4j
-          $NEO4J_HOME/bin/neo4j start
-          sleep 30
-          # Start frontend only (backend has module issues)
-          cd /app/packages/client && exec npx next start -p 3000
+        # Use default CMD from Dockerfile (supervisor-entrypoint.sh)
+        # Start both frontend and backend
         ports:
         - containerPort: 3000
           name: frontend
@@ -55,30 +47,29 @@ spec:
         - name: SKIP_INSTALL
           value: "true"
         - name: CLIENT_URL
-          value: "http://134.199.179.240"
+          value: "http://129.212.197.153"
         - name: NEXT_PUBLIC_API_URL
-          value: "http://134.199.179.240:4000"
+          value: "http://129.212.197.153:4000"
         - name: SERVER_URL
           value: "http://localhost:4000"
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
           value: "true"
-        # Kinde vars - using localhost for testing
-        # Update these to your actual domain when ready
+        # Kinde vars - using actual LoadBalancer IP for Digital Ocean
         - name: KINDE_SITE_URL
-          value: "http://localhost:8080"
+          value: "http://129.212.197.153"
         - name: KINDE_POST_LOGIN_REDIRECT_URL
-          value: "http://localhost:8080/fleet"
+          value: "http://129.212.197.153/fleet"
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          value: "http://localhost:8080"
-        # API keys (dummy for MVP, replace with real values later)
-        - name: STRIPE_SECRET_KEY
-          value: "sk_test_dummy_key_for_mvp"
-        - name: STRIPE_PUBLISHABLE_KEY
-          value: "pk_test_dummy_key_for_mvp"
+          value: "http://129.212.197.153"
+        # Additional API keys for backend
         - name: OPENAI_API_KEY
           value: "sk-dummy-openai-key-for-mvp"
         - name: ANTHROPIC_API_KEY
           value: "sk-ant-dummy-key-for-mvp"
+        - name: STRIPE_SECRET_KEY
+          value: "sk_test_dummy_key_for_mvp"
+        - name: STRIPE_PUBLISHABLE_KEY
+          value: "pk_test_dummy_key_for_mvp"
         resources:
           requests:
             memory: "512Mi"   # Reduced for MVP

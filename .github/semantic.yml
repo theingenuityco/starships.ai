@@ -1,0 +1,4 @@
+# Semantic PRs Configuration
+# Only validate PR title, ignore commits
+
+titleOnly: true

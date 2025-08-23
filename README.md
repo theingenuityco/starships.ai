@@ -22,7 +22,7 @@ For comprehensive documentation, see the [`docs/`](./docs/) directory:
 
 ### Automated Setup (Recommended)
 
-For new developers, we provide an automated setup script that handles all dependencies:
+For brand new developers, we provide an automated setup script that handles all dependencies:
 
 ```bash
 git clone https://github.com/your-org/starships.ai.git
@@ -34,12 +34,14 @@ pnpm run setup  # Installs Docker, Kubernetes tools, and configures everything
 See [Developer Setup Guide](./docs/DEVELOPER_SETUP.md) for detailed instructions.
 
 ### Prerequisites
+
 - Node.js 20+
 - pnpm 8.10.5+
 - Docker Desktop (automatically installed by setup script)
 - Neo4j database (local or cloud)
 
 ### Manual Installation
+
 ```bash
 git clone https://github.com/your-org/starships.ai.git
 cd starships.ai
@@ -47,7 +49,9 @@ pnpm install
 ```
 
 ### Configuration
+
 Create a `.env` file with your configuration:
+
 ```bash
 cp .env.example .env
 # Edit .env with your settings
@@ -56,6 +60,7 @@ cp .env.example .env
 See [Environment Variables](./docs/environment.md) for complete configuration options.
 
 ### Development
+
 ```bash
 pnpm dev    # Start all packages in watch mode
 pnpm build  # Build all packages
@@ -68,15 +73,15 @@ For detailed development workflow, see the [Development Guide](./docs/developmen
 
 ## 📦 Packages
 
-| Package | Description |
-|---------|-------------|
-| `@starships/server` | Express.js HTTP API server with mission orchestration, expeditions, workflows, and real-time communication |
-| `@starships/agent-engine` | Advanced AI orchestration with MCP tool integration, First Officer system, and workflow execution |
-| `@starships/models` | Neo4j graph database with mission system, MCP connectors, vision management, and Stripe integration |
-| `@starships/protocol` | TypeScript interfaces for missions, workflows, Socket.IO events, and MCP protocols |
-| `@starships/client` | Next.js frontend for mission control, expeditions, vision chambers, and starship management |
-| `@starships/core` | HTTP bridge services for MCP integration and Docker deployment orchestration |
-| `@starships/env-config` | Centralized environment configuration with validation for all services |
+| Package                   | Description                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `@starships/server`       | Express.js HTTP API server with mission orchestration, expeditions, workflows, and real-time communication |
+| `@starships/agent-engine` | Advanced AI orchestration with MCP tool integration, First Officer system, and workflow execution          |
+| `@starships/models`       | Neo4j graph database with mission system, MCP connectors, vision management, and Stripe integration        |
+| `@starships/protocol`     | TypeScript interfaces for missions, workflows, Socket.IO events, and MCP protocols                         |
+| `@starships/client`       | Next.js frontend for mission control, expeditions, vision chambers, and starship management                |
+| `@starships/core`         | HTTP bridge services for MCP integration and Docker deployment orchestration                               |
+| `@starships/env-config`   | Centralized environment configuration with validation for all services                                     |
 
 ---
 
@@ -99,32 +104,39 @@ For detailed development workflow, see the [Development Guide](./docs/developmen
 ### Core Feature APIs
 
 **Mission & Expedition Management:**
+
 - `POST /missions` - Create and manage mission orchestration
 - `POST /starships/:id/expeditions` - Multi-agent expedition execution
 - `GET /missions/:id/chat` - Mission chat and orchestrator communication
 
 **Agent & Starship Operations:**
+
 - `GET /agents` - List agents with marketplace filtering
 - `POST /starships/enhanced` - Create starships with vision integration
 - `PUT /starships/:id/vision` - AI-powered vision refinement
 
 **MCP Tool Integration:**
+
 - `GET /mcp-servers` - Available MCP server templates
 - `PUT /starships/:id/native-api-keys` - Encrypted tool API key management
 
 **Real-time Communication:**
+
 - Socket.IO endpoints for expeditions, missions, and chat
 - WebSocket-based progress tracking and status updates
 
 **Workflow Execution:**
+
 - Workflow DSL execution with approval workflows
 - Real-time workflow visualization and monitoring
 
 **Payment & Billing:**
+
 - `POST /webhooks/stripe` - Stripe subscription management
 - Automated billing for different starship classes
 
 ### Example Chat Request
+
 ```bash
 # Create a mission
 curl -X POST http://localhost:4000/missions \
@@ -189,6 +201,7 @@ GitHub Actions automatically builds and pushes Docker images to GHCR on every pu
 ## 🗺️ Roadmap
 
 **Current Platform Features:**
+
 - ✅ Mission orchestration with AI-powered planning
 - ✅ Multi-agent expedition execution with real-time coordination
 - ✅ Workflow DSL with approval workflows and quality validation
@@ -199,6 +212,7 @@ GitHub Actions automatically builds and pushes Docker images to GHCR on every pu
 - ✅ Enterprise-grade backup and disaster recovery
 
 **Roadmap:**
+
 - Enhanced expedition orchestration with advanced agent coordination
 - Advanced workflow templates and marketplace
 - Additional MCP connectors and tool integrations

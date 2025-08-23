@@ -1,0 +1,112 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 make g++ git bash wget curl netcat-openbsd \
+    openjdk17-jre-headless \
+    supervisor \
+    ca-certificates
+
+# Create supervisor config directory
+RUN mkdir -p /etc/supervisor/conf.d
+
+# Create cache directory for pnpm
+RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
+    chmod -R 777 /root/.cache
+
+# Download and install Neo4j (same version as production)
+RUN set -eux && \
+    echo "Downloading Neo4j 5.13.0..." && \
+    (wget --progress=dot:giga --timeout=300 --tries=3 \
+        -O neo4j.tar.gz \
+        "https://dist.neo4j.com/neo4j-community-5.13.0-unix.tar.gz" || \
+    wget --progress=dot:giga --timeout=300 --tries=3 \
+        -O neo4j.tar.gz \
+        "https://neo4j.com/artifact.php?name=neo4j-community-5.13.0-unix.tar.gz" || \
+    curl -L --progress-bar --retry 3 --retry-delay 5 \
+        -o neo4j.tar.gz \
+        "https://dist.neo4j.com/neo4j-community-5.13.0-unix.tar.gz") && \
+    echo "Download complete. Extracting Neo4j..." && \
+    tar -xzf neo4j.tar.gz && \
+    mv neo4j-community-5.13.0 /opt/neo4j && \
+    rm neo4j.tar.gz && \
+    echo "Neo4j 5.13.0 installed successfully at /opt/neo4j"
+
+# Configure Neo4j
+RUN echo "server.default_listen_address=0.0.0.0" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "server.bolt.listen_address=:7687" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "server.http.listen_address=:7474" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "server.https.listen_address=:7473" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "dbms.security.auth_enabled=false" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "dbms.memory.heap.initial_size=512m" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "dbms.memory.heap.max_size=1G" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "dbms.memory.pagecache.size=512m" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "dbms.connector.bolt.enabled=true" >> /opt/neo4j/conf/neo4j.conf && \
+    echo "dbms.connector.http.enabled=true" >> /opt/neo4j/conf/neo4j.conf
+
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
+
+# Install global packages
+RUN npm install -g concurrently
+
+# Create nodejs user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Copy application files
+COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
+COPY --chown=nodejs:nodejs production-startup.sh /app/production-startup.sh
+RUN chmod +x /app/production-startup.sh
+
+# Copy all application code
+COPY --chown=nodejs:nodejs . .
+
+# Make entrypoint scripts executable
+RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
+
+# Install dependencies
+RUN SKIP_POSTINSTALL=1 pnpm install --ignore-scripts
+
+# Build with LOCAL Kinde configuration
+ENV NODE_ENV=production \
+    PORT=4000 \
+    CLIENT_URL=http://localhost:3000 \
+    SERVER_URL=http://localhost:4000 \
+    NEXT_PUBLIC_SERVER_URL=http://localhost:4000 \
+    NEO4J_URI=bolt://localhost:7687 \
+    NEO4J_USERNAME=neo4j \
+    NEO4J_PASSWORD=password \
+    OPENAI_API_KEY=sk-dummy_build_only \
+    ANTHROPIC_API_KEY=sk-ant-dummy_build_only \
+    KINDE_CLIENT_ID=64a7c9db757e4a91ac54d003b6e869ef \
+    KINDE_CLIENT_SECRET=UmmaePjv0Grt4OrYNHNAheA51NMyv3FPJ4Erh3VnfCaaGbhldWsjS \
+    KINDE_ISSUER_URL=https://starshipsai.kinde.com \
+    KINDE_SITE_URL=http://localhost:3000 \
+    KINDE_POST_LOGIN_REDIRECT_URL=http://localhost:3000/fleet \
+    KINDE_POST_LOGOUT_REDIRECT_URL=http://localhost:3000
+RUN npx turbo run build
+
+# Create necessary directories
+RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \
+    mkdir -p /var/lib/neo4j/data /var/lib/neo4j/logs && \
+    chown -R nodejs:nodejs data && \
+    chown -R nodejs:nodejs /var/lib/neo4j && \
+    chown -R nodejs:nodejs /opt/neo4j
+
+# Copy deployment config
+COPY do-deployment/all-in-one-optimized.yaml /deployment/
+
+# Expose ports
+EXPOSE 3000 4000 7474 7687
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:4000/health || exit 1
+
+# Set entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["node"]

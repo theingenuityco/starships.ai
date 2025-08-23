@@ -54,6 +54,13 @@ echo "🌐 Starting frontend..."
 cd /app/packages/client
 export NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR=true
 export NEXT_PUBLIC_API_URL=http://134.199.179.240:4000
+# Export Kinde variables for Next.js runtime
+export KINDE_CLIENT_ID="${KINDE_CLIENT_ID}"
+export KINDE_CLIENT_SECRET="${KINDE_CLIENT_SECRET}"
+export KINDE_ISSUER_URL="${KINDE_ISSUER_URL}"
+export KINDE_SITE_URL="${KINDE_SITE_URL}"
+export KINDE_POST_LOGIN_REDIRECT_URL="${KINDE_POST_LOGIN_REDIRECT_URL}"
+export KINDE_POST_LOGOUT_REDIRECT_URL="${KINDE_POST_LOGOUT_REDIRECT_URL}"
 npx next start &
 FRONTEND_PID=$!
 echo "   Frontend started with PID: $FRONTEND_PID"

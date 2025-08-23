@@ -11,6 +11,10 @@ find /app/packages -name "*.js" -type f ! -path "*/node_modules/*" ! -path "*/.n
 
 # Start Neo4j database
 echo "🗄️  Starting Neo4j database..."
+# Ensure Java 17 is being used
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+export PATH="${JAVA_HOME}/bin:${PATH}"
+echo "   Using Java version: $(java -version 2>&1 | head -1)"
 /opt/neo4j/bin/neo4j start
 echo "   Waiting for Neo4j to be ready..."
 for i in $(seq 1 30); do

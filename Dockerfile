@@ -9,9 +9,15 @@ WORKDIR /app
 # Install system dependencies including Java 17 for Neo4j
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
-    openjdk17-jre-headless \
     supervisor \
-    ca-certificates
+    ca-certificates && \
+    apk add --no-cache openjdk17-jre-headless && \
+    rm -f /usr/bin/java && \
+    ln -s /usr/lib/jvm/java-17-openjdk/bin/java /usr/bin/java
+
+# Set Java 17 as default
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d

@@ -6,34 +6,12 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# Cache bust argument to force rebuild
-ARG CACHE_BUST=2
-
 # Install system dependencies including Java 17 for Neo4j
-# Remove any existing Java first, then install Java 17
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
+    openjdk17-jre-headless \
     supervisor \
-    ca-certificates && \
-    # Remove any possible Java installations
-    apk del openjdk11-jre-headless openjdk11 openjdk8-jre openjdk8 2>/dev/null || true && \
-    # Clean APK cache
-    rm -rf /var/cache/apk/* && \
-    # Install only Java 17
-    apk add --no-cache openjdk17-jre-headless && \
-    # Ensure Java 17 is the default
-    rm -f /usr/bin/java /usr/lib/jvm/default-jvm && \
-    ln -sf /usr/lib/jvm/java-17-openjdk /usr/lib/jvm/default-jvm && \
-    ln -sf /usr/lib/jvm/java-17-openjdk/bin/java /usr/bin/java && \
-    # Verify installation
-    echo "Java installation check:" && \
-    which java && \
-    java -version 2>&1 && \
-    echo "JAVA_HOME will be: /usr/lib/jvm/java-17-openjdk"
-
-# Set Java 17 as default
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
-ENV PATH="${JAVA_HOME}/bin:${PATH}"
+    ca-certificates
 
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d
@@ -89,31 +67,23 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy all application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
-COPY --chown=nodejs:nodejs production-startup.sh /app/production-startup.sh
-RUN chmod +x /app/production-startup.sh
 COPY --chown=nodejs:nodejs . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
-# Install dependencies (skip postinstall script which tries to detect Docker)
-RUN SKIP_POSTINSTALL=1 pnpm install --ignore-scripts
+# Set DOCKER_BUILD=true to skip Docker checks in postinstall
+ENV DOCKER_BUILD=true
+ENV SKIP_K8S_CHECK=true
 
-# Build the application (bypass prebuild script entirely)
-# Provide dummy env vars for build time only (real ones come from K8s secrets at runtime)
-ENV STRIPE_SECRET_KEY=sk_test_dummy_build_only \
-    STRIPE_WEBHOOK_SECRET=whsec_dummy_build_only \
-    STRIPE_PUBLISHABLE_KEY=pk_test_dummy_build_only \
-    NEO4J_URI=bolt://localhost:7687 \
-    NEO4J_USERNAME=neo4j \
-    NEO4J_PASSWORD=password \
-    OPENAI_API_KEY=sk-dummy_build_only \
-    ANTHROPIC_API_KEY=sk-ant-dummy_build_only \
-    KINDE_CLIENT_ID=64a7c9db757e4a91ac54d003b6e869ef \
-    KINDE_CLIENT_SECRET=UmmaePjv0Grt4OrYNHNAheA51NMyv3FPJ4Erh3VnfCaaGbhldWsjS \
-    KINDE_ISSUER_URL=https://starshipsai.kinde.com \
-    KINDE_SITE_URL=http://starships.ai \
-    KINDE_POST_LOGIN_REDIRECT_URL=http://starships.ai/fleet \
-    KINDE_POST_LOGOUT_REDIRECT_URL=http://starships.ai
-RUN npx turbo run build
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Build the application with secrets mounted (not stored in layers)
+# Secrets are only available during this RUN command, not in the final image
+RUN --mount=type=secret,id=stripe_secret_key \
+    --mount=type=secret,id=stripe_publishable_key \
+    STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
+    STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
+    pnpm run build
 
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \
@@ -134,6 +104,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
       wget --no-verbose --tries=1 --spider http://localhost:4000/health && \
       wget --no-verbose --tries=1 --spider http://localhost:7474
 
-# Default startup script for production
-COPY do-deployment/all-in-one-optimized.yaml /deployment/
-CMD ["/bin/sh", "-c", "cd /app/packages/client && npx next start"]
+# Start supervisor to manage all services
+CMD ["/app/supervisor-entrypoint.sh"]

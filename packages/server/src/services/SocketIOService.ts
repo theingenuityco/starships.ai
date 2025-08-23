@@ -4,8 +4,7 @@ import type {
   SocketConnectionState,
   SocketIOEvents,
   EventEmissionOptions,
-  EventEmissionResult,
-  SocketExpeditionEventType
+  EventEmissionResult
 } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from './UserService';
@@ -545,7 +544,7 @@ export class SocketIOService {
     options?: Partial<EventEmissionOptions>
   ): Promise<EventEmissionResult> {
     const userRoom = this.getUserRoom(userId);
-    return this.emitToRoom(userRoom, event, data, { ...options, expeditionId: options?.expeditionId || 'user-room' });
+    return this.emitToRoom(userRoom, event, data, { ...options });
   }
 
 
@@ -554,7 +553,7 @@ export class SocketIOService {
     userId: string,
     event: keyof SocketIOEvents,
     data: any,
-    options: EventEmissionOptions = { expeditionId: 'legacy' }
+    options: EventEmissionOptions = {}
   ): Promise<EventEmissionResult> {
     return this.emitToUser(userId, event, data, options);
   }
@@ -577,10 +576,7 @@ export class SocketIOService {
 
       if (recipientCount === 0) {
         // Queue the event if no recipients are currently connected
-        const expeditionId = options.expeditionId;
-        if (expeditionId && expeditionId !== 'user-room' && expeditionId !== 'legacy') {
-          console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`);
-        }
+        console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`);
       }
 
       // Emit to room with timeout
@@ -657,7 +653,7 @@ export class SocketIOService {
       totalConnections: this.connections.size,
       totalUsers: this.userSockets.size,
       connectedUsers: this.userSockets.size, // For backward compatibility
-      expeditionRooms: 0,
+      contextRooms: this.userSockets.size, // Migration note: was expeditionRooms, now represents user context rooms
       queuedEvents: Array.from(this.eventQueue.values()).reduce((sum, queue) => sum + queue.length, 0),
       averagePingTime: this.getAveragePingTime(),
       healthyConnections: this.getHealthyConnectionsCount(),

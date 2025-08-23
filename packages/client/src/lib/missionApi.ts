@@ -15,7 +15,9 @@ import type {
   SendMissionMessageRequest,
   MissionChatResponse,
   MissionClarity,
-  WorkflowResponse
+  WorkflowResponse,
+  MissionExecutionState,
+  MissionPhase
 } from '@starships/protocol';
 import api from './api';
 
@@ -245,5 +247,12 @@ export const missionApi = {
     return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-plan`, {
       method: 'POST'
     });
+  },
+
+  /**
+   * Get mission execution status
+   */
+  async getExecutionStatus(missionId: string): Promise<ApiResponse<{ executionState: MissionExecutionState | null; phase: MissionPhase }>> {
+    return apiRequest<{ executionState: MissionExecutionState | null; phase: MissionPhase }>(`/api/missions/${missionId}/execution-status`);
   }
 };

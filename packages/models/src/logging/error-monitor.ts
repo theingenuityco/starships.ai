@@ -7,7 +7,6 @@
 
 import { logger } from './index';
 import { BaseError, ErrorCategory } from '../errors';
-import { ExpeditionWorkflowError, TaskExecutionError, CoordinationError } from '../errors/expedition-errors';
 
 /**
  * Error severity levels
@@ -41,10 +40,8 @@ interface ErrorOccurrence {
   error: BaseError;
   severity: ErrorSeverity;
   context: {
-    expeditionId?: string;
     userId?: string;
     starshipId?: string;
-    taskId?: string;
     agentId?: string;
     requestId?: string;
     sessionId?: string;
@@ -209,7 +206,6 @@ export class ErrorMonitor {
     category?: ErrorCategory;
     severity?: ErrorSeverity;
     resolved?: boolean;
-    expeditionId?: string;
     startTime?: string;
     endTime?: string;
     limit?: number;
@@ -225,9 +221,6 @@ export class ErrorMonitor {
     }
     if (filters.resolved !== undefined) {
       occurrences = occurrences.filter(o => o.resolved === filters.resolved);
-    }
-    if (filters.expeditionId) {
-      occurrences = occurrences.filter(o => o.context.expeditionId === filters.expeditionId);
     }
     if (filters.startTime) {
       occurrences = occurrences.filter(o => o.timestamp >= filters.startTime!);
@@ -286,21 +279,8 @@ export class ErrorMonitor {
    * Calculate error severity based on error type and context
    */
   private calculateSeverity(error: BaseError): ErrorSeverity {
-    // Critical errors
-    if (error instanceof ExpeditionWorkflowError && error.currentPhase === 'failed') {
-      return ErrorSeverity.CRITICAL;
-    }
-    
     if (error.category === ErrorCategory.DATABASE) {
       return ErrorSeverity.HIGH;
-    }
-
-    if (error instanceof CoordinationError && error.communicationFailures > 2) {
-      return ErrorSeverity.HIGH;
-    }
-
-    if (error instanceof TaskExecutionError && error.retryCount >= error.maxRetries) {
-      return ErrorSeverity.MEDIUM;
     }
 
     // Default based on HTTP status code
@@ -319,8 +299,6 @@ export class ErrorMonitor {
   private generateCorrelationId(error: BaseError, context: ErrorOccurrence['context']): string {
     const components = [
       error.code,
-      context.expeditionId,
-      context.taskId,
       context.userId,
     ].filter(Boolean);
 
@@ -336,12 +314,7 @@ export class ErrorMonitor {
       error.code,
     ];
 
-    if (context.expeditionId) tags.push('expedition');
-    if (context.taskId) tags.push('task');
     if (context.agentId) tags.push('agent');
-    if (error instanceof ExpeditionWorkflowError) tags.push('workflow');
-    if (error instanceof TaskExecutionError) tags.push('execution');
-    if (error instanceof CoordinationError) tags.push('coordination');
 
     return tags;
   }
@@ -641,7 +614,6 @@ export function errorTrackingMiddleware() {
         userId: req.user?.id,
         ip: req.ip,
         userAgent: req.get('User-Agent'),
-        expeditionId: req.params?.expeditionId || req.body?.expeditionId,
         starshipId: req.params?.starshipId || req.body?.starshipId,
       };
 

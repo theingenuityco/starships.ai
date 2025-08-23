@@ -1,5 +1,6 @@
 import { getConnection } from '../connection';
 import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
+import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4j-helpers';
@@ -7,23 +8,30 @@ import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4
 /**
  * Neo4j-based agent repository
  */
-export class AgentRepository implements AgentRepositoryInterface {
+export class AgentRepository extends BaseRepository implements AgentRepositoryInterface {
+  constructor() {
+    super('AgentRepository');
+  }
   async findAll(): Promise<Agent[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
-      'MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC'
-    );
-    return convertNeo4jIntsInArray(result.map((record) => record.a));
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ a: Agent }>(
+        'MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC'
+      );
+      return convertNeo4jIntsInArray(result.map((record) => record.a));
+    }, 'findAll', 'Agent');
   }
 
   async findById(id: string): Promise<Agent | null> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
-      'MATCH (a:Agent) WHERE a.id = $id RETURN a',
-      { id }
-    );
-    const agent = result[0]?.a || null;
-    return agent ? convertNeo4jIntsInObject(agent) : null;
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ a: Agent }>(
+        'MATCH (a:Agent) WHERE a.id = $id RETURN a',
+        { id }
+      );
+      const agent = result[0]?.a || null;
+      return agent ? convertNeo4jIntsInObject(agent) : null;
+    }, 'findById', 'Agent', id);
   }
 
   async findByChannel(channelId: string): Promise<Agent[]> {
@@ -73,7 +81,7 @@ export class AgentRepository implements AgentRepositoryInterface {
     );
     
     if (!starshipCheck[0] || starshipCheck[0].count === 0) {
-      throw new Error(`Starship with id ${starshipId} not found`);
+      this.handleNotFound('Starship', starshipId, 'updateStarshipId');
     }
     
     // Update agent's starshipId
@@ -89,7 +97,7 @@ export class AgentRepository implements AgentRepositoryInterface {
     );
     
     if (!result[0] || result[0].count === 0) {
-      throw new Error(`Agent with id ${agentId} not found`);
+      this.handleNotFound('Agent', agentId, 'updateStarshipId');
     }
 
     // For backward compatibility, update Neo4j relationship during transition
@@ -131,75 +139,80 @@ export class AgentRepository implements AgentRepositoryInterface {
   async create(
     entity: Omit<Agent, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
   ): Promise<Agent> {
-    const connection = getConnection();
-    
-    // Validate required starshipId field
-    if (!entity.starshipId) {
-      throw new Error('starshipId is required when creating an agent');
-    }
-    
-    const now = new Date().toISOString();
-    const agent: Agent = {
-      ...entity,
-      id: uuidv4(),
-      createdAt: now,
-      updatedAt: now,
-      usageCount: 0,
-      tags: entity.tags || [],
-      category: entity.category || 'general',
-      isPublic: entity.isPublic || false,
-      version: entity.version || '1.0.0',
-      starshipId: entity.starshipId, // Ensure starshipId is included
-    };
+    return this.executeWithErrorHandling(async () => {
+      // Validate required starshipId field
+      if (!entity.starshipId) {
+        this.handleValidationError([{ field: 'starshipId', message: 'starshipId is required when creating an agent' }], 'create', 'Agent');
+      }
 
-    await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agent });
+      const connection = getConnection();
+      const now = new Date().toISOString();
+      const agent: Agent = {
+        ...entity,
+        id: uuidv4(),
+        createdAt: now,
+        updatedAt: now,
+        usageCount: 0,
+        tags: entity.tags || [],
+        category: entity.category || 'general',
+        isPublic: entity.isPublic || false,
+        version: entity.version || '1.0.0',
+        starshipId: entity.starshipId, // Ensure starshipId is included
+      };
 
-    // For backward compatibility, also create Neo4j relationship during transition
-    try {
-      await connection.executeWrite(
-        `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
-         CREATE (a)-[:DEPLOYED_ON {
-           deployedAt: $timestamp,
-           isActive: true
-         }]->(s)`,
-        {
-          starshipId: agent.starshipId,
-          agentId: agent.id,
-          timestamp: now
-        }
-      );
-    } catch (error) {
-      // Log but don't fail - Neo4j relationship is optional during transition
-      console.warn('Failed to create Neo4j relationship for agent deployment:', error);
-    }
+      await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agent });
 
-    return convertNeo4jIntsInObject(agent);
+      // For backward compatibility, also create Neo4j relationship during transition
+      try {
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
+           CREATE (a)-[:DEPLOYED_ON {
+             deployedAt: $timestamp,
+             isActive: true
+           }]->(s)`,
+          {
+            starshipId: agent.starshipId,
+            agentId: agent.id,
+            timestamp: now
+          }
+        );
+      } catch (error) {
+        // Log but don't fail - Neo4j relationship is optional during transition
+        console.warn('Failed to create Neo4j relationship for agent deployment:', error);
+      }
+
+      return convertNeo4jIntsInObject(agent);
+    }, 'create', 'Agent');
   }
 
   async update(id: string, updates: Partial<Agent>): Promise<Agent | null> {
-    const connection = getConnection();
-    const updateProps = {
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const updateProps = {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
 
-    const result = await connection.executeWrite<{ a: Agent }>(
-      'MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a',
-      { id, updates: updateProps }
-    );
+      const result = await connection.executeWrite<{ a: Agent }>(
+        'MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a',
+        { id, updates: updateProps }
+      );
 
-    const agent = result[0]?.a || null;
-    return agent ? convertNeo4jIntsInObject(agent) : null;
+      const agent = result[0]?.a || null;
+      return agent ? convertNeo4jIntsInObject(agent) : null;
+    }, 'update', 'Agent', id);
   }
 
   async delete(id: string): Promise<boolean> {
-    const connection = getConnection();
-    const result = await connection.executeWrite<{ deletedCount: number }>(
-      'MATCH (a:Agent) WHERE a.id = $id DETACH DELETE a RETURN count(a) as deletedCount',
-      { id }
-    );
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeWrite<{ deletedCount: number }>(
+        'MATCH (a:Agent) WHERE a.id = $id DETACH DELETE a RETURN count(a) as deletedCount',
+        { id }
+      );
 
-    return result[0]?.deletedCount > 0;
+      return result[0]?.deletedCount > 0;
+    }, 'delete', 'Agent', id);
   }
 
   // ADD: New enhanced query methods

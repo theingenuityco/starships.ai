@@ -25,6 +25,8 @@ export interface Mission {
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
+  executionState?: MissionExecutionState; // Workflow execution progress
+  executionResult?: MissionExecutionResult; // Final execution results for persistence
 }
 
 /**
@@ -41,11 +43,50 @@ export type MissionStatus =
  * Mission phase - controls chat behavior and UI sections
  */
 export type MissionPhase = 
-  | 'init'         // Initial setup and context building
   | 'welcome'      // Initial welcome and mission introduction
   | 'analysis'     // Mission analysis and breakdown
   | 'plan'         // Mission execution planning and approval
+  | 'execute'      // Running mission workflow tasks
   | 'converse';    // General conversation and mission guidance
+
+// ============================================================================
+// EXECUTION TYPES
+// ============================================================================
+
+/**
+ * Mission execution state - tracks workflow execution progress
+ */
+export interface MissionExecutionState {
+  status: 'running' | 'completed' | 'failed';
+  currentNodeIndex: number;
+  totalNodes: number;
+  nodeResults: MissionNodeResult[];
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+}
+
+/**
+ * Result from executing a single workflow node
+ */
+export interface MissionNodeResult {
+  nodeId: string;
+  nodeName: string;
+  success: boolean;
+  output: string;
+  timestamp: string;
+  error?: string;
+}
+
+/**
+ * Overall result from workflow execution
+ */
+export interface MissionExecutionResult {
+  success: boolean;
+  nodeResults: MissionNodeResult[];
+  summary: string;
+  executedAt: string;
+}
 
 // ============================================================================
 // REQUEST/RESPONSE TYPES
@@ -70,6 +111,8 @@ export interface UpdateMissionRequest {
   status?: MissionStatus;
   phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
+  executionState?: MissionExecutionState; // Update execution progress
+  executionResult?: MissionExecutionResult; // Update final execution results
 }
 
 /**

@@ -4,7 +4,7 @@ import { getConnection } from '../connection';
  * Database Performance Monitoring and Query Optimization
  * 
  * Provides real-time performance monitoring, query analysis,
- * and optimization recommendations for the expedition system.
+ * and optimization recommendations for the workflow system.
  */
 
 export interface QueryMetrics {
@@ -216,7 +216,7 @@ export class PerformanceMonitor {
       }>(
         `SHOW INDEXES 
          YIELD name, type, state, populationPercent
-         WHERE name CONTAINS 'expedition' OR name CONTAINS 'starship' OR name CONTAINS 'agent'
+         WHERE name CONTAINS 'workflow' OR name CONTAINS 'starship' OR name CONTAINS 'agent'
          RETURN name, type, state, populationPercent`
       );
 
@@ -293,12 +293,12 @@ export class PerformanceMonitor {
       }
     }
 
-    // Expedition-specific recommendations
-    const expeditionQueries = metrics.filter(m => m.queryType.includes('expedition'));
-    if (expeditionQueries.length > 0) {
-      const avgExpeditionTime = expeditionQueries.reduce((sum, m) => sum + m.executionTime, 0) / expeditionQueries.length;
-      if (avgExpeditionTime > 200) {
-        recommendations.push('🚀 Expedition queries are slower than optimal. Consider running migration 004 for expedition-specific optimizations.');
+    // Workflow-specific recommendations
+    const workflowQueries = metrics.filter(m => m.queryType.includes('workflow'));
+    if (workflowQueries.length > 0) {
+      const avgWorkflowTime = workflowQueries.reduce((sum, m) => sum + m.executionTime, 0) / workflowQueries.length;
+      if (avgWorkflowTime > 200) {
+        recommendations.push('🚀 Workflow queries are slower than optimal. Consider optimizing workflow-specific queries.');
       }
     }
 

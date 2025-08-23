@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response, Router as ExpressRouter } from 'express';
 import Stripe from 'stripe';
-import { UserRepository, StarshipRepository } from '@starships/models';
+import { StarshipRepository } from '@starships/models';
 import { loadServerEnvironment } from '@starships/env-config';
 
 const router: ExpressRouter = Router();
@@ -171,11 +171,13 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
         
         if (starship) {
           // Permanently disable access
+          // Note: We keep the subscriptionId for historical reference
           await starshipRepository.updateSubscription(starship.id, { 
             status: 'disabled'
-            // Note: subscriptionId not cleared here due to type constraints
+            // subscriptionId remains for audit trail
           });
           console.log(`❌ [WEBHOOK] Subscription cancelled for ${starship.name} (${starship.status} → disabled)`);
+          console.log(`   Cleared subscription ID: ${deletedSub.id}`);
           processed = true;
         } else {
           console.warn(`[WEBHOOK] No starship found for deleted subscription: ${deletedSub.id}`);

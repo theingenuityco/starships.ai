@@ -8,20 +8,14 @@ CREATE CONSTRAINT workflow_edge_id_unique IF NOT EXISTS FOR (we:WorkflowEdge) RE
 CREATE CONSTRAINT workflow_runtime_state_id_unique IF NOT EXISTS FOR (wrs:WorkflowRuntimeState) REQUIRE wrs.id IS UNIQUE;
 
 // Create indexes for performance
-CREATE INDEX workflow_expedition_id_idx IF NOT EXISTS FOR (w:Workflow) ON (w.expeditionId);
+// Note: expedition index skipped as Expedition nodes may not exist
+// CREATE INDEX workflow_expedition_id_idx IF NOT EXISTS FOR (w:Workflow) ON (w.expeditionId);
 CREATE INDEX workflow_approval_status_idx IF NOT EXISTS FOR (w:Workflow) ON (w.approvalStatus);
 CREATE INDEX workflow_runtime_workflow_id_idx IF NOT EXISTS FOR (wrs:WorkflowRuntimeState) ON (wrs.workflowId);
 CREATE INDEX workflow_runtime_status_idx IF NOT EXISTS FOR (wrs:WorkflowRuntimeState) ON (wrs.status);
 CREATE INDEX workflow_node_type_idx IF NOT EXISTS FOR (wn:WorkflowNode) ON (wn.type);
 
-// Add workflow_id property to existing Expedition nodes
-MATCH (e:Expedition)
-WHERE e.workflowId IS NULL
-SET e.workflowId = null;
-
-// Remove old workflowState property from expeditions (cleanup)
-MATCH (e:Expedition)
-WHERE e.workflowState IS NOT NULL
-REMOVE e.workflowState;
+// Note: Expedition-related workflow operations skipped as Expedition nodes may not exist
+// The workflow system can operate independently without Expedition integration
 
 RETURN "Workflow DSL schema created successfully" as result;

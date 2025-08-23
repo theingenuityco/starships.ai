@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
+import { extractErrorMessage } from '@/lib/error-utils';
 
 // Define types locally based on protocol package
 interface UpdateStarshipRequest {
@@ -78,15 +79,18 @@ interface StarshipState {
   // Command deck state (preserved)
   commandDeck: CommandDeckState;
   
-  // SIMPLIFIED VISION STATE (BREAKING CHANGE)
-  vision: string;  // CHANGED: was complex object with statement, confidence, lastUpdated
+  // Vision state (restored to complex object)
+  vision: {
+    statement: string;
+    confidence: number;
+    lastUpdated: string;
+  };
   visionLoading: boolean;
   visionError: string | null;
   
   // Legacy fields for backward compatibility (derived from active starship)
   get class(): 'scout' | 'cruiser' | 'draught';
   get powerLevel(): number;
-  get activeExpeditions(): number;
   get sibilInsights(): number;
   currentRoute: string;
 }
@@ -121,9 +125,9 @@ interface StarshipActions {
   clearErrors: () => void;
   clearError: (errorType: 'update' | 'delete' | 'status' | 'agents') => void;
   
-  // SIMPLIFIED VISION ACTIONS (BREAKING CHANGE)
+  // Vision actions (restored to complex object)
   loadVision: (starshipId: string) => Promise<void>;
-  saveVision: (starshipId: string, vision: string) => Promise<void>;
+  saveVision: (starshipId: string, statement: string, confidence?: number) => Promise<void>;
   
   // Command deck actions (preserved)
   setCommandDeckVisibility: (visibility: CommandDeckState['visibility']) => void;
@@ -174,8 +178,12 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           isHovered: false
         },
         
-        // SIMPLIFIED VISION STATE
-        vision: '',  // CHANGED: was complex object
+        // Vision state (restored to complex object)
+        vision: {
+          statement: '',
+          confidence: 0.8,
+          lastUpdated: new Date().toISOString()
+        },
         visionLoading: false,
         visionError: null,
 
@@ -202,16 +210,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
         
-        get activeExpeditions() {
-          try {
-            const state = get();
-            if (!state || !state.starships) return 0;
-            const activeStarship = state.starships.find(s => s.id === state.activeStarshipId);
-            return 0; // Default active expeditions since activeExpeditions doesn't exist on Starship
-          } catch {
-            return 0;
-          }
-        },
         
         get sibilInsights() {
           try {
@@ -258,7 +256,11 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               starships: newStarships,
               activeStarshipId: response.starship.id,
               loading: false,
-              vision: ''
+              vision: {
+                statement: '',
+                confidence: 0.8,
+                lastUpdated: new Date().toISOString()
+              }
             });
             
             // Return the created starship for navigation
@@ -350,7 +352,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
         deleteStarship: async (id) => {
           set({ loadingDelete: true, deleteError: null });
           try {
-            await starshipAPI.deleteStarship(id);
+            const response = await starshipAPI.deleteStarship(id);
             
             // Remove starship from the array
             const currentStarships = get().starships;
@@ -362,11 +364,27 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               // If we deleted the active starship, clear the selection
               activeStarshipId: get().activeStarshipId === id ? null : get().activeStarshipId
             });
-          } catch (error) {
+            
+            // Log subscription cancellation status for debugging
+            if (response.subscriptionCancelled) {
+              console.log('[STARSHIP] Subscription cancelled successfully for starship:', id);
+            }
+            
+            if (response.cancellationError) {
+              console.error('[STARSHIP] Subscription cancellation failed:', response.cancellationError);
+              // Could trigger a toast notification here to warn the user
+            }
+          } catch (error: any) {
+            // Use centralized error handling
+            const fullError = extractErrorMessage(error, 'Failed to delete starship');
+            
             set({
-              deleteError: error instanceof Error ? error.message : 'Failed to delete starship',
+              deleteError: fullError,
               loadingDelete: false
             });
+            
+            // Don't remove the starship from the list if deletion failed
+            console.error('[STARSHIP] Delete failed:', fullError);
           }
         },
 
@@ -455,22 +473,36 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
 
-        // SIMPLIFIED VISION ACTIONS (CRITICAL: BYPASS DATABASE)
+        // Vision actions (restored to complex object)
         loadVision: async (starshipId: string) => {
           set({ visionLoading: true, visionError: null });
           try {
             const data = await visionAPI.get(starshipId);
-            set({ vision: data.vision || '', visionLoading: false });
+            set({
+              vision: {
+                statement: data.vision?.statement || '',
+                confidence: data.vision?.confidence || 0.8,
+                lastUpdated: data.vision?.lastUpdated || new Date().toISOString()
+              },
+              visionLoading: false
+            });
           } catch (error) {
             set({ visionError: 'Failed to load vision', visionLoading: false });
           }
         },
         
-        saveVision: async (starshipId: string, vision: string) => {
+        saveVision: async (starshipId: string, statement: string, confidence?: number) => {
           set({ visionLoading: true, visionError: null });
           try {
-            await visionAPI.save(starshipId, vision);
-            set({ vision, visionLoading: false });
+            await visionAPI.save(starshipId, statement);
+            set({
+              vision: {
+                statement,
+                confidence: confidence || 0.8,
+                lastUpdated: new Date().toISOString()
+              },
+              visionLoading: false
+            });
           } catch (error) {
             set({ visionError: 'Failed to save vision', visionLoading: false });
           }
@@ -533,7 +565,13 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
 
         // Legacy actions for backward compatibility
         updateVision: (statement) => {
-          set({ vision: statement });
+          set({
+            vision: {
+              statement,
+              confidence: get().vision.confidence,
+              lastUpdated: new Date().toISOString()
+            }
+          });
         },
 
         navigateTo: (route) =>

@@ -23,6 +23,7 @@ import { StarshipStatusManager } from './StarshipStatusManager';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { LogoutLink } from '@kinde-oss/kinde-auth-nextjs/components';
+import { usePathname } from 'next/navigation';
 
 interface StarshipDashboardProps {
   className?: string;
@@ -43,6 +44,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   } = useStarshipStore();
 
   const { user, userName, userEmail, isAuthenticated } = useAuth();
+  const pathname = usePathname();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
@@ -51,10 +53,37 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   const [deletingStarship, setDeletingStarship] = useState<string | null>(null);
   const [statusManagingStarship, setStatusManagingStarship] = useState<string | null>(null);
 
-  // Load starships on mount
+  // Load starships on mount and when page becomes visible
   useEffect(() => {
     loadUserStarships();
+    
+    // Refresh data when page becomes visible again (e.g., navigating back)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadUserStarships();
+      }
+    };
+    
+    // Refresh data when window gains focus
+    const handleFocus = () => {
+      loadUserStarships();
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [loadUserStarships]);
+  
+  // Refresh data when navigating to fleet page
+  useEffect(() => {
+    if (pathname === '/fleet') {
+      loadUserStarships();
+    }
+  }, [pathname, loadUserStarships]);
 
   // Auto-open create modal for onboarding
   useEffect(() => {
@@ -95,24 +124,37 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     setActiveStarship(starshipId);
   };
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = async () => {
     setShowCreateModal(false);
-    // Call the parent's success handler if provided (for onboarding cleanup)
+    // Call the parent's success handler first if provided (for onboarding cleanup)
     if (onCreateSuccess) {
       onCreateSuccess();
     }
+    // Refresh the starships list after creation with a small delay to avoid race conditions
+    // This ensures the modal close animation completes and avoids conflicting with auto-refresh
+    setTimeout(() => {
+      if (!loading) {
+        loadUserStarships();
+      }
+    }, 300);
   };
 
   const handleEditSuccess = () => {
     setEditingStarship(null);
+    // Refresh the starships list after edit
+    loadUserStarships();
   };
 
   const handleDeleteSuccess = () => {
     setDeletingStarship(null);
+    // Refresh the starships list after deletion
+    loadUserStarships();
   };
 
   const handleStatusUpdateSuccess = () => {
     setStatusManagingStarship(null);
+    // Refresh the starships list after status update
+    loadUserStarships();
   };
 
   // Fleet overview stats

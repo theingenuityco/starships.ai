@@ -11,12 +11,14 @@ This migration script updates existing database records to work with the new sim
 **Removes deprecated fields:**
 - `powerLevel` - No longer used in simplified schema
 - `sibilInsights` - Replaced with direct Vision entities  
-- `activeExpeditions` - Replaced with `maxActiveExpeditions`
+- `activeExpeditions` - No longer used
+- `maxActiveExpeditions` - Replaced with `maxAgents`
 
 **Adds new fields:**
-- `maxActiveExpeditions` with default values:
-  - Scout class: `maxActiveExpeditions: 2`
-  - Cruiser class: `maxActiveExpeditions: 4`
+- `maxAgents` with default values:
+  - Scout class: `maxAgents: 3`
+  - Cruiser class: `maxAgents: 5`
+  - Draught class: `maxAgents: 10`
 
 **Updates status values:**
 - `'docked'` → `'inactive'`
@@ -60,7 +62,7 @@ npm run migrate:starship-schema:rollback --workspace=@starships/models
 📊 [SCHEMA-MIGRATION] Skipping database validation in dry-run mode
 🛸 [SCHEMA-MIGRATION] Step 1: Migrating starship entities...
 📄 [DRY RUN] Would remove deprecated fields from 10 starships
-📄 [DRY RUN] Would add maxActiveExpeditions to 8 starships
+📄 [DRY RUN] Would add maxAgents to 8 starships
 📄 [DRY RUN] Would update status for 5 starships
 👨‍🚀 [SCHEMA-MIGRATION] Step 2: Migrating agent entities...
 📄 [DRY RUN] Would populate starshipId for 12 agents
@@ -72,7 +74,7 @@ npm run migrate:starship-schema:rollback --workspace=@starships/models
 
 🛸 STARSHIP UPDATES:
   ✅ Deprecated fields removed: 10
-  ➕ MaxActiveExpeditions added: 8
+  ➕ MaxAgents added: 8
   🔄 Status values updated: 5
   ❌ Failures: 0
 
@@ -104,7 +106,7 @@ npm run migrate:starship-schema:dry-run --workspace=@starships/models
 - Pre-migration validation to assess current state
 - Post-migration validation to ensure integrity
 - Validation queries to verify:
-  - All starships have `maxActiveExpeditions`
+  - All starships have `maxAgents`
   - All starships have valid status values
   - All deployed agents have `starshipId`
   - `starshipId` matches `DEPLOYED_ON` relationships
@@ -126,16 +128,22 @@ WHERE s.powerLevel IS NOT NULL OR s.sibilInsights IS NOT NULL OR s.activeExpedit
 REMOVE s.powerLevel, s.sibilInsights, s.activeExpeditions
 RETURN count(s) as count
 
--- Add maxActiveExpeditions for Scout class
+-- Add maxAgents for Scout class
 MATCH (s:Starship {class: 'scout'})
-WHERE s.maxActiveExpeditions IS NULL
-SET s.maxActiveExpeditions = 2, s.updatedAt = $timestamp
+WHERE s.maxAgents IS NULL
+SET s.maxAgents = 3, s.updatedAt = $timestamp
 RETURN count(s) as count
 
--- Add maxActiveExpeditions for Cruiser class  
+-- Add maxAgents for Cruiser class  
 MATCH (s:Starship {class: 'cruiser'})
-WHERE s.maxActiveExpeditions IS NULL
-SET s.maxActiveExpeditions = 4, s.updatedAt = $timestamp
+WHERE s.maxAgents IS NULL
+SET s.maxAgents = 5, s.updatedAt = $timestamp
+RETURN count(s) as count
+
+-- Add maxAgents for Draught class  
+MATCH (s:Starship {class: 'draught'})
+WHERE s.maxAgents IS NULL
+SET s.maxAgents = 10, s.updatedAt = $timestamp
 RETURN count(s) as count
 
 -- Update status values
@@ -163,8 +171,8 @@ RETURN count(a) as count
 ### Validation Queries
 
 ```cypher
--- Check starships missing maxActiveExpeditions
-MATCH (s:Starship) WHERE s.maxActiveExpeditions IS NULL RETURN count(s) as count
+-- Check starships missing maxAgents
+MATCH (s:Starship) WHERE s.maxAgents IS NULL RETURN count(s) as count
 
 -- Check starships with invalid status
 MATCH (s:Starship) WHERE NOT s.status IN ['active', 'inactive'] OR s.status IS NULL RETURN count(s) as count

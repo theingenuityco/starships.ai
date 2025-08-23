@@ -23,7 +23,6 @@ import {
   EnhancedNotFoundError as NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
-import { validateSendMissionMessage } from '../middleware/validation';
 
 const router: Router = Router();
 
@@ -349,7 +348,6 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
  * Send message to mission orchestrator and get AI response
  */
 router.post('/:id/messages', 
-  validateSendMissionMessage,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
@@ -744,6 +742,61 @@ router.post('/:id/regenerate-workflow', async (req: Request, res: Response): Pro
       success: false, 
       error: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /missions/:id/execution-status
+ * Get mission execution status
+ */
+router.get('/:id/execution-status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ 
+        success: false,
+        error: 'User not authenticated' 
+      });
+      return;
+    }
+
+    validateUUID(id, 'id');
+
+    const mission = await MissionService.getMissionById(id);
+    
+    res.json({
+      success: true,
+      data: { 
+        executionState: mission.executionState || null,
+        phase: mission.phase 
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting execution status:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({
+        success: false,
+        error: 'Mission not found'
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
     });
   }
 });

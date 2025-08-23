@@ -27,16 +27,39 @@ export class SubscriptionService {
     if (!user) throw new Error('User not found');
     if (!user.email) throw new Error('User email is required for billing operations');
 
+    // If user has a stored customer ID, verify it still exists
     if (user.stripeCustomerId) {
-      return user.stripeCustomerId;
+      try {
+        // Try to retrieve the customer to verify it exists
+        const customer = await this.stripe.customers.retrieve(user.stripeCustomerId);
+        
+        // Check if customer is deleted
+        if ((customer as any).deleted) {
+          console.log(`[SUBSCRIPTION] Customer ${user.stripeCustomerId} is deleted in Stripe, creating new one`);
+        } else {
+          console.log(`[SUBSCRIPTION] Using existing customer ${user.stripeCustomerId}`);
+          return user.stripeCustomerId;
+        }
+      } catch (error: any) {
+        // Customer doesn't exist
+        if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
+          console.log(`[SUBSCRIPTION] Customer ${user.stripeCustomerId} not found in Stripe, creating new one`);
+        } else {
+          // Real error - throw it
+          throw error;
+        }
+      }
     }
 
+    // Create new customer
+    console.log(`[SUBSCRIPTION] Creating new Stripe customer for user ${userId}`);
     const customer = await this.stripe.customers.create({
       email: user.email,
       metadata: { userId: user.id },
     });
 
     await this.userRepository.updateStripeCustomerId(userId, customer.id);
+    console.log(`[SUBSCRIPTION] Created new customer ${customer.id} for user ${userId}`);
     return customer.id;
   }
 
@@ -185,7 +208,6 @@ export class SubscriptionService {
           yearly: yearlyPrice ? yearlyPrice.unit_amount! / 100 : 0,
           features: {
             maxAgents: parseInt(product.metadata.max_agents || '0'),
-            maxExpeditions: parseInt(product.metadata.max_expeditions || '0'),
           },
         };
       });
@@ -199,10 +221,51 @@ export class SubscriptionService {
       yearly: 0,
       features: {
         maxAgents: 3,
-        maxExpeditions: 2,
       },
     });
 
     return pricing;
+  }
+
+  // Cancel subscription immediately without proration
+  async cancelSubscription(subscriptionId: string): Promise<boolean> {
+    if (!subscriptionId) {
+      console.log('[SUBSCRIPTION] No subscription to cancel');
+      return true; // No subscription = nothing to cancel = success
+    }
+    
+    try {
+      // First check if subscription exists
+      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      
+      // If already cancelled, consider it a success
+      if (subscription.status === 'canceled') {
+        console.log(`[SUBSCRIPTION] Subscription ${subscriptionId} is already cancelled`);
+        return true;
+      }
+      
+      // Cancel immediately without proration (MVP approach)
+      const cancelledSub = await this.stripe.subscriptions.cancel(
+        subscriptionId,
+        {
+          prorate: false,        // No proration for MVP
+          invoice_now: false     // Don't create final invoice
+        }
+      );
+      
+      console.log(`[SUBSCRIPTION] Successfully cancelled subscription ${subscriptionId}, status: ${cancelledSub.status}`);
+      return cancelledSub.status === 'canceled';
+    } catch (error: any) {
+      // Check if error is because subscription doesn't exist
+      if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
+        console.log(`[SUBSCRIPTION] Subscription ${subscriptionId} not found in Stripe - likely already cancelled`);
+        // Subscription doesn't exist = already cancelled = allow deletion
+        return true;
+      }
+      
+      console.error(`[SUBSCRIPTION] Failed to cancel subscription ${subscriptionId}:`, error);
+      // Other errors should block deletion
+      return false;
+    }
   }
 }

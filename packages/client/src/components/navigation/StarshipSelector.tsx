@@ -160,9 +160,6 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                         {starship.status}
                       </Badge>
                       <span className="text-xs text-white/60 capitalize">{starship.class}</span>
-                      <span className="text-xs text-white/40">
-                        {starship.maxActiveExpeditions} max expeditions
-                      </span>
                     </div>
                   </div>
                 </DropdownMenuItem>

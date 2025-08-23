@@ -3,10 +3,27 @@
 // Mock external dependencies
 jest.mock('@starships/models', () => ({
   RepositoryFactory: {
-    getExpeditionRepository: jest.fn(),
-    getExpeditionTaskRepository: jest.fn(),
-    getExpeditionMessageRepository: jest.fn(),
-    getExpeditionResultRepository: jest.fn(),
+    getAgentRepository: jest.fn(() => ({
+      findById: jest.fn(),
+      findAll: jest.fn()
+    })),
+    getLLMRepository: jest.fn(() => ({
+      findById: jest.fn(),
+      findAll: jest.fn()
+    })),
+    getStarshipRepository: jest.fn(() => ({
+      findById: jest.fn(),
+      findAll: jest.fn(),
+      findByOwnerId: jest.fn()
+    })),
+    getVisionRepository: jest.fn(() => ({
+      findByStarship: jest.fn(),
+      save: jest.fn()
+    })),
+    getUserRepository: jest.fn(() => ({
+      findByKindeId: jest.fn(),
+      findById: jest.fn()
+    }))
   }
 }));
 

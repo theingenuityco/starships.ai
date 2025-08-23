@@ -678,7 +678,7 @@ Respond naturally while following these formatting conventions to ensure your re
         contextPrompt += `- Always keep this vision in mind when providing assistance and suggestions.\n`;
       }
       
-      contextPrompt += `- The starship can deploy up to ${starship.maxAgents} agents and handle ${starship.maxActiveExpeditions} concurrent expeditions.\n`;
+      contextPrompt += `- The starship can deploy up to ${starship.maxAgents} agents for various tasks.\n`;
       contextPrompt += `\nUse this context to provide more relevant and personalized assistance to the crew.`;
       
       return contextPrompt;
@@ -717,7 +717,7 @@ Respond naturally while following these formatting conventions to ensure your re
         contextPrompt += `- Always keep this vision in mind when providing assistance and suggestions.\n`;
       }
       
-      contextPrompt += `- The starship can deploy up to ${starship.maxAgents} agents and handle ${starship.maxActiveExpeditions} concurrent expeditions.\n`;
+      contextPrompt += `- The starship can deploy up to ${starship.maxAgents} agents for various tasks.\n`;
 
       // Add vision refinement capabilities
       contextPrompt += `\n\nVISION REFINEMENT CAPABILITIES:\n`;

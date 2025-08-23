@@ -17,10 +17,10 @@ spec:
     spec:
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:fix-docker-build
+        image: ghcr.io/theingenuityco/starships.ai:latest
         imagePullPolicy: Always
-        command: ["/bin/sh"]
-        args: ["-c", "cd /app/packages/client && NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR=true npx next start"]
+        # Use default CMD from Dockerfile (supervisor-entrypoint.sh)
+        # Image has correct Kinde env vars baked in from GitHub Actions build
         ports:
         - containerPort: 3000
           name: frontend
@@ -54,25 +54,21 @@ spec:
           value: "http://localhost:4000"
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
           value: "true"
-        - name: KINDE_CLIENT_ID
-          value: "test_client_id"
-        - name: KINDE_CLIENT_SECRET
-          value: "test_client_secret"
-        - name: KINDE_ISSUER_URL
-          value: "https://test.kinde.com"
+        # Kinde vars are baked into the image at build time
+        # Only override if needed for this specific deployment
         - name: KINDE_SITE_URL
-          value: "http://134.199.179.240"
+          value: "https://starships.ai"
         - name: KINDE_POST_LOGIN_REDIRECT_URL
-          value: "http://134.199.179.240/fleet"
+          value: "https://starships.ai/fleet"
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          value: "http://134.199.179.240"
+          value: "https://starships.ai"
         resources:
           requests:
-            memory: "1Gi"    # Minimum guaranteed
-            cpu: "500m"      
+            memory: "512Mi"   # Reduced for MVP
+            cpu: "250m"      
           limits:
-            memory: "3Gi"    # Increased for Neo4j
-            cpu: "1500m"     
+            memory: "2Gi"    # For Neo4j
+            cpu: "1000m"
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data

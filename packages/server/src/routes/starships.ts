@@ -22,11 +22,16 @@ import {
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
-import { serviceRegistry, DeploymentWorkflowService, connectorMigrationService } from '@starships/core';
+import { 
+  serviceRegistry, 
+  DeploymentWorkflowService, 
+  connectorMigrationService,
+  toggleHttpBridge, 
+  getFeatureFlags,
+  bridgeMonitoringService,
+  isHttpBridgeEnabled
+} from '@starships/core';
 import type { MigrationOptions, MigrationResult } from '@starships/core';
-import { bridgeMonitoringService } from '@starships/core/dist/services/mcp/BridgeMonitoringService';
-import { toggleHttpBridge, getFeatureFlags } from '@starships/core/dist/services/mcp/FeatureFlagService';
-import { isHttpBridgeEnabled } from '@starships/core/dist/services/mcp/DockerServiceTemplate';
 
 /**
  * Input validation helpers

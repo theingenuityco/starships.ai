@@ -62,7 +62,11 @@ RUN npm install -g concurrently
 
 # Create user for running services
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    # Create cache directories for nodejs user to fix pnpm permission issues
+    mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
+    chown -R nodejs:nodejs /home/nodejs/.cache && \
+    chmod -R 777 /home/nodejs/.cache
 
 # Copy all application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh

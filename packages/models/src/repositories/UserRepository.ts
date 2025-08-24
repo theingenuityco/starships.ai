@@ -69,16 +69,23 @@ export class UserRepository extends BaseRepository implements UserRepositoryInte
       const id = uuidv4();
       const createdAt = new Date().toISOString();
       
+      // Use MERGE to prevent duplicate users with same kindeId
+      // This is atomic and thread-safe
       const result = await connection.executeWrite<{ u: User }>(
-        `CREATE (u:User {
-          id: $id,
-          kindeId: $kindeId,
-          username: $username,
-          email: $email,
-          displayName: $displayName,
-          avatar: $avatar,
-          createdAt: $createdAt
-        }) RETURN u`,
+        `MERGE (u:User {kindeId: $kindeId})
+        ON CREATE SET 
+          u.id = $id,
+          u.username = $username,
+          u.email = $email,
+          u.displayName = $displayName,
+          u.avatar = $avatar,
+          u.createdAt = $createdAt
+        ON MATCH SET
+          u.email = $email,
+          u.displayName = COALESCE($displayName, u.displayName),
+          u.avatar = COALESCE($avatar, u.avatar),
+          u.username = COALESCE($username, u.username)
+        RETURN u`,
         { 
           id: id, 
           createdAt: createdAt, 

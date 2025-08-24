@@ -178,7 +178,7 @@ export function StarshipEditModal({
       try {
         setClassesLoading(true);
         // Use proxy endpoint that routes to backend
-        const response = await fetch('/v1/starships/pricing');
+        const response = await fetch('/api/pricing');
         if (response.ok) {
           const pricingData = await response.json();
           

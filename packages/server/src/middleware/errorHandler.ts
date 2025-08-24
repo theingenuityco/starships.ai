@@ -16,28 +16,33 @@ import {
   DatabaseError,
   NetworkError,
   BusinessLogicError,
-  StarshipError,
-  TaskError,
-  AgentError,
   ErrorFactory,
   isStandardError,
-  isValidationError,
-  isAuthenticationError,
-  isAuthorizationError,
-  isNotFoundError,
-  isConflictError,
-  isDatabaseError,
-  isNetworkError,
-  isBusinessLogicError,
-} from '@starships/protocol/src/types/error-classes';
+} from '@starships/protocol';
 
 import {
   StandardErrorCode,
   ErrorSeverity,
   ErrorResponse,
-  generateCorrelationId,
-  shouldLogError,
-} from '@starships/protocol/src/types/errors';
+} from '@starships/protocol';
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Generate a unique correlation ID for tracking errors
+ */
+function generateCorrelationId(): string {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Determine if an error should be logged based on severity
+ */
+function shouldLogError(severity: ErrorSeverity): boolean {
+  return severity === 'high' || severity === 'critical';
+}
 
 // ============================================================================
 // CONFIGURATION AND TYPES
@@ -566,10 +571,7 @@ export {
   ConflictError,
   NetworkError,
   BusinessLogicError,
-  StarshipError,
-  TaskError,
-  AgentError,
-} from '@starships/protocol/src/types/error-classes';
+} from '@starships/protocol';
 
 // Create ServiceUnavailableError as an alias for BusinessLogicError
 export class ServiceUnavailableError extends BusinessLogicError {

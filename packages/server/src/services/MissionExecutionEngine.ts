@@ -164,14 +164,10 @@ export class MissionExecutionEngine {
     
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        // Create consistent channel ID for mission execution context
-        const channelId = `mission:${missionId}`;
-        
         // Create ChatRequest for the agent
         const chatRequest: ChatRequest = {
           agent_id: agentId,
           user_id: effectiveUserId,
-          channel_id: channelId,
           message: `Mission Task: ${instructions}
 
 Please execute this task as part of mission ${missionId}. Provide a comprehensive response with clear results and any relevant analysis or recommendations.`,
@@ -181,7 +177,6 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
         this.logger.info('Executing real agent call via chatWithMCP', {
           agentId,
           missionId,
-          channelId,
           messageLength: chatRequest.message.length,
           attempt: attempt + 1,
           maxRetries: maxRetries + 1

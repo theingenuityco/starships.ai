@@ -165,7 +165,6 @@ describe('MissionExecutionEngine', () => {
         expect.objectContaining({
           agent_id: 'agent-1',
           user_id: 'user-123',
-          channel_id: 'mission:mission-1',
           message: expect.stringContaining('Execute first task')
         }),
         mockStore,
@@ -295,10 +294,9 @@ describe('MissionExecutionEngine', () => {
       expect(result.nodeResults[0].output).toBe('First task completed');
       expect(result.nodeResults[1].output).toBe('Second task completed');
       
-      // Verify sequential execution with same channel
+      // Verify sequential execution
       expect(mockChatWithMCP).toHaveBeenNthCalledWith(1,
         expect.objectContaining({
-          channel_id: 'mission:mission-1',
           message: expect.stringContaining('Execute first task')
         }),
         mockStore,
@@ -306,7 +304,6 @@ describe('MissionExecutionEngine', () => {
       );
       expect(mockChatWithMCP).toHaveBeenNthCalledWith(2,
         expect.objectContaining({
-          channel_id: 'mission:mission-1',
           message: expect.stringContaining('Execute second task')
         }),
         mockStore,

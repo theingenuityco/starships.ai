@@ -72,23 +72,6 @@ describe('AgentRepository', () => {
     });
   });
 
-  describe('findByChannel', () => {
-    it('should return agents active in channel', async () => {
-      const mockAgents = [{ id: '1', name: 'Agent 1' }];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockAgents.map(a => ({ a }))
-      );
-
-      const result = await repository.findByChannel('channel-1');
-
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (a:Agent)-[:ACTIVE_IN]->(c:Channel) WHERE c.id = $channelId RETURN a',
-        { channelId: 'channel-1' }
-      );
-      expect(result).toEqual(mockAgents);
-    });
-  });
-
   describe('findByUser', () => {
     it('should return agents that user interacts with', async () => {
       const mockAgents = [{ id: '1', name: 'Agent 1' }];

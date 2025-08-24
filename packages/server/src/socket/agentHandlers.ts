@@ -58,7 +58,6 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
         const chatRequest: ChatRequest = {
           agent_id: request.agent_id,
           user_id: userId,
-          channel_id: request.session_id, // Map session_id to channel_id for memory system
           message: request.message,
           stream: true // Enable true streaming
         };

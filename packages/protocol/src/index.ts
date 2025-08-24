@@ -6,7 +6,6 @@ export interface UsageStats {
 export interface ChatRequest {
   agent_id: string;
   user_id: string;
-  channel_id?: string;
   message: string;
   stream?: boolean;
 }

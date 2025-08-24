@@ -179,14 +179,6 @@ erDiagram
     string createdAt
   }
 
-  CHANNEL {
-    string id PK
-    string name
-    string guildId
-    string type
-    string createdAt
-  }
-
   LLM {
     string id PK
     string name
@@ -239,7 +231,6 @@ erDiagram
 
   MISSION ||--o{ AGENT : assigned_to
   USER ||--o{ AGENT : interacts_with
-  AGENT ||--o{ CHANNEL : active_in
 
   STARSHIP ||--o{ MCP_SERVER_CONNECTOR : has_connector
   MCP_SERVER_OPTION ||--o{ MCP_SERVER_CONNECTOR : created_from
@@ -248,3 +239,4 @@ erDiagram
   USER ||--o{ CONNECTOR_CONFIG_HISTORY : changes
   LLM ||--o{ AGENT_TEMPLATE : provides_model
   AGENT_TEMPLATE ||--o{ AGENT : instantiates
+```

@@ -123,8 +123,8 @@ export class LangChainMemoryStore {
     }
   }
 
-  makeKey(agentId: string, userId: string, channelId?: string): SessionKey {
-    return channelId ? `${agentId}:${userId}:${channelId}` : `${agentId}:${userId}`;
+  makeKey(agentId: string, userId: string): SessionKey {
+    return `${agentId}:${userId}`;
   }
 
   async get(sessionKey: SessionKey): Promise<MemoryEntry[]> {

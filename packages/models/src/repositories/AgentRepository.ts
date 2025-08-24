@@ -34,14 +34,6 @@ export class AgentRepository extends BaseRepository implements AgentRepositoryIn
     }, 'findById', 'Agent', id);
   }
 
-  async findByChannel(channelId: string): Promise<Agent[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
-      'MATCH (a:Agent)-[:ACTIVE_IN]->(c:Channel) WHERE c.id = $channelId RETURN a',
-      { channelId }
-    );
-    return convertNeo4jIntsInArray(result.map((record) => record.a));
-  }
 
   async findByUser(userId: string): Promise<Agent[]> {
     const connection = getConnection();

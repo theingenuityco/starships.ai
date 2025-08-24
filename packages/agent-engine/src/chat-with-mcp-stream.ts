@@ -205,7 +205,6 @@ export async function* chatWithMCPStream(
   console.log('🌊 [AGENT-ENGINE-MCP-STREAM] Starting MCP-enhanced streaming chat request:', {
     agent_id: req.agent_id,
     user_id: req.user_id,
-    channel_id: req.channel_id,
     message: req.message,
     timestamp: new Date().toISOString(),
   });
@@ -274,17 +273,6 @@ export async function* chatWithMCPStream(
   }
   
   let visionContext = "";
-  let starshipSlugFromChannel: string | null = null;
-  
-  // Handle starship channel format for vision loading  
-  if (req.channel_id && req.channel_id.startsWith('starship-')) {
-    // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
-    const colonIndex = req.channel_id.indexOf(':');
-    if (colonIndex > 0) {
-      starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
-      console.log('🔍 [AGENT-ENGINE-MCP-STREAM] Extracted starship slug from channel:', starshipSlugFromChannel);
-    }
-  }
   
   // Step 2: Load the agent's assigned starship for proper isolation
   try {
@@ -452,7 +440,7 @@ export async function* chatWithMCPStream(
   }
 
   // Get conversation history
-  const memoryKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
+  const memoryKey = store.makeKey(req.agent_id, req.user_id);
   const memories = await store.get(memoryKey);
   const memoryArray = memories.slice(-10); // Get last 10 messages
 

@@ -11,8 +11,8 @@ import type { ChatRequest, ChatResponse, MemoryEntry, MemorySearchResult } from 
 class MockLangChainMemoryStore {
   private readonly store = new Map<string, MemoryEntry[]>();
   
-  makeKey(agentId: string, userId: string, channelId?: string): string {
-    return channelId ? `${agentId}:${userId}:${channelId}` : `${agentId}:${userId}`;
+  makeKey(agentId: string, userId: string): string {
+    return `${agentId}:${userId}`;
   }
   
   async get(key: string): Promise<MemoryEntry[]> {

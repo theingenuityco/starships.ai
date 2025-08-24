@@ -4,7 +4,6 @@ import { getConnection } from '../../src/connection';
 import {
   AgentRepository,
   UserRepository,
-  ChannelRepository,
   LLMRepository,
   StarshipRepository,
   VisionRepository,
@@ -16,7 +15,6 @@ import { AgentTemplateService } from '../../src/services/AgentTemplateService';
 // Mock all repository classes
 jest.mock('../../src/repositories/AgentRepository');
 jest.mock('../../src/repositories/UserRepository');
-jest.mock('../../src/repositories/ChannelRepository');
 jest.mock('../../src/repositories/LLMRepository');
 jest.mock('../../src/repositories/StarshipRepository');
 jest.mock('../../src/repositories/VisionRepository');
@@ -53,29 +51,19 @@ describe('RepositoryFactory', () => {
     RepositoryFactory.resetAll();
   });
 
-  describe('Singleton Pattern', () => {
-    it('should return the same instance for multiple calls to getAgentRepository', async () => {
-      const repo1 = await RepositoryFactory.getAgentRepository();
-      const repo2 = await RepositoryFactory.getAgentRepository();
-
-      expect(repo1).toBe(repo2);
-      expect(AgentRepository).toHaveBeenCalledTimes(1);
+  describe('Initialization', () => {
+    it('should initialize repositories before they can be used', async () => {
+      await RepositoryFactory.initialize();
+      
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const userRepo = RepositoryFactory.getUserRepository();
+      
+      expect(agentRepo).toBeDefined();
+      expect(userRepo).toBeDefined();
     });
 
-    it('should return the same instance for multiple calls to getMCPServerConnectorRepository', async () => {
-      const repo1 = await RepositoryFactory.getMCPServerConnectorRepository();
-      const repo2 = await RepositoryFactory.getMCPServerConnectorRepository();
-
-      expect(repo1).toBe(repo2);
-      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return the same instance for multiple calls to getStarshipRepository', async () => {
-      const repo1 = await RepositoryFactory.getStarshipRepository();
-      const repo2 = await RepositoryFactory.getStarshipRepository();
-
-      expect(repo1).toBe(repo2);
-      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+    it('should throw error when accessing repositories before initialization', () => {
+      expect(() => RepositoryFactory.getAgentRepository()).toThrow('Repository factory not initialized');
     });
   });
 
@@ -195,51 +183,30 @@ describe('RepositoryFactory', () => {
     describe('getInitializationStatus', () => {
       it('should return correct initialization status', async () => {
         let status = RepositoryFactory.getInitializationStatus();
-        expect(status.agentRepo).toBe(false);
-        expect(status.mcpServerConnectorRepo).toBe(false);
+        expect(status.isInitialized).toBe(false);
+        expect(status.repositoryStatus.agentRepo).toBe(false);
 
-        await RepositoryFactory.getAgentRepository();
-        await RepositoryFactory.getMCPServerConnectorRepository();
+        await RepositoryFactory.initialize();
 
         status = RepositoryFactory.getInitializationStatus();
-        expect(status.agentRepo).toBe(true);
-        expect(status.mcpServerConnectorRepo).toBe(true);
+        expect(status.isInitialized).toBe(true);
+        expect(status.repositoryStatus.agentRepo).toBe(true);
       });
     });
 
-    describe('hasActiveInitializations', () => {
-      it('should return false when no initializations are active', () => {
-        expect(RepositoryFactory.hasActiveInitializations()).toBe(false);
-      });
-    });
-
-    describe('getActiveInitializations', () => {
-      it('should return empty array when no initializations are active', () => {
-        expect(RepositoryFactory.getActiveInitializations()).toEqual([]);
-      });
-    });
-
-    describe('initializeAll', () => {
+    describe('initialize', () => {
       it('should initialize all repositories in correct order', async () => {
-        await RepositoryFactory.initializeAll();
+        await RepositoryFactory.initialize();
 
-        // Verify all existing repositories were created
+        // Verify all repositories were created
         expect(AgentRepository).toHaveBeenCalledTimes(1);
         expect(UserRepository).toHaveBeenCalledTimes(1);
-        expect(ChannelRepository).toHaveBeenCalledTimes(1);
         expect(LLMRepository).toHaveBeenCalledTimes(1);
         expect(StarshipRepository).toHaveBeenCalledTimes(1);
         expect(VisionRepository).toHaveBeenCalledTimes(1);
         expect(MCPServerOptionRepository).toHaveBeenCalledTimes(1);
         expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
         expect(AgentTemplateService).toHaveBeenCalledTimes(1);
-
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Starting initialization of all repositories')
-        );
-        expect(consoleLogSpy).toHaveBeenCalledWith(
-          expect.stringContaining('All repositories initialized successfully')
-        );
       });
     });
 
@@ -263,22 +230,18 @@ describe('RepositoryFactory', () => {
     });
 
     describe('resetAll', () => {
-      it('should reset all repository instances and locks', async () => {
-        // Initialize some repositories
-        await RepositoryFactory.getAgentRepository();
-        await RepositoryFactory.getMCPServerConnectorRepository();
+      it('should reset all repository instances', async () => {
+        // Initialize factory
+        await RepositoryFactory.initialize();
 
         let status = RepositoryFactory.getInitializationStatus();
-        expect(status.agentRepo).toBe(true);
-        expect(status.mcpServerConnectorRepo).toBe(true);
+        expect(status.isInitialized).toBe(true);
 
         // Reset all
         RepositoryFactory.resetAll();
 
         status = RepositoryFactory.getInitializationStatus();
-        expect(status.agentRepo).toBe(false);
-        expect(status.mcpServerConnectorRepo).toBe(false);
-        expect(RepositoryFactory.hasActiveInitializations()).toBe(false);
+        expect(status.isInitialized).toBe(false);
       });
     });
   });
@@ -296,11 +259,6 @@ describe('RepositoryFactory', () => {
       expect(UserRepository).toHaveBeenCalledTimes(1);
     });
 
-    it('should create ChannelRepository', async () => {
-      const repo = await RepositoryFactory.getChannelRepository();
-      expect(repo).toBeDefined();
-      expect(ChannelRepository).toHaveBeenCalledTimes(1);
-    });
 
     it('should create LLMRepository', async () => {
       const repo = await RepositoryFactory.getLLMRepository();
@@ -343,35 +301,28 @@ describe('RepositoryFactory', () => {
   describe('Integration Scenarios', () => {
     it('should handle complete factory lifecycle', async () => {
       // Initialize all repositories
-      await RepositoryFactory.initializeAll();
+      await RepositoryFactory.initialize();
 
       // Validate critical repositories
       RepositoryFactory.validateCriticalRepositories();
 
       // Check status
       const status = RepositoryFactory.getInitializationStatus();
-      expect(Object.values(status).every(Boolean)).toBe(true);
+      expect(status.isInitialized).toBe(true);
 
       // Reset everything
       RepositoryFactory.resetAll();
 
       // Verify reset
       const resetStatus = RepositoryFactory.getInitializationStatus();
-      expect(Object.values(resetStatus).every((val) => !val)).toBe(true);
+      expect(resetStatus.isInitialized).toBe(false);
     });
 
-    it('should handle mixed initialization patterns', async () => {
-      // Initialize some repositories individually
-      await RepositoryFactory.getAgentRepository();
-      await RepositoryFactory.getMCPServerConnectorRepository();
-
-      // Then initialize all (should not recreate existing ones)
-      await RepositoryFactory.initializeAll();
-
-      // Verify singleton behavior maintained
-      expect(AgentRepository).toHaveBeenCalledTimes(1);
-      expect(MCPServerConnectorRepository).toHaveBeenCalledTimes(1);
-      expect(StarshipRepository).toHaveBeenCalledTimes(1);
+    it('should check socket operation readiness', async () => {
+      await RepositoryFactory.initialize();
+      
+      const isReady = RepositoryFactory.isReadyForSocketOperations();
+      expect(isReady).toBe(true);
     });
   });
 });

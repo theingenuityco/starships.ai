@@ -105,7 +105,7 @@ RUN --mount=type=secret,id=stripe_secret_key \
     pnpm run build
 
 # Create necessary directories
-RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \
+RUN mkdir -p data/sessions data/starships data/docker && \
     mkdir -p /var/lib/neo4j/data /var/lib/neo4j/logs && \
     chown -R nodejs:node data && \
     chown -R nodejs:node /var/lib/neo4j && \

@@ -11,7 +11,7 @@ Advanced AI orchestration engine powering the Starships mission control platform
 - **Smart Parameter Adaptation**: Intelligent parameter mapping using heuristics and pattern memory
 - **Enterprise Security**: Policy enforcement, audit logging, and comprehensive security management
 - **Performance Monitoring**: Real-time analytics, usage tracking, and optimization recommendations
-- **Vector Memory System**: FAISS-based semantic search with context-aware retrieval
+- **Memory System**: Simple chat history with buffer-based retrieval
 - **Quality Control**: Automated validation and retry mechanisms with configurable thresholds
 
 ## 📦 Installation
@@ -355,7 +355,7 @@ pnpm lint
 
 ### Core Dependencies
 - **LangChain + LangGraph**: Advanced LLM orchestration and workflow state management
-- **FAISS**: High-performance vector similarity search
+
 - **RxJS**: Reactive programming for real-time updates and event streams
 - **Prometheus**: Enterprise-grade metrics collection and monitoring
 - **@starships/models**: Neo4j database with pattern memory and expedition context

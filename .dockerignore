@@ -55,4 +55,4 @@ temp
 data/sessions/*
 data/starships/*
 data/docker/*
-data/faiss_index/*
+

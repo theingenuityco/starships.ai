@@ -200,6 +200,7 @@ app.get('/api/starships/pricing', async (req, res) => {
 });
 
 // API Routes
+app.use('/api/health', healthRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/chat', chatRoutes);

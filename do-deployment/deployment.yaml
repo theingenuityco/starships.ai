@@ -47,20 +47,18 @@ spec:
             - name: SKIP_INSTALL
               value: 'true'
             - name: CLIENT_URL
-              value: 'http://129.212.197.153'
+              value: 'http://starships.ai'
             - name: NEXT_PUBLIC_API_URL
-              value: 'http://129.212.197.153:4000'
+              value: 'http://starships.ai:4000'
             - name: SERVER_URL
               value: 'http://localhost:4000'
             - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
               value: 'true'
-            # Kinde vars - using actual LoadBalancer IP for Digital Ocean
-            - name: KINDE_SITE_URL
-              value: 'http://129.212.197.153'
-            - name: KINDE_POST_LOGIN_REDIRECT_URL
-              value: 'http://129.212.197.153/fleet'
-            - name: KINDE_POST_LOGOUT_REDIRECT_URL
-              value: 'http://129.212.197.153'
+            - name: KINDE_DEBUG_MODE
+              value: 'true'
+            - name: KINDE_COOKIE_DOMAIN
+              value: 'starships.ai'
+            # Kinde vars are loaded from kinde-auth-secret
             # Additional API keys for backend
             - name: OPENAI_API_KEY
               value: 'sk-dummy-openai-key-for-mvp'

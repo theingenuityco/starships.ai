@@ -27,13 +27,12 @@ export interface ServerEnvironmentConfig {
   // Default Model Configuration
   DEFAULT_LLM_PROVIDER: 'openai' | 'anthropic' | '';
   DEFAULT_CHAT_MODEL: string;
-  DEFAULT_EMBEDDING_MODEL: string;
+  
   DEFAULT_MODEL_ID: string;
   DEFAULT_TEMPERATURE: number;
   DEFAULT_MAX_TOKENS: number;
 
-  // Vector Store Configuration
-  FAISS_INDEX_PATH: string;
+  
 
   // Kinde Authentication Configuration (Server-side)
   KINDE_CLIENT_ID: string;

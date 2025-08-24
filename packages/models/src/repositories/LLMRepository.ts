@@ -59,7 +59,7 @@ export class LLMRepository implements LLMRepositoryInterface {
         provider: $provider,
         maxTokens: $maxTokens,
         temperature: $temperature,
-        embeddingModel: $embeddingModel,
+        
         supportsStreaming: $supportsStreaming,
         supportsTools: $supportsTools,
         costPer1kTokens: $costPer1kTokens,
@@ -71,7 +71,7 @@ export class LLMRepository implements LLMRepositoryInterface {
         provider: entity.provider, 
         maxTokens: entity.maxTokens, 
         temperature: entity.temperature,
-        embeddingModel: entity.embeddingModel,
+        
         supportsStreaming: entity.supportsStreaming,
         supportsTools: entity.supportsTools,
         costPer1kTokens: entity.costPer1kTokens,
@@ -104,7 +104,7 @@ export class LLMRepository implements LLMRepositoryInterface {
         provider: updates.provider, 
         maxTokens: updates.maxTokens, 
         temperature: updates.temperature,
-        embeddingModel: updates.embeddingModel,
+        
         supportsStreaming: updates.supportsStreaming,
         supportsTools: updates.supportsTools,
         costPer1kTokens: updates.costPer1kTokens

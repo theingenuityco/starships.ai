@@ -15,7 +15,7 @@ const LLM_MODELS = [
     provider: 'openai',
     temperature: 0.7,
     maxTokens: 4000,
-    embeddingModel: 'text-embedding-3-small',
+    
     supportsStreaming: true,
     supportsTools: true,
     costPer1kTokens: 0.045
@@ -26,7 +26,7 @@ const LLM_MODELS = [
     provider: 'openai',
     temperature: 0.7,
     maxTokens: 4000,
-    embeddingModel: 'text-embedding-3-small',
+    
     supportsStreaming: true,
     supportsTools: true,
     costPer1kTokens: 0.02
@@ -37,7 +37,7 @@ const LLM_MODELS = [
     provider: 'openai',
     temperature: 0.7,
     maxTokens: 4000,
-    embeddingModel: 'text-embedding-3-small',
+    
     supportsStreaming: true,
     supportsTools: true,
     costPer1kTokens: 0.001
@@ -48,7 +48,7 @@ const LLM_MODELS = [
     provider: 'anthropic',
     temperature: 0.7,
     maxTokens: 4000,
-    embeddingModel: null,
+    
     supportsStreaming: true,
     supportsTools: true,
     costPer1kTokens: 0.045
@@ -59,7 +59,7 @@ const LLM_MODELS = [
     provider: 'anthropic',
     temperature: 0.7,
     maxTokens: 4000,
-    embeddingModel: null,
+    
     supportsStreaming: true,
     supportsTools: true,
     costPer1kTokens: 0.009
@@ -70,7 +70,7 @@ const LLM_MODELS = [
     provider: 'anthropic',
     temperature: 0.7,
     maxTokens: 4000,
-    embeddingModel: null,
+    
     supportsStreaming: true,
     supportsTools: true,
     costPer1kTokens: 0.00175

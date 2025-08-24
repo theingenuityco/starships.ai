@@ -959,6 +959,7 @@ export { LangChainMemoryStore, chatStream };
 export { chatWithMCP } from './chat-with-mcp';
 export { chatWithMCPStream } from './chat-with-mcp-stream';
 
-// Export LLM Provider Factory
+// Export LLM Provider Factory and LangChainProvider
 export { ProviderFactory } from './llm/provider-factory';
+export { LangChainProvider } from './llm/langchain-provider';
 

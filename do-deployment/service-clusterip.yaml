@@ -14,5 +14,5 @@ spec:
       protocol: TCP
     - name: backend
       port: 4000
-      targetPort: 4000
+      targetPort: 3001
       protocol: TCP

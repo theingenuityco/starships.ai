@@ -31,15 +31,6 @@ lerna-debug.log*
 *~
 .DS_Store
 
-# Testing
-coverage
-.nyc_output
-jest.config.js
-**/*.test.js
-**/*.spec.js
-**/*.test.ts
-**/*.spec.ts
-
 # Documentation
 *.md
 !README.md

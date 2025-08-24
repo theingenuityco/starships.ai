@@ -260,6 +260,7 @@ jobs:
     needs: [version, docker, release]
     if: needs.docker.outputs.image_pushed == 'true'
     runs-on: ubuntu-latest
+    environment: dev
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

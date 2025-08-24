@@ -33,17 +33,29 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
     "lint:fix": {
-      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "@starships/client#lint": {
+      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "@starships/server#lint": {
+      "dependsOn": ["@starships/agent-engine#build", "@starships/core#build", "@starships/env-config#build", "@starships/models#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "@starships/agent-engine#lint": {
+      "dependsOn": ["@starships/core#build", "@starships/models#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
     "type-check": {
-      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },

@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
     "lib": ["ES2020", "DOM"],
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]

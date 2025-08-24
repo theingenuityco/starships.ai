@@ -1,4 +1,4 @@
-name: CI Build
+name: CI Checks
 
 on:
   pull_request:
@@ -94,7 +94,7 @@ jobs:
         run: pnpm --filter @starships/client run build
 
   security:
-    name: Security Audit
+    name: Security Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
 

@@ -1,7 +1,7 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "./tsconfig.nodejs.json",
   "compilerOptions": {
-    // Root level overrides if needed
+    /* Root level overrides if needed */
   },
   "files": [],
   "references": [

@@ -1,6 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
+    /* Models-specific overrides */
     "allowJs": true,
     "outDir": "./dist",
     "rootDir": "./src",
@@ -13,5 +14,7 @@
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../protocol" }]
+  "references": [
+    { "path": "../protocol" }
+  ]
 }

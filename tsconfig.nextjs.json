@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
-    // Next.js recommended target and libs
+    /* Next.js recommended target and libs */
     "target": "es5",
     "lib": ["dom", "dom.iterable", "esnext"],
     
-    // Frontend module system
+    /* Frontend module system */
     "module": "esnext",
     "moduleResolution": "bundler",
     
-    // Next.js specific settings
+    /* Next.js specific settings */
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -18,29 +18,34 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     
-    // React/JSX support
+    /* React/JSX support */
     "jsx": "preserve",
     
-    // Performance
+    /* Performance */
     "incremental": true,
     
-    // Next.js plugin
+    /* Next.js plugin */
     "plugins": [
       {
         "name": "next"
       }
     ],
     
-    // Default path mapping for Next.js
+    /* Default path mapping for Next.js */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
     
-    // Frontend types
+    /* Frontend types */
     "types": ["node", "react", "react-dom"]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
   "exclude": [
     "node_modules",
     "**/*.test.ts", 

@@ -1,11 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
+    /* Server-specific overrides */
     "outDir": "dist",
     "rootDir": "./src",
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../protocol" }, { "path": "../models" }, { "path": "../agent-engine" }]
+  "references": [
+    { "path": "../protocol" },
+    { "path": "../models" },
+    { "path": "../agent-engine" }
+  ]
 }

@@ -1,25 +1,15 @@
 {
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "lib": ["ES2020"],
+    /* Agent Engine-specific overrides */
     "outDir": "dist",
-    "rootDir": "./src",
-    "strict": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "downlevelIteration": true,
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "types": ["node"]
+    "rootDir": "./src"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../protocol" }, { "path": "../models" }, { "path": "../core" }]
+  "references": [
+    { "path": "../protocol" },
+    { "path": "../models" },
+    { "path": "../core" }
+  ]
 }

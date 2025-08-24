@@ -1,6 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
+    /* Env Config-specific overrides (needs DOM for browser compatibility) */
     "lib": ["ES2020", "DOM"],
     "outDir": "dist",
     "rootDir": "src"

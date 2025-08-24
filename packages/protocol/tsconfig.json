@@ -1,6 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
+    /* Protocol-specific overrides */
     "outDir": "dist",
     "rootDir": "src"
   },

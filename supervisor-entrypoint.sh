@@ -17,6 +17,7 @@ pidfile=/var/run/supervisord.pid
 command=/app/docker-entrypoint.sh
 directory=/app
 user=nodejs
+environment=HOME="/home/nodejs",USER="nodejs"
 autostart=true
 autorestart=false
 startsecs=30
@@ -40,6 +41,7 @@ command=/opt/neo4j/bin/neo4j console
 autostart=true
 autorestart=true
 user=nodejs
+environment=HOME="/home/nodejs",USER="nodejs"
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
@@ -50,6 +52,7 @@ priority=1
 command=/app/docker-entrypoint.sh
 directory=/app
 user=nodejs
+environment=HOME="/home/nodejs",USER="nodejs"
 autostart=true
 autorestart=false
 startsecs=30

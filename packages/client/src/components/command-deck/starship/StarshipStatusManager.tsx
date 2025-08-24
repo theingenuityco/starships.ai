@@ -170,7 +170,7 @@ export function StarshipStatusManager({
             <span>Status Management</span>
           </DialogTitle>
           <DialogDescription>
-            Update your starship's operational status and configuration
+            Update your starship&apos;s operational status and configuration
           </DialogDescription>
         </DialogHeader>
 

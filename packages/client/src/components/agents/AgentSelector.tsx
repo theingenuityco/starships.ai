@@ -165,7 +165,7 @@ export function AgentSelector({
   }
 
   const handleDeleteAgent = async (agent: Agent) => {
-    if (!confirm(`Are you sure you want to delete "${agent.name}"?`)) {
+    if (!confirm(`Are you sure you want to delete &ldquo;${agent.name}&rdquo;?`)) {
       return
     }
 
@@ -266,7 +266,7 @@ export function AgentSelector({
           </span>
           <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
-            <p className="text-sm text-muted-foreground">Manage your starship's AI crew members</p>
+            <p className="text-sm text-muted-foreground">Manage your starship&apos;s AI crew members</p>
           </div>
         </div>
         {showCreateButton && (

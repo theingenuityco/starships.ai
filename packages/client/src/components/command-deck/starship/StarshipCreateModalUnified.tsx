@@ -506,7 +506,7 @@ export function StarshipCreateModalUnified({
                             name: visionAnalysis.suggestedName 
                           })}
                         >
-                          Use "{visionAnalysis.suggestedName}"
+                          Use &ldquo;{visionAnalysis.suggestedName}&rdquo;
                           <ArrowRight className="w-3 h-3 ml-1" />
                         </Button>
                       </div>
@@ -535,7 +535,7 @@ export function StarshipCreateModalUnified({
                   {formData.vision && (
                     <div className="mt-3 pt-3 border-t border-border/50">
                       <p className="text-xs text-muted-foreground italic line-clamp-2">
-                        "{formData.vision}"
+                        &ldquo;{formData.vision}&rdquo;
                       </p>
                     </div>
                   )}
@@ -854,7 +854,7 @@ export function StarshipCreateModalUnified({
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
                         Vision
                       </p>
-                      <p className="text-sm italic">"{formData.vision}"</p>
+                      <p className="text-sm italic">&ldquo;{formData.vision}&rdquo;</p>
                     </div>
                   </div>
                 </div>

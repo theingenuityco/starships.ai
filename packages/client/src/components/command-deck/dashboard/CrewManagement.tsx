@@ -374,7 +374,7 @@ export function CrewManagement() {
             <UserCheck className="w-12 h-12 mx-auto mb-3 text-white/20" />
             <p className="text-base text-white/60 mb-2">No crew deployed</p>
             <p className="text-sm text-white/40 max-w-md mx-auto">
-              Deploy agents from the available list above to enhance your starship's capabilities
+              Deploy agents from the available list above to enhance your starship&apos;s capabilities
             </p>
           </div>
         )}

@@ -268,6 +268,7 @@ export class WebAutomationPatterns {
   ): Promise<AsyncGenerator<any>> {
     let previousContent: string | null = null;
 
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
     async function* monitor() {
       while (true) {

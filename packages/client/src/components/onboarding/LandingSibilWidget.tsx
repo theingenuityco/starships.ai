@@ -212,9 +212,9 @@ export function LandingSibilWidget({
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-2"
               >
-                <p className="text-lg font-medium">What's your vision?</p>
+                <p className="text-lg font-medium">What&apos;s your vision?</p>
                 <p className="text-sm text-muted-foreground">
-                  Tell me what you want to build, and I'll help you launch your starship...
+                  Tell me what you want to build, and I&apos;ll help you launch your starship...
                 </p>
               </motion.div>
             )}
@@ -262,7 +262,7 @@ export function LandingSibilWidget({
                 <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
                   <p className="text-sm font-medium text-primary">Vision Captured!</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Click "Create My Starship" below to begin your journey
+                    Click &quot;Create My Starship&quot; below to begin your journey
                   </p>
                 </div>
                 <motion.div

@@ -266,7 +266,7 @@ export function StarshipEditModal({
             <span>Edit Starship</span>
           </DialogTitle>
           <DialogDescription>
-            Modify your starship's configuration and status
+            Modify your starship&apos;s configuration and status
           </DialogDescription>
         </DialogHeader>
 

@@ -202,11 +202,12 @@ export function EnhancedConnectorSelector({
             (statusOrder[b.status as keyof typeof statusOrder] || 5)
           break
         }
-        case 'lastUsed':
+        case 'lastUsed': {
           const aTime = a.lastUsed?.getTime() || 0
           const bTime = b.lastUsed?.getTime() || 0
           comparison = bTime - aTime
           break
+        }
         case 'health': {
           const aHealth = a.healthMetrics?.healthStatus || 'unknown'
           const bHealth = b.healthMetrics?.healthStatus || 'unknown'
@@ -500,7 +501,7 @@ export function EnhancedConnectorSelector({
                 <div>
                   <CardTitle className="text-xl">Connectors</CardTitle>
                   <CardDescription>
-                    Manage your starship's external connections
+                    Manage your starship&apos;s external connections
                     {autoRefresh && (
                       <span className="ml-2 text-xs">
                         • Auto-refresh enabled
@@ -884,7 +885,7 @@ export function EnhancedConnectorSelector({
                           connectorId={connectorInstance.id}
                           starshipId={starshipId}
                           connectorName={connector.name}
-                          currentConfig={connectorInstance.config}
+                          currentConfig={(connectorInstance as any).config}
                           onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}
                           onTemplateApply={templateId =>
                             onTemplateApply(connectorInstance.id, templateId)

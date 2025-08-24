@@ -272,7 +272,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
           >
             <h3 className="text-lg font-semibold mb-4">Request Plan Changes</h3>
             <p className="text-gray-600 mb-4">
-              Please provide feedback on what changes you'd like to see in the execution plan:
+              Please provide feedback on what changes you&apos;d like to see in the execution plan:
             </p>
             <Textarea
               value={rejectionReason}

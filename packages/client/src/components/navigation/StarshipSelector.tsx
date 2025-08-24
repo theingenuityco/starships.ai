@@ -22,10 +22,7 @@ interface StarshipSelectorProps {
 export function StarshipSelector({ className }: StarshipSelectorProps) {
   const pathname = usePathname();
   
-  // Don't show StarshipSelector when inside individual starship routes
-  if (pathname.startsWith('/ship/')) {
-    return null;
-  }
+  // All hooks must be called before any conditional returns
   const {
     starships,
     activeStarshipId,
@@ -42,6 +39,11 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
   useEffect(() => {
     loadUserStarships();
   }, [loadUserStarships]);
+  
+  // Don't show StarshipSelector when inside individual starship routes
+  if (pathname.startsWith('/ship/')) {
+    return null;
+  }
 
   const activeStarship = starships.find(s => s.id === activeStarshipId);
 
@@ -59,8 +61,8 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
     }
   };
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout' ? '🚀' : '🛸';
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    return starshipClass === 'scout' ? '🚀' : starshipClass === 'cruiser' ? '🛸' : '🚢';
   };
 
   const getStatusColor = (status: string) => {

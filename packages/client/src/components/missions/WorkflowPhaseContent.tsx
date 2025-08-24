@@ -285,7 +285,7 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval, readonly = f
           >
             <h3 className="text-lg font-semibold mb-4">Request Workflow Changes</h3>
             <p className="text-gray-600 mb-4">
-              Please provide feedback on what changes you'd like to see in the execution workflow:
+              Please provide feedback on what changes you&apos;d like to see in the execution workflow:
             </p>
             <Textarea
               value={rejectionReason}

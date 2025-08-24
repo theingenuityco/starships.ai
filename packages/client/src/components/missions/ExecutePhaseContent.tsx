@@ -22,8 +22,6 @@ export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComp
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
     const pollExecutionStatus = async () => {
       try {
         const response = await missionApi.getExecutionStatus(mission.id);
@@ -34,7 +32,6 @@ export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComp
           // Stop polling if execution is complete
           const state = response.data.executionState;
           if (state && (state.status === 'completed' || state.status === 'failed')) {
-            clearInterval(interval);
             onExecutionComplete?.();
           }
         } else if (response.error) {
@@ -53,10 +50,10 @@ export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComp
     pollExecutionStatus();
     
     // Poll every 3 seconds during execution
-    interval = setInterval(pollExecutionStatus, 3000);
+    const interval = setInterval(pollExecutionStatus, 3000);
     
     return () => {
-      if (interval) clearInterval(interval);
+      clearInterval(interval);
     };
   }, [mission.id, onExecutionComplete]);
 

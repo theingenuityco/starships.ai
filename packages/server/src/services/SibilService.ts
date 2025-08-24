@@ -651,7 +651,7 @@ Respond naturally while following these formatting conventions to ensure your re
   }
 
   private static async getSibilSystemPromptWithContext(starshipId?: string): Promise<string> {
-    let basePrompt = this.getSibilSystemPrompt();
+    const basePrompt = this.getSibilSystemPrompt();
     
     if (!starshipId) {
       return basePrompt;
@@ -690,7 +690,7 @@ Respond naturally while following these formatting conventions to ensure your re
 
   // Enhanced system prompt that includes vision refinement capabilities
   private static async getSibilSystemPromptWithVisionContext(starshipId?: string): Promise<string> {
-    let basePrompt = this.getSibilSystemPrompt();
+    const basePrompt = this.getSibilSystemPrompt();
     
     if (!starshipId) {
       return basePrompt;

@@ -130,7 +130,7 @@ export function ReturnFlowBanner({
                 )}
               </div>
               <p className="text-sm italic text-muted-foreground">
-                "{visionPreview}"
+                &quot;{visionPreview}&quot;
               </p>
               {session.visionAnalysis?.suggestedName && (
                 <p className="text-xs text-muted-foreground mt-2">
@@ -264,7 +264,7 @@ export function InlineReturnPrompt({ className }: InlineReturnPromptProps) {
               <Rocket className="w-5 h-5 text-primary" />
               <div>
                 <p className="text-sm font-medium">Continue where you left off?</p>
-                <p className="text-xs text-muted-foreground">"{visionPreview}"</p>
+                <p className="text-xs text-muted-foreground">&quot;{visionPreview}&quot;</p>
               </div>
             </div>
             <div className="flex gap-2">

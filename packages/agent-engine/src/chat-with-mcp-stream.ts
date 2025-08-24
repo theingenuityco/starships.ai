@@ -510,7 +510,7 @@ export async function* chatWithMCPStream(
       
       let fullResponse = '';
       const responseChunks: string[] = [];
-      let executionStartTime = Date.now();
+      const executionStartTime = Date.now();
       
       // Execute and collect progress updates
       for await (const chunk of executeWithAgent(

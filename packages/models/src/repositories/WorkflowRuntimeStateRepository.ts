@@ -203,7 +203,7 @@ export class WorkflowRuntimeStateRepository extends BaseRepository {
       const now = new Date().toISOString();
       
       let setClause = 'wrs.status = $status, wrs.updatedAt = $updatedAt';
-      let params: Record<string, any> = { id, status, updatedAt: now };
+      const params: Record<string, any> = { id, status, updatedAt: now };
 
       // Set additional timestamps based on status
       if (status === 'running' && !params.startTime) {

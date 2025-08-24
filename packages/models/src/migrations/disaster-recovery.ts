@@ -708,7 +708,7 @@ export class DisasterRecoveryManager {
         return { success: true };
       } catch (parseError) {
         // Attempt basic JSON repair (remove trailing commas, fix brackets, etc.)
-        let repairedContent = content
+        const repairedContent = content
           .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
           .replace(/([{,]\s*)(\w+):/g, '$1"$2":'); // Quote unquoted keys
 

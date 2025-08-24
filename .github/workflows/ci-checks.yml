@@ -61,6 +61,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [lint, type-check]
+    environment: ci
+    env:
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      SKIP_K8S_CHECK: true
 
     steps:
       - name: Checkout code
@@ -79,19 +85,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build all packages
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          SKIP_K8S_CHECK: true
         run: pnpm run build
-
-      - name: Check client build
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-        run: pnpm --filter @starships/client run build
 
   security:
     name: Security Check

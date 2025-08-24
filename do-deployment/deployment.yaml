@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: starships
-          image: [DOCKER-REGISTRY-URL]:3.1.6
+          image: [DOCKER-REGISTRY-URL]:3.1.7
           imagePullPolicy: Always
           # Use default CMD from Dockerfile (supervisor-entrypoint.sh)
           # Image has correct Kinde env vars baked in from GitHub Actions build
@@ -47,9 +47,9 @@ spec:
             - name: SKIP_INSTALL
               value: 'true'
             - name: CLIENT_URL
-              value: '[INSECURE-PROD-URL]'
+              value: '[PROD-DOMAIN-URL]'
             - name: NEXT_PUBLIC_API_URL
-              value: '[INSECURE-PROD-URL]:4000'
+              value: '[PROD-DOMAIN-URL]/api'
             - name: SERVER_URL
               value: 'http://localhost:4000'
             - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR

@@ -21,7 +21,7 @@
     "seed:mcp": "tsx src/scripts/seed-mcp-servers.ts",
     "seed:llm": "tsx src/scripts/seed-llm-models.ts",
     "query:mcp": "tsx src/scripts/query-mcp-servers.ts",
-    "test:mcp-seeding": "tsx src/scripts/test-mcp-seeding.ts",
+    
     "test:migration": "tsx src/scripts/run-migration-tests.ts",
     "test:migration:empty": "tsx src/scripts/run-migration-tests.ts empty",
     "test:migration:single": "tsx src/scripts/run-migration-tests.ts single",

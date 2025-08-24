@@ -276,17 +276,7 @@ jobs:
       # Save DigitalOcean kubeconfig
       - name: Setup Kubernetes
         run: |
-          # For now, always deploy to production cluster
-          # TODO: Add dev cluster when ready
-          echo "Deploying to production cluster"
-          CLUSTER_NAME="starships-prod"
-          NAMESPACE="starships-prod"
-          echo "DEPLOY_ENV=production" >> $GITHUB_ENV
-          
-          echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
-          echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV
-          
-          doctl kubernetes cluster kubeconfig save $CLUSTER_NAME
+          doctl kubernetes cluster kubeconfig save starships-prod
           kubectl version --client
 
       # Update deployment with new image
@@ -298,13 +288,13 @@ jobs:
           # Update the deployment with the new image
           kubectl set image deployment/starships-app \
             starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ needs.version.outputs.new_release_version }} \
-            -n ${{ env.NAMESPACE }}
+            -n starships-prod
           
           # Wait for rollout to complete
-          kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=300s
+          kubectl rollout status deployment/starships-app -n starships-prod --timeout=300s
           
           # Get deployment info
-          kubectl get deployment starships-app -n ${{ env.NAMESPACE }} -o wide
+          kubectl get deployment starships-app -n starships-prod -o wide
 
       # Verify deployment health
       - name: Verify deployment
@@ -313,14 +303,14 @@ jobs:
           sleep 30
           
           # Check pod status
-          kubectl get pods -n ${{ env.NAMESPACE }} -l app=starships-ai
+          kubectl get pods -n starships-prod -l app=starships-ai
           
           # Check if at least one pod is running
-          RUNNING_PODS=$(kubectl get pods -n ${{ env.NAMESPACE }} -l app=starships-ai -o json | jq '[.items[] | select(.status.phase=="Running")] | length')
+          RUNNING_PODS=$(kubectl get pods -n starships-prod -l app=starships-ai -o json | jq '[.items[] | select(.status.phase=="Running")] | length')
           
           if [ "$RUNNING_PODS" -eq 0 ]; then
             echo "❌ No pods are running!"
-            kubectl describe pods -n ${{ env.NAMESPACE }} -l app=starships-ai
+            kubectl describe pods -n starships-prod -l app=starships-ai
             exit 1
           else
             echo "✅ $RUNNING_PODS pod(s) running successfully"
@@ -339,13 +329,8 @@ jobs:
           fi
           
           echo "**Version:** \`${{ needs.version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ env.DEPLOY_ENV }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Cluster:** ${{ env.CLUSTER_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Namespace:** ${{ env.NAMESPACE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Access Application" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ env.DEPLOY_ENV }}" == "production" ]; then
-            echo "🌐 **URL:** https://starships.ai" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "🧪 **URL:** https://dev.starships.ai (or your dev URL)" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "🌐 **URL:** https://starships.ai" >> $GITHUB_STEP_SUMMARY

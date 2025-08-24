@@ -379,7 +379,14 @@ importers:
         specifier: ^4.20.3
         version: 4.20.3
 
-  packages/protocol: {}
+  packages/protocol:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.10
+        version: 24.0.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
 
   packages/server:
     dependencies:

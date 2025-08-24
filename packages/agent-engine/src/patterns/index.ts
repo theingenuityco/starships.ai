@@ -6,21 +6,27 @@
 
 // Memory patterns
 export {
-  MemoryContext,
-  MemoryPattern,
   MCPMemoryPattern,
   AgentMemoryPatterns,
   createMemoryTools
 } from './memory-integration-pattern';
 
+export type {
+  MemoryContext,
+  MemoryPattern
+} from './memory-integration-pattern';
+
 // Web automation patterns
 export {
-  WebNavigationOptions,
-  ScreenshotOptions,
-  WebAutomationPattern,
   MCPWebAutomationPattern,
   WebAutomationPatterns,
   createWebAutomationTools
+} from './web-automation-pattern';
+
+export type {
+  WebNavigationOptions,
+  ScreenshotOptions,
+  WebAutomationPattern
 } from './web-automation-pattern';
 
 // Combined pattern utilities

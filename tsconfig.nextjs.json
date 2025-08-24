@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     /* Next.js recommended target and libs */
-    "target": "es5",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "target": "ES2020",
+    "lib": ["ES2020", "dom", "dom.iterable"],
     
     /* Frontend module system */
     "module": "esnext",
@@ -17,6 +17,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "downlevelIteration": true,
     
     /* React/JSX support */
     "jsx": "preserve",

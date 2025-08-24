@@ -3,9 +3,27 @@
   "compilerOptions": {
     /* Client-specific overrides if needed */
     "lib": [
-      "dom", 
-      "dom.iterable",
-      "esnext"
-    ]
-  }
+      "ES2020",
+      "dom",
+      "dom.iterable"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/__tests__/**/*",
+    ".next"
+  ]
 }

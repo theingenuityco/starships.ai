@@ -5,7 +5,10 @@
  */
 
 export {
-  AuditLogger,
+  AuditLogger
+} from './AuditLogger';
+
+export type {
   AuditEvent,
   AuditActor,
   AuditResource,
@@ -18,7 +21,10 @@ export {
 } from './AuditLogger';
 
 export {
-  MCPPolicyEnforcer,
+  MCPPolicyEnforcer
+} from './MCPPolicyEnforcer';
+
+export type {
   MCPPolicy,
   PolicyRule,
   PolicyQuota,
@@ -29,7 +35,10 @@ export {
 } from './MCPPolicyEnforcer';
 
 export {
-  SecurityManager,
+  SecurityManager
+} from './SecurityManager';
+
+export type {
   SecurityConfig,
   SecureToolInvocation,
   SecurityValidation,

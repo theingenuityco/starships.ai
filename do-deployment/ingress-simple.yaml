@@ -16,6 +16,20 @@ spec:
   - host: starships.ai
     http:
       paths:
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 4000
       - path: /
         pathType: Prefix
         backend:

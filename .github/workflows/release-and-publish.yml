@@ -254,3 +254,101 @@ jobs:
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "docker pull ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  deploy-to-digitalocean:
+    name: Deploy to Digital Ocean
+    needs: [version, docker, release]
+    if: needs.docker.outputs.image_pushed == 'true'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Install doctl CLI
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      # Save DigitalOcean kubeconfig
+      - name: Setup Kubernetes
+        run: |
+          doctl kubernetes cluster kubeconfig save starships-prod
+          kubectl version --client
+
+      # Update Kubernetes secrets from GitHub secrets
+      - name: Update Kubernetes secrets
+        run: |
+          # Delete existing secret if it exists (ignore errors if it doesn't)
+          kubectl delete secret starships-secrets -n starships-prod --ignore-not-found=true
+          
+          # Create new secret with all API keys
+          kubectl create secret generic starships-secrets \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
+            -n starships-prod
+          
+          echo "✅ Secrets updated successfully"
+
+      # Update deployment with new image
+      - name: Update Kubernetes deployment
+        run: |
+          # Convert repository name to lowercase (GHCR requires lowercase)
+          IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          
+          # Update the deployment with the new image
+          kubectl set image deployment/starships-app \
+            starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ needs.version.outputs.new_release_version }} \
+            -n starships-prod
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/starships-app -n starships-prod --timeout=300s
+          
+          # Get deployment info
+          kubectl get deployment starships-app -n starships-prod -o wide
+
+      # Verify deployment health
+      - name: Verify deployment
+        run: |
+          # Wait for pods to be ready
+          sleep 30
+          
+          # Check pod status
+          kubectl get pods -n starships-prod -l app=starships-ai
+          
+          # Check if at least one pod is running
+          RUNNING_PODS=$(kubectl get pods -n starships-prod -l app=starships-ai -o json | jq '[.items[] | select(.status.phase=="Running")] | length')
+          
+          if [ "$RUNNING_PODS" -eq 0 ]; then
+            echo "❌ No pods are running!"
+            kubectl describe pods -n starships-prod -l app=starships-ai
+            exit 1
+          else
+            echo "✅ $RUNNING_PODS pod(s) running successfully"
+          fi
+
+      - name: Create deployment summary
+        if: always()
+        run: |
+          echo "## 🚢 Digital Ocean Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status:** Successfully deployed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** Deployment failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "**Version:** \`${{ needs.version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access Application" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 **URL:** https://starships.ai" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: starships-lb
+  namespace: starships-prod
+  annotations:
+    # Digital Ocean managed certificate
+    service.beta.kubernetes.io/do-loadbalancer-protocol: "https"
+    service.beta.kubernetes.io/do-loadbalancer-tls-ports: "443"
+    service.beta.kubernetes.io/do-loadbalancer-tls-passthrough: "false"
+    service.beta.kubernetes.io/do-loadbalancer-certificate-id: "18d6af21-4550-4456-bc3b-6d1a94d91819"
+    service.beta.kubernetes.io/do-loadbalancer-redirect-http-to-https: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: starships-ai
+  ports:
+    - name: https
+      port: 443
+      targetPort: 3000
+      protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+    - name: backend
+      port: 4000
+      targetPort: 4000
+      protocol: TCP

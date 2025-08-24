@@ -1,0 +1,77 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: starships-ingress
+  namespace: starships-prod
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - starships.ai
+    secretName: starships-tls
+  rules:
+  - host: starships.ai
+    http:
+      paths:
+      # Auth routes go to frontend (Next.js/Kinde handles these)
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # API routes go directly to backend
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 4000
+      # /v1 routes also go to backend (port 4000 = backend on 3001)
+      - path: /v1
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 4000
+      # Everything else goes to frontend
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+---
+# Separate ingress for v1 rewrite to avoid conflicts
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: starships-ingress-v1-rewrite
+  namespace: starships-prod
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /api/$2
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - starships.ai
+    secretName: starships-tls
+  rules:
+  - host: starships.ai
+    http:
+      paths:
+      # This will rewrite /v1/xxx to /api/xxx
+      - path: /v1(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 4000

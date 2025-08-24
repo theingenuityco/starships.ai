@@ -50,6 +50,36 @@ router.post('/chat', authMiddleware, validateSibilRequest, async (req, res) => {
 });
 
 // NEW: Streaming endpoint
+// Preview endpoint - quick message preview without full chat context
+// Note: No auth required as this is used in pre-auth onboarding flow
+router.post('/preview', async (req, res) => {
+  try {
+    const { message, provider = 'openai' } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ error: 'message is required and must be a string' });
+      return;
+    }
+
+    // For preview, we'll return a simple acknowledgment
+    // In production, this would generate a quick preview response
+    const previewResponse = {
+      success: true,
+      preview: {
+        message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+        provider,
+        estimated_tokens: Math.ceil(message.split(' ').length * 1.3),
+        ready: true
+      }
+    };
+
+    res.json(previewResponse);
+  } catch (err) {
+    console.error('Sibil preview error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 router.post('/chat/stream', authMiddleware, validateSibilRequest, async (req, res) => {
   try {
     // Set up Server-Sent Events

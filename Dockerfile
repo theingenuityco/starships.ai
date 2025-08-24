@@ -72,9 +72,9 @@ RUN npm install -g concurrently
 # The nodejs user was already created earlier for pnpm cache permissions
 
 # Copy all application files
-COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY --chown=nodejs:nodejs supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
-COPY --chown=nodejs:nodejs . .
+COPY --chown=nodejs:node docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --chown=nodejs:node supervisor-entrypoint.sh /app/supervisor-entrypoint.sh
+COPY --chown=nodejs:node . .
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
@@ -107,9 +107,9 @@ RUN --mount=type=secret,id=stripe_secret_key \
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker data/faiss_index && \
     mkdir -p /var/lib/neo4j/data /var/lib/neo4j/logs && \
-    chown -R nodejs:nodejs data && \
-    chown -R nodejs:nodejs /var/lib/neo4j && \
-    chown -R nodejs:nodejs ${NEO4J_HOME}
+    chown -R nodejs:node data && \
+    chown -R nodejs:node /var/lib/neo4j && \
+    chown -R nodejs:node ${NEO4J_HOME}
 
 # Supervisor config will be created dynamically by supervisor-entrypoint.sh
 # based on whether NEO4J_EXTERNAL_URI is set

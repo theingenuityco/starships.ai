@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       # Setup Node and pnpm
       - name: Setup Node.js
@@ -55,7 +55,7 @@ jobs:
       - name: Calculate Semantic Version
         id: semantic
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           # Run semantic-release in dry-run mode to calculate version
           npx semantic-release --dry-run > semantic-output.txt 2>&1 || true
@@ -192,7 +192,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       # Setup Node and pnpm
       - name: Setup Node.js
@@ -212,11 +212,7 @@ jobs:
       # Now run actual semantic-release to commit version and create release
       - name: Commit Version and Create Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GIT_AUTHOR_NAME: github-actions[bot]
-          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
-          GIT_COMMITTER_NAME: github-actions[bot]
-          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
           # Configure semantic-release to create GitHub release with Docker info
           cat > .releaserc.json << 'EOF'

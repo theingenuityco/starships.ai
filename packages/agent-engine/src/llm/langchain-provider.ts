@@ -4,7 +4,7 @@ import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMChatPrompt, LLMProvider, LLMResult } from "@starships/protocol";
 import type { LLM } from "@starships/models";
-import { convertNeo4jInt, convertNeo4jIntsInObject } from "@starships/models/src/utils/neo4j-helpers";
+import { convertNeo4jInt, convertNeo4jIntsInObject } from "@starships/models";
 
 /**
  * LangChain-based LLM provider supporting OpenAI and Anthropic

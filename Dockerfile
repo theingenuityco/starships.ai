@@ -16,9 +16,18 @@ RUN apk add --no-cache \
 # Create supervisor config directory
 RUN mkdir -p /etc/supervisor/conf.d
 
-# Fix pnpm cache permissions
+# Fix pnpm cache permissions for all users
+# The node:20-alpine image already has a 'node' user with uid 1000
 RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
-    chmod -R 777 /root/.cache
+    chmod -R 777 /root/.cache && \
+    mkdir -p /home/node/.cache/node/corepack/v1/pnpm && \
+    chown -R node:node /home/node/.cache && \
+    chmod -R 777 /home/node/.cache && \
+    # Also create a nodejs user as an alias for compatibility
+    adduser -D -u 1001 -G node nodejs && \
+    mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
+    chown -R nodejs:node /home/nodejs/.cache && \
+    chmod -R 777 /home/nodejs/.cache
 
 # Download and install Neo4j Community Edition
 ENV NEO4J_VERSION=5.13.0
@@ -60,13 +69,7 @@ RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
 # Install concurrently globally
 RUN npm install -g concurrently
 
-# Create user for running services
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 && \
-    # Create cache directories for nodejs user to fix pnpm permission issues
-    mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
-    chown -R nodejs:nodejs /home/nodejs/.cache && \
-    chmod -R 777 /home/nodejs/.cache
+# The nodejs user was already created earlier for pnpm cache permissions
 
 # Copy all application files
 COPY --chown=nodejs:nodejs docker-entrypoint.sh /app/docker-entrypoint.sh

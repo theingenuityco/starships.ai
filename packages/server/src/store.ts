@@ -13,17 +13,13 @@ export default function getStore(): LangChainMemoryStore {
 }
 
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, saving vector index...');
-  if (store) {
-    await store.saveIndex();
-  }
+  console.log('SIGTERM received, graceful shutdown...');
+  // No vector index to save anymore
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received, saving vector index...');
-  if (store) {
-    await store.saveIndex();
-  }
+  console.log('SIGINT received, graceful shutdown...');
+  // No vector index to save anymore
   process.exit(0);
-}); 
+});

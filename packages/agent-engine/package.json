@@ -24,7 +24,7 @@
     "@starships/protocol": "workspace:*",
     "axios": "^1.7.2",
     "axios-retry": "^4.0.0",
-    "faiss-node": "^0.5.1",
+    
     "langchain": "^0.3.30",
     "lru-cache": "^11.1.0",
     "prom-client": "^15.1.3",

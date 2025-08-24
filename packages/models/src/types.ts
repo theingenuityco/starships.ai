@@ -11,7 +11,7 @@ export interface LLM {
   provider: 'openai' | 'anthropic';
   maxTokens?: number;
   temperature?: number;
-  embeddingModel?: string;
+  
   supportsStreaming?: boolean;
   supportsTools?: boolean;
   costPer1kTokens?: number;

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: starships
-          image: ghcr.io/theingenuityco/starships.ai:latest
+          image: ghcr.io/theingenuityco/starships.ai:3.1.2
           imagePullPolicy: Always
           # Use default CMD from Dockerfile (supervisor-entrypoint.sh)
           # Image has correct Kinde env vars baked in from GitHub Actions build

@@ -149,7 +149,7 @@ export function StarshipCreateModalUnified({
   const [formData, setFormData] = useState<StarshipFormData>({
     name: '',
     class: 'cruiser',
-    vision: hasPrefilledVision ? session?.pendingVision : ''
+    vision: hasPrefilledVision ? (session?.pendingVision || '') : ''
   });
   const [errors, setErrors] = useState<StarshipFormErrors>({});
 
@@ -331,7 +331,7 @@ export function StarshipCreateModalUnified({
         handleReset();
         
         // Navigate to the new starship's vision-chamber
-        if (newStarship && newStarship.slug) {
+        if (newStarship && typeof newStarship === 'object' && 'slug' in newStarship) {
           router.push(`/ship/${newStarship.slug}/vision-chamber`);
         }
       } else {
@@ -434,7 +434,7 @@ export function StarshipCreateModalUnified({
                   "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                   errors.vision && "border-destructive focus:border-destructive"
                 )}
-                disabled={isOnboarding && hasPrefilledVision}
+                disabled={!!(isOnboarding && hasPrefilledVision)}
                 tabIndex={1}
               />
               {errors.vision && (
@@ -773,7 +773,7 @@ export function StarshipCreateModalUnified({
 
                             {/* Features */}
                             <div className="space-y-2 mt-4 pt-4 border-t border-border/50">
-                              {classData.features.slice(0, 2).map((feature, idx) => (
+                              {classData.features.slice(0, 2).map((feature: string, idx: number) => (
                                 <motion.div
                                   key={idx}
                                   initial={{ opacity: 0, x: -10 }}
@@ -873,7 +873,7 @@ export function StarshipCreateModalUnified({
               <div className="space-y-3">
                 <h4 className="font-medium">Key Features</h4>
                 <ul className="space-y-2">
-                  {selectedClass.features.map((feature, index) => (
+                  {selectedClass.features.map((feature: string, index: number) => (
                     <li key={index} className="flex items-center space-x-2 text-sm">
                       <CheckCircle className="w-4 h-4 text-green-500" />
                       <span>{feature}</span>
@@ -889,9 +889,9 @@ export function StarshipCreateModalUnified({
                     <div key={stat} className="space-y-1">
                       <div className="flex justify-between text-sm">
                         <span className="capitalize">{stat}</span>
-                        <span>{value}%</span>
+                        <span>{value as number}%</span>
                       </div>
-                      <Progress value={value} className="h-1" />
+                      <Progress value={value as number} className="h-1" />
                     </div>
                   ))}
                 </div>

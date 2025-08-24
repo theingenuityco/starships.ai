@@ -245,7 +245,7 @@ export function SimpleVisionChamber() {
       starshipId: activeStarshipId,
       sessionId: refinementSessionId,
       userId: user.id
-    }, (response) => {
+    }, (response: { success: boolean; error?: string }) => {
       if (!response.success) {
         toast({
           title: 'Failed to Accept Proposal',
@@ -263,7 +263,7 @@ export function SimpleVisionChamber() {
       starshipId: activeStarshipId,
       sessionId: refinementSessionId,
       userId: user.id
-    }, (response) => {
+    }, (response: { success: boolean; error?: string }) => {
       if (response.success) {
         setCurrentProposal(undefined);
         toast({

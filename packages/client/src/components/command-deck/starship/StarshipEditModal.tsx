@@ -90,8 +90,23 @@ const STARSHIP_STATUSES = {
     name: 'Inactive',
     description: 'Currently not operational',
     color: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+  },
+  disabled: {
+    name: 'Disabled',
+    description: 'Subscription ended - starship is disabled',
+    color: 'bg-red-500/20 text-red-400 border-red-500/30'
+  },
+  restricted: {
+    name: 'Restricted',
+    description: 'Payment issue - limited functionality',
+    color: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+  },
+  pending_payment: {
+    name: 'Payment Required',
+    description: 'Payment required to activate starship',
+    color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
   }
-};
+} as const;
 
 export function StarshipEditModal({ 
   starshipId, 
@@ -124,9 +139,14 @@ export function StarshipEditModal({
   // Initialize form data when starship is loaded
   useEffect(() => {
     if (starship) {
+      // Map system statuses to user-selectable statuses
+      const userSelectableStatus = ['disabled', 'restricted', 'pending_payment'].includes(starship.status)
+        ? 'inactive'
+        : starship.status as 'active' | 'inactive';
+      
       const initialData = {
         name: starship.name,
-        status: starship.status,
+        status: userSelectableStatus,
         class: starship.class
       };
       setFormData(initialData);
@@ -232,9 +252,14 @@ export function StarshipEditModal({
   const handleClose = () => {
     onOpenChange(false);
     if (starship) {
+      // Map system statuses to user-selectable statuses
+      const userSelectableStatus = ['disabled', 'restricted', 'pending_payment'].includes(starship.status)
+        ? 'inactive'
+        : starship.status as 'active' | 'inactive';
+      
       setFormData({
         name: starship.name,
-        status: starship.status,
+        status: userSelectableStatus,
         class: starship.class
       });
     }
@@ -285,8 +310,8 @@ export function StarshipEditModal({
                 <div className="flex-1">
                   <div className="font-semibold">{starship.name}</div>
                   <div className="flex items-center space-x-2 mt-1">
-                    <Badge variant="outline" className={STARSHIP_STATUSES[starship.status].color}>
-                      {starship.status}
+                    <Badge variant="outline" className={STARSHIP_STATUSES[starship.status as keyof typeof STARSHIP_STATUSES]?.color || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}>
+                      {STARSHIP_STATUSES[starship.status as keyof typeof STARSHIP_STATUSES]?.name || starship.status}
                     </Badge>
                     <Badge variant="outline" className="capitalize">
                       {starship.class}

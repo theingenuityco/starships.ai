@@ -33,7 +33,7 @@ function MetricCard({
   isAnalyzing = false 
 }: MetricCardProps) {
   const trend = previousValue !== undefined ? value - previousValue : 0;
-  const trendIcon = trend > 0 ? TrendingUp : trend < 0 ? TrendingDown : Minus;
+  const TrendIcon = trend > 0 ? TrendingUp : trend < 0 ? TrendingDown : Minus;
 
   const getScoreColor = (score: number) => {
     if (score >= 80) return 'text-green-600 dark:text-green-400';
@@ -82,7 +82,7 @@ function MetricCard({
                           : 'text-red-600 dark:text-red-400'
                       }`}
                     >
-                      <trendIcon className="w-3 h-3" />
+                      <TrendIcon className="w-3 h-3" />
                       <span className="text-xs font-mono">
                         {trend > 0 ? '+' : ''}{trend}
                       </span>

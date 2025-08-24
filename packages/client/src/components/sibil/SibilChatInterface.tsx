@@ -39,14 +39,14 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
     // Add a system message to chat indicating the action
     const actionMessage: SibilMessage = {
       id: Date.now().toString(),
-      role: 'system',
-      content: action === 'accept' 
+      role: 'assistant',
+      content: action === 'accept'
         ? '✅ Vision refinement proposal accepted and applied to your starship.'
         : '❌ Vision refinement proposal rejected. Current vision remains unchanged.',
-      timestamp: Date.now(),
-      model,
+      timestamp: new Date().toISOString(),
+      sessionId: sessionId.current,
       provider,
-      starshipId
+      model
     }
     
     const updatedMessages = [...messages, actionMessage]

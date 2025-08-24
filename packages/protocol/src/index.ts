@@ -42,7 +42,7 @@ export interface Agent {
 
   // Deployment settings
   starshipId: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser')[];
+  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   requiredPermissions?: string[];
 }
 
@@ -62,7 +62,7 @@ export interface CreateAgentRequest {
   temperature?: number;
   maxTokens?: number;
   customInstructions?: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser')[];
+  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   authorId?: string;
   starshipId: string; // REQUIRED for new agents
 }

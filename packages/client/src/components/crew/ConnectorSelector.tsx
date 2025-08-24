@@ -437,7 +437,7 @@ export function ConnectorSelector({
 
                 // Enhanced status display with health metrics
                 const healthMetrics = connectorInstance
-                  ? monitoringService.createHealthMetrics(connectorInstance, connector)
+                  ? monitoringService.createHealthMetrics()
                   : null
 
                 const getStatusIcon = () => {
@@ -492,7 +492,7 @@ export function ConnectorSelector({
 
                 const getHealthTooltip = () => {
                   if (!healthMetrics) return getStatusText()
-                  return `Status: ${status}\nHealth: ${healthMetrics.healthStatus}\nUptime: ${connectorMonitoring.formatUptime(healthMetrics.uptime)}\nSuccess Rate: ${connectorMonitoring.formatSuccessRate(healthMetrics.successRate)}`
+                  return `Status: ${status}\nHealth: ${healthMetrics.healthStatus}\nUptime: ${connectorMonitoring.formatUptime()}\nSuccess Rate: ${connectorMonitoring.formatSuccessRate()}`
                 }
 
                 return (
@@ -623,7 +623,7 @@ export function ConnectorSelector({
 
               // Enhanced status display with health metrics
               const healthMetrics = connectorInstance
-                ? monitoringService.createHealthMetrics(connectorInstance, connector)
+                ? monitoringService.createHealthMetrics()
                 : null
 
               // Get API key status for this connector
@@ -643,12 +643,8 @@ export function ConnectorSelector({
                 }
 
                 if (healthMetrics) {
-                  const healthColor = connectorMonitoring.getHealthStatusColor(
-                    healthMetrics.healthStatus
-                  )
-                  const healthBg = connectorMonitoring.getHealthStatusBgColor(
-                    healthMetrics.healthStatus
-                  )
+                  const healthColor = connectorMonitoring.getHealthStatusColor()
+                  const healthBg = connectorMonitoring.getHealthStatusBgColor()
 
                   return {
                     icon: <CheckCircle className="w-4 h-4 text-green-500" />,

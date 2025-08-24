@@ -276,20 +276,12 @@ jobs:
       # Save DigitalOcean kubeconfig
       - name: Setup Kubernetes
         run: |
-          # Determine cluster and namespace based on version
-          # Pre-releases (rc, beta, alpha) go to dev, others to prod
-          VERSION="${{ needs.version.outputs.new_release_version }}"
-          if [[ "$VERSION" == *"-"* ]]; then
-            echo "Deploying pre-release to dev environment"
-            CLUSTER_NAME="starships-dev"
-            NAMESPACE="starships-dev"
-            echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
-          else
-            echo "Deploying stable release to production"
-            CLUSTER_NAME="starships-prod"
-            NAMESPACE="starships-prod"
-            echo "DEPLOY_ENV=production" >> $GITHUB_ENV
-          fi
+          # For now, always deploy to production cluster
+          # TODO: Add dev cluster when ready
+          echo "Deploying to production cluster"
+          CLUSTER_NAME="starships-prod"
+          NAMESPACE="starships-prod"
+          echo "DEPLOY_ENV=production" >> $GITHUB_ENV
           
           echo "CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
           echo "NAMESPACE=$NAMESPACE" >> $GITHUB_ENV

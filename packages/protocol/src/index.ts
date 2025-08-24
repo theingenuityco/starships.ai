@@ -79,7 +79,7 @@ export interface MemoryEntry {
 }
 
 export interface EnhancedMemoryEntry extends MemoryEntry {
-  embedding?: number[];
+  
   importance?: number;
   summary?: string;
 }

@@ -43,11 +43,11 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || ('' as const),
     DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4',
-    DEFAULT_EMBEDDING_MODEL: process.env.DEFAULT_EMBEDDING_MODEL || 'text-embedding-3-small',
+    
     DEFAULT_MODEL_ID: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
     DEFAULT_TEMPERATURE: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
     DEFAULT_MAX_TOKENS: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
-    FAISS_INDEX_PATH: process.env.FAISS_INDEX_PATH || './data/faiss_index',
+    
     KINDE_CLIENT_ID: process.env.KINDE_CLIENT_ID || 'kinde-client-id',
     KINDE_CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET || 'kinde-secret',
     KINDE_ISSUER_URL: process.env.KINDE_ISSUER_URL || 'placeholder',

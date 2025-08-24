@@ -386,9 +386,9 @@ export class ConnectorMigrationService {
         return { success: false, errorMessage: `Health check failed: HTTP ${healthResponse.status}` };
       }
 
-      const healthData = await healthResponse.json();
-      if (healthData.status !== 'healthy') {
-        return { success: false, errorMessage: `Container health status: ${healthData.status}` };
+      const healthData = await healthResponse.json() as any;
+      if (healthData?.status !== 'healthy') {
+        return { success: false, errorMessage: `Container health status: ${healthData?.status}` };
       }
 
       // Test tools endpoint

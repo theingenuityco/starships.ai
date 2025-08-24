@@ -1,16 +1,9 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "strict": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "downlevelIteration": true
+    // Root level overrides if needed
   },
-  "exclude": ["node_modules"],
+  "files": [],
   "references": [
     { "path": "./packages/protocol" },
     { "path": "./packages/env-config" },

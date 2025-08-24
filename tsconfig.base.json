@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    // Base compilation target and module system for backend/libraries
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    
+    // Module resolution
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    
+    // Type checking
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    // JSON and compatibility
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
+    
+    // Output options for libraries
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    
+    // Node.js types by default
+    "types": ["node"]
+  },
+  "exclude": ["node_modules", "dist", "build", ".next"]
+}

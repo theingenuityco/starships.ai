@@ -99,7 +99,7 @@ export class HealthMonitor extends EventEmitter {
 
       console.log(`[HealthMonitor] Checking health of ${connectors.length} connectors`);
 
-      const checkPromises = connectors.map(async (connector) => {
+      const checkPromises = connectors.map(async (connector: any) => {
         const result = await this.checkConnectorHealth(connector.id);
         
         // Handle unhealthy connectors
@@ -115,9 +115,9 @@ export class HealthMonitor extends EventEmitter {
       // Emit summary event
       const summary = {
         total: results.length,
-        healthy: results.filter(r => r.status === 'fulfilled' && r.value.healthy).length,
-        unhealthy: results.filter(r => r.status === 'fulfilled' && !r.value.healthy).length,
-        errors: results.filter(r => r.status === 'rejected').length
+        healthy: results.filter((r: any) => r.status === 'fulfilled' && r.value.healthy).length,
+        unhealthy: results.filter((r: any) => r.status === 'fulfilled' && !r.value.healthy).length,
+        errors: results.filter((r: any) => r.status === 'rejected').length
       };
       
       this.emit('health_check_completed', summary);

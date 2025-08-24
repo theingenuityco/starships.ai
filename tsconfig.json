@@ -15,6 +15,7 @@
     { "path": "./packages/protocol" },
     { "path": "./packages/env-config" },
     { "path": "./packages/models" },
+    { "path": "./packages/core" },
     { "path": "./packages/agent-engine" },
     { "path": "./packages/server" }
   ]

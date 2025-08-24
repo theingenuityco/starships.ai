@@ -254,19 +254,19 @@ export class CapabilitySyncService {
     try {
       // Get all HTTP bridge enabled connectors
       const connectors = await this.mcpConnectorRepo.findAll();
-      const httpBridgeConnectors = connectors.filter(c => c.httpBridgeEnabled);
+      const httpBridgeConnectors = connectors.filter((c: any) => c.httpBridgeEnabled);
 
       console.log(`[CapabilitySync] Found ${httpBridgeConnectors.length} HTTP bridge connectors to sync`);
 
       // Sync all connectors in parallel
-      const syncPromises = httpBridgeConnectors.map(connector => 
+      const syncPromises = httpBridgeConnectors.map((connector: any) =>
         this.syncConnectorCapabilities(connector.id)
       );
 
       const results = await Promise.allSettled(syncPromises);
       
       // Process results
-      const syncResults: CapabilitySyncResult[] = results.map((result, index) => {
+      const syncResults: CapabilitySyncResult[] = results.map((result: any, index: number) => {
         if (result.status === 'fulfilled') {
           return result.value;
         } else {

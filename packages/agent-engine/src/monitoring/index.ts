@@ -4,20 +4,29 @@
  * Provides comprehensive monitoring, analytics, and optimization for MCP tools
  */
 
-export { 
-  ToolUsageAnalytics,
+export {
+  ToolUsageAnalytics
+} from './ToolUsageAnalytics';
+
+export type {
   ToolUsageMetrics,
   ToolInvocationEvent,
   UsagePattern
 } from './ToolUsageAnalytics';
 
 export {
-  PerformanceOptimizer,
+  PerformanceOptimizer
+} from './PerformanceOptimizer';
+
+export type {
   OptimizationStats
 } from './PerformanceOptimizer';
 
 export {
-  MonitoringDashboard,
+  MonitoringDashboard
+} from './MonitoringDashboard';
+
+export type {
   DashboardMetric,
   DashboardWidget,
   DashboardAlert,

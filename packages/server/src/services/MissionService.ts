@@ -72,7 +72,7 @@ export class MissionService {
     );
 
     const duplicateName = existingMissions.missions.find(
-      mission => mission.name.toLowerCase() === request.name.toLowerCase()
+      (mission: Mission) => mission.name.toLowerCase() === request.name.toLowerCase()
     );
 
     if (duplicateName) {
@@ -201,8 +201,8 @@ export class MissionService {
       );
 
       const duplicateName = existingMissions.missions.find(
-        mission => 
-          mission.id !== id && 
+        (mission: Mission) =>
+          mission.id !== id &&
           mission.name.toLowerCase() === updates.name!.toLowerCase()
       );
 
@@ -310,13 +310,13 @@ export class MissionService {
       cancelled: 0
     };
 
-    missions.forEach(mission => {
-      byStatus[mission.status]++;
+    missions.forEach((mission: Mission) => {
+      byStatus[mission.status as MissionStatus]++;
     });
 
     // Get recent missions (last 5)
     const recentMissions = missions
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort((a: Mission, b: Mission) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 5);
 
     return {

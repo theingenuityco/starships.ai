@@ -1,10 +1,9 @@
 /**
  * @starships/core - Core services
  * 
- * MCP services have been removed and replaced with native tool implementation
+ * MCP services and K8s orchestration have been completely removed.
+ * This package now serves as a placeholder for future core services.
  */
 
-// Re-export any non-MCP services if they exist in the future
-// For now, this package exports nothing as MCP infrastructure has been removed
-
+// Currently exports nothing as MCP/K8s infrastructure has been removed
 export {};

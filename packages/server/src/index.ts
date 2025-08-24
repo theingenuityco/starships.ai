@@ -19,7 +19,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedLLMModels, ensureDockerImages } from '@starships/models';
+import { seedLLMModels } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -44,9 +44,6 @@ import healthRoutes from './routes/health';
 import { logger } from '@starships/models';
 
 import { authMiddleware } from './middleware/auth';
-
-// Import K8s initialization
-import { initializeK8sEnvironment, getDeployerType } from '@starships/core/dist/services/k8s/init';
 
 /**
  * Validate required environment variables
@@ -204,30 +201,7 @@ const socketService = initializeSocketIO(httpServer);
 // Start server
 httpServer.listen(PORT, async () => {
   try {
-    // Check if we should skip K8s initialization (dev mode)
-    if (process.env.SKIP_K8S_CHECK === 'true') {
-      console.log('⚡ Skipping Kubernetes initialization (SKIP_K8S_CHECK=true)');
-      console.log('🚢 Using mock deployer for containers in development mode');
-      process.env.K8S_AVAILABLE = 'false';
-    } else {
-      // Initialize Kubernetes environment (required for production/staging)
-      const k8sReady = await initializeK8sEnvironment({
-        skipSetup: process.env.SKIP_K8S_SETUP === 'true',
-        requireCluster: true, // K8s is required now
-        environment: process.env.NODE_ENV as 'development' | 'staging' | 'production'
-      });
-      
-      if (!k8sReady) {
-        console.error('❌ Kubernetes environment is required for container deployment');
-        console.error('   Please ensure Docker Desktop is running and try again');
-        console.error('   Or run: pnpm run k8s:setup');
-        process.exit(1);
-      }
-      
-      const deployerType = getDeployerType();
-      console.log(`🚢 Using ${deployerType} deployer for containers`);
-      process.env.K8S_AVAILABLE = 'true';
-    }
+    console.log('🚀 Starting Aether Core Server...');
     
     // Initialize database connection
     await dbConnection.connect();
@@ -238,10 +212,6 @@ httpServer.listen(PORT, async () => {
     console.log('🔧 Initializing RepositoryFactory...');
     await RepositoryFactory.initialize();
     console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
-    
-    // Ensure required Docker images are available
-    await ensureDockerImages();
-    console.log('✅ Docker images check completed');
     
     // AgentService no longer needs initialization - agents are created per starship
     // await AgentService.initialize();

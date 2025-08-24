@@ -346,7 +346,6 @@ async function main() {
   }
   
   log('\n🔍 Checking Kubernetes development requirements (REQUIRED)...', 'bright');
-  log('ℹ️  Kubernetes is now the only deployment option for MCP containers', 'cyan');
   
   let allReady = true;
   const missingTools = [];
@@ -400,7 +399,7 @@ async function main() {
   
   if (!allReady) {
     log('\n❌ Required Kubernetes tools could not be installed automatically', 'red');
-    log('Kubernetes is required for MCP deployment. Please install the following manually:', 'yellow');
+    log('Please install the following manually:', 'yellow');
     missingTools.forEach(tool => {
       const platform = getPlatform();
       log(`  - ${tool}: ${REQUIRED_TOOLS[tool].install[platform]}`, 'yellow');
@@ -413,9 +412,9 @@ async function main() {
   log('\n🔍 Checking Kind cluster (REQUIRED)...', 'cyan');
   if (!checkKindCluster()) {
     log(`⚠️  Kind cluster '${CLUSTER_NAME}' not found`, 'yellow');
-    log('   Creating cluster now (this is required for MCP deployment)...', 'cyan');
+    log('   Creating cluster now...', 'cyan');
     if (!(await createKindCluster())) {
-      log('❌ Failed to create Kind cluster - this is required for MCP deployment', 'red');
+      log('❌ Failed to create Kind cluster', 'red');
       log('   Please check the error messages above and fix any issues', 'yellow');
       log('   Then run: pnpm run k8s:setup', 'yellow');
       process.exit(1);
@@ -429,7 +428,6 @@ async function main() {
       log(`✅ Kubernetes context set to kind-${CLUSTER_NAME}`, 'green');
     } catch {
       log(`❌ Failed to set Kubernetes context`, 'red');
-      log('   This may cause issues with MCP deployment', 'yellow');
       process.exit(1);
     }
   }
@@ -468,18 +466,6 @@ async function main() {
     log(`\n📁 Created data directory: ${dataDir}`, 'green');
   }
   
-  // Check and ensure MCP HTTP Bridge image is in registry
-  log('\n🐳 Checking MCP HTTP Bridge image...', 'cyan');
-  try {
-    const { ensureMCPImage } = require('./ensure-mcp-image');
-    await ensureMCPImage();
-  } catch (error) {
-    log(`\n❌ MCP image setup failed: ${error.message}`, 'red');
-    log('   MCP containers will fail to start without the image in registry', 'yellow');
-    log('   To fix manually, run: node scripts/ensure-mcp-image.js', 'yellow');
-    log('\n   Build cannot continue without MCP image ready.', 'red');
-    process.exit(1); // Exit with error code to fail the build
-  }
   
   log('\n✅ All prerequisites ready! Build can continue.', 'green');
   process.exit(0);

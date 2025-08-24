@@ -18,7 +18,8 @@ function dockerImageExists(imageName: string): boolean {
 }
 
 /**
- * Builds the MCP HTTP Bridge Docker image if it doesn't exist
+ * Docker image management utilities
+ * MCP functionality has been removed - this is now a no-op
  */
 export async function ensureDockerImages() {
   // Skip Docker checks in dev mode
@@ -27,49 +28,8 @@ export async function ensureDockerImages() {
     return;
   }
   
-  console.log('🐳 Checking required Docker images...');
-
-  const requiredImages = [
-    {
-      name: 'starships/mcp-http-bridge:latest',
-      buildScript: path.resolve(__dirname, '../../../core/docker/mcp-http-bridge/build.sh'),
-      description: 'MCP HTTP Bridge'
-    }
-  ];
-
-  for (const image of requiredImages) {
-    if (dockerImageExists(image.name)) {
-      console.log(`✅ ${image.description} image exists: ${image.name}`);
-    } else {
-      console.log(`⚠️  ${image.description} image not found: ${image.name}`);
-      console.log(`🔨 Building ${image.description} image...`);
-
-      if (!fs.existsSync(image.buildScript)) {
-        console.error(`❌ Build script not found: ${image.buildScript}`);
-        continue;
-      }
-
-      try {
-        // Make build script executable
-        execSync(`chmod +x "${image.buildScript}"`, { stdio: 'inherit' });
-        
-        // Run build script
-        execSync(`"${image.buildScript}"`, { 
-          stdio: 'inherit',
-          cwd: path.dirname(image.buildScript)
-        });
-        
-        console.log(`✅ Successfully built ${image.description} image`);
-      } catch (error) {
-        console.error(`❌ Failed to build ${image.description} image:`, error);
-        console.error('   Please run the build script manually:');
-        console.error(`   ${image.buildScript}`);
-        // Don't throw - server can still start
-      }
-    }
-  }
-
-  console.log('🐳 Docker image check complete');
+  console.log('🐳 Docker image checks completed (no images to build)');
+  // MCP functionality removed - no Docker images to build
 }
 
 // Run if this script is executed directly

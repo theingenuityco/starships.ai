@@ -306,7 +306,7 @@ When users ask about page content using words like "stored", "inside", "text", "
     if (!llmModel && !agent.model.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       console.log(`🔍 [AGENT-ENGINE] Model ID "${agent.model}" not found, searching by name...`);
       const allModels = await llmRepo.findAll();
-      llmModel = allModels.find(m => m.name === agent.model || m.id === agent.model) || null;
+      llmModel = allModels.find((m: any) => m.name === agent.model || m.id === agent.model) || null;
     }
     
     if (!llmModel) {
@@ -406,7 +406,7 @@ When users ask about page content using words like "stored", "inside", "text", "
     if (!llmModel && !agent.model.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       console.log(`🔍 [AGENT-ENGINE] Model ID "${agent.model}" not found, searching by name...`);
       const allModels = await llmRepo.findAll();
-      llmModel = allModels.find(m => m.name === agent.model || m.id === agent.model) || null;
+      llmModel = allModels.find((m: any) => m.name === agent.model || m.id === agent.model) || null;
     }
     
     const result = await provider.complete(prompt, { temperature: llmModel?.temperature });

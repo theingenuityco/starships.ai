@@ -5,6 +5,7 @@ export * from './client';
 export function getServerConfig() {
   if (typeof window === 'undefined') {
     // Only import server module in Node.js environment
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { loadServerEnvironment } = require('./server');
     return loadServerEnvironment();
   }
@@ -12,6 +13,7 @@ export function getServerConfig() {
 }
 
 export function getClientConfig() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { loadClientEnvironment } = require('./client');
   return loadClientEnvironment();
 }

@@ -139,7 +139,7 @@ export function VisionReviewStep({
                 <Eye className="w-4 h-4 text-primary mt-0.5" />
                 <div className="flex-1">
                   <p className="text-base italic">
-                    "{editedVision || initialVision}"
+                    &quot;{editedVision || initialVision}&quot;
                   </p>
                   {editedVision !== initialVision && (
                     <Badge variant="secondary" className="mt-3">
@@ -205,7 +205,7 @@ export function VisionReviewStep({
       {/* Tip Section */}
       <div className="p-4 bg-muted/50 rounded-lg">
         <p className="text-sm text-muted-foreground">
-          <strong>Tip:</strong> Your vision will guide your starship's mission and help AI agents understand your goals. 
+          <strong>Tip:</strong> Your vision will guide your starship&apos;s mission and help AI agents understand your goals.
           Be specific about what you want to achieve.
         </p>
       </div>

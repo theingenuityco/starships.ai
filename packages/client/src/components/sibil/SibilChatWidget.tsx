@@ -117,7 +117,7 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
       id: Date.now().toString(),
       content: inputValue.trim(),
       role: 'user',
-      timestamp: Date.now(),
+      timestamp: new Date().toISOString(),
       sessionId: sessionId.current
     };
 
@@ -130,7 +130,8 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
         id: (Date.now() + 1).toString(),
         content: '',
         role: 'assistant',
-        timestamp: Date.now(),
+        timestamp: new Date().toISOString(),
+        sessionId: sessionId.current,
         provider: 'openai',
         model: 'gpt-4',
         streaming: true

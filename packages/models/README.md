@@ -486,6 +486,8 @@ interface NativeToolApiKey {
 (Agent)-[:HAS_TAG]->(Tag)
 (User)-[:RATES]->(Agent)
 (Agent)-[:USES_TEMPLATE]->(AgentTemplate)
+(User)-[:CREATES]->(Agent)
+(User)-[:CREATES]->(AgentTemplate)
 
 // Billing and subscription relationships
 (Starship)-[:HAS_SUBSCRIPTION]->(StripeSubscription)

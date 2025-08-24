@@ -254,7 +254,7 @@ export function LandingSibilWidgetStatic({
               
               <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-2">
-                  Click "Create My Starship" below to continue
+                  Click &quot;Create My Starship&quot; below to continue
                 </p>
                 <motion.div
                   animate={{ y: [0, 5, 0] }}

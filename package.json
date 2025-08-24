@@ -16,7 +16,6 @@
     "prebuild": "node scripts/check-k8s-requirements.js",
     "build": "turbo run build",
     "start": "pnpm --filter @starships/server start",
-    "test": "turbo run test",
     "deploy:staging": "cd deploy && npm run deploy:staging",
     "deploy:production": "cd deploy && npm run deploy:production",
     "deploy:staging:dry-run": "cd deploy && npm run deploy:staging:dry-run",

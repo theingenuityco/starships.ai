@@ -99,8 +99,13 @@ export function AgentCard({
     fetchStarship()
   }, [(agent as any)?.starshipId])
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout' ? '🚀' : '🛸'
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return '🚀'
+      case 'cruiser': return '🛸'
+      case 'draught': return '🚢'
+      default: return '🚀'
+    }
   }
 
   const getStarshipStatusColor = (status: 'active' | 'inactive') => {

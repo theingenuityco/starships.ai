@@ -34,14 +34,6 @@ export class AgentRepository extends BaseRepository implements AgentRepositoryIn
     }, 'findById', 'Agent', id);
   }
 
-  async findByChannel(channelId: string): Promise<Agent[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
-      'MATCH (a:Agent)-[:ACTIVE_IN]->(c:Channel) WHERE c.id = $channelId RETURN a',
-      { channelId }
-    );
-    return convertNeo4jIntsInArray(result.map((record) => record.a));
-  }
 
   async findByUser(userId: string): Promise<Agent[]> {
     const connection = getConnection();
@@ -161,7 +153,7 @@ export class AgentRepository extends BaseRepository implements AgentRepositoryIn
       };
 
       await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agent });
-
+      
       // For backward compatibility, also create Neo4j relationship during transition
       try {
         await connection.executeWrite(
@@ -181,6 +173,25 @@ export class AgentRepository extends BaseRepository implements AgentRepositoryIn
         console.warn('Failed to create Neo4j relationship for agent deployment:', error);
       }
 
+      // Create USER-[:CREATES]->AGENT relationship if author user exists
+      try {
+        if (agent.authorId && agent.authorId !== 'system') {
+          await connection.executeWrite(
+            `MATCH (u:User {id: $authorId}), (a:Agent {id: $agentId})
+             MERGE (u)-[r:CREATES]->(a)
+             ON CREATE SET r.createdAt = $timestamp`,
+            {
+              authorId: agent.authorId,
+              agentId: agent.id,
+              timestamp: now
+            }
+          );
+        }
+      } catch (error) {
+        // Log but don't fail - relationship is optional if user doesn't exist
+        console.warn('Failed to create USER-[:CREATES]->AGENT relationship:', error);
+      }
+      
       return convertNeo4jIntsInObject(agent);
     }, 'create', 'Agent');
   }

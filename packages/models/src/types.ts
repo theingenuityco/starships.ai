@@ -3,7 +3,7 @@ import { Agent } from '@starships/protocol';
 
 
 // Re-export Agent
-export { Agent };
+export type { Agent };
 
 export interface LLM {
   id: string;

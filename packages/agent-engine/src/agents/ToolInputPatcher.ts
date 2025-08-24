@@ -1,15 +1,15 @@
 /**
  * ToolInputPatcher - Patches LangChain's tool calling to fix parameter passing
- * 
+ *
  * This patcher intercepts tool calls at the lowest level to ensure
- * parameters are properly passed to MCP tools.
+ * parameters are properly passed to native tools.
  */
 
 import { DynamicTool } from '@langchain/core/tools';
 
 // Extend global type to support our custom properties
 declare global {
-  var __mcpToolInputs: Record<string, any> | undefined;
+  var __nativeToolInputs: Record<string, any> | undefined;
 }
 
 export class ToolInputPatcher {
@@ -30,10 +30,10 @@ export class ToolInputPatcher {
       console.log(`[ToolInputPatcher] Input value:`, JSON.stringify(input));
       
       // Store the input in global state for the tool wrapper to retrieve
-      if (!(global as any).__mcpToolInputs) {
-        (global as any).__mcpToolInputs = {};
+      if (!(global as any).__nativeToolInputs) {
+        (global as any).__nativeToolInputs = {};
       }
-      (global as any).__mcpToolInputs[tool.name] = input;
+      (global as any).__nativeToolInputs[tool.name] = input;
       
       // Call the original method
       return originalCall(input, runManager, config);

@@ -64,7 +64,7 @@ export async function ensureDockerImages() {
         console.error(`❌ Failed to build ${image.description} image:`, error);
         console.error('   Please run the build script manually:');
         console.error(`   ${image.buildScript}`);
-        // Don't throw - server can still start, just MCP HTTP bridge features won't work
+        // Don't throw - server can still start
       }
     }
   }

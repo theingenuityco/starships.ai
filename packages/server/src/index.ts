@@ -14,14 +14,12 @@ import {
   LLMRepository,
   StarshipRepository,
   VisionRepository,
-  MCPServerOptionRepository,
-  MCPServerConnectorRepository,
   ConnectorConfigTemplateRepository,
   ConnectorConfigHistoryRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedMCPServers, seedLLMModels, ensureDockerImages } from '@starships/models';
+import { seedLLMModels, ensureDockerImages } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -32,7 +30,6 @@ import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import starshipEnhancedRoutes, { initializeEnhancedStarshipRoutes } from './routes/starships-enhanced';
 import visionRoutes, { initializeVisionRoutes } from './routes/vision';
-import mcpServerRoutes, { initializeMCPServerRoutes } from './routes/mcp-servers';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
@@ -46,8 +43,6 @@ import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware
 import healthRoutes from './routes/health';
 import { logger } from '@starships/models';
 
-// Import Docker deployment routes
-import { createDeploymentApiRoutes } from '@starships/core';
 import { authMiddleware } from './middleware/auth';
 
 // Import K8s initialization
@@ -119,14 +114,8 @@ const userRepository = new UserRepository();
 const llmRepository = new LLMRepository();
 
 // Aether Core repositories - use proper dependency injection
-const mcpServerConnectorRepository = new MCPServerConnectorRepository();
 const connectorConfigTemplateRepository = new ConnectorConfigTemplateRepository();
 const connectorConfigHistoryRepository = new ConnectorConfigHistoryRepository();
-// const codexRepository = new CodexRepository();
-// const constraintRepository = new ConstraintRepository();
-// const conceptRepository = new ConceptRepository();
-// const metaAnchorRepository = new MetaAnchorRepository();
-const mcpServerOptionRepository = new MCPServerOptionRepository();
 
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
@@ -148,8 +137,6 @@ initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
   userRepository,
-  mcpServerOptionRepository,
-  mcpServerConnectorRepository,
   connectorConfigTemplateRepository,
   connectorConfigHistoryRepository,
   visionRepository,
@@ -172,19 +159,6 @@ initializeEnhancedStarshipRoutes({
   visionRepository,
 });
 
-// Initialize MCP server routes with dependencies
-initializeMCPServerRoutes({
-  mcpServerOptionRepository,
-});
-
-// Create Docker deployment routes with enhanced MCP connector management
-const deploymentRoutes = createDeploymentApiRoutes({
-  starshipRepo: starshipRepository,
-  mcpConnectorRepo: mcpServerConnectorRepository,
-  mcpServerOptionRepo: mcpServerOptionRepository,
-  enableDockerDeployment: true,
-  authMiddleware
-});
 
 // Public pricing endpoint - must be before auth-protected routes
 app.get('/api/starships/pricing', async (req, res) => {
@@ -207,11 +181,9 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/sibil', sibilRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api', deploymentRoutes); // Enhanced MCP connector routes with Docker deployment (PRIORITY)
 app.use('/api', starshipRoutes);
 app.use('/api', starshipEnhancedRoutes); // Enhanced starship routes with vision support
 app.use('/api', visionRoutes);
-app.use('/api', mcpServerRoutes);
 // app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/missions', missionRoutes);
@@ -235,7 +207,7 @@ httpServer.listen(PORT, async () => {
     // Check if we should skip K8s initialization (dev mode)
     if (process.env.SKIP_K8S_CHECK === 'true') {
       console.log('⚡ Skipping Kubernetes initialization (SKIP_K8S_CHECK=true)');
-      console.log('🚢 Using mock deployer for MCP containers in development mode');
+      console.log('🚢 Using mock deployer for containers in development mode');
       process.env.K8S_AVAILABLE = 'false';
     } else {
       // Initialize Kubernetes environment (required for production/staging)
@@ -246,14 +218,14 @@ httpServer.listen(PORT, async () => {
       });
       
       if (!k8sReady) {
-        console.error('❌ Kubernetes environment is required for MCP deployment');
+        console.error('❌ Kubernetes environment is required for container deployment');
         console.error('   Please ensure Docker Desktop is running and try again');
         console.error('   Or run: pnpm run k8s:setup');
         process.exit(1);
       }
       
       const deployerType = getDeployerType();
-      console.log(`🚢 Using ${deployerType} deployer for MCP containers`);
+      console.log(`🚢 Using ${deployerType} deployer for containers`);
       process.env.K8S_AVAILABLE = 'true';
     }
     
@@ -284,27 +256,11 @@ httpServer.listen(PORT, async () => {
       console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable');
     }
 
-    // Initialize MCP Server Options (seeds default connectors)
-    await seedMCPServers();
-    console.log('✅ MCP Server Options initialized with default connectors');
     
     // Initialize LLM Models (seeds default models)
     await seedLLMModels();
     console.log('✅ LLM Models initialized with default models');
 
-    // Initialize MCPServerConnectorRepository (validate schema and constraints)
-    try {
-      console.log('🔄 Checking for missing servers to add...');
-      const connectorCount = await mcpServerConnectorRepository
-        .findAll()
-        .then((connectors) => connectors.length);
-      console.log(
-        `✅ MCPServerConnectorRepository initialized with ${connectorCount} existing connector instances`
-      );
-    } catch (error) {
-      console.error('❌ Failed to initialize MCPServerConnectorRepository:', error);
-      // Don't exit - this is not critical for server startup
-    }
 
     // Log Socket.IO status
     console.log('✅ Socket.IO server initialized');

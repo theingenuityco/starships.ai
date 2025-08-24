@@ -2,14 +2,14 @@
  * Mission Execution Engine
  * 
  * Sequential execution engine for mission workflows using real agent calls.
- * Runs approved workflow nodes in order, executes agents via chatWithMCP,
+ * Runs approved workflow nodes in order, executes agents via native chat,
  * and tracks progress with comprehensive logging and error handling.
  */
 
 import { RepositoryFactory } from '@starships/models';
 import { MissionService } from './MissionService';
 import { Logger } from '../utils/logger';
-import { chatWithMCP, LangChainMemoryStore } from '@starships/agent-engine';
+import { chat, LangChainMemoryStore } from '@starships/agent-engine';
 import type { 
   MissionWorkflow, 
   WorkflowNode, 
@@ -174,7 +174,7 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
           stream: false
         };
 
-        this.logger.info('Executing real agent call via chatWithMCP', {
+        this.logger.info('Executing real agent call via native chat', {
           agentId,
           missionId,
           messageLength: chatRequest.message.length,
@@ -184,7 +184,7 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
 
         // Execute using real agent engine with shared memory store
         const startTime = Date.now();
-        const response: ChatResponse = await chatWithMCP(chatRequest, this.store, { overrideStarshipId: agent.starshipId });
+        const response: ChatResponse = await chat(chatRequest, this.store, { overrideStarshipId: agent.starshipId });
         const executionTime = Date.now() - startTime;
 
         this.logger.info('Real agent execution completed successfully', {

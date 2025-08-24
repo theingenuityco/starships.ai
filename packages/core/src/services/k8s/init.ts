@@ -37,7 +37,7 @@ export async function initializeK8sEnvironment(options: K8sInitOptions = {}): Pr
   // Check if we should skip setup (for CI/CD)
   if (skipSetup || process.env.SKIP_K8S_SETUP === 'true') {
     console.log('⏭️  Skipping Kubernetes setup (SKIP_K8S_SETUP=true)');
-    console.warn('⚠️  K8s is required for MCP deployment - ensure cluster is ready');
+    console.warn('⚠️  K8s is required for container deployment - ensure cluster is ready');
     return true;
   }
 
@@ -57,7 +57,7 @@ export async function initializeK8sEnvironment(options: K8sInitOptions = {}): Pr
     
     if (!clusterReady) {
       console.error('❌ Failed to setup Kubernetes cluster');
-      console.error('   Kubernetes is required for MCP deployment');
+      console.error('   Kubernetes is required for container deployment');
       console.error('   Try running: pnpm run k8s:setup');
       console.error('   Or check the logs above for specific issues');
       return false;
@@ -73,7 +73,7 @@ export async function initializeK8sEnvironment(options: K8sInitOptions = {}): Pr
     return true;
   } catch (error) {
     console.error('❌ Error during K8s initialization:', error);
-    console.error('   Kubernetes is required for MCP deployment');
+    console.error('   Kubernetes is required for container deployment');
     return false;
   }
 }

@@ -2,7 +2,7 @@ import { buildPrompt } from "./prompt/builder";
 import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
 import { RepositoryFactory } from "@starships/models";
-import { NativeToolWrapper } from "./tools/MCPToolWrapper";
+import { NativeToolWrapper } from "./tools/NativeToolWrapper";
 import type { ChatRequest, ChatResponse, MemoryEntry } from "@starships/protocol";
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatAnthropic } from "@langchain/anthropic";

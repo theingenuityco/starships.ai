@@ -119,8 +119,8 @@ export function SibilPageFloatingMessage({ show, onDismiss, isManualOpen = false
                 {/* Message content */}
                 <div className="space-y-3">
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    It's me! Whether you need to refine your vision, brainstorm solutions, or get unstuck on a problem—just give me a shout! 
-                    I'm always here to provide insights and guide you forward.
+                    It&apos;s me! Whether you need to refine your vision, brainstorm solutions, or get unstuck on a problem—just give me a shout!
+                    I&apos;m always here to provide insights and guide you forward.
                   </p>
 
                 </div>

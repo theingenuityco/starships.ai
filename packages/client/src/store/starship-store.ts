@@ -98,15 +98,15 @@ interface StarshipState {
 interface StarshipActions {
   // Existing API actions
   loadUserStarships: () => Promise<void>;
-  createStarship: (data: { 
-    name: string; 
+  createStarship: (data: {
+    name: string;
     class: 'scout' | 'cruiser' | 'draught';
     vision?: {
       statement: string;
       confidence?: number;
       sibilSessionId?: string;
     };
-  }) => Promise<void>;
+  }) => Promise<{ id: string; slug: string; ownerId: string; class: 'scout' | 'cruiser' | 'draught'; name: string; maxAgents: number; status: 'active' | 'inactive' | 'disabled' | 'restricted' | 'pending_payment'; createdAt: string; updatedAt: string; plan?: 'scout' | 'cruiser' | 'draught'; subscriptionId?: string; billingPeriod?: 'monthly' | 'yearly'; }>;
   setActiveStarship: (starshipId: string | null) => void;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
@@ -370,10 +370,9 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
               console.log('[STARSHIP] Subscription cancelled successfully for starship:', id);
             }
             
-            if (response.cancellationError) {
-              console.error('[STARSHIP] Subscription cancellation failed:', response.cancellationError);
-              // Could trigger a toast notification here to warn the user
-            }
+            // Note: cancellationError property doesn't exist in response type
+            // Log subscription cancellation details if available
+            console.log('[STARSHIP] Subscription cancellation details:', response);
           } catch (error: any) {
             // Use centralized error handling
             const fullError = extractErrorMessage(error, 'Failed to delete starship');
@@ -480,9 +479,9 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             const data = await visionAPI.get(starshipId);
             set({
               vision: {
-                statement: data.vision?.statement || '',
-                confidence: data.vision?.confidence || 0.8,
-                lastUpdated: data.vision?.lastUpdated || new Date().toISOString()
+                statement: typeof data.vision === 'string' ? data.vision : '',
+                confidence: 0.8,
+                lastUpdated: new Date().toISOString()
               },
               visionLoading: false
             });

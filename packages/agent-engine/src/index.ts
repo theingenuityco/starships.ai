@@ -12,7 +12,6 @@ export async function chat(req: ChatRequest, store: LangChainMemoryStore): Promi
   console.log(`🚀 [AGENT-ENGINE][${requestId}] Starting chat request:`, {
     agent_id: req.agent_id,
     user_id: req.user_id,
-    channel_id: req.channel_id,
     message: req.message,
     stream: req.stream,
     timestamp: new Date().toISOString(),
@@ -90,17 +89,6 @@ You should be helpful, professional, and focused on delivering high-quality resu
   }
   
   let visionContext = "";
-  let starshipSlugFromChannel: string | null = null;
-  
-  // Handle starship channel format for vision loading
-  if (req.channel_id && req.channel_id.startsWith('starship-')) {
-    // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
-    const colonIndex = req.channel_id.indexOf(':');
-    if (colonIndex > 0) {
-      starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
-      console.log('🔍 [AGENT-ENGINE] Extracted starship slug from channel:', starshipSlugFromChannel);
-    }
-  }
   
   // Step 2: Load the agent's assigned starship for proper isolation
   try {
@@ -266,7 +254,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
       //     console.log('🔍 [AGENT-ENGINE] Checking for starship strategies...');
       //     console.log('🔍 [AGENT-ENGINE] Available strategies:', starshipLookupStrategies);
           
-      //     // Try direct starship ID first (from enhanced channel_id)
+      //     // Try direct starship ID first (from enhanced context)
       //     const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
       //     if (directStarshipStrategy) {
       //       const starshipId = directStarshipStrategy.split(':')[1];
@@ -367,7 +355,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
     console.log('🔄 [AGENT-ENGINE] Continuing without vision context due to critical error');
   }
 
-  const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
+  const sessionKey = store.makeKey(req.agent_id, req.user_id);
   const memory = await store.get(sessionKey);
   console.log('🧠 [AGENT-ENGINE] Memory loaded:', {
     sessionKey,
@@ -398,7 +386,6 @@ You should be helpful, professional, and focused on delivering high-quality resu
     hasVisionContext: !!visionContext,
     visionContextLength: visionContext.length,
     visionPreview: visionContext ? visionContext.substring(0, 100) + '...' : 'none',
-    channelId: req.channel_id,
     agentId: req.agent_id,
     agentName: agent.name
   });
@@ -485,7 +472,6 @@ async function* chatStream(
   console.log('🌊 [AGENT-ENGINE-STREAM] Starting streaming chat request:', {
     agent_id: req.agent_id,
     user_id: req.user_id,
-    channel_id: req.channel_id,
     message: req.message,
     timestamp: new Date().toISOString(),
   });
@@ -562,17 +548,6 @@ You should be helpful, professional, and focused on delivering high-quality resu
   }
   
   let visionContext = "";
-  let starshipSlugFromChannel: string | null = null;
-  
-  // Handle starship channel format for vision loading
-  if (req.channel_id && req.channel_id.startsWith('starship-')) {
-    // Extract starship slug from channel_id format: starship-SLUG:agent-AGENTID:user-USERID
-    const colonIndex = req.channel_id.indexOf(':');
-    if (colonIndex > 0) {
-      starshipSlugFromChannel = req.channel_id.substring(9, colonIndex); // 'starship-'.length = 9
-      console.log('🔍 [AGENT-ENGINE-STREAM] Extracted starship slug from channel:', starshipSlugFromChannel);
-    }
-  }
   
   // Step 2: Load the agent's assigned starship for proper isolation
   try {
@@ -740,7 +715,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
           console.log('🔍 [AGENT-ENGINE] Checking for starship strategies...');
           console.log('🔍 [AGENT-ENGINE] Available strategies:', starshipLookupStrategies);
           
-          // Try direct starship ID first (from enhanced channel_id)
+          // Try direct starship ID first (from enhanced context)
           const directStarshipStrategy = starshipLookupStrategies.find(s => s.startsWith('direct-starship:'));
           if (directStarshipStrategy) {
             const starshipId = directStarshipStrategy.split(':')[1];
@@ -840,7 +815,7 @@ You should be helpful, professional, and focused on delivering high-quality resu
     console.log('🔄 [AGENT-ENGINE-STREAM] Continuing without vision context due to critical error');
   }
 
-  const sessionKey = store.makeKey(req.agent_id, req.user_id, req.channel_id);
+  const sessionKey = store.makeKey(req.agent_id, req.user_id);
   const memory = await store.get(sessionKey);
   console.log('🧠 [AGENT-ENGINE-STREAM] Memory loaded:', {
     sessionKey,

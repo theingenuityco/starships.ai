@@ -61,11 +61,7 @@ export function debounce<T extends any[]>(
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
-      try {
-        return await func(...latestArgs);
-      } catch (error) {
-        throw error;
-      }
+      return await func(...latestArgs);
     }
     return Promise.resolve();
   };
@@ -105,18 +101,13 @@ export class Memoizer<T> {
       }
 
       // Execute function and cache result
-      try {
-        const result = await func(...args);
-        this.cache.set(key, {
-          value: result,
-          timestamp: now,
-          expiresAt: now + ttl
-        });
-        return result;
-      } catch (error) {
-        // Don't cache errors
-        throw error;
-      }
+      const result = await func(...args);
+      this.cache.set(key, {
+        value: result,
+        timestamp: now,
+        expiresAt: now + ttl
+      });
+      return result;
     };
   }
 

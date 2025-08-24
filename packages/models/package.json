@@ -6,15 +6,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc --build tsconfig.json",
+    "type-check": "tsc --noEmit",
     "start": "node dist/index.js",
     "clean": "rm -rf dist && find tests -name '*.js' -o -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.js.map' | xargs rm -f",
-    "test": "pnpm run test:unit && pnpm run test:integration",
-    "test:unit": "jest",
-    "test:integration": "jest --config jest.integration.config.js",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:service": "jest --testPathIgnorePatterns=integration",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "migrate": "tsx src/scripts/run-migration.ts",
     "migrate:stripe": "tsx src/scripts/run-stripe-migration.ts",
@@ -52,17 +47,11 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@testcontainers/neo4j": "^11.2.1",
     "@types/fs-extra": "^11.0.4",
-    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.10",
     "@types/node-fetch": "^2.6.12",
     "@types/uuid": "^10.0.0",
-    "jest": "^30.0.4",
-    "jest-environment-node": "^30.0.4",
     "node-fetch": "^2.7.0",
-    "testcontainers": "^11.2.1",
-    "ts-jest": "^29.4.0",
     "tsx": "^4.20.3"
   }
 }

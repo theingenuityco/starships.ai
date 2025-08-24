@@ -245,7 +245,7 @@ export function SimpleVisionChamber() {
       starshipId: activeStarshipId,
       sessionId: refinementSessionId,
       userId: user.id
-    }, (response) => {
+    }, (response: { success: boolean; error?: string }) => {
       if (!response.success) {
         toast({
           title: 'Failed to Accept Proposal',
@@ -263,7 +263,7 @@ export function SimpleVisionChamber() {
       starshipId: activeStarshipId,
       sessionId: refinementSessionId,
       userId: user.id
-    }, (response) => {
+    }, (response: { success: boolean; error?: string }) => {
       if (response.success) {
         setCurrentProposal(undefined);
         toast({
@@ -357,7 +357,7 @@ export function SimpleVisionChamber() {
                   </div>
                   <div>
                     <CardTitle className="text-lg font-semibold text-blue-700 dark:text-blue-300">
-                      Sibil's Vision Refinement
+                      Sibil&apos;s Vision Refinement
                     </CardTitle>
                     <p className="text-sm text-blue-600 dark:text-blue-400">
                       Confidence: {currentProposal.confidenceLevel}% • {currentProposal.keyChanges.length} key changes
@@ -455,7 +455,7 @@ export function SimpleVisionChamber() {
                 </div>
                 <div>
                   <CardTitle className="text-xl font-semibold">Vision Statement</CardTitle>
-                  <p className="text-sm text-muted-foreground">Define your starship's guiding purpose</p>
+                  <p className="text-sm text-muted-foreground">Define your starship&apos;s guiding purpose</p>
                 </div>
                 
                 {!isEditing && vision.trim().length > 0 && (
@@ -592,7 +592,7 @@ export function SimpleVisionChamber() {
                               Vision Statement Required
                             </p>
                             <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-                              A vision statement is required before agents can be used. Please create one to enable agent interactions and unlock your starship's full potential.
+                              A vision statement is required before agents can be used. Please create one to enable agent interactions and unlock your starship&apos;s full potential.
                             </p>
                           </div>
                         </div>

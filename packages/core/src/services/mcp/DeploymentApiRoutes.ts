@@ -207,7 +207,7 @@ export function createDeploymentApiRoutes(config: DeploymentApiConfig): Router {
 
       // Build status response
       const statuses = await Promise.all(
-        connectors.map(async (connector) => {
+        connectors.map(async (connector: any) => {
           const status = await workflowService.getDeploymentStatus(connector.id);
           return {
             connectorId: connector.id,
@@ -231,8 +231,8 @@ export function createDeploymentApiRoutes(config: DeploymentApiConfig): Router {
         data: {
           starshipId: starship.id,
           connectorCount: statuses.length,
-          runningCount: statuses.filter(s => s.status === 'running').length,
-          errorCount: statuses.filter(s => s.status === 'error').length,
+          runningCount: statuses.filter((s: any) => s.status === 'running').length,
+          errorCount: statuses.filter((s: any) => s.status === 'error').length,
           connectors: statuses
         }
       });
@@ -437,11 +437,13 @@ export function deploymentErrorHandler() {
   };
 }
 
-// Extend Request interface for Docker deployment flag
+// Extend Request interface for Docker deployment flag and user
 declare global {
   namespace Express {
     interface Request {
       dockerDeploymentEnabled?: boolean;
+      user?: any;
+      kindeId?: string;
     }
   }
 }

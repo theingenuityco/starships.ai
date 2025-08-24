@@ -282,7 +282,7 @@ export class PerformanceOptimizer {
 
   private async processBatch(
     toolName: string,
-    items: Array<{ starshipId: string; params: any; resolve: Function; reject: Function }>
+    items: Array<{ starshipId: string; params: any; resolve: (value: any) => void; reject: (reason?: any) => void }>
   ): Promise<void> {
     try {
       // Group by starshipId for efficiency
@@ -478,8 +478,8 @@ class BatchQueue {
   private queue: Array<{
     starshipId: string;
     params: any;
-    resolve: Function;
-    reject: Function;
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
   }> = [];
   private timer: NodeJS.Timeout | null = null;
   private batchCount = 0;
@@ -489,7 +489,7 @@ class BatchQueue {
     private toolName: string,
     private maxBatchSize: number,
     private maxWaitTime: number,
-    private processBatch: Function
+    private processBatch: (toolName: string, items: Array<{ starshipId: string; params: any; resolve: (value: any) => void; reject: (reason?: any) => void }>) => Promise<void>
   ) {}
 
   async add(item: { starshipId: string; params: any }): Promise<any> {

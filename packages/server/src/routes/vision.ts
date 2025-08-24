@@ -141,7 +141,7 @@ router.post('/starships/:id/vision', authMiddleware, generalVisionRateLimit, asy
     }
     
     // Update existing vision or create new one
-    let existingVision = await visionRepo.findByStarship(starshipId);
+    const existingVision = await visionRepo.findByStarship(starshipId);
     if (existingVision) {
       await visionRepo.updateStatement(starshipId, vision);
       // Update metrics if calculated successfully

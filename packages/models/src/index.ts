@@ -11,7 +11,6 @@ export * from './types';
 // Repository implementations
 export { AgentRepository } from './repositories/AgentRepository';
 export { UserRepository } from './repositories/UserRepository';
-export { ChannelRepository } from './repositories/ChannelRepository';
 export { LLMRepository } from './repositories/LLMRepository';
 
 // Aether Core Repository implementations
@@ -37,8 +36,6 @@ export { VisionFileService } from './services/VisionFileService';
 // NEW: Export comprehensive error handling system
 export {
   BaseError,
-  ErrorCategory,
-  ErrorDetails,
   ErrorFactory,
   ErrorUtils,
   AuthenticationError,
@@ -55,17 +52,25 @@ export {
   NotFoundError as EnhancedNotFoundError,
 } from './errors';
 
+export type {
+  ErrorCategory,
+  ErrorDetails
+} from './errors';
+
 // NEW: Export structured logging and monitoring system
 export {
   Logger,
-  LogLevel,
-  LogContext,
-  PerformanceMetrics,
-  HealthStatus,
   PerformanceMonitor,
   HealthMonitor,
   RequestContext,
   logger,
+} from './logging';
+
+export type {
+  LogLevel,
+  LogContext,
+  PerformanceMetrics,
+  HealthStatus
 } from './logging';
 
 // Export scripts

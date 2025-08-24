@@ -73,6 +73,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
   private getMCPServerConnectorRepository(): MCPServerConnectorRepository {
     if (!this.mcpServerConnectorRepository) {
       // Import here to avoid circular dependencies
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { MCPServerConnectorRepository } = require('./MCPServerConnectorRepository');
       this.mcpServerConnectorRepository = new MCPServerConnectorRepository();
     }
@@ -375,6 +376,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     }
 
     // FALLBACK: If somehow still collides, use UUID suffix
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const uuidSuffix = require('uuid').v4().substring(0, 8);
     const fallbackSlug = `${baseSlug}-${uuidSuffix}`;
 
@@ -393,7 +395,7 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     const connection = getConnection();
 
     let query = 'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId';
-    const params: any = { slug, ownerId };
+    const params: Record<string, any> = { slug, ownerId };
 
     if (excludeId) {
       query += ' AND s.id <> $excludeId';
@@ -651,44 +653,39 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     this.validateUUID(starshipId, 'starshipId');
     this.validateUUID(templateId, 'templateId');
 
-    try {
-      console.log(
-        `[StarshipRepository] Creating connector instance from template ${templateId} for starship ${starshipId}`
-      );
+    console.log(
+      `[StarshipRepository] Creating connector instance from template ${templateId} for starship ${starshipId}`
+    );
 
-      // Validate starship exists
-      const starship = await this.findById(starshipId);
-      if (!starship) {
-        this.handleNotFound('Starship', starshipId, 'createConnectorInstance');
-      }
-
-      // Use MCPServerConnectorRepository to create the connector instance
-      const mcpConnectorRepo = this.getMCPServerConnectorRepository();
-
-      // Check for existing connector instance with same starship and template
-      const existingConnector = await mcpConnectorRepo.findByStarshipAndTemplate(
-        starshipId,
-        templateId
-      );
-      if (existingConnector) {
-        this.handleConflict(
-          'MCPServerConnector',
-          `Connector instance already exists for starship ${starshipId} and template ${templateId}. Only one connector instance per template is allowed per starship.`,
-          'createConnectorInstance',
-          `${starshipId}-${templateId}`
-        );
-      }
-
-      const connectorInstance = await mcpConnectorRepo.createFromTemplate(starshipId, templateId);
-
-      console.log(
-        `[StarshipRepository] Successfully created connector instance ${connectorInstance.id} for starship ${starshipId}`
-      );
-      return connectorInstance;
-    } catch (error) {
-      // BaseRepository will handle error conversion
-      throw error;
+    // Validate starship exists
+    const starship = await this.findById(starshipId);
+    if (!starship) {
+      this.handleNotFound('Starship', starshipId, 'createConnectorInstance');
     }
+
+    // Use MCPServerConnectorRepository to create the connector instance
+    const mcpConnectorRepo = this.getMCPServerConnectorRepository();
+
+    // Check for existing connector instance with same starship and template
+    const existingConnector = await mcpConnectorRepo.findByStarshipAndTemplate(
+      starshipId,
+      templateId
+    );
+    if (existingConnector) {
+      this.handleConflict(
+        'MCPServerConnector',
+        `Connector instance already exists for starship ${starshipId} and template ${templateId}. Only one connector instance per template is allowed per starship.`,
+        'createConnectorInstance',
+        `${starshipId}-${templateId}`
+      );
+    }
+
+    const connectorInstance = await mcpConnectorRepo.createFromTemplate(starshipId, templateId);
+
+    console.log(
+      `[StarshipRepository] Successfully created connector instance ${connectorInstance.id} for starship ${starshipId}`
+    );
+    return connectorInstance;
   }
 
   /**
@@ -702,54 +699,49 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
     this.validateUUID(starshipId, 'starshipId');
     this.validateUUID(connectorId, 'connectorId');
 
-    try {
-      console.log(
-        `[StarshipRepository] Removing connector instance ${connectorId} from starship ${starshipId}`
-      );
+    console.log(
+      `[StarshipRepository] Removing connector instance ${connectorId} from starship ${starshipId}`
+    );
 
-      // Validate starship exists
-      const starship = await this.findById(starshipId);
-      if (!starship) {
-        this.handleNotFound('Starship', starshipId, 'removeConnectorInstance');
-      }
-
-      // Use MCPServerConnectorRepository to validate ownership and delete
-      const mcpConnectorRepo = this.getMCPServerConnectorRepository();
-
-      // First, verify the connector belongs to this starship
-      const connector = await mcpConnectorRepo.findById(connectorId);
-      if (!connector) {
-        console.log(`[StarshipRepository] No connector instance found with ID ${connectorId}`);
-        return false;
-      }
-
-      if (connector.starshipId !== starshipId) {
-        this.handleConflict(
-          'MCPServerConnector',
-          `Connector instance ${connectorId} does not belong to starship ${starshipId}. Cannot remove connector from different starship.`,
-          'removeConnectorInstance',
-          connectorId
-        );
-      }
-
-      // Delete the connector instance
-      const success = await mcpConnectorRepo.delete(connectorId);
-
-      if (success) {
-        console.log(
-          `[StarshipRepository] Successfully removed connector instance ${connectorId} from starship ${starshipId}`
-        );
-      } else {
-        console.log(
-          `[StarshipRepository] Failed to remove connector instance ${connectorId} from starship ${starshipId}`
-        );
-      }
-
-      return success;
-    } catch (error) {
-      // BaseRepository will handle error conversion
-      throw error;
+    // Validate starship exists
+    const starship = await this.findById(starshipId);
+    if (!starship) {
+      this.handleNotFound('Starship', starshipId, 'removeConnectorInstance');
     }
+
+    // Use MCPServerConnectorRepository to validate ownership and delete
+    const mcpConnectorRepo = this.getMCPServerConnectorRepository();
+
+    // First, verify the connector belongs to this starship
+    const connector = await mcpConnectorRepo.findById(connectorId);
+    if (!connector) {
+      console.log(`[StarshipRepository] No connector instance found with ID ${connectorId}`);
+      return false;
+    }
+
+    if (connector.starshipId !== starshipId) {
+      this.handleConflict(
+        'MCPServerConnector',
+        `Connector instance ${connectorId} does not belong to starship ${starshipId}. Cannot remove connector from different starship.`,
+        'removeConnectorInstance',
+        connectorId
+      );
+    }
+
+    // Delete the connector instance
+    const success = await mcpConnectorRepo.delete(connectorId);
+
+    if (success) {
+      console.log(
+        `[StarshipRepository] Successfully removed connector instance ${connectorId} from starship ${starshipId}`
+      );
+    } else {
+      console.log(
+        `[StarshipRepository] Failed to remove connector instance ${connectorId} from starship ${starshipId}`
+      );
+    }
+
+    return success;
   }
 
   /**
@@ -837,18 +829,14 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
   // ============================================================================
 
   async findBySubscriptionId(subscriptionId: string): Promise<Starship | null> {
-    try {
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ starship: Starship }>(
-        `MATCH (starship:Starship {subscriptionId: $subscriptionId})
-         RETURN starship`,
-        { subscriptionId }
-      );
-      
-      return result[0]?.starship || null;
-    } catch (error) {
-      throw error;
-    }
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ starship: Starship }>(
+      `MATCH (starship:Starship {subscriptionId: $subscriptionId})
+       RETURN starship`,
+      { subscriptionId }
+    );
+    
+    return result[0]?.starship || null;
   }
 
   async updateSubscription(
@@ -860,35 +848,27 @@ export class StarshipRepository extends BaseRepository implements StarshipReposi
       billingPeriod?: 'monthly' | 'yearly';
     }
   ): Promise<void> {
-    try {
-      const connection = getConnection();
-      const setClause = Object.entries(updates)
-        .map(([key]) => `starship.${key} = $${key}`)
-        .join(', ');
-        
-      await connection.executeWrite(
-        `MATCH (starship:Starship {id: $starshipId})
-         SET ${setClause}, starship.updatedAt = $timestamp`,
-        { starshipId, ...updates, timestamp: new Date().toISOString() }
-      );
-    } catch (error) {
-      throw error;
-    }
+    const connection = getConnection();
+    const setClause = Object.entries(updates)
+      .map(([key]) => `starship.${key} = $${key}`)
+      .join(', ');
+      
+    await connection.executeWrite(
+      `MATCH (starship:Starship {id: $starshipId})
+       SET ${setClause}, starship.updatedAt = $timestamp`,
+      { starshipId, ...updates, timestamp: new Date().toISOString() }
+    );
   }
 
   async countFreeStarships(userId: string): Promise<number> {
-    try {
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ count: number }>(
-        `MATCH (user:User {id: $userId})-[:OWNS]->(starship:Starship {plan: 'scout'})
-         RETURN count(starship) as count`,
-        { userId }
-      );
-      
-      return result[0]?.count || 0;
-    } catch (error) {
-      throw error;
-    }
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ count: number }>(
+      `MATCH (user:User {id: $userId})-[:OWNS]->(starship:Starship {plan: 'scout'})
+       RETURN count(starship) as count`,
+      { userId }
+    );
+    
+    return result[0]?.count || 0;
   }
 
   // ============================================================================

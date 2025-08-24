@@ -398,7 +398,7 @@ export function ConnectorSelector({
           <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">Connectors</h3>
             <p className="text-sm text-muted-foreground">
-              Manage your starship's external connections
+              Manage your starship&apos;s external connections
             </p>
           </div>
         </div>

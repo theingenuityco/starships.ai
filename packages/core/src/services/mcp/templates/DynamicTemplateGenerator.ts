@@ -94,7 +94,7 @@ export class DynamicTemplateGenerator {
       if (!node) {
         // Fallback: try to find by normalized name
         const allNodes = await this.mcpServerOptionRepo.findAll();
-        return allNodes.find(n => 
+        return allNodes.find((n: any) =>
           n.slug === slug || 
           n.name.toLowerCase().replace(/\s+/g, '-') === slug
         ) || null;

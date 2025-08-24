@@ -1,14 +1,11 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    "rootDir": "./src",
     "outDir": "./dist",
-    "composite": true,
-    "declarationMap": true,
-    "types": ["node", "jest"]
+    "rootDir": "./src"
   },
-  "include": ["src/**/*", "src/types/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
+  "include": ["src/**/*"],
+  "exclude": ["dist"],
   "references": [
     { "path": "../models" }
   ]

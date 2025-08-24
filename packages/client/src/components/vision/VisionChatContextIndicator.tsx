@@ -298,7 +298,7 @@ export function VisionChatContextIndicator({
                     </div>
                   </div>
                   <p className="text-sm text-green-600 dark:text-green-400">
-                    Your starship's vision has been successfully updated with the refined version.
+                    Your starship&apos;s vision has been successfully updated with the refined version.
                   </p>
                 </div>
                 <Button

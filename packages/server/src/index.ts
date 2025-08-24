@@ -11,7 +11,6 @@ import getStore from './store';
 import {
   AgentRepository,
   UserRepository,
-  ChannelRepository,
   LLMRepository,
   StarshipRepository,
   VisionRepository,
@@ -117,7 +116,6 @@ const store = getStore();
 // Core repositories
 const agentRepository = new AgentRepository();
 const userRepository = new UserRepository();
-const channelRepository = new ChannelRepository();
 const llmRepository = new LLMRepository();
 
 // Aether Core repositories - use proper dependency injection

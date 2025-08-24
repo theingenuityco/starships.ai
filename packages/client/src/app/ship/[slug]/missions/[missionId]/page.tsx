@@ -949,7 +949,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                                 Reasoning:
                               </span>
                               <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">
-                                "{clarity.reasoning}"
+                                &ldquo;{clarity.reasoning}&rdquo;
                               </blockquote>
                             </div>
                           </div>

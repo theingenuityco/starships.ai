@@ -17,7 +17,8 @@ import type {
   MissionClarity,
   WorkflowResponse,
   MissionExecutionState,
-  MissionPhase
+  MissionPhase,
+  MissionPlanResponse
 } from '@starships/protocol';
 import api from './api';
 
@@ -247,6 +248,13 @@ export const missionApi = {
     return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-plan`, {
       method: 'POST'
     });
+  },
+
+  /**
+   * Get mission plan (legacy - deprecated, use getMissionWorkflow instead)
+   */
+  async getMissionPlan(missionId: string): Promise<ApiResponse<MissionPlanResponse | null>> {
+    return apiRequest<MissionPlanResponse | null>(`/api/missions/${missionId}/plan`);
   },
 
   /**

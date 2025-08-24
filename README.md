@@ -90,7 +90,7 @@ For detailed development workflow, see the [Development Guide](./docs/developmen
 - **Monorepo:** pnpm Workspaces + Turborepo
 - **Language:** TypeScript 5 (strict) with project references
 - **Database:** Neo4j graph database with Cypher queries and migration system
-- **AI & LLM:** LangChain + LangGraph, OpenAI/Anthropic with FAISS vector storage
+- **AI & LLM:** LangChain + LangGraph, OpenAI/Anthropic integration
 - **Server:** Express.js 5 with Socket.IO real-time communication
 - **Orchestration:** Kubernetes + Docker with automated MCP connector deployment
 - **Payments:** Stripe integration with subscription management and webhook handling

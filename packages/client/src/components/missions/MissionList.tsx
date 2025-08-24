@@ -38,8 +38,28 @@ import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
 import { starshipAPI, type Agent } from '@/lib/api';
 
-// Type for deployed agents (excludes starshipId since it's implied by context)
-type DeployedAgent = Omit<Agent, 'starshipId'>;
+// Type for deployed agents - use the API response type directly
+type DeployedAgent = {
+  id: string;
+  name: string;
+  model: string;
+  systemPrompt?: string;
+  createdAt: string;
+  description?: string;
+  tags: string[];
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  authorId: string;
+  isPublic: boolean;
+  version: string;
+  updatedAt: string;
+  usageCount: number;
+  rating?: number;
+  temperature?: number;
+  maxTokens?: number;
+  customInstructions?: string;
+  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
+  requiredPermissions?: string[];
+};
 import type { 
   Mission, 
   MissionStatus, 

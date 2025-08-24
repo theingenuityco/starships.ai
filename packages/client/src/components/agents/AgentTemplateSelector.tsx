@@ -332,7 +332,7 @@ export function AgentTemplateSelector({
           <DialogHeader>
             <DialogTitle>Create Agent from Template</DialogTitle>
             <DialogDescription>
-              Create a new agent based on the "{selectedTemplate?.name}" template.
+              Create a new agent based on the &ldquo;{selectedTemplate?.name}&rdquo; template.
             </DialogDescription>
           </DialogHeader>
 

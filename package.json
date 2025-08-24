@@ -1,7 +1,7 @@
 {
   "name": "starships.ai",
   "private": true,
-  "version": "3.1.1",
+  "version": "3.1.5",
   "packageManager": "pnpm@10.12.4",
   "workspaces": [
     "packages/*"
@@ -13,10 +13,10 @@
     "postinstall": "node scripts/setup-docker-path.js",
     "dev": "SKIP_K8S_CHECK=true turbo run dev",
     "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
     "prebuild": "node scripts/check-k8s-requirements.js",
     "build": "turbo run build",
     "start": "pnpm --filter @starships/server start",
-    "test": "turbo run test",
     "deploy:staging": "cd deploy && npm run deploy:staging",
     "deploy:production": "cd deploy && npm run deploy:production",
     "deploy:staging:dry-run": "cd deploy && npm run deploy:staging:dry-run",

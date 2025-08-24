@@ -386,9 +386,9 @@ export class ConnectorMigrationService {
         return { success: false, errorMessage: `Health check failed: HTTP ${healthResponse.status}` };
       }
 
-      const healthData = await healthResponse.json();
-      if (healthData.status !== 'healthy') {
-        return { success: false, errorMessage: `Container health status: ${healthData.status}` };
+      const healthData = await healthResponse.json() as any;
+      if (healthData?.status !== 'healthy') {
+        return { success: false, errorMessage: `Container health status: ${healthData?.status}` };
       }
 
       // Test tools endpoint
@@ -497,7 +497,7 @@ export class ConnectorMigrationService {
     try {
       // Find all connectors using this template
       const connectors = await this.mcpConnectorRepo.findByTemplate(templateSlug);
-      const legacyConnectors = connectors.filter(c => !c.httpBridgeEnabled);
+      const legacyConnectors = connectors.filter((c: any) => !c.httpBridgeEnabled);
       
       if (legacyConnectors.length === 0) {
         console.log(`[ConnectorMigration] No legacy connectors found for template ${templateSlug}`);
@@ -507,7 +507,7 @@ export class ConnectorMigrationService {
       console.log(`[ConnectorMigration] Found ${legacyConnectors.length} legacy connectors for template ${templateSlug}`);
       
       // Migrate connectors in parallel with controlled concurrency
-      const migrationPromises = legacyConnectors.map(connector => 
+      const migrationPromises = legacyConnectors.map((connector: any) =>
         this.migrateToHttpBridge({
           ...options,
           connectorId: connector.id
@@ -516,7 +516,7 @@ export class ConnectorMigrationService {
       
       const results = await Promise.allSettled(migrationPromises);
       
-      return results.map((result, index) => {
+      return results.map((result: any, index: number) => {
         if (result.status === 'fulfilled') {
           return result.value;
         } else {

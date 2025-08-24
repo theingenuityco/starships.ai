@@ -211,7 +211,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Select the category that best describes your agent's purpose
+                  Select the category that best describes your agent&apos;s purpose
                 </p>
               </div>
             </div>
@@ -263,7 +263,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   rows={2}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Provide a clear, concise description of your agent's capabilities
+                  Provide a clear, concise description of your agent&apos;s capabilities
                 </p>
               </div>
 

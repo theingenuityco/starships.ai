@@ -3,7 +3,7 @@ import { Agent } from '@starships/protocol';
 
 
 // Re-export Agent
-export { Agent };
+export type { Agent };
 
 export interface LLM {
   id: string;
@@ -11,7 +11,7 @@ export interface LLM {
   provider: 'openai' | 'anthropic';
   maxTokens?: number;
   temperature?: number;
-  embeddingModel?: string;
+  
   supportsStreaming?: boolean;
   supportsTools?: boolean;
   costPer1kTokens?: number;
@@ -28,14 +28,6 @@ export interface User {
   createdAt: string;
   // Stripe integration
   stripeCustomerId?: string;  // Stripe customer ID
-}
-
-export interface Channel {
-  id: string;
-  name: string;
-  guildId?: string;
-  type: 'text' | 'voice' | 'dm';
-  createdAt: string;
 }
 
 // NEW: Aether Core Entities
@@ -116,7 +108,6 @@ export interface Repository<T> {
 }
 
 export interface AgentRepository extends Repository<Agent> {
-  findByChannel(channelId: string): Promise<Agent[]>;
   findByUser(userId: string): Promise<Agent[]>;
   findByStarship(starshipId: string): Promise<Agent[]>;
 
@@ -152,10 +143,6 @@ export interface UserRepository extends Repository<User> {
   findByKindeId(kindeId: string): Promise<User | null>;
 }
 
-export interface ChannelRepository extends Repository<Channel> {
-  findByGuild(guildId: string): Promise<Channel[]>;
-  findByType(type: string): Promise<Channel[]>;
-}
 
 export interface LLMRepository extends Repository<LLM> {
   findByProvider(provider: string): Promise<LLM[]>;
@@ -696,19 +683,7 @@ export interface VisionRepository {
   updateVision(starshipId: string, newVision: string): Promise<Vision | null>;
 }
 
-export interface AgentChannelRelationship {
-  agentId: string;
-  channelId: string;
-  deployedAt: string;
-  isActive: boolean;
-}
 
-export interface UserInteractionRelationship {
-  userId: string;
-  agentId: string;
-  lastInteraction: string;
-  messageCount: number;
-}
 
 // NEW: Agent Templates System
 export interface AgentTemplate {

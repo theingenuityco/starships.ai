@@ -106,7 +106,7 @@ async function seedStarships() {
     for (const userData of TEST_USERS) {
       try {
         // Check if user already exists
-        let existingUser = await userRepo.findByUsername(userData.username);
+        const existingUser = await userRepo.findByUsername(userData.username);
         
         if (existingUser) {
           console.log(`  ✅ User already exists: ${existingUser.username} (${existingUser.id})`);

@@ -2564,9 +2564,9 @@ router.get(
       const starshipConnectors = await mcpConnectorRepo.findByStarship(starship.id);
       const connectorIds = starshipConnectors.map((c: any) => c.id);
 
-      const starshipMetrics = allMetrics.filter(m => connectorIds.includes(m.connectorId));
-      const starshipLogs = allLogs.filter(l => connectorIds.includes(l.connectorId));
-      const starshipAlerts = allAlerts.filter(a => connectorIds.includes(a.connectorId));
+      const starshipMetrics = allMetrics.filter((m: any) => connectorIds.includes(m.connectorId));
+      const starshipLogs = allLogs.filter((l: any) => connectorIds.includes(l.connectorId));
+      const starshipAlerts = allAlerts.filter((a: any) => connectorIds.includes(a.connectorId));
 
       console.log(`[STARSHIPS] Retrieved monitoring overview for starship ${starship.id}: ${starshipMetrics.length} connectors, ${starshipLogs.length} logs, ${starshipAlerts.length} alerts`);
 

@@ -250,7 +250,7 @@ export function StarshipDeleteDialog({
                         <div>
                           <div className="font-medium">Active Starship</div>
                           <div className="text-sm text-muted-foreground">
-                            This is your currently active starship. You'll need to select another one.
+                            This is your currently active starship. You&apos;ll need to select another one.
                           </div>
                         </div>
                       </div>
@@ -298,7 +298,7 @@ export function StarshipDeleteDialog({
                     />
                     {confirmationText && !isConfirmationValid && (
                       <p className="text-sm text-destructive">
-                        Name doesn't match. Please type exactly: {starship.name}
+                        Name doesn&apos;t match. Please type exactly: {starship.name}
                       </p>
                     )}
                   </div>
@@ -312,7 +312,7 @@ export function StarshipDeleteDialog({
                     <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
                     <div className="text-sm">
                       <strong>Warning:</strong> This action is irreversible. 
-                      The starship "{starship.name}" and all associated data will be permanently deleted.
+                      The starship &ldquo;{starship.name}&rdquo; and all associated data will be permanently deleted.
                     </div>
                   </div>
                 </CardContent>

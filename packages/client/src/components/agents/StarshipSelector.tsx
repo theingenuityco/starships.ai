@@ -50,8 +50,13 @@ export function StarshipSelector({
     loadStarships()
   }, [])
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout' ? '🚀' : '🛸'
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return '🚀'
+      case 'cruiser': return '🛸'
+      case 'draught': return '🚢'
+      default: return '🚀'
+    }
   }
 
   if (loading) {

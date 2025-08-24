@@ -59,6 +59,7 @@ export class AgentToolInterceptor {
    */
   wrapTool(tool: DynamicTool): DynamicTool {
     const originalFunc = tool.func.bind(tool);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const interceptor = this;
     const toolName = tool.name;
     

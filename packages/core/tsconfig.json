@@ -5,10 +5,10 @@
     "outDir": "./dist",
     "composite": true,
     "declarationMap": true,
-    "types": ["node", "jest"]
+    "types": ["node"]
   },
   "include": ["src/**/*", "src/types/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"],
+  "exclude": ["node_modules", "dist"],
   "references": [
     { "path": "../models" }
   ]

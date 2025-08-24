@@ -32,7 +32,7 @@ export function StarfieldBackground({
 }: StarfieldBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const starsRef = useRef<Star[]>([]);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
   const timeRef = useRef<number>(0);
   const starIdCounter = useRef<number>(0);
   const deadStars = useRef<Set<number>>(new Set());

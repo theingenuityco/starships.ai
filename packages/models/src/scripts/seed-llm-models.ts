@@ -140,8 +140,8 @@ export async function seedLLMModels() {
 if (require.main === module) {
   async function runSeedScript() {
     // Load environment variables from project root
-    const path = require('path');
-    const fs = require('fs');
+    const path = await import('path');
+    const fs = await import('fs');
     
     // Look for .env file in project root (two levels up from this script)
     const envPath = path.resolve(__dirname, '../../../../.env');

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 
 export function ExpeditionControl() {
   const { activeStarshipId, starshipAgents } = useStarshipStore();
-  const deployedAgents = starshipAgents[activeStarshipId]?.deployedCount ?? 0;
+  const deployedAgents = activeStarshipId ? starshipAgents[activeStarshipId]?.deployedCount ?? 0 : 0;
   
   return (
     <Card className="p-6">

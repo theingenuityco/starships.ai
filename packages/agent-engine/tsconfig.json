@@ -17,9 +17,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node", "jest"]
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../protocol" }, { "path": "../models" }]
+  "references": [{ "path": "../protocol" }, { "path": "../models" }, { "path": "../core" }]
 }

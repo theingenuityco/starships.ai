@@ -30,8 +30,8 @@ interface FlowNode extends Node {
   data: {
     label: string;
     task: MissionTask;
-    priority: 'low' | 'medium' | 'high';
-    agentId: string;
+    priority: 'low' | 'medium' | 'high' | 'critical';
+    agentId: string | undefined;
   };
 }
 
@@ -75,7 +75,7 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
   const edges: Edge[] = [];
 
   // Create a map of task IDs for validation
-  const taskIdSet = new Set(plan.tasks.map(task => task.id));
+  const taskIdSet = new Set(plan.tasks.map((task: MissionTask) => task.id));
 
   // Use original task order from the plan (since dependencies don't match current tasks)
   const sortedTasks = [...plan.tasks];
@@ -91,17 +91,17 @@ const convertToFlowData = (plan: MissionPlanResponse) => {
       type: 'default',
       position: { x, y },
       data: {
-        label: `${plan.tasks.findIndex(t => t.id === task.id) + 1}. ${task.title}`,
+        label: `${plan.tasks.findIndex((t: MissionTask) => t.id === task.id) + 1}. ${task.title}`,
         task,
         priority: task.priority,
-        agentId: task.assignedAgentId,
+        agentId: task.assignedAgentId || '',
       },
       style: getNodeStyle(task.priority),
     });
 
     // Generate edges for dependencies that exist in the current task set
     if (task.dependencies && task.dependencies.length > 0) {
-      task.dependencies.forEach((depId) => {
+      task.dependencies.forEach((depId: string) => {
         if (taskIdSet.has(depId)) {
           edges.push({
             id: `${depId}-${task.id}`,

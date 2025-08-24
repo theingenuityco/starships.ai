@@ -256,9 +256,10 @@ export class AffirmationDetector {
       case 'reject':
         return "No problem! Let me know what specific aspects you'd like me to focus on instead.";
       
-      case 'modify':
+      case 'modify': {
         const feedbackSuggestions = this.generateFeedbackSuggestions(analysis.feedback);
         return `I understand you'd like some adjustments. ${feedbackSuggestions} Let me refine the vision based on your feedback.`;
+      }
       
       case 'unclear':
       default:

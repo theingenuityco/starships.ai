@@ -1,9 +1,8 @@
 {
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    /* Protocol-specific overrides */
-    "outDir": "dist",
-    "rootDir": "src"
+    "outDir": "./dist"
   },
-  "include": ["src"]
+  "include": ["src/**/*"],
+  "exclude": ["dist"]
 }

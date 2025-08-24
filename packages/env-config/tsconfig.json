@@ -1,11 +1,9 @@
 {
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    /* Env Config-specific overrides (needs DOM for browser compatibility) */
     "lib": ["ES2020", "DOM"],
-    "outDir": "dist",
-    "rootDir": "src"
+    "outDir": "./dist"
   },
   "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist"]
 }

@@ -1,19 +1,13 @@
 {
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    /* Models-specific overrides */
     "allowJs": true,
     "outDir": "./dist",
-    "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
+  "exclude": ["dist"],
   "references": [
     { "path": "../protocol" }
   ]

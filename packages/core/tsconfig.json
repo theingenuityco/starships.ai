@@ -1,12 +1,10 @@
 {
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    /* Core-specific overrides */
-    "rootDir": "./src",
     "outDir": "./dist"
   },
-  "include": ["src/**/*", "src/types/**/*"],
-  "exclude": ["node_modules", "dist"],
+  "include": ["src/**/*"],
+  "exclude": ["dist"],
   "references": [
     { "path": "../models" }
   ]

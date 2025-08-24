@@ -1,8 +1,4 @@
 {
-  "extends": "./tsconfig.nodejs.json",
-  "compilerOptions": {
-    /* Root level overrides if needed */
-  },
   "files": [],
   "references": [
     { "path": "./packages/protocol" },
@@ -10,6 +6,7 @@
     { "path": "./packages/models" },
     { "path": "./packages/core" },
     { "path": "./packages/agent-engine" },
-    { "path": "./packages/server" }
+    { "path": "./packages/server" },
+    { "path": "./packages/client" }
   ]
 }

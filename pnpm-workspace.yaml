@@ -5,7 +5,7 @@ onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - cpu-features
   - esbuild
-  - faiss-node
+  
   - protobufjs
   - sharp
   - ssh2

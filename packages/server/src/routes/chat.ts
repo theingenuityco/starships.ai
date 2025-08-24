@@ -35,7 +35,6 @@ router.post('/', authMiddleware, validateChatRequest, async (req, res) => {
       agent_id: req.body.agent_id,
       user_id: req.user!.id, // Use authenticated user ID, not client-provided
       message: req.body.message,
-      channel_id: req.body.channel_id,
       stream: false,
     };
 

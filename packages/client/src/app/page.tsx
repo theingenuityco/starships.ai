@@ -112,7 +112,7 @@ export default function HomePage() {
   const [launching, setLaunching] = useState(false);
   const [hasVision, setHasVision] = useState(false);
   const [hasExistingStarships, setHasExistingStarships] = useState(false);
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, userName } = useAuth();
   const { scrollYProgress } = useScroll();
   const { session } = useOnboardingSession();
   const { starships, loadUserStarships } = useStarshipStore();
@@ -385,9 +385,9 @@ export default function HomePage() {
             {isAuthenticated ? (
               <LandingSibilWidgetAuthenticated 
                 userName={(() => {
-                  // Simply use the first word from displayName
-                  if (user?.displayName) {
-                    const firstName = user.displayName.trim().split(' ')[0];
+                  // Simply use the first word from userName
+                  if (userName) {
+                    const firstName = userName.trim().split(' ')[0];
                     return firstName;
                   }
                   

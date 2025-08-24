@@ -45,9 +45,30 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
       CREATE (t:AgentTemplate $template)
       RETURN t
     `;
-
+    
     const results = await this.connection.executeWrite<{ t: AgentTemplate }>(query, { template });
-    return convertNeo4jIntsInObject(results[0].t);
+    const created = convertNeo4jIntsInObject(results[0].t);
+
+    // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
+    try {
+      if (template.authorId && template.authorId !== 'system') {
+        await this.connection.executeWrite(
+          `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
+           MERGE (u)-[r:CREATES]->(t)
+           ON CREATE SET r.createdAt = $now`,
+          {
+            authorId: template.authorId,
+            templateId: created.id,
+            now
+          }
+        );
+      }
+    } catch (error) {
+      // Log but don't fail - relationship is optional if user doesn't exist
+      console.warn('Failed to create USER-[:CREATES]->AGENT_TEMPLATE relationship:', error);
+    }
+
+    return created;
   }
 
   async update(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | null> {
@@ -224,9 +245,29 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
       CREATE (a)-[:DEPLOYED_ON]->(s)
       RETURN a
     `;
-
+    
     const results = await this.connection.executeWrite<{ a: Agent }>(query, { agent, starshipId });
-    return convertNeo4jIntsInObject(results[0].a);
+    const createdAgent = convertNeo4jIntsInObject(results[0].a);
+
+    // Create USER-[:CREATES]->AGENT relationship if author user exists
+    try {
+      if (authorId && authorId !== 'system') {
+        await this.connection.executeWrite(
+          `MATCH (u:User {id: $authorId}), (a:Agent {id: $agentId})
+           MERGE (u)-[r:CREATES]->(a)
+           ON CREATE SET r.createdAt = $now`,
+          {
+            authorId,
+            agentId: createdAgent.id,
+            now
+          }
+        );
+      }
+    } catch (error) {
+      console.warn('Failed to create USER-[:CREATES]->AGENT relationship:', error);
+    }
+
+    return createdAgent;
   }
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {
@@ -273,10 +314,30 @@ export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
       CREATE (t:AgentTemplate $template)
       RETURN t
     `;
-
+    
     const results = await this.connection.executeWrite<{ t: AgentTemplate }>(createQuery, {
       template,
     });
-    return convertNeo4jIntsInObject(results[0].t);
+    const created = convertNeo4jIntsInObject(results[0].t);
+
+    // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
+    try {
+      if (template.authorId && template.authorId !== 'system') {
+        await this.connection.executeWrite(
+          `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
+           MERGE (u)-[r:CREATES]->(t)
+           ON CREATE SET r.createdAt = $now`,
+          {
+            authorId: template.authorId,
+            templateId: created.id,
+            now
+          }
+        );
+      }
+    } catch (error) {
+      console.warn('Failed to create USER-[:CREATES]->AGENT_TEMPLATE relationship:', error);
+    }
+
+    return created;
   }
 }

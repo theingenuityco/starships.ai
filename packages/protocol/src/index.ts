@@ -6,7 +6,6 @@ export interface UsageStats {
 export interface ChatRequest {
   agent_id: string;
   user_id: string;
-  channel_id?: string;
   message: string;
   stream?: boolean;
 }
@@ -43,7 +42,7 @@ export interface Agent {
 
   // Deployment settings
   starshipId: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser')[];
+  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   requiredPermissions?: string[];
 }
 
@@ -63,7 +62,7 @@ export interface CreateAgentRequest {
   temperature?: number;
   maxTokens?: number;
   customInstructions?: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser')[];
+  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   authorId?: string;
   starshipId: string; // REQUIRED for new agents
 }

@@ -1,21 +1,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
-  DialogFooter 
+  DialogFooter
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Activity, 
-  Save, 
-  X, 
+import {
+  Activity,
+  Save,
+  X,
   Loader2,
   Rocket,
   AlertCircle,
@@ -23,7 +23,8 @@ import {
   Circle,
   Anchor,
   Settings,
-  ArrowRight
+  ArrowRight,
+  XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
@@ -72,8 +73,35 @@ const STARSHIP_STATUSES = {
       'Mission completion',
       'System diagnostics clear'
     ]
+  },
+  disabled: {
+    name: 'Disabled',
+    icon: XCircle,
+    description: 'Subscription ended - starship is disabled',
+    color: 'bg-red-500/20 text-red-400 border-red-500/30',
+    iconColor: 'text-red-500',
+    benefits: [],
+    requirements: []
+  },
+  restricted: {
+    name: 'Restricted',
+    icon: AlertCircle,
+    description: 'Payment issue - limited functionality',
+    color: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    iconColor: 'text-orange-500',
+    benefits: [],
+    requirements: []
+  },
+  pending_payment: {
+    name: 'Payment Required',
+    icon: AlertCircle,
+    description: 'Payment required to activate starship',
+    color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    iconColor: 'text-yellow-500',
+    benefits: [],
+    requirements: []
   }
-};
+} as const;
 
 export function StarshipStatusManager({ 
   starshipId, 
@@ -96,10 +124,14 @@ export function StarshipStatusManager({
   const currentStatus = starship?.status || 'inactive';
   const statusData = STARSHIP_STATUSES[selectedStatus];
 
-  // Initialize with current status
+  // Initialize with current status (map system statuses to user-selectable ones)
   useEffect(() => {
     if (starship) {
-      setSelectedStatus(starship.status);
+      // Map system statuses to user-selectable statuses
+      const userSelectableStatus = ['disabled', 'restricted', 'pending_payment'].includes(starship.status)
+        ? 'inactive'
+        : starship.status as 'active' | 'inactive';
+      setSelectedStatus(userSelectableStatus);
       setStep(1);
     }
   }, [starship]);
@@ -111,8 +143,13 @@ export function StarshipStatusManager({
     }
   }, [open, clearError]);
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout' ? '🚀' : '🛸';
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return '🚀'
+      case 'cruiser': return '🛸'
+      case 'draught': return '🚢'
+      default: return '🚀'
+    }
   };
 
   const handleStatusUpdate = async () => {
@@ -130,7 +167,11 @@ export function StarshipStatusManager({
   const handleClose = () => {
     onOpenChange(false);
     if (starship) {
-      setSelectedStatus(starship.status);
+      // Map system statuses to user-selectable statuses
+      const userSelectableStatus = ['disabled', 'restricted', 'pending_payment'].includes(starship.status)
+        ? 'inactive'
+        : starship.status as 'active' | 'inactive';
+      setSelectedStatus(userSelectableStatus);
     }
     setStep(1);
     clearError('status');
@@ -170,7 +211,7 @@ export function StarshipStatusManager({
             <span>Status Management</span>
           </DialogTitle>
           <DialogDescription>
-            Update your starship's operational status and configuration
+            Update your starship&apos;s operational status and configuration
           </DialogDescription>
         </DialogHeader>
 
@@ -195,13 +236,13 @@ export function StarshipStatusManager({
                     <div className="flex-1">
                       <div className="flex items-center space-x-2">
                         <span className="font-medium">Current Status:</span>
-                        <Badge variant="outline" className={STARSHIP_STATUSES[currentStatus].color}>
-                          {React.createElement(STARSHIP_STATUSES[currentStatus].icon, { className: "w-3 h-3 mr-1" })}
-                          {STARSHIP_STATUSES[currentStatus].name}
+                        <Badge variant="outline" className={STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.color || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}>
+                          {React.createElement(STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.icon || Circle, { className: "w-3 h-3 mr-1" })}
+                          {STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.name || currentStatus}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {STARSHIP_STATUSES[currentStatus].description}
+                        {STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.description || 'System-managed status'}
                       </p>
                     </div>
                   </div>
@@ -282,9 +323,9 @@ export function StarshipStatusManager({
                     {/* Current Status */}
                     <div className="text-center space-y-2">
                       <div className="text-sm text-muted-foreground">Current</div>
-                      <Badge variant="outline" className={STARSHIP_STATUSES[currentStatus].color}>
-                        {React.createElement(STARSHIP_STATUSES[currentStatus].icon, { className: "w-3 h-3 mr-1" })}
-                        {STARSHIP_STATUSES[currentStatus].name}
+                      <Badge variant="outline" className={STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.color || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}>
+                        {React.createElement(STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.icon || Circle, { className: "w-3 h-3 mr-1" })}
+                        {STARSHIP_STATUSES[currentStatus as keyof typeof STARSHIP_STATUSES]?.name || currentStatus}
                       </Badge>
                     </div>
 

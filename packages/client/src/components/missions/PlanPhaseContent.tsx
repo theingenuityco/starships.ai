@@ -196,7 +196,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
       </div>
 
       {/* Action Buttons */}
-      {plan.approvalStatus === 'pending' && (
+      {(!plan || !(plan as any).approvalStatus || (plan as any).approvalStatus === 'pending') && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -234,7 +234,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
       )}
       
       {/* Status Messages */}
-      {plan.approvalStatus === 'approved' && (
+      {(plan as any).approvalStatus === 'approved' && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -245,7 +245,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
         </motion.div>
       )}
       
-      {plan.approvalStatus === 'rejected' && (
+      {(plan as any).approvalStatus === 'rejected' && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -272,7 +272,7 @@ export function PlanPhaseContent({ mission, onPlanApproval }: PlanPhaseContentPr
           >
             <h3 className="text-lg font-semibold mb-4">Request Plan Changes</h3>
             <p className="text-gray-600 mb-4">
-              Please provide feedback on what changes you'd like to see in the execution plan:
+              Please provide feedback on what changes you&apos;d like to see in the execution plan:
             </p>
             <Textarea
               value={rejectionReason}

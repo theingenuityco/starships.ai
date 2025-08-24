@@ -30,14 +30,6 @@ export interface User {
   stripeCustomerId?: string;  // Stripe customer ID
 }
 
-export interface Channel {
-  id: string;
-  name: string;
-  guildId?: string;
-  type: 'text' | 'voice' | 'dm';
-  createdAt: string;
-}
-
 // NEW: Aether Core Entities
 export interface Starship {
   id: string;
@@ -116,7 +108,6 @@ export interface Repository<T> {
 }
 
 export interface AgentRepository extends Repository<Agent> {
-  findByChannel(channelId: string): Promise<Agent[]>;
   findByUser(userId: string): Promise<Agent[]>;
   findByStarship(starshipId: string): Promise<Agent[]>;
 
@@ -152,10 +143,6 @@ export interface UserRepository extends Repository<User> {
   findByKindeId(kindeId: string): Promise<User | null>;
 }
 
-export interface ChannelRepository extends Repository<Channel> {
-  findByGuild(guildId: string): Promise<Channel[]>;
-  findByType(type: string): Promise<Channel[]>;
-}
 
 export interface LLMRepository extends Repository<LLM> {
   findByProvider(provider: string): Promise<LLM[]>;
@@ -696,19 +683,7 @@ export interface VisionRepository {
   updateVision(starshipId: string, newVision: string): Promise<Vision | null>;
 }
 
-export interface AgentChannelRelationship {
-  agentId: string;
-  channelId: string;
-  deployedAt: string;
-  isActive: boolean;
-}
 
-export interface UserInteractionRelationship {
-  userId: string;
-  agentId: string;
-  lastInteraction: string;
-  messageCount: number;
-}
 
 // NEW: Agent Templates System
 export interface AgentTemplate {

@@ -329,7 +329,6 @@ export interface Vision {
 // Backend request/response types (snake_case)
 interface ChatBackendRequest {
   agent_id: string
-  channel_id?: string
   message: string
   stream?: boolean
 }
@@ -353,7 +352,6 @@ export interface ChatRequest {
 function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   return {
     agent_id: req.agentId,
-    channel_id: req.sessionId,
     message: req.message,
     stream: false,
   }

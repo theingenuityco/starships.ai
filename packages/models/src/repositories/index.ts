@@ -1,6 +1,5 @@
 import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
-import { ChannelRepository } from './ChannelRepository';
 import { LLMRepository } from './LLMRepository';
 import { Neo4jAgentTemplateRepository } from './AgentTemplateRepository';
 import { AgentTemplateService } from '../services/AgentTemplateService';
@@ -9,7 +8,6 @@ import { NotFoundError } from '../errors';
 
 export { AgentRepository } from './AgentRepository';
 export { UserRepository } from './UserRepository';
-export { ChannelRepository } from './ChannelRepository';
 export { LLMRepository } from './LLMRepository';
 
 // NEW: Aether Core Repositories
@@ -62,7 +60,6 @@ export class RepositoryFactory {
   // Repository instances - all initialized synchronously
   private static agentRepo: AgentRepository | null = null;
   private static userRepo: UserRepository | null = null;
-  private static channelRepo: ChannelRepository | null = null;
   private static llmRepo: LLMRepository | null = null;
 
   // Aether Core repository instances
@@ -134,7 +131,6 @@ export class RepositoryFactory {
       // Initialize basic repositories first (no dependencies)
       this.agentRepo = new AgentRepository();
       this.userRepo = new UserRepository();
-      this.channelRepo = new ChannelRepository();
       this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
       this.mcpServerOptionRepo = new MCPServerOptionRepository();
@@ -201,7 +197,6 @@ export class RepositoryFactory {
       repositoryStatus: {
         agentRepo: this.agentRepo !== null,
         userRepo: this.userRepo !== null,
-        channelRepo: this.channelRepo !== null,
         llmRepo: this.llmRepo !== null,
         starshipRepo: this.starshipRepo !== null,
         visionRepo: this.visionRepo !== null,
@@ -243,16 +238,6 @@ export class RepositoryFactory {
     return this.userRepo;
   }
 
-  /**
-   * Get ChannelRepository instance (synchronous)
-   */
-  static getChannelRepository(): ChannelRepository {
-    this.ensureInitialized();
-    if (!this.channelRepo) {
-      throw new Error('ChannelRepository not initialized');
-    }
-    return this.channelRepo;
-  }
 
   /**
    * Get LLMRepository instance (synchronous)
@@ -401,7 +386,6 @@ export class RepositoryFactory {
     // Clear all repository instances
     this.agentRepo = null;
     this.userRepo = null;
-    this.channelRepo = null;
     this.llmRepo = null;
     this.starshipRepo = null;
     this.visionRepo = null;

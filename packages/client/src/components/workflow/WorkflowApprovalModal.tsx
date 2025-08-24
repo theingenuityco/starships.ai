@@ -284,8 +284,8 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({
             <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
               <p className="text-sm text-yellow-800">
-                Once approved, this workflow will begin execution immediately. 
-                Make sure you've reviewed all steps carefully.
+                Once approved, this workflow will begin execution immediately.
+                Make sure you&apos;ve reviewed all steps carefully.
               </p>
             </div>
 

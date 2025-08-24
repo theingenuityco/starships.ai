@@ -101,20 +101,31 @@ export function StarshipCard({
 
   const notificationStatus = getNotificationStatus()
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout' ? '🚀' : '🛸'
+  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return '🚀'
+      case 'cruiser': return '🛸'
+      case 'draught': return '🚢'
+      default: return '🚀'
+    }
   }
 
-  const getStarshipDescription = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout'
-      ? 'Fast and agile vessel designed for exploration and reconnaissance missions.'
-      : 'Heavy-duty starship built for extended operations and complex multi-agent deployments.'
+  const getStarshipDescription = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return 'Fast and agile vessel designed for exploration and reconnaissance missions.'
+      case 'cruiser': return 'Heavy-duty starship built for extended operations and complex multi-agent deployments.'
+      case 'draught': return 'Massive flagship vessel for large-scale operations and complex enterprise missions.'
+      default: return 'Versatile starship for various mission types.'
+    }
   }
 
-  const getClassColor = (starshipClass: 'scout' | 'cruiser') => {
-    return starshipClass === 'scout'
-      ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
-      : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+  const getClassColor = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
+    switch (starshipClass) {
+      case 'scout': return 'bg-violet-500/20 text-violet-400 border-violet-500/30'
+      case 'cruiser': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+      case 'draught': return 'bg-red-500/20 text-red-400 border-red-500/30'
+      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+    }
   }
 
   const handleCardClick = () => {

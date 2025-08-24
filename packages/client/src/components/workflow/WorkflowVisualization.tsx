@@ -26,14 +26,15 @@ import {
   Eye, 
   Clock 
 } from 'lucide-react';
-import type { MissionWorkflow, WorkflowDSLNode, Agent } from '@starships/protocol';
+import type { WorkflowDSL, WorkflowDSLNode, Agent, MissionWorkflow } from '@starships/protocol';
 
 export interface WorkflowVisualizationProps {
-  workflow: MissionWorkflow;
+  workflow: WorkflowDSL | MissionWorkflow;
   agents?: Record<string, Agent>;
   currentNodeId?: string;
   onNodeClick?: (nodeId: string) => void;
   className?: string;
+  showControls?: boolean;
 }
 
 interface FlowNode extends Node {
@@ -277,7 +278,7 @@ const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: 
 };
 
 // Convert workflow to React Flow format
-const convertToFlowData = (workflow: MissionWorkflow, currentNodeId?: string, agents?: Record<string, Agent>) => {
+const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeId?: string, agents?: Record<string, Agent>) => {
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
 

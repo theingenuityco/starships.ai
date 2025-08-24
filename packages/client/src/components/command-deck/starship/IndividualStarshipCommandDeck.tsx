@@ -123,7 +123,7 @@ export function IndividualStarshipCommandDeck({ slug, className }: IndividualSta
                     <span className="text-4xl mr-3">🚧</span> <span className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">Command Deck</span>
                   </CardTitle>
                   <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-                    This is the central command interface for managing your starship's internal operations and systems.
+                    This is the central command interface for managing your starship&apos;s internal operations and systems.
                   </p>
                 </div>
               </CardHeader>

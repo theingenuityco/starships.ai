@@ -548,7 +548,7 @@ ${taskResults}
                      content.includes('```') || 
                      content.includes('---') || 
                      content.length > 100 ||
-                     /[{}\[\]<>]/.test(content);
+                     /[{}<>]/.test(content);
     
     if (isComplex) {
       return `---\n${content}\n---`;

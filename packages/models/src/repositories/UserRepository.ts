@@ -143,20 +143,6 @@ export class UserRepository extends BaseRepository implements UserRepositoryInte
 
 
 
-  async joinChannel(userId: string, channelId: string, role?: string): Promise<void> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ userId, channelId }, ['userId', 'channelId'], 'joinChannel');
-      
-      const connection = getConnection();
-      await connection.executeWrite(
-        `MATCH (u:User), (c:Channel)
-         WHERE u.id = $userId AND c.id = $channelId
-         MERGE (u)-[r:ACTIVE_IN]->(c)
-         SET r.joinedAt = $joinedAt, r.role = $role`,
-        { userId: userId, channelId: channelId, joinedAt: new Date().toISOString(), role: role }
-      );
-    }, 'joinChannel', 'User', userId);
-  }
 
   // Stripe integration methods
   async findByStripeCustomerId(stripeCustomerId: string): Promise<User | null> {

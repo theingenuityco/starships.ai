@@ -13,6 +13,7 @@
     "postinstall": "node scripts/setup-docker-path.js",
     "dev": "SKIP_K8S_CHECK=true turbo run dev",
     "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
     "prebuild": "node scripts/check-k8s-requirements.js",
     "build": "turbo run build",
     "start": "pnpm --filter @starships/server start",

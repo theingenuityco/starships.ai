@@ -33,53 +33,47 @@
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
-    "lint:fix": {
-      "dependsOn": ["^build"],
+    "@starships/client#lint": {
+      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
-    "type-check": {
-      "dependsOn": ["^build"],
+    "@starships/server#lint": {
+      "dependsOn": ["@starships/agent-engine#build", "@starships/core#build", "@starships/env-config#build", "@starships/models#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "@starships/agent-engine#lint": {
+      "dependsOn": ["@starships/core#build", "@starships/models#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
+      "outputs": []
+    },
+    "@starships/client#type-check": {
+      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
-    "format": {
-      "inputs": ["$TURBO_DEFAULT$", ".prettierrc*", "prettier.config.*"],
+     "type-check": {
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
-    "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "jest.*.config.*"],
-      "outputs": ["coverage/**", "test-results/**"]
+    "@starships/models#type-check": {
+      "dependsOn": ["@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
     },
-    "test:unit": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "jest.config.*"],
-      "outputs": ["coverage/**"]
+    "@starships/agent-engine#type-check": {
+      "dependsOn": ["@starships/core#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
     },
-    "test:integration": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "jest.integration.config.*"],
-      "outputs": ["coverage/**"],
-      "env": ["NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD"]
-    },
-    "test:watch": {
-      "cache": false,
-      "persistent": true
-    },
-    "test:coverage": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "jest.config.*"],
-      "outputs": ["coverage/**"]
-    },
-    "test:service": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "jest.config.*"],
-      "outputs": ["coverage/**"]
+    "@starships/core#type-check": {
+      "dependsOn": ["@starships/models#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
     },
     "clean": {
       "cache": false,

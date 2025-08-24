@@ -23,6 +23,7 @@
   },
   "scripts": {
     "build": "rm -f tsconfig.tsbuildinfo && tsc",
+    "type-check": "tsc --noEmit",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",

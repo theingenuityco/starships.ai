@@ -1,5 +1,0 @@
-# Audit configuration for GitHub Actions
-# Only fail the build on high or critical vulnerabilities
-# Moderate vulnerabilities in deprecated packages (like request) are accepted
-
-audit-level: high

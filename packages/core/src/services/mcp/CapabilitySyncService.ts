@@ -213,8 +213,8 @@ export class CapabilitySyncService {
     ]);
 
     return {
-      tools: toolsData.tools || [],
-      resources: resourcesData.resources || [],
+      tools: (toolsData as any)?.tools || [],
+      resources: (resourcesData as any)?.resources || [],
       lastSync: new Date().toISOString(),
       syncVersion: Date.now(), // Use timestamp as version
     };

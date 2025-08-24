@@ -5,20 +5,16 @@
  */
 
 export { MCPDeployer } from './MCPDeployer';
-export type { 
-  DeploymentStatus, 
-  DeploymentResult, 
-  NetworkConfig 
+export type {
+  DeploymentStatus,
+  DeploymentResult,
+  NetworkConfig
 } from './MCPDeployer';
 
 export { DockerComposeDeployer } from './DockerComposeDeployer';
 export { MockDeployer } from './MockDeployer';
 
-export { 
-  DockerServiceTemplate,
-  VolumeMapping,
-  HealthCheck,
-  ResourceLimits,
+export {
   getDockerServiceTemplate,
   getAllDockerServiceTemplates,
   hasDockerServiceTemplate,
@@ -28,18 +24,31 @@ export {
   getDefaultResourceLimits,
   validateTemplate,
   getTemplateStats,
-  DOCKER_SERVICE_TEMPLATES 
+  DOCKER_SERVICE_TEMPLATES
 } from './DockerServiceTemplate';
 
-export { 
-  DeploymentWorkflowService,
+export type {
+  DockerServiceTemplate,
+  VolumeMapping,
+  HealthCheck,
+  ResourceLimits
+} from './DockerServiceTemplate';
+
+export {
+  DeploymentWorkflowService
+} from './DeploymentWorkflowService';
+
+export type {
   DeploymentWorkflowOptions,
   WorkflowResult,
   DeploymentNotification
 } from './DeploymentWorkflowService';
 
 export {
-  DeploymentRouteHandler,
+  DeploymentRouteHandler
+} from './DeploymentRouteHandler';
+
+export type {
   DeploymentRequest,
   DeploymentResponse
 } from './DeploymentRouteHandler';

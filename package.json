@@ -35,8 +35,7 @@
     "backup:list": "cd deploy && npm run backup:list",
     "k8s:setup": "bash scripts/setup-kind-cluster.sh",
     "k8s:cleanup": "kind delete cluster --name starships",
-    "k8s:status": "kubectl get all -A",
-    "k8s:logs": "kubectl logs -f -n $NAMESPACE -l app=mcp-connector"
+    "k8s:status": "kubectl get all -A"
   },
   "devDependencies": {
     "@semantic-release/git": "^10.0.1",

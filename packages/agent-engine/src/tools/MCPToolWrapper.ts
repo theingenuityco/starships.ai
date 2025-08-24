@@ -1,7 +1,7 @@
 /**
  * NativeToolWrapper - Direct API integration for agent tools
  *
- * Simplified tool wrapper that uses direct API integration instead of MCP
+ * Simplified tool wrapper that uses direct API integration for various services
  */
 
 import { DynamicTool } from '@langchain/core/tools';

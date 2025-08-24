@@ -1,2 +1,2 @@
-export { MCPToolWrapper } from './MCPToolWrapper';
-export type { MCPToolConfig } from './MCPToolWrapper';
+export { NativeToolWrapper, MCPToolWrapper } from './MCPToolWrapper';
+export type { NativeToolConfig } from './MCPToolWrapper';

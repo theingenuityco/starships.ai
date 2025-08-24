@@ -29,7 +29,7 @@ export const authMiddleware = async (
         email: 'test@starships.ai',
         displayName: 'Test User',
         username: 'test-user',
-        avatar: null,
+        avatar: undefined,
         kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -73,7 +73,7 @@ export const authMiddleware = async (
         email: 'test@starships.ai',
         displayName: 'Test User',
         username: 'test-user',
-        avatar: null,
+        avatar: undefined,
         kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -138,7 +138,10 @@ export const authMiddleware = async (
     }
 
     // Attach user info to request for use in route handlers
-    req.user = user;
+    req.user = {
+      ...user,
+      updatedAt: (user as any).updatedAt || user.createdAt || new Date().toISOString()
+    };
     req.kindeId = payload.sub as string;
 
     console.log(`[AUTH] User resolved: ${user.id} (${user.displayName || user.username})`);

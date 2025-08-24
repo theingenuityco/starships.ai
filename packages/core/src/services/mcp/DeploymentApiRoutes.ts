@@ -437,11 +437,13 @@ export function deploymentErrorHandler() {
   };
 }
 
-// Extend Request interface for Docker deployment flag
+// Extend Request interface for Docker deployment flag and user
 declare global {
   namespace Express {
     interface Request {
       dockerDeploymentEnabled?: boolean;
+      user?: any;
+      kindeId?: string;
     }
   }
 }

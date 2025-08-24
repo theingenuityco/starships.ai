@@ -279,6 +279,24 @@ jobs:
           doctl kubernetes cluster kubeconfig save starships-prod
           kubectl version --client
 
+      # Update Kubernetes secrets from GitHub secrets
+      - name: Update Kubernetes secrets
+        run: |
+          # Delete existing secret if it exists (ignore errors if it doesn't)
+          kubectl delete secret starships-secrets -n starships-prod --ignore-not-found=true
+          
+          # Create new secret with all API keys
+          kubectl create secret generic starships-secrets \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
+            -n starships-prod
+          
+          echo "✅ Secrets updated successfully"
+
       # Update deployment with new image
       - name: Update Kubernetes deployment
         run: |

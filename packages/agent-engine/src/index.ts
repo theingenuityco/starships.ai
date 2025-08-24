@@ -931,10 +931,13 @@ You should be helpful, professional, and focused on delivering high-quality resu
 
 
 export { LangChainMemoryStore, chatStream };
-export { chatWithMCP } from './chat-with-mcp';
-export { chatWithMCPStream } from './chat-with-mcp-stream';
+export { chatWithMCP as chatWithNativeTools } from './chat-with-mcp';
+export { chatWithMCPStream as chatWithNativeToolsStream } from './chat-with-mcp-stream';
 
 // Export LLM Provider Factory and LangChainProvider
 export { ProviderFactory } from './llm/provider-factory';
 export { LangChainProvider } from './llm/langchain-provider';
+
+// Export native tool wrapper
+export { MCPToolWrapper as NativeToolWrapper, NativeToolConfig } from './tools/MCPToolWrapper';
 

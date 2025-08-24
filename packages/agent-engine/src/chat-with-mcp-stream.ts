@@ -3,7 +3,6 @@ import { LangChainMemoryStore } from "./memory/langchain-memory";
 import { ProviderFactory } from "./llm/provider-factory";
 import { RepositoryFactory } from "@starships/models";
 import { MCPToolWrapper } from "./tools/MCPToolWrapper";
-import { mcpToolGatewayDB } from "@starships/core";
 import type { ChatRequest, MemoryEntry } from "@starships/protocol";
 import { createToolCallingAgent } from "langchain/agents";
 import { MCPAgentExecutor } from "./agents/MCPAgentExecutor";
@@ -110,7 +109,7 @@ When appropriate, use these tools to provide better assistance. You are connecte
     // Set up progress tracking
     if (config.streaming.progressUpdates) {
       executor.callbacks = [{
-        handleToolStart: async (tool, input) => {
+        handleToolStart: async (tool: any, input: any) => {
           toolCallCount++;
           const now = Date.now();
           if (now - lastProgressUpdate > 1000) { // Update every second
@@ -411,31 +410,29 @@ export async function* chatWithMCPStream(
       starshipId = effectiveStarshipId;
       console.log('🚢 [AGENT-ENGINE-MCP-STREAM] Using starship for MCP tools:', starshipId);
       
-      // Create MCP tool wrapper
+      // Create tool wrapper
       const toolWrapper = new MCPToolWrapper({
         starshipId: starshipId!,
         agentId: req.agent_id,
-        gateway: mcpToolGatewayDB,
         enableLogging: true
       });
       
-      // Get available MCP tools
-      console.log('🔧 [AGENT-ENGINE-MCP-STREAM] Attempting to create MCP tools...');
+      // Get available native tools
+      console.log('🔧 [AGENT-ENGINE-MCP-STREAM] Attempting to create native tools...');
       mcpTools = await toolWrapper.createAllTools();
-      console.log(`🔧 [AGENT-ENGINE-MCP-STREAM] Loaded ${mcpTools.length} MCP tools`);
+      console.log(`🔧 [AGENT-ENGINE-MCP-STREAM] Loaded ${mcpTools.length} native tools`);
       if (mcpTools.length > 0) {
         console.log('📋 [AGENT-ENGINE-MCP-STREAM] Available tools:', mcpTools.map(t => ({ name: t.name, description: t.description })));
       } else {
-        console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] No MCP tools found for starship. This might mean:');
-        console.log('   - No MCP servers are configured for this starship');
-        console.log('   - MCP servers are not running or not accessible');
-        console.log('   - There was an error connecting to MCP servers');
+        console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] No native tools found for starship. This might mean:');
+        console.log('   - No API keys are configured for this starship');
+        console.log('   - There was an error loading the native tools');
       }
     } else {
       console.log('⚠️ [AGENT-ENGINE-MCP-STREAM] No starshipId found for agent');
     }
   } catch (error) {
-    console.warn('⚠️ [AGENT-ENGINE-MCP-STREAM] Could not load MCP tools:', error);
+    console.warn('⚠️ [AGENT-ENGINE-MCP-STREAM] Could not load native tools:', error);
     console.warn('   Stack trace:', (error as Error).stack);
   }
 
@@ -453,10 +450,9 @@ export async function* chatWithMCPStream(
   const envConfig = loadAgentExecutorConfig();
   const config = mergeConfig(DEFAULT_AGENT_EXECUTOR_CONFIG, envConfig);
 
-  // For now, if MCP tools are available, we need to handle them differently
-  // since streaming with tool execution is complex
+  // If native tools are available, use agent executor
   if (mcpTools.length > 0) {
-    console.log('🎯 [AGENT-ENGINE-MCP-STREAM] MCP tools available - using agent executor');
+    console.log('🎯 [AGENT-ENGINE-MCP-STREAM] Native tools available - using agent executor');
     
     try {
       // Check if streaming is enabled
@@ -590,8 +586,8 @@ export async function* chatWithMCPStream(
       }
     }
   } else {
-    // No MCP tools - use regular streaming
-    console.log('📝 [AGENT-ENGINE-MCP-STREAM] No MCP tools available, using regular streaming');
+    // No native tools - use regular streaming
+    console.log('📝 [AGENT-ENGINE-MCP-STREAM] No native tools available, using regular streaming');
     
     const formattedMemories = memoryArray;
     const prompt = buildPrompt(

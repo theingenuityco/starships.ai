@@ -34,10 +34,11 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
     // Return keys with masked values for security
     const maskedKeys: Record<string, string> = {};
     for (const [tool, key] of Object.entries(apiKeys)) {
-      if (key && key.length > 8) {
-        maskedKeys[tool] = `${key.slice(0, 4)}${'*'.repeat(key.length - 8)}${key.slice(-4)}`;
+      const keyStr = String(key || '');
+      if (keyStr && keyStr.length > 8) {
+        maskedKeys[tool] = `${keyStr.slice(0, 4)}${'*'.repeat(keyStr.length - 8)}${keyStr.slice(-4)}`;
       } else {
-        maskedKeys[tool] = key ? '*'.repeat(key.length) : '';
+        maskedKeys[tool] = keyStr ? '*'.repeat(keyStr.length) : '';
       }
     }
 

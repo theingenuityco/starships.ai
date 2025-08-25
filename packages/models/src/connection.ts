@@ -144,7 +144,6 @@ export class Neo4jConnection {
         // 'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
         // 'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
         // 'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
-        'CREATE CONSTRAINT mcp_server_option_id_unique IF NOT EXISTS FOR (m:MCPServerOption) REQUIRE m.id IS UNIQUE',
         
         // Mission system constraints
         'CREATE CONSTRAINT mission_id_unique IF NOT EXISTS FOR (m:Mission) REQUIRE m.id IS UNIQUE',
@@ -169,8 +168,6 @@ export class Neo4jConnection {
         // 'CREATE INDEX concept_codex_index IF NOT EXISTS FOR (concept:Concept) ON (concept.codexId)',
         // 'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
         // 'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
-        'CREATE INDEX mcp_server_option_name_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.name)',
-        'CREATE INDEX mcp_server_option_command_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.command)',
         'CREATE INDEX vision_starship_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId)',
         
         

@@ -1,9 +1,27 @@
-import {
-  ConnectorInstanceMigration,
-  runMigration,
-  runRollback,
-  runValidation,
-} from './001-connector-instances';
+// Stubs for removed MCP migration functionality
+class ConnectorInstanceMigration {
+  async migrate(): Promise<any> {
+    console.warn('ConnectorInstanceMigration.migrate: MCP functionality removed');
+    return { success: false, message: 'MCP functionality removed' };
+  }
+  
+  async rollback(): Promise<boolean> {
+    console.warn('ConnectorInstanceMigration.rollback: MCP functionality removed');
+    return false;
+  }
+}
+
+async function runMigration(): Promise<void> {
+  console.warn('runMigration: MCP functionality removed');
+}
+
+async function runRollback(): Promise<void> {
+  console.warn('runRollback: MCP functionality removed');
+}
+
+async function runValidation(): Promise<void> {
+  console.warn('runValidation: MCP functionality removed');
+}
 
 /**
  * Simple structure test for the migration script

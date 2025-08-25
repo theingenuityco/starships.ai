@@ -43,7 +43,7 @@ export function ConnectorPerformanceMetrics({
     const keyStatus = new Map<string, ApiKeyStatusInfo>()
 
     connectorInstances.forEach(connector => {
-      const healthMetric = monitoringService.createHealthMetrics(connector, connector.template)
+      const healthMetric = monitoringService.createHealthMetrics()
       metrics.set(connector.id, healthMetric)
 
       const apiStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
@@ -120,7 +120,7 @@ export function ConnectorPerformanceMetrics({
             <div className="flex items-center gap-2">
               <Progress value={overallMetrics.averageSuccessRate} className="flex-1 h-2" />
               <span className="text-sm font-mono">
-                {connectorMonitoring.formatSuccessRate(overallMetrics.averageSuccessRate)}
+                {connectorMonitoring.formatSuccessRate()}
               </span>
             </div>
           </div>
@@ -131,7 +131,7 @@ export function ConnectorPerformanceMetrics({
               <span className="text-xs text-muted-foreground">Avg Response</span>
             </div>
             <div className="text-sm font-mono">
-              {connectorMonitoring.formatResponseTime(overallMetrics.averageResponseTime)}
+              {connectorMonitoring.formatResponseTime()}
             </div>
           </div>
 
@@ -232,13 +232,13 @@ export function ConnectorPerformanceMetrics({
                     <div className="flex items-center gap-3 text-xs">
                       <div className="flex items-center gap-1">
                         <Target className="w-3 h-3 text-muted-foreground" />
-                        <span>{connectorMonitoring.formatSuccessRate(metrics.successRate)}</span>
+                        <span>{connectorMonitoring.formatSuccessRate()}</span>
                       </div>
                       {metrics.lastResponseTime && (
                         <div className="flex items-center gap-1">
                           <Zap className="w-3 h-3 text-muted-foreground" />
                           <span>
-                            {connectorMonitoring.formatResponseTime(metrics.lastResponseTime)}
+                            {connectorMonitoring.formatResponseTime()}
                           </span>
                         </div>
                       )}
@@ -258,7 +258,7 @@ export function ConnectorPerformanceMetrics({
           </div>
           <div className="text-center">
             <p className="text-lg font-semibold text-blue-600">
-              {connectorMonitoring.formatUptime(overallMetrics.averageUptime)}
+              {connectorMonitoring.formatUptime()}
             </p>
             <p className="text-xs text-muted-foreground">Avg Uptime</p>
           </div>

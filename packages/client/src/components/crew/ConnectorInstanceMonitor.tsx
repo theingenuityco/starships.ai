@@ -155,7 +155,7 @@ function ConnectorMonitorCard({
                     <span
                       className={cn(
                         'text-xs font-medium',
-                        connectorMonitoring.getHealthStatusColor(healthMetrics.healthStatus)
+                        connectorMonitoring.getHealthStatusColor()
                       )}
                     >
                       {healthMetrics.healthStatus}
@@ -202,7 +202,7 @@ function ConnectorMonitorCard({
             <span
               className={cn(
                 'text-xs font-medium',
-                connectorMonitoring.getPerformanceLevelColor(healthMetrics.performanceLevel)
+                connectorMonitoring.getPerformanceLevelColor()
               )}
             >
               {healthMetrics.performanceLevel}
@@ -258,7 +258,7 @@ function ConnectorMonitorCard({
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground">Uptime</span>
             <span className="text-xs font-mono">
-              {connectorMonitoring.formatUptime(healthMetrics.uptime)}
+              {connectorMonitoring.formatUptime()}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -266,7 +266,7 @@ function ConnectorMonitorCard({
             <div className="flex items-center gap-2">
               <Progress value={healthMetrics.successRate} className="w-12 h-1" />
               <span className="text-xs font-mono">
-                {connectorMonitoring.formatSuccessRate(healthMetrics.successRate)}
+                {connectorMonitoring.formatSuccessRate()}
               </span>
             </div>
           </div>
@@ -274,7 +274,7 @@ function ConnectorMonitorCard({
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground">Response Time</span>
               <span className="text-xs font-mono">
-                {connectorMonitoring.formatResponseTime(healthMetrics.lastResponseTime)}
+                {connectorMonitoring.formatResponseTime()}
               </span>
             </div>
           )}
@@ -534,22 +534,17 @@ export function ConnectorInstanceMonitor({
       const newHistory = new Map<string, ConnectorStatusHistoryEntry[]>()
 
       connectorInstances.forEach(connector => {
-        const metrics = monitoringService.createHealthMetrics(connector, connector.template)
+        const metrics = monitoringService.createHealthMetrics()
         newMetrics.set(connector.id, metrics)
 
         const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
         newApiKeyStatus.set(connector.id, keyStatus)
 
-        const history = monitoringService.getStatusHistory(connector.id)
+        const history = monitoringService.getStatusHistory()
         newHistory.set(connector.id, history)
 
         // Record current status in history
-        monitoringService.recordStatusChange(
-          connector.id,
-          connector.status,
-          metrics.healthStatus,
-          connector.errorMessage
-        )
+        monitoringService.recordStatusChange()
       })
 
       setHealthMetrics(newMetrics)
@@ -571,7 +566,7 @@ export function ConnectorInstanceMonitor({
       const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
 
       connectorInstances.forEach(connector => {
-        const metrics = monitoringService.createHealthMetrics(connector, connector.template)
+        const metrics = monitoringService.createHealthMetrics()
         newMetrics.set(connector.id, metrics)
 
         const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
@@ -603,7 +598,7 @@ export function ConnectorInstanceMonitor({
     const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
 
     connectorInstances.forEach(connector => {
-      const metrics = monitoringService.createHealthMetrics(connector, connector.template)
+      const metrics = monitoringService.createHealthMetrics()
       newMetrics.set(connector.id, metrics)
 
       const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)

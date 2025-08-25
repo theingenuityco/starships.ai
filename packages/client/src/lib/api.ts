@@ -5,8 +5,8 @@ import {
   apiCache,
   CACHE_KEYS,
   invalidateAgentCaches,
-  invalidateMCPServerCaches,
   invalidateConnectorInstanceCaches,
+  invalidateMCPServerCaches,
 } from './cache'
 
 const API_BASE_URL = getApiBaseUrl()
@@ -150,7 +150,7 @@ api.interceptors.response.use(
     } else if (error.response?.status === 409) {
       console.warn('[API] Conflict error (409):', error.response.data)
 
-      // Handle 409 conflicts for MCP server connections gracefully
+      // Handle 409 conflicts gracefully
       if (error.config?.url?.includes('/connectors/')) {
         console.log('[API] Interceptor handling 409 for connector operation - treating as success')
         // Return a successful response instead of rejecting
@@ -780,343 +780,79 @@ interface CreateConnectorInstanceResponse {
   connectorInstance: MCPServerConnector
 }
 
-// NEW: MCP Server API
+// Deprecated: MCP Server API functionality has been removed
 export const mcpServerAPI = {
-  // Get all available MCP server options with 5-minute caching
+  // Get all available MCP server options - DEPRECATED
   getAll: async (): Promise<MCPServerOption[]> => {
-    const cacheKey = CACHE_KEYS.MCP_SERVERS_ALL
-    const cached = apiCache.get<MCPServerOption[]>(cacheKey)
-    if (cached) {
-      console.log('[API] Using cached MCP servers:', cached.length)
-      return cached
-    }
-
-    console.log('[API] Fetching all MCP servers from server')
-    const data = await api
-      .get('/api/mcp-servers')
-      .then((res: AxiosResponse<MCPServersResponse>) => {
-        console.log('[API] Received MCP servers from server:', res.data.mcpServers.length)
-        return res.data.mcpServers
-      })
-
-    // Cache for 5 minutes (rarely changes)
-    apiCache.set(cacheKey, data, 5 * 60 * 1000)
-    return data
+    console.warn('[API] MCP Server functionality has been removed')
+    return []
   },
 
-  // Get connected MCP servers for a starship with 1-minute caching
+  // Get connected MCP servers for a starship - DEPRECATED
   getConnectedToStarship: async (starshipId: string): Promise<MCPServerOption[]> => {
-    const cacheKey = CACHE_KEYS.MCP_SERVERS_BY_STARSHIP(starshipId)
-    const cached = apiCache.get<MCPServerOption[]>(cacheKey)
-    if (cached) {
-      console.log(
-        '[API] Using cached connected MCP servers for starship:',
-        starshipId,
-        cached.length
-      )
-      return cached
-    }
-
-    console.log('[API] Fetching connected MCP servers for starship:', starshipId)
-    const data = await api
-      .get(`/api/starships/${starshipId}/connectors`)
-      .then((res: AxiosResponse<StarshipConnectorsResponse>) => {
-        console.log(
-          '[API] Received connected MCP servers for starship:',
-          starshipId,
-          res.data.connectedConnectors.length
-        )
-        return res.data.connectedConnectors
-      })
-
-    // Cache for 1 minute (changes more frequently)
-    apiCache.set(cacheKey, data, 1 * 60 * 1000)
-    return data
+    console.warn('[API] MCP Server functionality has been removed for starship:', starshipId)
+    return []
   },
 
-  // Connect MCP server to starship with cache invalidation
+  // Connect MCP server to starship - DEPRECATED
   connectToStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
-    console.log('[API] Connecting MCP server to starship:', { starshipId, mcpServerId })
-
-    try {
-      await api.post(`/api/starships/${starshipId}/connectors/${mcpServerId}`)
-      console.log('[API] Successfully connected MCP server to starship')
-
-      // Invalidate relevant caches
-      invalidateMCPServerCaches(starshipId)
-
-      // Also invalidate starship cache since connector state changed
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    } catch (error: any) {
-      console.log('[API] Caught error in connectToStarship:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-      })
-
-      // Handle 409 Conflict as success - connector is already connected
-      if (error.response?.status === 409) {
-        console.log('[API] MCP server already connected to starship (409) - treating as success')
-
-        // Still invalidate caches to ensure UI is up to date
-        invalidateMCPServerCaches(starshipId)
-        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-
-        console.log('[API] Successfully handled 409 conflict, returning without error')
-        return
-      }
-
-      console.error('[API] Failed to connect MCP server to starship:', error)
-      throw error
-    }
+    console.warn('[API] MCP Server connection functionality has been removed:', { starshipId, mcpServerId })
+    // Use deprecation stub instead of actual cache invalidation
+    invalidateMCPServerCaches(starshipId)
+    // No-op for compatibility
   },
 
-  // Disconnect MCP server from starship with cache invalidation
+  // Disconnect MCP server from starship - DEPRECATED
   disconnectFromStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
-    console.log('[API] Disconnecting MCP server from starship:', { starshipId, mcpServerId })
-
-    try {
-      await api.delete(`/api/starships/${starshipId}/connectors/${mcpServerId}`)
-      console.log('[API] Successfully disconnected MCP server from starship')
-
-      // Invalidate relevant caches
-      invalidateMCPServerCaches(starshipId)
-
-      // Also invalidate starship cache since connector state changed
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    } catch (error: any) {
-      // Handle 404 Not Found as success - connector is already disconnected
-      if (error.response?.status === 404) {
-        console.log(
-          '[API] MCP server already disconnected from starship (404) - treating as success'
-        )
-
-        // Still invalidate caches to ensure UI is up to date
-        invalidateMCPServerCaches(starshipId)
-        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-        return
-      }
-
-      console.error('[API] Failed to disconnect MCP server from starship:', error)
-      throw error
-    }
+    console.warn('[API] MCP Server disconnection functionality has been removed:', { starshipId, mcpServerId })
+    // Use deprecation stub instead of actual cache invalidation
+    invalidateMCPServerCaches(starshipId)
+    // No-op for compatibility
   },
 
-  // NEW: Connector Instance Methods
-  // Get connector instances for a starship with 1-minute caching
+  // Get connector instances - DEPRECATED
   getConnectorInstances: async (starshipId: string): Promise<MCPServerConnector[]> => {
-    const cacheKey = CACHE_KEYS.CONNECTOR_INSTANCES_BY_STARSHIP(starshipId)
-    const cached = apiCache.get<MCPServerConnector[]>(cacheKey)
-    if (cached) {
-      console.log('[API] Using cached connector instances for starship:', starshipId, cached.length)
-      return cached
-    }
-
-    console.log('[API] Fetching connector instances for starship:', starshipId)
-    const data = await api
-      .get(`/api/starships/${starshipId}/connectors`)
-      .then((res: AxiosResponse<{ starshipId: string; connectedConnectors: any[] }>) => {
-        console.log(
-          '[API] Received connector instances for starship:',
-          starshipId,
-          res.data.connectedConnectors.length
-        )
-        // Transform the response to match MCPServerConnector interface
-        return res.data.connectedConnectors.map(connector => ({
-          id: connector.id,
-          starshipId: starshipId,
-          templateId: connector.templateId,
-          status: connector.status,
-          isActive: connector.isActive,
-          connectedAt: connector.connectedAt,
-          lastUsed: connector.lastUsed,
-          errorMessage: connector.errorMessage,
-          createdAt: connector.createdAt,
-          updatedAt: connector.updatedAt,
-          template: {
-            id: connector.templateId,
-            name: connector.name,
-            command: connector.command,
-            args: connector.args,
-            env: connector.env,
-          },
-        }))
-      })
-
-    // Cache for 1 minute (changes more frequently)
-    apiCache.set(cacheKey, data, 1 * 60 * 1000)
-    return data
+    console.warn('[API] MCP Connector instances functionality has been removed for starship:', starshipId)
+    return []
   },
 
-  // Create connector instance from template with cache invalidation
+  // Create connector instance - DEPRECATED
   createConnectorInstance: async (
     starshipId: string,
     templateId: string,
     env?: string
   ): Promise<MCPServerConnector> => {
-    console.log('[API] Creating connector instance for starship:', {
-      starshipId,
-      templateId,
-      hasEnv: !!env,
-    })
-
-    try {
-      const requestBody = env ? { env } : {}
-
-      const data = await api
-        .post(`/api/starships/${starshipId}/connectors/${templateId}`, requestBody, {
-          timeout: 120000 // 120 seconds (2 minutes) timeout for connector creation
-        })
-        .then((res: AxiosResponse<any>) => {
-          console.log('[API] Successfully created connector instance:', res.data.connectorId)
-          // Transform response to match MCPServerConnector interface
-          return {
-            id: res.data.connectorId,
-            starshipId: res.data.starshipId,
-            templateId: res.data.templateId,
-            status: res.data.status,
-            isActive: true,
-            connectedAt: res.data.connectedAt,
-            createdAt: res.data.createdAt,
-            updatedAt: res.data.createdAt,
-            env: res.data.env,
-          }
-        })
-
-      // Invalidate relevant caches
-      invalidateConnectorInstanceCaches(starshipId)
-
-      // Also invalidate starship cache since connector state changed
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-
-      return data
-    } catch (error: any) {
-      console.log('[API] Caught error in createConnectorInstance:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message,
-      })
-
-      // Handle 200 success for already connected - backend returns 200 for idempotent operation
-      if (error.response?.status === 200 || error.response?.data?.alreadyConnected) {
-        console.log('[API] Connector instance already exists - treating as success')
-
-        // Still invalidate caches to ensure UI is up to date
-        invalidateConnectorInstanceCaches(starshipId)
-        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-
-        // Return the existing instance info
-        return {
-          id: error.response.data.connectorId,
-          starshipId: error.response.data.starshipId,
-          templateId: error.response.data.templateId,
-          status: error.response.data.status,
-          isActive: true,
-          connectedAt: error.response.data.connectedAt,
-          createdAt: error.response.data.connectedAt,
-          updatedAt: error.response.data.connectedAt,
-          env: error.response.data.env,
-        }
-      }
-
-      console.error('[API] Failed to create connector instance:', error)
-      throw error
-    }
+    console.warn('[API] MCP Connector instance creation has been removed:', { starshipId, templateId })
+    throw new Error('MCP functionality has been removed')
   },
 
-  // Remove connector instance with cache invalidation
+  // Remove connector instance - DEPRECATED
   removeConnectorInstance: async (starshipId: string, connectorId: string): Promise<void> => {
-    console.log('[API] Removing connector instance from starship:', { starshipId, connectorId })
-
-    try {
-      await api.delete(`/api/starships/${starshipId}/connectors/${connectorId}`, {
-        timeout: 30000 // 30 seconds timeout for connector removal
-      })
-      console.log('[API] Successfully removed connector instance from starship')
-
-      // Invalidate relevant caches
-      invalidateConnectorInstanceCaches(starshipId)
-
-      // Also invalidate starship cache since connector state changed
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    } catch (error: any) {
-      // Handle 404 Not Found as success - connector instance is already removed
-      if (error.response?.status === 404) {
-        console.log(
-          '[API] Connector instance already removed from starship (404) - treating as success'
-        )
-
-        // Still invalidate caches to ensure UI is up to date
-        invalidateConnectorInstanceCaches(starshipId)
-        apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-        return
-      }
-
-      console.error('[API] Failed to remove connector instance from starship:', error)
-      throw error
-    }
+    console.warn('[API] MCP Connector instance removal has been removed:', { starshipId, connectorId })
+    // No-op for compatibility
   },
 
-  // NEW: Configuration Management Methods
-  // Update connector instance configuration
+  // Update connector configuration - DEPRECATED
   updateConnectorConfig: async (
     starshipId: string,
     connectorId: string,
     config: ConnectorInstanceConfig
   ): Promise<MCPServerConnector> => {
-    console.log('[API] Updating connector configuration:', { starshipId, connectorId })
-
-    try {
-      const data = await api
-        .put(`/api/starships/${starshipId}/connectors/${connectorId}/config`, { config })
-        .then((res: AxiosResponse<{ connectorInstance: MCPServerConnector }>) => {
-          console.log('[API] Successfully updated connector configuration')
-          return res.data.connectorInstance
-        })
-
-      // Invalidate relevant caches
-      invalidateConnectorInstanceCaches(starshipId)
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to update connector configuration:', error)
-      throw error
-    }
+    console.warn('[API] MCP Connector configuration update has been removed:', { starshipId, connectorId })
+    throw new Error('MCP functionality has been removed')
   },
 
-  // Apply configuration template to connector instance
+  // Apply configuration template - DEPRECATED
   applyConfigTemplate: async (
     starshipId: string,
     connectorId: string,
     templateId: string
   ): Promise<MCPServerConnector> => {
-    console.log('[API] Applying configuration template:', { starshipId, connectorId, templateId })
-
-    try {
-      const data = await api
-        .post(`/api/starships/${starshipId}/connectors/${connectorId}/config/template`, {
-          templateId,
-        })
-        .then((res: AxiosResponse<{ connectorInstance: MCPServerConnector }>) => {
-          console.log('[API] Successfully applied configuration template')
-          return res.data.connectorInstance
-        })
-
-      // Invalidate relevant caches
-      invalidateConnectorInstanceCaches(starshipId)
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to apply configuration template:', error)
-      throw error
-    }
+    console.warn('[API] MCP Configuration template application has been removed:', { starshipId, connectorId, templateId })
+    throw new Error('MCP functionality has been removed')
   },
 
-  // Get connector instance configuration
+  // Get connector configuration - DEPRECATED
   getConnectorConfig: async (
     starshipId: string,
     connectorId: string
@@ -1126,92 +862,29 @@ export const mcpServerAPI = {
     version: number
     lastModified: string
   }> => {
-    console.log('[API] Getting connector configuration:', { starshipId, connectorId })
-
-    try {
-      const data = await api
-        .get(`/api/starships/${starshipId}/connectors/${connectorId}/config`)
-        .then(
-          (
-            res: AxiosResponse<{
-              config: ConnectorInstanceConfig
-              templateId?: string
-              version: number
-              lastModified: string
-            }>
-          ) => {
-            console.log('[API] Successfully retrieved connector configuration')
-            return res.data
-          }
-        )
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to get connector configuration:', error)
-      throw error
-    }
+    console.warn('[API] MCP Connector configuration retrieval has been removed:', { starshipId, connectorId })
+    throw new Error('MCP functionality has been removed')
   },
 
-  // NEW: Configuration History Methods
-  // Get configuration history for a connector instance
+  // Get configuration history - DEPRECATED
   getConnectorConfigHistory: async (
     starshipId: string,
     connectorId: string,
     limit?: number
   ): Promise<ConnectorConfigHistory[]> => {
-    console.log('[API] Getting connector configuration history:', {
-      starshipId,
-      connectorId,
-      limit,
-    })
-
-    try {
-      const params = new URLSearchParams()
-      if (limit) params.append('limit', limit.toString())
-
-      const data = await api
-        .get(
-          `/api/starships/${starshipId}/connectors/${connectorId}/config/history${params.toString() ? `?${params.toString()}` : ''}`
-        )
-        .then((res: AxiosResponse<{ history: ConnectorConfigHistory[] }>) => {
-          console.log('[API] Successfully retrieved connector configuration history')
-          return res.data.history
-        })
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to get connector configuration history:', error)
-      throw error
-    }
+    console.warn('[API] MCP Configuration history retrieval has been removed:', { starshipId, connectorId })
+    return []
   },
 
-  // Rollback connector configuration to a previous state
+  // Rollback connector configuration - DEPRECATED
   rollbackConnectorConfig: async (
     starshipId: string,
     connectorId: string,
     historyId: string,
     changeReason?: string
   ): Promise<void> => {
-    console.log('[API] Rolling back connector configuration:', {
-      starshipId,
-      connectorId,
-      historyId,
-    })
-
-    try {
-      await api.post(`/api/starships/${starshipId}/connectors/${connectorId}/config/rollback`, {
-        historyId,
-        changeReason,
-      })
-      console.log('[API] Successfully rolled back connector configuration')
-
-      // Invalidate relevant caches
-      invalidateConnectorInstanceCaches(starshipId)
-      apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    } catch (error) {
-      console.error('[API] Failed to rollback connector configuration:', error)
-      throw error
-    }
+    console.warn('[API] MCP Configuration rollback has been removed:', { starshipId, connectorId, historyId })
+    // No-op for compatibility
   },
 }
 

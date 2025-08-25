@@ -15,7 +15,7 @@ export interface ChatResponse {
   usage?: UsageStats;
 }
 
-// Define Agent interface directly to avoid circular dependency
+// Agent interface - core API contract type
 export interface Agent {
   // Existing fields
   id: string;

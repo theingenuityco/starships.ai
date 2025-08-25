@@ -1,8 +1,7 @@
-// Import Agent from protocol to avoid circular dependency
+// Import Agent from protocol - clean separation of concerns
 import { Agent } from '@starships/protocol';
 
-
-// Re-export Agent
+// Re-export Agent for convenience
 export type { Agent };
 
 export interface LLM {

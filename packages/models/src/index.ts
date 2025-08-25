@@ -29,29 +29,32 @@ export { AgentTemplateService } from './services/AgentTemplateService';
 export { VisionFileService } from './services/VisionFileService';
 
 
-// NEW: Export comprehensive error handling system
+// Export standardized error handling system from protocol
 export {
-  BaseError,
-  ErrorFactory,
-  ErrorUtils,
+  StandardError,
+  ValidationError,
   AuthenticationError,
   AuthorizationError,
+  NotFoundError,
   ConflictError,
   DatabaseError,
   NetworkError,
-  RateLimitError,
-  ServiceUnavailableError,
-  InternalServerError,
-  // Re-export enhanced versions with new names to avoid conflicts
-  ValidationError as EnhancedValidationError,
-  ConstraintViolationError as EnhancedConstraintViolationError,
-  NotFoundError as EnhancedNotFoundError,
-} from './errors';
+  BusinessLogicError,
+  ErrorFactory,
+  isStandardError,
+  // Re-export with legacy names for backward compatibility
+  StandardError as BaseError,
+  ErrorFactory as ErrorUtils,
+} from '@starships/protocol';
 
 export type {
   ErrorCategory,
-  ErrorDetails
-} from './errors';
+  ErrorSeverity,
+  ErrorInfo,
+  ErrorContext,
+  ErrorResponse,
+  StandardErrorCode
+} from '@starships/protocol';
 
 // NEW: Export structured logging and monitoring system
 export {

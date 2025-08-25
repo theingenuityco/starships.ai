@@ -276,7 +276,7 @@ jobs:
       # Save DigitalOcean kubeconfig
       - name: Setup Kubernetes
         run: |
-          doctl kubernetes cluster kubeconfig save starships-prod
+          doctl kubernetes cluster kubeconfig save starships-dev
           kubectl version --client
 
       # Update Kubernetes secrets from GitHub secrets
@@ -347,7 +347,7 @@ jobs:
           fi
           
           echo "**Version:** \`${{ needs.version.outputs.new_release_version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** starships-dev" >> $GITHUB_STEP_SUMMARY
           echo "**Namespace:** starships-dev" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Access Application" >> $GITHUB_STEP_SUMMARY

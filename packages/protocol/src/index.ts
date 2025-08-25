@@ -10,7 +10,6 @@ export * from './contracts/agent';
 export * from './contracts/chat';
 export * from './contracts/llm';
 export * from './contracts/socket';
-export * from './contracts/communication';
 
 // Export domain types (business entities)
 export * from './domain/mission';

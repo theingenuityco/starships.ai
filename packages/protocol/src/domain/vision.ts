@@ -207,31 +207,3 @@ export interface VisionRefinementRateLimit {
   windowDurationMs: number;
   maxRequests: number;
 }
-
-// ============================================================================
-// COMPREHENSIVE PROTOCOL
-// ============================================================================
-
-/**
- * Combined interface for all vision refinement functionality
- */
-export interface VisionRefinementProtocol {
-  types: {
-    VisionMetrics: VisionMetrics;
-    VisionAnalysisResult: VisionAnalysisResult;
-    VisionRefinementProposal: VisionRefinementProposal;
-    VisionRefinementState: VisionRefinementState;
-    VisionRefinementContext: VisionRefinementContext;
-  };
-  requests: {
-    VisionAnalysisRequest: VisionAnalysisRequest;
-    VisionRefinementRequest: VisionRefinementRequest;
-    VisionUpdateRequest: VisionUpdateRequest;
-  };
-  responses: {
-    VisionAnalysisEventData: VisionAnalysisEventData;
-    VisionProposalEventData: VisionProposalEventData;
-    VisionUpdatedEventData: VisionUpdatedEventData;
-    VisionRefinementErrorEventData: VisionRefinementErrorEventData;
-  };
-}

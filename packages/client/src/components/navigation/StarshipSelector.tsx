@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useStarshipStore } from '@/store/starship-store';
+import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
 import { cn } from '@/lib/utils';
 
 interface StarshipSelectorProps {
@@ -28,17 +29,14 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
     activeStarshipId,
     loading,
     error,
-    loadUserStarships,
     setActiveStarship,
     createStarship
   } = useStarshipStore();
 
   const [isCreatingStarship, setIsCreatingStarship] = useState(false);
 
-  // Load starships on mount
-  useEffect(() => {
-    loadUserStarships();
-  }, [loadUserStarships]);
+  // Use centralized loader - only loads once on mount and deduplicates calls
+  const { loadStarships } = useStarshipsLoader({ enabled: true });
   
   // Don't show StarshipSelector when inside individual starship routes
   if (pathname.startsWith('/ship/')) {
@@ -90,7 +88,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => loadUserStarships()}
+          onClick={() => loadStarships()}
           className="border-red-500/30 text-red-400 hover:bg-red-500/10"
         >
           Retry

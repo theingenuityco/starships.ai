@@ -51,7 +51,8 @@ router.post('/chat', authMiddleware, validateSibilRequest, async (req, res) => {
 
 // NEW: Streaming endpoint
 // Preview endpoint - quick message preview without full chat context
-router.post('/preview', authMiddleware, async (req, res) => {
+// Note: No auth required as this is used in pre-auth onboarding flow
+router.post('/preview', async (req, res) => {
   try {
     const { message, provider = 'openai' } = req.body;
 

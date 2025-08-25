@@ -56,9 +56,6 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     KINDE_POST_LOGOUT_REDIRECT_URL: process.env.KINDE_POST_LOGOUT_REDIRECT_URL || 'http://localhost:3000',
     KINDE_DEBUG_MODE: process.env.KINDE_DEBUG_MODE === 'true',
     
-    // MCP HTTP Bridge Feature Flag
-    MCP_HTTP_BRIDGE_ENABLED: process.env.MCP_HTTP_BRIDGE_ENABLED !== 'false', // Default: true
-    
     // Stripe Configuration - use test keys as defaults for development/CI
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || (process.env.NODE_ENV === 'production' ? '' : 'sk_test_dummy_key_for_development'),
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || (process.env.NODE_ENV === 'production' ? '' : 'pk_test_dummy_key_for_development'),

@@ -126,7 +126,7 @@ export class AgentService {
       console.log(`[AGENT-SERVICE] Found ${agents.length} agents for author: ${authorId}`);
 
       // Log each agent's authorId to verify it matches
-      agents.forEach((agent) => {
+      agents.forEach((agent: Agent) => {
         console.log(`[AGENT-SERVICE] Agent ${agent.id} has authorId: ${agent.authorId}`);
       });
 

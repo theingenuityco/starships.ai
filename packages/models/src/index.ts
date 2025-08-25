@@ -16,8 +16,6 @@ export { LLMRepository } from './repositories/LLMRepository';
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
-export { MCPServerOptionRepository } from './repositories/MCPServerOptionRepository';
-export { MCPServerConnectorRepository } from './repositories/MCPServerConnectorRepository';
 export { ConnectorConfigTemplateRepository } from './repositories/ConnectorConfigTemplateRepository';
 export { ConnectorConfigHistoryRepository } from './repositories/ConnectorConfigHistoryRepository';
 
@@ -74,6 +72,5 @@ export type {
 } from './logging';
 
 // Export scripts
-export { seedMCPServers } from './scripts/seed-mcp-servers';
 export { seedLLMModels } from './scripts/seed-llm-models';
 export { ensureDockerImages } from './scripts/ensure-docker-images';

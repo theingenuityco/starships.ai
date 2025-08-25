@@ -1,7 +1,7 @@
 {
   "name": "starships.ai",
   "private": true,
-  "version": "3.3.0",
+  "version": "3.3.5",
   "packageManager": "pnpm@10.12.4",
   "workspaces": [
     "packages/*"
@@ -10,11 +10,10 @@
     "setup": "bash scripts/developer-setup.sh",
     "setup:docker": "node scripts/setup-docker-path.js",
     "setup:verify": "node scripts/verify-build-setup.js",
-    "postinstall": "node scripts/setup-docker-path.js",
+    "postinstall": "node scripts/docker-check.js",
     "dev": "SKIP_K8S_CHECK=true turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
-    "prebuild": "node scripts/check-k8s-requirements.js",
     "build": "turbo run build",
     "start": "pnpm --filter @starships/server start",
     "deploy:staging": "cd deploy && npm run deploy:staging",
@@ -32,11 +31,7 @@
     "migration:test": "cd deploy && npm run migration:test",
     "backup:create": "cd deploy && npm run backup:create",
     "backup:restore": "cd deploy && npm run backup:restore",
-    "backup:list": "cd deploy && npm run backup:list",
-    "k8s:setup": "bash scripts/setup-kind-cluster.sh",
-    "k8s:cleanup": "kind delete cluster --name starships",
-    "k8s:status": "kubectl get all -A",
-    "k8s:logs": "kubectl logs -f -n $NAMESPACE -l app=mcp-connector"
+    "backup:list": "cd deploy && npm run backup:list"
   },
   "devDependencies": {
     "@semantic-release/git": "^10.0.1",

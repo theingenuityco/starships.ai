@@ -48,7 +48,7 @@ export function ConnectorTroubleshootingPanel({
     const metrics = new Map<string, ConnectorHealthMetrics>()
 
     connectorInstances.forEach(connector => {
-      const healthMetric = monitoringService.createHealthMetrics(connector, connector.template)
+      const healthMetric = monitoringService.createHealthMetrics()
       metrics.set(connector.id, healthMetric)
 
       // Add error logs for connectors with errors

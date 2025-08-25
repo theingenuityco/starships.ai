@@ -43,9 +43,6 @@ export interface ServerEnvironmentConfig {
   KINDE_POST_LOGOUT_REDIRECT_URL: string;
   KINDE_DEBUG_MODE?: boolean;
   
-  // MCP Feature Flags
-  MCP_HTTP_BRIDGE_ENABLED: boolean;
-  
   // Stripe Configuration
   STRIPE_SECRET_KEY: string;
   STRIPE_PUBLISHABLE_KEY: string;

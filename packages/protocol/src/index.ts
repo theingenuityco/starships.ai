@@ -1,158 +1,18 @@
-export interface UsageStats {
-  prompt_tokens: number;
-  completion_tokens: number;
-}
+// ============================================================================
+// MAIN PROTOCOL EXPORTS
+// ============================================================================
 
-export interface ChatRequest {
-  agent_id: string;
-  user_id: string;
-  message: string;
-  stream?: boolean;
-}
+// Export contract types (API boundaries)
+export * from './contracts/agent';
+export * from './contracts/chat';
+export * from './contracts/llm';
 
-export interface ChatResponse {
-  reply: string;
-  usage?: UsageStats;
-}
+// Export domain types (business entities)
+export * from './domain/mission';
+export * from './domain/starship';
 
-// Agent interface - core API contract type
-export interface Agent {
-  // Existing fields
-  id: string;
-  name: string;
-  model: string;
-  systemPrompt?: string;
-  createdAt: string;
-
-  // Enhanced marketplace fields
-  description?: string;
-  tags: string[];
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  authorId: string;
-  isPublic: boolean;
-  version: string;
-  updatedAt: string;
-  usageCount: number;
-  rating?: number;
-
-  // Advanced configuration
-  temperature?: number;
-  maxTokens?: number;
-  customInstructions?: string;
-
-  // Deployment settings
-  starshipId: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-  requiredPermissions?: string[];
-}
-
-export interface AgentConfig extends Agent {
-  provider?: 'openai' | 'anthropic';
-}
-
-// ADD: New interfaces for enhanced functionality
-export interface CreateAgentRequest {
-  name: string;
-  description?: string;
-  category: Agent['category'];
-  systemPrompt?: string;
-  model: string;
-  tags?: string[];
-  isPublic?: boolean;
-  temperature?: number;
-  maxTokens?: number;
-  customInstructions?: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-  authorId?: string;
-  starshipId: string; // REQUIRED for new agents
-}
-
-export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
-  version?: string;
-  starshipId?: string; // Allow updating starship assignment
-}
-
-export interface MemoryEntry {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: number;
-}
-
-export interface EnhancedMemoryEntry extends MemoryEntry {
-  
-  importance?: number;
-  summary?: string;
-}
-
-export interface MemorySearchResult {
-  entries: EnhancedMemoryEntry[];
-  relevanceScores: number[];
-}
-
-export type SessionKey = string;
-
-export interface LLMChatPrompt {
-  messages: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>;
-}
-
-export interface LLMResult {
-  reply: string;
-  usage?: UsageStats;
-  toolCalls?: Array<{
-    id: string;
-    name: string;
-    arguments: Record<string, any>;
-  }>;
-}
-
-export interface LLMProvider {
-  complete(
-    prompt: LLMChatPrompt,
-    opts?: {
-      stream?: boolean;
-      temperature?: number;
-      maxTokens?: number;
-      tools?: any[];
-    }
-  ): Promise<LLMResult>;
-  
-  completeStream(
-    prompt: LLMChatPrompt,
-    opts?: {
-      temperature?: number;
-      maxTokens?: number;
-      tools?: any[];
-    }
-  ): AsyncGenerator<string, void, unknown>;
-}
-
-// NEW: Agent Templates System
-export interface AgentTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  tags: string[];
-
-  // Template configuration
-  systemPrompt: string;
-  model: string; // References LLM.id
-  temperature?: number;
-  maxTokens?: number;
-
-  // Template metadata
-  authorId: string;
-  isPublic: boolean;
-  usageCount: number;
-  rating?: number;
-
-  // Template preview
-  icon?: string;
-  previewPrompts?: string[]; // Example prompts to show what the template can do
-
-  createdAt: string;
-  updatedAt: string;
-}
+// Import types for remaining definitions
+import type { UsageStats } from './contracts/chat';
 
 // Sibil-specific interfaces
 export interface ContentBlock {
@@ -322,15 +182,10 @@ export interface AgentStreamError {
   recoverable: boolean;
 }
 
-// Export starship-related types
-export * from './types/starship';
-
-
-// Export mission-related types
-export * from './types/mission';
-
-// Export mission phase constants
-export * from './constants/mission-phases';
+// Legacy exports - these will be removed after migration completes
+// export * from './types/starship';
+// export * from './types/mission';
+// export * from './constants/mission-phases';
 
 // Export workflow DSL types
 export * from './types/workflow';

@@ -15,11 +15,7 @@ import {
   ValidationErrorDetail,
   DatabaseErrorDetail,
   NetworkErrorDetail,
-  getHttpStatusCode,
-  getErrorCategory,
-  getErrorSeverity,
-  generateCorrelationId,
-  isRetryableError
+  generateCorrelationId
 } from './errors';
 
 // ============================================================================
@@ -55,19 +51,55 @@ export class StandardError extends Error {
     
     this.name = 'StandardError';
     this.code = code;
-    this.category = getErrorCategory(code);
-    this.severity = getErrorSeverity(code);
-    this.httpStatusCode = getHttpStatusCode(code);
+    this.category = this.getCategory(code);
+    this.severity = this.getSeverity(code);
+    this.httpStatusCode = this.getHttpStatus(code);
     this.details = details;
     this.context = context;
     this.timestamp = new Date().toISOString();
     this.correlationId = correlationId || generateCorrelationId();
-    this.isRetryable = isRetryableError(code);
+    this.isRetryable = this.getRetryable(code);
     this.userId = userId;
     this.requestId = requestId;
 
     // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, StandardError.prototype);
+  }
+
+  private getCategory(code: StandardErrorCode): ErrorCategory {
+    // Simple categorization logic
+    if (code.includes('VALIDATION') || code.includes('INVALID')) return 'validation';
+    if (code.includes('AUTH')) return 'authentication';
+    if (code.includes('NOT_FOUND')) return 'not_found';
+    if (code.includes('DATABASE')) return 'database';
+    if (code.includes('NETWORK')) return 'network';
+    return 'business';
+  }
+
+  private getSeverity(code: StandardErrorCode): ErrorSeverity {
+    // Simple severity logic
+    if (code.includes('CRITICAL') || code.includes('DATABASE') || code === 'INTERNAL_SERVER_ERROR') return 'critical';
+    if (code.includes('TIMEOUT') || code.includes('NETWORK')) return 'high';
+    if (code.includes('NOT_FOUND') || code.includes('VALIDATION')) return 'low';
+    return 'medium';
+  }
+
+  private getHttpStatus(code: StandardErrorCode): number {
+    // Simple HTTP status mapping
+    if (code.includes('VALIDATION') || code.includes('INVALID')) return 400;
+    if (code.includes('AUTH') && code.includes('REQUIRED')) return 401;
+    if (code.includes('ACCESS_DENIED')) return 403;
+    if (code.includes('NOT_FOUND')) return 404;
+    if (code.includes('CONFLICT') || code.includes('ALREADY_EXISTS')) return 409;
+    if (code.includes('RATE_LIMIT')) return 429;
+    if (code.includes('TIMEOUT')) return 504;
+    return 500;
+  }
+
+  private getRetryable(code: StandardErrorCode): boolean {
+    // Simple retry logic
+    const retryableCodes = ['TIMEOUT_ERROR', 'NETWORK_ERROR', 'SERVICE_UNAVAILABLE', 'RATE_LIMIT_EXCEEDED'];
+    return retryableCodes.some(retryable => code.includes(retryable));
   }
 
   /**

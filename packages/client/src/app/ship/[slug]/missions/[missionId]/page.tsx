@@ -12,7 +12,8 @@ import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity, MissionPhase } from '@starships/protocol';
-import { getMissionPhaseConfig, MISSION_PHASES, isValidMissionPhase } from '@starships/protocol';
+import { MISSION_PHASES, isValidMissionPhase } from '@starships/protocol';
+import { getMissionPhaseConfig } from '@/constants/mission-phases';
 import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
 import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent';
 

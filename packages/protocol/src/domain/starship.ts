@@ -1,0 +1,145 @@
+/**
+ * Starship Domain Types
+ * 
+ * Clean starship type definitions for protocol contract.
+ */
+
+// ============================================================================
+// STARSHIP TYPES
+// ============================================================================
+
+/**
+ * Starship class definitions
+ */
+export type StarshipClass = 'scout' | 'cruiser' | 'draught';
+
+/**
+ * Starship status definitions
+ */
+export type StarshipStatus = 'active' | 'inactive' | 'restricted' | 'disabled' | 'pending_payment';
+
+/**
+ * Billing period options
+ */
+export type BillingPeriod = 'monthly' | 'yearly';
+
+// ============================================================================
+// REQUEST/RESPONSE TYPES
+// ============================================================================
+
+/**
+ * Request to update a starship
+ */
+export interface UpdateStarshipRequest {
+  name?: string;
+  slug?: string; // Optional - will be auto-generated from name if not provided
+  status?: StarshipStatus;
+  class?: StarshipClass;
+}
+
+/**
+ * Request to update starship status
+ */
+export interface UpdateStarshipStatusRequest {
+  status: StarshipStatus;
+}
+
+/**
+ * Starship response structure
+ */
+export interface StarshipResponse {
+  starship: {
+    id: string;
+    slug: string;
+    ownerId: string;
+    class: StarshipClass;
+    name: string;
+    maxAgents: number;
+    status: StarshipStatus;
+    createdAt: string;
+    updatedAt: string;
+    plan?: StarshipClass;
+    subscriptionId?: string;
+    billingPeriod?: BillingPeriod;
+  };
+}
+
+/**
+ * Starship agents response
+ */
+export interface StarshipAgentsResponse {
+  starshipId: string;
+  starshipName: string;
+  starshipClass: StarshipClass;
+  maxAgents: number;
+  deployedAgents: Array<{
+    id: string;
+    name: string;
+    model: string;
+    systemPrompt?: string;
+    createdAt: string;
+    description?: string;
+    tags: string[];
+    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+    authorId: string;
+    isPublic: boolean;
+    version: string;
+    updatedAt: string;
+    usageCount: number;
+    rating?: number;
+    temperature?: number;
+    maxTokens?: number;
+    customInstructions?: string;
+    allowedStarshipClasses?: StarshipClass[];
+    requiredPermissions?: string[];
+  }>;
+  availableSlots: number;
+  deployedCount: number;
+}
+
+/**
+ * Starship list response
+ */
+export interface StarshipListResponse {
+  starships: StarshipResponse['starship'][];
+}
+
+/**
+ * Detailed starship response with agents
+ */
+export interface StarshipDetailsResponse extends StarshipResponse {
+  agents: StarshipAgentsResponse['deployedAgents'];
+  availableSlots: number;
+}
+
+/**
+ * Request to create a new starship
+ */
+export interface CreateStarshipRequest {
+  name: string;
+  class: StarshipClass;
+  slug?: string; // Optional - will be auto-generated if not provided
+}
+
+// ============================================================================
+// GENERIC API TYPES
+// ============================================================================
+
+/**
+ * Generic API response wrapper
+ */
+export interface ApiResponse<T = any> {
+  success?: boolean;
+  message?: string;
+  error?: string;
+  data?: T;
+}
+
+/**
+ * Generic API error structure
+ */
+export interface ApiError {
+  error: string;
+  code?: number;
+  details?: any;
+}

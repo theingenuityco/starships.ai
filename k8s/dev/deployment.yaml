@@ -60,6 +60,8 @@ spec:
           value: "[DEV-DOMAIN-URL]"
         - name: KINDE_COOKIE_DOMAIN
           value: "dev.starships.ai"
+        - name: KINDE_REDIRECT_URL
+          value: "[DEV-DOMAIN-URL]/api/auth/kinde_callback"
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
           value: "true"
         - name: KINDE_DEBUG_MODE

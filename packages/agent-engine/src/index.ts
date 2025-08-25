@@ -9,7 +9,8 @@ export { ProviderFactory } from './llm/provider-factory';
 export { LangChainProvider } from './llm/langchain-provider';
 
 // Export native tool wrapper
-export { NativeToolWrapper, NativeToolConfig } from './tools/NativeToolWrapper';
+export { NativeToolWrapper } from './tools/NativeToolWrapper';
+export type { NativeToolConfig } from './tools/NativeToolWrapper';
 
 // Create a minimal streaming function wrapper for backward compatibility
 import type { ChatRequest } from "@starships/protocol";

@@ -35,24 +35,20 @@ export class NativeToolWrapper {
       // Add Brave Search if API key exists
       if (apiKeys.brave) {
         try {
-          const { BraveSearch } = await import('@langchain/community/tools/brave_search');
+          const { BraveSearchTool } = await import('./native/BraveSearchTool');
           
-          const braveTool = new BraveSearch({
-            apiKey: apiKeys.brave
-          });
+          const braveSearchTool = new BraveSearchTool(apiKeys.brave);
+          const braveDynamicTool = braveSearchTool.toDynamicTool();
           
-          const wrappedBrave = new DynamicTool({
-            name: 'brave_web_search',
-            description: 'Privacy-focused web search using Brave Search API. Provide search terms as input.',
-            func: async (input: string) => {
-              console.log(`[NativeToolWrapper] Brave search for starship ${this.config.starshipId}: ${input}`);
-              this.trackUsage('brave_web_search');
-              const result = await braveTool.invoke(input);
-              return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-            }
-          });
+          // Wrap with usage tracking
+          const originalFunc = braveDynamicTool.func;
+          braveDynamicTool.func = async (input: string) => {
+            console.log(`[NativeToolWrapper] Brave search for starship ${this.config.starshipId}: ${input}`);
+            this.trackUsage('brave_web_search');
+            return await originalFunc(input);
+          };
           
-          langchainTools.push(wrappedBrave);
+          langchainTools.push(braveDynamicTool);
           console.log(`[NativeToolWrapper] Added Brave search for starship ${this.config.starshipId}`);
         } catch (error) {
           console.error('[NativeToolWrapper] Failed to add Brave tool:', error);
@@ -91,25 +87,20 @@ export class NativeToolWrapper {
       // Add Tavily if API key exists
       if (apiKeys.tavily) {
         try {
-          const { TavilySearchResults } = await import('@langchain/community/tools/tavily_search');
+          const { TavilySearchTool } = await import('./native/TavilySearchTool');
           
-          const tavilyTool = new TavilySearchResults({
-            apiKey: apiKeys.tavily,
-            maxResults: 5
-          });
+          const tavilySearchTool = new TavilySearchTool(apiKeys.tavily, 5);
+          const tavilyDynamicTool = tavilySearchTool.toDynamicTool();
           
-          const wrappedTavily = new DynamicTool({
-            name: 'tavily_search',
-            description: 'Advanced web search using Tavily API for comprehensive search results. Provide search query as input.',
-            func: async (input: string) => {
-              console.log(`[NativeToolWrapper] Tavily search for starship ${this.config.starshipId}: ${input}`);
-              this.trackUsage('tavily_search');
-              const result = await tavilyTool.invoke(input);
-              return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-            }
-          });
+          // Wrap with usage tracking
+          const originalFunc = tavilyDynamicTool.func;
+          tavilyDynamicTool.func = async (input: string) => {
+            console.log(`[NativeToolWrapper] Tavily search for starship ${this.config.starshipId}: ${input}`);
+            this.trackUsage('tavily_search');
+            return await originalFunc(input);
+          };
           
-          langchainTools.push(wrappedTavily);
+          langchainTools.push(tavilyDynamicTool);
           console.log(`[NativeToolWrapper] Added Tavily Search for starship ${this.config.starshipId}`);
         } catch (error) {
           console.error('[NativeToolWrapper] Failed to add Tavily Search tool:', error);
@@ -153,17 +144,5 @@ export class NativeToolWrapper {
    */
   resetUsageStats(): void {
     this.toolUsageStats.clear();
-  }
-}
-
-// Keep the old class name for backward compatibility during migration
-export class MCPToolWrapper extends NativeToolWrapper {
-  // Maintain the old interface temporarily
-  constructor(config: { starshipId: string; agentId: string; enableLogging?: boolean; gateway?: any }) {
-    super({
-      starshipId: config.starshipId,
-      agentId: config.agentId,
-      enableLogging: config.enableLogging
-    });
   }
 }

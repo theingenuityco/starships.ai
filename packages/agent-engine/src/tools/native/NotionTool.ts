@@ -328,10 +328,11 @@ export class NotionTool {
     return text;
   }
 
-  getTools(): DynamicTool[] {
-    const tools: DynamicTool[] = [];
-
-    tools.push(new DynamicTool({
+  /**
+   * Convert to LangChain DynamicTool
+   */
+  toDynamicTool(): DynamicTool {
+    return new DynamicTool({
       name: 'notion_tool',
       description: `Notion workspace tool for managing pages and databases. Use with JSON input containing an "action" field:
 - {"action": "search", "query": ""} - List ALL pages (use empty query to get all pages)
@@ -378,9 +379,9 @@ IMPORTANT: To list all pages, use search with empty query: {"action": "search", 
                 results: results.map((item: any) => ({
                   id: item.id,
                   type: item.object,
-                  title: item.object === 'page' 
-                    ? (item.properties?.title?.title?.[0]?.plain_text || 
-                       item.properties?.Name?.title?.[0]?.plain_text || 
+                  title: item.object === 'page'
+                    ? (item.properties?.title?.title?.[0]?.plain_text ||
+                       item.properties?.Name?.title?.[0]?.plain_text ||
                        'Untitled')
                     : item.title?.[0]?.plain_text || 'Untitled',
                   url: item.url,
@@ -394,7 +395,7 @@ IMPORTANT: To list all pages, use search with empty query: {"action": "search", 
               const content = this.extractTextFromBlocks(blocks);
               return JSON.stringify({
                 id: page.id,
-                title: 'properties' in page && page.properties?.title 
+                title: 'properties' in page && page.properties?.title
                   ? (page.properties.title as any).title?.[0]?.plain_text || 'Untitled'
                   : 'Untitled',
                 url: 'url' in page ? page.url : undefined,
@@ -487,12 +488,6 @@ IMPORTANT: To list all pages, use search with empty query: {"action": "search", 
           });
         }
       },
-    }));
-
-    return tools;
-  }
-
-  toDynamicTool(): DynamicTool {
-    return this.getTools()[0];
+    });
   }
 }

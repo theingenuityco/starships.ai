@@ -79,7 +79,6 @@ RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
-ENV SKIP_K8S_CHECK=true
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile

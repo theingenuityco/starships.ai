@@ -49,7 +49,6 @@ cd /app/packages/server
 export NODE_PATH="/app/node_modules:/app/packages/server/node_modules"
 export PORT=4000
 export SKIP_VECTOR_STORE=true
-export SKIP_K8S_CHECK=true
 export NEO4J_URI=[NEO4J-LOCAL-URL]
 export NEO4J_USERNAME=neo4j
 export NEO4J_PASSWORD=[DEFAULT-PASSWORD]

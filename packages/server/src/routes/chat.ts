@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { chatWithMCP as agentChat } from '@starships/agent-engine';
+import { chat as agentChat } from '@starships/agent-engine';
 import type { ChatRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import getStore from '../store';

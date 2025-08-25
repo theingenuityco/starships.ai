@@ -44,6 +44,16 @@ const validateUUID = (id: string, fieldName: string): void => {
 };
 
 /**
+ * Safely extract error message from unknown error
+ */
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+};
+
+/**
  * GET /missions
  * Get all missions with optional filters and sorting
  */
@@ -97,7 +107,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     console.error('Error fetching missions:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getErrorMessage(error) });
       return;
     }
     
@@ -122,12 +132,12 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     console.error('Error fetching mission:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getErrorMessage(error) });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ error: error.message });
+      res.status(404).json({ error: getErrorMessage(error) });
       return;
     }
     
@@ -186,12 +196,12 @@ router.get('/starship/:starshipId', async (req: Request, res: Response): Promise
     console.error('Error fetching starship missions:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getErrorMessage(error) });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ error: error.message });
+      res.status(404).json({ error: getErrorMessage(error) });
       return;
     }
     
@@ -252,12 +262,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     console.error('Error creating mission:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getErrorMessage(error) });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ error: error.message });
+      res.status(404).json({ error: getErrorMessage(error) });
       return;
     }
     
@@ -294,12 +304,12 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     console.error('Error updating mission:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getErrorMessage(error) });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ error: error.message });
+      res.status(404).json({ error: getErrorMessage(error) });
       return;
     }
     
@@ -330,12 +340,12 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     console.error('Error deleting mission:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({ error: getErrorMessage(error) });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ error: error.message });
+      res.status(404).json({ error: getErrorMessage(error) });
       return;
     }
     
@@ -376,18 +386,18 @@ router.post('/:id/messages',
       console.error('Error sending mission message:', error);
       
       if (error instanceof ValidationError) {
-        res.status(400).json({ 
-          success: false, 
-          error: error.message,
+        res.status(400).json({
+          success: false,
+          error: getErrorMessage(error),
           code: 'VALIDATION_ERROR'
         });
         return;
       }
       
       if (error instanceof NotFoundError) {
-        res.status(404).json({ 
-          success: false, 
-          error: error.message,
+        res.status(404).json({
+          success: false,
+          error: getErrorMessage(error),
           code: 'MISSION_NOT_FOUND'
         });
         return;
@@ -412,8 +422,8 @@ router.post('/:id/messages',
         return;
       }
       
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         error: 'Internal server error',
         code: 'INTERNAL_SERVER_ERROR'
       });
@@ -464,25 +474,25 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
     console.error('Error fetching message history:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ 
-        success: false, 
-        error: error.message,
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'VALIDATION_ERROR'
       });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ 
-        success: false, 
-        error: error.message,
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'MISSION_NOT_FOUND'
       });
       return;
     }
     
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
     });
@@ -510,25 +520,25 @@ router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> =>
     console.error('Error fetching mission clarity:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ 
-        success: false, 
-        error: error.message,
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'VALIDATION_ERROR'
       });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ 
-        success: false, 
-        error: error.message,
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'MISSION_NOT_FOUND'
       });
       return;
     }
     
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
     });
@@ -579,25 +589,25 @@ router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> =
     console.error('Error fetching mission workflow:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ 
-        success: false, 
-        error: error.message,
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'VALIDATION_ERROR'
       });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ 
-        success: false, 
-        error: error.message,
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }
     
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
     });
@@ -660,25 +670,25 @@ router.put('/:id/workflow/approval', async (req: Request, res: Response): Promis
     console.error('Error approving mission workflow:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ 
-        success: false, 
-        error: error.message,
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'VALIDATION_ERROR'
       });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ 
-        success: false, 
-        error: error.message,
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }
     
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
     });
@@ -721,25 +731,25 @@ router.post('/:id/regenerate-workflow', async (req: Request, res: Response): Pro
     console.error('Error regenerating mission workflow:', error);
     
     if (error instanceof ValidationError) {
-      res.status(400).json({ 
-        success: false, 
-        error: error.message,
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'VALIDATION_ERROR'
       });
       return;
     }
     
     if (error instanceof NotFoundError) {
-      res.status(404).json({ 
-        success: false, 
-        error: error.message,
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
         code: 'WORKFLOW_NOT_FOUND'
       });
       return;
     }
     
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: 'Internal server error',
       code: 'INTERNAL_SERVER_ERROR'
     });
@@ -781,7 +791,7 @@ router.get('/:id/execution-status', async (req: Request, res: Response): Promise
     if (error instanceof ValidationError) {
       res.status(400).json({
         success: false,
-        error: error.message
+        error: getErrorMessage(error)
       });
       return;
     }

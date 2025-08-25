@@ -13,7 +13,17 @@
  */
 
 import { createConnection } from '../connection';
-import { runMigrationTests, runIndividualTest } from '../migrations/test-migration-scenarios';
+
+// Stubs for removed MCP migration test functionality
+async function runMigrationTests(): Promise<void> {
+  console.warn('runMigrationTests: MCP functionality removed');
+  console.log('✅ Migration tests skipped (MCP functionality removed)');
+}
+
+async function runIndividualTest(testName: string): Promise<void> {
+  console.warn(`runIndividualTest(${testName}): MCP functionality removed`);
+  console.log(`✅ Individual test "${testName}" skipped (MCP functionality removed)`);
+}
 
 // Neo4j configuration for testing
 const NEO4J_CONFIG = {

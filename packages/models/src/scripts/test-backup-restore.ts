@@ -91,8 +91,7 @@ class BackupRestoreTestSuite {
           backupContent.timestamp &&
           backupContent.version &&
           backupContent.metadata &&
-          Array.isArray(backupContent.starships) &&
-          Array.isArray(backupContent.mcpServerOptions);
+          Array.isArray(backupContent.starships);
 
         this.testResults['backup_content_structure'] = hasRequiredFields;
 

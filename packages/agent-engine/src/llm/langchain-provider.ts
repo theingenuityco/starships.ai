@@ -31,7 +31,7 @@ export class LangChainProvider implements LLMProvider {
       // Bind tools if provided
       let model: any = baseModel;
       if (opts?.tools && opts.tools.length > 0 && 'bindTools' in baseModel) {
-        // Tools are already LangChain DynamicTool instances from MCPToolWrapper
+        // Tools are already LangChain DynamicTool instances from NativeToolWrapper
         model = (baseModel as any).bindTools(opts.tools);
       }
 
@@ -67,7 +67,7 @@ export class LangChainProvider implements LLMProvider {
       // Bind tools if provided
       let model: any = baseModel;
       if (opts?.tools && opts.tools.length > 0 && 'bindTools' in baseModel) {
-        // Tools are already LangChain DynamicTool instances from MCPToolWrapper
+        // Tools are already LangChain DynamicTool instances from NativeToolWrapper
         model = (baseModel as any).bindTools(opts.tools);
       }
 

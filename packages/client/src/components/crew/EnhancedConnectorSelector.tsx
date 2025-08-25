@@ -139,7 +139,7 @@ export function EnhancedConnectorSelector({
       const instance = connectorInstanceMap.get(connector.id)
       const status = instance ? instance.status : 'disconnected'
       const healthMetrics = instance
-        ? monitoringService.createHealthMetrics(instance, connector)
+        ? monitoringService.createHealthMetrics()
         : null
       const apiKeyStatus = apiKeyStatusMap.get(connector.id)
       const isConnecting = connectingIds.has(connector.id)

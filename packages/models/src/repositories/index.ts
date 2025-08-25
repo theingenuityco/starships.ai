@@ -13,8 +13,6 @@ export { LLMRepository } from './LLMRepository';
 // NEW: Aether Core Repositories
 export { StarshipRepository } from './StarshipRepository';
 export { VisionRepository } from './VisionRepository';
-export { MCPServerOptionRepository } from './MCPServerOptionRepository';
-export { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 export { MissionRepository } from './MissionRepository';
 
 
@@ -31,8 +29,6 @@ export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
-import { MCPServerOptionRepository } from './MCPServerOptionRepository';
-import { MCPServerConnectorRepository } from './MCPServerConnectorRepository';
 import { MissionRepository } from './MissionRepository';
 
 
@@ -65,8 +61,6 @@ export class RepositoryFactory {
   // Aether Core repository instances
   private static starshipRepo: StarshipRepository | null = null;
   private static visionRepo: VisionRepository | null = null;
-  private static mcpServerOptionRepo: MCPServerOptionRepository | null = null;
-  private static mcpServerConnectorRepo: MCPServerConnectorRepository | null = null;
   private static missionRepo: MissionRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
@@ -133,7 +127,6 @@ export class RepositoryFactory {
       this.userRepo = new UserRepository();
       this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
-      this.mcpServerOptionRepo = new MCPServerOptionRepository();
       this.missionRepo = new MissionRepository();
 
 
@@ -148,7 +141,6 @@ export class RepositoryFactory {
       this.nativeToolApiKeyRepo = new NativeToolApiKeyRepository();
 
       // Initialize repositories with dependencies
-      this.mcpServerConnectorRepo = new MCPServerConnectorRepository();
       this.starshipRepo = new StarshipRepository();
 
       // Initialize services that require database connections
@@ -200,8 +192,6 @@ export class RepositoryFactory {
         llmRepo: this.llmRepo !== null,
         starshipRepo: this.starshipRepo !== null,
         visionRepo: this.visionRepo !== null,
-        mcpServerOptionRepo: this.mcpServerOptionRepo !== null,
-        mcpServerConnectorRepo: this.mcpServerConnectorRepo !== null,
         missionRepo: this.missionRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
         workflowRepo: this.workflowRepo !== null,
@@ -272,27 +262,6 @@ export class RepositoryFactory {
     return this.visionRepo;
   }
 
-  /**
-   * Get MCPServerOptionRepository instance (synchronous)
-   */
-  static getMCPServerOptionRepository(): MCPServerOptionRepository {
-    this.ensureInitialized();
-    if (!this.mcpServerOptionRepo) {
-      throw new Error('MCPServerOptionRepository not initialized');
-    }
-    return this.mcpServerOptionRepo;
-  }
-
-  /**
-   * Get MCPServerConnectorRepository instance (synchronous)
-   */
-  static getMCPServerConnectorRepository(): MCPServerConnectorRepository {
-    this.ensureInitialized();
-    if (!this.mcpServerConnectorRepo) {
-      throw new Error('MCPServerConnectorRepository not initialized');
-    }
-    return this.mcpServerConnectorRepo;
-  }
 
   /**
    * Get AgentTemplateService instance (synchronous)
@@ -389,8 +358,6 @@ export class RepositoryFactory {
     this.llmRepo = null;
     this.starshipRepo = null;
     this.visionRepo = null;
-    this.mcpServerOptionRepo = null;
-    this.mcpServerConnectorRepo = null;
     this.missionRepo = null;
     this.agentTemplateService = null;
     this.workflowRepo = null;
@@ -415,8 +382,7 @@ export class RepositoryFactory {
     this.ensureInitialized();
     
     const critical = [
-      { name: 'starshipRepo', instance: this.starshipRepo },
-      { name: 'mcpServerConnectorRepo', instance: this.mcpServerConnectorRepo }
+      { name: 'starshipRepo', instance: this.starshipRepo }
     ];
 
     for (const repo of critical) {

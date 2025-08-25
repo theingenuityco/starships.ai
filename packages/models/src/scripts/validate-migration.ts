@@ -10,7 +10,11 @@
  *   npm run validate-migration -- --report --save --verbose
  */
 
-import { runValidation } from '../migrations/validate-migration';
+// Stub for removed MCP migration validation functionality
+async function runValidation(): Promise<void> {
+  console.warn('runValidation: MCP functionality removed');
+  console.log('✅ Migration validation skipped (MCP functionality removed)');
+}
 
 async function main() {
   const args = process.argv.slice(2);

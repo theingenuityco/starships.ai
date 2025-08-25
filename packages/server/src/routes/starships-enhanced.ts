@@ -24,6 +24,16 @@ export function initializeEnhancedStarshipRoutes(deps: {
   visionRepo = deps.visionRepository;
 }
 
+/**
+ * Safely extract error message from unknown error
+ */
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+};
+
 interface CreateStarshipWithVisionRequest {
   name: string;
   class: 'scout' | 'cruiser';
@@ -140,7 +150,9 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
           isActive: true
         });
 
-        console.log('[STARSHIP-CREATE-ENHANCED] Vision created successfully:', createdVision.id);
+        if (createdVision) {
+          console.log('[STARSHIP-CREATE-ENHANCED] Vision created successfully:', createdVision.id);
+        }
       }
 
       // Success response - match expected format
@@ -194,14 +206,14 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
     
     if (error instanceof ValidationError) {
       res.status(400).json({
-        error: error.message,
+        error: getErrorMessage(error),
         field: (error as any).field,
         details: (error as any).details,
       });
     } else {
       res.status(500).json({
         error: 'Failed to create starship',
-        details: error instanceof Error ? error.message : 'An unexpected error occurred',
+        details: getErrorMessage(error),
       });
     }
   }

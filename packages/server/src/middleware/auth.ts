@@ -138,10 +138,7 @@ export const authMiddleware = async (
     }
 
     // Attach user info to request for use in route handlers
-    req.user = {
-      ...user,
-      updatedAt: (user as any).updatedAt || user.createdAt || new Date().toISOString()
-    };
+    req.user = user;
     req.kindeId = payload.sub as string;
 
     console.log(`[AUTH] User resolved: ${user.id} (${user.displayName || user.username})`);

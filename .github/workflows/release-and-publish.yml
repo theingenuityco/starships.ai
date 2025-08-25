@@ -81,7 +81,7 @@ jobs:
     needs: version
     if: needs.version.outputs.new_release_published == 'true'
     runs-on: ubuntu-latest
-    environment: ci
+    environment: dev
     outputs:
       image_pushed: ${{ steps.digest.outputs.pushed }}
       image_digest: ${{ steps.digest.outputs.digest }}

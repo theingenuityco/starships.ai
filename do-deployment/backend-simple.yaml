@@ -72,8 +72,6 @@ spec:
           value: "http://[HARDCODED-IP]:4000"
         - name: SERVER_URL
           value: "http://localhost:4000"
-        - name: SKIP_K8S_CHECK
-          value: "true"
         - name: SKIP_VECTOR_STORE
           value: "true"
         envFrom:

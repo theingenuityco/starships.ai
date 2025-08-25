@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useStarshipStore } from '@/store/starship-store';
+import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
 import { StarshipCard } from './StarshipCard';
 import { StarshipCreateModalUnified } from './StarshipCreateModalUnified';
 import { StarshipEditModal } from './StarshipEditModal';
@@ -36,15 +37,20 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     starships,
     activeStarshipId,
     loading,
-    loadingStarships,
     error,
-    loadUserStarships,
     setActiveStarship,
     clearErrors
   } = useStarshipStore();
 
   const { user, userName, userEmail, isAuthenticated } = useAuth();
   const pathname = usePathname();
+
+  // Use the centralized loader hook with controlled refetch behavior
+  const { loadStarships, isLoading: loadingStarships } = useStarshipsLoader({
+    enabled: true,
+    refetchOnWindowFocus: true,
+    refetchOnVisibilityChange: true
+  });
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
@@ -53,37 +59,13 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   const [deletingStarship, setDeletingStarship] = useState<string | null>(null);
   const [statusManagingStarship, setStatusManagingStarship] = useState<string | null>(null);
 
-  // Load starships on mount and when page becomes visible
-  useEffect(() => {
-    loadUserStarships();
-    
-    // Refresh data when page becomes visible again (e.g., navigating back)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadUserStarships();
-      }
-    };
-    
-    // Refresh data when window gains focus
-    const handleFocus = () => {
-      loadUserStarships();
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [loadUserStarships]);
-  
-  // Refresh data when navigating to fleet page
+  // Only reload when pathname changes to /fleet
   useEffect(() => {
     if (pathname === '/fleet') {
-      loadUserStarships();
+      // Small delay to ensure navigation is complete
+      setTimeout(() => loadStarships(), 100);
     }
-  }, [pathname, loadUserStarships]);
+  }, [pathname]);
 
   // Auto-open create modal for onboarding
   useEffect(() => {
@@ -134,7 +116,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     // This ensures the modal close animation completes and avoids conflicting with auto-refresh
     setTimeout(() => {
       if (!loading) {
-        loadUserStarships();
+        loadStarships();
       }
     }, 300);
   };
@@ -142,19 +124,19 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   const handleEditSuccess = () => {
     setEditingStarship(null);
     // Refresh the starships list after edit
-    loadUserStarships();
+    loadStarships();
   };
 
   const handleDeleteSuccess = () => {
     setDeletingStarship(null);
     // Refresh the starships list after deletion
-    loadUserStarships();
+    loadStarships();
   };
 
   const handleStatusUpdateSuccess = () => {
     setStatusManagingStarship(null);
     // Refresh the starships list after status update
-    loadUserStarships();
+    loadStarships();
   };
 
   // Fleet overview stats
@@ -209,7 +191,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
                 <p className="text-sm text-muted-foreground">{error}</p>
               </div>
               <Button 
-                onClick={() => { clearErrors(); loadUserStarships(); }}
+                onClick={() => { clearErrors(); loadStarships(); }}
                 className="bg-primary/90 hover:bg-primary"
               >
                 Try Again

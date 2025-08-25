@@ -10,7 +10,7 @@ import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from './UserService';
 
 // Kinde JWKS endpoint for token verification
-const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starshipsai.kinde.com';
+const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
 const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
 
 // JWT verification function for Socket.IO

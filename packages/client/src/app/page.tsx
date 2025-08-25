@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { DynamicLoginButton } from '@/components/auth/DynamicLoginButton';
 import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
+import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
 import { LandingSibilWidgetStaticChat } from '@/components/onboarding/LandingSibilWidgetStaticChat';
 import { LandingSibilWidgetAuthenticated } from '@/components/onboarding/LandingSibilWidgetAuthenticated';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
@@ -115,7 +116,10 @@ export default function HomePage() {
   const { isAuthenticated, isLoading, userName } = useAuth();
   const { scrollYProgress } = useScroll();
   const { session } = useOnboardingSession();
-  const { starships, loadUserStarships } = useStarshipStore();
+  const starships = useStarshipStore(state => state.starships);
+  
+  // Use centralized loader - only loads when authenticated
+  useStarshipsLoader({ enabled: !!(isAuthenticated && !isLoading) });
 
 
   useEffect(() => {
@@ -123,15 +127,11 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    // Check for existing starships for authenticated users
-    if (isAuthenticated && !isLoading) {
-      loadUserStarships().then(() => {
-        if (starships && starships.length > 0) {
-          setHasExistingStarships(true);
-        }
-      });
+    // Check for existing starships
+    if (starships && starships.length > 0) {
+      setHasExistingStarships(true);
     }
-  }, [isAuthenticated, isLoading, loadUserStarships]);
+  }, [starships]);
 
   // Check if user has a vision in session
   useEffect(() => {

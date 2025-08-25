@@ -71,4 +71,3 @@ export type {
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';
-export { ensureDockerImages } from './scripts/ensure-docker-images';

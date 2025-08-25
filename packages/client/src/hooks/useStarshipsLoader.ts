@@ -26,7 +26,7 @@ export function useStarshipsLoader(options: UseStarshipsLoaderOptions = {}) {
   
   const isLoadingRef = useRef(false);
   const lastFetchRef = useRef<number>(0);
-  const intervalRef = useRef<NodeJS.Timeout>();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // Debounced load function to prevent rapid successive calls
   const loadStarshipsDebounced = async () => {

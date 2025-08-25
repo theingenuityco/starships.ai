@@ -119,7 +119,7 @@ export default function HomePage() {
   const starships = useStarshipStore(state => state.starships);
   
   // Use centralized loader - only loads when authenticated
-  useStarshipsLoader({ enabled: isAuthenticated && !isLoading });
+  useStarshipsLoader({ enabled: !!(isAuthenticated && !isLoading) });
 
 
   useEffect(() => {

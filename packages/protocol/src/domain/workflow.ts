@@ -1,7 +1,7 @@
 /**
- * Workflow DSL Types
+ * Workflow Domain Types
  * 
- * Defines the Domain Specific Language for workflow creation, approval, and execution
+ * Domain Specific Language for workflow creation, approval, and execution
  * within the expedition orchestration system.
  */
 
@@ -115,7 +115,7 @@ export interface UserPromptNodeParameters {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string; // Optional context from previous node
-  timeout?: number; // In minutes, defaults to WORKFLOW_CONFIG.USER_PROMPT_TIMEOUT_MINUTES
+  timeout?: number; // In minutes
   required?: boolean; // Whether user response is required
 }
 
@@ -244,11 +244,8 @@ export interface WorkflowGenerationPreferences {
   userInteraction?: string; // User interaction level
 }
 
-
-// Note: TaskBreakdown is imported from expedition types to avoid duplication
-
 /**
- * Agent assignment structure (imported from existing types)
+ * Agent assignment structure
  */
 export interface AgentAssignment {
   agentId: string;
@@ -301,56 +298,73 @@ export interface WorkflowApprovalResult {
 }
 
 // ============================================================================
-// VISUALIZATION TYPES
+// ENUM TYPES
 // ============================================================================
 
 /**
- * Visualization configuration
+ * Workflow complexity levels
  */
-export interface VisualizationConfig {
-  format: VisualizationFormat;
-  includeMetadata?: boolean;
-  showEstimates?: boolean;
-  showNodeIds?: boolean;
-  maxWidth?: number;
-  theme?: VisualizationTheme;
+export type WorkflowComplexity = 
+  | 'simple'     // Linear workflow, no conditionals
+  | 'moderate'   // Some branching, limited conditionals
+  | 'complex'    // Multiple branches, complex conditionals
+  | 'advanced';  // Highly complex with nested logic
+
+/**
+ * Workflow execution status
+ */
+export type WorkflowExecutionStatus = 
+  | 'not_started'  // Workflow created but not executed
+  | 'running'      // Currently executing
+  | 'paused'       // Execution paused (e.g., waiting for user input)
+  | 'completed'    // Successfully completed
+  | 'failed'       // Failed during execution
+  | 'cancelled';   // Cancelled by user
+
+/**
+ * Output formats for workflow results
+ */
+export type OutputFormat = 
+  | 'text'
+  | 'markdown'
+  | 'json'
+  | 'html'
+  | 'xml'
+  | 'pdf'
+  | 'csv';
+
+// ============================================================================
+// ERROR TYPES
+// ============================================================================
+
+/**
+ * Workflow execution error
+ */
+export interface WorkflowExecutionError {
+  code: WorkflowErrorCode;
+  message: string;
+  nodeId?: string;
+  details?: any;
+  timestamp: string;
+  recoverable: boolean;
+  retryCount?: number;
 }
 
 /**
- * Visualization formats
+ * Workflow error codes
  */
-export type VisualizationFormat = 
-  | 'ascii'      // ASCII art (initial implementation)
-  | 'mermaid'    // Mermaid diagram syntax
-  | 'dot'        // DOT/Graphviz format
-  | 'json'       // JSON representation
-  | 'svg';       // SVG format (future)
-
-/**
- * Visualization themes
- */
-export type VisualizationTheme = 
-  | 'default'
-  | 'compact'
-  | 'detailed'
-  | 'minimal';
-
-/**
- * Visualization result
- */
-export interface VisualizationResult {
-  content: string;
-  format: VisualizationFormat;
-  metadata: {
-    generatedAt: string;
-    nodeCount: number;
-    edgeCount: number;
-    estimatedSize: {
-      width: number;
-      height: number;
-    };
-  };
-}
+export type WorkflowErrorCode = 
+  | 'NODE_EXECUTION_FAILED'
+  | 'TIMEOUT_EXCEEDED'
+  | 'USER_INPUT_TIMEOUT'
+  | 'INVALID_CONDITION_RESULT'
+  | 'AGENT_UNAVAILABLE'
+  | 'RESOURCE_EXHAUSTED'
+  | 'PERMISSION_DENIED'
+  | 'WORKFLOW_CANCELLED'
+  | 'SYSTEM_ERROR'
+  | 'VALIDATION_FAILED'
+  | 'JSONATA_ERROR';
 
 // ============================================================================
 // VALIDATION TYPES
@@ -399,42 +413,6 @@ export interface ValidationSuggestion {
   nodeId?: string;
 }
 
-// ============================================================================
-// ENUM TYPES
-// ============================================================================
-
-/**
- * Workflow complexity levels
- */
-export type WorkflowComplexity = 
-  | 'simple'     // Linear workflow, no conditionals
-  | 'moderate'   // Some branching, limited conditionals
-  | 'complex'    // Multiple branches, complex conditionals
-  | 'advanced';  // Highly complex with nested logic
-
-/**
- * Workflow execution status
- */
-export type WorkflowExecutionStatus = 
-  | 'not_started'  // Workflow created but not executed
-  | 'running'      // Currently executing
-  | 'paused'       // Execution paused (e.g., waiting for user input)
-  | 'completed'    // Successfully completed
-  | 'failed'       // Failed during execution
-  | 'cancelled';   // Cancelled by user
-
-/**
- * Output formats for workflow results
- */
-export type OutputFormat = 
-  | 'text'
-  | 'markdown'
-  | 'json'
-  | 'html'
-  | 'xml'
-  | 'pdf'
-  | 'csv';
-
 /**
  * Validation error codes
  */
@@ -465,36 +443,3 @@ export type ValidationWarningCode =
   | 'POTENTIAL_TIMEOUT'
   | 'COMPLEX_CONDITIONALS'
   | 'LARGE_WORKFLOW_SIZE';
-
-// ============================================================================
-// ERROR TYPES
-// ============================================================================
-
-/**
- * Workflow execution error
- */
-export interface WorkflowExecutionError {
-  code: WorkflowErrorCode;
-  message: string;
-  nodeId?: string;
-  details?: any;
-  timestamp: string;
-  recoverable: boolean;
-  retryCount?: number;
-}
-
-/**
- * Workflow error codes
- */
-export type WorkflowErrorCode = 
-  | 'NODE_EXECUTION_FAILED'
-  | 'TIMEOUT_EXCEEDED'
-  | 'USER_INPUT_TIMEOUT'
-  | 'INVALID_CONDITION_RESULT'
-  | 'AGENT_UNAVAILABLE'
-  | 'RESOURCE_EXHAUSTED'
-  | 'PERMISSION_DENIED'
-  | 'WORKFLOW_CANCELLED'
-  | 'SYSTEM_ERROR'
-  | 'VALIDATION_FAILED'
-  | 'JSONATA_ERROR';

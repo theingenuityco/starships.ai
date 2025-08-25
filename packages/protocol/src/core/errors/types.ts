@@ -1,8 +1,7 @@
 /**
- * Standardized Error Handling System
+ * Core Error Types
  * 
- * Provides comprehensive error types, classes, and utilities for consistent
- * error management across the entire expedition system.
+ * Standardized error types for the expedition system.
  */
 
 // ============================================================================
@@ -242,12 +241,11 @@ export interface NetworkErrorDetail {
 }
 
 // ============================================================================
-// UTILITY FUNCTIONS (moved to server implementation)
+// UTILITY FUNCTIONS
 // ============================================================================
 
 /**
  * Generate a correlation ID for error tracking
- * Note: Implementation moved to server package, this is kept for compatibility
  */
 export function generateCorrelationId(): string {
   return `err_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;

@@ -5,7 +5,7 @@
  * descriptions, and visual properties.
  */
 
-import { MissionPhase } from '../types/mission';
+import { MissionPhase } from '../domain/mission';
 
 /**
  * Mission phase constants - use these instead of string literals

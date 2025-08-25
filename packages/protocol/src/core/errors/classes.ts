@@ -16,7 +16,7 @@ import {
   DatabaseErrorDetail,
   NetworkErrorDetail,
   generateCorrelationId
-} from './errors';
+} from './types';
 
 // ============================================================================
 // BASE ERROR CLASS
@@ -491,137 +491,6 @@ export class BusinessLogicError extends StandardError {
 }
 
 // ============================================================================
-// DOMAIN-SPECIFIC ERROR CLASSES
-// ============================================================================
-
-/**
- * Expedition-specific error
- */
-export class ExpeditionError extends StandardError {
-  public readonly expeditionId?: string;
-
-  constructor(
-    code: StandardErrorCode,
-    message?: string,
-    expeditionId?: string,
-    details?: Record<string, any>,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ) {
-    super(
-      code,
-      message,
-      { ...details, expeditionId },
-      context,
-      undefined,
-      userId,
-      requestId
-    );
-    
-    this.name = 'ExpeditionError';
-    this.expeditionId = expeditionId;
-    Object.setPrototypeOf(this, ExpeditionError.prototype);
-  }
-}
-
-/**
- * Starship-specific error
- */
-export class StarshipError extends StandardError {
-  public readonly starshipId?: string;
-
-  constructor(
-    code: StandardErrorCode,
-    message?: string,
-    starshipId?: string,
-    details?: Record<string, any>,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ) {
-    super(
-      code,
-      message,
-      { ...details, starshipId },
-      context,
-      undefined,
-      userId,
-      requestId
-    );
-    
-    this.name = 'StarshipError';
-    this.starshipId = starshipId;
-    Object.setPrototypeOf(this, StarshipError.prototype);
-  }
-}
-
-/**
- * Task-specific error
- */
-export class TaskError extends StandardError {
-  public readonly taskId?: string;
-  public readonly expeditionId?: string;
-
-  constructor(
-    code: StandardErrorCode,
-    message?: string,
-    taskId?: string,
-    expeditionId?: string,
-    details?: Record<string, any>,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ) {
-    super(
-      code,
-      message,
-      { ...details, taskId, expeditionId },
-      context,
-      undefined,
-      userId,
-      requestId
-    );
-    
-    this.name = 'TaskError';
-    this.taskId = taskId;
-    this.expeditionId = expeditionId;
-    Object.setPrototypeOf(this, TaskError.prototype);
-  }
-}
-
-/**
- * Agent-specific error
- */
-export class AgentError extends StandardError {
-  public readonly agentId?: string;
-
-  constructor(
-    code: StandardErrorCode,
-    message?: string,
-    agentId?: string,
-    details?: Record<string, any>,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ) {
-    super(
-      code,
-      message,
-      { ...details, agentId },
-      context,
-      undefined,
-      userId,
-      requestId
-    );
-    
-    this.name = 'AgentError';
-    this.agentId = agentId;
-    Object.setPrototypeOf(this, AgentError.prototype);
-  }
-}
-
-// ============================================================================
 // ERROR FACTORY FUNCTIONS
 // ============================================================================
 
@@ -703,63 +572,6 @@ export const ErrorFactory = {
     requestId?: string
   ): BusinessLogicError => {
     return new BusinessLogicError(code, businessRule, message, undefined, context, userId, requestId);
-  },
-
-  /**
-   * Create an expedition error
-   */
-  expedition: (
-    code: StandardErrorCode,
-    message?: string,
-    expeditionId?: string,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ): ExpeditionError => {
-    return new ExpeditionError(code, message, expeditionId, undefined, context, userId, requestId);
-  },
-
-  /**
-   * Create a starship error
-   */
-  starship: (
-    code: StandardErrorCode,
-    message?: string,
-    starshipId?: string,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ): StarshipError => {
-    return new StarshipError(code, message, starshipId, undefined, context, userId, requestId);
-  },
-
-  /**
-   * Create a task error
-   */
-  task: (
-    code: StandardErrorCode,
-    message?: string,
-    taskId?: string,
-    expeditionId?: string,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ): TaskError => {
-    return new TaskError(code, message, taskId, expeditionId, undefined, context, userId, requestId);
-  },
-
-  /**
-   * Create an agent error
-   */
-  agent: (
-    code: StandardErrorCode,
-    message?: string,
-    agentId?: string,
-    context?: ErrorContext,
-    userId?: string,
-    requestId?: string
-  ): AgentError => {
-    return new AgentError(code, message, agentId, undefined, context, userId, requestId);
   }
 };
 

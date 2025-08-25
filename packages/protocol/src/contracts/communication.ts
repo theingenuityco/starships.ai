@@ -1,8 +1,7 @@
 /**
- * Agent-First Officer Bidirectional Communication Protocol
+ * Agent Communication Contract Types
  * 
- * Defines message types and structures for two-way communication
- * between agents and the Virtual First Officer
+ * Bidirectional communication protocol between agents and the Virtual First Officer.
  */
 
 // ============================================================================
@@ -101,7 +100,7 @@ export interface AgentFirstOfficerContext {
 }
 
 // ============================================================================
-// CLARIFICATION STRUCTURES
+// SPECIALIZED MESSAGE STRUCTURES
 // ============================================================================
 
 /**
@@ -130,10 +129,6 @@ export interface ClarificationResponse extends OfficerToAgentMessage {
     modifiedRequirements?: Record<string, any>;
   };
 }
-
-// ============================================================================
-// BLOCKER STRUCTURES
-// ============================================================================
 
 /**
  * Blocker report from agent
@@ -164,10 +159,6 @@ export interface GuidanceMessage extends OfficerToAgentMessage {
   };
 }
 
-// ============================================================================
-// PROGRESS STRUCTURES
-// ============================================================================
-
 /**
  * Progress update from agent
  */
@@ -182,10 +173,6 @@ export interface ProgressUpdate extends AgentToOfficerMessage {
     insights?: string[];          // Discoveries or learnings
   };
 }
-
-// ============================================================================
-// ASSISTANCE STRUCTURES
-// ============================================================================
 
 /**
  * Request for assistance from another agent

@@ -43,7 +43,7 @@ export const DEFAULT_AGENT_EXECUTOR_CONFIG: AgentExecutorConfig = {
     }
   },
   streaming: {
-    enabled: process.env.ENABLE_STREAMING_MCP !== 'false',
+    enabled: process.env.ENABLE_STREAMING !== 'false',
     progressUpdates: true,
     chunkSize: 20,
     delayMs: 10

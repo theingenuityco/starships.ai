@@ -3,18 +3,18 @@ import { AgentExecutorConfig } from './agent-executor-config';
 export function loadAgentExecutorConfig(): Partial<AgentExecutorConfig> {
   return {
     streaming: {
-      enabled: process.env.ENABLE_STREAMING_MCP !== 'false',
-      progressUpdates: process.env.MCP_PROGRESS_UPDATES !== 'false',
-      chunkSize: parseInt(process.env.MCP_CHUNK_SIZE || '20'),
-      delayMs: parseInt(process.env.MCP_STREAM_DELAY || '10')
+      enabled: process.env.ENABLE_STREAMING !== 'false',
+      progressUpdates: process.env.STREAMING_PROGRESS_UPDATES !== 'false',
+      chunkSize: parseInt(process.env.STREAM_CHUNK_SIZE || '20'),
+      delayMs: parseInt(process.env.STREAM_DELAY || '10')
     },
     timeouts: {
-      overall: parseInt(process.env.MCP_EXECUTOR_TIMEOUT || '300000'),
+      overall: parseInt(process.env.AGENT_EXECUTOR_TIMEOUT || '300000'),
       perTool: {} // Tool-specific can be added as needed
     },
     debug: {
-      verbose: process.env.MCP_EXECUTOR_DEBUG === 'true' || process.env.NODE_ENV === 'development',
-      showToolCalls: process.env.MCP_SHOW_TOOL_CALLS === 'true'
+      verbose: process.env.AGENT_EXECUTOR_DEBUG === 'true' || process.env.NODE_ENV === 'development',
+      showToolCalls: process.env.SHOW_TOOL_CALLS === 'true'
     }
   };
 }

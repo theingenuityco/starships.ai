@@ -80,7 +80,7 @@ export function ConnectorStatusDashboard({
       const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
 
       connectorInstances.forEach(connector => {
-        const metrics = monitoringService.createHealthMetrics(connector, connector.template)
+        const metrics = monitoringService.createHealthMetrics()
         newMetrics.set(connector.id, metrics)
 
         const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)
@@ -99,7 +99,7 @@ export function ConnectorStatusDashboard({
     const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
 
     connectorInstances.forEach(connector => {
-      const metrics = monitoringService.createHealthMetrics(connector, connector.template)
+      const metrics = monitoringService.createHealthMetrics()
       newMetrics.set(connector.id, metrics)
 
       const keyStatus = ConnectorApiKeyStatus.checkApiKeyStatus(connector, connector.template)

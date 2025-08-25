@@ -1,9 +1,16 @@
 import { BackupManager, BackupData } from './backup-restore';
-import { ConnectorInstanceMigration } from './001-connector-instances';
 import { getConnection } from '../connection';
 import { Session } from 'neo4j-driver';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Stub for removed ConnectorInstanceMigration
+class ConnectorInstanceMigration {
+  async rollback(_rollbackData: any): Promise<boolean> {
+    console.warn('ConnectorInstanceMigration.rollback: MCP functionality removed');
+    return false;
+  }
+}
 
 /**
  * Disaster recovery scenarios and their handling procedures

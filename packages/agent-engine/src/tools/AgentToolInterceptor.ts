@@ -9,7 +9,7 @@ import { DynamicTool } from '@langchain/core/tools';
 
 // Extend global type to support our custom properties
 declare global {
-  var __mcpToolInputs: Record<string, any> | undefined;
+  var __nativeToolInputs: Record<string, any> | undefined;
 }
 
 /**
@@ -36,10 +36,10 @@ export class AgentToolInterceptor {
     this.toolInputCache.set(toolName, input);
     
     // Also store in global for backup
-    if (!(global as any).__mcpToolInputs) {
-      (global as any).__mcpToolInputs = {};
+    if (!(global as any).__nativeToolInputs) {
+      (global as any).__nativeToolInputs = {};
     }
-    (global as any).__mcpToolInputs[toolName] = input;
+    (global as any).__nativeToolInputs[toolName] = input;
   }
   
   /**
@@ -94,8 +94,8 @@ export class AgentToolInterceptor {
     });
     
     // Copy any additional properties
-    if ((tool as any).__mcpTool) {
-      (wrappedTool as any).__mcpTool = (tool as any).__mcpTool;
+    if ((tool as any).__nativeTool) {
+      (wrappedTool as any).__nativeTool = (tool as any).__nativeTool;
     }
     
     return wrappedTool;
@@ -113,8 +113,8 @@ export class AgentToolInterceptor {
    */
   clearCache(): void {
     this.toolInputCache.clear();
-    if ((global as any).__mcpToolInputs) {
-      delete (global as any).__mcpToolInputs;
+    if ((global as any).__nativeToolInputs) {
+      delete (global as any).__nativeToolInputs;
     }
   }
 }

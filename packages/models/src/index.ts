@@ -16,8 +16,6 @@ export { LLMRepository } from './repositories/LLMRepository';
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
-export { ConnectorConfigTemplateRepository } from './repositories/ConnectorConfigTemplateRepository';
-export { ConnectorConfigHistoryRepository } from './repositories/ConnectorConfigHistoryRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';

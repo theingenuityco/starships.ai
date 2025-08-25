@@ -1,6 +1,6 @@
-# Starships.ai - Visual ER Diagram
+# Starships.ai Entity Relationship Diagram
 
-## Mermaid Entity Relationship Diagram
+## Comprehensive Data Model
 
 ```mermaid
 erDiagram
@@ -18,16 +18,16 @@ erDiagram
 
     Starship {
         string id PK
-        string slug UK
+        string slug UK "Unique per owner"
         string ownerId FK
-        string class
+        string class "scout|cruiser|draught"
         string name
-        int maxAgents
+        int maxAgents "Class-based limits"
         int maxActiveMissions
-        string status
+        string status "active|inactive|restricted|disabled|pending_payment"
         string subscriptionId
-        string plan
-        string billingPeriod
+        string plan "scout|cruiser|draught"
+        string billingPeriod "monthly|yearly"
         string stripeCustomerId
         string createdAt
         string updatedAt
@@ -57,7 +57,7 @@ erDiagram
     LLM {
         string id PK
         string name
-        string provider
+        string provider "openai|anthropic"
         int maxTokens
         float temperature
         boolean supportsStreaming
@@ -70,10 +70,10 @@ erDiagram
         string id PK
         string name
         string description
-        string category
+        string category "general|coding|creative|analysis|support"
         string[] tags
         string systemPrompt
-        string model FK
+        string model FK "References LLM.id"
         float temperature
         int maxTokens
         string authorId FK
@@ -88,13 +88,13 @@ erDiagram
 
     Agent {
         string id PK
-        string starshipId FK
+        string starshipId FK "Direct FK - Key Change"
         string name
-        string model
+        string model "References LLM.id"
         string systemPrompt
         string description
         string[] tags
-        string category
+        string category "general|coding|creative|analysis|support"
         string authorId FK
         boolean isPublic
         string version
@@ -115,12 +115,12 @@ erDiagram
         string starshipId FK
         string name
         string description
-        string status
-        string phase
-        string[] agentIds
+        string status "draft|active|completed|failed|cancelled"
+        string phase "welcome|analysis|plan|execute|converse"
+        string[] agentIds "Assigned agent IDs"
         string createdBy FK
-        json executionState
-        json executionResult
+        json executionState "Workflow execution progress"
+        json executionResult "Final execution results"
         string createdAt
         string updatedAt
     }
@@ -128,25 +128,25 @@ erDiagram
     MissionMessage {
         string id PK
         string missionId FK
-        string role
+        string role "user|orchestrator|system"
         string content
         string timestamp
-        string userId FK
-        string senderName
+        string userId FK "When role=user"
+        string senderName "Cached display name"
         json metadata
     }
 
     MissionClarity {
         string id PK
         string missionId FK
-        float objectiveClarity
+        float objectiveClarity "0-10 scoring"
         float successMetrics
         float timelineDefinition
         float scopeBoundaries
         float visionAlignment
-        float overallScore
-        string reasoning
-        int iteration
+        float overallScore "Calculated average"
+        string reasoning "AI qualitative analysis"
+        int iteration "Assessment iteration"
         string createdAt
         string updatedAt
     }
@@ -155,33 +155,41 @@ erDiagram
     MissionWorkflow {
         string id PK
         string missionId FK
-        string approvalStatus
+        json nodes "WorkflowNode[]"
+        json edges "WorkflowEdge[]"
+        string approvalStatus "pending|approved|rejected"
         string createdAt
         string approvedAt
     }
 
     WorkflowNode {
         string id PK
-        string type
+        string workflowId FK
+        string type "agent|conditional|user_prompt|output|start|end"
         string name
         string description
-        json parameters
+        int estimatedTime "In minutes"
+        json parameters "Node-specific parameters"
+        json position "For visual layout"
+        json metadata "Additional node metadata"
     }
 
     WorkflowEdge {
         string id PK
-        string from FK
-        string to FK
-        string condition
-        string label
+        string workflowId FK
+        string from FK "Source node ID"
+        string to FK "Target node ID"
+        string condition "Condition key for routing"
+        string label "Human-readable edge label"
+        json metadata "Additional edge metadata"
     }
 
     WorkflowRuntimeState {
         string id PK
         string workflowId FK
         string currentNodeId FK
-        string status
-        json executionResults
+        string status "not_started|running|paused|completed|failed|cancelled"
+        json executionResults "Map of nodeId to result"
         string startTime
         string endTime
         string pausedAt
@@ -190,71 +198,16 @@ erDiagram
         string updatedAt
     }
 
-    %% MCP Connector System
-    MCPServerOption {
-        string id PK
-        string name
-        string slug UK
-        string command
-        string[] args
-        string env
-    }
-
-    MCPServerConnector {
+    %% Security and API Management
+    NativeToolApiKey {
         string id PK
         string starshipId FK
-        string templateId FK
-        string status
-        boolean isActive
-        string connectedAt
-        string lastUsed
-        string errorMessage
-        string env
-        string configTemplateId FK
-        int configVersion
-        string dockerServiceName
-        string dockerStatus
-        string dockerContainerId
-        string dockerHealthStatus
-        string dockerLastHealthCheck
-        string dockerNetworkName
-        string dockerImageName
-        string dockerErrorMessage
-        int dockerPort
-        boolean httpBridgeEnabled
-        string internalUrl
-        string bridgeVersion
-        string lastToolsSync
-        string availableTools
-        string availableResources
-        string bridgeCapabilities
+        string toolName
+        string encryptedApiKey "AES-256-GCM encrypted"
         string createdAt
         string updatedAt
     }
 
-    ConnectorConfigTemplate {
-        string id PK
-        string name
-        string description
-        string category
-        string[] tags
-        json config
-        boolean isPublic
-        string authorId FK
-        int usageCount
-        string createdAt
-        string updatedAt
-    }
-
-    ConnectorConfigHistory {
-        string id PK
-        string connectorId FK
-        json config
-        string changedBy FK
-        string changeSummary
-        string changeReason
-        string createdAt
-    }
 
     %% Primary Relationships
     User ||--o{ Starship : "OWNS"
@@ -262,14 +215,12 @@ erDiagram
     User ||--o{ AgentTemplate : "CREATES"
     User ||--o{ Mission : "CREATES"
     User ||--o{ MissionMessage : "SENDS"
-    User ||--o{ ConnectorConfigTemplate : "CREATES"
-    User ||--o{ ConnectorConfigHistory : "CHANGES"
 
     %% Starship Relationships
     Starship ||--|| Vision : "HAS_VISION"
     Starship ||--o{ Agent : "DEPLOYED_ON"
     Starship ||--o{ Mission : "HAS"
-    Starship ||--o{ MCPServerConnector : "HAS_CONNECTOR_INSTANCE"
+    Starship ||--o{ NativeToolApiKey : "HAS_API_KEYS"
 
     %% Agent System Relationships
     LLM ||--o{ AgentTemplate : "REFERENCES"
@@ -286,13 +237,9 @@ erDiagram
     WorkflowNode ||--o{ WorkflowEdge : "FLOWS_FROM"
     WorkflowNode ||--o{ WorkflowEdge : "FLOWS_TO"
 
-    %% Connector Relationships
-    MCPServerOption ||--o{ MCPServerConnector : "CREATED_FROM"
-    ConnectorConfigTemplate ||--o{ MCPServerConnector : "USES"
-    MCPServerConnector ||--o{ ConnectorConfigHistory : "HAS"
 ```
 
-## Simplified Core Domain Model
+## Concise Core Domain Model
 
 ```mermaid
 graph TD
@@ -301,7 +248,7 @@ graph TD
     S --> V[Vision]
     S --> A[Agent]
     S --> M[Mission]
-    S --> C[MCPServerConnector]
+    S --> NK[NativeToolApiKey]
 
     %% Agent System
     U --> AT[AgentTemplate]
@@ -312,118 +259,20 @@ graph TD
     M --> MW[MissionWorkflow]
     MW --> WN[WorkflowNode]
     WN --> WE[WorkflowEdge]
+    MW --> WRS[WorkflowRuntimeState]
     M --> MM[MissionMessage]
+    M --> MC[MissionClarity]
     U --> MM
 
-    %% Connector System
-    MSO[MCPServerOption] --> C
-    CCT[ConnectorConfigTemplate] --> C
-    C --> CCH[ConnectorConfigHistory]
 
     %% Styling
     classDef primary fill:#e1f5fe
     classDef secondary fill:#f3e5f5
     classDef system fill:#e8f5e8
+    classDef security fill:#ffebee
 
     class U,S primary
     class A,M,V secondary
-    class L,AT,MSO,CCT system
+    class L,AT system
+    class NK security
 ```
-
-## Domain Boundaries
-
-```mermaid
-graph LR
-    subgraph "User Management"
-        U[User]
-        U_Auth[Authentication]
-        U_Billing[Billing]
-    end
-
-    subgraph "Starship Domain"
-        S[Starship]
-        V[Vision]
-        S_Config[Configuration]
-    end
-
-    subgraph "Agent Domain"
-        A[Agent]
-        AT[AgentTemplate]
-        L[LLM]
-        A_Deploy[Deployment]
-    end
-
-    subgraph "Mission Domain"
-        M[Mission]
-        MW[MissionWorkflow]
-        WN[WorkflowNode]
-        WE[WorkflowEdge]
-        MM[MissionMessage]
-        MC[MissionClarity]
-    end
-
-    subgraph "Connector Domain"
-        MSO[MCPServerOption]
-        MCPS[MCPServerConnector]
-        CCT[ConnectorConfigTemplate]
-        CCH[ConnectorConfigHistory]
-        Docker[Docker Integration]
-    end
-
-    %% Cross-domain relationships
-    U --> S
-    S --> A
-    S --> M
-    S --> MCPS
-    A --> M
-    MSO --> MCPS
-```
-
-## Key Entity States and Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> pending_payment : Create Starship
-    pending_payment --> active : Payment Success
-    active --> restricted : Payment Failed
-    active --> disabled : Admin Action
-    restricted --> active : Payment Resolved
-    disabled --> active : Admin Reactivation
-    active --> [*] : Delete
-```
-
-```mermaid
-stateDiagram-v2
-    [*] --> draft : Create Mission
-    draft --> active : Start Mission
-    active --> completed : Success
-    active --> failed : Error
-    active --> cancelled : User Cancel
-    completed --> [*]
-    failed --> [*]
-    cancelled --> [*]
-```
-
-```mermaid
-stateDiagram-v2
-    [*] --> connecting : Deploy Connector
-    connecting --> active : Success
-    connecting --> error : Failed
-    active --> inactive : Deactivate
-    active --> error : Runtime Error
-    inactive --> active : Reactivate
-    error --> connecting : Retry
-    active --> [*] : Remove
-    inactive --> [*] : Remove
-    error --> [*] : Remove
-```
-
-This visual representation helps understand:
-
-1. **Entity Relationships**: Clear connections between all major entities
-2. **Domain Boundaries**: Logical groupings of related functionality
-3. **Lifecycle Management**: State transitions for key entities
-4. **Data Flow**: How information moves through the system
-5. **Complexity Areas**: Where the most intricate relationships exist (Mission/Workflow system)
-
-The diagram shows that Starships.ai is built around a **starship-centric architecture** where users own starships that serve as containers for agents, missions, and connectors, with sophisticated workflow orchestration and real-time collaboration features.

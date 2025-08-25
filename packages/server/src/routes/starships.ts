@@ -9,8 +9,6 @@ import type {
   AgentRepository,
   Starship,
   VisionRepository,
-  ConnectorConfigTemplateRepository,
-  ConnectorConfigHistoryRepository,
   UserRepository,
 } from '@starships/models';
 import {
@@ -70,23 +68,17 @@ const router: Router = Router();
 let starshipRepo: StarshipRepository;
 let agentRepo: AgentRepository;
 let userRepo: UserRepository;
-let configTemplateRepo: ConnectorConfigTemplateRepository;
-let configHistoryRepo: ConnectorConfigHistoryRepository;
 let visionRepo: VisionRepository;
 
 export function initializeStarshipRoutes(deps: {
   starshipRepository: StarshipRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
-  connectorConfigTemplateRepository: ConnectorConfigTemplateRepository;
-  connectorConfigHistoryRepository: ConnectorConfigHistoryRepository;
   visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
   userRepo = deps.userRepository;
-  configTemplateRepo = deps.connectorConfigTemplateRepository;
-  configHistoryRepo = deps.connectorConfigHistoryRepository;
   visionRepo = deps.visionRepository;
 }
 

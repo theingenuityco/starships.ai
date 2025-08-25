@@ -54,8 +54,6 @@ spec:
           value: "http://backend-service:4000"
         - name: SERVER_URL
           value: "http://backend-service:4000"
-        - name: SKIP_K8S_CHECK
-          value: "true"
         - name: SKIP_VECTOR_STORE
           value: "true"
         envFrom:

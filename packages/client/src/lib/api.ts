@@ -8,6 +8,7 @@ import {
   invalidateConnectorInstanceCaches,
   invalidateMCPServerCaches,
 } from './cache'
+import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
 const API_BASE_URL = getApiBaseUrl()
 

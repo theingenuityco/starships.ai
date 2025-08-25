@@ -12,7 +12,7 @@ erDiagram
         string email
         string displayName
         string avatar
-        string stripeCustomerId
+        string stripeCustomerId "Stripe integration"
         string createdAt
     }
 
@@ -28,7 +28,7 @@ erDiagram
         string subscriptionId
         string plan "scout|cruiser|draught"
         string billingPeriod "monthly|yearly"
-        string stripeCustomerId
+        string stripeCustomerId "Stripe integration"
         string createdAt
         string updatedAt
     }
@@ -90,7 +90,7 @@ erDiagram
         string id PK
         string starshipId FK "Direct FK - Key Change"
         string name
-        string model "References LLM.id"
+        string model FK "References LLM.id"
         string systemPrompt
         string description
         string[] tags
@@ -208,6 +208,12 @@ erDiagram
         string updatedAt
     }
 
+    %% Stripe Integration
+    StripeEvent {
+        string eventId PK
+        string eventType
+        string processedAt
+    }
 
     %% Primary Relationships
     User ||--o{ Starship : "OWNS"
@@ -224,16 +230,17 @@ erDiagram
 
     %% Agent System Relationships
     LLM ||--o{ AgentTemplate : "REFERENCES"
+    LLM ||--o{ Agent : "REFERENCES"
     AgentTemplate ||--o{ Agent : "CREATES_FROM"
 
     %% Mission Relationships
     Mission ||--|| MissionWorkflow : "HAS_WORKFLOW"
     Mission ||--o{ MissionMessage : "BELONGS_TO"
-    Mission ||--o{ MissionClarity : "HAS"
+    Mission ||--o{ MissionClarity : "HAS_CLARITY"
 
     %% Workflow Relationships
     MissionWorkflow ||--o{ WorkflowNode : "CONTAINS"
-    MissionWorkflow ||--|| WorkflowRuntimeState : "HAS"
+    MissionWorkflow ||--|| WorkflowRuntimeState : "HAS_RUNTIME_STATE"
     WorkflowNode ||--o{ WorkflowEdge : "FLOWS_FROM"
     WorkflowNode ||--o{ WorkflowEdge : "FLOWS_TO"
 
@@ -254,6 +261,7 @@ graph TD
     U --> AT[AgentTemplate]
     AT --> A
     L[LLM] --> AT
+    L --> A
 
     %% Mission System
     M --> MW[MissionWorkflow]
@@ -264,15 +272,45 @@ graph TD
     M --> MC[MissionClarity]
     U --> MM
 
+    %% Stripe Integration
+    SE[StripeEvent] -.-> S
 
     %% Styling
     classDef primary fill:#e1f5fe
     classDef secondary fill:#f3e5f5
     classDef system fill:#e8f5e8
     classDef security fill:#ffebee
+    classDef integration fill:#fff3e0
 
     class U,S primary
     class A,M,V secondary
     class L,AT system
     class NK security
+    class SE integration
 ```
+
+## Key Relationships and Constraints
+
+### Core Business Logic
+- **Starship Classes**: Scout (3 agents, 3 missions), Cruiser (5 agents, 6 missions), Draught (10 agents, 10 missions)
+- **Vision**: Each starship has exactly one vision that can be refined over time
+- **Agent Deployment**: Agents are deployed to specific starships via `starshipId` FK
+- **Mission Assignment**: Missions belong to starships and reference assigned agent IDs as arrays
+
+### Data Flow Patterns
+- **Workflow Execution**: `Mission` → `MissionWorkflow` → `WorkflowRuntimeState` tracks execution progress
+- **Message Threading**: `MissionMessage` entities belong to missions and maintain conversation history
+- **Clarity Assessment**: `MissionClarity` provides AI-driven mission assessment with 5-dimensional scoring
+- **Template System**: `AgentTemplate` → `Agent` creation flow with usage tracking
+
+### Security & Integration
+- **API Key Management**: `NativeToolApiKey` stores encrypted tool credentials per starship
+- **Stripe Integration**: `StripeEvent` ensures webhook idempotency; `User.stripeCustomerId` and `Starship.stripeCustomerId` link to Stripe
+- **Authentication**: `User.kindeId` provides external auth integration
+
+### Technical Implementation Notes
+- **Neo4j Relationships**: Repository code maintains both FK references and Neo4j relationship patterns
+- **JSON Storage**: Complex objects (workflow parameters, execution results, metadata) stored as JSON
+- **Soft References**: Agent IDs in missions stored as string arrays for flexibility
+- **Encryption**: Native tool API keys use AES-256-GCM encryption
+- **Slug Generation**: Starship slugs are auto-generated with collision handling

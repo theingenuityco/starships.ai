@@ -5,7 +5,7 @@
  * Implementation details moved to appropriate packages.
  */
 
-import type { Agent } from '../contracts/agent';
+import type { Agent } from './agent';
 
 // ============================================================================
 // CORE MISSION TYPES

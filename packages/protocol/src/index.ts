@@ -3,7 +3,6 @@
 // ============================================================================
 
 // Export contract types (API boundaries)
-export * from './contracts/agent';
 export * from './contracts/chat';
 export * from './contracts/llm';
 export * from './contracts/socket';

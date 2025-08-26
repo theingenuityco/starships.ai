@@ -33,22 +33,15 @@ export type {
   AgentChatResponse,
   AgentStreamError,
   SocketConnectionState,
-  LegacySocketIOEvents
 } from './contracts/sibil';
 
-
-// ============================================================================
-// RE-EXPORTS FOR BACKWARD COMPATIBILITY
-// ============================================================================
-
-// Re-export specific types to avoid conflicts
+// Export socket types
 export type {
-  EnhancedSocketIOEvents,
   EventEmissionOptions,
   EventEmissionResult,
 } from './contracts/socket';
 
-// Re-export error classes with explicit naming to avoid conflicts
+// Export error classes
 export {
   StandardError,
   ValidationError,

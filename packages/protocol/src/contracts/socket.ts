@@ -117,10 +117,6 @@ export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents, Vision
  */
 export interface SocketIOEvents extends SocketEvents {}
 
-/**
- * Enhanced SocketIO Events interface for backward compatibility
- */
-export interface EnhancedSocketIOEvents extends SocketIOEvents {}
 
 // ============================================================================
 // UTILITY TYPES

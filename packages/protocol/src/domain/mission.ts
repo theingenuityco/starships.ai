@@ -321,7 +321,7 @@ export interface WorkflowResponse {
 }
 
 // ============================================================================
-// MISSION PLANNING TYPES (for legacy compatibility)
+// MISSION PLANNING TYPES
 // ============================================================================
 
 /**

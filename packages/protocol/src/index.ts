@@ -2,25 +2,23 @@
 // MAIN PROTOCOL EXPORTS
 // ============================================================================
 
-// Export core error handling
-export * from './core/errors';
-
 // Export contract types (API boundaries)
-export * from './contracts/agent';
 export * from './contracts/chat';
-export * from './contracts/llm';
+export * from './contracts/sibil';
 export * from './contracts/socket';
 
-// Export domain types (business entities)
-export * from './domain/mission';
-export * from './domain/starship';
-export * from './domain/vision';
-export * from './domain/workflow';
-export * from './domain/user';
-export * from './domain/waitlist';
-export * from './domain/relationships';
+// Export domain types (database domains)
+export * from './domains/agent';
+export * from './domains/llm';
+export * from './domains/mission';
+export * from './domains/starship';
+export * from './domains/vision';
+export * from './domains/workflow';
+export * from './domains/user';
+export * from './domains/waitlist';
+export * from './domains/native-tool';
 
-// Export domain types with explicit naming to avoid conflicts
+// Export collection types with explicit naming to avoid conflicts
 export type {
   LLM,
   LLMProviderType,
@@ -30,7 +28,7 @@ export type {
   LLMListResponse,
   LLMFilters,
   LLMSort
-} from './domain/llm';
+} from './domains/llm';
 
 export type {
   AgentTemplate,
@@ -44,7 +42,8 @@ export type {
   AgentTemplateUsage,
   IncrementTemplateUsageRequest,
   RateTemplateRequest
-} from './domain/agent-template';
+} from './domains/agent-template';
+
 
 // Export Sibil types with explicit exports to avoid conflicts
 export type {
@@ -70,16 +69,3 @@ export type {
   EventEmissionResult,
 } from './contracts/socket';
 
-// Export error classes
-export {
-  StandardError,
-  ValidationError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  ConflictError,
-  DatabaseError,
-  NetworkError,
-  BusinessLogicError,
-  ErrorFactory
-} from './core/errors';

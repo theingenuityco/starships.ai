@@ -1,6 +1,6 @@
 /**
- * Waitlist Domain Types
- * 
+ * Waitlist Collection Types
+ *
  * Clean waitlist type definitions for protocol contract.
  */
 

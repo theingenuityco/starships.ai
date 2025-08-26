@@ -1,11 +1,11 @@
 /**
- * Mission Domain Types
- * 
+ * Mission Collection Types
+ *
  * Clean mission type definitions for protocol contract.
  * Implementation details moved to appropriate packages.
  */
 
-import type { Agent } from '../contracts/agent';
+import type { Agent } from './agent';
 
 // ============================================================================
 // CORE MISSION TYPES

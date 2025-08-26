@@ -34,18 +34,18 @@ router.use(authMiddleware);
  */
 const validateUUID = (id: string, fieldName: string): void => {
   if (!id || typeof id !== 'string') {
-    throw ValidationError.fromFields([{
-      field: fieldName,
-      message: `${fieldName} is required and must be a string`
-    }]);
+    throw new ValidationError(
+      `${fieldName} is required and must be a string`,
+      fieldName
+    );
   }
 
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {
-    throw ValidationError.fromFields([{
-      field: fieldName,
-      message: `${fieldName} must be a valid UUID format`
-    }]);
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID format`,
+      fieldName
+    );
   }
 };
 
@@ -232,38 +232,38 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     // Basic validation
     if (!createRequest.starshipId) {
-      throw ValidationError.fromFields([{
-        field: 'starshipId',
-        message: 'starshipId is required'
-      }]);
+      throw new ValidationError(
+        'starshipId is required',
+        'starshipId'
+      );
     }
     
     if (!createRequest.name) {
-      throw ValidationError.fromFields([{
-        field: 'name',
-        message: 'name is required'
-      }]);
+      throw new ValidationError(
+        'name is required',
+        'name'
+      );
     }
     
     if (!createRequest.description) {
-      throw ValidationError.fromFields([{
-        field: 'description',
-        message: 'description is required'
-      }]);
+      throw new ValidationError(
+        'description is required',
+        'description'
+      );
     }
 
     if (!createRequest.agentIds || !Array.isArray(createRequest.agentIds)) {
-      throw ValidationError.fromFields([{
-        field: 'agentIds',
-        message: 'agentIds is required and must be an array'
-      }]);
+      throw new ValidationError(
+        'agentIds is required and must be an array',
+        'agentIds'
+      );
     }
 
     if (createRequest.agentIds.length === 0) {
-      throw ValidationError.fromFields([{
-        field: 'agentIds',
-        message: 'At least one agent must be assigned to the mission'
-      }]);
+      throw new ValidationError(
+        'At least one agent must be assigned to the mission',
+        'agentIds'
+      );
     }
 
     validateUUID(createRequest.starshipId, 'starshipId');
@@ -271,10 +271,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // Validate each agent ID is a valid UUID
     createRequest.agentIds.forEach((agentId, index) => {
       if (typeof agentId !== 'string') {
-        throw ValidationError.fromFields([{
-          field: 'agentIds',
-          message: `agentIds[${index}] must be a string`
-        }]);
+        throw new ValidationError(
+          `agentIds[${index}] must be a string`,
+          'agentIds'
+        );
       }
       validateUUID(agentId, `agentIds[${index}]`);
     });
@@ -318,10 +318,10 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 
     // Ensure at least one field is being updated
     if (!updates || Object.keys(updates).length === 0) {
-      throw ValidationError.fromFields([{
-        field: 'updates',
-        message: 'At least one field must be provided for update'
-      }]);
+      throw new ValidationError(
+        'At least one field must be provided for update',
+        'updates'
+      );
     }
 
     const mission = await MissionService.updateMission(id, updates, userId);

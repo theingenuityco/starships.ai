@@ -1,15 +1,7 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
+import { NativeToolApiKey } from '@starships/protocol';
 import crypto from 'crypto';
-
-export interface NativeToolApiKey {
-  id: string;
-  starshipId: string;
-  toolName: string;
-  encryptedApiKey: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 export class NativeToolApiKeyRepository extends BaseRepository {
   private algorithm = 'aes-256-gcm';

@@ -21,7 +21,6 @@
     "seed:mcp": "tsx src/scripts/seed-mcp-servers.ts",
     "seed:llm": "tsx src/scripts/seed-llm-models.ts",
     "query:mcp": "tsx src/scripts/query-mcp-servers.ts",
-    
     "test:migration": "tsx src/scripts/run-migration-tests.ts",
     "test:migration:empty": "tsx src/scripts/run-migration-tests.ts empty",
     "test:migration:single": "tsx src/scripts/run-migration-tests.ts single",
@@ -51,6 +50,7 @@
     "@types/node": "^24.0.10",
     "@types/node-fetch": "^2.6.12",
     "@types/uuid": "^10.0.0",
+    "dotenv": "^17.1.0",
     "node-fetch": "^2.7.0",
     "tsx": "^4.20.3"
   }

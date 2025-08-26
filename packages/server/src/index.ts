@@ -5,6 +5,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { initializeSocketIO } from './socket';
 import getStore from './store';
@@ -35,6 +36,7 @@ import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
 import missionRoutes from './routes/missions';
 import nativeApiKeysRoutes from './routes/native-api-keys';
+import waitlistRoutes from './routes/waitlist';
 import { AgentService } from './services/AgentService';
 import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
@@ -121,6 +123,7 @@ const visionRepository = new VisionRepository();
 app.use(cors());
 app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 app.use(express.json());
+app.use(cookieParser());
 
 // Add error handling middleware
 app.use(requestIdMiddleware);
@@ -172,6 +175,7 @@ app.get('/api/starships/pricing', async (req, res) => {
 
 // API Routes
 app.use('/api/health', healthRoutes);
+app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unauthenticated access
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/chat', chatRoutes);

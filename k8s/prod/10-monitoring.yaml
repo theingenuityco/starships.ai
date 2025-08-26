@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-config
+  namespace: starships-prod
+data:
+  endpoints.yaml: |
+    endpoints:
+      - name: homepage
+        url: https://starships.ai
+        interval: 60
+      - name: api-health
+        url: https://starships.ai/api/health
+        interval: 30
+      - name: auth-check
+        url: https://starships.ai/api/auth/me
+        interval: 120

@@ -1,4 +1,5 @@
 import { Agent, LLM, User, Starship, Vision, AgentTemplate } from './entities';
+import { MissionMessage } from '@starships/protocol';
 
 // Repository interfaces
 export interface Repository<T> {
@@ -108,4 +109,20 @@ export interface AgentTemplateRepository extends Repository<AgentTemplate> {
 
   // Create template from public agent
   createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null>;
+}
+
+export interface MissionMessageRepository {
+  saveMessage(message: Omit<MissionMessage, 'id'>): Promise<MissionMessage>;
+  getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessage[]>;
+  getMessageCount(missionId: string): Promise<number>;
+  getMessagesByMissionWithPagination(missionId: string, page?: number, pageSize?: number): Promise<{
+    messages: MissionMessage[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }>;
+  deleteMessagesByMission(missionId: string): Promise<void>;
+  deleteMessage(messageId: string): Promise<boolean>;
+  findMessageById(messageId: string): Promise<MissionMessage | null>;
 }

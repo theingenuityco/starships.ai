@@ -17,6 +17,8 @@ export { WaitlistRepository } from './repositories/WaitlistRepository';
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
+export { MissionRepository } from './repositories/MissionRepository';
+export { MissionMessageRepository } from './repositories/MissionMessageRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';

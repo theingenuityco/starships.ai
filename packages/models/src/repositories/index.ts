@@ -14,6 +14,7 @@ export { LLMRepository } from './LLMRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { VisionRepository } from './VisionRepository';
 export { MissionRepository } from './MissionRepository';
+export { MissionMessageRepository } from './MissionMessageRepository';
 
 
 // Export workflow repositories
@@ -33,6 +34,7 @@ export { WaitlistRepository } from './WaitlistRepository';
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
 import { MissionRepository } from './MissionRepository';
+import { MissionMessageRepository } from './MissionMessageRepository';
 import { WaitlistRepository } from './WaitlistRepository';
 
 
@@ -66,6 +68,7 @@ export class RepositoryFactory {
   private static starshipRepo: StarshipRepository | null = null;
   private static visionRepo: VisionRepository | null = null;
   private static missionRepo: MissionRepository | null = null;
+  private static missionMessageRepo: MissionMessageRepository | null = null;
   private static agentTemplateService: AgentTemplateService | null = null;
 
 
@@ -135,6 +138,7 @@ export class RepositoryFactory {
       this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
       this.missionRepo = new MissionRepository();
+      this.missionMessageRepo = new MissionMessageRepository();
 
 
       // Initialize workflow repositories (no dependencies)
@@ -203,6 +207,7 @@ export class RepositoryFactory {
         starshipRepo: this.starshipRepo !== null,
         visionRepo: this.visionRepo !== null,
         missionRepo: this.missionRepo !== null,
+        missionMessageRepo: this.missionMessageRepo !== null,
         agentTemplateService: this.agentTemplateService !== null,
         workflowRepo: this.workflowRepo !== null,
         workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
@@ -331,6 +336,17 @@ export class RepositoryFactory {
   }
 
   /**
+   * Get MissionMessageRepository instance (synchronous)
+   */
+  static getMissionMessageRepository(): MissionMessageRepository {
+    this.ensureInitialized();
+    if (!this.missionMessageRepo) {
+      throw new Error('MissionMessageRepository not initialized');
+    }
+    return this.missionMessageRepo;
+  }
+
+  /**
    * Get MissionClarityRepository instance (synchronous)
    */
   static getMissionClarityRepository(): MissionClarityRepository {
@@ -392,6 +408,7 @@ export class RepositoryFactory {
     this.starshipRepo = null;
     this.visionRepo = null;
     this.missionRepo = null;
+    this.missionMessageRepo = null;
     this.agentTemplateService = null;
     this.workflowRepo = null;
     this.workflowRuntimeStateRepo = null;

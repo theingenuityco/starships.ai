@@ -3,13 +3,7 @@
 // ============================================================================
 
 // Import Agent types from contracts to use in collection-specific interfaces
-import type {
-  Agent,
-  AgentConfig,
-  CreateAgentRequest,
-  UpdateAgentRequest,
-  AgentAnalytics
-} from '../contracts/agent';
+import type { Agent } from '../contracts/agent';
 
 // Re-export Agent types from contracts as they serve as both API contracts and database domains
 export type {
@@ -19,7 +13,6 @@ export type {
   UpdateAgentRequest,
   AgentAnalytics
 } from '../contracts/agent';
-
 // ============================================================================
 // AGENT COLLECTION-SPECIFIC TYPES
 // ============================================================================

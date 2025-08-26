@@ -1,9 +1,9 @@
 // Connection
-export { createConnection, getConnection, Neo4jConnection } from './connection';
-export type { Neo4jConfig } from './connection';
+export { createConnection, getConnection, Neo4jConnection } from './helpers/database';
+export type { Neo4jConfig } from './helpers/database';
 
 // Utils
-export { convertNeo4jInt, convertNeo4jIntsInObject } from './utils/neo4j-helpers';
+export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
 // Types (interfaces only)
 export * from './types';
@@ -60,14 +60,14 @@ export {
   HealthMonitor,
   RequestContext,
   logger,
-} from './logging';
+} from './helpers/logging';
 
 export type {
   LogLevel,
   LogContext,
   PerformanceMetrics,
   HealthStatus
-} from './logging';
+} from './helpers/logging';
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';

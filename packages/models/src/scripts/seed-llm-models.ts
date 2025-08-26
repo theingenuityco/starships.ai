@@ -5,7 +5,7 @@
  * This creates the necessary LLM model entries in the database
  */
 
-import { createConnection, Neo4jConfig } from '../connection';
+import { createConnection, Neo4jConfig } from '../helpers/database';
 import { LLMRepository } from '../repositories/LLMRepository';
 
 const LLM_MODELS = [

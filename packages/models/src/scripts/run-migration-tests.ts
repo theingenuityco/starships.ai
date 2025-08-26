@@ -12,7 +12,7 @@
  *   npm run test:migration rollback     # Run rollback test
  */
 
-import { createConnection } from '../connection';
+import { createConnection } from '../helpers/database';
 
 // Stubs for removed MCP migration test functionality
 async function runMigrationTests(): Promise<void> {

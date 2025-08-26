@@ -4,7 +4,7 @@
  * Clean up duplicate ParameterPattern nodes in Neo4j
  */
 
-import { createConnection, Neo4jConfig } from '../connection';
+import { createConnection, Neo4jConfig } from '../helpers/database';
 
 async function cleanupDuplicates() {
   const config: Neo4jConfig = {

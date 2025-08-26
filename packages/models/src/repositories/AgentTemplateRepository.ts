@@ -1,8 +1,8 @@
 import { AgentTemplate, AgentTemplateRepository, Agent } from '../types';
-import { Neo4jConnection } from '../connection';
+import { Neo4jConnection } from '../helpers/database';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4j-helpers';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
 export class Neo4jAgentTemplateRepository implements AgentTemplateRepository {
   constructor(private connection: Neo4jConnection) {}

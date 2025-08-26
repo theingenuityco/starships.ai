@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { createConnection, getConnection, Neo4jConfig } from '../connection';
+import { createConnection, getConnection, Neo4jConfig } from '../helpers/database';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

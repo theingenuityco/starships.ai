@@ -6,7 +6,7 @@
  * Creates Neo4j schema for Smart Parameter Adapter pattern storage
  */
 
-import { createConnection, Neo4jConfig } from '../connection';
+import { createConnection, Neo4jConfig } from '../helpers/database';
 import * as fs from 'fs';
 import * as path from 'path';
 

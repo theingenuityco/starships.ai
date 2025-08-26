@@ -2,7 +2,7 @@
 
 import fs from 'fs-extra';
 import path from 'path';
-import { createConnection, getConnection } from '../connection';
+import { createConnection, getConnection } from '../helpers/database';
 import { VisionRepository } from '../repositories/VisionRepository';
 import { StarshipRepository } from '../repositories/StarshipRepository';
 import { VisionFileService } from '../services/VisionFileService';

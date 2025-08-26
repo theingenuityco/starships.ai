@@ -1,4 +1,4 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 

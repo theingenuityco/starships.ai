@@ -1,4 +1,4 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { LLM, LLMRepository as LLMRepositoryInterface } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 

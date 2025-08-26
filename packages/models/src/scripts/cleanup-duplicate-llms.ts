@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { createConnection } from '../connection';
+import { createConnection } from '../helpers/database';
 
 async function cleanupDuplicateLLMs() {
   console.log('🧹 Starting cleanup of duplicate LLM models...');

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createConnection, getConnection } from '../connection';
+import { createConnection, getConnection } from '../helpers/database';
 import { StarshipRepository } from '../repositories/StarshipRepository';
 import { AgentRepository } from '../repositories/AgentRepository';
 

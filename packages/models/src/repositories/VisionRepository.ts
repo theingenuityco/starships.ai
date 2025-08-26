@@ -1,4 +1,4 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { Vision, VisionRepository as VisionRepositoryInterface } from '../types';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';

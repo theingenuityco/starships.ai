@@ -9,7 +9,7 @@
  * 3. Updates the Vision nodes with calculated metrics
  */
 
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { Vision } from '../types';
 
 // Import the VisionMetricsCalculator - this will need to be available in models package

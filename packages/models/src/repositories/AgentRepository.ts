@@ -1,9 +1,9 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../utils/neo4j-helpers';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
 /**
  * Neo4j-based agent repository

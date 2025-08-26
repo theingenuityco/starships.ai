@@ -3,8 +3,8 @@ import { UserRepository } from './UserRepository';
 import { LLMRepository } from './LLMRepository';
 import { Neo4jAgentTemplateRepository } from './AgentTemplateRepository';
 import { AgentTemplateService } from '../services/AgentTemplateService';
-import { getConnection } from '../connection';
-import { NotFoundError } from '../errors';
+import { getConnection } from '../helpers/database';
+import { NotFoundError } from '../helpers/errors';
 
 export { AgentRepository } from './AgentRepository';
 export { UserRepository } from './UserRepository';

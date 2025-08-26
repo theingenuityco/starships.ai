@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { createConnection } from '../connection';
+import { createConnection } from '../helpers/database';
 
 async function queryLLMModels() {
   console.log('🔍 Querying LLMModel nodes from Neo4j...');

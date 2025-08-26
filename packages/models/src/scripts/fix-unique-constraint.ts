@@ -5,7 +5,7 @@
  * Drops the regular index and creates a unique constraint instead
  */
 
-import { createConnection, Neo4jConfig } from '../connection';
+import { createConnection, Neo4jConfig } from '../helpers/database';
 
 async function fixUniqueConstraint() {
   const config: Neo4jConfig = {

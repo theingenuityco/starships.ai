@@ -1,6 +1,6 @@
-import { Neo4jConnection } from '../connection';
+import { Neo4jConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { NotFoundError, ValidationError, DatabaseError } from '../errors';
+import { NotFoundError, ValidationError, DatabaseError } from '../helpers/errors';
 
 export interface WaitlistEntry {
   email: string;

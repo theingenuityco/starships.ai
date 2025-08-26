@@ -1,4 +1,4 @@
-import { createConnection } from '../connection';
+import { createConnection } from '../helpers/database';
 import { WaitlistRepository } from '../repositories/WaitlistRepository';
 import dotenv from 'dotenv';
 import path from 'path';

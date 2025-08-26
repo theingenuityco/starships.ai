@@ -1,4 +1,4 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 
 /**
  * Database Performance Monitoring and Query Optimization

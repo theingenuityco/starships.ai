@@ -1,6 +1,6 @@
 import { AgentTemplate, AgentTemplateRepository, Agent } from '../types';
 import { Neo4jAgentTemplateRepository } from '../repositories/AgentTemplateRepository';
-import { Neo4jConnection } from '../connection';
+import { Neo4jConnection } from '../helpers/database';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;

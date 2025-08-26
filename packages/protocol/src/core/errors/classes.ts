@@ -572,6 +572,13 @@ export const ErrorFactory = {
     requestId?: string
   ): BusinessLogicError => {
     return new BusinessLogicError(code, businessRule, message, undefined, context, userId, requestId);
+  },
+
+  /**
+   * Generate a unique request ID
+   */
+  generateRequestId: (): string => {
+    return generateCorrelationId();
   }
 };
 

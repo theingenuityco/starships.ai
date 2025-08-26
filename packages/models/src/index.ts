@@ -42,9 +42,6 @@ export {
   BusinessLogicError,
   ErrorFactory,
   isStandardError,
-  // Re-export with legacy names for backward compatibility
-  StandardError as BaseError,
-  ErrorFactory as ErrorUtils,
 } from '@starships/protocol';
 
 export type {

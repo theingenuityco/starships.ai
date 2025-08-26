@@ -7,7 +7,7 @@ TypeScript protocol definitions and contracts for the starships.ai platform. Thi
 The protocol package serves as the single source of truth for:
 
 - **API Contracts** - Interface definitions for cross-service communication
-- **Domain Entities** - Core business object types (Starship, Mission, Agent, etc.)
+- **Entity Types** - Database collection types (Starship, Mission, Agent, etc.)
 - **Socket.IO Events** - Real-time communication protocols
 - **Request/Response Types** - HTTP API input/output structures
 
@@ -19,26 +19,26 @@ pnpm add @starships/protocol
 
 ## Core Exports
 
-### Domain Entities
+### Entity Types
 
 ```typescript
-import { 
-  Starship, 
-  Mission, 
-  Agent, 
-  User, 
+import {
+  Starship,
+  Mission,
+  Agent,
+  User,
   Vision,
-  Workflow 
+  Workflow
 } from '@starships/protocol';
 ```
 
-**Key domain types:**
-- [`Starship`](src/domain/starship.ts) - Starship management with billing integration
-- [`Mission`](src/domain/mission.ts) - Mission orchestration with workflow execution
-- [`Agent`](src/domain/agent-template.ts) - AI agent configurations and templates
-- [`User`](src/domain/user.ts) - User management and authentication
-- [`Vision`](src/domain/vision.ts) - Vision refinement system
-- [`Workflow`](src/domain/workflow.ts) - Workflow execution definitions
+**Key entity types:**
+- [`Starship`](src/entities/starship.ts) - Starship management with billing integration
+- [`Mission`](src/entities/mission.ts) - Mission orchestration with workflow execution
+- [`Agent`](src/entities/agent-template.ts) - AI agent configurations and templates
+- [`User`](src/entities/user.ts) - User management and authentication
+- [`Vision`](src/entities/vision.ts) - Vision refinement system
+- [`Workflow`](src/entities/workflow.ts) - Workflow execution definitions
 
 ### API Contracts
 
@@ -103,7 +103,7 @@ src/
 │   ├── llm.ts              # LLM provider contracts
 │   ├── sibil.ts            # AI assistant protocols
 │   └── socket.ts           # Real-time event contracts
-├── domain/                 # Business entity types
+├── entities/               # Database collection types
 │   ├── starship.ts         # Starship management
 │   ├── mission.ts          # Mission orchestration
 │   ├── agent-template.ts   # Agent templates

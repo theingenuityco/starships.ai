@@ -1,6 +1,6 @@
 /**
- * LLM Domain Types
- * 
+ * LLM Entity Types
+ *
  * Clean language model type definitions for protocol contract.
  */
 

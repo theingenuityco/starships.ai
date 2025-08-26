@@ -1,6 +1,6 @@
 /**
- * Workflow Domain Types
- * 
+ * Workflow Entity Types
+ *
  * Domain Specific Language for workflow creation, approval, and execution
  * within the expedition orchestration system.
  */

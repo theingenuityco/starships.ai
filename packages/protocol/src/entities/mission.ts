@@ -1,6 +1,6 @@
 /**
- * Mission Domain Types
- * 
+ * Mission Entity Types
+ *
  * Clean mission type definitions for protocol contract.
  * Implementation details moved to appropriate packages.
  */

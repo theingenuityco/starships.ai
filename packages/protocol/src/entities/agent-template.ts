@@ -1,6 +1,6 @@
 /**
- * Agent Template Domain Types
- * 
+ * Agent Template Entity Types
+ *
  * Clean agent template type definitions for protocol contract.
  */
 

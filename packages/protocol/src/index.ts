@@ -8,15 +8,15 @@ export * from './contracts/chat';
 export * from './contracts/llm';
 export * from './contracts/socket';
 
-// Export domain types (business entities)
-export * from './domain/mission';
-export * from './domain/starship';
-export * from './domain/vision';
-export * from './domain/workflow';
-export * from './domain/user';
-export * from './domain/waitlist';
+// Export entity types (database collections)
+export * from './entities/mission';
+export * from './entities/starship';
+export * from './entities/vision';
+export * from './entities/workflow';
+export * from './entities/user';
+export * from './entities/waitlist';
 
-// Export domain types with explicit naming to avoid conflicts
+// Export entity types with explicit naming to avoid conflicts
 export type {
   LLM,
   LLMProviderType,
@@ -26,7 +26,7 @@ export type {
   LLMListResponse,
   LLMFilters,
   LLMSort
-} from './domain/llm';
+} from './entities/llm';
 
 export type {
   AgentTemplate,
@@ -40,7 +40,7 @@ export type {
   AgentTemplateUsage,
   IncrementTemplateUsageRequest,
   RateTemplateRequest
-} from './domain/agent-template';
+} from './entities/agent-template';
 
 // Export Sibil types with explicit exports to avoid conflicts
 export type {

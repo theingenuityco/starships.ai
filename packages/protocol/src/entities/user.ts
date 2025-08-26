@@ -1,6 +1,6 @@
 /**
- * User Domain Types
- * 
+ * User Entity Types
+ *
  * Clean user type definitions for protocol contract.
  */
 

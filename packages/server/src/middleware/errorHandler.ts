@@ -20,10 +20,29 @@ import {
 } from '@starships/models';
 
 import type {
-  StandardErrorCode,
   ErrorSeverity,
-  ErrorResponse,
-} from '@starships/protocol';
+} from '@starships/models';
+
+// Define local types that were previously imported from protocol
+interface ErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    category: string;
+    severity: ErrorSeverity;
+    details?: any;
+    timestamp: string;
+    requestId?: string;
+  };
+  meta: {
+    version: string;
+    environment: string;
+    service: string;
+  };
+}
+
+type StandardErrorCode = string; // Simplified type for now
 
 // ============================================================================
 // UTILITY FUNCTIONS

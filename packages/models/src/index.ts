@@ -50,14 +50,9 @@ export {
   ErrorUtils
 } from './helpers/errors';
 
-export type {
-  ErrorSeverity,
-  ErrorInfo,
-  ErrorContext,
-  ErrorResponse,
-  StandardErrorCode,
-  ErrorCategory as ProtocolErrorCategory
-} from '@starships/protocol';
+// Export local error types
+export { ErrorSeverity } from './helpers/logging/error-monitor';
+export { ErrorCategory } from './helpers/errors';
 
 // Export LLM domain types from protocol
 export type {

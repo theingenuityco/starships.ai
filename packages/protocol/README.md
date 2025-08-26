@@ -8,8 +8,7 @@ The protocol package serves as the single source of truth for:
 
 - **API Contracts** - Interface definitions for cross-service communication
 - **Domain Entities** - Core business object types (Starship, Mission, Agent, etc.)
-- **Socket.IO Events** - Real-time communication protocols  
-- **Error System** - Standardized error classes and codes
+- **Socket.IO Events** - Real-time communication protocols
 - **Request/Response Types** - HTTP API input/output structures
 
 ## Installation
@@ -60,31 +59,6 @@ import {
 - [`Sibil contracts`](src/contracts/sibil.ts) - AI assistant communication protocols
 - [`Socket contracts`](src/contracts/socket.ts) - Real-time event definitions
 
-### Error Types
-
-```typescript
-import type {
-  StandardErrorCode,
-  ErrorCategory,
-  ErrorSeverity,
-  ErrorInfo,
-  ErrorResponse
-} from '@starships/protocol';
-
-// Error types for consistent error handling
-const errorCode: StandardErrorCode = 'VALIDATION_ERROR';
-const category: ErrorCategory = 'validation';
-```
-
-**Error types and interfaces:**
-- [`StandardErrorCode`](src/core/errors/types.ts:40) - Standardized error codes
-- [`ErrorCategory`](src/core/errors/types.ts:23) - Error classification
-- [`ErrorSeverity`](src/core/errors/types.ts:14) - Error severity levels
-- [`ErrorInfo`](src/core/errors/types.ts:161) - Core error information structure
-- [`ErrorResponse`](src/core/errors/types.ts:192) - API error response format
-
-> **Note:** Error class implementations are provided by `@starships/models` package.
-
 ## Usage Examples
 
 ### Creating API Endpoints
@@ -118,24 +92,6 @@ socket.on('sibil:stream', (request: SibilSocketRequest) => {
 });
 ```
 
-### Error Handling
-
-```typescript
-import type { ErrorResponse, StandardErrorCode } from '@starships/protocol';
-import { ErrorFactory, BaseError } from '@starships/models';
-
-try {
-  // Business logic
-} catch (error) {
-  if (error instanceof BaseError) {
-    return error.toResponse();
-  }
-  
-  // Convert generic errors using models package
-  throw ErrorFactory.database('Database operation failed');
-}
-```
-
 ## Package Structure
 
 ```
@@ -155,11 +111,6 @@ src/
 │   ├── vision.ts           # Vision refinement
 │   ├── workflow.ts         # Workflow execution
 │   └── waitlist.ts         # Waitlist management
-└── core/                   # Core system types
-    └── errors/             # Standardized error system
-        ├── index.ts        # Error exports
-        ├── types.ts        # Error type definitions
-        └── classes.ts      # Error class implementations
 ```
 
 ## Used By

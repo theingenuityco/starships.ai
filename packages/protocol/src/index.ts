@@ -2,9 +2,6 @@
 // MAIN PROTOCOL EXPORTS
 // ============================================================================
 
-// Export core error handling
-export * from './core/errors';
-
 // Export contract types (API boundaries)
 export * from './contracts/agent';
 export * from './contracts/chat';
@@ -69,15 +66,3 @@ export type {
   EventEmissionResult,
 } from './contracts/socket';
 
-// Export error types only (implementations provided by @starships/models)
-export type {
-  StandardErrorCode,
-  ErrorCategory,
-  ErrorSeverity,
-  ErrorInfo,
-  ErrorContext,
-  ErrorResponse,
-  ValidationErrorDetail,
-  DatabaseErrorDetail,
-  NetworkErrorDetail
-} from './core/errors';

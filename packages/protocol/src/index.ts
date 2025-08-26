@@ -4,11 +4,12 @@
 
 // Export contract types (API boundaries)
 export * from './contracts/chat';
-export * from './contracts/llm';
+export * from './contracts/sibil';
 export * from './contracts/socket';
 
 // Export domain types (database domains)
 export * from './domains/agent';
+export * from './domains/llm';
 export * from './domains/mission';
 export * from './domains/starship';
 export * from './domains/vision';
@@ -42,6 +43,7 @@ export type {
   IncrementTemplateUsageRequest,
   RateTemplateRequest
 } from './domains/agent-template';
+
 
 // Export Sibil types with explicit exports to avoid conflicts
 export type {

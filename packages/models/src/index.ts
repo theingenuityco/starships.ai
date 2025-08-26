@@ -12,6 +12,7 @@ export * from './types';
 export { AgentRepository } from './repositories/AgentRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { LLMRepository } from './repositories/LLMRepository';
+export { WaitlistRepository } from './repositories/WaitlistRepository';
 
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
@@ -70,3 +71,4 @@ export type {
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';
+export { seedWaitlist } from './scripts/seed-waitlist';

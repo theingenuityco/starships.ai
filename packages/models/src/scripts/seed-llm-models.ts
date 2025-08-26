@@ -78,61 +78,23 @@ const LLM_MODELS = [
 ];
 
 export async function seedLLMModels() {
-  console.log('🌱 Starting LLM models seeding...');
+  console.log('🌱 LLM models are now seeded automatically during schema initialization');
+  console.log('✅ No additional seeding required - models are created in 001_initialize_schema.cypher');
   
-  const llmRepo = new LLMRepository();
-
+  // List existing models for verification
   try {
-    // Check if any LLM models already exist
+    const llmRepo = new LLMRepository();
     const existingModels = await llmRepo.findAll();
+    console.log(`📋 Found ${existingModels.length} LLM models in database`);
     
     if (existingModels.length > 0) {
-      console.log(`📋 Found ${existingModels.length} existing LLM models`);
-      console.log('🔄 Checking for missing models to add...');
-      
-      // Only add models that don't already exist (check by name, not ID)
-      const existingNames = new Set(existingModels.map(m => m.name));
-      const modelsToAdd = LLM_MODELS.filter(m => !existingNames.has(m.name));
-      
-      if (modelsToAdd.length === 0) {
-        console.log('✅ All default LLM models already exist');
-        return;
-      }
-      
-      console.log(`📝 Adding ${modelsToAdd.length} new LLM models...`);
-      
-      for (const model of modelsToAdd) {
-        try {
-          await llmRepo.create({
-            ...model,
-            createdAt: new Date().toISOString()
-          } as any);
-          console.log(`  ✅ Added: ${model.id} (${model.name})`);
-        } catch (error) {
-          console.error(`  ❌ Failed to add ${model.id}:`, error);
-        }
-      }
-    } else {
-      // No existing models, add all defaults
-      console.log('📝 No existing LLM models found, adding all defaults...');
-      
-      for (const model of LLM_MODELS) {
-        try {
-          await llmRepo.create({
-            ...model,
-            createdAt: new Date().toISOString()
-          } as any);
-          console.log(`  ✅ Added: ${model.id} (${model.name})`);
-        } catch (error) {
-          console.error(`  ❌ Failed to add ${model.id}:`, error);
-        }
-      }
+      console.log('📋 Available LLM models:');
+      existingModels.forEach(model => {
+        console.log(`  - ${model.name} (${model.provider})`);
+      });
     }
-
-    console.log('✅ LLM model seeding completed!');
   } catch (error) {
-    console.error('❌ Error seeding LLM models:', error);
-    // Don't throw - allow server to continue even if seeding fails
+    console.error('❌ Error checking LLM models:', error);
   }
 }
 

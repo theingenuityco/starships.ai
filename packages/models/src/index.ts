@@ -89,3 +89,5 @@ export type {
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';
 export { seedWaitlist } from './scripts/seed-waitlist';
+export { initializeSchema } from './scripts/initialize-schema';
+export { migrationRunner } from './scripts/migration-runner';

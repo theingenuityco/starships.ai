@@ -18,7 +18,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedLLMModels, seedWaitlist } from '@starships/models';
+import { initializeSchema, seedWaitlist } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -202,8 +202,11 @@ httpServer.listen(PORT, async () => {
     
     // Initialize database connection FIRST
     await dbConnection.connect();
-    await dbConnection.initializeSchema();
-    console.log('✅ Neo4j database connected and schema initialized');
+    console.log('✅ Neo4j database connected');
+    
+    // Initialize complete database schema (includes seeding)
+    await initializeSchema();
+    console.log('✅ Database schema initialized with seed data');
     
     // Initialize RepositoryFactory AFTER database connection is established
     console.log('🔧 Initializing RepositoryFactory...');
@@ -228,9 +231,8 @@ httpServer.listen(PORT, async () => {
       console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
     }
     
-    // Initialize LLM Models (seeds default models)
-    await seedLLMModels();
-    console.log('✅ LLM Models initialized with default models');
+    // LLM Models are now initialized automatically with schema
+    console.log('✅ LLM Models ready (seeded during schema initialization)');
 
     // Initialize Waitlist (seeds approved emails)
     try {

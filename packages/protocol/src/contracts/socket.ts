@@ -4,6 +4,28 @@
  * Real-time communication event definitions for Socket.IO integration.
  */
 
+import type {
+  SibilSocketRequest,
+  SibilSocketStreamChunk,
+  SibilStreamError,
+  SibilStreamCompleteResponse,
+  AgentSocketRequest,
+  AgentSocketStreamChunk,
+  AgentStreamError,
+  AgentChatResponse
+} from './sibil';
+
+import type {
+  VisionAnalysisRequest,
+  VisionRefinementRequest,
+  VisionUpdateRequest,
+  VisionAnalysisEventData,
+  VisionProposalEventData,
+  VisionUpdatedEventData,
+  VisionRefinementErrorEventData,
+  VisionRefinementState
+} from '../domain/vision';
+
 // ============================================================================
 // BASE SOCKET EVENTS
 // ============================================================================
@@ -46,30 +68,30 @@ export interface ChatSocketEvents {
   'pong': () => void;
 
   // Sibil Client to Server events
-  'sibil:start-stream': (request: any) => void;
+  'sibil:start-stream': (request: SibilSocketRequest) => void;
   'sibil:stop-stream': (streamId: string) => void;
   'sibil:join-room': (userId: string) => void;
   'sibil:leave-room': (userId: string) => void;
 
   // Sibil Server to Client events
   'sibil:stream-start': (streamId: string) => void;
-  'sibil:stream-chunk': (chunk: any) => void;
-  'sibil:stream-complete': (response: any) => void;
-  'sibil:stream-error': (error: any) => void;
+  'sibil:stream-chunk': (chunk: SibilSocketStreamChunk) => void;
+  'sibil:stream-complete': (response: SibilStreamCompleteResponse) => void;
+  'sibil:stream-error': (error: SibilStreamError) => void;
   'sibil:typing-start': () => void;
   'sibil:typing-stop': () => void;
 
   // Agent Chat Client to Server events
-  'agent:start-stream': (request: any) => void;
+  'agent:start-stream': (request: AgentSocketRequest) => void;
   'agent:stop-stream': (streamId: string) => void;
   'agent:join-room': (userId: string, agentId: string) => void;
   'agent:leave-room': (userId: string, agentId: string) => void;
 
   // Agent Chat Server to Client events
   'agent:stream-start': (streamId: string, agentId: string) => void;
-  'agent:stream-chunk': (chunk: any) => void;
-  'agent:stream-complete': (response: any) => void;
-  'agent:stream-error': (error: any) => void;
+  'agent:stream-chunk': (chunk: AgentSocketStreamChunk) => void;
+  'agent:stream-complete': (response: AgentChatResponse) => void;
+  'agent:stream-error': (error: AgentStreamError) => void;
   'agent:typing-start': (agentId: string) => void;
   'agent:typing-stop': (agentId: string) => void;
 }
@@ -83,20 +105,20 @@ export interface ChatSocketEvents {
  */
 export interface VisionRefinementSocketEvents {
   // Client to Server events
-  'vision:analyze': (request: any, callback?: (response: { success: boolean; error?: string; sessionId?: string }) => void) => void;
-  'vision:refine': (request: any, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'vision:analyze': (request: VisionAnalysisRequest, callback?: (response: { success: boolean; error?: string; sessionId?: string }) => void) => void;
+  'vision:refine': (request: VisionRefinementRequest, callback?: (response: { success: boolean; error?: string }) => void) => void;
   'vision:accept-proposal': (data: { starshipId: string; sessionId: string; userId: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
   'vision:reject-proposal': (data: { starshipId: string; sessionId: string; userId: string; feedback?: string[] }, callback?: (response: { success: boolean; error?: string }) => void) => void;
-  'vision:update': (request: any, callback?: (response: { success: boolean; error?: string }) => void) => void;
-  'vision:get-state': (data: { starshipId: string; userId: string }, callback?: (response: { success: boolean; state?: any; error?: string }) => void) => void;
+  'vision:update': (request: VisionUpdateRequest, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'vision:get-state': (data: { starshipId: string; userId: string }, callback?: (response: { success: boolean; state?: VisionRefinementState; error?: string }) => void) => void;
   
   // Server to Client events
-  'vision:analyzing': (data: any) => void;
-  'vision:analysis-complete': (data: any) => void;
-  'vision:proposal': (data: any) => void;
-  'vision:updated': (data: any) => void;
-  'vision:state-changed': (data: any) => void;
-  'vision:error': (data: any) => void;
+  'vision:analyzing': (data: VisionAnalysisEventData) => void;
+  'vision:analysis-complete': (data: VisionAnalysisEventData) => void;
+  'vision:proposal': (data: VisionProposalEventData) => void;
+  'vision:updated': (data: VisionUpdatedEventData) => void;
+  'vision:state-changed': (data: VisionUpdatedEventData) => void;
+  'vision:error': (data: VisionRefinementErrorEventData) => void;
   
   // Room management for vision refinement
   'vision:join-starship-room': (data: { starshipId: string; userId: string }) => void;
@@ -113,9 +135,9 @@ export interface VisionRefinementSocketEvents {
 export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents, VisionRefinementSocketEvents {}
 
 /**
- * Main SocketIO Events interface
+ * Main SocketIO Events interface - alias for SocketEvents
  */
-export interface SocketIOEvents extends SocketEvents {}
+export type SocketIOEvents = SocketEvents;
 
 
 // ============================================================================

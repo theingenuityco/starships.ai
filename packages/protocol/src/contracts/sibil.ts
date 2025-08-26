@@ -5,7 +5,20 @@
  */
 
 import type { UsageStats } from './chat';
-import type { ConnectionStatus } from './socket';
+
+// ============================================================================
+// TYPEWRITER INTERFACES
+// ============================================================================
+
+/**
+ * Minimal typewriter interface for streaming effects
+ * Client packages can extend this with additional properties
+ */
+export interface TypewriterData {
+  type: string;
+  content: string;
+  [key: string]: unknown; // Allow extensions by client
+}
 
 // ============================================================================
 // SIBIL CORE INTERFACES
@@ -81,6 +94,13 @@ export interface SibilStreamResponse {
   status: 'started' | 'streaming' | 'completed' | 'error';
 }
 
+/**
+ * Sibil stream completion response - extends SibilResponse with stream info
+ */
+export interface SibilStreamCompleteResponse extends SibilResponse {
+  stream_id?: string;
+}
+
 // ============================================================================
 // SOCKET.IO INTERFACES
 // ============================================================================
@@ -99,7 +119,7 @@ export interface SibilSocketRequest extends SibilRequest {
  */
 export interface SibilSocketStreamChunk extends SibilStreamChunk {
   stream_id: string;
-  typewriter?: any; // Client-side typewriter functionality
+  typewriter?: TypewriterData; // Client-side typewriter functionality
   typing_speed?: number;
   timestamp: number;
 }
@@ -140,7 +160,7 @@ export interface AgentSocketStreamChunk {
   agent_id: string;
   type: 'content' | 'complete' | 'error';
   content?: string;
-  typewriter?: any; // Client-side typewriter functionality
+  typewriter?: TypewriterData; // Client-side typewriter functionality
   timestamp: number;
 }
 

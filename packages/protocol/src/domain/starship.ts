@@ -128,7 +128,7 @@ export interface CreateStarshipRequest {
 /**
  * Generic API response wrapper
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success?: boolean;
   message?: string;
   error?: string;
@@ -141,5 +141,5 @@ export interface ApiResponse<T = any> {
 export interface ApiError {
   error: string;
   code?: number;
-  details?: any;
+  details?: unknown;
 }

@@ -52,6 +52,5 @@ export {
   DatabaseError,
   NetworkError,
   BusinessLogicError,
-  ErrorFactory,
-  isStandardError
+  ErrorFactory
 } from './core/errors';

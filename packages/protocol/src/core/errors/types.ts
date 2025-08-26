@@ -163,7 +163,7 @@ export interface ErrorInfo {
   message: string;
   category: ErrorCategory;
   severity: ErrorSeverity;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   context?: ErrorContext;
   timestamp: string;
   correlationId?: string;
@@ -183,7 +183,7 @@ export interface ErrorContext {
   stackTrace?: string;
   userAgent?: string;
   ipAddress?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -196,7 +196,7 @@ export interface ErrorResponse {
     message: string;
     category: ErrorCategory;
     severity: ErrorSeverity;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
     timestamp: string;
     correlationId?: string;
     requestId?: string;
@@ -214,7 +214,7 @@ export interface ErrorResponse {
 export interface ValidationErrorDetail {
   field: string;
   message: string;
-  value?: any;
+  value?: unknown;
   constraint?: string;
 }
 
@@ -243,10 +243,3 @@ export interface NetworkErrorDetail {
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-
-/**
- * Generate a correlation ID for error tracking
- */
-export function generateCorrelationId(): string {
-  return `err_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-}

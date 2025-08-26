@@ -191,7 +191,7 @@ export interface MissionMessage {
   senderName?: string;    // Cached display name
   
   // Extensibility
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -283,7 +283,11 @@ export interface WorkflowNode {
   type: 'start' | 'agent' | 'end';
   name: string;
   description: string;
-  parameters: Record<string, any>;
+  parameters: {
+    agentId?: string;
+    estimatedTime?: number;
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -324,10 +328,3 @@ export interface WorkflowResponse {
 // ============================================================================
 // VALIDATION HELPERS
 // ============================================================================
-
-/**
- * Helper function to check if a phase is valid
- */
-export function isValidMissionPhase(phase: string): phase is MissionPhase {
-  return Object.values(MISSION_PHASES).includes(phase as MissionPhase);
-}

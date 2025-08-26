@@ -7,6 +7,30 @@
 import type { UsageStats } from './chat';
 
 // ============================================================================
+// LLM TOOL INTERFACES
+// ============================================================================
+
+/**
+ * Tool definition for LLM function calling
+ */
+export interface LLMToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, {
+        type: string;
+        description?: string;
+        enum?: string[];
+      }>;
+      required?: string[];
+    };
+  };
+}
+
+// ============================================================================
 // LLM PROVIDER INTERFACES
 // ============================================================================
 
@@ -26,7 +50,7 @@ export interface LLMResult {
   toolCalls?: Array<{
     id: string;
     name: string;
-    arguments: Record<string, any>;
+    arguments: Record<string, unknown>;
   }>;
 }
 
@@ -40,7 +64,7 @@ export interface LLMProvider {
       stream?: boolean;
       temperature?: number;
       maxTokens?: number;
-      tools?: any[];
+      tools?: LLMToolDefinition[];
     }
   ): Promise<LLMResult>;
   
@@ -49,7 +73,7 @@ export interface LLMProvider {
     opts?: {
       temperature?: number;
       maxTokens?: number;
-      tools?: any[];
+      tools?: LLMToolDefinition[];
     }
   ): AsyncGenerator<string, void, unknown>;
 }

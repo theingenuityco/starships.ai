@@ -41,7 +41,6 @@ export {
   NetworkError,
   BusinessLogicError,
   ErrorFactory,
-  isStandardError,
 } from '@starships/protocol';
 
 export type {

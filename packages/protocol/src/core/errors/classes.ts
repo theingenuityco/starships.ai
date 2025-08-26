@@ -14,9 +14,26 @@ import {
   ErrorResponse,
   ValidationErrorDetail,
   DatabaseErrorDetail,
-  NetworkErrorDetail,
-  generateCorrelationId
+  NetworkErrorDetail
 } from './types';
+
+// ============================================================================
+// NETWORK ERROR INTERFACES
+// ============================================================================
+
+/**
+ * Network request error structure for HTTP errors
+ */
+export interface NetworkRequestError {
+  message: string;
+  code?: string;
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  timeout?: boolean;
+  request?: unknown;
+}
 
 // ============================================================================
 // BASE ERROR CLASS
@@ -30,7 +47,7 @@ export class StandardError extends Error {
   public readonly category: ErrorCategory;
   public readonly severity: ErrorSeverity;
   public readonly httpStatusCode: number;
-  public readonly details?: Record<string, any>;
+  public readonly details?: Record<string, unknown>;
   public readonly context?: ErrorContext;
   public readonly timestamp: string;
   public readonly correlationId: string;
@@ -41,7 +58,7 @@ export class StandardError extends Error {
   constructor(
     code: StandardErrorCode,
     message?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
     context?: ErrorContext,
     correlationId?: string,
     userId?: string,
@@ -57,7 +74,7 @@ export class StandardError extends Error {
     this.details = details;
     this.context = context;
     this.timestamp = new Date().toISOString();
-    this.correlationId = correlationId || generateCorrelationId();
+    this.correlationId = correlationId || `err_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     this.isRetryable = this.getRetryable(code);
     this.userId = userId;
     this.requestId = requestId;
@@ -143,7 +160,7 @@ export class StandardError extends Error {
   /**
    * Convert error to JSON for logging
    */
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       code: this.code,
@@ -230,7 +247,7 @@ export class ValidationError extends StandardError {
    * Create validation error from field errors
    */
   static fromFields(
-    fieldErrors: Array<{ field: string; message: string; value?: any }>,
+    fieldErrors: Array<{ field: string; message: string; value?: unknown }>,
     context?: ErrorContext,
     userId?: string,
     requestId?: string
@@ -258,7 +275,7 @@ export class AuthenticationError extends StandardError {
   constructor(
     code: 'AUTHENTICATION_REQUIRED' | 'AUTHENTICATION_FAILED' | 'TOKEN_EXPIRED' | 'TOKEN_INVALID' = 'AUTHENTICATION_FAILED',
     message?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
     context?: ErrorContext,
     userId?: string,
     requestId?: string
@@ -276,7 +293,7 @@ export class AuthorizationError extends StandardError {
   constructor(
     code: 'ACCESS_DENIED' | 'INSUFFICIENT_PERMISSIONS' | 'FORBIDDEN_OPERATION' = 'ACCESS_DENIED',
     message?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
     context?: ErrorContext,
     userId?: string,
     requestId?: string
@@ -430,7 +447,7 @@ export class NetworkError extends StandardError {
    * Create network error from HTTP request failure
    */
   static fromHttpError(
-    error: any,
+    error: NetworkRequestError,
     url?: string,
     method?: string,
     context?: ErrorContext,
@@ -441,7 +458,7 @@ export class NetworkError extends StandardError {
       url,
       method,
       statusCode: error.response?.status,
-      timeout: error.timeout
+      timeout: error.timeout ? 1 : undefined
     };
 
     const code: StandardErrorCode = error.code === 'ECONNABORTED' 
@@ -469,7 +486,7 @@ export class BusinessLogicError extends StandardError {
     code: StandardErrorCode,
     businessRule: string,
     message?: string,
-    details?: Record<string, any>,
+    details?: Record<string, unknown>,
     context?: ErrorContext,
     userId?: string,
     requestId?: string
@@ -502,7 +519,7 @@ export const ErrorFactory = {
    * Create a validation error
    */
   validation: (
-    fieldErrors: Array<{ field: string; message: string; value?: any }>,
+    fieldErrors: Array<{ field: string; message: string; value?: unknown }>,
     context?: ErrorContext,
     userId?: string,
     requestId?: string
@@ -578,73 +595,6 @@ export const ErrorFactory = {
    * Generate a unique request ID
    */
   generateRequestId: (): string => {
-    return generateCorrelationId();
+    return `err_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
   }
 };
-
-// ============================================================================
-// TYPE GUARDS
-// ============================================================================
-
-/**
- * Type guard to check if an error is a StandardError
- */
-export function isStandardError(error: any): error is StandardError {
-  return error instanceof StandardError;
-}
-
-/**
- * Type guard to check if an error is a ValidationError
- */
-export function isValidationError(error: any): error is ValidationError {
-  return error instanceof ValidationError;
-}
-
-/**
- * Type guard to check if an error is an AuthenticationError
- */
-export function isAuthenticationError(error: any): error is AuthenticationError {
-  return error instanceof AuthenticationError;
-}
-
-/**
- * Type guard to check if an error is an AuthorizationError
- */
-export function isAuthorizationError(error: any): error is AuthorizationError {
-  return error instanceof AuthorizationError;
-}
-
-/**
- * Type guard to check if an error is a NotFoundError
- */
-export function isNotFoundError(error: any): error is NotFoundError {
-  return error instanceof NotFoundError;
-}
-
-/**
- * Type guard to check if an error is a ConflictError
- */
-export function isConflictError(error: any): error is ConflictError {
-  return error instanceof ConflictError;
-}
-
-/**
- * Type guard to check if an error is a DatabaseError
- */
-export function isDatabaseError(error: any): error is DatabaseError {
-  return error instanceof DatabaseError;
-}
-
-/**
- * Type guard to check if an error is a NetworkError
- */
-export function isNetworkError(error: any): error is NetworkError {
-  return error instanceof NetworkError;
-}
-
-/**
- * Type guard to check if an error is a BusinessLogicError
- */
-export function isBusinessLogicError(error: any): error is BusinessLogicError {
-  return error instanceof BusinessLogicError;
-}

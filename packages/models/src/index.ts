@@ -5,8 +5,6 @@ export type { Neo4jConfig } from './helpers/database';
 // Utils
 export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
-// Types (interfaces only)
-export * from './types';
 
 // Repository implementations
 export { AgentRepository } from './repositories/AgentRepository';
@@ -52,6 +50,9 @@ export {
   ErrorFactory,
 } from '@starships/protocol';
 
+// Export ConstraintViolationError from helpers for backward compatibility
+export { ConstraintViolationError } from './helpers/errors';
+
 export type {
   ErrorCategory,
   ErrorSeverity,
@@ -59,6 +60,18 @@ export type {
   ErrorContext,
   ErrorResponse,
   StandardErrorCode
+} from '@starships/protocol';
+
+// Export LLM domain types from protocol
+export type {
+  LLM,
+  LLMProviderType,
+  CreateLLMRequest,
+  UpdateLLMRequest,
+  LLMResponse,
+  LLMListResponse,
+  LLMFilters,
+  LLMSort
 } from '@starships/protocol';
 
 // NEW: Export structured logging and monitoring system

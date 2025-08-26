@@ -1,14 +1,7 @@
 import { Neo4jConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError, ValidationError, DatabaseError } from '../helpers/errors';
-
-export interface WaitlistEntry {
-  email: string;
-  status: 'approved' | 'pending' | 'rejected';
-  createdAt: Date;
-  addedBy: string;
-  notes?: string;
-}
+import { WaitlistEntry } from '@starships/protocol';
 
 export class WaitlistRepository extends BaseRepository {
   private connection: Neo4jConnection;

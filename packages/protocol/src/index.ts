@@ -17,6 +17,7 @@ export * from './domain/starship';
 export * from './domain/vision';
 export * from './domain/workflow';
 export * from './domain/user';
+export * from './domain/waitlist';
 export * from './domain/relationships';
 
 // Export domain types with explicit naming to avoid conflicts

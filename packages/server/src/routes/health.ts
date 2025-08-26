@@ -8,7 +8,7 @@
 import express from 'express';
 import { getConnection } from '@starships/models';
 import { RepositoryFactory } from '@starships/models';
-import { logger, LogContext, ErrorUtils } from '@starships/models';
+import { logger, LogContext, ErrorFactory } from '@starships/models';
 
 const router: express.Router = express.Router();
 
@@ -50,7 +50,7 @@ interface HealthCheckResponse {
  * GET /health
  */
 router.get('/', async (req, res) => {
-  const requestId = ErrorUtils.generateRequestId();
+  const requestId = ErrorFactory.generateRequestId();
   const startTime = Date.now();
 
   try {
@@ -173,7 +173,7 @@ router.get('/', async (req, res) => {
  * GET /health/detailed
  */
 router.get('/detailed', async (req, res) => {
-  const requestId = ErrorUtils.generateRequestId();
+  const requestId = ErrorFactory.generateRequestId();
   const startTime = Date.now();
 
   try {

@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit",
-    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config .eslintrc.cjs",
     "test": "echo 'No tests yet' && exit 0"
   },
   "devDependencies": {

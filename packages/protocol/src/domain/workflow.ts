@@ -1,7 +1,7 @@
 /**
- * Workflow DSL Types
+ * Workflow Domain Types
  * 
- * Defines the Domain Specific Language for workflow creation, approval, and execution
+ * Domain Specific Language for workflow creation, approval, and execution
  * within the expedition orchestration system.
  */
 
@@ -34,10 +34,11 @@ export interface WorkflowDSLNode {
   name: string;
   description: string;
   estimatedTime?: number; // In minutes
-  parameters: Record<string, any>; // Node-specific parameters
-  metadata?: Record<string, any>; // Additional node metadata
+  parameters: WorkflowNodeParameters; // Node-specific parameters
+  metadata?: Record<string, unknown>; // Additional node metadata
   position?: NodePosition; // For visual layout
 }
+
 
 /**
  * Edges connecting workflow nodes
@@ -48,7 +49,7 @@ export interface WorkflowDSLEdge {
   to: string;   // Target node ID
   condition?: string; // Condition key for routing (optional)
   label?: string; // Human-readable edge label
-  metadata?: Record<string, any>; // Additional edge metadata
+  metadata?: Record<string, unknown>; // Additional edge metadata
 }
 
 /**
@@ -79,7 +80,7 @@ export interface WorkflowMetadata {
 /**
  * Types of workflow nodes
  */
-export type WorkflowNodeType = 
+export type WorkflowNodeType =
   | 'agent'           // Execute work via AI agents
   | 'conditional'     // Data-driven routing
   | 'user_prompt'     // User interaction point
@@ -88,20 +89,33 @@ export type WorkflowNodeType =
   | 'end';            // Workflow end node
 
 /**
- * Agent node parameters for executing agent tasks
+ * Base interface for all workflow node parameters
+ * Include common properties that client code expects to be available
  */
-export interface AgentNodeParameters {
-  agentId: string;
-  taskIds: string[];
+interface BaseWorkflowNodeParameters {
+  // Common properties that are accessed across different node types in client
+  agentId?: string;          // For agent node identification
+  estimatedTime?: number;    // For time calculations
+  // Allow additional node-specific properties
+  [key: string]: unknown;
+}
+
+/**
+ * Agent-specific node parameters
+ */
+export interface AgentNodeParameters extends BaseWorkflowNodeParameters {
+  agentId: string; // Required for agent nodes
+  taskIds?: string[];
   instructions?: string;
   expectedOutput?: string;
-  timeout?: number; // In minutes
+  timeout?: number;
+  estimatedTime?: number;
 }
 
 /**
  * Conditional node parameters for data-driven routing
  */
-export interface ConditionalNodeParameters {
+export interface ConditionalNodeParameters extends BaseWorkflowNodeParameters {
   sourceNodeId: string; // Node whose output to evaluate
   expression: string; // JSONata expression to evaluate
   conditions: Record<string, string>; // conditionKey → JSONata boolean expression
@@ -111,11 +125,11 @@ export interface ConditionalNodeParameters {
 /**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptNodeParameters {
+export interface UserPromptNodeParameters extends BaseWorkflowNodeParameters {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string; // Optional context from previous node
-  timeout?: number; // In minutes, defaults to WORKFLOW_CONFIG.USER_PROMPT_TIMEOUT_MINUTES
+  timeout?: number; // In minutes
   required?: boolean; // Whether user response is required
 }
 
@@ -126,18 +140,31 @@ export interface UserPromptChoice {
   id: string;
   text: string;
   description?: string;
-  value: any; // Value to return when this choice is selected
+  value: unknown; // Value to return when this choice is selected
 }
 
 /**
  * Output node parameters for final result generation
  */
-export interface OutputNodeParameters {
+export interface OutputNodeParameters extends BaseWorkflowNodeParameters {
   template: string; // Template for generating output
   sources: string[]; // Node IDs to gather data from
   format: OutputFormat;
   title?: string;
 }
+
+export type StartEndNodeParameters = BaseWorkflowNodeParameters;
+
+/**
+ * Union type for all workflow node parameters
+ * All variants extend BaseWorkflowNodeParameters which includes common properties
+ */
+export type WorkflowNodeParameters =
+  | AgentNodeParameters
+  | ConditionalNodeParameters
+  | UserPromptNodeParameters
+  | OutputNodeParameters
+  | StartEndNodeParameters;
 
 // ============================================================================
 // WORKFLOW EXECUTION TYPES
@@ -166,12 +193,12 @@ export interface WorkflowRuntimeState {
 export interface WorkflowNodeResult {
   nodeId: string;
   success: boolean;
-  data?: any; // Node output data
+  data?: unknown; // Node output data
   error?: string; // Error message if failed
   executedAt: string;
   duration?: number; // Execution time in milliseconds
   nextEdgeCondition?: string; // For conditional nodes
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -182,18 +209,8 @@ export interface WorkflowExecutionContext {
   workflowId: string;
   userId: string;
   previousResults: Map<string, WorkflowNodeResult>;
-  expeditionState: any; // Current expedition state
-  services: WorkflowServices; // Available services
-}
-
-/**
- * Services available during workflow execution
- */
-export interface WorkflowServices {
-  agentService: any; // Agent execution service
-  userPromptService: any; // User prompt management
-  dataService: any; // Data storage and retrieval
-  notificationService?: any; // Optional notifications
+  expeditionState: unknown; // Current expedition state
+  services: unknown; // Available services - implementation specific
 }
 
 // ============================================================================
@@ -205,10 +222,10 @@ export interface WorkflowServices {
  */
 export interface WorkflowGenerationRequest {
   expeditionId: string;
-  taskBreakdown?: any[]; // Use any[] to avoid circular dependency with expedition types
+  taskBreakdown?: unknown[]; // Task breakdown items - avoid circular dependency with expedition types
   selectedAgents: string[] | AgentAssignment[]; // Support both formats
   objective: string;
-  complexity?: WorkflowComplexity | any;
+  complexity?: WorkflowComplexity;
   preferences?: WorkflowGenerationPreferences;
   agentAssignments?: Record<string, string[]>;
   requirements?: string[];
@@ -244,11 +261,8 @@ export interface WorkflowGenerationPreferences {
   userInteraction?: string; // User interaction level
 }
 
-
-// Note: TaskBreakdown is imported from expedition types to avoid duplication
-
 /**
- * Agent assignment structure (imported from existing types)
+ * Agent assignment structure
  */
 export interface AgentAssignment {
   agentId: string;
@@ -301,105 +315,6 @@ export interface WorkflowApprovalResult {
 }
 
 // ============================================================================
-// VISUALIZATION TYPES
-// ============================================================================
-
-/**
- * Visualization configuration
- */
-export interface VisualizationConfig {
-  format: VisualizationFormat;
-  includeMetadata?: boolean;
-  showEstimates?: boolean;
-  showNodeIds?: boolean;
-  maxWidth?: number;
-  theme?: VisualizationTheme;
-}
-
-/**
- * Visualization formats
- */
-export type VisualizationFormat = 
-  | 'ascii'      // ASCII art (initial implementation)
-  | 'mermaid'    // Mermaid diagram syntax
-  | 'dot'        // DOT/Graphviz format
-  | 'json'       // JSON representation
-  | 'svg';       // SVG format (future)
-
-/**
- * Visualization themes
- */
-export type VisualizationTheme = 
-  | 'default'
-  | 'compact'
-  | 'detailed'
-  | 'minimal';
-
-/**
- * Visualization result
- */
-export interface VisualizationResult {
-  content: string;
-  format: VisualizationFormat;
-  metadata: {
-    generatedAt: string;
-    nodeCount: number;
-    edgeCount: number;
-    estimatedSize: {
-      width: number;
-      height: number;
-    };
-  };
-}
-
-// ============================================================================
-// VALIDATION TYPES
-// ============================================================================
-
-/**
- * Workflow validation result
- */
-export interface WorkflowValidationResult {
-  valid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-  suggestions: ValidationSuggestion[];
-}
-
-/**
- * Validation error details
- */
-export interface ValidationError {
-  code: ValidationErrorCode;
-  message: string;
-  nodeId?: string;
-  edgeId?: string;
-  severity: 'error' | 'warning';
-  details?: any;
-}
-
-/**
- * Validation warning details
- */
-export interface ValidationWarning {
-  code: ValidationWarningCode;
-  message: string;
-  nodeId?: string;
-  edgeId?: string;
-  suggestion?: string;
-}
-
-/**
- * Validation suggestion details
- */
-export interface ValidationSuggestion {
-  type: 'optimization' | 'improvement' | 'best_practice';
-  message: string;
-  impact: 'low' | 'medium' | 'high';
-  nodeId?: string;
-}
-
-// ============================================================================
 // ENUM TYPES
 // ============================================================================
 
@@ -435,6 +350,86 @@ export type OutputFormat =
   | 'pdf'
   | 'csv';
 
+// ============================================================================
+// ERROR TYPES
+// ============================================================================
+
+/**
+ * Workflow execution error
+ */
+export interface WorkflowExecutionError {
+  code: WorkflowErrorCode;
+  message: string;
+  nodeId?: string;
+  details?: unknown;
+  timestamp: string;
+  recoverable: boolean;
+  retryCount?: number;
+}
+
+/**
+ * Workflow error codes
+ */
+export type WorkflowErrorCode = 
+  | 'NODE_EXECUTION_FAILED'
+  | 'TIMEOUT_EXCEEDED'
+  | 'USER_INPUT_TIMEOUT'
+  | 'INVALID_CONDITION_RESULT'
+  | 'AGENT_UNAVAILABLE'
+  | 'RESOURCE_EXHAUSTED'
+  | 'PERMISSION_DENIED'
+  | 'WORKFLOW_CANCELLED'
+  | 'SYSTEM_ERROR'
+  | 'VALIDATION_FAILED'
+  | 'JSONATA_ERROR';
+
+// ============================================================================
+// VALIDATION TYPES
+// ============================================================================
+
+/**
+ * Workflow validation result
+ */
+export interface WorkflowValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  suggestions: ValidationSuggestion[];
+}
+
+/**
+ * Validation error details
+ */
+export interface ValidationError {
+  code: ValidationErrorCode;
+  message: string;
+  nodeId?: string;
+  edgeId?: string;
+  severity: 'error' | 'warning';
+  details?: unknown;
+}
+
+/**
+ * Validation warning details
+ */
+export interface ValidationWarning {
+  code: ValidationWarningCode;
+  message: string;
+  nodeId?: string;
+  edgeId?: string;
+  suggestion?: string;
+}
+
+/**
+ * Validation suggestion details
+ */
+export interface ValidationSuggestion {
+  type: 'optimization' | 'improvement' | 'best_practice';
+  message: string;
+  impact: 'low' | 'medium' | 'high';
+  nodeId?: string;
+}
+
 /**
  * Validation error codes
  */
@@ -465,36 +460,3 @@ export type ValidationWarningCode =
   | 'POTENTIAL_TIMEOUT'
   | 'COMPLEX_CONDITIONALS'
   | 'LARGE_WORKFLOW_SIZE';
-
-// ============================================================================
-// ERROR TYPES
-// ============================================================================
-
-/**
- * Workflow execution error
- */
-export interface WorkflowExecutionError {
-  code: WorkflowErrorCode;
-  message: string;
-  nodeId?: string;
-  details?: any;
-  timestamp: string;
-  recoverable: boolean;
-  retryCount?: number;
-}
-
-/**
- * Workflow error codes
- */
-export type WorkflowErrorCode = 
-  | 'NODE_EXECUTION_FAILED'
-  | 'TIMEOUT_EXCEEDED'
-  | 'USER_INPUT_TIMEOUT'
-  | 'INVALID_CONDITION_RESULT'
-  | 'AGENT_UNAVAILABLE'
-  | 'RESOURCE_EXHAUSTED'
-  | 'PERMISSION_DENIED'
-  | 'WORKFLOW_CANCELLED'
-  | 'SYSTEM_ERROR'
-  | 'VALIDATION_FAILED'
-  | 'JSONATA_ERROR';

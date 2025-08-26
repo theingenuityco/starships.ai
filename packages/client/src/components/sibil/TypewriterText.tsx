@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useTypewriter } from '@/hooks/useTypewriter';
-import type { TypewriterChunk } from '@starships/protocol';
+import type { TypewriterChunk } from '@/types';
 
 interface TypewriterTextProps {
   chunks: TypewriterChunk[];

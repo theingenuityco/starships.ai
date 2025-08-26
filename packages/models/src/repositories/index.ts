@@ -26,10 +26,14 @@ export { MissionClarityRepository } from './MissionClarityRepository';
 // Export native tool API key repository
 export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 
+// Export waitlist repository
+export { WaitlistRepository } from './WaitlistRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
 import { MissionRepository } from './MissionRepository';
+import { WaitlistRepository } from './WaitlistRepository';
 
 
 // Import workflow repositories
@@ -74,6 +78,9 @@ export class RepositoryFactory {
 
   // Native tool API key repository instance
   private static nativeToolApiKeyRepo: NativeToolApiKeyRepository | null = null;
+
+  // Waitlist repository instance
+  private static waitlistRepo: WaitlistRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -146,6 +153,7 @@ export class RepositoryFactory {
       // Initialize services that require database connections
       try {
         const connection = getConnection();
+        this.waitlistRepo = new WaitlistRepository(connection);
         this.agentTemplateService = new AgentTemplateService(connection);
       } catch (connectionError) {
         console.warn('[RepositoryFactory] Database connection not available for AgentTemplateService, will retry later');
@@ -198,6 +206,7 @@ export class RepositoryFactory {
         workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
+        waitlistRepo: this.waitlistRepo !== null,
       }
     };
   }
@@ -341,6 +350,17 @@ export class RepositoryFactory {
     return this.nativeToolApiKeyRepo;
   }
 
+  /**
+   * Get WaitlistRepository instance (synchronous)
+   */
+  static getWaitlistRepository(): WaitlistRepository {
+    this.ensureInitialized();
+    if (!this.waitlistRepo) {
+      throw new Error('WaitlistRepository not initialized');
+    }
+    return this.waitlistRepo;
+  }
+
 
   // ========================================================================
   // UTILITY METHODS
@@ -364,6 +384,7 @@ export class RepositoryFactory {
     this.workflowRuntimeStateRepo = null;
     this.missionClarityRepo = null;
     this.nativeToolApiKeyRepo = null;
+    this.waitlistRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

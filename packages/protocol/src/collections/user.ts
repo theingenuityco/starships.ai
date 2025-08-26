@@ -1,5 +1,5 @@
 /**
- * User Entity Types
+ * User Collection Types
  *
  * Clean user type definitions for protocol contract.
  */

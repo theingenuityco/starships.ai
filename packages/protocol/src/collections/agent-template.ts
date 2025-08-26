@@ -1,5 +1,5 @@
 /**
- * Agent Template Entity Types
+ * Agent Template Collection Types
  *
  * Clean agent template type definitions for protocol contract.
  */

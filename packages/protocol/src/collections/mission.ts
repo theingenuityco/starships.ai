@@ -1,5 +1,5 @@
 /**
- * Mission Entity Types
+ * Mission Collection Types
  *
  * Clean mission type definitions for protocol contract.
  * Implementation details moved to appropriate packages.

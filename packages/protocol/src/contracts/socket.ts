@@ -24,7 +24,7 @@ import type {
   VisionUpdatedEventData,
   VisionRefinementErrorEventData,
   VisionRefinementState
-} from '../entities/vision';
+} from '../collections/vision';
 
 // ============================================================================
 // BASE SOCKET EVENTS

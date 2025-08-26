@@ -1,5 +1,5 @@
 /**
- * LLM Entity Types
+ * LLM Collection Types
  *
  * Clean language model type definitions for protocol contract.
  */

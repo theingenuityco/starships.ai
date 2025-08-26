@@ -54,7 +54,7 @@ export {
 export { ErrorSeverity } from './helpers/logging/error-monitor';
 export { ErrorCategory } from './helpers/errors';
 
-// Export LLM entity types from protocol
+// Export LLM collection types from protocol
 export type {
   LLM,
   LLMProviderType,

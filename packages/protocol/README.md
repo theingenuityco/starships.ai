@@ -1,13 +1,13 @@
 # @starships/protocol
 
-TypeScript protocol definitions and contracts for the starships.ai platform. This package provides centralized type definitions, API contracts, domain entities, and standardized error handling across all services.
+TypeScript protocol definitions and contracts for the starships.ai platform. This package provides centralized type definitions, API contracts, database collections, and standardized error handling across all services.
 
 ## Overview
 
 The protocol package serves as the single source of truth for:
 
 - **API Contracts** - Interface definitions for cross-service communication
-- **Entity Types** - Database collection types (Starship, Mission, Agent, etc.)
+- **Collection Types** - Database collection types (Starship, Mission, Agent, etc.)
 - **Socket.IO Events** - Real-time communication protocols
 - **Request/Response Types** - HTTP API input/output structures
 
@@ -19,7 +19,7 @@ pnpm add @starships/protocol
 
 ## Core Exports
 
-### Entity Types
+### Collection Types
 
 ```typescript
 import {
@@ -32,13 +32,13 @@ import {
 } from '@starships/protocol';
 ```
 
-**Key entity types:**
-- [`Starship`](src/entities/starship.ts) - Starship management with billing integration
-- [`Mission`](src/entities/mission.ts) - Mission orchestration with workflow execution
-- [`Agent`](src/entities/agent-template.ts) - AI agent configurations and templates
-- [`User`](src/entities/user.ts) - User management and authentication
-- [`Vision`](src/entities/vision.ts) - Vision refinement system
-- [`Workflow`](src/entities/workflow.ts) - Workflow execution definitions
+**Key collection types:**
+- [`Starship`](src/collections/starship.ts) - Starship management with billing integration
+- [`Mission`](src/collections/mission.ts) - Mission orchestration with workflow execution
+- [`Agent`](src/collections/agent-template.ts) - AI agent configurations and templates
+- [`User`](src/collections/user.ts) - User management and authentication
+- [`Vision`](src/collections/vision.ts) - Vision refinement system
+- [`Workflow`](src/collections/workflow.ts) - Workflow execution definitions
 
 ### API Contracts
 
@@ -103,7 +103,7 @@ src/
 │   ├── llm.ts              # LLM provider contracts
 │   ├── sibil.ts            # AI assistant protocols
 │   └── socket.ts           # Real-time event contracts
-├── entities/               # Database collection types
+├── collections/            # Database collection types
 │   ├── starship.ts         # Starship management
 │   ├── mission.ts          # Mission orchestration
 │   ├── agent-template.ts   # Agent templates
@@ -119,7 +119,7 @@ This package is imported across the entire starships.ai platform:
 
 - **`@starships/server`** - API route definitions, middleware, socket handlers
 - **`@starships/client`** - Frontend API calls, socket communication, forms
-- **`@starships/models`** - Repository interfaces, database entity mapping
+- **`@starships/models`** - Repository interfaces, database collection mapping
 - **`@starships/agent-engine`** - Chat processing, LLM integration
 
 ## Type Safety

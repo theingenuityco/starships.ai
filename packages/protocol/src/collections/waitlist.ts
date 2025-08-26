@@ -1,5 +1,5 @@
 /**
- * Waitlist Entity Types
+ * Waitlist Collection Types
  *
  * Clean waitlist type definitions for protocol contract.
  */

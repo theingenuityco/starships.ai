@@ -1,5 +1,5 @@
 /**
- * Vision Refinement Entity Types
+ * Vision Refinement Collection Types
  *
  * Types for real-time vision refinement and analysis functionality.
  */

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { createConnection, Neo4jConfig } from '../connection';
+import { createConnection, Neo4jConfig } from '../helpers/database';
 import { StarshipRepository } from '../repositories/StarshipRepository';
 
 async function cleanupAbandonedStarships() {

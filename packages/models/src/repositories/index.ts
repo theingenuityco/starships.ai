@@ -1,10 +1,9 @@
 import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
 import { LLMRepository } from './LLMRepository';
-import { Neo4jAgentTemplateRepository } from './AgentTemplateRepository';
-import { AgentTemplateService } from '../services/AgentTemplateService';
-import { getConnection } from '../connection';
-import { NotFoundError } from '../errors';
+import { AgentTemplateRepository } from './AgentTemplateRepository';
+import { getConnection } from '../helpers/database';
+import { NotFoundError } from '../helpers/errors';
 
 export { AgentRepository } from './AgentRepository';
 export { UserRepository } from './UserRepository';
@@ -14,10 +13,13 @@ export { LLMRepository } from './LLMRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { VisionRepository } from './VisionRepository';
 export { MissionRepository } from './MissionRepository';
+export { MissionMessageRepository } from './MissionMessageRepository';
 
 
 // Export workflow repositories
 export { WorkflowRepository } from './WorkflowRepository';
+export { WorkflowNodeRepository } from './WorkflowNodeRepository';
+export { WorkflowEdgeRepository } from './WorkflowEdgeRepository';
 export { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
 // Export mission clarity repository
@@ -33,11 +35,14 @@ export { WaitlistRepository } from './WaitlistRepository';
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
 import { MissionRepository } from './MissionRepository';
+import { MissionMessageRepository } from './MissionMessageRepository';
 import { WaitlistRepository } from './WaitlistRepository';
 
 
 // Import workflow repositories
 import { WorkflowRepository } from './WorkflowRepository';
+import { WorkflowNodeRepository } from './WorkflowNodeRepository';
+import { WorkflowEdgeRepository } from './WorkflowEdgeRepository';
 import { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
 // Import mission clarity repository
@@ -66,11 +71,13 @@ export class RepositoryFactory {
   private static starshipRepo: StarshipRepository | null = null;
   private static visionRepo: VisionRepository | null = null;
   private static missionRepo: MissionRepository | null = null;
-  private static agentTemplateService: AgentTemplateService | null = null;
+  private static missionMessageRepo: MissionMessageRepository | null = null;
 
 
   // Workflow repository instances
   private static workflowRepo: WorkflowRepository | null = null;
+  private static workflowNodeRepo: WorkflowNodeRepository | null = null;
+  private static workflowEdgeRepo: WorkflowEdgeRepository | null = null;
   private static workflowRuntimeStateRepo: WorkflowRuntimeStateRepository | null = null;
 
   // Mission clarity repository instance
@@ -135,10 +142,13 @@ export class RepositoryFactory {
       this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
       this.missionRepo = new MissionRepository();
+      this.missionMessageRepo = new MissionMessageRepository();
 
 
       // Initialize workflow repositories (no dependencies)
       this.workflowRepo = new WorkflowRepository();
+      this.workflowNodeRepo = new WorkflowNodeRepository();
+      this.workflowEdgeRepo = new WorkflowEdgeRepository();
       this.workflowRuntimeStateRepo = new WorkflowRuntimeStateRepository();
 
       // Initialize mission clarity repository (no dependencies)
@@ -153,13 +163,11 @@ export class RepositoryFactory {
       // Initialize services that require database connections
       try {
         const connection = getConnection();
-        this.agentTemplateService = new AgentTemplateService(connection);
         this.waitlistRepo = new WaitlistRepository(connection);
       } catch (connectionError) {
-        console.warn('[RepositoryFactory] Database connection not available for AgentTemplateService and WaitlistRepository, will retry later');
+        console.warn('[RepositoryFactory] Database connection not available for WaitlistRepository, will retry later');
         // Don't fail initialization for these - they can be retried later
         this.waitlistRepo = null;
-        this.agentTemplateService = null;
       }
 
       console.log('[RepositoryFactory] Repository initialization completed successfully');
@@ -203,8 +211,10 @@ export class RepositoryFactory {
         starshipRepo: this.starshipRepo !== null,
         visionRepo: this.visionRepo !== null,
         missionRepo: this.missionRepo !== null,
-        agentTemplateService: this.agentTemplateService !== null,
+        missionMessageRepo: this.missionMessageRepo !== null,
         workflowRepo: this.workflowRepo !== null,
+        workflowNodeRepo: this.workflowNodeRepo !== null,
+        workflowEdgeRepo: this.workflowEdgeRepo !== null,
         workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
@@ -274,27 +284,6 @@ export class RepositoryFactory {
   }
 
 
-  /**
-   * Get AgentTemplateService instance (synchronous)
-   * Note: May return null if database connection was not available during initialization
-   */
-  static getAgentTemplateService(): AgentTemplateService | null {
-    this.ensureInitialized();
-    
-    // Try to initialize if not available and connection is now available
-    if (!this.agentTemplateService) {
-      try {
-        const connection = getConnection();
-        this.agentTemplateService = new AgentTemplateService(connection);
-        console.log('[RepositoryFactory] AgentTemplateService initialized on demand');
-      } catch (error) {
-        console.warn('[RepositoryFactory] AgentTemplateService still not available:', error);
-        return null;
-      }
-    }
-    
-    return this.agentTemplateService;
-  }
 
 
   /**
@@ -328,6 +317,39 @@ export class RepositoryFactory {
       throw new Error('MissionRepository not initialized');
     }
     return this.missionRepo;
+  }
+
+  /**
+   * Get MissionMessageRepository instance (synchronous)
+   */
+  static getMissionMessageRepository(): MissionMessageRepository {
+    this.ensureInitialized();
+    if (!this.missionMessageRepo) {
+      throw new Error('MissionMessageRepository not initialized');
+    }
+    return this.missionMessageRepo;
+  }
+
+  /**
+   * Get WorkflowNodeRepository instance (synchronous)
+   */
+  static getWorkflowNodeRepository(): WorkflowNodeRepository {
+    this.ensureInitialized();
+    if (!this.workflowNodeRepo) {
+      throw new Error('WorkflowNodeRepository not initialized');
+    }
+    return this.workflowNodeRepo;
+  }
+
+  /**
+   * Get WorkflowEdgeRepository instance (synchronous)
+   */
+  static getWorkflowEdgeRepository(): WorkflowEdgeRepository {
+    this.ensureInitialized();
+    if (!this.workflowEdgeRepo) {
+      throw new Error('WorkflowEdgeRepository not initialized');
+    }
+    return this.workflowEdgeRepo;
   }
 
   /**
@@ -392,8 +414,10 @@ export class RepositoryFactory {
     this.starshipRepo = null;
     this.visionRepo = null;
     this.missionRepo = null;
-    this.agentTemplateService = null;
+    this.missionMessageRepo = null;
     this.workflowRepo = null;
+    this.workflowNodeRepo = null;
+    this.workflowEdgeRepo = null;
     this.workflowRuntimeStateRepo = null;
     this.missionClarityRepo = null;
     this.nativeToolApiKeyRepo = null;
@@ -449,14 +473,12 @@ export class RepositoryFactory {
     details: {
       initialized: boolean;
       criticalRepositoriesReady: boolean;
-      agentTemplateServiceAvailable: boolean;
       error?: string;
     };
   } {
     const details = {
       initialized: this.isInitialized,
       criticalRepositoriesReady: false,
-      agentTemplateServiceAvailable: this.agentTemplateService !== null,
       error: this.initializationError?.message
     };
 
@@ -468,7 +490,7 @@ export class RepositoryFactory {
 
     let status: 'healthy' | 'degraded' | 'unhealthy';
     if (details.initialized && details.criticalRepositoriesReady) {
-      status = details.agentTemplateServiceAvailable ? 'healthy' : 'degraded';
+      status = 'healthy';
     } else {
       status = 'unhealthy';
     }

@@ -6,46 +6,24 @@
  */
 
 import { BaseRepository } from './BaseRepository';
-import { getConnection } from '../connection';
-import { 
-  MissionWorkflow, 
-  WorkflowNode,
-  WorkflowEdge,
-  CreateWorkflowRequest, 
-  UpdateWorkflowApprovalRequest 
+import { getConnection } from '../helpers/database';
+import { WorkflowNodeRepository } from './WorkflowNodeRepository';
+import { WorkflowEdgeRepository } from './WorkflowEdgeRepository';
+import {
+  MissionWorkflow,
+  CreateWorkflowRequest,
+  UpdateWorkflowApprovalRequest
 } from '@starships/protocol';
 import { v4 as uuidv4 } from 'uuid';
 
-// Inline ID mapper utilities for this repository
-class WorkflowIdMapper {
-  private aiToRealMap = new Map<string, string>();
-  
-  addMapping(aiId: string, realId: string): void {
-    this.aiToRealMap.set(aiId, realId);
-  }
-  
-  getRealId(aiId: string): string | undefined {
-    return this.aiToRealMap.get(aiId);
-  }
-  
-  convertEdgesToReal(edges: Array<{ from: string; to: string }>): Array<{ from: string; to: string }> {
-    return edges.map(edge => ({
-      from: this.getRealId(edge.from) || edge.from,
-      to: this.getRealId(edge.to) || edge.to
-    }));
-  }
-}
+export class WorkflowRepository extends BaseRepository {
+  private workflowNodeRepo: WorkflowNodeRepository;
+  private workflowEdgeRepo: WorkflowEdgeRepository;
 
-export interface WorkflowRepositoryInterface {
-  createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow>;
-  getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null>;
-  updateApprovalStatus(workflowId: string, updates: UpdateWorkflowApprovalRequest): Promise<MissionWorkflow>;
-  deleteWorkflow(workflowId: string): Promise<void>;
-}
-
-export class WorkflowRepository extends BaseRepository implements WorkflowRepositoryInterface {
   constructor() {
     super('WorkflowRepository');
+    this.workflowNodeRepo = new WorkflowNodeRepository();
+    this.workflowEdgeRepo = new WorkflowEdgeRepository();
   }
 
   async createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow> {
@@ -87,87 +65,28 @@ export class WorkflowRepository extends BaseRepository implements WorkflowReposi
       const workflowCypher = `
         MATCH (m:Mission {id: $missionId})
         MERGE (m)-[:HAS_WORKFLOW]->(w:Workflow {missionId: $missionId})
-        ON CREATE SET 
+        ON CREATE SET
           w.id = $workflowId,
           w.approvalStatus = 'pending',
           w.createdAt = $now
         RETURN w
       `;
 
-      await connection.executeWrite(workflowCypher, { 
-        missionId: request.missionId, 
-        workflowId, 
-        now 
+      await connection.executeWrite(workflowCypher, {
+        missionId: request.missionId,
+        workflowId,
+        now
       });
 
-      // Clear existing nodes and edges
-      await connection.executeWrite(`
-        MATCH (w:Workflow {missionId: $missionId})-[:CONTAINS]->(n:WorkflowNode)
-        OPTIONAL MATCH (n)-[r:FLOWS_TO]->()
-        DETACH DELETE n, r
-      `, { missionId: request.missionId });
+      // Clear existing nodes and edges using separate repositories
+      await this.workflowNodeRepo.deleteNodesByWorkflowId(workflowId);
+      await this.workflowEdgeRepo.deleteEdgesByWorkflowId(workflowId);
 
-      // Create ID mapper and nodes
-      const idMapper = new WorkflowIdMapper();
-      const nodes: WorkflowNode[] = [];
+      // Create nodes using WorkflowNodeRepository
+      const { nodes, idMapping } = await this.workflowNodeRepo.createNodes(workflowId, request.nodes);
 
-      for (const nodeData of request.nodes) {
-        const nodeId = uuidv4();
-        const { aiId, ...nodeWithoutAiId } = nodeData as any;
-        const node: WorkflowNode = {
-          id: nodeId,
-          ...nodeWithoutAiId
-        };
-
-        // Serialize parameters as JSON string for Neo4j storage
-        const nodeProps = {
-          ...node,
-          parameters: JSON.stringify(node.parameters || {})
-        };
-
-        await connection.executeWrite(`
-          MATCH (w:Workflow {missionId: $missionId})
-          CREATE (w)-[:CONTAINS]->(n:WorkflowNode $nodeProps)
-        `, {
-          missionId: request.missionId,
-          nodeProps
-        });
-
-        // Map AI-provided ID to real UUID for edge creation
-        if (aiId) {
-          idMapper.addMapping(aiId, nodeId);
-        }
-        nodes.push(node);
-      }
-
-      // Create edges between nodes using ID mapper
-      const edges: WorkflowEdge[] = [];
-      const mappedEdges = idMapper.convertEdgesToReal(request.edges);
-      
-      for (let i = 0; i < mappedEdges.length; i++) {
-        const edgeData = mappedEdges[i];
-        const edgeId = uuidv4();
-        
-        const edge: WorkflowEdge = {
-          id: edgeId,
-          from: edgeData.from,
-          to: edgeData.to
-        };
-
-        // Create relationship between nodes
-        await connection.executeWrite(`
-          MATCH (w:Workflow {missionId: $missionId})-[:CONTAINS]->(from:WorkflowNode {id: $fromId})
-          MATCH (w)-[:CONTAINS]->(to:WorkflowNode {id: $toId})
-          CREATE (from)-[:FLOWS_TO {id: $edgeId}]->(to)
-        `, {
-          missionId: request.missionId,
-          fromId: edge.from,
-          toId: edge.to,
-          edgeId: edge.id
-        });
-
-        edges.push(edge);
-      }
+      // Create edges using WorkflowEdgeRepository with ID mapping
+      const edges = await this.workflowEdgeRepo.createEdges(workflowId, request.edges, idMapping);
 
       return {
         id: workflowId,
@@ -186,55 +105,25 @@ export class WorkflowRepository extends BaseRepository implements WorkflowReposi
 
       const connection = getConnection();
       
-      // Get workflow and nodes
+      // Get workflow metadata
       const workflowResult = await connection.executeQuery(`
         MATCH (m:Mission {id: $missionId})-[:HAS_WORKFLOW]->(w:Workflow)
-        OPTIONAL MATCH (w)-[:CONTAINS]->(n:WorkflowNode)
-        RETURN w, collect(n) as nodes
+        RETURN w
       `, { missionId });
 
       if (!workflowResult || workflowResult.length === 0) return null;
 
-      const record = workflowResult[0];
-      const w = record.w;
-      const nodes = record.nodes;
+      const workflow = workflowResult[0].w;
+      const workflowId = workflow.id;
 
-      // Get edges
-      const edgeResult = await connection.executeQuery(`
-        MATCH (w:Workflow {missionId: $missionId})-[:CONTAINS]->(from:WorkflowNode)
-        MATCH (from)-[r:FLOWS_TO]->(to:WorkflowNode)
-        RETURN r.id as edgeId, from.id as fromId, to.id as toId
-      `, { missionId });
-
-      // Extract properties from Neo4j nodes
-      const workflowProperties = w?.properties || w;
-      const nodeProperties = nodes ? 
-        nodes.filter((n: unknown) => n !== null)
-             .map((n: any) => {
-               const nodeProps = n?.properties || n;
-               // Deserialize parameters from JSON string
-               if (nodeProps.parameters && typeof nodeProps.parameters === 'string') {
-                 try {
-                   nodeProps.parameters = JSON.parse(nodeProps.parameters);
-                 } catch (error) {
-                   console.warn('Failed to parse node parameters JSON:', nodeProps.id, error);
-                   nodeProps.parameters = {};
-                 }
-               }
-               return nodeProps;
-             }) : [];
-
-      const edgeProperties = edgeResult ? 
-        edgeResult.map((e: any) => ({
-          id: e.edgeId,
-          from: e.fromId,
-          to: e.toId
-        })) : [];
+      // Get nodes and edges using separate repositories
+      const nodes = await this.workflowNodeRepo.getNodesByWorkflowId(workflowId);
+      const edges = await this.workflowEdgeRepo.getEdgesByWorkflowId(workflowId);
       
-      return { 
-        ...workflowProperties, 
-        nodes: nodeProperties,
-        edges: edgeProperties
+      return {
+        ...workflow,
+        nodes,
+        edges
       } as MissionWorkflow;
     }, 'getWorkflowByMissionId', 'MissionWorkflow', missionId);
   }
@@ -282,13 +171,15 @@ export class WorkflowRepository extends BaseRepository implements WorkflowReposi
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ workflowId }, ['workflowId'], 'deleteWorkflow');
 
+      // Delete nodes and edges using separate repositories
+      await this.workflowNodeRepo.deleteNodesByWorkflowId(workflowId);
+      await this.workflowEdgeRepo.deleteEdgesByWorkflowId(workflowId);
+
+      // Delete the workflow itself
       const connection = getConnection();
-      
       await connection.executeWrite(`
         MATCH (w:Workflow {id: $workflowId})
-        OPTIONAL MATCH (w)-[:CONTAINS]->(n:WorkflowNode)
-        OPTIONAL MATCH (n)-[r:FLOWS_TO]->()
-        DETACH DELETE w, n, r
+        DETACH DELETE w
       `, { workflowId });
     }, 'deleteWorkflow', 'MissionWorkflow', workflowId);
   }

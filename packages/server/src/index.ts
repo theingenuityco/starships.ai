@@ -18,7 +18,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedLLMModels, seedWaitlist } from '@starships/models';
+import { migrationRunner, seedWaitlist } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -36,6 +36,7 @@ import missionRoutes from './routes/missions';
 import nativeApiKeysRoutes from './routes/native-api-keys';
 import waitlistRoutes from './routes/waitlist';
 import { AgentService } from './services/AgentService';
+import { AgentTemplateService } from './services/AgentTemplateService';
 import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
 // Import new error handling and health check routes
@@ -201,8 +202,11 @@ httpServer.listen(PORT, async () => {
     
     // Initialize database connection FIRST
     await dbConnection.connect();
-    await dbConnection.initializeSchema();
-    console.log('✅ Neo4j database connected and schema initialized');
+    console.log('✅ Neo4j database connected');
+    
+    // Initialize complete database schema (includes seeding)
+    await migrationRunner.runAllPendingMigrations();
+    console.log('✅ Database schema initialized with seed data');
     
     // Initialize RepositoryFactory AFTER database connection is established
     console.log('🔧 Initializing RepositoryFactory...');
@@ -219,17 +223,16 @@ httpServer.listen(PORT, async () => {
     }
     
     // Initialize AgentTemplateService (seeds default templates)
-    const templateService = RepositoryFactory.getAgentTemplateService();
-    if (templateService) {
+    try {
+      const templateService = new AgentTemplateService(dbConnection);
       await templateService.seedDefaultTemplates();
       console.log('✅ AgentTemplateService initialized with default templates');
-    } else {
-      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable');
+    } catch (error) {
+      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
     }
     
-    // Initialize LLM Models (seeds default models)
-    await seedLLMModels();
-    console.log('✅ LLM Models initialized with default models');
+    // LLM Models are now initialized automatically with schema
+    console.log('✅ LLM Models ready (seeded during schema initialization)');
 
     // Initialize Waitlist (seeds approved emails)
     try {

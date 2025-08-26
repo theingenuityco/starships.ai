@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 
 export class VisionFileService {
@@ -17,7 +17,7 @@ export class VisionFileService {
   
   // Write vision file
   static async writeVision(starshipId: string, content: string): Promise<void> {
-    await fs.ensureDir(this.VISION_DIR);
+    await fs.mkdir(this.VISION_DIR, { recursive: true });
     const filePath = path.join(this.VISION_DIR, `${starshipId}.txt`);
     await fs.writeFile(filePath, content.trim(), 'utf8');
   }

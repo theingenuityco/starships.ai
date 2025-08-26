@@ -5,7 +5,6 @@ import path from 'path';
 import { createConnection, getConnection } from '../helpers/database';
 import { VisionRepository } from '../repositories/VisionRepository';
 import { StarshipRepository } from '../repositories/StarshipRepository';
-import { VisionFileService } from '../services/VisionFileService';
 
 interface MigrationResult {
   totalFiles: number;
@@ -169,6 +168,19 @@ class VisionFileMigration {
   }
 
   /**
+   * Read vision file content
+   */
+  private async readVisionFile(starshipId: string): Promise<string | null> {
+    const filePath = path.join(this.VISION_DIR, `${starshipId}.txt`);
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      return content.trim();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Migrate a single vision file to database
    */
   private async migrateVisionFile(starshipId: string): Promise<boolean> {
@@ -192,7 +204,7 @@ class VisionFileMigration {
       }
 
       // 3. Read vision content from file
-      const visionContent = await VisionFileService.readVision(starshipId);
+      const visionContent = await this.readVisionFile(starshipId);
       if (!visionContent || visionContent.trim().length === 0) {
         console.log(`📄 [VISION-MIGRATION] Empty vision file for starship ${starshipId} - creating empty record`);
         // Create empty vision record
@@ -237,7 +249,7 @@ class VisionFileMigration {
   private async dryRunMigrateVisionFile(starshipId: string): Promise<boolean> {
     try {
       // 1. Read vision content from file
-      const visionContent = await VisionFileService.readVision(starshipId);
+      const visionContent = await this.readVisionFile(starshipId);
       
       if (!visionContent || visionContent.trim().length === 0) {
         console.log(`📄 [DRY RUN] Would create empty vision record for starship ${starshipId}`);

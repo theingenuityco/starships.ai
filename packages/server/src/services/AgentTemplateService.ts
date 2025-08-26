@@ -1,6 +1,6 @@
 import { AgentTemplate, Agent } from '@starships/protocol';
-import { AgentTemplateRepository } from '../repositories/AgentTemplateRepository';
-import { Neo4jConnection } from '../helpers/database';
+import { AgentTemplateRepository } from '@starships/models';
+import { Neo4jConnection } from '@starships/models';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;

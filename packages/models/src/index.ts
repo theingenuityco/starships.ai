@@ -30,10 +30,6 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 // Factory for creating repositories
 export { RepositoryFactory } from './repositories';
 
-// NEW: Export AgentTemplateService
-export { AgentTemplateService } from './services/AgentTemplateService';
-// NEW: Export VisionFileService
-export { VisionFileService } from './services/VisionFileService';
 
 
 // Export standardized error handling system from protocol

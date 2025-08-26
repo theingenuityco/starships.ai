@@ -3,13 +3,25 @@ import { RepositoryFactory } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import { Request, Response } from 'express';
 import { getConnection } from '@starships/models';
+import { AgentTemplateService } from '../services/AgentTemplateService';
 
 const router: Router = Router();
+
+// Helper function to get AgentTemplateService instance
+function getAgentTemplateService(): AgentTemplateService | null {
+  try {
+    const connection = getConnection();
+    return new AgentTemplateService(connection);
+  } catch (error) {
+    console.error('Failed to get AgentTemplateService:', error);
+    return null;
+  }
+}
 
 // Get all templates
 router.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = getAgentTemplateService();
     if (!templateService) {
       res.status(503).json({ error: 'Template service not available' });
       return;
@@ -25,7 +37,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 // Get template by ID
 router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = getAgentTemplateService();
     if (!templateService) {
       res.status(503).json({ error: 'Template service not available' });
       return;
@@ -55,7 +67,7 @@ router.post('/:templateId/create-agent', authMiddleware, async (req: Request, re
       return;
     }
 
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = getAgentTemplateService();
     if (!templateService) {
       res.status(503).json({ error: 'Template service not available' });
       return;
@@ -172,7 +184,7 @@ router.post('/convert-from-agent/:agentId', authMiddleware, async (req: Request,
     }
 
     console.log('[TEMPLATE] Getting template service...');
-    const templateService = RepositoryFactory.getAgentTemplateService();
+    const templateService = getAgentTemplateService();
     if (!templateService) {
       res.status(503).json({ error: 'Template service not available' });
       return;

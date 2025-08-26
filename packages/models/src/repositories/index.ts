@@ -2,7 +2,6 @@ import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
 import { LLMRepository } from './LLMRepository';
 import { AgentTemplateRepository } from './AgentTemplateRepository';
-import { AgentTemplateService } from '../services/AgentTemplateService';
 import { getConnection } from '../helpers/database';
 import { NotFoundError } from '../helpers/errors';
 
@@ -73,7 +72,6 @@ export class RepositoryFactory {
   private static visionRepo: VisionRepository | null = null;
   private static missionRepo: MissionRepository | null = null;
   private static missionMessageRepo: MissionMessageRepository | null = null;
-  private static agentTemplateService: AgentTemplateService | null = null;
 
 
   // Workflow repository instances
@@ -165,13 +163,11 @@ export class RepositoryFactory {
       // Initialize services that require database connections
       try {
         const connection = getConnection();
-        this.agentTemplateService = new AgentTemplateService(connection);
         this.waitlistRepo = new WaitlistRepository(connection);
       } catch (connectionError) {
-        console.warn('[RepositoryFactory] Database connection not available for AgentTemplateService and WaitlistRepository, will retry later');
+        console.warn('[RepositoryFactory] Database connection not available for WaitlistRepository, will retry later');
         // Don't fail initialization for these - they can be retried later
         this.waitlistRepo = null;
-        this.agentTemplateService = null;
       }
 
       console.log('[RepositoryFactory] Repository initialization completed successfully');
@@ -216,7 +212,6 @@ export class RepositoryFactory {
         visionRepo: this.visionRepo !== null,
         missionRepo: this.missionRepo !== null,
         missionMessageRepo: this.missionMessageRepo !== null,
-        agentTemplateService: this.agentTemplateService !== null,
         workflowRepo: this.workflowRepo !== null,
         workflowNodeRepo: this.workflowNodeRepo !== null,
         workflowEdgeRepo: this.workflowEdgeRepo !== null,
@@ -289,27 +284,6 @@ export class RepositoryFactory {
   }
 
 
-  /**
-   * Get AgentTemplateService instance (synchronous)
-   * Note: May return null if database connection was not available during initialization
-   */
-  static getAgentTemplateService(): AgentTemplateService | null {
-    this.ensureInitialized();
-    
-    // Try to initialize if not available and connection is now available
-    if (!this.agentTemplateService) {
-      try {
-        const connection = getConnection();
-        this.agentTemplateService = new AgentTemplateService(connection);
-        console.log('[RepositoryFactory] AgentTemplateService initialized on demand');
-      } catch (error) {
-        console.warn('[RepositoryFactory] AgentTemplateService still not available:', error);
-        return null;
-      }
-    }
-    
-    return this.agentTemplateService;
-  }
 
 
   /**
@@ -441,7 +415,6 @@ export class RepositoryFactory {
     this.visionRepo = null;
     this.missionRepo = null;
     this.missionMessageRepo = null;
-    this.agentTemplateService = null;
     this.workflowRepo = null;
     this.workflowNodeRepo = null;
     this.workflowEdgeRepo = null;
@@ -500,14 +473,12 @@ export class RepositoryFactory {
     details: {
       initialized: boolean;
       criticalRepositoriesReady: boolean;
-      agentTemplateServiceAvailable: boolean;
       error?: string;
     };
   } {
     const details = {
       initialized: this.isInitialized,
       criticalRepositoriesReady: false,
-      agentTemplateServiceAvailable: this.agentTemplateService !== null,
       error: this.initializationError?.message
     };
 
@@ -519,7 +490,7 @@ export class RepositoryFactory {
 
     let status: 'healthy' | 'degraded' | 'unhealthy';
     if (details.initialized && details.criticalRepositoriesReady) {
-      status = details.agentTemplateServiceAvailable ? 'healthy' : 'degraded';
+      status = 'healthy';
     } else {
       status = 'unhealthy';
     }

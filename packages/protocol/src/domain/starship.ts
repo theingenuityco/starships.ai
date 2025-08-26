@@ -24,6 +24,32 @@ export type StarshipStatus = 'active' | 'inactive' | 'restricted' | 'disabled' |
 export type BillingPeriod = 'monthly' | 'yearly';
 
 // ============================================================================
+// CORE STARSHIP ENTITY
+// ============================================================================
+
+/**
+ * Core starship entity
+ */
+export interface Starship {
+  id: string;
+  slug: string;
+  ownerId: string; // Foreign key to User
+  class: StarshipClass;
+  name: string;
+  maxAgents: number; // Based on class: Scout=3, Cruiser=5, Draught=10
+  maxActiveMissions: number; // Based on class: Scout=3, Cruiser=6, Draught=10
+  status: StarshipStatus;
+  createdAt: string;
+  updatedAt: string;
+  
+  // Stripe integration
+  subscriptionId?: string;     // Stripe subscription ID
+  plan?: StarshipClass;  // Separate from class for billing
+  billingPeriod?: BillingPeriod;  // Billing period
+  stripeCustomerId?: string;  // Links to Stripe Customer for portal access
+}
+
+// ============================================================================
 // REQUEST/RESPONSE TYPES
 // ============================================================================
 

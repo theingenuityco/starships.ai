@@ -172,13 +172,14 @@ export class MissionOrchestratorService {
 
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
+      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
       
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
 
-      const result = await missionRepo.getMessagesByMissionWithPagination(
-        missionId, 
-        page || 1, 
+      const result = await missionMessageRepo.getMessagesByMissionWithPagination(
+        missionId,
+        page || 1,
         pageSize || 50
       );
 
@@ -212,9 +213,13 @@ export class MissionOrchestratorService {
 
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
+      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      
+      // Check if mission exists first
+      await missionRepo.getMissionById(missionId);
       
       // Get messages with limit, ordered by timestamp DESC for recent messages
-      const messages = await missionRepo.getMessagesByMission(missionId, limit);
+      const messages = await missionMessageRepo.getMessagesByMission(missionId, limit);
       
       // Reverse to get chronological order for context
       return messages.reverse();
@@ -242,6 +247,10 @@ export class MissionOrchestratorService {
   private async saveUserMessage(missionId: string, userId: string, content: string): Promise<MissionMessage> {
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
+      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      
+      // Check if mission exists first
+      await missionRepo.getMissionById(missionId);
       
       // TODO: Get actual user name from UserRepository when available
       const userName = 'User'; // Placeholder
@@ -255,7 +264,7 @@ export class MissionOrchestratorService {
         senderName: userName
       };
 
-      return await missionRepo.saveMessage(messageData);
+      return await missionMessageRepo.saveMessage(messageData);
     } catch (error) {
       this.logger.error('Failed to save user message to database', {
         service: 'MissionOrchestratorService',
@@ -274,6 +283,10 @@ export class MissionOrchestratorService {
   private async saveOrchestratorMessage(missionId: string, content: string): Promise<MissionMessage> {
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
+      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      
+      // Check if mission exists first
+      await missionRepo.getMissionById(missionId);
       
       const messageData = {
         missionId,
@@ -283,7 +296,7 @@ export class MissionOrchestratorService {
         senderName: 'Mission Orchestrator'
       };
 
-      return await missionRepo.saveMessage(messageData);
+      return await missionMessageRepo.saveMessage(messageData);
     } catch (error) {
       this.logger.error('Failed to save orchestrator message to database', {
         service: 'MissionOrchestratorService',

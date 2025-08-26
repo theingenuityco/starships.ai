@@ -1,9 +1,9 @@
-import { getConnection } from '../connection';
-import { User, UserRepository as UserRepositoryInterface } from '../types';
+import { getConnection } from '../helpers/database';
+import { User } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
-export class UserRepository extends BaseRepository implements UserRepositoryInterface {
+export class UserRepository extends BaseRepository {
   constructor() {
     super('UserRepository');
   }

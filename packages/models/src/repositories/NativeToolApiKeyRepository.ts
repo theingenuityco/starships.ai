@@ -1,4 +1,4 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import crypto from 'crypto';
 

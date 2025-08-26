@@ -44,3 +44,20 @@ coverage/
 
 # Docker wrapper created by setup
 .docker-bin/
+
+# Security - NEVER commit secrets
+*.secret.yaml
+*-secret.yaml
+secrets/
+*.pem
+*.key
+*.cert
+*.crt
+kubeconfig*
+.kube/
+
+# Kubernetes sensitive files
+do-deployment/*secret*.yaml
+do-deployment/*.secret
+k8s/**/secrets/
+k8s/**/*-secrets.yaml

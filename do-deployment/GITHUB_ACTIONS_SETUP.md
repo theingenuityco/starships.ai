@@ -7,7 +7,7 @@ Go to Settings → Secrets and variables → Actions → New repository secret
 
 ### 1. DIGITALOCEAN_ACCESS_TOKEN
 Your DigitalOcean API token with Kubernetes access.
-- Value: `dop_v1_cbac377dc8d1ee4fb8c03f98c08b604ea3903c2e387f6025c088f1f00e2bfe2e`
+- Value: `<YOUR_DIGITALOCEAN_TOKEN_HERE>` (Generate from DO → API → Tokens)
 
 ### 2. GHCR_PAT (Optional - if using private packages)
 GitHub Personal Access Token for pushing to GitHub Container Registry.
@@ -15,7 +15,7 @@ GitHub Personal Access Token for pushing to GitHub Container Registry.
 
 ### 3. KINDE_CLIENT_SECRET
 Your Kinde client secret (already in Kubernetes, but add here for builds).
-- Value: `IxdFNqlGrpBfYF2GFBI7uNVHhncU5QnZB000dfXjBk9VU0VHMRG`
+- Value: `<YOUR_KINDE_CLIENT_SECRET_HERE>` (Get from Kinde Dashboard)
 
 ### 4. STRIPE_SECRET_KEY (Optional)
 Your Stripe secret key if needed for builds.

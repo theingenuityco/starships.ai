@@ -2,16 +2,16 @@
 
 ## 📊 Live Deployment Status Tracker
 
-### Overall Progress: ![](https://progress-bar.dev/0/?title=Overall&width=300&color=blue)
+### Overall Progress: ![](https://progress-bar.dev/7/?title=Overall&width=300&color=blue)
 
 | Phase | Status | Progress | Last Updated | Notes |
 |-------|--------|----------|--------------|-------|
-| **Phase 1: Security Hardening** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Remove secrets, configure auth |
+| **Phase 1: Security Hardening** | 🟡 In Progress | ![](https://progress-bar.dev/66/) | 2025-08-26 | Remove secrets ✅, Neo4j pwd ✅, GitHub secrets pending |
 | **Phase 2: Infrastructure Setup** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Create cluster, install controllers |
 | **Phase 3: DNS Configuration** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Configure Namecheap, verify DNS |
 | **Phase 4: GitHub Secrets** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Setup production environment |
 | **Phase 5: K8s Manifests** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Create production configs |
-| **Phase 6: CI/CD Workflow** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Update GitHub Actions |
+| **Phase 6: CI/CD Workflow** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Branch strategy, versioning, dual deployments |
 | **Phase 7: Monitoring** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Setup observability |
 | **Phase 8: Backup & DR** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Configure backups |
 | **Phase 9: Security Audit** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | - | Final security checks |
@@ -27,6 +27,16 @@
 
 ## Overview
 This document outlines the complete plan for deploying Starships.ai to a production Kubernetes cluster on Digital Ocean, with enhanced security, reliability, and scalability compared to the development environment.
+
+### 📌 Key Decisions Made (Updated)
+- **GitHub Environment**: Using existing `prod` environment (not creating new `production`)
+- **Cluster Configuration**: Single node in `nyc1` region (~$60/month)
+- **Storage**: 5GB for Neo4j, 1GB for sessions (matching dev)
+- **SSL Contact**: dewang@theingenuity.co
+- **Kinde OAuth**: Production app configured with callbacks for starships.ai
+- **Neo4j**: Authentication will be ENABLED (requires testing!)
+- **Secrets**: All stored in GitHub `prod` environment, nothing hardcoded
+- **DNS**: Expect 2-4 hours propagation when switching from dev to prod
 
 ## Current State Analysis
 
@@ -97,13 +107,20 @@ This document outlines the complete plan for deploying Starships.ai to a product
 
 ### Phase 1: Security Hardening (Day 1) 🔒
 
+#### ⚠️ CRITICAL: Neo4j Authentication Testing Required
+**Before proceeding to production**, you must test Neo4j with authentication enabled:
+1. The dev environment currently has Neo4j auth DISABLED
+2. Production will have auth ENABLED with [DEFAULT-PASSWORD]
+3. Your application code may need updates to handle authentication
+4. Test this in a staging environment first!
+
 #### 📋 Phase 1 Task Tracker
 | Task | Status | Owner | Completion Date |
 |------|--------|-------|-----------------|
-| Remove hardcoded secrets from repo | 🔴 | - | - |
-| Generate secure Neo4j [DEFAULT-PASSWORD] | 🔴 | - | - |
+| Remove hardcoded secrets from repo | 🟢 | DevOps | 2025-08-26 |
+| Generate secure Neo4j [DEFAULT-PASSWORD] | 🟢 | DevOps | 2025-08-26 |
 | Create production Kinde OAuth app | 🔴 | - | - |
-| Update .gitignore for secrets | 🔴 | - | - |
+| Update .gitignore for secrets | 🟢 | DevOps | 2025-08-26 |
 | Verify no secrets in Git history | 🔴 | - | - |
 
 #### Step 1.1: Remove Hardcoded Secrets
@@ -152,13 +169,10 @@ doctl kubernetes cluster get starships-dev --format Region
 
 # Create production cluster (adjust region as needed)
 doctl kubernetes cluster create starships-prod \
-  --region nyc3 \
+  --region nyc1 \
   --size s-2vcpu-4gb \
-  --count 2 \
-  --auto-upgrade \
-  --surge-upgrade \
-  --ha \
-  --node-pool "name=worker;size=s-2vcpu-4gb;count=2;auto-scale=true;min-nodes=2;max-nodes=5"
+  --count 1 \
+  --auto-upgrade
 
 # Save kubeconfig
 doctl kubernetes cluster kubeconfig save starships-prod
@@ -243,48 +257,50 @@ curl -I [DNS-CHECK-SERVICE]/api/details?server=[DNS-SERVER-IP]&type=A&query=star
 | Set environment protection rules | 🔴 | - | - |
 | Test secret access | 🔴 | - | - |
 
-#### Step 4.1: Create Production Environment
+#### Step 4.1: Use Existing Production Environment
 
 1. Go to GitHub Repository → Settings → Environments
-2. Click "New environment" → Name: `production`
-3. Configure protection rules:
+2. Use existing `prod` environment (NOT creating new `production`)
+3. Verify protection rules:
    - ✅ Required reviewers: Add yourself and team leads
    - ✅ Deployment branches: Only from `main` branch
    - ✅ Wait timer: 5 minutes (optional)
 
 #### Step 4.2: Add Production Secrets
 
-Navigate to Settings → Environments → production → Add Secret for each:
+Navigate to Settings → Environments → `prod` → Add Secret for each:
+
+**🔴 MANUAL ACTION REQUIRED - Add these secrets to GitHub 'prod' environment:**
 
 **Infrastructure Secrets:**
 ```yaml
-DIGITALOCEAN_ACCESS_TOKEN: <same-as-dev>
-RELEASE_TOKEN: <github-pat-with-repo-permissions>
-GHCR_TOKEN: <github-pat-with-packages-write>
+DIGITALOCEAN_ACCESS_TOKEN: <use-same-token-as-dev-environment>
+RELEASE_TOKEN: <use-existing-github-pat-with-repo-permissions>
+GHCR_TOKEN: <use-existing-github-pat-with-packages-write>
 ```
 
 **Application Secrets:**
 ```yaml
-# API Keys
-OPENAI_API_KEY: <production-api-key>
-ANTHROPIC_API_KEY: <production-api-key>
+# API Keys (copy from dev or generate new production keys)
+OPENAI_API_KEY: <copy-from-dev-or-generate-production-key>
+ANTHROPIC_API_KEY: <copy-from-dev-or-generate-production-key>
 
-# Stripe (Production Mode)
+# Stripe (Use Production Mode Keys from Stripe Dashboard)
 STRIPE_SECRET_KEY: sk_live_xxx
 STRIPE_PUBLISHABLE_KEY: pk_live_xxx
 STRIPE_WEBHOOK_SECRET: whsec_xxx
 
-# Database
-NEO4J_PASSWORD: <generated-secure-[DEFAULT-PASSWORD]>
+# Database (CRITICAL - Use this exact [DEFAULT-PASSWORD])
+NEO4J_PASSWORD: [NEO4J-PASSWORD]
 NEO4J_USERNAME: neo4j
 
-# Kinde OAuth (Production)
-KINDE_CLIENT_ID: <production-client-id>
-KINDE_CLIENT_SECRET: <production-client-secret>
-KINDE_ISSUER_URL: https://<your-domain>.kinde.com
+# Kinde OAuth (Production - Already Provided)
+KINDE_CLIENT_ID: [KINDE-PROD-CLIENT-ID]
+KINDE_CLIENT_SECRET: [API-KEY]
+KINDE_ISSUER_URL: [KINDE-ISSUER-URL]
 ```
 
-**Environment Variables:**
+**Environment Variables (Also add as secrets):**
 ```yaml
 KINDE_SITE_URL: [PROD-DOMAIN-URL]
 KINDE_POST_LOGIN_REDIRECT_URL: [PROD-DOMAIN-URL]/fleet
@@ -746,7 +762,7 @@ metadata:
 spec:
   acme:
     server: [LETSENCRYPT-API]/directory
-    email: admin@starships.ai  # Replace with your email
+    email: dewang@theingenuity.co  # SSL certificate contact
     privateKeySecretRef:
       name: letsencrypt-prod-key
     solvers:
@@ -762,7 +778,7 @@ metadata:
 spec:
   acme:
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: admin@starships.ai  # Replace with your email
+    email: dewang@theingenuity.co  # SSL certificate contact
     privateKeySecretRef:
       name: letsencrypt-staging-key
     solvers:
@@ -879,28 +895,85 @@ spec:
 
 ### Phase 6: CI/CD Workflow Configuration (Day 4) 🚀
 
-#### 📋 Phase 6 Task Tracker
-| Task | Status | Owner | Completion Date |
-|------|--------|-------|-----------------|
-| Update main release workflow | 🔴 | - | - |
-| Create manual deployment workflow | 🔴 | - | - |
-| Configure production approval | 🔴 | - | - |
-| Test deployment pipeline | 🔴 | - | - |
-| Setup deployment notifications | 🔴 | - | - |
+#### 📋 Phase 6 Overall Task Tracker
+| Task Category | Status | Progress | Details |
+|---------------|--------|----------|----------|
+| **Deployment Strategy** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | Branch strategy & versioning |
+| **GitHub Workflow Updates** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | Modify release workflow |
+| **Production Controls** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | Approvals & protection |
+| **Testing & Validation** | 🔴 Not Started | ![](https://progress-bar.dev/0/) | Pipeline verification |
 
-#### Step 6.1: Update Main Release Workflow
+#### 📌 Deployment Strategy Configuration
+| Task | Status | Owner | Completion Date | Notes |
+|------|--------|-------|-----------------|---------|
+| Document deployment flow (dev vs prod) | 🔴 | - | - | main → dev, releases → prod |
+| Keep semantic-release for dev | 🔴 | - | - | Auto-versioning on main |
+| Configure release-based prod deployment | 🔴 | - | - | Deploy on GitHub releases |
+| Document version sync strategy | 🔴 | - | - | Handle v3.6.1 vs v3.1.6 mismatch |
+| Create deployment decision matrix | 🔴 | - | - | When to deploy what |
+
+#### Step 6.1: Configure Deployment Strategy
+
+##### 6.1.1: Deployment Flow Architecture
+
+**Current State:**
+- Every push to `main` → Auto-versions → Deploys to `dev.starships.ai`
+- Using `semantic-release` for automatic versioning
+- Version mismatch: package.json (3.6.1) vs git tag (v3.1.6)
+
+**Target State:**
+```yaml
+Development Flow (unchanged):
+  Push to main → semantic-release → v3.7.0 → dev.starships.ai
+  
+Production Flow (new):
+  GitHub Release published/edited → Deploy v3.7.0 → starships.ai
+```
+
+##### 6.1.2: Implementation Tasks
+
+| Subtask | Status | Progress | Command/Action |
+|---------|--------|----------|----------------|
+| Verify semantic-release config | 🔴 | ![](https://progress-bar.dev/0/) | Check `.releaserc` |
+| Add release trigger to workflow | 🔴 | ![](https://progress-bar.dev/0/) | Add `release: [published]` |
+| Add deployment conditions | 🔴 | ![](https://progress-bar.dev/0/) | `if: github.event_name == 'release'` |
+| Configure environment routing | 🔴 | ![](https://progress-bar.dev/0/) | Dev vs Prod logic |
+| Test version propagation | 🔴 | ![](https://progress-bar.dev/0/) | Ensure tags match |
+
+##### 6.1.3: Update Main Release Workflow
 
 Modify `.github/workflows/release-and-publish.yml` to add production deployment:
 
 ```yaml
-# Add this job after the existing deploy-to-digitalocean job
+# Add release trigger to existing workflow
+on:
+  push:
+    branches: [main]  # Existing: auto-deploy to dev
+  release:
+    types: [published, edited]  # NEW: trigger production deployment
+  workflow_dispatch:  # Keep manual trigger option
+
+# Modify deployment job to handle both environments
+jobs:
+  # ... existing version and docker jobs ...
+  
+  # Update existing deploy job to handle dev
+  deploy-to-dev:
+    name: Deploy to Development
+    needs: [version, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: development
+      url: [DEV-DOMAIN-URL]
+    steps:
+      # ... existing dev deployment steps ...
+  
+  # Add new production deployment job
   deploy-to-production:
     name: Deploy to Production
     needs: [version, docker, release]
-    if: |
-      needs.docker.outputs.image_pushed == 'true' && 
-      github.event_name == 'release' && 
-      github.event.action == 'published'
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     environment: 
       name: production
@@ -988,7 +1061,20 @@ Modify `.github/workflows/release-and-publish.yml` to add production deployment:
           curl -I [PROD-DOMAIN-URL]/api/health || true
 ```
 
-#### Step 6.2: Create Manual Production Deployment
+#### Step 6.2: Production Deployment Workflow Tasks
+
+##### 📋 Production Workflow Task Tracker
+| Task | Status | Progress | Validation |
+|------|--------|----------|------------|
+| Create production environment in GitHub | 🔴 | ![](https://progress-bar.dev/0/) | Check Settings → Environments |
+| Add approval requirements | 🔴 | ![](https://progress-bar.dev/0/) | Set reviewers |
+| Configure branch protection | 🔴 | ![](https://progress-bar.dev/0/) | Main branch only |
+| Add environment secrets | 🔴 | ![](https://progress-bar.dev/0/) | All prod secrets |
+| Test workflow triggers | 🔴 | ![](https://progress-bar.dev/0/) | Dry run |
+| Verify image versioning | 🔴 | ![](https://progress-bar.dev/0/) | Correct tags |
+| Test rollback procedure | 🔴 | ![](https://progress-bar.dev/0/) | Previous version |
+
+#### Step 6.3: Create Manual Production Deployment
 
 Create `.github/workflows/deploy-production-manual.yml`
 
@@ -1044,6 +1130,75 @@ jobs:
 
       # Rest of deployment steps same as above...
 ```
+
+#### Step 6.4: Version Synchronization Strategy
+
+##### 📋 Version Management Tasks
+| Task | Status | Priority | Action Required |
+|------|--------|----------|----------------|
+| Audit current version mismatch | 🔴 | High | package.json: 3.6.1, tag: v3.1.6 |
+| Sync git tags with package.json | 🔴 | High | Create missing tags |
+| Configure semantic-release properly | 🔴 | High | Ensure tags are created |
+| Document version strategy | 🔴 | Medium | Update README |
+| Create version rollback plan | 🔴 | Medium | Emergency procedures |
+
+##### Resolution Steps:
+```bash
+# 1. Check current state
+git describe --tags --abbrev=0  # Current: v3.1.6
+cat package.json | grep version  # Current: 3.6.1
+
+# 2. Option A: Reset to match package.json
+git tag v3.6.1
+git push origin v3.6.1
+
+# 3. Option B: Let semantic-release auto-fix on next release
+# Just continue with normal flow, it will self-correct
+```
+
+#### Step 6.5: Deployment Flow Summary
+
+##### 🎯 Final Deployment Strategy
+
+| Trigger | Environment | Version | Automatic | Approval Required |
+|---------|-------------|---------|-----------|-------------------|
+| Push to `main` | dev.starships.ai | Auto-increment | ✅ Yes | ❌ No |
+| Create Release | starships.ai | Specific tag | ✅ Yes | ✅ Yes |
+| Manual Workflow | Either | Selected | ❌ No | ✅ Yes |
+
+##### 📊 Implementation Progress Tracker
+
+| Phase | Tasks | Progress | Status |
+|-------|-------|----------|--------|
+| **Strategy Design** | 5 | ![](https://progress-bar.dev/0/) | 🔴 Not Started |
+| **Workflow Updates** | 8 | ![](https://progress-bar.dev/0/) | 🔴 Not Started |
+| **GitHub Configuration** | 6 | ![](https://progress-bar.dev/0/) | 🔴 Not Started |
+| **Testing & Validation** | 4 | ![](https://progress-bar.dev/0/) | 🔴 Not Started |
+| **Documentation** | 3 | ![](https://progress-bar.dev/0/) | 🔴 Not Started |
+
+##### ✅ Deployment Checklist
+
+**Pre-Implementation:**
+- [ ] Review current semantic-release configuration
+- [ ] Backup existing workflow files
+- [ ] Document current deployment process
+- [ ] Identify all environment-specific variables
+
+**Implementation:**
+- [ ] Update `.github/workflows/release-and-publish.yml`
+- [ ] Create production environment in GitHub
+- [ ] Configure environment protection rules
+- [ ] Add all production secrets
+- [ ] Update workflow with conditional deployment
+- [ ] Test push to main (should deploy to dev only)
+- [ ] Test release creation (should trigger prod approval)
+
+**Post-Implementation:**
+- [ ] Verify dev deployment still works
+- [ ] Test production deployment with dry-run
+- [ ] Document new deployment process
+- [ ] Train team on new workflow
+- [ ] Create emergency rollback procedure
 
 ### Phase 7: Monitoring & Observability (Day 5) 📊
 
@@ -1259,6 +1414,38 @@ kubectl patch secret starships-secrets -n $NAMESPACE \
 echo "Secrets rotated. Update GitHub secrets accordingly."
 ```
 
+## ⚠️ Critical Pre-Deployment Checklist
+
+### Must Complete Before Starting:
+1. ✅ **GitHub Secrets**: All secrets added to `prod` environment
+2. ⚠️ **Neo4j Auth Testing**: Test your app with Neo4j authentication enabled
+3. ✅ **Kinde Callbacks**: Configured for [PROD-DOMAIN-URL]
+4. ✅ **DNS Access**: Ready to update Namecheap records
+5. ⚠️ **Downtime Notice**: Inform users if needed (2-4 hours DNS propagation)
+
+## Pre-Deployment GitHub Secrets Setup
+
+### Required GitHub Secrets for Production Environment
+
+**Go to: GitHub Repository → Settings → Environments → Production → Secrets**
+
+Add these secrets (DO NOT commit these anywhere):
+
+| Secret Name | Value | Source |
+|------------|-------|--------|
+| **DIGITALOCEAN_ACCESS_TOKEN** | (Use same as dev) | Your DO API token |
+| **KINDE_CLIENT_ID** | `[KINDE-PROD-CLIENT-ID]` | From Kinde dashboard |
+| **KINDE_CLIENT_SECRET** | `[API-KEY]` | From Kinde dashboard |
+| **KINDE_ISSUER_URL** | `[KINDE-ISSUER-URL]` | Your Kinde domain |
+| **NEO4J_PASSWORD** | `[NEO4J-PASSWORD]` | Generated [DEFAULT-PASSWORD] |
+| **OPENAI_API_KEY** | (Use same as dev) | OpenAI dashboard |
+| **ANTHROPIC_API_KEY** | (Use same as dev) | Anthropic console |
+| **STRIPE_SECRET_KEY** | (Use same as dev) | Stripe dashboard |
+| **STRIPE_PUBLISHABLE_KEY** | (Use same as dev) | Stripe dashboard |
+| **STRIPE_WEBHOOK_SECRET** | (Use same as dev) | Stripe webhooks |
+| **GITHUB_USERNAME** | Your GitHub username | For GHCR pull |
+| **GITHUB_PAT** | Your PAT with packages:read | GitHub settings |
+
 ## Deployment Execution Guide
 
 ### Initial Production Deployment Checklist
@@ -1268,11 +1455,10 @@ echo "Secrets rotated. Update GitHub secrets accordingly."
 
 # 1. Create cluster
 doctl kubernetes cluster create starships-prod \
-  --region nyc3 \
+  --region nyc1 \
   --size s-2vcpu-4gb \
-  --count 2 \
-  --auto-upgrade \
-  --ha
+  --count 1 \
+  --auto-upgrade
 
 # 2. Save and switch context
 doctl kubernetes cluster kubeconfig save starships-prod

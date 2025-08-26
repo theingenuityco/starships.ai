@@ -13,7 +13,7 @@ The "Resource not accessible by integration" errors are just telemetry warnings 
 4. Click **New repository secret**
 5. Add this secret:
    - **Name**: `DIGITALOCEAN_ACCESS_TOKEN`
-   - **Secret**: `[DIGITALOCEAN-TOKEN]`
+   - **Secret**: `<YOUR_DIGITALOCEAN_TOKEN_HERE>` (Generate from DO → API → Tokens)
 6. Click **Add secret**
 
 ### 2. Check the Workflow Permissions

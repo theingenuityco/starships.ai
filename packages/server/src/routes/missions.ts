@@ -34,18 +34,18 @@ router.use(authMiddleware);
  */
 const validateUUID = (id: string, fieldName: string): void => {
   if (!id || typeof id !== 'string') {
-    throw ValidationError.fromFields([{
-      field: fieldName,
-      message: `${fieldName} is required and must be a string`
-    }]);
+    throw new ValidationError(
+      `${fieldName} is required and must be a string`,
+      fieldName
+    );
   }
 
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   if (!uuidRegex.test(id)) {
-    throw ValidationError.fromFields([{
-      field: fieldName,
-      message: `${fieldName} must be a valid UUID format`
-    }]);
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID format`,
+      fieldName
+    );
   }
 };
 

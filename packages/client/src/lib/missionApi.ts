@@ -18,7 +18,6 @@ import type {
   WorkflowResponse,
   MissionExecutionState,
   MissionPhase,
-  MissionPlanResponse
 } from '@starships/protocol';
 import api from './api';
 
@@ -212,15 +211,6 @@ export const missionApi = {
     return apiRequest<WorkflowResponse | null>(`/api/missions/${missionId}/workflow`);
   },
 
-  /**
-   * Approve or reject mission plan
-   */
-  async approveMissionPlan(missionId: string, approved: boolean, reason?: string): Promise<ApiResponse<{ approved: boolean; message: string }>> {
-    return apiRequest<{ approved: boolean; message: string }>(`/api/missions/${missionId}/approve-plan`, {
-      method: 'POST',
-      body: JSON.stringify({ approved, reason })
-    });
-  },
 
   /**
    * Approve or reject mission workflow
@@ -241,21 +231,6 @@ export const missionApi = {
     });
   },
 
-  /**
-   * Regenerate mission plan (legacy - deprecated)
-   */
-  async regenerateMissionPlan(missionId: string): Promise<ApiResponse<{ message: string }>> {
-    return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-plan`, {
-      method: 'POST'
-    });
-  },
-
-  /**
-   * Get mission plan (legacy - deprecated, use getMissionWorkflow instead)
-   */
-  async getMissionPlan(missionId: string): Promise<ApiResponse<MissionPlanResponse | null>> {
-    return apiRequest<MissionPlanResponse | null>(`/api/missions/${missionId}/plan`);
-  },
 
   /**
    * Get mission execution status

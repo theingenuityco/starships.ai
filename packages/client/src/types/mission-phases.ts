@@ -1,22 +1,10 @@
 /**
- * Mission Phase Constants and UI Mapping
+ * Mission Phase UI Configuration
  * 
- * Centralized constants for mission phases with consistent UI labels,
- * descriptions, and visual properties.
+ * Client-side UI configuration for mission phases including colors, icons, and display properties.
  */
 
-import { MissionPhase } from '../types/mission';
-
-/**
- * Mission phase constants - use these instead of string literals
- */
-export const MISSION_PHASES = {
-  WELCOME: 'welcome' as const,
-  ANALYSIS: 'analysis' as const,
-  PLAN: 'plan' as const,
-  EXECUTE: 'execute' as const,
-  CONVERSE: 'converse' as const,
-} as const;
+import { MissionPhase, MISSION_PHASES } from '@starships/protocol';
 
 /**
  * Mission phase configuration for UI display
@@ -33,7 +21,7 @@ export interface MissionPhaseConfig {
 }
 
 /**
- * Complete mission phase configuration mapping
+ * Complete mission phase configuration mapping for UI
  */
 export const MISSION_PHASE_CONFIG: Record<MissionPhase, MissionPhaseConfig> = {
   [MISSION_PHASES.WELCOME]: {
@@ -89,7 +77,7 @@ export const MISSION_PHASE_CONFIG: Record<MissionPhase, MissionPhaseConfig> = {
 } as const;
 
 /**
- * Helper function to get phase configuration
+ * Helper function to get phase configuration for UI
  */
 export function getMissionPhaseConfig(phase: MissionPhase): MissionPhaseConfig {
   return MISSION_PHASE_CONFIG[phase] || {
@@ -105,14 +93,7 @@ export function getMissionPhaseConfig(phase: MissionPhase): MissionPhaseConfig {
 }
 
 /**
- * Helper function to check if a phase is valid
- */
-export function isValidMissionPhase(phase: string): phase is MissionPhase {
-  return Object.values(MISSION_PHASES).includes(phase as MissionPhase);
-}
-
-/**
- * Get all valid mission phases in order
+ * Get all valid mission phases in order (UI utility)
  */
 export function getMissionPhasesInOrder(): MissionPhase[] {
   return [
@@ -125,7 +106,7 @@ export function getMissionPhasesInOrder(): MissionPhase[] {
 }
 
 /**
- * Get the next phase in the mission lifecycle
+ * Get the next phase in the mission lifecycle (UI utility)
  */
 export function getNextMissionPhase(currentPhase: MissionPhase): MissionPhase | null {
   const phases = getMissionPhasesInOrder();
@@ -139,7 +120,7 @@ export function getNextMissionPhase(currentPhase: MissionPhase): MissionPhase | 
 }
 
 /**
- * Get the previous phase in the mission lifecycle
+ * Get the previous phase in the mission lifecycle (UI utility)
  */
 export function getPreviousMissionPhase(currentPhase: MissionPhase): MissionPhase | null {
   const phases = getMissionPhasesInOrder();

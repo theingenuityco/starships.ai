@@ -1,15 +1,46 @@
 /**
- * Mission System Types
+ * Mission Domain Types
  * 
- * Clean, minimal types for the new mission system.
- * Starting with just the essentials for a blank canvas approach.
+ * Clean mission type definitions for protocol contract.
+ * Implementation details moved to appropriate packages.
  */
 
-import type { Agent } from '../index';
+import type { Agent } from '../contracts/agent';
 
 // ============================================================================
 // CORE MISSION TYPES
 // ============================================================================
+
+/**
+ * Mission phase - controls chat behavior and UI sections
+ */
+export type MissionPhase = 
+  | 'welcome'      // Initial welcome and mission introduction
+  | 'analysis'     // Mission analysis and breakdown
+  | 'plan'         // Mission execution planning and approval
+  | 'execute'      // Running mission workflow tasks
+  | 'converse';    // General conversation and mission guidance
+
+/**
+ * Mission status - simplified lifecycle
+ */
+export type MissionStatus = 
+  | 'draft'        // Created but not started
+  | 'active'       // Currently running
+  | 'completed'    // Successfully finished
+  | 'failed'       // Failed to complete
+  | 'cancelled';   // Cancelled by user
+
+/**
+ * Mission phase constants - use these instead of string literals
+ */
+export const MISSION_PHASES = {
+  WELCOME: 'welcome' as const,
+  ANALYSIS: 'analysis' as const,
+  PLAN: 'plan' as const,
+  EXECUTE: 'execute' as const,
+  CONVERSE: 'converse' as const,
+} as const;
 
 /**
  * Main mission entity - simplified and clean
@@ -28,26 +59,6 @@ export interface Mission {
   executionState?: MissionExecutionState; // Workflow execution progress
   executionResult?: MissionExecutionResult; // Final execution results for persistence
 }
-
-/**
- * Mission status - simplified lifecycle
- */
-export type MissionStatus = 
-  | 'draft'        // Created but not started
-  | 'active'       // Currently running
-  | 'completed'    // Successfully finished
-  | 'failed'       // Failed to complete
-  | 'cancelled';   // Cancelled by user
-
-/**
- * Mission phase - controls chat behavior and UI sections
- */
-export type MissionPhase = 
-  | 'welcome'      // Initial welcome and mission introduction
-  | 'analysis'     // Mission analysis and breakdown
-  | 'plan'         // Mission execution planning and approval
-  | 'execute'      // Running mission workflow tasks
-  | 'converse';    // General conversation and mission guidance
 
 // ============================================================================
 // EXECUTION TYPES
@@ -180,7 +191,7 @@ export interface MissionMessage {
   senderName?: string;    // Cached display name
   
   // Extensibility
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -204,7 +215,6 @@ export interface MissionChatResponse {
 
 /**
  * Mission clarity assessment - tracks 5-dimension clarity scoring
- * Used by AI to systematically assess and improve mission understanding
  */
 export interface MissionClarity {
   id: string;
@@ -273,7 +283,11 @@ export interface WorkflowNode {
   type: 'start' | 'agent' | 'end';
   name: string;
   description: string;
-  parameters: Record<string, any>;
+  parameters: {
+    agentId?: string;
+    estimatedTime?: number;
+    [key: string]: unknown;
+  };
 }
 
 /**
@@ -310,34 +324,7 @@ export interface WorkflowResponse {
   agents: Record<string, Agent>; // agentId -> Agent details
 }
 
-// ============================================================================
-// MISSION PLANNING TYPES (for legacy compatibility)
-// ============================================================================
 
-/**
- * Mission task for planning and execution
- */
-export interface MissionTask {
-  id: string;
-  title: string;
-  description: string;
-  dependencies: string[]; // Task IDs this task depends on
-  assignedAgentId?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  estimatedDuration?: number; // in minutes
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  createdAt: string;
-  completedAt?: string;
-}
-
-/**
- * Mission plan response containing tasks and structure
- */
-export interface MissionPlanResponse {
-  missionId: string;
-  tasks: MissionTask[];
-  totalEstimatedDuration: number; // in minutes
-  complexity: 'simple' | 'moderate' | 'complex' | 'advanced';
-  createdAt: string;
-  version: number;
-}
+// ============================================================================
+// VALIDATION HELPERS
+// ============================================================================

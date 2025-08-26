@@ -12,7 +12,8 @@ import { starshipAPI, agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity, MissionPhase } from '@starships/protocol';
-import { getMissionPhaseConfig, MISSION_PHASES, isValidMissionPhase } from '@starships/protocol';
+import { MISSION_PHASES } from '@starships/protocol';
+import { getMissionPhaseConfig } from '@/types';
 import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
 import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent';
 
@@ -119,6 +120,11 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     } else {
       return '🤖'; // Robot emoji as default
     }
+  };
+
+  // Local validation function for mission phases
+  const isValidMissionPhase = (phase: string): phase is MissionPhase => {
+    return Object.values(MISSION_PHASES).includes(phase as MissionPhase);
   };
 
   // Function to get current phase information using centralized config

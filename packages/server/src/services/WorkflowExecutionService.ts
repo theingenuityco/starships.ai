@@ -13,8 +13,7 @@ import {
   WorkflowExecutionContext,
   WorkflowRuntimeState,
   WorkflowExecutionStatus,
-  WorkflowExecutionError,
-  WorkflowServices
+  WorkflowExecutionError
 } from '@starships/protocol';
 import { workflowNodeRegistry, WorkflowNodeRegistry } from './WorkflowNodeRegistry';
 import { AgentService } from './AgentService';
@@ -187,11 +186,7 @@ export class WorkflowExecutionService {
       userId: contextData.userId || 'system',
       previousResults: runtimeState.executionResults,
       expeditionState: contextData.expeditionState || {}, // Migration note: keeping for backward compatibility
-      services: {
-        agentService: contextData.services?.agentService || AgentService,
-        userPromptService: contextData.services?.userPromptService || {},
-        dataService: contextData.services?.dataService || {}
-      }
+      services: contextData.services || {}
     };
 
     while (currentNode && runtimeState.status === 'running') {

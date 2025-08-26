@@ -15,8 +15,6 @@ import {
   LLMRepository,
   StarshipRepository,
   VisionRepository,
-  ConnectorConfigTemplateRepository,
-  ConnectorConfigHistoryRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
@@ -112,10 +110,6 @@ const agentRepository = new AgentRepository();
 const userRepository = new UserRepository();
 const llmRepository = new LLMRepository();
 
-// Aether Core repositories - use proper dependency injection
-const connectorConfigTemplateRepository = new ConnectorConfigTemplateRepository();
-const connectorConfigHistoryRepository = new ConnectorConfigHistoryRepository();
-
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
 const visionRepository = new VisionRepository();
@@ -137,8 +131,6 @@ initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
   userRepository,
-  connectorConfigTemplateRepository,
-  connectorConfigHistoryRepository,
   visionRepository,
 });
 

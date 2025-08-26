@@ -1,8 +1,38 @@
 /**
  * Vision Refinement Domain Types
- * 
+ *
  * Types for real-time vision refinement and analysis functionality.
  */
+
+// ============================================================================
+// CORE VISION ENTITY
+// ============================================================================
+
+/**
+ * Core vision entity
+ */
+export interface Vision {
+  id: string;
+  starshipId: string; // Direct FK to Starship
+  statement: string;
+  confidence: number;
+  refinementCount: number;
+  lastRefined: string;
+  isActive: boolean;
+  
+  // Vision Metrics
+  clarityScore?: number;
+  specificityScore?: number;
+  actionabilityScore?: number;
+  inspirationalScore?: number;
+  overallQuality?: number;
+  hasObjectives?: boolean;
+  hasTimeframe?: boolean;
+  hasMeasurables?: boolean;
+  
+  createdAt: string;
+  updatedAt: string;
+}
 
 // ============================================================================
 // VISION METRICS AND ANALYSIS

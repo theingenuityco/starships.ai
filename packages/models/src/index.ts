@@ -19,11 +19,15 @@ export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
 export { MissionRepository } from './repositories/MissionRepository';
 export { MissionMessageRepository } from './repositories/MissionMessageRepository';
+export { WorkflowRepository } from './repositories/WorkflowRepository';
 export { WorkflowNodeRepository } from './repositories/WorkflowNodeRepository';
 export { WorkflowEdgeRepository } from './repositories/WorkflowEdgeRepository';
+export { WorkflowRuntimeStateRepository } from './repositories/WorkflowRuntimeStateRepository';
+export { MissionClarityRepository } from './repositories/MissionClarityRepository';
+export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 
 // NEW: Agent Templates
-export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';
+export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
 
 // Factory for creating repositories
 export { RepositoryFactory } from './repositories';

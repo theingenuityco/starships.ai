@@ -1,5 +1,25 @@
 import { Agent, LLM, User, Starship, Vision, AgentTemplate } from './entities';
-import { MissionMessage, WorkflowNode, WorkflowEdge } from '@starships/protocol';
+import {
+  MissionMessage,
+  WorkflowNode,
+  WorkflowEdge,
+  Mission,
+  MissionStatus,
+  CreateMissionRequest,
+  UpdateMissionRequest,
+  MissionFilters,
+  MissionSort,
+  MissionListResponse,
+  MissionWorkflow,
+  CreateWorkflowRequest,
+  UpdateWorkflowApprovalRequest,
+  WorkflowRuntimeState,
+  WorkflowExecutionStatus,
+  WorkflowNodeResult,
+  MissionClarity,
+  CreateMissionClarityRequest,
+  UpdateMissionClarityRequest
+} from '@starships/protocol';
 
 // Repository interfaces
 export interface Repository<T> {
@@ -51,17 +71,13 @@ export interface LLMRepository extends Repository<LLM> {
 }
 
 // NEW: Aether Core Repository Interfaces
-export interface StarshipRepository {
-  findAll(): Promise<Starship[]>;
-  findById(id: string): Promise<Starship | null>;
+export interface StarshipRepository extends Repository<Starship> {
   findBySlug(slug: string, ownerId: string): Promise<Starship | null>;
   create(
     entity: Omit<Starship, 'id' | 'createdAt' | 'maxAgents' | 'maxActiveMissions' | 'updatedAt' | 'slug'> & {
       slug?: string;
     }
   ): Promise<Starship>;
-  update(id: string, updates: Partial<Starship>): Promise<Starship | null>;
-  delete(id: string): Promise<boolean>;
   findByOwner(ownerId: string): Promise<Starship[]>;
   getDeployedAgents(starshipId: string): Promise<Agent[]>;
   deployAgent(starshipId: string, agentId: string): Promise<boolean>;
@@ -70,20 +86,10 @@ export interface StarshipRepository {
   generateUniqueSlug(name: string, ownerId: string): Promise<string>;
   isSlugAvailable(slug: string, ownerId: string, excludeId?: string): Promise<boolean>;
   createSlugFromName(name: string): string;
-
-  // export interface CodexRepository extends Repository<Codex> {
-  //   findActiveByStarship(starshipId: string): Promise<Codex | null>;
-  //   getVersionHistory(starshipId: string): Promise<Codex[]>;
-  //   createVersion(starshipId: string, author: string, changeSummary: string): Promise<Codex>;
-  //   deactivateCurrentVersion(starshipId: string): Promise<void>;
 }
 
-export interface VisionRepository {
-  findAll(): Promise<Vision[]>;
-  findById(id: string): Promise<Vision | null>;
+export interface VisionRepository extends Repository<Vision> {
   create(entity: Omit<Vision, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vision>;
-  update(id: string, updates: Partial<Vision>): Promise<Vision | null>;
-  delete(id: string): Promise<boolean>;
   findByStarship(starshipId: string): Promise<Vision | null>;
   updateStatement(starshipId: string, statement: string): Promise<Vision | null>;
   getVisionByStarshipId(starshipId: string): Promise<{ vision: string } | null>;
@@ -147,4 +153,67 @@ export interface WorkflowEdgeRepository {
   deleteEdgesByWorkflowId(workflowId: string): Promise<void>;
   getEdgesByFromNode(fromNodeId: string): Promise<WorkflowEdge[]>;
   getEdgesByToNode(toNodeId: string): Promise<WorkflowEdge[]>;
+}
+
+// Missing Repository Interfaces
+export interface MissionRepository {
+  createMission(request: CreateMissionRequest, userId: string): Promise<Mission>;
+  getMissionById(id: string): Promise<Mission>;
+  getMissionsByStarshipId(starshipId: string, filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse>;
+  getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse>;
+  updateMission(id: string, updates: UpdateMissionRequest): Promise<Mission>;
+  deleteMission(id: string): Promise<void>;
+}
+
+export interface WorkflowRepository {
+  createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow>;
+  getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null>;
+  updateApprovalStatus(workflowId: string, updates: UpdateWorkflowApprovalRequest): Promise<MissionWorkflow>;
+  deleteWorkflow(workflowId: string): Promise<void>;
+}
+
+export interface WorkflowRuntimeStateRepository {
+  create(runtimeState: Omit<WorkflowRuntimeState, 'id' | 'createdAt' | 'updatedAt'>): Promise<WorkflowRuntimeState>;
+  findById(id: string): Promise<WorkflowRuntimeState | null>;
+  findByWorkflowId(workflowId: string): Promise<WorkflowRuntimeState | null>;
+  update(id: string, updates: Partial<WorkflowRuntimeState>): Promise<WorkflowRuntimeState | null>;
+  updateStatus(id: string, status: WorkflowExecutionStatus): Promise<boolean>;
+  updateNodeResult(id: string, nodeId: string, result: WorkflowNodeResult): Promise<boolean>;
+  findByStatus(status: WorkflowExecutionStatus): Promise<WorkflowRuntimeState[]>;
+  delete(id: string): Promise<boolean>;
+}
+
+export interface MissionClarityRepository {
+  upsertByMissionId(missionId: string, request: CreateMissionClarityRequest): Promise<MissionClarity>;
+  getByMissionId(missionId: string): Promise<MissionClarity | null>;
+  updateByMissionId(missionId: string, request: UpdateMissionClarityRequest): Promise<MissionClarity>;
+  deleteByMissionId(missionId: string): Promise<boolean>;
+  getAll(): Promise<MissionClarity[]>;
+  getByScoreRange(minScore: number, maxScore: number): Promise<MissionClarity[]>;
+}
+
+export interface NativeToolApiKeyRepository {
+  saveApiKey(starshipId: string, toolName: string, apiKey: string): Promise<void>;
+  getApiKey(starshipId: string, toolName: string): Promise<string | null>;
+  getAllApiKeys(starshipId: string): Promise<Record<string, string>>;
+  deleteApiKey(starshipId: string, toolName: string): Promise<void>;
+  hasApiKey(starshipId: string, toolName: string): Promise<boolean>;
+}
+
+export interface WaitlistEntry {
+  email: string;
+  status: 'approved' | 'pending' | 'rejected';
+  createdAt: Date;
+  addedBy: string;
+  notes?: string;
+}
+
+export interface WaitlistRepository {
+  checkApproval(email: string): Promise<boolean>;
+  getByEmail(email: string): Promise<WaitlistEntry | null>;
+  addApprovedEmail(email: string, addedBy?: string, notes?: string): Promise<WaitlistEntry>;
+  getAllApproved(): Promise<WaitlistEntry[]>;
+  getApprovedCount(): Promise<number>;
+  initializeSchema(): Promise<void>;
+  seedInitialEmails(): Promise<void>;
 }

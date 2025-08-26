@@ -1,7 +1,7 @@
 import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
 import { LLMRepository } from './LLMRepository';
-import { Neo4jAgentTemplateRepository } from './AgentTemplateRepository';
+import { AgentTemplateRepository } from './AgentTemplateRepository';
 import { AgentTemplateService } from '../services/AgentTemplateService';
 import { getConnection } from '../helpers/database';
 import { NotFoundError } from '../helpers/errors';

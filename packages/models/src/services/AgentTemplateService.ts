@@ -1,12 +1,12 @@
-import { AgentTemplate, AgentTemplateRepository, Agent } from '../types';
-import { Neo4jAgentTemplateRepository } from '../repositories/AgentTemplateRepository';
+import { AgentTemplate, AgentTemplateRepository as AgentTemplateRepositoryInterface, Agent } from '../types';
+import { AgentTemplateRepository } from '../repositories/AgentTemplateRepository';
 import { Neo4jConnection } from '../helpers/database';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
 
   constructor(connection: Neo4jConnection) {
-    this.templateRepository = new Neo4jAgentTemplateRepository(connection);
+    this.templateRepository = new AgentTemplateRepository(connection);
   }
 
   async getAllTemplates(): Promise<AgentTemplate[]> {

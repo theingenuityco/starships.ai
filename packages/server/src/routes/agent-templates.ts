@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { RepositoryFactory, Neo4jAgentTemplateRepository } from '@starships/models';
+import { RepositoryFactory } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import { Request, Response } from 'express';
 import { getConnection } from '@starships/models';

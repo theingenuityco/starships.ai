@@ -20,7 +20,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { seedLLMModels } from '@starships/models';
+import { seedLLMModels, seedWaitlist } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -100,7 +100,7 @@ validateEnvironmentVariables();
 const dbConnection = createConnection({
   uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
   username: process.env.NEO4J_USERNAME || 'neo4j',
-  password: process.env.NEO4J_PASSWORD || 'password',
+  password: process.env.NEO4J_PASSWORD || 'mcppassword',
   database: process.env.NEO4J_DATABASE || 'neo4j',
 });
 
@@ -207,20 +207,25 @@ httpServer.listen(PORT, async () => {
   try {
     console.log('🚀 Starting Aether Core Server...');
     
-    // Initialize database connection
+    // Initialize database connection FIRST
     await dbConnection.connect();
     await dbConnection.initializeSchema();
     console.log('✅ Neo4j database connected and schema initialized');
     
-    // Initialize RepositoryFactory BEFORE any socket connections
+    // Initialize RepositoryFactory AFTER database connection is established
     console.log('🔧 Initializing RepositoryFactory...');
     await RepositoryFactory.initialize();
     console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
     
-    // AgentService no longer needs initialization - agents are created per starship
-    // await AgentService.initialize();
-    // console.log('✅ AgentService initialized with default agents');
-
+    // Ensure WaitlistRepository is properly initialized
+    try {
+      const waitlistRepo = RepositoryFactory.getWaitlistRepository();
+      console.log('✅ WaitlistRepository initialized and ready');
+    } catch (error) {
+      console.error('❌ Failed to initialize WaitlistRepository:', error);
+      // Continue startup - waitlist is not critical for the application
+    }
+    
     // Initialize AgentTemplateService (seeds default templates)
     const templateService = RepositoryFactory.getAgentTemplateService();
     if (templateService) {
@@ -229,11 +234,19 @@ httpServer.listen(PORT, async () => {
     } else {
       console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable');
     }
-
     
     // Initialize LLM Models (seeds default models)
     await seedLLMModels();
     console.log('✅ LLM Models initialized with default models');
+
+    // Initialize Waitlist (seeds approved emails)
+    try {
+      await seedWaitlist();
+      console.log('✅ Waitlist initialized with approved emails');
+    } catch (error) {
+      console.error('⚠️ Failed to seed waitlist:', error);
+      // Continue - seeding is not critical for startup
+    }
 
 
     // Log Socket.IO status

@@ -95,24 +95,11 @@ export interface SibilSocketRequest extends SibilRequest {
 }
 
 /**
- * Typewriter chunk for character-by-character display
- */
-export interface TypewriterChunk {
-  type: 'character' | 'word' | 'line' | 'complete';
-  content: string;
-  position: number;
-  total_length?: number;
-  delay?: number; // milliseconds
-  is_code?: boolean;
-  is_markdown?: boolean;
-}
-
-/**
  * Enhanced Sibil streaming chunk for Socket.IO
  */
 export interface SibilSocketStreamChunk extends SibilStreamChunk {
   stream_id: string;
-  typewriter?: TypewriterChunk;
+  typewriter?: any; // Client-side typewriter functionality
   typing_speed?: number;
   timestamp: number;
 }
@@ -153,7 +140,7 @@ export interface AgentSocketStreamChunk {
   agent_id: string;
   type: 'content' | 'complete' | 'error';
   content?: string;
-  typewriter?: TypewriterChunk;
+  typewriter?: any; // Client-side typewriter functionality
   timestamp: number;
 }
 

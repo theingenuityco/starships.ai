@@ -26,7 +26,6 @@ export type {
   SibilStreamChunk,
   SibilStreamResponse,
   SibilSocketRequest,
-  TypewriterChunk,
   SibilSocketStreamChunk,
   SibilStreamError,
   AgentSocketRequest,
@@ -37,18 +36,6 @@ export type {
   LegacySocketIOEvents
 } from './contracts/sibil';
 
-// Export mission phase config with explicit exports to avoid conflicts
-export type {
-  MissionPhaseConfig
-} from './constants/mission-phases';
-
-export {
-  MISSION_PHASE_CONFIG,
-  getMissionPhaseConfig,
-  getMissionPhasesInOrder,
-  getNextMissionPhase,
-  getPreviousMissionPhase
-} from './constants/mission-phases';
 
 // ============================================================================
 // RE-EXPORTS FOR BACKWARD COMPATIBILITY

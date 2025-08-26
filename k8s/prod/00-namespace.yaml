@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: starships-prod
+  labels:
+    environment: production
+    app: starships-ai

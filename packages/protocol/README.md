@@ -1,6 +1,6 @@
 # @starships/protocol
 
-TypeScript protocol definitions and contracts for the starships.ai platform. This package provides centralized type definitions, API contracts, database collections, and standardized error handling across all services.
+TypeScript protocol definitions and contracts for the starships.ai platform. This package provides centralized type definitions, API contracts, database domains, and standardized error handling across all services.
 
 ## Overview
 
@@ -33,14 +33,14 @@ import {
 } from '@starships/protocol';
 ```
 
-**Key collection types:**
-- [`Agent`](src/collections/agent.ts) - AI agent configurations and deployment management
-- [`Starship`](src/collections/starship.ts) - Starship management with billing integration
-- [`Mission`](src/collections/mission.ts) - Mission orchestration with workflow execution
-- [`User`](src/collections/user.ts) - User management and authentication
-- [`Vision`](src/collections/vision.ts) - Vision refinement system
-- [`Workflow`](src/collections/workflow.ts) - Workflow execution definitions
-- [`NativeToolApiKey`](src/collections/native-tool.ts) - Encrypted API key storage for native tools
+**Key domain types:**
+- [`Agent`](src/domains/agent.ts) - AI agent configurations and deployment management
+- [`Starship`](src/domains/starship.ts) - Starship management with billing integration
+- [`Mission`](src/domains/mission.ts) - Mission orchestration with workflow execution
+- [`User`](src/domains/user.ts) - User management and authentication
+- [`Vision`](src/domains/vision.ts) - Vision refinement system
+- [`Workflow`](src/domains/workflow.ts) - Workflow execution definitions
+- [`NativeToolApiKey`](src/domains/native-tool.ts) - Encrypted API key storage for native tools
 
 ### API Contracts
 
@@ -105,7 +105,7 @@ src/
 │   ├── llm.ts              # LLM provider contracts
 │   ├── sibil.ts            # AI assistant protocols
 │   └── socket.ts           # Real-time event contracts
-├── collections/            # Database collection types
+├── domains/                # Database domain types
 │   ├── agent.ts            # AI agent configurations and deployment
 │   ├── starship.ts         # Starship management
 │   ├── mission.ts          # Mission orchestration

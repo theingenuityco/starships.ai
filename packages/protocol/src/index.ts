@@ -8,15 +8,15 @@ export * from './contracts/chat';
 export * from './contracts/llm';
 export * from './contracts/socket';
 
-// Export collection types (database collections)
-export * from './collections/agent';
-export * from './collections/mission';
-export * from './collections/starship';
-export * from './collections/vision';
-export * from './collections/workflow';
-export * from './collections/user';
-export * from './collections/waitlist';
-export * from './collections/native-tool';
+// Export domain types (database domains)
+export * from './domains/agent';
+export * from './domains/mission';
+export * from './domains/starship';
+export * from './domains/vision';
+export * from './domains/workflow';
+export * from './domains/user';
+export * from './domains/waitlist';
+export * from './domains/native-tool';
 
 // Export collection types with explicit naming to avoid conflicts
 export type {
@@ -28,7 +28,7 @@ export type {
   LLMListResponse,
   LLMFilters,
   LLMSort
-} from './collections/llm';
+} from './domains/llm';
 
 export type {
   AgentTemplate,
@@ -42,7 +42,7 @@ export type {
   AgentTemplateUsage,
   IncrementTemplateUsageRequest,
   RateTemplateRequest
-} from './collections/agent-template';
+} from './domains/agent-template';
 
 // Export Sibil types with explicit exports to avoid conflicts
 export type {

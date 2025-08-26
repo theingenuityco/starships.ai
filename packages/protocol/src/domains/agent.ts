@@ -11,7 +11,7 @@ import type {
   AgentAnalytics
 } from '../contracts/agent';
 
-// Re-export Agent types from contracts as they serve as both API contracts and database collections
+// Re-export Agent types from contracts as they serve as both API contracts and database domains
 export type {
   Agent,
   AgentConfig,

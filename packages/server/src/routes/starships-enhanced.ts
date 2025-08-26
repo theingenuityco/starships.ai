@@ -6,8 +6,8 @@ import {
   Vision
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
-import { 
-  EnhancedValidationError as ValidationError,
+import {
+  ValidationError,
 } from '@starships/models';
 
 const router: Router = Router();
@@ -207,8 +207,8 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: getErrorMessage(error),
-        field: (error as any).field,
-        details: (error as any).details,
+        validationErrors: error.validationErrors,
+        details: error.details,
       });
     } else {
       res.status(500).json({

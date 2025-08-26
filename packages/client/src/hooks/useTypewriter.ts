@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { TypewriterChunk } from '@starships/protocol';
+import type { TypewriterChunk } from '@/types';
 
 interface UseTypewriterOptions {
   speed?: number;

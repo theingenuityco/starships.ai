@@ -9,14 +9,12 @@ import type {
   AgentRepository,
   Starship,
   VisionRepository,
-  ConnectorConfigTemplateRepository,
-  ConnectorConfigHistoryRepository,
   UserRepository,
 } from '@starships/models';
 import {
-  EnhancedValidationError as ValidationError,
-  EnhancedConstraintViolationError as ConstraintViolationError,
-  EnhancedNotFoundError as NotFoundError,
+  ValidationError,
+  ConflictError as ConstraintViolationError,
+  NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
@@ -31,17 +29,17 @@ const handleError = (error: any, res: Response, context: string): void => {
     res.status(400).json({
       error: 'Validation Error',
       message: error.message,
-      field: error.field,
+      validationErrors: error.validationErrors,
     });
     return;
   }
 
   if (error instanceof ConstraintViolationError) {
-    const statusCode = error.constraintType === 'unique' ? 409 : 400;
+    const statusCode = error.conflictReason.includes('unique') ? 409 : 400;
     res.status(statusCode).json({
       error: 'Constraint Violation',
       message: error.message,
-      constraintType: error.constraintType,
+      conflictReason: error.conflictReason,
     });
     return;
   }
@@ -50,8 +48,8 @@ const handleError = (error: any, res: Response, context: string): void => {
     res.status(404).json({
       error: 'Not Found',
       message: error.message,
-      entityType: error.entityType,
-      entityId: error.entityId,
+      resourceType: error.resourceType,
+      resourceId: error.resourceId,
     });
     return;
   }
@@ -70,23 +68,17 @@ const router: Router = Router();
 let starshipRepo: StarshipRepository;
 let agentRepo: AgentRepository;
 let userRepo: UserRepository;
-let configTemplateRepo: ConnectorConfigTemplateRepository;
-let configHistoryRepo: ConnectorConfigHistoryRepository;
 let visionRepo: VisionRepository;
 
 export function initializeStarshipRoutes(deps: {
   starshipRepository: StarshipRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
-  connectorConfigTemplateRepository: ConnectorConfigTemplateRepository;
-  connectorConfigHistoryRepository: ConnectorConfigHistoryRepository;
   visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
   userRepo = deps.userRepository;
-  configTemplateRepo = deps.connectorConfigTemplateRepository;
-  configHistoryRepo = deps.connectorConfigHistoryRepository;
   visionRepo = deps.visionRepository;
 }
 

@@ -17,7 +17,6 @@ import {
   NetworkError,
   BusinessLogicError,
   ErrorFactory,
-  isStandardError,
 } from '@starships/protocol';
 
 import {
@@ -273,6 +272,13 @@ export function resetErrorMetrics(): void {
 // ============================================================================
 // ERROR CONVERSION UTILITIES
 // ============================================================================
+
+/**
+ * Local type guard for StandardError
+ */
+function isStandardError(error: unknown): error is StandardError {
+  return error instanceof StandardError;
+}
 
 /**
  * Convert various error types to StandardError

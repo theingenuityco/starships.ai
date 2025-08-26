@@ -8,6 +8,7 @@ import {
   invalidateConnectorInstanceCaches,
   invalidateMCPServerCaches,
 } from './cache'
+import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
 const API_BASE_URL = getApiBaseUrl()
 
@@ -211,67 +212,6 @@ export interface MCPServerOption {
   env?: string // Environment variables as JSON string (optional)
 }
 
-// Configuration history interface
-export interface ConnectorConfigHistory {
-  id: string
-  connectorId: string
-  config: ConnectorInstanceConfig
-  changedBy: string
-  changeSummary?: string
-  changeReason?: string
-  createdAt: string
-}
-
-// Configuration template interface
-export interface ConnectorConfigTemplate {
-  id: string
-  name: string
-  description?: string
-  category: 'development' | 'production' | 'testing' | 'monitoring' | 'custom'
-  tags: string[]
-  config: ConnectorInstanceConfig
-  isPublic: boolean
-  authorId: string
-  usageCount: number
-  createdAt: string
-  updatedAt: string
-}
-
-// Configuration interface for connector instances
-export interface ConnectorInstanceConfig {
-  customName?: string
-  customDescription?: string
-  environmentVariables?: string
-  timeouts?: {
-    connection?: number
-    request?: number
-    idle?: number
-  }
-  retry?: {
-    maxAttempts?: number
-    baseDelay?: number
-    maxDelay?: number
-    exponentialBackoff?: boolean
-  }
-  logging?: {
-    level?: 'error' | 'warn' | 'info' | 'debug'
-    enableDebug?: boolean
-    logRequests?: boolean
-    logMetrics?: boolean
-  }
-  resources?: {
-    maxMemoryMB?: number
-    maxCpuPercent?: number
-    maxConnections?: number
-  }
-  healthCheck?: {
-    enabled?: boolean
-    interval?: number
-    timeout?: number
-    failureThreshold?: number
-  }
-  customConfig?: Record<string, any>
-}
 
 // NEW: MCP Server Connector Instance interface (matching backend model)
 export interface MCPServerConnector {
@@ -871,7 +811,7 @@ export const mcpServerAPI = {
     starshipId: string,
     connectorId: string,
     limit?: number
-  ): Promise<ConnectorConfigHistory[]> => {
+  ): Promise<any[]> => {
     console.warn('[API] MCP Configuration history retrieval has been removed:', { starshipId, connectorId })
     return []
   },
@@ -888,134 +828,6 @@ export const mcpServerAPI = {
   },
 }
 
-// NEW: Configuration Template API
-export const configTemplateAPI = {
-  // Get all configuration templates
-  getAll: async (options?: {
-    category?: string
-    public?: boolean
-  }): Promise<ConnectorConfigTemplate[]> => {
-    console.log('[API] Getting configuration templates:', options)
-
-    try {
-      const params = new URLSearchParams()
-      if (options?.category) params.append('category', options.category)
-      if (options?.public) params.append('public', 'true')
-
-      const data = await api
-        .get(`/api/config-templates${params.toString() ? `?${params.toString()}` : ''}`)
-        .then((res: AxiosResponse<{ templates: ConnectorConfigTemplate[] }>) => {
-          console.log('[API] Successfully retrieved configuration templates')
-          return res.data.templates
-        })
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to get configuration templates:', error)
-      throw error
-    }
-  },
-
-  // Create configuration template
-  create: async (
-    template: Omit<
-      ConnectorConfigTemplate,
-      'id' | 'usageCount' | 'createdAt' | 'updatedAt' | 'authorId'
-    >
-  ): Promise<ConnectorConfigTemplate> => {
-    console.log('[API] Creating configuration template:', template.name)
-
-    try {
-      const data = await api
-        .post('/api/config-templates', template)
-        .then((res: AxiosResponse<{ template: ConnectorConfigTemplate }>) => {
-          console.log('[API] Successfully created configuration template')
-          return res.data.template
-        })
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to create configuration template:', error)
-      throw error
-    }
-  },
-
-  // Get configuration template by ID
-  getById: async (id: string): Promise<ConnectorConfigTemplate> => {
-    console.log('[API] Getting configuration template:', id)
-
-    try {
-      const data = await api
-        .get(`/api/config-templates/${id}`)
-        .then((res: AxiosResponse<{ template: ConnectorConfigTemplate }>) => {
-          console.log('[API] Successfully retrieved configuration template')
-          return res.data.template
-        })
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to get configuration template:', error)
-      throw error
-    }
-  },
-
-  // Update configuration template
-  update: async (
-    id: string,
-    updates: Partial<Omit<ConnectorConfigTemplate, 'id' | 'createdAt' | 'updatedAt' | 'authorId'>>
-  ): Promise<ConnectorConfigTemplate> => {
-    console.log('[API] Updating configuration template:', id)
-
-    try {
-      const data = await api
-        .put(`/api/config-templates/${id}`, updates)
-        .then((res: AxiosResponse<{ template: ConnectorConfigTemplate }>) => {
-          console.log('[API] Successfully updated configuration template')
-          return res.data.template
-        })
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to update configuration template:', error)
-      throw error
-    }
-  },
-
-  // Delete configuration template
-  delete: async (id: string): Promise<void> => {
-    console.log('[API] Deleting configuration template:', id)
-
-    try {
-      await api.delete(`/api/config-templates/${id}`)
-      console.log('[API] Successfully deleted configuration template')
-    } catch (error) {
-      console.error('[API] Failed to delete configuration template:', error)
-      throw error
-    }
-  },
-
-  // Search configuration templates
-  search: async (query: string, category?: string): Promise<ConnectorConfigTemplate[]> => {
-    console.log('[API] Searching configuration templates:', { query, category })
-
-    try {
-      const params = new URLSearchParams({ q: query })
-      if (category) params.append('category', category)
-
-      const data = await api
-        .get(`/api/config-templates/search?${params.toString()}`)
-        .then((res: AxiosResponse<{ templates: ConnectorConfigTemplate[] }>) => {
-          console.log('[API] Successfully searched configuration templates')
-          return res.data.templates
-        })
-
-      return data
-    } catch (error) {
-      console.error('[API] Failed to search configuration templates:', error)
-      throw error
-    }
-  },
-}
 
 export const userAPI = {
   // Sync Kinde user to backend database

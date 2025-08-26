@@ -18,7 +18,7 @@ import {
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
-import { initializeSchema, seedWaitlist } from '@starships/models';
+import { migrationRunner, seedWaitlist } from '@starships/models';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -205,7 +205,7 @@ httpServer.listen(PORT, async () => {
     console.log('✅ Neo4j database connected');
     
     // Initialize complete database schema (includes seeding)
-    await initializeSchema();
+    await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
     
     // Initialize RepositoryFactory AFTER database connection is established

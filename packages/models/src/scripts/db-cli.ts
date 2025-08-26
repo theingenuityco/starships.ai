@@ -5,9 +5,9 @@ import { schemaValidator } from './schema-validator';
 import { performanceMonitor } from './performance-monitor';
 
 /**
- * Database Optimizer CLI Tool
- * 
- * Command-line interface for managing database optimizations,
+ * Database CLI Tool
+ *
+ * Command-line interface for managing database operations,
  * running migrations, validating schema, and monitoring performance.
  */
 
@@ -19,7 +19,7 @@ interface CliOptions {
   duration?: string;
 }
 
-class DatabaseOptimizerCLI {
+class DatabaseCLI {
   private args: string[];
   private options: CliOptions = {};
 
@@ -480,10 +480,10 @@ class DatabaseOptimizerCLI {
 
   private showHelp(): void {
     console.log(`
-🚀 Database Optimizer CLI - Starships.ai
+🚀 Database CLI - Starships.ai
 
 USAGE:
-  node db-optimizer-cli.js <command> [subcommand] [options]
+  node db-cli.js <command> [subcommand] [options]
 
 COMMANDS:
   migration <subcommand>    Database migration management
@@ -514,21 +514,21 @@ OPTIONS:
   --duration N             Duration in minutes
 
 EXAMPLES:
-  node db-optimizer-cli.js migration run-all
-  node db-optimizer-cli.js validate schema --report
-  node db-optimizer-cli.js performance report --hours 24
-  node db-optimizer-cli.js optimize full
+  node db-cli.js migration run-all
+  node db-cli.js validate schema --report
+  node db-cli.js performance report --hours 24
+  node db-cli.js optimize full
 `);
   }
 }
 
 // Run CLI if called directly
 if (require.main === module) {
-  const cli = new DatabaseOptimizerCLI();
+  const cli = new DatabaseCLI();
   cli.run().catch(error => {
     console.error('CLI Error:', error);
     process.exit(1);
   });
 }
 
-export { DatabaseOptimizerCLI };
+export { DatabaseCLI };

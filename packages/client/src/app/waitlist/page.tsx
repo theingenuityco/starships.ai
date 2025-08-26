@@ -74,7 +74,7 @@ export default function WaitlistPage() {
   };
 
   return (
-    <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
+    <div className="relative min-h-screen bg-black dark:bg-black text-white overflow-hidden">
       <StarfieldBackground />
       
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
@@ -112,10 +112,10 @@ export default function WaitlistPage() {
           </div>
 
           {/* Waitlist Form Card */}
-          <Card className="p-6 bg-card/50 backdrop-blur-md border-border">
+          <Card className="p-6 bg-gray-900/80 dark:bg-gray-900/80 backdrop-blur-md border-gray-700 dark:border-gray-700">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                   Enter your email to join the waitlist
                 </label>
                 <Input
@@ -125,7 +125,7 @@ export default function WaitlistPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading || isValidated}
-                  className="bg-background/50 border-border text-foreground placeholder-muted-foreground focus:border-primary"
+                  className="bg-gray-800/50 dark:bg-gray-800/50 border-gray-600 dark:border-gray-600 text-white dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:border-primary focus:ring-primary"
                   required
                 />
               </div>
@@ -133,7 +133,7 @@ export default function WaitlistPage() {
               <Button
                 type="submit"
                 disabled={isLoading || isValidated}
-                className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white dark:text-white disabled:opacity-50"
               >
                 {isLoading ? (
                   <>

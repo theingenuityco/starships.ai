@@ -174,7 +174,7 @@ export class WaitlistRepository extends BaseRepository {
     try {
       // Create unique constraint on email
       await this.connection.executeWrite(
-        `CREATE CONSTRAINT unique_waitlist_email IF NOT EXISTS
+        `CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS
          FOR (w:Waitlist) REQUIRE w.email IS UNIQUE`
       );
 
@@ -186,7 +186,7 @@ export class WaitlistRepository extends BaseRepository {
 
       console.log('Waitlist schema initialized successfully');
     } catch (error) {
-      console.error('Error initializing waitlist schema:', error);
+      console.warn('Waitlist schema initialization warning:', error);
       // Don't throw - indexes might already exist
     }
   }

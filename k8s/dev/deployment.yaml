@@ -43,7 +43,7 @@ spec:
         - name: NEO4J_USERNAME
           value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "[DEFAULT-PASSWORD]"
+          value: "[NEO4J-PASSWORD]"
         - name: SKIP_INSTALL
           value: "true"
         - name: CLIENT_URL

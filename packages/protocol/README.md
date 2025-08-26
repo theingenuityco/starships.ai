@@ -28,17 +28,19 @@ import {
   Agent,
   User,
   Vision,
-  Workflow
+  Workflow,
+  NativeToolApiKey
 } from '@starships/protocol';
 ```
 
 **Key collection types:**
+- [`Agent`](src/collections/agent.ts) - AI agent configurations and deployment management
 - [`Starship`](src/collections/starship.ts) - Starship management with billing integration
 - [`Mission`](src/collections/mission.ts) - Mission orchestration with workflow execution
-- [`Agent`](src/collections/agent-template.ts) - AI agent configurations and templates
 - [`User`](src/collections/user.ts) - User management and authentication
 - [`Vision`](src/collections/vision.ts) - Vision refinement system
 - [`Workflow`](src/collections/workflow.ts) - Workflow execution definitions
+- [`NativeToolApiKey`](src/collections/native-tool.ts) - Encrypted API key storage for native tools
 
 ### API Contracts
 
@@ -104,13 +106,15 @@ src/
 │   ├── sibil.ts            # AI assistant protocols
 │   └── socket.ts           # Real-time event contracts
 ├── collections/            # Database collection types
+│   ├── agent.ts            # AI agent configurations and deployment
 │   ├── starship.ts         # Starship management
 │   ├── mission.ts          # Mission orchestration
 │   ├── agent-template.ts   # Agent templates
 │   ├── user.ts             # User management
 │   ├── vision.ts           # Vision refinement
 │   ├── workflow.ts         # Workflow execution
-│   └── waitlist.ts         # Waitlist management
+│   ├── waitlist.ts         # Waitlist management
+│   └── native-tool.ts      # Native tool API key storage
 ```
 
 ## Used By

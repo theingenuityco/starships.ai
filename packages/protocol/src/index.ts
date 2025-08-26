@@ -9,12 +9,14 @@ export * from './contracts/llm';
 export * from './contracts/socket';
 
 // Export collection types (database collections)
+export * from './collections/agent';
 export * from './collections/mission';
 export * from './collections/starship';
 export * from './collections/vision';
 export * from './collections/workflow';
 export * from './collections/user';
 export * from './collections/waitlist';
+export * from './collections/native-tool';
 
 // Export collection types with explicit naming to avoid conflicts
 export type {

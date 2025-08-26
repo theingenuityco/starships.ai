@@ -1,4 +1,4 @@
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
@@ -40,13 +40,13 @@ export class MigrationRunner {
   }
 
   /**
-   * Execute a migration with full error handling
+   * Initialize schema if not already done
    */
-  async runMigration(migrationId: string): Promise<MigrationResult> {
+  async initializeSchema(): Promise<MigrationResult> {
     const startTime = Date.now();
     const result: MigrationResult = {
       success: false,
-      migrationId,
+      migrationId: '001_initialize_schema',
       executionTime: 0,
       errors: [],
       warnings: [],
@@ -54,72 +54,67 @@ export class MigrationRunner {
     };
 
     try {
-      // Check if migration already applied
-      const isApplied = await this.isMigrationApplied(migrationId);
+      // Check if schema is already initialized
+      const isApplied = await this.isMigrationApplied('001_initialize_schema');
       if (isApplied) {
-        result.warnings?.push(`Migration ${migrationId} is already applied`);
+        result.warnings?.push('Schema already initialized');
         result.success = true;
         result.executionTime = Date.now() - startTime;
         return result;
       }
 
       // Validate migration file exists
-      const migrationPath = join(this.migrationsPath, `${migrationId}.cypher`);
+      const migrationPath = join(this.migrationsPath, '001_initialize_schema.cypher');
       if (!existsSync(migrationPath)) {
-        result.errors?.push(`Migration file not found: ${migrationPath}`);
+        result.errors?.push(`Schema file not found: ${migrationPath}`);
         return result;
       }
 
-      // Check rollback file exists
-      const rollbackPath = join(this.migrationsPath, `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.cypher`);
-      result.rollbackAvailable = existsSync(rollbackPath);
+      console.log('🚀 Initializing database schema...');
 
-      // Validate dependencies
-      const dependencyCheck = await this.validateDependencies(migrationId);
-      if (!dependencyCheck.valid) {
-        result.errors?.push(`Dependency validation failed: ${dependencyCheck.missing?.join(', ')}`);
-        return result;
-      }
+      // Execute schema initialization
+      const schemaContent = readFileSync(migrationPath, 'utf-8');
+      await this.executeMigrationContent(schemaContent, '001_initialize_schema');
 
-      // Create backup point
-      await this.createBackupPoint(migrationId);
-
-      // Execute migration
-      const migrationContent = readFileSync(migrationPath, 'utf-8');
-      await this.executeMigrationContent(migrationContent, migrationId);
-
-      // Verify migration success
-      const verificationResult = await this.verifyMigration(migrationId);
+      // Verify schema initialization
+      const verificationResult = await this.verifySchemaInitialization();
       if (!verificationResult.success) {
-        result.errors?.push(`Migration verification failed: ${verificationResult.errors?.join(', ')}`);
-        
-        // Attempt rollback
-        if (result.rollbackAvailable) {
-          await this.rollbackMigration(migrationId);
-          result.warnings?.push('Migration rolled back due to verification failure');
-        }
+        result.errors?.push(`Schema verification failed: ${verificationResult.errors?.join(', ')}`);
         return result;
       }
 
       result.success = true;
       result.executionTime = Date.now() - startTime;
+      console.log(`✅ Schema initialized successfully in ${result.executionTime}ms`);
 
     } catch (error) {
-      result.errors?.push(`Migration execution failed: ${error instanceof Error ? error.message : String(error)}`);
-      
-      // Attempt rollback on error
-      if (result.rollbackAvailable) {
-        try {
-          await this.rollbackMigration(migrationId);
-          result.warnings?.push('Migration rolled back due to execution error');
-        } catch (rollbackError) {
-          result.errors?.push(`Rollback failed: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
-        }
-      }
+      result.errors?.push(`Schema initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('❌ Schema initialization failed:', error);
     }
 
     result.executionTime = Date.now() - startTime;
     return result;
+  }
+
+  /**
+   * Execute a migration with full error handling (deprecated - use initializeSchema)
+   */
+  async runMigration(migrationId: string): Promise<MigrationResult> {
+    console.warn('⚠️  runMigration is deprecated. Use initializeSchema() instead.');
+    
+    if (migrationId === '001_initialize_schema') {
+      return this.initializeSchema();
+    }
+
+    // Return error for other migration IDs since they no longer exist
+    return {
+      success: false,
+      migrationId,
+      executionTime: 0,
+      errors: [`Migration ${migrationId} no longer exists. Use initializeSchema() instead.`],
+      warnings: [],
+      rollbackAvailable: false
+    };
   }
 
   /**
@@ -308,9 +303,9 @@ export class MigrationRunner {
   }
 
   /**
-   * Verify migration was applied correctly
+   * Verify schema initialization was successful
    */
-  private async verifyMigration(migrationId: string): Promise<{
+  private async verifySchemaInitialization(): Promise<{
     success: boolean;
     errors?: string[];
   }> {
@@ -318,16 +313,62 @@ export class MigrationRunner {
 
     try {
       // Check if migration record was created
+      const migrationExists = await this.isMigrationApplied('001_initialize_schema');
+      if (!migrationExists) {
+        errors.push('Schema initialization record not found');
+      }
+
+      // Check constraints were created
+      const constraints = await this.getConnection().executeQuery('SHOW CONSTRAINTS');
+      if (constraints.length < 10) {
+        errors.push(`Expected at least 10 constraints, found ${constraints.length}`);
+      }
+
+      // Check indexes were created
+      const indexes = await this.getConnection().executeQuery('SHOW INDEXES');
+      if (indexes.length < 15) {
+        errors.push(`Expected at least 15 indexes, found ${indexes.length}`);
+      }
+
+      // Check seed data was created
+      const llmCount = await this.getConnection().executeQuery('MATCH (l:LLM) RETURN count(l) as count');
+      if (llmCount[0]?.count < 5) {
+        errors.push(`Expected at least 5 LLM models, found ${llmCount[0]?.count || 0}`);
+      }
+
+      const mcpCount = await this.getConnection().executeQuery('MATCH (m:MCPServerOption) RETURN count(m) as count');
+      if (mcpCount[0]?.count < 8) {
+        errors.push(`Expected at least 8 MCP server options, found ${mcpCount[0]?.count || 0}`);
+      }
+
+    } catch (error) {
+      errors.push(`Schema verification failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    return {
+      success: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  /**
+   * Verify migration was applied correctly (deprecated)
+   */
+  private async verifyMigration(migrationId: string): Promise<{
+    success: boolean;
+    errors?: string[];
+  }> {
+    if (migrationId === '001_initialize_schema') {
+      return this.verifySchemaInitialization();
+    }
+
+    // For other migrations, just check if they exist (shouldn't happen)
+    const errors: string[] = [];
+    try {
       const migrationExists = await this.isMigrationApplied(migrationId);
       if (!migrationExists) {
         errors.push('Migration record not found after execution');
       }
-
-      // Specific verification based on migration type
-      if (migrationId.includes('database_optimizations')) {
-        await this.verifyConstraintsAndIndexes(errors);
-      }
-
     } catch (error) {
       errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -368,26 +409,20 @@ export class MigrationRunner {
 
 
   /**
-   * Run all pending migrations
+   * Initialize database schema (replaces runAllPendingMigrations)
    */
   async runAllPendingMigrations(): Promise<MigrationResult[]> {
-    const pendingMigrations = await this.getPendingMigrations();
-    const results: MigrationResult[] = [];
-
-    for (const migrationId of pendingMigrations) {
-      console.log(`Running migration: ${migrationId}`);
-      const result = await this.runMigration(migrationId);
-      results.push(result);
-
-      if (!result.success) {
-        console.error(`Migration ${migrationId} failed:`, result.errors);
-        break; // Stop on first failure
-      } else {
-        console.log(`Migration ${migrationId} completed successfully in ${result.executionTime}ms`);
-      }
+    console.log('🚀 Checking database schema...');
+    
+    const result = await this.initializeSchema();
+    
+    if (result.success) {
+      console.log('✅ Database schema is ready');
+    } else {
+      console.error('❌ Database schema initialization failed:', result.errors);
     }
-
-    return results;
+    
+    return [result];
   }
 }
 

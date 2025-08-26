@@ -1,5 +1,5 @@
-import { getConnection } from '../connection';
-import { Vision, VisionRepository as VisionRepositoryInterface } from '../types';
+import { getConnection } from '../helpers/database';
+import { Vision } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
  * Neo4j-based vision repository with direct starship relationships
  * Rebuilt for Phase 2: Direct Vision → Starship relationship with starshipId FK
  */
-export class VisionRepository extends BaseRepository implements VisionRepositoryInterface {
+export class VisionRepository extends BaseRepository {
   constructor() {
     super('VisionRepository');
   }

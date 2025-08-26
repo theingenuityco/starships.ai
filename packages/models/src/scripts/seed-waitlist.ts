@@ -3,9 +3,9 @@
  * Automatically adds approved emails to the waitlist on server startup
  */
 
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { WaitlistRepository } from '../repositories/WaitlistRepository';
-import { logger } from '../logging';
+import { logger } from '../helpers/logging';
 
 // List of approved emails - add new testers here
 const APPROVED_EMAILS = [

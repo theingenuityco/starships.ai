@@ -12,7 +12,7 @@ import {
   ConflictError,
   ValidationError,
   ErrorFactory
-} from '../errors';
+} from '../helpers/errors';
 
 // Local error context interface
 interface ErrorContext {

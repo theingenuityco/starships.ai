@@ -6,7 +6,7 @@
  */
 
 import { BaseRepository } from './BaseRepository';
-import { getConnection } from '../connection';
+import { getConnection } from '../helpers/database';
 import { 
   MissionClarity, 
   CreateMissionClarityRequest, 

@@ -10,6 +10,10 @@ export { AgentService } from './AgentService';
 export { UserService } from './UserService';
 export { SibilService } from './SibilService';
 
+// Migrated services from @starships/models
+export { AgentTemplateService } from './AgentTemplateService';
+export { VisionFileService } from './VisionFileService';
+
 // Vision refinement services
 export { VisionRefinementService } from './VisionRefinementService';
 export { AffirmationDetector } from './AffirmationDetector';

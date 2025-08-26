@@ -1,8 +1,83 @@
 /**
  * LLM Domain Types
- * 
- * Clean language model type definitions for protocol contract.
+ *
+ * Consolidated language model type definitions for protocol contract.
+ * Moved from contracts/llm.ts as LLM is now a domain concept.
  */
+
+import type { UsageStats } from '../contracts/chat';
+
+// ============================================================================
+// LLM TOOL INTERFACES
+// ============================================================================
+
+/**
+ * Tool definition for LLM function calling
+ */
+export interface LLMToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, {
+        type: string;
+        description?: string;
+        enum?: string[];
+      }>;
+      required?: string[];
+    };
+  };
+}
+
+// ============================================================================
+// LLM PROVIDER INTERFACES
+// ============================================================================
+
+/**
+ * LLM chat prompt structure
+ */
+export interface LLMChatPrompt {
+  messages: Array<{ role: 'system' | 'assistant' | 'user'; content: string }>;
+}
+
+/**
+ * LLM completion result
+ */
+export interface LLMResult {
+  reply: string;
+  usage?: UsageStats;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * LLM provider interface
+ */
+export interface LLMProvider {
+  complete(
+    prompt: LLMChatPrompt,
+    opts?: {
+      stream?: boolean;
+      temperature?: number;
+      maxTokens?: number;
+      tools?: LLMToolDefinition[];
+    }
+  ): Promise<LLMResult>;
+  
+  completeStream(
+    prompt: LLMChatPrompt,
+    opts?: {
+      temperature?: number;
+      maxTokens?: number;
+      tools?: LLMToolDefinition[];
+    }
+  ): AsyncGenerator<string, void, unknown>;
+}
 
 // ============================================================================
 // LLM TYPES

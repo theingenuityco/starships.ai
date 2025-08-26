@@ -7,7 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import {
-  StandardError,
+  BaseError,
   ValidationError,
   AuthenticationError,
   AuthorizationError,
@@ -15,15 +15,34 @@ import {
   ConflictError,
   DatabaseError,
   NetworkError,
-  BusinessLogicError,
+  InternalServerError,
   ErrorFactory,
-} from '@starships/protocol';
+} from '@starships/models';
 
-import {
-  StandardErrorCode,
+import type {
   ErrorSeverity,
-  ErrorResponse,
-} from '@starships/protocol';
+} from '@starships/models';
+
+// Define local types that were previously imported from protocol
+interface ErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    category: string;
+    severity: ErrorSeverity;
+    details?: any;
+    timestamp: string;
+    requestId?: string;
+  };
+  meta: {
+    version: string;
+    environment: string;
+    service: string;
+  };
+}
+
+type StandardErrorCode = string; // Simplified type for now
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -116,12 +135,12 @@ class ErrorLogger {
   /**
    * Log error with structured format
    */
-  logError(error: StandardError, req: Request, additionalContext?: Record<string, any>): void {
+  logError(error: BaseError, req: Request, additionalContext?: Record<string, any>): void {
     if (!this.config.logErrors) return;
 
     const logEntry = {
       timestamp: new Date().toISOString(),
-      level: this.getSeverityLogLevel(error.severity),
+      level: 'error', // Default log level since severity is not available
       service: this.config.service,
       version: this.config.version,
       environment: this.config.environment,
@@ -130,10 +149,7 @@ class ErrorLogger {
         code: error.code,
         message: error.message,
         category: error.category,
-        severity: error.severity,
-        correlationId: error.correlationId,
-        httpStatusCode: error.httpStatusCode,
-        isRetryable: error.isRetryable,
+        statusCode: error.statusCode,
       },
       request: {
         method: req.method,
@@ -143,11 +159,11 @@ class ErrorLogger {
         headers: this.sanitizeHeaders(req.headers),
         userAgent: req.get('User-Agent'),
         ip: req.ip || req.connection.remoteAddress,
-        userId: error.userId || (req as any).user?.id,
+        userId: (req as any).user?.id,
         requestId: error.requestId || req.get('X-Request-ID'),
       },
       context: {
-        ...error.context,
+        // Context would be in error.details if needed
         ...additionalContext,
       },
       details: error.details,
@@ -155,21 +171,13 @@ class ErrorLogger {
     };
 
     // Use appropriate log level based on severity
-    switch (error.severity) {
-      case 'critical':
-        console.error('[CRITICAL ERROR]', JSON.stringify(logEntry, null, 2));
-        break;
-      case 'high':
-        console.error('[HIGH ERROR]', JSON.stringify(logEntry, null, 2));
-        break;
-      case 'medium':
-        console.warn('[MEDIUM ERROR]', JSON.stringify(logEntry, null, 2));
-        break;
-      case 'low':
-        console.info('[LOW ERROR]', JSON.stringify(logEntry, null, 2));
-        break;
-      default:
-        console.error('[ERROR]', JSON.stringify(logEntry, null, 2));
+    // Log based on HTTP status code instead of severity
+    if (error.statusCode >= 500) {
+      console.error('[SERVER ERROR]', JSON.stringify(logEntry, null, 2));
+    } else if (error.statusCode >= 400) {
+      console.warn('[CLIENT ERROR]', JSON.stringify(logEntry, null, 2));
+    } else {
+      console.info('[INFO]', JSON.stringify(logEntry, null, 2));
     }
   }
 
@@ -177,17 +185,11 @@ class ErrorLogger {
    * Log unhandled errors
    */
   logUnhandledError(error: Error, req: Request): void {
-    const standardError = StandardError.fromError(
-      error,
-      'INTERNAL_SERVER_ERROR',
-      {
-        service: this.config.service,
-        method: req.method,
-        resource: req.path,
-        operation: 'unhandled_error',
-      },
-      (req as any).user?.id,
-      req.get('X-Request-ID')
+    const standardError = new InternalServerError(
+      error?.message || 'Unhandled error occurred',
+      { originalError: error },
+      req.get('X-Request-ID'),
+      req.path
     );
 
     this.logError(standardError, req, { unhandled: true });
@@ -230,7 +232,7 @@ class ErrorLogger {
 /**
  * Update error metrics
  */
-function updateErrorMetrics(error: StandardError, req: Request): void {
+function updateErrorMetrics(error: BaseError, req: Request): void {
   if (!DEFAULT_CONFIG.enableMetrics) return;
 
   errorMetrics.totalErrors++;
@@ -242,9 +244,9 @@ function updateErrorMetrics(error: StandardError, req: Request): void {
   errorMetrics.errorsByCategory[error.category] =
     (errorMetrics.errorsByCategory[error.category] || 0) + 1;
 
-  // Count by severity
-  errorMetrics.errorsBySeverity[error.severity] =
-    (errorMetrics.errorsBySeverity[error.severity] || 0) + 1;
+  // Count by status code range instead of severity
+  const statusGroup = error.statusCode >= 500 ? 'server' : error.statusCode >= 400 ? 'client' : 'other';
+  errorMetrics.errorsBySeverity[statusGroup] = (errorMetrics.errorsBySeverity[statusGroup] || 0) + 1;
 
   // Count by endpoint
   const endpoint = `${req.method} ${req.path}`;
@@ -276,14 +278,14 @@ export function resetErrorMetrics(): void {
 /**
  * Local type guard for StandardError
  */
-function isStandardError(error: unknown): error is StandardError {
-  return error instanceof StandardError;
+function isStandardError(error: unknown): error is BaseError {
+  return error instanceof BaseError;
 }
 
 /**
  * Convert various error types to StandardError
  */
-function convertToStandardError(error: any, req: Request): StandardError {
+function convertToStandardError(error: any, req: Request): BaseError {
   // If already a StandardError, return as-is
   if (isStandardError(error)) {
     return error;
@@ -291,42 +293,55 @@ function convertToStandardError(error: any, req: Request): StandardError {
 
   const userId = (req as any).user?.id;
   const requestId = req.get('X-Request-ID');
-  const context = {
-    service: DEFAULT_CONFIG.service,
-    method: req.method,
-    resource: req.path,
-    operation: 'error_conversion',
-  };
-
   // Handle specific error types
   if (error.name === 'ValidationError' || error.type === 'validation') {
-    return ErrorFactory.validation(
-      error.errors || [{ field: 'unknown', message: error.message }],
-      context,
-      userId,
-      requestId
+    return new ValidationError(
+      error.message || 'Validation failed',
+      error.field,
+      { originalError: error },
+      requestId,
+      req.path
     );
   }
 
   if (error.name === 'UnauthorizedError' || error.status === 401) {
-    return ErrorFactory.authentication(error.message, context, userId, requestId);
+    return new AuthenticationError(
+      error.message || 'Authentication failed',
+      { originalError: error },
+      requestId,
+      req.path
+    );
   }
 
   if (error.name === 'ForbiddenError' || error.status === 403) {
-    return ErrorFactory.authorization(error.message, context, userId, requestId);
+    return new AuthorizationError(
+      error.message || 'Access denied',
+      undefined, // requiredPermission
+      undefined, // userRole
+      { originalError: error },
+      requestId,
+      req.path
+    );
   }
 
   if (error.name === 'NotFoundError' || error.status === 404) {
-    return ErrorFactory.notFound('Resource', undefined, context, userId, requestId);
+    return new NotFoundError(
+      error.message || 'Resource not found',
+      'Resource',
+      'unknown',
+      { originalError: error },
+      requestId,
+      req.path
+    );
   }
 
   if (error.name === 'ConflictError' || error.status === 409) {
-    return ErrorFactory.conflict(
-      'Resource',
+    return new ConflictError(
       error.message || 'Conflict occurred',
-      context,
-      userId,
-      requestId
+      undefined,
+      { originalError: error },
+      requestId,
+      req.path
     );
   }
 
@@ -336,30 +351,35 @@ function convertToStandardError(error: any, req: Request): StandardError {
     error.code?.startsWith('ER_') ||
     error.code?.startsWith('SQLITE_')
   ) {
-    return ErrorFactory.businessLogic(
-      'DATABASE_ERROR',
-      'Database operation failed',
-      error.message,
-      context,
-      userId,
-      requestId
+    return new DatabaseError(
+      error.message || 'Database operation failed',
+      'database_operation',
+      undefined,
+      { originalError: error },
+      requestId,
+      req.path
     );
   }
 
   // Handle network/HTTP errors
   if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
-    return ErrorFactory.businessLogic(
-      'NETWORK_ERROR',
-      'Network operation failed',
-      error.message,
-      context,
-      userId,
-      requestId
+    return new NetworkError(
+      error.message || 'Network operation failed',
+      'external_service',
+      undefined,
+      { originalError: error },
+      requestId,
+      req.path
     );
   }
 
   // Default to internal server error
-  return StandardError.fromError(error, 'INTERNAL_SERVER_ERROR', context, userId, requestId);
+  return new InternalServerError(
+    error?.message || 'Internal server error',
+    { originalError: error },
+    requestId,
+    req.path
+  );
 }
 
 // ============================================================================
@@ -382,25 +402,33 @@ export function errorHandler(config: Partial<ErrorHandlerConfig> = {}) {
       (standardError as any).requestId = req.get('X-Request-ID');
     }
 
-    // Add user ID if not present
-    if (!standardError.userId && (req as any).user?.id) {
-      (standardError as any).userId = (req as any).user.id;
-    }
-
-    // Log error if it should be logged
-    if (shouldLogError(standardError.severity)) {
+    // Log error (always log server errors)
+    if (standardError.statusCode >= 500) {
       logger.logError(standardError, req);
     }
 
     // Update metrics
     updateErrorMetrics(standardError, req);
 
-    // Create error response
-    const errorResponse: ErrorResponse = standardError.toErrorResponse({
-      version: finalConfig.version,
-      environment: finalConfig.environment,
-      service: finalConfig.service,
-    });
+    // Create error response using the BaseError toResponse method
+    const baseResponse = standardError.toResponse();
+    const errorResponse: ErrorResponse = {
+      success: false,
+      error: {
+        code: baseResponse.code as any,
+        message: baseResponse.message,
+        category: baseResponse.category as any,
+        severity: 'medium' as any, // Default severity since it's not in BaseError
+        details: baseResponse.details,
+        timestamp: baseResponse.timestamp,
+        requestId: baseResponse.requestId,
+      },
+      meta: {
+        version: finalConfig.version,
+        environment: finalConfig.environment,
+        service: finalConfig.service,
+      },
+    };
 
     // Add stack trace in development
     if (finalConfig.includeStackTrace && standardError.stack) {
@@ -408,7 +436,7 @@ export function errorHandler(config: Partial<ErrorHandlerConfig> = {}) {
     }
 
     // Send error response
-    res.status(standardError.httpStatusCode).json(errorResponse);
+    res.status(standardError.statusCode).json(errorResponse);
   };
 }
 
@@ -430,14 +458,8 @@ export function notFoundHandler(req: Request, res: Response, next: NextFunction)
   const error = ErrorFactory.notFound(
     'Endpoint',
     `${req.method} ${req.path}`,
-    {
-      service: DEFAULT_CONFIG.service,
-      method: req.method,
-      resource: req.path,
-      operation: 'not_found',
-    },
-    (req as any).user?.id,
-    req.get('X-Request-ID')
+    req.get('X-Request-ID'),
+    req.path
   );
 
   next(error);
@@ -450,19 +472,11 @@ export function timeoutHandler(timeout: number = 30000) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const timer = setTimeout(() => {
       if (!res.headersSent) {
-        const error = ErrorFactory.businessLogic(
-          'REQUEST_TIMEOUT',
-          'Request timeout',
+        const error = new InternalServerError(
           `Request timed out after ${timeout}ms`,
-          {
-            service: DEFAULT_CONFIG.service,
-            method: req.method,
-            resource: req.path,
-            operation: 'timeout',
-            metadata: { timeout },
-          },
-          (req as any).user?.id,
-          req.get('X-Request-ID')
+          { timeout, operation: 'timeout' },
+          req.get('X-Request-ID'),
+          req.path
         );
         next(error);
       }
@@ -480,18 +494,11 @@ export function timeoutHandler(timeout: number = 30000) {
  * Rate limit error handler
  */
 export function rateLimitErrorHandler(req: Request, res: Response, next: NextFunction): void {
-  const error = ErrorFactory.businessLogic(
-    'RATE_LIMIT_EXCEEDED',
-    'Rate limit exceeded',
+  const error = new InternalServerError(
     'Too many requests, please try again later',
-    {
-      service: DEFAULT_CONFIG.service,
-      method: req.method,
-      resource: req.path,
-      operation: 'rate_limit',
-    },
-    (req as any).user?.id,
-    req.get('X-Request-ID')
+    { operation: 'rate_limit' },
+    req.get('X-Request-ID'),
+    req.path
   );
 
   next(error);
@@ -510,27 +517,31 @@ export function createErrorResponse(
   details?: Record<string, any>,
   req?: Request
 ): ErrorResponse {
-  const error = new StandardError(
-    code,
-    message,
+  const error = new InternalServerError(
+    message || 'Internal server error',
     details,
-    req
-      ? {
-          service: DEFAULT_CONFIG.service,
-          method: req.method,
-          resource: req.path,
-        }
-      : undefined,
-    undefined,
-    req ? (req as any).user?.id : undefined,
-    req ? req.get('X-Request-ID') : undefined
+    req ? req.get('X-Request-ID') : undefined,
+    req ? req.path : undefined
   );
 
-  return error.toErrorResponse({
-    version: DEFAULT_CONFIG.version,
-    environment: DEFAULT_CONFIG.environment,
-    service: DEFAULT_CONFIG.service,
-  });
+  const baseResponse = error.toResponse();
+  return {
+    success: false,
+    error: {
+      code: code,
+      message: baseResponse.message,
+      category: baseResponse.category as any,
+      severity: 'high' as any,
+      details: baseResponse.details,
+      timestamp: baseResponse.timestamp,
+      requestId: baseResponse.requestId,
+    },
+    meta: {
+      version: DEFAULT_CONFIG.version,
+      environment: DEFAULT_CONFIG.environment,
+      service: DEFAULT_CONFIG.service,
+    },
+  };
 }
 
 /**
@@ -569,60 +580,44 @@ export { ErrorLogger, DEFAULT_CONFIG as defaultErrorHandlerConfig };
 export {
   ErrorFactory,
   DatabaseError,
-  StandardError,
   ValidationError,
   AuthenticationError,
   AuthorizationError,
   NotFoundError,
   ConflictError,
   NetworkError,
-  BusinessLogicError,
-} from '@starships/protocol';
+  InternalServerError,
+} from '@starships/models';
 
-// Create ServiceUnavailableError as an alias for BusinessLogicError
-export class ServiceUnavailableError extends BusinessLogicError {
+// Create ServiceUnavailableError as an alias for InternalServerError
+export class ServiceUnavailableError extends InternalServerError {
   constructor(
     message: string,
-    service: string,
+    service?: string,
     retryAfter?: number,
-    context?: Record<string, any>,
-    requestId?: string,
-    resource?: string
+    requestId?: string
   ) {
     super(
-      'SERVICE_UNAVAILABLE',
-      'Service unavailable',
       message,
       {
         service,
         retryAfter,
-        ...context,
       },
-      undefined,
       requestId
     );
-  }
-
-  toResponse() {
-    return this.toErrorResponse();
   }
 }
 
 // Create ErrorHandlerUtils as a utility class
 export class ErrorHandlerUtils {
   static database(message: string, operation: string, req: any) {
-    return ErrorFactory.businessLogic(
-      'DATABASE_ERROR',
-      'Database operation failed',
+    return new DatabaseError(
       message,
-      {
-        service: 'starships-api',
-        method: req.method,
-        resource: req.path,
-        operation,
-      },
-      req.user?.id,
-      req.get?.('X-Request-ID')
+      operation,
+      undefined,
+      { service: 'starships-api' },
+      req.get?.('X-Request-ID'),
+      req.path
     );
   }
 }

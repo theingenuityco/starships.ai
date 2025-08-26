@@ -1,7 +1,8 @@
 /**
- * Agent Contract Types
+ * Agent Domain Types
  * 
- * Core agent interface definitions for cross-package communication.
+ * Consolidated agent interface definitions and domain-specific types.
+ * Moved from contracts/agent.ts as agents are now domain concepts.
  */
 
 // ============================================================================
@@ -132,4 +133,92 @@ export interface AgentAnalytics {
     total: number;
     distribution: Record<number, number>;
   };
+}
+
+// ============================================================================
+// AGENT COLLECTION-SPECIFIC TYPES
+// ============================================================================
+
+/**
+ * Agent database response with pagination
+ */
+export interface AgentListResponse {
+  agents: Agent[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+/**
+ * Agent response with single agent
+ */
+export interface AgentResponse {
+  agent: Agent;
+}
+
+/**
+ * Request to search agents
+ */
+export interface SearchAgentsRequest {
+  query: string;
+  category?: string;
+  tags?: string[];
+  isPublic?: boolean;
+  authorId?: string;
+  starshipClass?: 'scout' | 'cruiser';
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Response for search agents
+ */
+export interface SearchAgentsResponse {
+  agents: Agent[];
+  total: number;
+  searchQuery: string;
+}
+
+/**
+ * Request to filter agents
+ */
+export interface AgentFilters {
+  category?: string;
+  tags?: string[];
+  isPublic?: boolean;
+  authorId?: string;
+  starshipClass?: 'scout' | 'cruiser';
+  starshipId?: string;
+}
+
+/**
+ * Agent deployment request
+ */
+export interface DeployAgentRequest {
+  agentId: string;
+  starshipId: string;
+}
+
+/**
+ * Agent deployment response
+ */
+export interface DeployAgentResponse {
+  success: boolean;
+  message: string;
+  deployment?: {
+    agentId: string;
+    starshipId: string;
+    deployedAt: string;
+  };
+}
+
+/**
+ * Agent usage statistics
+ */
+export interface AgentUsageStats {
+  agentId: string;
+  totalUsage: number;
+  last30Days: number;
+  lastUsedAt: string | null;
 }

@@ -37,7 +37,7 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     OPEN_WEBUI_BASE_URL: process.env.OPEN_WEBUI_BASE_URL,
     NEO4J_URI: process.env.NEO4J_URI || 'bolt://localhost:7687',
     NEO4J_USERNAME: process.env.NEO4J_USERNAME || 'neo4j',
-    NEO4J_PASSWORD: process.env.NEO4J_PASSWORD || 'password',
+    NEO4J_PASSWORD: process.env.NEO4J_PASSWORD || 'mcppassword',
     NEO4J_DATABASE: process.env.NEO4J_DATABASE || 'neo4j',
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,

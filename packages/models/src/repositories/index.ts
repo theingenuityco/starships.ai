@@ -153,11 +153,13 @@ export class RepositoryFactory {
       // Initialize services that require database connections
       try {
         const connection = getConnection();
-        this.waitlistRepo = new WaitlistRepository(connection);
         this.agentTemplateService = new AgentTemplateService(connection);
+        this.waitlistRepo = new WaitlistRepository(connection);
       } catch (connectionError) {
-        console.warn('[RepositoryFactory] Database connection not available for AgentTemplateService, will retry later');
-        // Don't fail initialization for this - it can be retried later
+        console.warn('[RepositoryFactory] Database connection not available for AgentTemplateService and WaitlistRepository, will retry later');
+        // Don't fail initialization for these - they can be retried later
+        this.waitlistRepo = null;
+        this.agentTemplateService = null;
       }
 
       console.log('[RepositoryFactory] Repository initialization completed successfully');
@@ -352,12 +354,23 @@ export class RepositoryFactory {
 
   /**
    * Get WaitlistRepository instance (synchronous)
+   * Note: Will attempt lazy initialization if not available
    */
   static getWaitlistRepository(): WaitlistRepository {
     this.ensureInitialized();
+    
+    // Try to initialize if not available and connection is now available
     if (!this.waitlistRepo) {
-      throw new Error('WaitlistRepository not initialized');
+      try {
+        const connection = getConnection();
+        this.waitlistRepo = new WaitlistRepository(connection);
+        console.log('[RepositoryFactory] WaitlistRepository initialized on demand');
+      } catch (error) {
+        console.error('[RepositoryFactory] Failed to initialize WaitlistRepository:', error);
+        throw new Error('WaitlistRepository not initialized - database connection may be unavailable');
+      }
     }
+    
     return this.waitlistRepo;
   }
 

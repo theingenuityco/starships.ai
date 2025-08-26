@@ -122,7 +122,7 @@ class VisionFileMigration {
     const config = {
       uri: process.env.NEO4J_URI || 'bolt://localhost:7687',
       username: process.env.NEO4J_USERNAME || 'neo4j',
-      password: process.env.NEO4J_PASSWORD || 'password'
+      password: process.env.NEO4J_PASSWORD || 'mcppassword'
     };
 
     const connection = createConnection(config);

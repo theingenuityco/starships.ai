@@ -6,10 +6,17 @@ import { asyncHandler } from '../middleware/errorHandler';
 
 const router: Router = Router();
 
-// Initialize waitlist service
+// Initialize waitlist service with proper error handling
 const getWaitlistService = () => {
-  const waitlistRepo = RepositoryFactory.getWaitlistRepository();
-  return new WaitlistService(waitlistRepo);
+  try {
+    const waitlistRepo = RepositoryFactory.getWaitlistRepository();
+    return new WaitlistService(waitlistRepo);
+  } catch (error) {
+    logger.error('Failed to get WaitlistRepository:', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw new Error('Waitlist service is temporarily unavailable');
+  }
 };
 
 /**
@@ -29,7 +36,19 @@ router.post('/check', asyncHandler(async (req: Request, res: Response) => {
     }
 
     // Use service to check approval
-    const waitlistService = getWaitlistService();
+    let waitlistService;
+    try {
+      waitlistService = getWaitlistService();
+    } catch (error) {
+      logger.error('Failed to initialize waitlist service:', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return res.status(503).json({
+        isApproved: false,
+        message: 'Service temporarily unavailable. Please try again.'
+      });
+    }
+    
     const result = await waitlistService.checkApproval(email);
 
     if (result.isApproved) {
@@ -45,7 +64,9 @@ router.post('/check', asyncHandler(async (req: Request, res: Response) => {
     return res.json(result);
 
   } catch (error) {
-    logger.error('Error checking waitlist approval', { error });
+    logger.error('Error checking waitlist approval', { 
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
     
     // Return generic error message (no information leakage)
     return res.status(500).json({

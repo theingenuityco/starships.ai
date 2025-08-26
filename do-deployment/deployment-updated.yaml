@@ -39,7 +39,7 @@ spec:
         - name: NEO4J_USERNAME
           value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "password"
+          value: "mcppassword"
         # Override the baked-in URLs if needed for this specific deployment
         - name: KINDE_SITE_URL
           value: "https://starships.ai"  # Or your actual domain

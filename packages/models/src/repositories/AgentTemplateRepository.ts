@@ -1,4 +1,4 @@
-import { AgentTemplate, Agent } from '../types';
+import { AgentTemplate, Agent } from '@starships/protocol';
 import { Neo4jConnection, getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';

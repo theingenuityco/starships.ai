@@ -11,7 +11,7 @@
 /**
  * LLM provider options
  */
-export type LLMProvider = 'openai' | 'anthropic';
+export type LLMProviderType = 'openai' | 'anthropic';
 
 /**
  * Core LLM entity
@@ -19,7 +19,7 @@ export type LLMProvider = 'openai' | 'anthropic';
 export interface LLM {
   id: string;
   name: string;
-  provider: LLMProvider;
+  provider: LLMProviderType;
   maxTokens?: number;
   temperature?: number;
   
@@ -42,7 +42,7 @@ export interface LLM {
  */
 export interface CreateLLMRequest {
   name: string;
-  provider: LLMProvider;
+  provider: LLMProviderType;
   maxTokens?: number;
   temperature?: number;
   supportsStreaming?: boolean;
@@ -55,7 +55,7 @@ export interface CreateLLMRequest {
  */
 export interface UpdateLLMRequest {
   name?: string;
-  provider?: LLMProvider;
+  provider?: LLMProviderType;
   maxTokens?: number;
   temperature?: number;
   supportsStreaming?: boolean;
@@ -86,7 +86,7 @@ export interface LLMListResponse {
  * Filters for querying LLM models
  */
 export interface LLMFilters {
-  provider?: LLMProvider;
+  provider?: LLMProviderType;
   supportsStreaming?: boolean;
   supportsTools?: boolean;
 }

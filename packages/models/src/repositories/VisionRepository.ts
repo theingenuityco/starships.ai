@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { Vision } from '../types';
+import { Vision } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 

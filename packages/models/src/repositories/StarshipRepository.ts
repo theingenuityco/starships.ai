@@ -1,8 +1,5 @@
 import { getConnection } from '../helpers/database';
-import {
-  Starship,
-  Agent,
-} from '../types';
+import { Starship, Agent } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 

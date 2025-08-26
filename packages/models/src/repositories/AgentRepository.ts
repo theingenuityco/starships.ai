@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { Agent } from '../types';
+import { Agent } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';

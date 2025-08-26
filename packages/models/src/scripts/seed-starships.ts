@@ -3,7 +3,7 @@
 import { createConnection, Neo4jConfig } from '../helpers/database';
 import { StarshipRepository } from '../repositories/StarshipRepository';
 import { UserRepository } from '../repositories/UserRepository';
-import { Starship, User } from '../types';
+import { Starship, User } from '@starships/protocol';
 
 /**
  * Test users to create for starship ownership

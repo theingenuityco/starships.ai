@@ -16,6 +16,34 @@ export * from './domain/mission';
 export * from './domain/starship';
 export * from './domain/vision';
 export * from './domain/workflow';
+export * from './domain/user';
+export * from './domain/relationships';
+
+// Export domain types with explicit naming to avoid conflicts
+export type {
+  LLM,
+  LLMProviderType,
+  CreateLLMRequest,
+  UpdateLLMRequest,
+  LLMResponse,
+  LLMListResponse,
+  LLMFilters,
+  LLMSort
+} from './domain/llm';
+
+export type {
+  AgentTemplate,
+  AgentTemplateCategory,
+  CreateAgentTemplateRequest,
+  UpdateAgentTemplateRequest,
+  AgentTemplateResponse,
+  AgentTemplateListResponse,
+  AgentTemplateFilters,
+  AgentTemplateSort,
+  AgentTemplateUsage,
+  IncrementTemplateUsageRequest,
+  RateTemplateRequest
+} from './domain/agent-template';
 
 // Export Sibil types with explicit exports to avoid conflicts
 export type {

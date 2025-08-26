@@ -10,7 +10,7 @@
  */
 
 import { getConnection } from '../helpers/database';
-import { Vision } from '../types';
+import { Vision } from '@starships/protocol';
 
 // Import the VisionMetricsCalculator - this will need to be available in models package
 // We'll create a simple calculator here since the main one is in server package

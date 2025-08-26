@@ -19,6 +19,8 @@ export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
 export { MissionRepository } from './repositories/MissionRepository';
 export { MissionMessageRepository } from './repositories/MissionMessageRepository';
+export { WorkflowNodeRepository } from './repositories/WorkflowNodeRepository';
+export { WorkflowEdgeRepository } from './repositories/WorkflowEdgeRepository';
 
 // NEW: Agent Templates
 export { Neo4jAgentTemplateRepository } from './repositories/AgentTemplateRepository';

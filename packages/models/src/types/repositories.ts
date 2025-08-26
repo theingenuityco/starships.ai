@@ -1,5 +1,5 @@
 import { Agent, LLM, User, Starship, Vision, AgentTemplate } from './entities';
-import { MissionMessage } from '@starships/protocol';
+import { MissionMessage, WorkflowNode, WorkflowEdge } from '@starships/protocol';
 
 // Repository interfaces
 export interface Repository<T> {
@@ -125,4 +125,26 @@ export interface MissionMessageRepository {
   deleteMessagesByMission(missionId: string): Promise<void>;
   deleteMessage(messageId: string): Promise<boolean>;
   findMessageById(messageId: string): Promise<MissionMessage | null>;
+}
+
+export interface WorkflowNodeRepository {
+  createNode(workflowId: string, nodeData: Omit<WorkflowNode, 'id'>): Promise<WorkflowNode>;
+  createNodes(workflowId: string, nodesData: Array<Omit<WorkflowNode, 'id'> & { aiId?: string }>): Promise<{ nodes: WorkflowNode[]; idMapping: Map<string, string> }>;
+  getNodesByWorkflowId(workflowId: string): Promise<WorkflowNode[]>;
+  getNodeById(nodeId: string): Promise<WorkflowNode | null>;
+  updateNode(nodeId: string, updates: Partial<WorkflowNode>): Promise<WorkflowNode | null>;
+  deleteNode(nodeId: string): Promise<boolean>;
+  deleteNodesByWorkflowId(workflowId: string): Promise<void>;
+}
+
+export interface WorkflowEdgeRepository {
+  createEdge(workflowId: string, edgeData: Omit<WorkflowEdge, 'id'>): Promise<WorkflowEdge>;
+  createEdges(workflowId: string, edgesData: Array<Omit<WorkflowEdge, 'id'>>, idMapping?: Map<string, string>): Promise<WorkflowEdge[]>;
+  getEdgesByWorkflowId(workflowId: string): Promise<WorkflowEdge[]>;
+  getEdgeById(edgeId: string): Promise<WorkflowEdge | null>;
+  updateEdge(edgeId: string, updates: Partial<WorkflowEdge>): Promise<WorkflowEdge | null>;
+  deleteEdge(edgeId: string): Promise<boolean>;
+  deleteEdgesByWorkflowId(workflowId: string): Promise<void>;
+  getEdgesByFromNode(fromNodeId: string): Promise<WorkflowEdge[]>;
+  getEdgesByToNode(toNodeId: string): Promise<WorkflowEdge[]>;
 }

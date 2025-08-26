@@ -1,0 +1,172 @@
+name: Deploy to Production
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Docker image version to deploy (e.g., 3.7.0)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: read
+  packages: read
+  id-token: write
+
+jobs:
+  deploy-to-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: 
+      name: prod
+      url: [PROD-DOMAIN-URL]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine version to deploy
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: Setup Production Kubernetes
+        run: |
+          doctl kubernetes cluster kubeconfig save starships-prod
+          kubectl config use-context do-nyc1-starships-prod
+          
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace starships-prod --dry-run=client -o yaml | kubectl apply -f -
+          
+      - name: Create/Update Secrets
+        run: |
+          # Delete and recreate secrets
+          kubectl delete secret starships-secrets -n starships-prod --ignore-not-found=true
+          kubectl delete secret kinde-auth-secret -n starships-prod --ignore-not-found=true
+          kubectl delete secret ghcr-pull-secret -n starships-prod --ignore-not-found=true
+          
+          # Create API secrets
+          kubectl create secret generic starships-secrets \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
+            -n starships-prod
+          
+          # Create Kinde secrets
+          kubectl create secret generic kinde-auth-secret \
+            --from-literal=KINDE_CLIENT_ID="${{ secrets.KINDE_CLIENT_ID }}" \
+            --from-literal=KINDE_CLIENT_SECRET="${{ secrets.KINDE_CLIENT_SECRET }}" \
+            --from-literal=KINDE_ISSUER_URL="${{ secrets.KINDE_ISSUER_URL }}" \
+            -n starships-prod
+          
+          # Create GHCR pull secret
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-[DEFAULT-PASSWORD]=${{ secrets.GITHUB_TOKEN }} \
+            -n starships-prod
+
+      - name: Apply Let's Encrypt Issuers
+        run: |
+          kubectl apply -f k8s/prod/06-letsencrypt-issuer.yaml
+
+      - name: Deploy to Production
+        run: |
+          # Apply all manifests
+          kubectl apply -f k8s/prod/00-namespace.yaml
+          kubectl apply -f k8s/prod/02-pvc.yaml
+          kubectl apply -f k8s/prod/03-deployment.yaml
+          kubectl apply -f k8s/prod/04-service.yaml
+          kubectl apply -f k8s/prod/05-ingress.yaml
+          kubectl apply -f k8s/prod/07-hpa.yaml
+          kubectl apply -f k8s/prod/08-network-policy.yaml
+          kubectl apply -f k8s/prod/09-pdb.yaml
+          
+          # Update deployment with new image
+          IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          kubectl set image deployment/starships-app \
+            starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }} \
+            -n starships-prod
+          
+          # Wait for rollout
+          kubectl rollout status deployment/starships-app -n starships-prod --timeout=600s
+
+      - name: Verify Production Deployment
+        run: |
+          # Check pod status
+          kubectl get pods -n starships-prod
+          
+          # Verify endpoints
+          kubectl get endpoints -n starships-prod
+          
+          # Check service
+          kubectl get svc -n starships-prod
+          
+          # Check ingress
+          kubectl get ingress -n starships-prod
+          
+          # Test health endpoint via load balancer
+          sleep 30
+          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Testing health endpoint via Load Balancer IP: $INGRESS_IP"
+          curl -f -k https://${INGRESS_IP}/api/health -H "Host: starships.ai" || echo "Health check pending DNS propagation"
+
+      - name: Production Smoke Test
+        continue-on-error: true
+        run: |
+          # Wait for DNS and SSL
+          sleep 60
+          
+          # Test main domain
+          echo "Testing main domain..."
+          curl -I [PROD-DOMAIN-URL] || true
+          
+          # Test API endpoint
+          echo "Testing API endpoint..."
+          curl -I [PROD-DOMAIN-URL]/api/health || true
+
+      - name: Create deployment summary
+        if: always()
+        run: |
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Status:** Successfully deployed to production" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** Production deployment failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "**Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access Production" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 **URL:** [PROD-DOMAIN-URL]" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 **WWW:** https://www.starships.ai" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Monitor application health" >> $GITHUB_STEP_SUMMARY
+          echo "2. Check error logs if issues arise" >> $GITHUB_STEP_SUMMARY
+          echo "3. Rollback if necessary: \`kubectl rollout undo deployment/starships-app -n starships-prod\`" >> $GITHUB_STEP_SUMMARY

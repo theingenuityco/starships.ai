@@ -3,6 +3,8 @@ name: Release and Publish
 on:
   push:
     branches: [main]
+  release:
+    types: [published, edited]  # Trigger production deployment on release
   workflow_dispatch:  # Allow manual triggering
   pull_request:
     branches: [main]
@@ -265,12 +267,14 @@ jobs:
           echo "docker pull ghcr.io/${{ github.repository }}:${{ needs.version.outputs.new_release_version }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
-  deploy-to-digitalocean:
-    name: Deploy to Digital Ocean Dev
+  deploy-to-dev:
+    name: Deploy to Development
     needs: [version, docker, release]
-    if: needs.docker.outputs.image_pushed == 'true'
+    if: needs.docker.outputs.image_pushed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: dev
+    environment: 
+      name: dev
+      url: [DEV-DOMAIN-URL]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -362,3 +366,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Access Application" >> $GITHUB_STEP_SUMMARY
           echo "🌐 **URL:** [DEV-DOMAIN-URL]" >> $GITHUB_STEP_SUMMARY
+

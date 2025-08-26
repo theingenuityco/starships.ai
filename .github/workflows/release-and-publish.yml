@@ -42,10 +42,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10.12.4
+      - name: Install pnpm
+        run: |
+          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
+          chmod +x pnpm
+          sudo mv pnpm /usr/local/bin/
+          pnpm --version
+          # Configure pnpm to use npmmirror.com (reliable mirror in case npm is down)
+          pnpm config set registry https://registry.npmmirror.com
 
       # Install dependencies for semantic-release
       - name: Install dependencies
@@ -202,10 +206,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10.12.4
+      - name: Install pnpm
+        run: |
+          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
+          chmod +x pnpm
+          sudo mv pnpm /usr/local/bin/
+          pnpm --version
+          # Configure pnpm to use npmmirror.com (reliable mirror in case npm is down)
+          pnpm config set registry https://registry.npmmirror.com
 
       # Install dependencies for semantic-release
       - name: Install dependencies

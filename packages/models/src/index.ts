@@ -74,3 +74,4 @@ export type {
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';
+export { seedWaitlist } from './scripts/seed-waitlist';

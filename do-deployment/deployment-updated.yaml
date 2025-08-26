@@ -39,7 +39,7 @@ spec:
         - name: NEO4J_USERNAME
           value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "[DEFAULT-PASSWORD]"
+          value: "[NEO4J-PASSWORD]"
         # Override the baked-in URLs if needed for this specific deployment
         - name: KINDE_SITE_URL
           value: "[PROD-DOMAIN-URL]"  # Or your actual domain

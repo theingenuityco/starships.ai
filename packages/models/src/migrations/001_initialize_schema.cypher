@@ -12,19 +12,27 @@
 CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE;
 CREATE CONSTRAINT user_kinde_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.kindeId IS UNIQUE;
 CREATE CONSTRAINT user_email_unique IF NOT EXISTS FOR (u:User) REQUIRE u.email IS UNIQUE;
-CREATE CONSTRAINT user_required_props IF NOT EXISTS FOR (u:User) REQUIRE (u.id, u.kindeId, u.email, u.createdAt) IS NOT NULL;
+CREATE CONSTRAINT user_required_props IF NOT EXISTS FOR (u:User) REQUIRE (u.id, u.createdAt) IS NOT NULL;
 
 // Starship constraints
 CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE;
 CREATE CONSTRAINT starship_owner_slug_key IF NOT EXISTS FOR (s:Starship) REQUIRE (s.ownerId, s.slug) IS NODE KEY;
-CREATE CONSTRAINT starship_required_props IF NOT EXISTS FOR (s:Starship) REQUIRE (s.id, s.ownerId, s.name, s.class, s.status, s.createdAt) IS NOT NULL;
+CREATE CONSTRAINT starship_required_props IF NOT EXISTS FOR (s:Starship) REQUIRE (s.id, s.ownerId, s.name, s.class, s.status, s.maxAgents, s.maxActiveMissions, s.createdAt) IS NOT NULL;
 CREATE CONSTRAINT starship_class_values IF NOT EXISTS FOR (s:Starship) REQUIRE s.class IN ['scout', 'cruiser', 'draught'];
 CREATE CONSTRAINT starship_status_values IF NOT EXISTS FOR (s:Starship) REQUIRE s.status IN ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
 CREATE CONSTRAINT starship_subscription_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.subscriptionId IS UNIQUE;
 
 // Agent constraints
 CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE;
-CREATE CONSTRAINT agent_required_props IF NOT EXISTS FOR (a:Agent) REQUIRE (a.id, a.name, a.createdAt) IS NOT NULL;
+CREATE CONSTRAINT agent_required_props IF NOT EXISTS FOR (a:Agent) REQUIRE (a.id, a.name, a.starshipId, a.authorId, a.createdAt) IS NOT NULL;
+
+// Agent Template constraints
+CREATE CONSTRAINT agent_template_id_unique IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
+CREATE CONSTRAINT agent_template_required_props IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE (at.id, at.name, at.authorId, at.createdAt) IS NOT NULL;
+
+// Mission Clarity constraints
+CREATE CONSTRAINT mission_clarity_id_unique IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE mc.id IS UNIQUE;
+CREATE CONSTRAINT mission_clarity_required_props IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE (mc.id, mc.missionId, mc.createdAt) IS NOT NULL;
 
 // Vision constraints
 CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE;
@@ -85,12 +93,23 @@ CREATE RANGE INDEX starship_created_at_range IF NOT EXISTS FOR (s:Starship) ON (
 CREATE INDEX agent_category_index IF NOT EXISTS FOR (a:Agent) ON (a.category);
 CREATE INDEX agent_public_index IF NOT EXISTS FOR (a:Agent) ON (a.isPublic);
 CREATE INDEX agent_author_index IF NOT EXISTS FOR (a:Agent) ON (a.authorId);
+CREATE INDEX agent_starship_index IF NOT EXISTS FOR (a:Agent) ON (a.starshipId);
 CREATE INDEX agent_tags_index IF NOT EXISTS FOR (a:Agent) ON (a.tags);
 CREATE INDEX agent_starship_category_composite IF NOT EXISTS FOR (a:Agent) ON (a.starshipId, a.category);
 CREATE INDEX agent_author_public_composite IF NOT EXISTS FOR (a:Agent) ON (a.authorId, a.isPublic);
 CREATE INDEX agent_tags_array IF NOT EXISTS FOR (a:Agent) ON (a.tags);
 CREATE INDEX agent_allowed_starship_classes_array IF NOT EXISTS FOR (a:Agent) ON (a.allowedStarshipClasses);
 CREATE RANGE INDEX agent_created_at_range IF NOT EXISTS FOR (a:Agent) ON (a.createdAt);
+
+// Agent Template indexes
+CREATE INDEX agent_template_category_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.category);
+CREATE INDEX agent_template_author_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.authorId);
+CREATE INDEX agent_template_public_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.isPublic);
+CREATE INDEX agent_template_usage_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.usageCount);
+
+// Mission Clarity indexes
+CREATE INDEX mission_clarity_mission_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.missionId);
+CREATE INDEX mission_clarity_score_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.overallScore);
 
 // Vision indexes
 CREATE INDEX vision_starship_id_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId);
@@ -149,77 +168,52 @@ RETURN "Created full-text search index: " + name as result;
 // SEED DATA - LLM MODELS
 // ============================================================================
 
-// OpenAI Models
+// OpenAI Models - Updated to match Protocol interface
 MERGE (l:LLM {name: 'gpt-4o', provider: 'openai'})
 SET l.id = COALESCE(l.id, randomUUID()),
-    l.displayName = 'GPT-4O',
     l.maxTokens = 128000,
-    l.contextWindow = 128000,
-    l.costPerInputToken = 0.000005,
-    l.costPerOutputToken = 0.000015,
-    l.description = 'Most capable GPT-4 model for complex reasoning tasks',
-    l.isActive = true,
-    l.supportsVision = true,
+    l.temperature = 0.7,
     l.supportsStreaming = true,
-    l.createdAt = COALESCE(l.createdAt, datetime().epochMillis),
-    l.updatedAt = datetime().epochMillis;
+    l.supportsTools = true,
+    l.costPer1kTokens = 0.015,
+    l.createdAt = COALESCE(l.createdAt, toString(datetime()));
 
 MERGE (l:LLM {name: 'gpt-4o-mini', provider: 'openai'})
 SET l.id = COALESCE(l.id, randomUUID()),
-    l.displayName = 'GPT-4O Mini',
     l.maxTokens = 128000,
-    l.contextWindow = 128000,
-    l.costPerInputToken = 0.00000015,
-    l.costPerOutputToken = 0.0000006,
-    l.description = 'Faster, cost-effective GPT-4 model for simpler tasks',
-    l.isActive = true,
-    l.supportsVision = true,
+    l.temperature = 0.7,
     l.supportsStreaming = true,
-    l.createdAt = COALESCE(l.createdAt, datetime().epochMillis),
-    l.updatedAt = datetime().epochMillis;
+    l.supportsTools = true,
+    l.costPer1kTokens = 0.0015,
+    l.createdAt = COALESCE(l.createdAt, toString(datetime()));
 
 MERGE (l:LLM {name: 'gpt-3.5-turbo', provider: 'openai'})
 SET l.id = COALESCE(l.id, randomUUID()),
-    l.displayName = 'GPT-3.5 Turbo',
     l.maxTokens = 16385,
-    l.contextWindow = 16385,
-    l.costPerInputToken = 0.0000005,
-    l.costPerOutputToken = 0.0000015,
-    l.description = 'Fast and economical model for simple tasks',
-    l.isActive = true,
-    l.supportsVision = false,
+    l.temperature = 0.7,
     l.supportsStreaming = true,
-    l.createdAt = COALESCE(l.createdAt, datetime().epochMillis),
-    l.updatedAt = datetime().epochMillis;
+    l.supportsTools = true,
+    l.costPer1kTokens = 0.002,
+    l.createdAt = COALESCE(l.createdAt, toString(datetime()));
 
-// Anthropic Models
+// Anthropic Models - Updated to match Protocol interface
 MERGE (l:LLM {name: 'claude-3-5-sonnet-20241022', provider: 'anthropic'})
 SET l.id = COALESCE(l.id, randomUUID()),
-    l.displayName = 'Claude 3.5 Sonnet',
     l.maxTokens = 8192,
-    l.contextWindow = 200000,
-    l.costPerInputToken = 0.000003,
-    l.costPerOutputToken = 0.000015,
-    l.description = 'Anthropics most intelligent model',
-    l.isActive = true,
-    l.supportsVision = true,
+    l.temperature = 0.7,
     l.supportsStreaming = true,
-    l.createdAt = COALESCE(l.createdAt, datetime().epochMillis),
-    l.updatedAt = datetime().epochMillis;
+    l.supportsTools = true,
+    l.costPer1kTokens = 0.018,
+    l.createdAt = COALESCE(l.createdAt, toString(datetime()));
 
 MERGE (l:LLM {name: 'claude-3-haiku-20240307', provider: 'anthropic'})
 SET l.id = COALESCE(l.id, randomUUID()),
-    l.displayName = 'Claude 3 Haiku',
     l.maxTokens = 4096,
-    l.contextWindow = 200000,
-    l.costPerInputToken = 0.00000025,
-    l.costPerOutputToken = 0.00000125,
-    l.description = 'Fastest and most compact model for near-instant responsiveness',
-    l.isActive = true,
-    l.supportsVision = true,
+    l.temperature = 0.7,
     l.supportsStreaming = true,
-    l.createdAt = COALESCE(l.createdAt, datetime().epochMillis),
-    l.updatedAt = datetime().epochMillis;
+    l.supportsTools = true,
+    l.costPer1kTokens = 0.00125,
+    l.createdAt = COALESCE(l.createdAt, toString(datetime()));
 
 // ============================================================================
 // SEED DATA - MCP SERVER OPTIONS
@@ -384,8 +378,10 @@ CREATE (m:Migration {
   dependencies: [],
   features: [
     'user_management',
-    'starship_system', 
+    'starship_system',
     'agent_deployment',
+    'agent_templates',
+    'mission_clarity',
     'vision_metrics',
     'mission_execution',
     'workflow_dsl',

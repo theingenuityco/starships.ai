@@ -7,7 +7,6 @@ import type { Request, Response } from 'express';
 import type {
   StarshipRepository,
   AgentRepository,
-  Starship,
   VisionRepository,
   UserRepository,
 } from '@starships/models';
@@ -16,6 +15,7 @@ import {
   ConflictError as ConstraintViolationError,
   NotFoundError,
 } from '@starships/models';
+import type { Starship } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
 

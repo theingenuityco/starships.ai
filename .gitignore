@@ -1,5 +1,6 @@
 # ai editors
 .kilocode/
+.claude/
 
 # Node / pnpm workspace
 node_modules/

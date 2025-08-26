@@ -1,4 +1,5 @@
-import { RepositoryFactory, Agent } from '@starships/models';
+import { RepositoryFactory } from '@starships/models';
+import { Agent } from '@starships/protocol';
 import { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { env } from '../config/environment';
 

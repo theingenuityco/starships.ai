@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { 
-  StarshipRepository, 
+import {
+  StarshipRepository,
   VisionRepository,
-  Vision
 } from '@starships/models';
+import type { Vision } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import {
   ValidationError,

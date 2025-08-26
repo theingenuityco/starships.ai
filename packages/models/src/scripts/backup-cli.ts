@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { createConnection } from '../connection';
-import { BackupManager } from '../migrations/backup-restore';
+import { createConnection } from '../helpers/database';
+import { BackupManager } from './backup-restore';
 
 /**
  * CLI script for database backup operations

@@ -27,7 +27,8 @@ import type {
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
-import type { LLM, Starship, Vision, Agent } from '@starships/models';
+import type { LLM } from '@starships/models';
+import type { Starship, Vision, Agent } from '@starships/protocol';
 
 /**
  * Configuration for MissionOrchestratorAgent

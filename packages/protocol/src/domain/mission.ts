@@ -320,37 +320,6 @@ export interface WorkflowResponse {
   agents: Record<string, Agent>; // agentId -> Agent details
 }
 
-// ============================================================================
-// MISSION PLANNING TYPES
-// ============================================================================
-
-/**
- * Mission task for planning and execution
- */
-export interface MissionTask {
-  id: string;
-  title: string;
-  description: string;
-  dependencies: string[]; // Task IDs this task depends on
-  assignedAgentId?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-  estimatedDuration?: number; // in minutes
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  createdAt: string;
-  completedAt?: string;
-}
-
-/**
- * Mission plan response containing tasks and structure
- */
-export interface MissionPlanResponse {
-  missionId: string;
-  tasks: MissionTask[];
-  totalEstimatedDuration: number; // in minutes
-  complexity: 'simple' | 'moderate' | 'complex' | 'advanced';
-  createdAt: string;
-  version: number;
-}
 
 // ============================================================================
 // VALIDATION HELPERS

@@ -51,10 +51,10 @@ export class MissionService {
           throw new NotFoundError('Agent not found', 'Agent', agentId);
         }
         if (agent.starshipId !== request.starshipId) {
-          throw ValidationError.fromFields([{
-            field: 'agentIds',
-            message: `Agent ${agentId} does not belong to starship ${request.starshipId}`
-          }]);
+          throw new ValidationError(
+            `Agent ${agentId} does not belong to starship ${request.starshipId}`,
+            'agentIds'
+          );
         }
         assignedAgents.push(agent);
       } catch (error) {
@@ -76,10 +76,10 @@ export class MissionService {
     );
 
     if (duplicateName) {
-      throw ValidationError.fromFields([{
-        field: 'name',
-        message: `A mission with the name "${request.name}" already exists for this starship`
-      }]);
+      throw new ValidationError(
+        `A mission with the name "${request.name}" already exists for this starship`,
+        'name'
+      );
     }
 
     const mission = await missionRepo.createMission(request, userId);
@@ -179,10 +179,10 @@ export class MissionService {
             throw new NotFoundError('Agent not found', 'Agent', agentId);
           }
           if (agent.starshipId !== existingMission.starshipId) {
-            throw ValidationError.fromFields([{
-              field: 'agentIds',
-              message: `Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`
-            }]);
+            throw new ValidationError(
+              `Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`,
+              'agentIds'
+            );
           }
         } catch (error) {
           if (error instanceof NotFoundError) {
@@ -207,10 +207,10 @@ export class MissionService {
       );
 
       if (duplicateName) {
-        throw ValidationError.fromFields([{
-          field: 'name',
-          message: `A mission with the name "${updates.name}" already exists for this starship`
-        }]);
+        throw new ValidationError(
+          `A mission with the name "${updates.name}" already exists for this starship`,
+          'name'
+        );
       }
     }
 
@@ -239,10 +239,10 @@ export class MissionService {
 
     // Business rule: Don't allow deletion of active missions
     if (existingMission.status === 'active') {
-      throw ValidationError.fromFields([{
-        field: 'status',
-        message: 'Cannot delete an active mission. Cancel it first.'
-      }]);
+      throw new ValidationError(
+        'Cannot delete an active mission. Cancel it first.',
+        'status'
+      );
     }
 
     // TODO: Add authorization check if userId is provided
@@ -344,11 +344,10 @@ export class MissionService {
     const allowedTransitions = validTransitions[currentStatus];
     
     if (!allowedTransitions.includes(newStatus)) {
-      throw ValidationError.fromFields([{
-        field: 'status',
-        message: `Cannot transition mission from "${currentStatus}" to "${newStatus}". ` +
-        `Valid transitions: ${allowedTransitions.join(', ')}`
-      }]);
+      throw new ValidationError(
+        `Cannot transition mission from "${currentStatus}" to "${newStatus}". Valid transitions: ${allowedTransitions.join(', ')}`,
+        'status'
+      );
     }
   }
 

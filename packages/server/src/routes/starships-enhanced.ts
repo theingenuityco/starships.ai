@@ -207,7 +207,7 @@ router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Res
     if (error instanceof ValidationError) {
       res.status(400).json({
         error: getErrorMessage(error),
-        validationErrors: error.validationErrors,
+        field: error.field,
         details: error.details,
       });
     } else {

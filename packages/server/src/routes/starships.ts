@@ -29,17 +29,17 @@ const handleError = (error: any, res: Response, context: string): void => {
     res.status(400).json({
       error: 'Validation Error',
       message: error.message,
-      validationErrors: error.validationErrors,
+      field: error.field,
     });
     return;
   }
 
   if (error instanceof ConstraintViolationError) {
-    const statusCode = error.conflictReason.includes('unique') ? 409 : 400;
+    const statusCode = error.conflictType?.includes('unique') ? 409 : 400;
     res.status(statusCode).json({
       error: 'Constraint Violation',
       message: error.message,
-      conflictReason: error.conflictReason,
+      conflictType: error.conflictType,
     });
     return;
   }
@@ -48,8 +48,8 @@ const handleError = (error: any, res: Response, context: string): void => {
     res.status(404).json({
       error: 'Not Found',
       message: error.message,
-      resourceType: error.resourceType,
-      resourceId: error.resourceId,
+      entityType: error.entityType,
+      entityId: error.entityId,
     });
     return;
   }

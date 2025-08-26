@@ -1,5 +1,5 @@
 /**
- * Vision Refinement Domain Types
+ * Vision Refinement Collection Types
  *
  * Types for real-time vision refinement and analysis functionality.
  */

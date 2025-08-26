@@ -1,6 +1,6 @@
 /**
- * Starship Domain Types
- * 
+ * Starship Collection Types
+ *
  * Clean starship type definitions for protocol contract.
  */
 

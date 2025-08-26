@@ -1,4 +1,4 @@
-import { AgentTemplate, AgentTemplateRepository as AgentTemplateRepositoryInterface, Agent } from '../types';
+import { AgentTemplate, Agent } from '../types';
 import { AgentTemplateRepository } from '../repositories/AgentTemplateRepository';
 import { Neo4jConnection } from '../helpers/database';
 

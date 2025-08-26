@@ -5,17 +5,7 @@ import {
   WorkflowNode
 } from '@starships/protocol';
 
-export interface WorkflowNodeRepositoryInterface {
-  createNode(workflowId: string, nodeData: Omit<WorkflowNode, 'id'>): Promise<WorkflowNode>;
-  createNodes(workflowId: string, nodesData: Array<Omit<WorkflowNode, 'id'> & { aiId?: string }>): Promise<{ nodes: WorkflowNode[]; idMapping: Map<string, string> }>;
-  getNodesByWorkflowId(workflowId: string): Promise<WorkflowNode[]>;
-  getNodeById(nodeId: string): Promise<WorkflowNode | null>;
-  updateNode(nodeId: string, updates: Partial<WorkflowNode>): Promise<WorkflowNode | null>;
-  deleteNode(nodeId: string): Promise<boolean>;
-  deleteNodesByWorkflowId(workflowId: string): Promise<void>;
-}
-
-export class WorkflowNodeRepository extends BaseRepository implements WorkflowNodeRepositoryInterface {
+export class WorkflowNodeRepository extends BaseRepository {
   constructor() {
     super('WorkflowNodeRepository');
   }

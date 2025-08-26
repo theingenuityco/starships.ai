@@ -13,16 +13,7 @@ import {
   MissionListResponse
 } from '@starships/protocol';
 
-export interface MissionRepositoryInterface {
-  createMission(request: CreateMissionRequest, userId: string): Promise<Mission>;
-  getMissionById(id: string): Promise<Mission>;
-  getMissionsByStarshipId(starshipId: string, filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse>;
-  getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse>;
-  updateMission(id: string, updates: UpdateMissionRequest): Promise<Mission>;
-  deleteMission(id: string): Promise<void>;
-}
-
-export class MissionRepository extends BaseRepository implements MissionRepositoryInterface {
+export class MissionRepository extends BaseRepository {
   constructor() {
     super('MissionRepository');
   }

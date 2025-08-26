@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import {
   Starship,
-  StarshipRepository as StarshipRepositoryInterface,
   Agent,
 } from '../types';
 import { BaseRepository } from './BaseRepository';
@@ -10,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 /**
  * Neo4j-based starship repository
  */
-export class StarshipRepository extends BaseRepository implements StarshipRepositoryInterface {
+export class StarshipRepository extends BaseRepository {
   constructor() {
     super('StarshipRepository');
   }

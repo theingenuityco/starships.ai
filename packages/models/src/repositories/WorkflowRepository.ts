@@ -16,14 +16,7 @@ import {
 } from '@starships/protocol';
 import { v4 as uuidv4 } from 'uuid';
 
-export interface WorkflowRepositoryInterface {
-  createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow>;
-  getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null>;
-  updateApprovalStatus(workflowId: string, updates: UpdateWorkflowApprovalRequest): Promise<MissionWorkflow>;
-  deleteWorkflow(workflowId: string): Promise<void>;
-}
-
-export class WorkflowRepository extends BaseRepository implements WorkflowRepositoryInterface {
+export class WorkflowRepository extends BaseRepository {
   private workflowNodeRepo: WorkflowNodeRepository;
   private workflowEdgeRepo: WorkflowEdgeRepository;
 

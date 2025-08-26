@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { Agent, AgentRepository as AgentRepositoryInterface } from '../types';
+import { Agent } from '../types';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
@@ -8,7 +8,7 @@ import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/da
 /**
  * Neo4j-based agent repository
  */
-export class AgentRepository extends BaseRepository implements AgentRepositoryInterface {
+export class AgentRepository extends BaseRepository {
   constructor() {
     super('AgentRepository');
   }

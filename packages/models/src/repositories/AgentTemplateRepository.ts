@@ -1,11 +1,11 @@
-import { AgentTemplate, AgentTemplateRepository as AgentTemplateRepositoryInterface, Agent } from '../types';
+import { AgentTemplate, Agent } from '../types';
 import { Neo4jConnection, getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
-export class AgentTemplateRepository extends BaseRepository implements AgentTemplateRepositoryInterface {
+export class AgentTemplateRepository extends BaseRepository {
   private connection: Neo4jConnection;
 
   constructor(connection?: Neo4jConnection) {

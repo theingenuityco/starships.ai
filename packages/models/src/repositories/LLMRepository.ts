@@ -1,9 +1,9 @@
 import { getConnection } from '../helpers/database';
-import { LLM, LLMRepository as LLMRepositoryInterface } from '../types';
+import { LLM } from '../types';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
-export class LLMRepository extends BaseRepository implements LLMRepositoryInterface {
+export class LLMRepository extends BaseRepository {
   
   constructor() {
     super('LLMRepository');

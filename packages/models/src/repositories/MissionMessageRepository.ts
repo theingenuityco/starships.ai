@@ -8,23 +8,7 @@ import {
   MissionMessageRole
 } from '@starships/protocol';
 
-export interface MissionMessageRepositoryInterface {
-  saveMessage(message: Omit<MissionMessage, 'id'>): Promise<MissionMessage>;
-  getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessage[]>;
-  getMessageCount(missionId: string): Promise<number>;
-  getMessagesByMissionWithPagination(missionId: string, page?: number, pageSize?: number): Promise<{
-    messages: MissionMessage[];
-    total: number;
-    page: number;
-    pageSize: number;
-    totalPages: number;
-  }>;
-  deleteMessagesByMission(missionId: string): Promise<void>;
-  deleteMessage(messageId: string): Promise<boolean>;
-  findMessageById(messageId: string): Promise<MissionMessage | null>;
-}
-
-export class MissionMessageRepository extends BaseRepository implements MissionMessageRepositoryInterface {
+export class MissionMessageRepository extends BaseRepository {
   constructor() {
     super('MissionMessageRepository');
   }

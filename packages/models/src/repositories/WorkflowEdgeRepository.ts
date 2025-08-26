@@ -5,19 +5,7 @@ import {
   WorkflowEdge
 } from '@starships/protocol';
 
-export interface WorkflowEdgeRepositoryInterface {
-  createEdge(workflowId: string, edgeData: Omit<WorkflowEdge, 'id'>): Promise<WorkflowEdge>;
-  createEdges(workflowId: string, edgesData: Array<Omit<WorkflowEdge, 'id'>>, idMapping?: Map<string, string>): Promise<WorkflowEdge[]>;
-  getEdgesByWorkflowId(workflowId: string): Promise<WorkflowEdge[]>;
-  getEdgeById(edgeId: string): Promise<WorkflowEdge | null>;
-  updateEdge(edgeId: string, updates: Partial<WorkflowEdge>): Promise<WorkflowEdge | null>;
-  deleteEdge(edgeId: string): Promise<boolean>;
-  deleteEdgesByWorkflowId(workflowId: string): Promise<void>;
-  getEdgesByFromNode(fromNodeId: string): Promise<WorkflowEdge[]>;
-  getEdgesByToNode(toNodeId: string): Promise<WorkflowEdge[]>;
-}
-
-export class WorkflowEdgeRepository extends BaseRepository implements WorkflowEdgeRepositoryInterface {
+export class WorkflowEdgeRepository extends BaseRepository {
   constructor() {
     super('WorkflowEdgeRepository');
   }

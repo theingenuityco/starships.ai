@@ -589,6 +589,7 @@ router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> =
       const agentIds = workflow.nodes
         .filter(node => node.type === 'agent' && node.parameters?.agentId)
         .map(node => node.parameters.agentId)
+        .filter((id): id is string => typeof id === 'string') // Type guard to ensure string
         .filter((id, index, array) => array.indexOf(id) === index); // Remove duplicates
 
       // Fetch agent details for all unique agent IDs

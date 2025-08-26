@@ -97,7 +97,8 @@ export class MissionExecutionEngine {
       }
 
       // Compute safe instructions string
-      const instructions = (node.description?.trim() || node.parameters?.instructions || node.name)?.trim();
+      const paramInstructions = typeof node.parameters?.instructions === 'string' ? node.parameters.instructions : '';
+      const instructions = (node.description?.trim() || paramInstructions || node.name)?.trim();
       if (!instructions) {
         throw new Error('No instructions found for node');
       }

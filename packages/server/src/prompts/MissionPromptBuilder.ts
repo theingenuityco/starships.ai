@@ -574,10 +574,12 @@ ${taskResults}
     const agentNodes = workflow.nodes.filter(node => node.type === 'agent');
     const agentAssignments = agentNodes.reduce((assignments, node) => {
       const agentId = node.parameters.agentId;
-      if (!assignments[agentId]) {
-        assignments[agentId] = [];
+      if (agentId && typeof agentId === 'string') {
+        if (!assignments[agentId]) {
+          assignments[agentId] = [];
+        }
+        assignments[agentId].push(node.id);
       }
-      assignments[agentId].push(node.id);
       return assignments;
     }, {} as Record<string, string[]>);
 

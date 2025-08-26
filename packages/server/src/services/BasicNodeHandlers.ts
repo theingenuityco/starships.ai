@@ -122,9 +122,9 @@ export class OutputNodeHandler extends BaseWorkflowNodeHandler {
     context: WorkflowExecutionContext
   ): Promise<WorkflowNodeResult> {
     const params = node.parameters;
-    const sources = params.sources || [];
-    const template = params.template || 'default';
-    const format = params.format || 'text';
+    const sources = Array.isArray(params.sources) ? params.sources : [];
+    const template = typeof params.template === 'string' ? params.template : 'default';
+    const format = typeof params.format === 'string' ? params.format : 'text';
 
     // Gather data from source nodes
     const sourceData: any[] = [];
@@ -175,7 +175,8 @@ export class OutputNodeHandler extends BaseWorkflowNodeHandler {
       });
     }
 
-    if (!params.sources || !Array.isArray(params.sources) || params.sources.length === 0) {
+    const sources = Array.isArray(params.sources) ? params.sources : [];
+    if (sources.length === 0) {
       warnings.push({
         code: 'NO_SOURCES',
         message: 'Output node has no data sources specified',
@@ -194,8 +195,9 @@ export class OutputNodeHandler extends BaseWorkflowNodeHandler {
 
   getVisualization(node: WorkflowDSLNode): string {
     const params = node.parameters;
-    const sourceCount = params.sources ? params.sources.length : 0;
-    const format = params.format || 'text';
+    const sources = Array.isArray(params.sources) ? params.sources : [];
+    const sourceCount = sources.length;
+    const format = typeof params.format === 'string' ? params.format : 'text';
     const timeStr = node.estimatedTime ? ` (${node.estimatedTime}m)` : '';
 
     return `[OUTPUT] ${node.name}${timeStr}\n` +
@@ -209,7 +211,8 @@ export class OutputNodeHandler extends BaseWorkflowNodeHandler {
     }
 
     const params = node.parameters;
-    const sourceCount = params.sources ? params.sources.length : 0;
+    const sources = Array.isArray(params.sources) ? params.sources : [];
+    const sourceCount = sources.length;
     
     // Base time: 1 minute, plus 0.5 minutes per source
     return Math.max(1, 1 + Math.floor(sourceCount * 0.5));

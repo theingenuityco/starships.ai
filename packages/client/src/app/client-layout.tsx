@@ -43,6 +43,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { commandDeck, expandCommandDeck } = useStarshipStore()
   const { isAuthenticated, isLoading } = useAuth()
   const isDashboard = pathname === '/'
+  const isWaitlist = pathname === '/waitlist'
 
   // Enable keyboard shortcuts only for authenticated users
   useCommandDeckKeyboard()
@@ -60,12 +61,12 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  if (isDashboard) {
-    // Landing page route - no CommandDeck, no authentication required
+  if (isDashboard || isWaitlist) {
+    // Landing page and waitlist routes - no CommandDeck, no authentication required
     return (
       <AnimatePresence mode="wait">
         <motion.div
-          key="landing"
+          key={pathname}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

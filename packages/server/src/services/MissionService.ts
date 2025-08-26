@@ -51,10 +51,10 @@ export class MissionService {
           throw new NotFoundError('Agent not found', 'Agent', agentId);
         }
         if (agent.starshipId !== request.starshipId) {
-          throw ValidationError.fromFields([{
-            field: 'agentIds',
-            message: `Agent ${agentId} does not belong to starship ${request.starshipId}`
-          }]);
+          throw new ValidationError(
+            `Agent ${agentId} does not belong to starship ${request.starshipId}`,
+            'agentIds'
+          );
         }
         assignedAgents.push(agent);
       } catch (error) {
@@ -344,11 +344,10 @@ export class MissionService {
     const allowedTransitions = validTransitions[currentStatus];
     
     if (!allowedTransitions.includes(newStatus)) {
-      throw ValidationError.fromFields([{
-        field: 'status',
-        message: `Cannot transition mission from "${currentStatus}" to "${newStatus}". ` +
-        `Valid transitions: ${allowedTransitions.join(', ')}`
-      }]);
+      throw new ValidationError(
+        `Cannot transition mission from "${currentStatus}" to "${newStatus}". Valid transitions: ${allowedTransitions.join(', ')}`,
+        'status'
+      );
     }
   }
 

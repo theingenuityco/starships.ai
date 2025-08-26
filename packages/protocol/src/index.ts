@@ -69,16 +69,15 @@ export type {
   EventEmissionResult,
 } from './contracts/socket';
 
-// Export error classes
-export {
-  StandardError,
-  ValidationError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  ConflictError,
-  DatabaseError,
-  NetworkError,
-  BusinessLogicError,
-  ErrorFactory
+// Export error types only (implementations provided by @starships/models)
+export type {
+  StandardErrorCode,
+  ErrorCategory,
+  ErrorSeverity,
+  ErrorInfo,
+  ErrorContext,
+  ErrorResponse,
+  ValidationErrorDetail,
+  DatabaseErrorDetail,
+  NetworkErrorDetail
 } from './core/errors';

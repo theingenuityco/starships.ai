@@ -7,7 +7,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import {
-  StandardError,
+  BaseError,
   ValidationError,
   AuthenticationError,
   AuthorizationError,
@@ -15,11 +15,11 @@ import {
   ConflictError,
   DatabaseError,
   NetworkError,
-  BusinessLogicError,
+  InternalServerError,
   ErrorFactory,
-} from '@starships/protocol';
+} from '@starships/models';
 
-import {
+import type {
   StandardErrorCode,
   ErrorSeverity,
   ErrorResponse,
@@ -116,7 +116,7 @@ class ErrorLogger {
   /**
    * Log error with structured format
    */
-  logError(error: StandardError, req: Request, additionalContext?: Record<string, any>): void {
+  logError(error: BaseError, req: Request, additionalContext?: Record<string, any>): void {
     if (!this.config.logErrors) return;
 
     const logEntry = {
@@ -230,7 +230,7 @@ class ErrorLogger {
 /**
  * Update error metrics
  */
-function updateErrorMetrics(error: StandardError, req: Request): void {
+function updateErrorMetrics(error: BaseError, req: Request): void {
   if (!DEFAULT_CONFIG.enableMetrics) return;
 
   errorMetrics.totalErrors++;
@@ -276,14 +276,14 @@ export function resetErrorMetrics(): void {
 /**
  * Local type guard for StandardError
  */
-function isStandardError(error: unknown): error is StandardError {
-  return error instanceof StandardError;
+function isStandardError(error: unknown): error is BaseError {
+  return error instanceof BaseError;
 }
 
 /**
  * Convert various error types to StandardError
  */
-function convertToStandardError(error: any, req: Request): StandardError {
+function convertToStandardError(error: any, req: Request): BaseError {
   // If already a StandardError, return as-is
   if (isStandardError(error)) {
     return error;
@@ -359,7 +359,12 @@ function convertToStandardError(error: any, req: Request): StandardError {
   }
 
   // Default to internal server error
-  return StandardError.fromError(error, 'INTERNAL_SERVER_ERROR', context, userId, requestId);
+  return new InternalServerError(
+    error?.message || 'Internal server error',
+    { originalError: error },
+    requestId,
+    req.path
+  );
 }
 
 // ============================================================================
@@ -577,10 +582,10 @@ export {
   ConflictError,
   NetworkError,
   BusinessLogicError,
-} from '@starships/protocol';
+} from '@starships/models';
 
 // Create ServiceUnavailableError as an alias for BusinessLogicError
-export class ServiceUnavailableError extends BusinessLogicError {
+export class ServiceUnavailableError extends InternalServerError {
   constructor(
     message: string,
     service: string,

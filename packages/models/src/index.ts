@@ -32,30 +32,31 @@ export { RepositoryFactory } from './repositories';
 
 
 
-// Export standardized error handling system from protocol
+// Export error classes from local implementation (models package)
 export {
-  StandardError,
+  BaseError,
   ValidationError,
   AuthenticationError,
   AuthorizationError,
   NotFoundError,
   ConflictError,
+  ConstraintViolationError,
   DatabaseError,
   NetworkError,
-  BusinessLogicError,
+  RateLimitError,
+  ServiceUnavailableError,
+  InternalServerError,
   ErrorFactory,
-} from '@starships/protocol';
-
-// Export ConstraintViolationError from helpers for backward compatibility
-export { ConstraintViolationError } from './helpers/errors';
+  ErrorUtils
+} from './helpers/errors';
 
 export type {
-  ErrorCategory,
   ErrorSeverity,
   ErrorInfo,
   ErrorContext,
   ErrorResponse,
-  StandardErrorCode
+  StandardErrorCode,
+  ErrorCategory as ProtocolErrorCategory
 } from '@starships/protocol';
 
 // Export LLM domain types from protocol

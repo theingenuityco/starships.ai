@@ -1,11 +1,9 @@
 /**
  * Core Errors Module
- * 
- * Exports all error types and classes for the expedition system.
+ *
+ * Exports error types and interfaces for the expedition system.
+ * Error implementations are provided by the @starships/models package.
  */
 
 // Export all types
 export * from './types';
-
-// Export all classes
-export * from './classes';

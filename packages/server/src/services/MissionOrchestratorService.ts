@@ -11,7 +11,7 @@ import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
-import { ErrorFactory } from '@starships/protocol';
+import { ErrorFactory, InternalServerError } from '@starships/models';
 import { AIMessage } from '@langchain/core/messages';
 import type { 
   MissionMessage,
@@ -84,14 +84,10 @@ export class MissionOrchestratorService {
 
     // Validate message content
     if (!message?.trim()) {
-      throw ErrorFactory.validation([
-        { field: 'message', message: 'Message content is required' }
-      ], {
-        service: 'MissionOrchestratorService',
-        operation: 'handleMessage',
-        resource: 'mission',
-        resourceId: missionId
-      });
+      throw ErrorFactory.validation(
+        'Message content is required',
+        'message'
+      );
     }
 
     const { userId, isSystemMessage = false } = options;
@@ -140,11 +136,13 @@ export class MissionOrchestratorService {
         throw error;
       }
 
-      throw ErrorFactory.businessLogic(
-        'MISSION_MESSAGE_SEND_FAILED',
+      throw new InternalServerError(
         'Failed to process user message',
-        error instanceof Error ? error.message : 'Unknown error',
-        { service: 'MissionOrchestratorService', operation: 'handleUserMessage', resource: 'mission', resourceId: missionId }
+        {
+          missionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          code: 'MISSION_MESSAGE_SEND_FAILED'
+        }
       );
     }
   }

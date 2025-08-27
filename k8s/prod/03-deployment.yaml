@@ -7,7 +7,7 @@ metadata:
     app: starships-ai
     environment: production
 spec:
-  replicas: 2
+  replicas: 1
   revisionHistoryLimit: 5
   strategy:
     type: RollingUpdate
@@ -29,8 +29,7 @@ spec:
     spec:
       # Security Context
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
+        runAsUser: 0
         fsGroup: 1000
       
       # Anti-affinity for HA
@@ -52,7 +51,7 @@ spec:
       
       containers:
       - name: starships
-        image: [DOCKER-REGISTRY-URL]:latest
+        image: [DOCKER-REGISTRY-URL]:prod-latest
         imagePullPolicy: Always
         
         ports:
@@ -74,8 +73,6 @@ spec:
         # Core Settings
         - name: NODE_ENV
           value: "production"
-        - name: PORT
-          value: "3000"
         - name: SKIP_BUILD
           value: "true"
         - name: SKIP_INSTALL
@@ -109,8 +106,6 @@ spec:
           value: "[PROD-DOMAIN-URL]/fleet"
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
           value: "[PROD-DOMAIN-URL]"
-        - name: KINDE_COOKIE_DOMAIN
-          value: ".starships.ai"
         - name: KINDE_REDIRECT_URL
           value: "[PROD-DOMAIN-URL]/api/auth/kinde_callback"
         
@@ -155,41 +150,12 @@ spec:
         # Resource Limits
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "512Mi"
+            cpu: "250m"
           limits:
-            memory: "3Gi"
-            cpu: "1500m"
+            memory: "2Gi"
+            cpu: "1000m"
         
-        # Health Checks
-        livenessProbe:
-          httpGet:
-            path: /api/health
-            port: 4000
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
-        
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 4000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 3
-        
-        # Startup Probe for slow starts
-        startupProbe:
-          httpGet:
-            path: /api/health
-            port: 4000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 30
         
         # Volume Mounts
         volumeMounts:

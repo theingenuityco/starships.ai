@@ -8,12 +8,8 @@
 // Import pure socket infrastructure types
 import type {
   TypewriterData,
-  SocketConnectionState,
   BaseSocketEvents,
   ConnectionStatusEvent,
-  ConnectionStatus,
-  EventEmissionOptions,
-  EventEmissionResult,
 } from '../contracts/socket';
 
 // ============================================================================

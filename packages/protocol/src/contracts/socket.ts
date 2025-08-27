@@ -70,7 +70,7 @@ export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | '
 /**
  * Generic type helper for socket event data
  */
-export type SocketEventData<T extends (...args: any[]) => any> = Parameters<T>[0];
+export type SocketEventData<T extends (...args: unknown[]) => unknown> = Parameters<T>[0];
 
 /**
  * Event emission options

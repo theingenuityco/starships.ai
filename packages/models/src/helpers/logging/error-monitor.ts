@@ -401,7 +401,7 @@ export class ErrorMonitor {
    * Check alert conditions and trigger alerts
    */
   private async checkAlertConditions(occurrence: ErrorOccurrence): Promise<void> {
-    for (const [ruleId, rule] of this.alertRules) {
+    for (const rule of this.alertRules.values()) {
       if (!rule.enabled) continue;
 
       const shouldAlert = this.evaluateAlertCondition(rule, occurrence);
@@ -414,7 +414,7 @@ export class ErrorMonitor {
   /**
    * Evaluate if alert condition is met
    */
-  private evaluateAlertCondition(rule: AlertRule, occurrence: ErrorOccurrence): boolean {
+  private evaluateAlertCondition(rule: AlertRule, _occurrence: ErrorOccurrence): boolean {
     const { condition } = rule;
     const windowStart = Date.now() - condition.windowMs;
 

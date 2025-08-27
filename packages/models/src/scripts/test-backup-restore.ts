@@ -4,7 +4,6 @@ import { createConnection } from '../helpers/database';
 import { BackupManager } from './backup-restore';
 import { DisasterRecoveryManager, DisasterScenario } from './disaster-recovery';
 import * as fs from 'fs';
-import * as path from 'path';
 
 /**
  * Comprehensive test suite for backup and restore functionality
@@ -149,7 +148,7 @@ class BackupRestoreTestSuite {
       let validation2 = { valid: true };
       try {
         await this.backupManager['loadBackupFromFile']('./non-existent-backup.json');
-      } catch (error) {
+      } catch {
         validation2 = { valid: false };
       }
       this.testResults['backup_validation_nonexistent'] = !validation2.valid;
@@ -169,7 +168,7 @@ class BackupRestoreTestSuite {
       let validation3 = { valid: true };
       try {
         await this.backupManager['loadBackupFromFile'](corruptedBackupPath);
-      } catch (error) {
+      } catch {
         validation3 = { valid: false };
       }
       this.testResults['backup_validation_corrupted'] = !validation3.valid;
@@ -304,7 +303,7 @@ class BackupRestoreTestSuite {
         await this.backupManager.restoreFromBackup('/invalid/path/backup.json');
         this.testResults['error_handling_invalid_path'] = false;
         console.log('  ❌ Should have thrown error for invalid path');
-      } catch (error) {
+      } catch {
         this.testResults['error_handling_invalid_path'] = true;
         console.log('  ✅ Correctly handled invalid backup path');
       }
@@ -318,7 +317,7 @@ class BackupRestoreTestSuite {
         await this.backupManager.restoreFromBackup(corruptedPath);
         this.testResults['error_handling_corrupted_backup'] = false;
         console.log('  ❌ Should have thrown error for corrupted backup');
-      } catch (error) {
+      } catch {
         this.testResults['error_handling_corrupted_backup'] = true;
         console.log('  ✅ Correctly handled corrupted backup');
       }

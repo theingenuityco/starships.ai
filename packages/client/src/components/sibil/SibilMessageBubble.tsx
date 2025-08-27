@@ -55,7 +55,6 @@ export function SibilMessageBubble({ message }: SibilMessageBubbleProps) {
             <div className="w-full overflow-hidden">
               <IntelligentContentRenderer
                 content={message.content}
-                structured_content={message.structured_content}
                 isStreaming={isStreaming}
               />
             </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { motion, useScroll, useTransform } from 'motion/react';
-import { useEffect, useState, useRef, memo, useCallback, lazy, Suspense } from 'react';
+import { motion } from 'motion/react';
+import { useEffect, useState, memo, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,22 +15,16 @@ import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { ReturnFlowBanner } from '@/components/onboarding/ReturnFlow';
 import { useStarshipStore } from '@/store/starship-store';
 const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
-import { 
-  Sparkles, 
-  Rocket, 
-  Brain, 
-  Eye, 
-  Compass, 
-  Zap, 
-  Users, 
+import {
+  Sparkles,
+  Rocket,
+  Brain,
+  Compass,
+  Users,
   User,
-  Book, 
-  ArrowRight,
+  Book,
   ChevronDown,
   Star,
-  Layers,
-  Navigation,
-  GithubIcon,
   Lightbulb,
   Minus
 } from 'lucide-react';
@@ -114,7 +108,6 @@ export default function HomePage() {
   const [hasVision, setHasVision] = useState(false);
   const [hasExistingStarships, setHasExistingStarships] = useState(false);
   const { isAuthenticated, isLoading, userName } = useAuth();
-  const { scrollYProgress } = useScroll();
   const { session } = useOnboardingSession();
   const starships = useStarshipStore(state => state.starships);
   
@@ -163,7 +156,7 @@ export default function HomePage() {
     }, 1000);
   };
 
-  const handleVisionSubmit = (vision: string, analysis: any) => {
+  const handleVisionSubmit = () => {
     setHasVision(true);
     // The vision is already saved in session by the widget
     // Just update our local state to transform the button

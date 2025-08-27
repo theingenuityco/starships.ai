@@ -8,7 +8,7 @@
 import express from 'express';
 import { getConnection } from '@starships/models';
 import { RepositoryFactory } from '@starships/models';
-import { logger, LogContext, ErrorUtils } from '@starships/models';
+import { logger, ErrorUtils } from '@starships/models';
 
 const router: express.Router = express.Router();
 
@@ -270,7 +270,7 @@ router.get('/detailed', async (req, res) => {
           },
         };
       }
-    } catch (error) {
+    } catch {
       healthCheck.services.llm = {
         status: 'degraded',
         error: 'LLM provider check failed',

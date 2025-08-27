@@ -1,13 +1,11 @@
-'use client'
+'use client';
 
-import { Agent, starshipAPI, Starship } from '@/lib/api'
-import { useState, useEffect } from 'react'
-// import { motion } from 'motion/react'
+import React from 'react';
+import type { Agent } from '@starships/protocol';
 import {
   Bot,
   Edit,
   Trash2,
-  Eye,
   EyeOff,
   Star,
   TestTube,
@@ -16,29 +14,21 @@ import {
   Lightbulb,
   BarChart2,
   HeartPulse,
-  Headphones,
-  Database,
-  PenTool,
   MoreVertical,
-  Rocket,
-  Loader2,
   Sparkles,
-  Shield,
   Brain,
-  Zap,
-  Activity,
-} from 'lucide-react'
-import { Card } from '@/components/ui/card'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
 
 interface AgentCardProps {
   agent: Agent
@@ -61,59 +51,6 @@ export function AgentCard({
   onAnalytics,
   showActions = false,
 }: AgentCardProps) {
-  const [starship, setStarship] = useState<Starship | null>(null)
-  const [loadingStarship, setLoadingStarship] = useState(false)
-
-  // Fetch starship information if agent has starshipId
-  useEffect(() => {
-    const fetchStarship = async () => {
-      if (!(agent as any)?.starshipId) return
-
-      try {
-        setLoadingStarship(true)
-        console.log('[AGENT-CARD] Attempting to fetch starship:', (agent as any).starshipId)
-        console.log('[AGENT-CARD] Agent details:', {
-          id: agent.id,
-          name: agent.name,
-          starshipId: (agent as any).starshipId,
-        })
-
-        const starshipData = await starshipAPI.getStarship((agent as any).starshipId)
-        console.log('[AGENT-CARD] Successfully fetched starship:', starshipData.starship.name)
-        setStarship(starshipData.starship)
-      } catch (error) {
-        console.error('[AGENT-CARD] Failed to fetch starship:', {
-          starshipId: (agent as any).starshipId,
-          agentId: agent.id,
-          agentName: agent.name,
-          error: error,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          errorStatus: (error as any)?.response?.status,
-          timestamp: new Date().toISOString(),
-        })
-      } finally {
-        setLoadingStarship(false)
-      }
-    }
-
-    fetchStarship()
-  }, [(agent as any)?.starshipId])
-
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
-    switch (starshipClass) {
-      case 'scout': return '🚀'
-      case 'cruiser': return '🛸'
-      case 'draught': return '🚢'
-      default: return '🚀'
-    }
-  }
-
-  const getStarshipStatusColor = (status: 'active' | 'inactive') => {
-    return status === 'active'
-      ? 'bg-green-500/20 text-green-400 border-green-500/30'
-      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-  }
-
   const getCategoryColor = (category: Agent['category']) => {
     const colors = {
       general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
@@ -150,28 +87,6 @@ export function AgentCard({
     }
   }
 
-  const getAgentAvatarIcon = (agent: Agent) => {
-    // Determine icon based on agent name or category
-    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
-      return <Headphones className="h-6 w-6" />
-    } else if (
-      agent.name.toLowerCase().includes('data') ||
-      agent.name.toLowerCase().includes('analyst') ||
-      agent.category === 'analysis'
-    ) {
-      return <Database className="h-6 w-6" />
-    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
-      return <PenTool className="h-6 w-6" />
-    } else if (
-      agent.name.toLowerCase().includes('code') ||
-      agent.name.toLowerCase().includes('coding') ||
-      agent.category === 'coding'
-    ) {
-      return <Code className="h-6 w-6" />
-    } else {
-      return <Bot className="h-6 w-6" />
-    }
-  }
 
   const getAgentAvatarContent = (agent: Agent) => {
     // Determine emoji-like icon based on agent name or category

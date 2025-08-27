@@ -10,8 +10,7 @@ import {
   DatabaseError,
   NotFoundError,
   ConflictError,
-  ValidationError,
-  ErrorFactory
+  ValidationError
 } from '../helpers/errors';
 
 // Local error context interface
@@ -140,7 +139,7 @@ export abstract class BaseRepository {
   protected handleValidationError(
     fieldErrors: Array<{ field: string; message: string; value?: any }>,
     operation?: string,
-    resource?: string
+    _resource?: string
   ): never {
     const message = fieldErrors.map(e => `${e.field}: ${e.message}`).join(', ');
     throw new ValidationError(

@@ -509,8 +509,7 @@ export class PerformanceMonitor {
       );
 
       for (const cache of cacheNodes) {
-        const cacheAge = Date.now() - cache.lastUpdated;
-        const relatedQueries = this.queryMetrics.filter(m => 
+        const relatedQueries = this.queryMetrics.filter(m =>
           m.queryType.includes(cache.type.replace('_', ''))
         );
 

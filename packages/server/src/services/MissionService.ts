@@ -155,8 +155,7 @@ export class MissionService {
    */
   static async updateMission(
     id: string,
-    updates: UpdateMissionRequest,
-    userId?: string
+    updates: UpdateMissionRequest
   ): Promise<Mission> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const agentRepo = RepositoryFactory.getAgentRepository();
@@ -231,7 +230,7 @@ export class MissionService {
   /**
    * Delete a mission
    */
-  static async deleteMission(id: string, userId?: string): Promise<void> {
+  static async deleteMission(id: string): Promise<void> {
     const missionRepo = RepositoryFactory.getMissionRepository();
 
     // Get existing mission to check business rules
@@ -256,36 +255,36 @@ export class MissionService {
   /**
    * Start a mission (transition from draft to active)
    */
-  static async startMission(id: string, userId?: string): Promise<Mission> {
-    return await this.updateMission(id, { status: 'active' }, userId);
+  static async startMission(id: string): Promise<Mission> {
+    return await this.updateMission(id, { status: 'active' });
   }
 
   /**
    * Complete a mission (transition from active to completed)
    */
-  static async completeMission(id: string, userId?: string): Promise<Mission> {
-    return await this.updateMission(id, { status: 'completed' }, userId);
+  static async completeMission(id: string): Promise<Mission> {
+    return await this.updateMission(id, { status: 'completed' });
   }
 
   /**
    * Fail a mission (transition from active to failed)
    */
-  static async failMission(id: string, userId?: string): Promise<Mission> {
-    return await this.updateMission(id, { status: 'failed' }, userId);
+  static async failMission(id: string): Promise<Mission> {
+    return await this.updateMission(id, { status: 'failed' });
   }
 
   /**
    * Cancel a mission (transition to cancelled from any status except completed)
    */
-  static async cancelMission(id: string, userId?: string): Promise<Mission> {
-    return await this.updateMission(id, { status: 'cancelled' }, userId);
+  static async cancelMission(id: string): Promise<Mission> {
+    return await this.updateMission(id, { status: 'cancelled' });
   }
 
   /**
    * Update mission phase
    */
-  static async updateMissionPhase(id: string, phase: MissionPhase, userId?: string): Promise<Mission> {
-    return await this.updateMission(id, { phase }, userId);
+  static async updateMissionPhase(id: string, phase: MissionPhase): Promise<Mission> {
+    return await this.updateMission(id, { phase });
   }
 
   /**

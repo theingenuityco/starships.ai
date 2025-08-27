@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   ArrowLeft, BookOpen, Loader2, Activity, 
-  FileText, Archive, ScrollText, History, PenTool
+  ScrollText, History, PenTool
 } from 'lucide-react'
 import '@/styles/animations.css'
 import Link from 'next/link'
@@ -18,8 +18,7 @@ interface LogbookContentProps {
 export function LogbookContent({ slug }: LogbookContentProps) {
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
-  const [totalEntries, setTotalEntries] = useState(0)
-  const [recentEntries, setRecentEntries] = useState(0)
+  
 
   // Fetch starship data
   useEffect(() => {

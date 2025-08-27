@@ -8,7 +8,6 @@ import { SocketProvider } from '@/providers/socket-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
-import { Toaster } from '@/components/ui/toast'
 
 const inter = Inter({ subsets: ['latin'] })
 

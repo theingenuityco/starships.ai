@@ -1,19 +1,15 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
 import { motion } from 'motion/react';
-import { useStarshipStore } from '@/store/starship-store';
 import {
-  Users, Rocket, BookOpen, Brain,
-  Cpu, Zap, Eye, Command, Power,
-  Activity, Lightbulb, ChevronRight,
-  Gauge, Target
+  Users, BookOpen, Brain,
+  Zap, Eye, Command,
+  Target
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NavigationSection } from './NavigationSection';
-import { NavigationItem } from './NavigationItem';
 
 interface NavigationProps {
   mode?: 'sidebar' | 'module';
@@ -62,11 +58,9 @@ const itemVariants: any = {
 };
 
 export function Navigation({
-  mode = 'sidebar',
-  isMobile: _isMobile = false
+  mode = 'sidebar'
 }: NavigationProps) {
   const pathname = usePathname();
-  const { powerLevel, sibilInsights } = useStarshipStore();
 
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {

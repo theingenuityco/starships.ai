@@ -21,12 +21,10 @@ import {
   AlertCircle,
   CheckCircle,
   Circle,
-  Anchor,
-  Settings,
   ArrowRight,
   XCircle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { useStarshipStore } from '@/store/starship-store';
 import { cn } from '@/lib/utils';
 

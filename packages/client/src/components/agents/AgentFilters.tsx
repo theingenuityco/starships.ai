@@ -14,8 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { X, Filter, ChevronDown, Check } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { X, Filter, ChevronDown } from 'lucide-react'
 
 interface FilterState {
   category?: Agent['category']
@@ -33,7 +32,7 @@ interface AgentFiltersProps {
 export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  const updateFilter = (key: keyof FilterState, value: any) => {
+  const updateFilter = (key: keyof FilterState, value: FilterState[keyof FilterState]) => {
     onFiltersChange({ ...filters, [key]: value })
   }
 

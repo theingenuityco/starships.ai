@@ -14,8 +14,6 @@ import {
   generateSessionId 
 } from '@/lib/onboarding/storage';
 
-const SESSION_TTL_HOURS = 2;
-
 export function useOnboardingSession() {
   const [session, setSession] = useState<OnboardingSession | null>(null);
   const [isExpired, setIsExpired] = useState(false);

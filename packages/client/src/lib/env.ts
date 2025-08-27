@@ -10,17 +10,6 @@
 
 import { loadClientEnvironment } from '@starships/env-config/client';
 
-// Client-side environment (browser-safe)
-let clientEnv: any = null;
-
-try {
-  // Safe to load client config in any environment
-  clientEnv = loadClientEnvironment();
-} catch (error) {
-  // Fallback if config loading fails
-  console.warn('Failed to load client environment config:', error);
-}
-
 /**
  * Type-safe environment variables for the client
  * All variables are loaded from Next.js environment configuration

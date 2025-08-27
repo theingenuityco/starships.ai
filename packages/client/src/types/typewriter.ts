@@ -17,33 +17,20 @@ export interface TypewriterChunk {
   is_markdown?: boolean;
 }
 
-/**
- * Enhanced streaming chunk with typewriter support
- */
-export interface SibilSocketStreamChunk {
-  stream_id: string;
-  type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
-  content?: string;
-  structured_content?: any[];
-  provider?: 'openai' | 'anthropic';
-  model?: string;
-  usage?: any;
-  error?: string;
-  chunk_id?: string;
-  is_final?: boolean;
-  typewriter?: TypewriterChunk;
-  typing_speed?: number;
-  timestamp: number;
-}
+// Import unified types from protocol
+import type { ChatSocketStreamChunk } from '@starships/protocol';
 
-/**
- * Agent streaming chunk with typewriter support
- */
-export interface AgentSocketStreamChunk {
-  stream_id: string;
-  agent_id: string;
-  type: 'content' | 'complete' | 'error';
-  content?: string;
+// Legacy type aliases for backward compatibility in client code
+export type SibilSocketStreamChunk = ChatSocketStreamChunk & {
+  source: 'sibil';
   typewriter?: TypewriterChunk;
-  timestamp: number;
-}
+};
+
+export type AgentSocketStreamChunk = ChatSocketStreamChunk & {
+  source: 'agent';
+  agent_id: string;
+  typewriter?: TypewriterChunk;
+};
+
+// Re-export for external use
+export type { ChatSocketStreamChunk };

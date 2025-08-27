@@ -15,7 +15,7 @@ interface DynamicLoginButtonProps {
   postLoginRedirectURL?: string;
   preserveOnboarding?: boolean;
   showIcon?: boolean;
-  [key: string]: any; // Allow additional props
+  [key: string]: unknown; // Allow additional props
 }
 
 /**

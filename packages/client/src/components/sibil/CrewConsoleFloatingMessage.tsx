@@ -4,13 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface CrewConsoleFloatingMessageProps {
   show: boolean;
   onDismiss?: () => void;
   isManualOpen?: boolean;
-  currentTab: string;
   onTabChange: (tab: string) => void;
 }
 
@@ -18,7 +16,6 @@ export function CrewConsoleFloatingMessage({
   show, 
   onDismiss, 
   isManualOpen = false,
-  currentTab,
   onTabChange
 }: CrewConsoleFloatingMessageProps) {
   const [isVisible, setIsVisible] = useState(false);

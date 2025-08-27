@@ -1,17 +1,18 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
-import type { SocketIOEvents, AgentSocketRequest, AgentSocketStreamChunk, ChatRequest } from '@starships/protocol';
-import { chat, chatStream } from '@starships/agent-engine';
+import type { SocketEvents, ChatSocketRequest, ChatSocketStreamChunk, ChatRequest } from '@starships/protocol';
+import { chatStream } from '@starships/agent-engine';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import getStore from '../store';
 
-export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
+export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
   io.on('connection', (socket: Socket) => {
     const userId = socket.data.userId;
     const socketService = SocketIOService.getInstance();
 
     // Handle agent stream start
-    socket.on('agent:start-stream', async (request: AgentSocketRequest) => {
+    socket.on('chat:start-stream', async (request: ChatSocketRequest) => {
+      if (request.source !== 'agent' || !request.agent_id) return;
       console.log(`[AGENT SOCKET] Starting stream for user ${userId}, agent ${request.agent_id}:`, request.stream_id);
 
       try {
@@ -48,7 +49,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
 
         // Track agent usage
         try {
-          await AgentService.trackUsage(request.agent_id, userId);
+          await AgentService.trackUsage(request.agent_id);
         } catch (error) {
           console.warn(`[AGENT SOCKET] Failed to track usage for agent ${request.agent_id}:`, error);
           // Continue with streaming - don't fail on analytics
@@ -56,6 +57,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
 
         // Convert to ChatRequest for agent engine
         const chatRequest: ChatRequest = {
+          source: 'agent',
           agent_id: request.agent_id,
           user_id: userId,
           message: request.message,
@@ -81,7 +83,8 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
                 const char = characters[i];
                 const delay = 1000 / typingSpeed; // milliseconds per character
 
-                const typewriterChunk: AgentSocketStreamChunk = {
+                const typewriterChunk: ChatSocketStreamChunk = {
+                  source: 'agent' as const,
                   stream_id: request.stream_id,
                   agent_id: request.agent_id,
                   type: 'content',
@@ -107,7 +110,8 @@ export function setupAgentHandlers(io: SocketIOServer<SocketIOEvents>) {
               }
             } else {
               // Send chunk without typewriter effect
-              const streamChunk: AgentSocketStreamChunk = {
+              const streamChunk: ChatSocketStreamChunk = {
+                source: 'agent' as const,
                 stream_id: request.stream_id,
                 agent_id: request.agent_id,
                 type: 'content',

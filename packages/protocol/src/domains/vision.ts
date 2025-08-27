@@ -237,3 +237,32 @@ export interface VisionRefinementRateLimit {
   windowDurationMs: number;
   maxRequests: number;
 }
+
+// ============================================================================
+// VISION SOCKET EVENTS
+// ============================================================================
+
+/**
+ * Vision refinement Socket.IO events
+ */
+export interface VisionSocketEvents {
+  // Client to Server events
+  'vision:analyze': (request: VisionAnalysisRequest, callback?: (response: { success: boolean; error?: string; sessionId?: string }) => void) => void;
+  'vision:refine': (request: VisionRefinementRequest, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'vision:accept-proposal': (data: { starshipId: string; sessionId: string; userId: string }, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'vision:reject-proposal': (data: { starshipId: string; sessionId: string; userId: string; feedback?: string[] }, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'vision:update': (request: VisionUpdateRequest, callback?: (response: { success: boolean; error?: string }) => void) => void;
+  'vision:get-state': (data: { starshipId: string; userId: string }, callback?: (response: { success: boolean; state?: VisionRefinementState; error?: string }) => void) => void;
+  
+  // Server to Client events
+  'vision:analyzing': (data: VisionAnalysisEventData) => void;
+  'vision:analysis-complete': (data: VisionAnalysisEventData) => void;
+  'vision:proposal': (data: VisionProposalEventData) => void;
+  'vision:updated': (data: VisionUpdatedEventData) => void;
+  'vision:state-changed': (data: VisionUpdatedEventData) => void;
+  'vision:error': (data: VisionRefinementErrorEventData) => void;
+  
+  // Room management for vision refinement
+  'vision:join-starship-room': (data: { starshipId: string; userId: string }) => void;
+  'vision:leave-starship-room': (data: { starshipId: string; userId: string }) => void;
+}

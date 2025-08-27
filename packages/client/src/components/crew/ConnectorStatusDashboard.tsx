@@ -5,7 +5,6 @@ import { MCPServerConnector } from '@/lib/api'
 import {
   ConnectorHealthMetrics,
   monitoringService,
-  connectorMonitoring,
 } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,14 +24,12 @@ import {
 import { cn } from '@/lib/utils'
 
 interface ConnectorStatusDashboardProps {
-  starshipId: string
   connectorInstances: MCPServerConnector[]
   className?: string
   compact?: boolean
 }
 
 export function ConnectorStatusDashboard({
-  starshipId,
   connectorInstances,
   className,
   compact = false,

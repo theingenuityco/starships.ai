@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
 import { VisionRepository } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import type { StarshipRepository } from '@starships/models';
@@ -149,7 +148,7 @@ router.post('/starships/:id/vision', authMiddleware, generalVisionRateLimit, asy
         await visionRepo.updateMetrics(starshipId, metrics);
       }
     } else {
-      const newVision = await visionRepo.create({
+      await visionRepo.create({
         starshipId,
         statement: vision,
         confidence: 0.5,

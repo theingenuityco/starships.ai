@@ -25,6 +25,7 @@ export interface ConnectorInstanceConfig {
 
 interface ConnectorInstanceConfigProps {
   connectorId: string
+  starshipId: string
   connectorName: string
   currentConfig?: ConnectorInstanceConfig
   onTemplateApply: (templateId: string) => Promise<void>

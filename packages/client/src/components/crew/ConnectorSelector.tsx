@@ -262,8 +262,7 @@ export function ConnectorSelector({
 
       // Build environment variables string for the connector configuration
       const environmentVariables = ConnectorApiKeyManager.buildEnvironmentString(
-        currentConnectorForApiKeys,
-        apiKeys
+        currentConnectorForApiKeys
       )
 
       console.log('[ConnectorSelector] Built environment variables:', environmentVariables)
@@ -731,8 +730,7 @@ export function ConnectorSelector({
                             currentConfig={{
                               environmentVariables: connectorInstance.env || '{}',
                             }}
-                            onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}
-                            onTemplateApply={templateId =>
+                            onTemplateApply={(templateId: string) =>
                               onTemplateApply(connectorInstance.id, templateId)
                             }
                             disabled={disabled}

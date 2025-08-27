@@ -423,7 +423,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       type={showKey ? 'text' : 'password'}
                       placeholder={getSelectedTool()!.apiKeyPlaceholder}
                       value={tempApiKey}
-                      onChange={(e) => setTempApiKey(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempApiKey(e.target.value)}
                       className="pr-10 bg-background/50 border-border/50 font-mono text-sm focus:border-primary/50"
                     />
                     <Button
@@ -460,7 +460,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       type={field.type}
                       placeholder={field.placeholder}
                       value={tempConfigs[field.name] || ''}
-                      onChange={(e) => setTempConfigs(prev => ({
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempConfigs(prev => ({
                         ...prev,
                         [field.name]: e.target.value
                       }))}

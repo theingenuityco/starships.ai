@@ -341,8 +341,7 @@ export function EnhancedConnectorSelector({
 
       try {
         const enhancedEnv = ConnectorApiKeyManager.buildEnvironmentString(
-          currentConnectorForApiKeys,
-          apiKeys
+          currentConnectorForApiKeys
         )
 
         const enhancedConnector: MCPServerOption = {

@@ -49,7 +49,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
 
         // Track agent usage
         try {
-          await AgentService.trackUsage(request.agent_id, userId);
+          await AgentService.trackUsage(request.agent_id);
         } catch (error) {
           console.warn(`[AGENT SOCKET] Failed to track usage for agent ${request.agent_id}:`, error);
           // Continue with streaming - don't fail on analytics

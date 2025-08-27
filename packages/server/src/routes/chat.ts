@@ -46,7 +46,7 @@ router.post('/', authMiddleware, validateChatRequest, async (req, res) => {
 
     // Track agent usage after successful chat
     try {
-      await AgentService.trackUsage(chatRequest.agent_id!, chatRequest.user_id);
+      await AgentService.trackUsage(chatRequest.agent_id!);
       console.log(`[ANALYTICS] Tracked usage for agent: ${chatRequest.agent_id}`);
     } catch (trackingError) {
       // Don't fail the chat request if usage tracking fails

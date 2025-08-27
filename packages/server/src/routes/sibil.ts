@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { SibilRequest, SibilStreamChunk } from '@starships/protocol';
+import type { ChatRequest, ChatStreamChunk } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { SibilService } from '../services/SibilService';
@@ -29,7 +29,8 @@ const validateSibilRequest = (req: Request, res: Response, next: any) => {
 router.post('/chat', authMiddleware, validateSibilRequest, async (req, res) => {
   try {
     // Build Sibil request using authenticated user ID from middleware
-    const sibilRequest: SibilRequest = {
+    const sibilRequest: ChatRequest = {
+      source: 'sibil',
       provider: req.body.provider,
       model: req.body.model,
       message: req.body.message,
@@ -91,7 +92,8 @@ router.post('/chat/stream', authMiddleware, validateSibilRequest, async (req, re
       'Access-Control-Allow-Headers': 'Cache-Control'
     });
 
-    const sibilRequest: SibilRequest = {
+    const sibilRequest: ChatRequest = {
+      source: 'sibil',
       provider: req.body.provider,
       model: req.body.model,
       message: req.body.message,

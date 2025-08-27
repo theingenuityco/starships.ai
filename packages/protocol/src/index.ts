@@ -46,8 +46,6 @@ export type {
 export type {
   // Basic types
   UsageStats,
-  ChatRequest,
-  ChatResponse,
   MemoryEntry,
   EnhancedMemoryEntry,
   MemorySearchResult,
@@ -57,20 +55,20 @@ export type {
   TypewriterData,
   ContentBlock,
   
-  // Unified chat types
+  // Chat types (works for both REST and Socket.IO)
   ChatSourceType,
+  ChatRequest,
+  ChatResponse,
+  ChatStreamRequest,
+  ChatStreamChunk,
+  ChatStreamResponse,
+  
+  // Socket.IO enhanced types
   ChatSocketRequest,
   ChatSocketStreamChunk,
   ChatSocketResponse,
   ChatSocketStreamError,
   ChatSocketStreamResponse,
-  
-  // Sibil REST API types
-  SibilRequest,
-  SibilResponse,
-  SibilStreamRequest,
-  SibilStreamChunk,
-  SibilStreamResponse,
   
   // Connection and socket types
   SocketConnectionState,

@@ -1,7 +1,7 @@
 /**
- * Unified Chat & Socket Contract Types
- * 
- * Combined interface definitions for chat communication and Socket.IO integration.
+ * Chat & Socket Contract Types
+ *
+ * Interface definitions for chat communication and Socket.IO integration.
  */
 
 // ============================================================================
@@ -17,26 +17,8 @@ export interface UsageStats {
 }
 
 // ============================================================================
-// BASIC CHAT TYPES
+// MEMORY TYPES
 // ============================================================================
-
-/**
- * Basic chat request
- */
-export interface ChatRequest {
-  agent_id: string;
-  user_id: string;
-  message: string;
-  stream?: boolean;
-}
-
-/**
- * Basic chat response
- */
-export interface ChatResponse {
-  reply: string;
-  usage?: UsageStats;
-}
 
 /**
  * Basic memory entry for conversation history
@@ -99,7 +81,7 @@ export interface ContentBlock {
 }
 
 // ============================================================================
-// UNIFIED CHAT INTERFACES
+// CHAT TYPES (REST + Socket.IO)
 // ============================================================================
 
 /**
@@ -108,13 +90,12 @@ export interface ContentBlock {
 export type ChatSourceType = 'sibil' | 'agent';
 
 /**
- * Unified chat request interface
+ * Base chat request (works for both REST API and Socket.IO)
  */
-export interface ChatSocketRequest {
+export interface ChatRequest {
   source: ChatSourceType;
   message: string;
   user_id: string;
-  stream_id: string;
   session_id?: string;
   
   // Sibil-specific fields
@@ -125,17 +106,41 @@ export interface ChatSocketRequest {
   // Agent-specific fields
   agent_id?: string;
   
-  // Socket enhancements
-  typewriter_enabled?: boolean;
-  typing_speed?: number; // characters per second (default: 75)
+  // Optional streaming flag for REST API
+  stream?: boolean;
 }
 
 /**
- * Unified chat streaming chunk
+ * Base chat response (works for both REST API and Socket.IO)
  */
-export interface ChatSocketStreamChunk {
+export interface ChatResponse {
   source: ChatSourceType;
-  stream_id: string;
+  content: string;
+  session_id?: string;
+  timestamp?: string;
+  
+  // Sibil-specific fields
+  structured_content?: ContentBlock[];
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  usage?: UsageStats;
+  
+  // Agent-specific fields
+  agent_id?: string;
+}
+
+/**
+ * Streaming request (extends ChatRequest)
+ */
+export interface ChatStreamRequest extends ChatRequest {
+  stream: true;
+}
+
+/**
+ * Streaming chunk (works for both REST API and Socket.IO)
+ */
+export interface ChatStreamChunk {
+  source: ChatSourceType;
   type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
   content?: string;
   structured_content?: ContentBlock[];
@@ -148,39 +153,59 @@ export interface ChatSocketStreamChunk {
   // Agent-specific fields
   agent_id?: string;
   
-  // Socket enhancements
-  typewriter?: TypewriterData;
-  typing_speed?: number;
-  timestamp: number;
-  
   // Error handling
   error?: string;
   chunk_id?: string;
   is_final?: boolean;
+  stream_id?: string; // Optional for REST, required for Socket.IO
 }
 
 /**
- * Unified chat response
+ * Streaming response metadata (works for both REST API and Socket.IO)
  */
-export interface ChatSocketResponse {
+export interface ChatStreamResponse {
+  stream_id: string;
   source: ChatSourceType;
-  content: string;
-  stream_id?: string;
-  session_id?: string;
-  timestamp: string;
+  status: 'started' | 'streaming' | 'completed' | 'error';
+}
+
+// ============================================================================
+// SOCKET.IO ENHANCED INTERFACES
+// ============================================================================
+
+/**
+ * Socket.IO enhanced chat request (extends base ChatRequest)
+ */
+export interface ChatSocketRequest extends ChatRequest {
+  stream_id: string; // Required for Socket.IO
   
-  // Sibil-specific fields
-  structured_content?: ContentBlock[];
-  provider?: 'openai' | 'anthropic';
-  model?: string;
-  usage?: UsageStats;
-  
-  // Agent-specific fields
-  agent_id?: string;
+  // Socket enhancements
+  typewriter_enabled?: boolean;
+  typing_speed?: number; // characters per second (default: 75)
 }
 
 /**
- * Unified stream error interface
+ * Socket.IO enhanced chat streaming chunk (extends base ChatStreamChunk)
+ */
+export interface ChatSocketStreamChunk extends ChatStreamChunk {
+  stream_id: string; // Required for Socket.IO
+  timestamp: number; // Required for Socket.IO
+  
+  // Socket enhancements
+  typewriter?: TypewriterData;
+  typing_speed?: number;
+}
+
+/**
+ * Socket.IO enhanced chat response (extends base ChatResponse)
+ */
+export interface ChatSocketResponse extends ChatResponse {
+  stream_id?: string;
+  timestamp: string; // Required for Socket.IO
+}
+
+/**
+ * Socket.IO stream error interface
  */
 export interface ChatSocketStreamError {
   source: ChatSourceType;
@@ -193,70 +218,10 @@ export interface ChatSocketStreamError {
 }
 
 /**
- * Stream response metadata
+ * Socket.IO stream response metadata (extends base ChatStreamResponse)
  */
-export interface ChatSocketStreamResponse {
-  stream_id: string;
-  source: ChatSourceType;
-  status: 'started' | 'streaming' | 'completed' | 'error';
-}
-
-// ============================================================================
-// STANDALONE SIBIL INTERFACES (for non-socket usage)
-// ============================================================================
-
-/**
- * Basic Sibil request interface (for REST API)
- */
-export interface SibilRequest {
-  provider: 'openai' | 'anthropic';
-  model?: string;
-  message: string;
-  user_id: string;
-  session_id?: string;
-  starship_id?: string;
-}
-
-/**
- * Basic Sibil response interface (for REST API)
- */
-export interface SibilResponse {
-  content: string;
-  structured_content?: ContentBlock[];
-  provider: 'openai' | 'anthropic';
-  model: string;
-  usage?: UsageStats;
-}
-
-/**
- * Sibil streaming request (for REST API)
- */
-export interface SibilStreamRequest extends SibilRequest {
-  stream: true;
-}
-
-/**
- * Sibil streaming chunk (for REST API)
- */
-export interface SibilStreamChunk {
-  type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
-  content?: string;
-  structured_content?: ContentBlock[];
-  provider?: 'openai' | 'anthropic';
-  model?: string;
-  usage?: UsageStats;
-  error?: string;
-  chunk_id?: string;
-  is_final?: boolean;
-  stream_id?: string;
-}
-
-/**
- * Sibil streaming response (for REST API)
- */
-export interface SibilStreamResponse {
-  stream_id: string;
-  status: 'started' | 'streaming' | 'completed' | 'error';
+export interface ChatSocketStreamResponse extends ChatStreamResponse {
+  // Inherits from base ChatStreamResponse
 }
 
 // ============================================================================

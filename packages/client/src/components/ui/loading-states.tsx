@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Loader2, CheckCircle, AlertCircle, Clock, Wifi, Key } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, Key } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
 import { Badge } from './badge'
@@ -182,7 +182,7 @@ export function ConnectionStatus({
       color: 'text-green-600',
     },
     disconnected: {
-      icon: <Wifi className="h-4 w-4 text-gray-400" />,
+      icon: <Key className="h-4 w-4 text-gray-400" />,
       label: 'Disconnected',
       badgeVariant: 'outline' as const,
       color: 'text-gray-500',

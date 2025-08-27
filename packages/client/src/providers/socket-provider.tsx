@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useSocketConnection } from '@/hooks/useSocketConnection';
 import type { ConnectionStatus, SocketConnectionState } from '@starships/protocol';

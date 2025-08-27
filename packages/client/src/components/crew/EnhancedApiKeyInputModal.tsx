@@ -193,7 +193,7 @@ export function EnhancedApiKeyInputModal({
           clearError()
         }
       } catch (error) {
-        const enhanced = handleError(
+        handleError(
           error as Error,
           ErrorRecoveryManager.createContext('validate-field', 'EnhancedApiKeyInputModal', {
             envKey,
@@ -363,7 +363,7 @@ export function EnhancedApiKeyInputModal({
 
       onClose()
     } catch (error) {
-      const enhanced = handleError(
+      handleError(
         error as Error,
         ErrorRecoveryManager.createContext('submit-form', 'EnhancedApiKeyInputModal', {
           connector: connector.id,
@@ -371,7 +371,7 @@ export function EnhancedApiKeyInputModal({
         })
       )
 
-      setFormError(enhanced)
+      setFormError(error as Error)
       focusFirstInvalidField()
     } finally {
       setIsSubmitting(false)

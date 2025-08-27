@@ -6,7 +6,7 @@ import { visionAPI } from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, Save, Edit, AlertTriangle, Sparkles, Target, Lightbulb, Brain } from 'lucide-react';
+import { Eye, Save, Edit, AlertTriangle, Sparkles, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisionMetricsDisplay } from '@/components/vision/VisionMetricsDisplay';
 import SocketClient from '@/lib/socket-client';

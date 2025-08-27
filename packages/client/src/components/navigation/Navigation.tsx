@@ -63,7 +63,6 @@ export function Navigation({
   isMobile: _isMobile = false
 }: NavigationProps) {
   const pathname = usePathname();
-  const { powerLevel, sibilInsights } = useStarshipStore();
 
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {

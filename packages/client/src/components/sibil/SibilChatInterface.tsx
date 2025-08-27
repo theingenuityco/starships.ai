@@ -21,7 +21,7 @@ interface SibilChatInterfaceProps {
 
 export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
-  const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
+  const { isConnected, connectionStatus } = useSocketConnection()
   const [messages, setMessages] = useState<SibilMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)

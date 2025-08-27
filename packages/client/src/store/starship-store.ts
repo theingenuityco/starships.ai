@@ -107,7 +107,6 @@ interface StarshipActions {
       sibilSessionId?: string;
     };
   }) => Promise<{ id: string; slug: string; ownerId: string; class: 'scout' | 'cruiser' | 'draught'; name: string; maxAgents: number; status: 'active' | 'inactive' | 'disabled' | 'restricted' | 'pending_payment'; createdAt: string; updatedAt: string; plan?: 'scout' | 'cruiser' | 'draught'; subscriptionId?: string; billingPeriod?: 'monthly' | 'yearly'; }>;
-  setActiveStarship: (starshipId: string | null) => void;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
   
@@ -272,10 +271,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             });
             throw error;
           }
-        },
-
-        setActiveStarship: (starshipId) => {
-          set({ activeStarshipId: starshipId });
         },
 
         deployAgent: async (agentId) => {

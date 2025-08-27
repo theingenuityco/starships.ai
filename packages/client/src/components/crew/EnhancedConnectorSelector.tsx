@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import { monitoringService } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
-import { ConnectorInstanceConfig } from './ConnectorInstanceConfig'
 import { EnhancedApiKeyInputModal } from './EnhancedApiKeyInputModal'
 import { ConnectorApiKeyManager } from '@/lib/connector-api-keys'
 import { ApiKeyRequirement } from '@/types/connector-api-keys'
@@ -107,10 +106,6 @@ export function EnhancedConnectorSelector({
 
   // API Key status tracking
   const [apiKeyStatusMap, setApiKeyStatusMap] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
-
-  // Bulk actions
-  const [selectedForBulk, setSelectedForBulk] = useState<Set<string>>(new Set())
-  const [bulkActionInProgress, setBulkActionInProgress] = useState(false)
 
   // Create connector instance map
   const connectorInstanceMap = useMemo(() => {
@@ -244,15 +239,15 @@ export function EnhancedConnectorSelector({
         })
 
         setAvailableConnectors(available)
-      } catch (err) {
-        const enhanced = handleError(
-          err as Error,
+      } catch (error) {
+        handleError(
+          error as Error,
           ErrorRecoveryManager.createContext('fetch-connectors', 'EnhancedConnectorSelector', {
             starshipId,
             showLoading,
           })
         )
-        setError(enhanced)
+        setError(error as Error)
       } finally {
         setLoading(false)
         setRefreshing(false)
@@ -316,15 +311,15 @@ export function EnhancedConnectorSelector({
             onConnectorsChange(newSelected)
           }
         }
-      } catch (err) {
-        const enhanced = handleError(
-          err as Error,
+      } catch (error) {
+        handleError(
+          error as Error,
           ErrorRecoveryManager.createContext('toggle-connector', 'EnhancedConnectorSelector', {
             connectorId: connector.id,
             action: isCurrentlySelected ? 'disconnect' : 'connect',
           })
         )
-        setError(enhanced)
+        setError(error as Error)
       } finally {
         // Clear connecting state if not showing modal
         if (!ConnectorApiKeyManager.detectRequirements(connector).length || isCurrentlySelected) {
@@ -870,20 +865,6 @@ export function EnhancedConnectorSelector({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {connectorInstance && onConfigUpdate && onTemplateApply && (
-                        <ConnectorInstanceConfig
-                          connectorId={connectorInstance.id}
-                          connectorName={connector.name}
-                          currentConfig={(connectorInstance as any).config}
-                          onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}
-                          onTemplateApply={templateId =>
-                            onTemplateApply(connectorInstance.id, templateId)
-                          }
-                          disabled={disabled}
-                          className="h-8 w-8 p-0"
-                        />
-                      )}
-
                       <Button
                         onClick={() => handleConnectorToggle(connector)}
                         size="sm"

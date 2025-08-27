@@ -7,7 +7,7 @@ import { SimpleVisionChamber } from './SimpleVisionChamber'
 import { SibilFloatingMessage } from '@/components/sibil/SibilFloatingMessage'
 import { 
   ArrowLeft, Eye, Loader2, Activity, 
-  Sparkles, Target, Info, CheckCircle
+  Sparkles, Info, CheckCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { starshipAPI, Starship } from '@/lib/api'
@@ -23,13 +23,10 @@ interface VisionChamberContentProps {
 export function VisionChamberContent({ slug }: VisionChamberContentProps) {
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
-  const [activeVisions, setActiveVisions] = useState(0)
-  const [totalInsights, setTotalInsights] = useState(0)
-  const [isFirstStarship, setIsFirstStarship] = useState(false)
   const [showFloatingMessage, setShowFloatingMessage] = useState(false)
   const [isManualOpen, setIsManualOpen] = useState(false)
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
-  const { starships } = useStarshipStore()
+  const {  } = useStarshipStore()
   const searchParams = useSearchParams()
 
   // Fetch starship data and check if first starship
@@ -41,12 +38,9 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
         setStarship(data.starship)
         
         // Check if this is the user's first starship and auto-show message
-        if (starships && starships.length === 1) {
-          setIsFirstStarship(true)
-          const dismissed = localStorage.getItem('sibil-vision-message-dismissed')
-          if (!dismissed) {
-            setShowFloatingMessage(true)
-          }
+        const dismissed = localStorage.getItem('sibil-vision-message-dismissed')
+        if (!dismissed) {
+          setShowFloatingMessage(true)
         }
       } catch (error) {
         console.error('Failed to fetch starship:', error)
@@ -56,7 +50,7 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
     }
 
     fetchStarship()
-  }, [slug, starships])
+  }, [slug])
 
   // Check for payment success parameter
   useEffect(() => {

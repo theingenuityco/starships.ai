@@ -13,8 +13,7 @@ import {
   ArrowUp,
   ArrowRight,
   Eye,
-  User,
-  Rocket
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';

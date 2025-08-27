@@ -57,6 +57,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
 
         // Convert to ChatRequest for agent engine
         const chatRequest: ChatRequest = {
+          source: 'agent',
           agent_id: request.agent_id,
           user_id: userId,
           message: request.message,

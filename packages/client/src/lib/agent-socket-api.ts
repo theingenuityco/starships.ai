@@ -59,8 +59,8 @@ export const agentSocketAPI = {
       typing_speed: 75
     };
 
-    const handleStreamStart = (receivedStreamId: string, receivedAgentId: string) => {
-      if (receivedStreamId === streamId && receivedAgentId === agentId) {
+    const handleStreamStart = (data: { streamId: string; source: 'agent' | 'sibil'; agentId?: string }) => {
+      if (data.streamId === streamId && data.agentId === agentId && data.source === 'agent') {
         console.log('[AGENT API] Stream started:', streamId, 'for agent:', agentId);
       }
     };
@@ -102,45 +102,45 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleTypingStart = (receivedAgentId: string) => {
-      if (receivedAgentId === agentId) {
+    const handleTypingStart = (data: { source: 'agent' | 'sibil'; agentId?: string }) => {
+      if (data.agentId === agentId && data.source === 'agent') {
         callbacks.onTypingStart?.();
       }
     };
 
-    const handleTypingStop = (receivedAgentId: string) => {
-      if (receivedAgentId === agentId) {
+    const handleTypingStop = (data: { source: 'agent' | 'sibil'; agentId?: string }) => {
+      if (data.agentId === agentId && data.source === 'agent') {
         callbacks.onTypingStop?.();
       }
     };
 
     const cleanup = () => {
-      socket.off('agent:stream-start', handleStreamStart);
-      socket.off('agent:stream-chunk', handleStreamChunk);
-      socket.off('agent:stream-complete', handleStreamComplete);
-      socket.off('agent:stream-error', handleStreamError);
-      socket.off('agent:typing-start', handleTypingStart);
-      socket.off('agent:typing-stop', handleTypingStop);
+      socket.off('chat:stream-start', handleStreamStart);
+      socket.off('chat:stream-chunk', handleStreamChunk);
+      socket.off('chat:stream-complete', handleStreamComplete);
+      socket.off('chat:stream-error', handleStreamError);
+      socket.off('chat:typing-start', handleTypingStart);
+      socket.off('chat:typing-stop', handleTypingStop);
     };
 
     // Set up event listeners
-    socket.on('agent:stream-start', handleStreamStart);
-    socket.on('agent:stream-chunk', handleStreamChunk);
-    socket.on('agent:stream-complete', handleStreamComplete);
-    socket.on('agent:stream-error', handleStreamError);
-    socket.on('agent:typing-start', handleTypingStart);
-    socket.on('agent:typing-stop', handleTypingStop);
+    socket.on('chat:stream-start', handleStreamStart);
+    socket.on('chat:stream-chunk', handleStreamChunk);
+    socket.on('chat:stream-complete', handleStreamComplete);
+    socket.on('chat:stream-error', handleStreamError);
+    socket.on('chat:typing-start', handleTypingStart);
+    socket.on('chat:typing-stop', handleTypingStop);
 
     // Join agent room for this session
     socketClient.joinAgentRoom(agentId, 'current-user'); // Will be overridden by server auth
 
     // Start the stream
-    socket.emit('agent:start-stream', socketRequest);
+    socket.emit('chat:start-stream', socketRequest);
 
     return {
       abort: () => {
         isAborted = true;
-        socket.emit('agent:stop-stream', streamId);
+        socket.emit('chat:stop-stream', streamId);
         socketClient.leaveAgentRoom(agentId, 'current-user');
         cleanup();
       }

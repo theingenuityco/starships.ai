@@ -15,10 +15,15 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
  * Enhanced chat function with native tool integration
  */
 export async function chat(
-  req: ChatRequest, 
-  store: LangChainMemoryStore, 
+  req: ChatRequest,
+  store: LangChainMemoryStore,
   options?: { overrideStarshipId?: string }
 ): Promise<ChatResponse> {
+  // Validate that agent_id is provided for agent chat
+  if (!req.agent_id) {
+    throw new Error('agent_id is required for agent chat');
+  }
+
   console.log('🚀 [AGENT-ENGINE] Starting chat request:', {
     agent_id: req.agent_id,
     user_id: req.user_id,
@@ -232,7 +237,7 @@ export async function chat(
       // Create native tool wrapper
       const toolWrapper = new NativeToolWrapper({
         starshipId: starshipId!,
-        agentId: req.agent_id,
+        agentId: req.agent_id!,
         enableLogging: true
       });
       
@@ -251,7 +256,7 @@ export async function chat(
   }
 
   // Get conversation history
-  const memoryKey = store.makeKey(req.agent_id, req.user_id);
+  const memoryKey = store.makeKey(req.agent_id!, req.user_id);
   const memories = await store.get(memoryKey);
   const memoryArray = memories.slice(-10); // Get last 10 messages
   
@@ -378,7 +383,9 @@ When users ask about page content using words like "stored", "inside", "text", "
     } as MemoryEntry);
     
     return {
-      reply: result.output,
+      source: 'agent',
+      content: result.output,
+      agent_id: req.agent_id,
       usage: undefined, // Agent executor doesn't provide token usage
     };
   } else {
@@ -396,7 +403,7 @@ When users ask about page content using words like "stored", "inside", "text", "
     );
 
     // Get LLM provider
-    const provider = await ProviderFactory.getProvider(req.agent_id);
+    const provider = await ProviderFactory.getProvider(req.agent_id!);
 
     // Execute completion
     // Try to find by ID first, then by name if it looks like a model name
@@ -426,7 +433,12 @@ When users ask about page content using words like "stored", "inside", "text", "
 
     console.log('✅ [AGENT-ENGINE] Chat completed successfully');
 
-    return result;
+    return {
+      source: 'agent',
+      content: result.reply,
+      agent_id: req.agent_id,
+      usage: result.usage
+    };
   }
 }
 

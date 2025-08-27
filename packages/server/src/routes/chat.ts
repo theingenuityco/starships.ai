@@ -32,6 +32,7 @@ router.post('/', authMiddleware, validateChatRequest, async (req, res) => {
   try {
     // Build chat request using authenticated user ID from middleware
     const chatRequest: ChatRequest = {
+      source: 'agent',
       agent_id: req.body.agent_id,
       user_id: req.user!.id, // Use authenticated user ID, not client-provided
       message: req.body.message,
@@ -45,7 +46,7 @@ router.post('/', authMiddleware, validateChatRequest, async (req, res) => {
 
     // Track agent usage after successful chat
     try {
-      await AgentService.trackUsage(chatRequest.agent_id, chatRequest.user_id);
+      await AgentService.trackUsage(chatRequest.agent_id!, chatRequest.user_id);
       console.log(`[ANALYTICS] Tracked usage for agent: ${chatRequest.agent_id}`);
     } catch (trackingError) {
       // Don't fail the chat request if usage tracking fails

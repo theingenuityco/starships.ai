@@ -114,6 +114,7 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
 
         // Convert to standard SibilRequest
         const sibilRequest = {
+          source: 'sibil' as const,
           provider: request.provider,
           model: request.model,
           message: request.message,

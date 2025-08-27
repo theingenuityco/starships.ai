@@ -103,9 +103,7 @@ export class SibilService {
       role,
       content,
       structured_content: metadata?.structured_content,
-      provider: metadata?.provider,
-      model: metadata?.model,
-      usage: metadata?.usage
+      stream_id: metadata?.stream_id
     });
   }
   

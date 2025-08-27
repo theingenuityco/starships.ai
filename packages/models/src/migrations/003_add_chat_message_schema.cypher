@@ -20,9 +20,6 @@ CREATE CONSTRAINT chat_message_role_values IF NOT EXISTS FOR (cm:ChatMessage) RE
 // Basic indexes for lookups
 CREATE INDEX chat_message_session_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.session_id);
 CREATE INDEX chat_message_role_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.role);
-CREATE INDEX chat_message_provider_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.provider);
-CREATE INDEX chat_message_model_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.model);
-CREATE INDEX chat_message_agent_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.agent_id);
 CREATE INDEX chat_message_stream_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.stream_id);
 
 // Range indexes for time-based queries

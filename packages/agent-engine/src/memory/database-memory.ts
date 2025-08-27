@@ -75,9 +75,7 @@ export class DatabaseMemoryStore {
       await chatMessageRepo.create({
         session_id: session.id,
         role: entry.role,
-        content: entry.content,
-        provider: 'agent',
-        model: agentId // Use agent ID as model reference
+        content: entry.content
       });
 
       console.log('✅ [DATABASE-MEMORY] Message stored successfully');

@@ -186,13 +186,7 @@ export interface ChatMessage {
   structured_content?: ContentBlock[];
   timestamp: string;
   
-  // Metadata
-  provider?: 'openai' | 'anthropic';
-  model?: string;
-  usage?: UsageStats;
-  
   // Optional fields
-  agent_id?: string;
   stream_id?: string;
 }
 

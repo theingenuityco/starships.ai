@@ -16,10 +16,6 @@ export class ChatMessageRepository extends BaseRepository {
     role: 'user' | 'assistant' | 'system';
     content: string;
     structured_content?: ContentBlock[];
-    provider?: string;
-    model?: string;
-    usage?: UsageStats;
-    agent_id?: string;
     stream_id?: string;
   }): Promise<ChatMessage> {
     return this.executeWithErrorHandling(async () => {
@@ -37,10 +33,6 @@ export class ChatMessageRepository extends BaseRepository {
         content: data.content,
         structured_content: data.structured_content ? JSON.stringify(data.structured_content) : null,
         timestamp: now,
-        provider: data.provider || null,
-        model: data.model || null,
-        usage: data.usage ? JSON.stringify(data.usage) : null,
-        agent_id: data.agent_id || null,
         stream_id: data.stream_id || null
       };
 
@@ -61,8 +53,7 @@ export class ChatMessageRepository extends BaseRepository {
 
       return {
         ...messageData,
-        structured_content: data.structured_content,
-        usage: data.usage
+        structured_content: data.structured_content
       } as ChatMessage;
     }, 'create', 'ChatMessage');
   }
@@ -218,10 +209,6 @@ export class ChatMessageRepository extends BaseRepository {
       content: record.content,
       structured_content: record.structured_content ? JSON.parse(record.structured_content) : undefined,
       timestamp: record.timestamp,
-      provider: record.provider || undefined,
-      model: record.model || undefined,
-      usage: record.usage ? JSON.parse(record.usage) : undefined,
-      agent_id: record.agent_id || undefined,
       stream_id: record.stream_id || undefined
     };
   }

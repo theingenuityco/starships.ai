@@ -264,7 +264,7 @@ export const WorkflowApprovalModal: React.FC<WorkflowApprovalModalProps> = ({
                     <Textarea
                       placeholder="Please provide a reason for rejecting this workflow..."
                       value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRejectionReason(e.target.value)}
                       rows={3}
                       className="resize-none"
                     />

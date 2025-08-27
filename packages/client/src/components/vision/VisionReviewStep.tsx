@@ -77,7 +77,7 @@ export function VisionReviewStep({
             <div className="relative">
               <Textarea
                 value={editedVision}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                   setEditedVision(e.target.value);
                   setError(null);
                 }}

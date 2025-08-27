@@ -8,6 +8,11 @@ metadata:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     
+    # WebSocket support
+    nginx.ingress.kubernetes.io/websocket-services: "starships-service"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "starships-prod/custom-headers"
+    
     # Performance (matching dev)
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
@@ -37,6 +42,13 @@ spec:
             name: starships-service
             port:
               number: 3000
+      - path: /socket.io
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: starships-service
+            port:
+              number: 4000
       - path: /api
         pathType: Prefix
         backend:
@@ -68,6 +80,13 @@ spec:
             name: starships-service
             port:
               number: 3000
+      - path: /socket.io
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: starships-service
+            port:
+              number: 4000
       - path: /api
         pathType: Prefix
         backend:

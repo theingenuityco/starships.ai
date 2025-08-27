@@ -83,6 +83,8 @@ spec:
           value: "https://starships.ai"
         - name: NEXT_PUBLIC_API_URL
           value: "https://starships.ai/api"
+        - name: NEXT_PUBLIC_SERVER_URL
+          value: "https://starships.ai"
         - name: SERVER_URL
           value: "http://localhost:4000"
         

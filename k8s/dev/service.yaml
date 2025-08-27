@@ -17,10 +17,14 @@ spec:
     targetPort: 3000
   - name: backend
     port: 4000
-    targetPort: 3001
+    targetPort: 4000
   - name: neo4j-http
     port: 7474
     targetPort: 7474
   - name: neo4j-bolt
     port: 7687
     targetPort: 7687
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800

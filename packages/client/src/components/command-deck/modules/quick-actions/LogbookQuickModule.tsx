@@ -5,8 +5,7 @@ interface LogbookQuickModuleProps {
   onAction: (action: string, data?: any) => void;
 }
 
-export function LogbookQuickModule({ data, onAction }: LogbookQuickModuleProps) {
-  const recentEntries = 12;
+export function LogbookQuickModule({ data: _data, onAction }: LogbookQuickModuleProps) {
   const totalEntries = 247;
   const unreadEntries = 3;
 

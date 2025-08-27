@@ -12,9 +12,6 @@ import { agentAPI, starshipAPI, type Agent } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { cn } from '@/lib/utils'
 
-interface DeployedAgent extends Agent {
-  isDeployed: boolean
-}
 
 export function CrewManagement() {
   const { activeStarshipId, deployAgent, removeAgent } = useStarshipStore()

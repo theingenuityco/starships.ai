@@ -1,12 +1,11 @@
-import { Brain, TrendingUp, Lightbulb, Zap, Eye, Target, AlertCircle } from 'lucide-react';
+import { Brain, Lightbulb, Zap, Eye, Target, AlertCircle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SocketClient from '@/lib/socket-client';
 import { useAuth } from '@/hooks/useAuth';
-import type { 
-  VisionAnalyzingEventData, 
-  VisionProposalEventData, 
-  VisionUpdatedEventData,
-  VisionMetrics
+import type {
+  VisionAnalyzingEventData,
+  VisionProposalEventData,
+  VisionUpdatedEventData
 } from '@starships/protocol';
 
 interface SibilQuickModuleProps {
@@ -101,7 +100,6 @@ export function SibilQuickModule({ data, onAction }: SibilQuickModuleProps) {
   // Mock AI data - replace with real AI data
   const newPredictions = 3;
   const confidence = 94;
-  const recommendations = 2;
   const processingActive = visionBeingRefined || true;
 
   return (

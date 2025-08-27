@@ -5,10 +5,8 @@ interface DriveQuickModuleProps {
   onAction: (action: string, data?: any) => void;
 }
 
-export function DriveQuickModule({ data, onAction }: DriveQuickModuleProps) {
-  const driveStatus = 'warning'; // warning from navigation
+export function DriveQuickModule({ data: _data, onAction }: DriveQuickModuleProps) {
   const thrusterPower = 78;
-  const fuelLevel = 45;
 
   return (
     <div className="space-y-3">

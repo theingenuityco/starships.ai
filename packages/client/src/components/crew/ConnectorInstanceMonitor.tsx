@@ -31,8 +31,6 @@ import {
   Eye,
   EyeOff,
   BarChart3,
-  Settings,
-  Info,
   Lightbulb,
   Key,
   Minus,
@@ -475,10 +473,10 @@ function ConnectorMonitorCard({
 }
 
 export function ConnectorInstanceMonitor({
-  starshipId,
+  starshipId: _starshipId,
   connectorInstances,
   className,
-  showDetailedView = false,
+  showDetailedView: _showDetailedView = false,
   autoRefresh = true,
   refreshInterval = 30000,
 }: ConnectorInstanceMonitorProps) {

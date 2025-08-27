@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starships-app
+  namespace: starships-prod
+  labels:
+    app: starships-ai
+spec:
+  replicas: 1 # Single replica for MVP
+  selector:
+    matchLabels:
+      app: starships-ai
+  template:
+    metadata:
+      labels:
+        app: starships-ai
+    spec:
+      containers:
+        - name: starships
+          image: ghcr.io/theingenuityco/starships.ai:3.3.1
+          imagePullPolicy: Always
+          # Use default CMD from Dockerfile (supervisor-entrypoint.sh)
+          # Image has correct Kinde env vars baked in from GitHub Actions build
+          ports:
+            - containerPort: 3000
+              name: frontend
+            - containerPort: 4000
+              name: backend
+            - containerPort: 7474
+              name: neo4j-http
+            - containerPort: 7687
+              name: neo4j-bolt
+          envFrom:
+            - secretRef:
+                name: kinde-auth-secret
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: SKIP_BUILD
+              value: 'true'
+            - name: NEO4J_URI
+              value: 'bolt://localhost:7687'
+            - name: NEO4J_USERNAME
+              value: 'neo4j'
+            - name: NEO4J_PASSWORD
+              value: 'password'
+            - name: SKIP_INSTALL
+              value: 'true'
+            - name: CLIENT_URL
+              value: 'https://starships.ai'
+            - name: NEXT_PUBLIC_API_URL
+              value: 'https://starships.ai/api'
+            - name: SERVER_URL
+              value: 'http://localhost:4000'
+            - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
+              value: 'true'
+            - name: KINDE_DEBUG_MODE
+              value: 'true'
+            - name: KINDE_COOKIE_DOMAIN
+              value: 'starships.ai'
+            # Kinde vars are loaded from kinde-auth-secret
+            # Additional API keys for backend - load from secrets
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: OPENAI_API_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ANTHROPIC_API_KEY
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_SECRET_KEY
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_WEBHOOK_SECRET
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_PUBLISHABLE_KEY
+          resources:
+            requests:
+              memory: '512Mi' # Reduced for MVP
+              cpu: '250m'
+            limits:
+              memory: '2Gi' # For Neo4j
+              cpu: '1000m'
+          volumeMounts:
+            - name: neo4j-data
+              mountPath: /var/lib/neo4j/data
+            - name: app-sessions
+              mountPath: /app/data/sessions
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      volumes:
+        - name: neo4j-data
+          persistentVolumeClaim:
+            claimName: neo4j-data-pvc
+        - name: app-sessions
+          persistentVolumeClaim:
+            claimName: sessions-pvc

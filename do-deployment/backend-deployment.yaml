@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: starships-prod
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4000
+    targetPort: 4000
+    name: http
+  selector:
+    app: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: starships-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      initContainers:
+      - name: wait-for-neo4j
+        image: busybox:1.35
+        command: ['sh', '-c', 'until nc -z neo4j-service 7687; do echo waiting for neo4j; sleep 2; done']
+      containers:
+      - name: backend
+        image: ghcr.io/theingenuityco/starships.ai:backend-latest
+        ports:
+        - containerPort: 4000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "4000"
+        - name: NEO4J_URI
+          value: "bolt://neo4j-service:7687"
+        - name: NEO4J_USERNAME
+          value: "neo4j"
+        - name: NEO4J_PASSWORD
+          value: "password"
+        - name: CLIENT_URL
+          value: "http://134.199.179.240"
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://backend-service:4000"
+        - name: SERVER_URL
+          value: "http://backend-service:4000"
+        - name: SKIP_VECTOR_STORE
+          value: "true"
+        envFrom:
+        - secretRef:
+            name: starships-secrets
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 5

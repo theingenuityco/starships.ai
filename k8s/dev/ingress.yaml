@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: starships-app-ingress
+  namespace: starships-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($request_uri ~* "^/api/(.*)") {
+        proxy_pass http://starships-app-internal.starships-dev.svc.cluster.local:4000/api/$1;
+      }
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - dev.starships.ai
+    secretName: dev-starships-ai-tls
+  rules:
+  - host: dev.starships.ai
+    http:
+      paths:
+      - path: /api/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 4000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000

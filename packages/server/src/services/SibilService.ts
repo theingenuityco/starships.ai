@@ -1,12 +1,29 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import type { ChatRequest, ChatResponse, ChatStreamChunk, ContentBlock, UsageStats } from '@starships/protocol';
+import type { ChatRequest, ChatResponse, ChatStreamChunk, ContentBlock, UsageStats, ChatSession, ChatMessage } from '@starships/protocol';
 import { env } from '../config/environment';
 import { RepositoryFactory } from '@starships/models';
 import { VisionRefinementService } from './VisionRefinementService';
 import { AffirmationDetector } from './AffirmationDetector';
 import { VisionMetricsCalculator } from './VisionMetricsCalculator';
-import { VisionRefinementSessionManager, type VisionRefinementSession } from './VisionRefinementSessionManager';
+
+// Vision refinement session interface for compatibility
+interface VisionRefinementState {
+  sessionId: string;
+  starshipId: string;
+  userId: string;
+  currentVision: string;
+  proposedVision?: string;
+  awaitingConfirmation: boolean;
+  confidenceLevel: number;
+  refinementCount: number;
+  conversationContext: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: number;
+    metadata?: any;
+  }>;
+}
 
 export class SibilService {
   private static openai = new OpenAI({
@@ -21,7 +38,9 @@ export class SibilService {
   private static visionRefinementService: VisionRefinementService | null = null;
   private static affirmationDetector: AffirmationDetector | null = null;
   private static metricsCalculator: VisionMetricsCalculator | null = null;
-  private static sessionManager: VisionRefinementSessionManager | null = null;
+  
+  // In-memory state for vision refinement sessions (temporary during migration)
+  private static visionRefinementStates: Map<string, VisionRefinementState> = new Map();
 
   private static getVisionRefinementService(): VisionRefinementService {
     if (!this.visionRefinementService) {
@@ -44,11 +63,99 @@ export class SibilService {
     return this.metricsCalculator;
   }
 
-  private static getSessionManager(): VisionRefinementSessionManager {
-    if (!this.sessionManager) {
-      this.sessionManager = new VisionRefinementSessionManager();
+  // Helper methods for chat session management
+  private static async getOrCreateChatSession(userId: string, starshipId: string): Promise<ChatSession> {
+    const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
+    
+    // Try to find active session for this user and starship
+    const activeSessions = await chatSessionRepo.findByUser(userId, 10);
+    const existingSession = activeSessions.find((session: ChatSession) => 
+      session.starship_id === starshipId && 
+      session.source === 'sibil' &&
+      this.isSessionActive(session)
+    );
+    
+    if (existingSession) {
+      // Update activity
+      await chatSessionRepo.updateActivity(existingSession.id);
+      return existingSession;
     }
-    return this.sessionManager;
+    
+    // Create new session
+    return await chatSessionRepo.create({
+      source: 'sibil',
+      created_by: userId,
+      starship_id: starshipId
+    });
+  }
+  
+  private static isSessionActive(session: ChatSession): boolean {
+    const lastActivity = new Date(session.last_activity_at);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
+    return diffMinutes < 30; // 30 minute timeout
+  }
+  
+  private static async storeMessage(sessionId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> {
+    const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
+    await chatMessageRepo.create({
+      session_id: sessionId,
+      role,
+      content,
+      structured_content: metadata?.structured_content,
+      provider: metadata?.provider,
+      model: metadata?.model,
+      usage: metadata?.usage
+    });
+  }
+  
+  private static async getConversationHistory(sessionId: string, limit: number = 10): Promise<ChatMessage[]> {
+    const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
+    return await chatMessageRepo.getRecentMessages(sessionId, limit);
+  }
+  
+  private static async getOrCreateVisionRefinementState(userId: string, starshipId: string, currentVision: string, chatSession: ChatSession): Promise<VisionRefinementState> {
+    const sessionKey = `${userId}_${starshipId}`;
+    let state = this.visionRefinementStates.get(sessionKey);
+    
+    if (!state) {
+      // Get conversation history to build context
+      const messages = await this.getConversationHistory(chatSession.id, 10);
+      const conversationContext = messages.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        timestamp: new Date(msg.timestamp).getTime(),
+        metadata: msg.structured_content ? { structured_content: msg.structured_content } : undefined
+      }));
+      
+      state = {
+        sessionId: chatSession.id,
+        starshipId,
+        userId,
+        currentVision,
+        awaitingConfirmation: false,
+        confidenceLevel: 0.5,
+        refinementCount: 0,
+        conversationContext
+      };
+      
+      this.visionRefinementStates.set(sessionKey, state);
+    }
+    
+    return state;
+  }
+  
+  private static getVisionRefinementState(userId: string, starshipId: string): VisionRefinementState | null {
+    const sessionKey = `${userId}_${starshipId}`;
+    return this.visionRefinementStates.get(sessionKey) || null;
+  }
+  
+  private static updateVisionRefinementState(userId: string, starshipId: string, updates: Partial<VisionRefinementState>): void {
+    const sessionKey = `${userId}_${starshipId}`;
+    const state = this.visionRefinementStates.get(sessionKey);
+    if (state) {
+      Object.assign(state, updates);
+    }
   }
 
   static async chat(request: ChatRequest): Promise<ChatResponse> {
@@ -93,16 +200,18 @@ export class SibilService {
     }
 
     try {
-      // Check if there's an active vision session awaiting confirmation
-      const sessionManager = SibilService.getSessionManager();
-      const existingSession = sessionManager.getSessionForUser(user_id!);
-      const hasActiveVisionSession = existingSession && existingSession.awaitingConfirmation;
+      // Get or create chat session
+      const chatSession = await this.getOrCreateChatSession(user_id!, starship_id!);
+      
+      // Check if there's an active vision refinement state
+      const visionState = this.getVisionRefinementState(user_id!, starship_id!);
+      const hasActiveVisionSession = visionState && visionState.awaitingConfirmation;
       
       // Check if message is vision-related or there's an active session
-      const isVisionRelated = SibilService.getVisionRefinementService().isVisionRelated(message);
+      const isVisionRelated = this.getVisionRefinementService().isVisionRelated(message);
       
       if (isVisionRelated || hasActiveVisionSession) {
-        yield* this.streamVisionRefinement(request);
+        yield* this.streamVisionRefinement(request, chatSession);
       } else {
         yield* this.streamNormalChat(request);
       }
@@ -117,7 +226,7 @@ export class SibilService {
   }
 
   // Vision refinement streaming flow
-  private static async *streamVisionRefinement(request: ChatRequest): AsyncGenerator<ChatStreamChunk> {
+  private static async *streamVisionRefinement(request: ChatRequest, chatSession: ChatSession): AsyncGenerator<ChatStreamChunk> {
     const { message, starship_id, user_id } = request;
     
     // Get current vision
@@ -129,73 +238,74 @@ export class SibilService {
       return;
     }
 
-    // Get or create refinement session
-    const session = SibilService.getSessionManager().getOrCreateSession(user_id!, starship_id!, vision.statement);
+    // Get or create vision refinement state
+    const visionState = await this.getOrCreateVisionRefinementState(user_id!, starship_id!, vision.statement, chatSession);
     console.log('Vision refinement session:', {
-      sessionId: session.sessionId,
-      awaitingConfirmation: session.awaitingConfirmation,
-      hasProposedVision: !!session.proposedVision,
-      proposedVision: session.proposedVision
+      sessionId: visionState.sessionId,
+      awaitingConfirmation: visionState.awaitingConfirmation,
+      hasProposedVision: !!visionState.proposedVision,
+      proposedVision: visionState.proposedVision
     });
     
-    // Add user message to session
-    SibilService.getSessionManager().addMessage(session.sessionId, 'user', message, {
+    // Store user message
+    await this.storeMessage(chatSession.id, 'user', message, {
       isVisionRelated: true
     });
 
     // Check if awaiting confirmation for previous proposal
-    if (session.awaitingConfirmation) {
-      yield* this.handleConfirmationResponse(session, message, request);
+    if (visionState.awaitingConfirmation) {
+      yield* this.handleConfirmationResponse(visionState, message, request, chatSession);
       return;
     }
 
     // Process new vision refinement request
-    yield* this.processVisionRefinement(session, message, request);
+    yield* this.processVisionRefinement(visionState, message, request, chatSession);
   }
 
   // Handle confirmation response (accept/reject/modify)
   private static async *handleConfirmationResponse(
-    session: VisionRefinementSession, 
+    state: VisionRefinementState, 
     message: string, 
-    request: ChatRequest
+    request: ChatRequest,
+    chatSession: ChatSession
   ): AsyncGenerator<ChatStreamChunk> {
-    const analysis = SibilService.getAffirmationDetector().analyzeResponse(message);
+    const analysis = this.getAffirmationDetector().analyzeResponse(message);
     
-    // Add analysis metadata to session message
-    const lastMessageIndex = session.conversationContext.length - 1;
-    if (session.conversationContext[lastMessageIndex]) {
-      session.conversationContext[lastMessageIndex].metadata = {
-        ...session.conversationContext[lastMessageIndex].metadata,
-        userIntent: analysis.intent
-      };
-    }
+    // Add to conversation context
+    state.conversationContext.push({
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+      metadata: { userIntent: analysis.intent }
+    });
 
     switch (analysis.intent) {
       case 'accept':
-        yield* this.acceptVisionRefinement(session, request);
+        yield* this.acceptVisionRefinement(state, request, chatSession);
         break;
       
       case 'reject':
-        yield* this.rejectVisionRefinement(session, analysis.feedback, request);
+        yield* this.rejectVisionRefinement(state, analysis.feedback, request, chatSession);
         break;
       
       case 'modify':
-        yield* this.handleModificationRequest(session, analysis.feedback, message, request);
+        yield* this.handleModificationRequest(state, analysis.feedback, message, request, chatSession);
         break;
       
       default:
-        yield* this.handleUnclearResponse(session, request);
+        yield* this.handleUnclearResponse(state, request, chatSession);
         break;
     }
   }
 
   // Accept vision refinement and update database
   private static async *acceptVisionRefinement(
-    session: VisionRefinementSession,
-    request: ChatRequest
+    state: VisionRefinementState,
+    request: ChatRequest,
+    chatSession: ChatSession
   ): AsyncGenerator<ChatStreamChunk> {
-    if (!session.proposedVision) {
-      console.error('No proposed vision in session:', session.sessionId);
+    if (!state.proposedVision) {
+      console.error('No proposed vision in session:', state.sessionId);
       yield {
         source: 'sibil',
         type: 'error',
@@ -207,22 +317,22 @@ export class SibilService {
 
     try {
       // Save the proposed vision before it gets cleared
-      const proposedVisionText = session.proposedVision;
+      const proposedVisionText = state.proposedVision;
       
       // Update vision in database
       const visionRepo = RepositoryFactory.getVisionRepository();
       
       // First check if vision exists
-      const existingVision = await visionRepo.findByStarship(session.starshipId);
+      const existingVision = await visionRepo.findByStarship(state.starshipId);
       
       let updatedVision;
       if (existingVision) {
         // Update existing vision
-        updatedVision = await visionRepo.updateStatement(session.starshipId, proposedVisionText);
+        updatedVision = await visionRepo.updateStatement(state.starshipId, proposedVisionText);
       } else {
         // Create new vision if it doesn't exist
         updatedVision = await visionRepo.create({
-          starshipId: session.starshipId,
+          starshipId: state.starshipId,
           statement: proposedVisionText,
           refinementCount: 1,
           confidence: 0.8,
@@ -235,11 +345,15 @@ export class SibilService {
         throw new Error('Failed to update or create vision');
       }
       
-      // Update session state (this will clear proposedVision)
-      SibilService.getSessionManager().acceptProposal(session.sessionId);
+      // Update state
+      this.updateVisionRefinementState(state.userId, state.starshipId, {
+        awaitingConfirmation: false,
+        proposedVision: undefined,
+        refinementCount: state.refinementCount + 1
+      });
       
       // Calculate metrics for the new vision using the saved text
-      await SibilService.getMetricsCalculator().calculateMetrics(
+      await this.getMetricsCalculator().calculateMetrics(
         proposedVisionText,
         updatedVision?.refinementCount || 0
       );
@@ -249,8 +363,8 @@ export class SibilService {
       
       yield* this.streamTextResponse(confirmationMessage, request);
       
-      // Add assistant message to session
-      SibilService.getSessionManager().addMessage(session.sessionId, 'assistant', confirmationMessage, {
+      // Store assistant message
+      await this.storeMessage(chatSession.id, 'assistant', confirmationMessage, {
         isVisionRelated: true
       });
 
@@ -267,12 +381,16 @@ export class SibilService {
 
   // Reject vision refinement and ask for feedback
   private static async *rejectVisionRefinement(
-    session: VisionRefinementSession,
+    state: VisionRefinementState,
     feedback: string[],
-    request: ChatRequest
+    request: ChatRequest,
+    chatSession: ChatSession
   ): AsyncGenerator<ChatStreamChunk> {
-    // Update session state
-    SibilService.getSessionManager().rejectProposal(session.sessionId, feedback);
+    // Update state
+    this.updateVisionRefinementState(state.userId, state.starshipId, {
+      awaitingConfirmation: false,
+      proposedVision: undefined
+    });
     
     let response = "No problem! I understand this refinement doesn't quite capture what you're looking for. ";
     
@@ -284,60 +402,66 @@ export class SibilService {
     
     yield* this.streamTextResponse(response, request);
     
-    // Add assistant message to session
-    SibilService.getSessionManager().addMessage(session.sessionId, 'assistant', response);
+    // Store assistant message
+    await this.storeMessage(chatSession.id, 'assistant', response);
   }
 
   // Handle modification requests
   private static async *handleModificationRequest(
-    session: VisionRefinementSession,
+    state: VisionRefinementState,
     feedback: string[],
     message: string,
-    request: ChatRequest
+    request: ChatRequest,
+    chatSession: ChatSession
   ): AsyncGenerator<ChatStreamChunk> {
-    // Update session state
-    SibilService.getSessionManager().rejectProposal(session.sessionId, feedback);
+    // Update state
+    this.updateVisionRefinementState(state.userId, state.starshipId, {
+      awaitingConfirmation: false,
+      proposedVision: undefined
+    });
     
     // Process the modification request as a new refinement
-    yield* this.processVisionRefinement(session, message, request);
+    yield* this.processVisionRefinement(state, message, request, chatSession);
   }
 
   // Handle unclear responses
   private static async *handleUnclearResponse(
-    session: VisionRefinementSession,
-    request: ChatRequest
+    state: VisionRefinementState,
+    request: ChatRequest,
+    chatSession: ChatSession
   ): AsyncGenerator<ChatStreamChunk> {
     const response = "I want to make sure I understand correctly. Are you happy with this vision refinement, or would you like me to make some adjustments? You can say 'yes' to accept it, or tell me what you'd like me to change.";
     
     yield* this.streamTextResponse(response, request);
     
-    // Add assistant message to session
-    SibilService.getSessionManager().addMessage(session.sessionId, 'assistant', response);
+    // Store assistant message
+    await this.storeMessage(chatSession.id, 'assistant', response);
   }
 
   // Process vision refinement request
   private static async *processVisionRefinement(
-    session: VisionRefinementSession,
+    state: VisionRefinementState,
     message: string,
-    request: ChatRequest
+    request: ChatRequest,
+    chatSession: ChatSession
   ): AsyncGenerator<ChatStreamChunk> {
-    // Get conversation context
-    const conversationHistory = session.conversationContext.slice(-5); // Last 5 messages
+    // Get conversation context (last 5 messages)
+    const conversationHistory = state.conversationContext.slice(-5);
     
     // Generate refinement
-    const refinement = await SibilService.getVisionRefinementService().refine(
-      session.currentVision,
+    const refinement = await this.getVisionRefinementService().refine(
+      state.currentVision,
       message,
       conversationHistory
     );
     
     if (refinement.proposedVision) {
-      // Set session to awaiting confirmation
-      SibilService.getSessionManager().setAwaitingConfirmation(
-        session.sessionId, 
-        refinement.proposedVision, 
-        refinement.confidenceLevel
-      );
+      // Update state to awaiting confirmation
+      this.updateVisionRefinementState(state.userId, state.starshipId, {
+        proposedVision: refinement.proposedVision,
+        awaitingConfirmation: true,
+        confidenceLevel: refinement.confidenceLevel
+      });
       
       // Stream the proposed vision
       let response = `Based on our conversation, I'd like to propose this refined vision:\n\n**"${refinement.proposedVision}"**\n\n`;
@@ -346,21 +470,21 @@ export class SibilService {
       
       yield* this.streamTextResponse(response, request);
       
-      // Add assistant message to session
-      SibilService.getSessionManager().addMessage(session.sessionId, 'assistant', response, {
+      // Store assistant message
+      await this.storeMessage(chatSession.id, 'assistant', response, {
         isVisionRelated: true,
         proposalIncluded: true
       });
     } else {
       // No refinement needed or couldn't generate one
-      let response = `I've analyzed your current vision: "${session.currentVision}"\n\n`;
+      let response = `I've analyzed your current vision: "${state.currentVision}"\n\n`;
       response += `**Analysis:** ${refinement.reasoning}\n\n`;
       response += "Your vision is already quite strong! Is there any particular aspect you'd like to enhance or clarify?";
       
       yield* this.streamTextResponse(response, request);
       
-      // Add assistant message to session
-      SibilService.getSessionManager().addMessage(session.sessionId, 'assistant', response, {
+      // Store assistant message
+      await this.storeMessage(chatSession.id, 'assistant', response, {
         isVisionRelated: true
       });
     }

@@ -2,7 +2,7 @@
 export { chat } from './chat';
 
 // Export memory and other utilities
-export { LangChainMemoryStore } from "./memory/langchain-memory";
+export { DatabaseMemoryStore } from "./memory/database-memory";
 
 // Export LLM Provider Factory and LangChainProvider
 export { ProviderFactory } from './llm/provider-factory';
@@ -14,7 +14,7 @@ export type { NativeToolConfig } from './tools/NativeToolWrapper';
 
 // Create a minimal streaming function wrapper for backward compatibility
 import type { ChatRequest } from "@starships/protocol";
-import { LangChainMemoryStore } from "./memory/langchain-memory";
+import { DatabaseMemoryStore } from "./memory/database-memory";
 import { ProviderFactory } from "./llm/provider-factory";
 import { RepositoryFactory } from "@starships/models";
 import { buildPrompt } from "./prompt/builder";
@@ -24,7 +24,7 @@ import { buildPrompt } from "./prompt/builder";
  */
 export async function* chatStream(
   req: ChatRequest,
-  store: LangChainMemoryStore
+  store: DatabaseMemoryStore
 ): AsyncGenerator<string, void, unknown> {
   // This is a simplified streaming implementation
   // For full streaming with native tools, use the chat function from chat.ts

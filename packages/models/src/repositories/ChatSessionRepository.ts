@@ -65,6 +65,26 @@ export class ChatSessionRepository extends BaseRepository {
   }
 
   /**
+   * Find sessions by user ID
+   */
+  async findByUser(userId: string, limit: number = 50): Promise<ChatSession[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ userId }, ['userId'], 'findByUser');
+
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ s: any }>(
+        `MATCH (s:ChatSession {created_by: $userId})
+         RETURN s
+         ORDER BY s.last_activity_at DESC
+         LIMIT $limit`,
+        { userId, limit }
+      );
+
+      return result.map(record => record.s as ChatSession);
+    }, 'findByUser', 'ChatSession');
+  }
+
+  /**
    * Update last activity and token count
    */
   async updateActivity(sessionId: string, tokensUsed: number = 0): Promise<boolean> {

@@ -52,7 +52,7 @@ function checkVisionRateLimit(userId: string): boolean {
 }
 
 export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
-  // Lazy-initialize vision refinement services
+  // Lazy-initialize services
   let visionRefinementService: VisionRefinementService | null = null;
   let visionSessionManager: VisionRefinementSessionManager | null = null;
   let visionMetricsCalculator: VisionMetricsCalculator | null = null;
@@ -84,6 +84,51 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
       visionRepo = RepositoryFactory.getVisionRepository();
     }
     return visionRepo;
+  };
+
+  // Helper functions for chat session management (new database-backed approach)
+  const getOrCreateChatSession = async (userId: string, starshipId: string): Promise<any> => {
+    const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
+    
+    // Try to find active session
+    const activeSessions = await chatSessionRepo.findByUser(userId, 10);
+    const existingSession = activeSessions.find((session: any) =>
+      session.starship_id === starshipId &&
+      session.source === 'sibil' &&
+      isSessionActive(session)
+    );
+    
+    if (existingSession) {
+      await chatSessionRepo.updateActivity(existingSession.id);
+      return existingSession;
+    }
+    
+    // Create new session
+    return await chatSessionRepo.create({
+      source: 'sibil',
+      created_by: userId,
+      starship_id: starshipId
+    });
+  };
+  
+  const isSessionActive = (session: any): boolean => {
+    const lastActivity = new Date(session.last_activity_at);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
+    return diffMinutes < 30; // 30 minute timeout
+  };
+  
+  const storeMessage = async (sessionId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> => {
+    const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
+    await chatMessageRepo.create({
+      session_id: sessionId,
+      role,
+      content,
+      structured_content: metadata?.structured_content,
+      provider: metadata?.provider,
+      model: metadata?.model,
+      usage: metadata?.usage
+    });
   };
 
   io.on('connection', (socket: Socket) => {

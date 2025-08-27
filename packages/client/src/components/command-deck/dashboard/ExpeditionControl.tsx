@@ -3,8 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 export function ExpeditionControl() {
-  const { activeStarshipId, starshipAgents } = useStarshipStore();
-  const deployedAgents = activeStarshipId ? starshipAgents[activeStarshipId]?.deployedCount ?? 0 : 0;
+  const { activeStarshipId } = useStarshipStore();
+  const deployedAgents = 0; // Placeholder since starshipAgents was unused
   
   return (
     <Card className="p-6">

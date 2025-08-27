@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import type {
   SocketConnectionState,
-  SocketIOEvents,
+  SocketEvents,
   EventEmissionOptions,
   EventEmissionResult
 } from '@starships/protocol';
@@ -49,7 +49,7 @@ async function verifySocketJWT(token: string) {
  */
 export class SocketIOService {
   private static instance: SocketIOService;
-  private io: SocketIOServer<SocketIOEvents>;
+  private io: SocketIOServer<SocketEvents>;
   private connections: Map<string, SocketConnectionState> = new Map();
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
@@ -491,7 +491,7 @@ export class SocketIOService {
   }
 
   // Public methods for other services
-  getIO(): SocketIOServer<SocketIOEvents> {
+  getIO(): SocketIOServer<SocketEvents> {
     return this.io;
   }
 
@@ -517,7 +517,7 @@ export class SocketIOService {
     console.log(`[SOCKET.IO] User ${userId} left agent room: ${room}`);
   }
 
-  emitToAgentRoom(agentId: string, userId: string, event: keyof SocketIOEvents, data: any) {
+  emitToAgentRoom(agentId: string, userId: string, event: keyof SocketEvents, data: any) {
     const agentRoom = this.getAgentRoom(agentId, userId);
     this.io.to(agentRoom).emit(event, data);
   }
@@ -537,10 +537,10 @@ export class SocketIOService {
 
 
   // Enhanced event emission with error handling and retry logic
-  async emitToUser<K extends keyof SocketIOEvents>(
+  async emitToUser<K extends keyof SocketEvents>(
     userId: string,
     event: K,
-    data: Parameters<SocketIOEvents[K]>[0],
+    data: Parameters<SocketEvents[K]>[0],
     options?: Partial<EventEmissionOptions>
   ): Promise<EventEmissionResult> {
     const userRoom = this.getUserRoom(userId);
@@ -551,7 +551,7 @@ export class SocketIOService {
   // Legacy method for backward compatibility
   async emitToUserWithRetry(
     userId: string,
-    event: keyof SocketIOEvents,
+    event: keyof SocketEvents,
     data: any,
     options: EventEmissionOptions = {}
   ): Promise<EventEmissionResult> {
@@ -559,14 +559,14 @@ export class SocketIOService {
   }
 
 
-  private async emitToRoom<K extends keyof SocketIOEvents>(
+  private async emitToRoom<K extends keyof SocketEvents>(
     room: string,
     event: K,
-    data: Parameters<SocketIOEvents[K]>[0],
+    data: Parameters<SocketEvents[K]>[0],
     options: EventEmissionOptions
   ): Promise<EventEmissionResult> {
-    const startTime = Date.now();
-    const errors: Array<{ userId: string; error: string }> = [];
+    // const startTime = Date.now();
+    // const errors: Array<{ userId: string; error: string }> = [];
     let recipientCount = 0;
 
     try {

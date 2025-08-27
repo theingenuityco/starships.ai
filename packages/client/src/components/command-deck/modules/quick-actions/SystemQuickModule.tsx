@@ -1,4 +1,4 @@
-import { Activity, Zap, Shield, Gauge } from 'lucide-react';
+import { Activity, Gauge } from 'lucide-react';
 
 interface SystemQuickModuleProps {
   data: any;

@@ -5,16 +5,12 @@ import { Users, Plus, UserMinus, UserCheck, Bot, Settings, Star, AlertCircle } f
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useStarshipStore } from '@/store/starship-store'
 import { agentAPI, starshipAPI, type Agent } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { cn } from '@/lib/utils'
 
-interface DeployedAgent extends Agent {
-  isDeployed: boolean
-}
 
 export function CrewManagement() {
   const { activeStarshipId, deployAgent, removeAgent } = useStarshipStore()

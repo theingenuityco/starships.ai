@@ -29,11 +29,16 @@ export async function* chatStream(
   // This is a simplified streaming implementation
   // For full streaming with native tools, use the chat function from chat.ts
   
+  // Validate that agent_id is provided for agent chat
+  if (!req.agent_id) {
+    throw new Error('agent_id is required for agent chat stream');
+  }
+  
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
-  const starshipRepo = RepositoryFactory.getStarshipRepository();
-  const visionRepo = RepositoryFactory.getVisionRepository();
-  const userRepo = RepositoryFactory.getUserRepository();
+  // const starshipRepo = RepositoryFactory.getStarshipRepository();
+  // const visionRepo = RepositoryFactory.getVisionRepository();
+  // const userRepo = RepositoryFactory.getUserRepository();
   
   ProviderFactory.initialize(agentRepo, llmRepo);
 
@@ -43,7 +48,7 @@ export async function* chatStream(
   }
 
   // Get memory and build prompt
-  const sessionKey = store.makeKey(req.agent_id, req.user_id);
+  const sessionKey = store.makeKey(req.agent_id!, req.user_id);
   const memory = await store.get(sessionKey);
   
   const prompt = buildPrompt(
@@ -52,7 +57,7 @@ export async function* chatStream(
     req.message
   );
 
-  const provider = await ProviderFactory.getProvider(req.agent_id);
+  const provider = await ProviderFactory.getProvider(req.agent_id!);
   
   // Stream the response
   let fullResponse = '';

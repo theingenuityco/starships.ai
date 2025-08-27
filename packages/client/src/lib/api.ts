@@ -6,7 +6,6 @@ import {
   CACHE_KEYS,
   invalidateAgentCaches,
   invalidateConnectorInstanceCaches,
-  invalidateMCPServerCaches,
 } from './cache'
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
@@ -737,16 +736,12 @@ export const mcpServerAPI = {
   // Connect MCP server to starship - DEPRECATED
   connectToStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
     console.warn('[API] MCP Server connection functionality has been removed:', { starshipId, mcpServerId })
-    // Use deprecation stub instead of actual cache invalidation
-    invalidateMCPServerCaches(starshipId)
     // No-op for compatibility
   },
 
   // Disconnect MCP server from starship - DEPRECATED
   disconnectFromStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
     console.warn('[API] MCP Server disconnection functionality has been removed:', { starshipId, mcpServerId })
-    // Use deprecation stub instead of actual cache invalidation
-    invalidateMCPServerCaches(starshipId)
     // No-op for compatibility
   },
 
@@ -810,7 +805,7 @@ export const mcpServerAPI = {
   getConnectorConfigHistory: async (
     starshipId: string,
     connectorId: string,
-    limit?: number
+    // Removed unused parameter
   ): Promise<any[]> => {
     console.warn('[API] MCP Configuration history retrieval has been removed:', { starshipId, connectorId })
     return []
@@ -821,7 +816,7 @@ export const mcpServerAPI = {
     starshipId: string,
     connectorId: string,
     historyId: string,
-    changeReason?: string
+    // Removed unused parameter
   ): Promise<void> => {
     console.warn('[API] MCP Configuration rollback has been removed:', { starshipId, connectorId, historyId })
     // No-op for compatibility

@@ -30,8 +30,8 @@ export function MessageList<T = Message>({
       if (messagesEndRef.current) {
         // Use instant scroll for code blocks to prevent bouncing
         const hasCodeBlock = messages.some(msg =>
-          typeof (msg as any).content === 'string' &&
-          (msg as any).content.includes('```')
+          typeof (msg as Message).content === 'string' &&
+          (msg as Message).content.includes('```')
         );
         
         messagesEndRef.current.scrollIntoView({
@@ -104,13 +104,13 @@ export function MessageList<T = Message>({
         {messages.map((message) => {
           // Check if MessageComponent is MessageBubble and pass streaming prop
           const isMessageBubble = MessageComponent === MessageBubble;
-          const streamingProp = isMessageBubble ? { streaming: (message as any).streaming } : {};
+          const streamingProp = isMessageBubble ? { streaming: (message as Message).streaming } : {};
           
           return (
             <MessageComponent
-              key={(message as any).id}
+              key={(message as Message).id}
               message={message}
-              {...streamingProp}
+              {...(streamingProp as Record<string, unknown>)}
             />
           );
         })}

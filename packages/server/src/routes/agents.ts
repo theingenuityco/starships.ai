@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { AgentService } from '../services/AgentService';
 import type {
   Agent,
-  AgentConfig,
   CreateAgentRequest,
   UpdateAgentRequest,
 } from '@starships/protocol';
@@ -224,7 +223,7 @@ router.post('/:id/rate', authMiddleware, async (req: Request, res: Response) => 
 // Usage tracking endpoint (called internally)
 router.post('/:id/track-usage', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const result = await AgentService.trackUsage(req.params.id, req.user!.id);
+    const result = await AgentService.trackUsage(req.params.id);
     if (!result) {
       res.status(404).json({ error: 'Agent not found' });
     } else {

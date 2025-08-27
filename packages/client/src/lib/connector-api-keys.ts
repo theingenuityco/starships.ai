@@ -436,41 +436,17 @@ export class ConnectorApiKeyManager {
    * Get environment variables string for the connector instance
    */
   public static buildEnvironmentString(
-    template: MCPServerOption,
-    apiKeyValues: Record<string, string>
+    template: MCPServerOption
   ): string {
     try {
       // Start with existing environment variables
       const envVars = template.env ? this.parseEnvironmentVariables(template.env) : {}
 
-      // Merge with API key values
-      const mergedValues = this.mergeWithEnvironment(
-        apiKeyValues,
-        this.detectRequirements(template)
-      )
+      // Removed unused code
 
-      // Replace placeholders in environment variables
-      for (const [key, value] of Object.entries(envVars)) {
-        if (typeof value === 'string') {
-          let processedValue = value
-          for (const [envKey, envValue] of Object.entries(mergedValues)) {
-            if (envValue) {
-              processedValue = processedValue.replace(
-                new RegExp(`\\$\\{${envKey}\\}`, 'g'),
-                envValue
-              )
-            }
-          }
-          envVars[key] = processedValue
-        }
-      }
+      // Removed unused code
 
-      // Add any direct environment variable mappings
-      for (const [envKey, envValue] of Object.entries(mergedValues)) {
-        if (envValue && !envVars[envKey]) {
-          envVars[envKey] = envValue
-        }
-      }
+      // Removed unused code
 
       return JSON.stringify(envVars, null, 2)
     } catch (error) {

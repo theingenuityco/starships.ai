@@ -1,7 +1,7 @@
 'use client'
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
-import { AlertTriangle, RefreshCw, Bug, ExternalLink } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Bug } from 'lucide-react'
 import { Button } from './button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card'
 import { Badge } from './badge'

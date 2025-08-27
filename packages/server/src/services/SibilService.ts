@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import type { SibilRequest, SibilResponse, SibilStreamChunk, ContentBlock, UsageStats } from '@starships/protocol';
+import type { ChatRequest, ChatResponse, ChatStreamChunk, ContentBlock, UsageStats } from '@starships/protocol';
 import { env } from '../config/environment';
 import { RepositoryFactory } from '@starships/models';
 import { VisionRefinementService } from './VisionRefinementService';
@@ -51,7 +51,7 @@ export class SibilService {
     return this.sessionManager;
   }
 
-  static async chat(request: SibilRequest): Promise<SibilResponse> {
+  static async chat(request: ChatRequest): Promise<ChatResponse> {
     const { provider, model, message, starship_id } = request;
 
     // Get system prompt with starship context
@@ -74,6 +74,7 @@ export class SibilService {
     const structured_content = this.parseStructuredContent(content);
 
     return {
+      source: 'sibil',
       content,
       structured_content,
       provider,
@@ -83,8 +84,8 @@ export class SibilService {
   }
 
   // NEW: Enhanced streaming method with vision refinement
-  static async *chatStream(request: SibilRequest): AsyncGenerator<SibilStreamChunk> {
-    const { provider, model, message, starship_id, user_id } = request;
+  static async *chatStream(request: ChatRequest): AsyncGenerator<ChatStreamChunk> {
+    const { message, starship_id, user_id } = request;
 
     if (!starship_id || !user_id) {
       yield* this.streamNormalChat(request);
@@ -107,6 +108,7 @@ export class SibilService {
       }
     } catch (error) {
       yield {
+        source: 'sibil',
         type: 'error',
         error: error instanceof Error ? error.message : 'Unknown streaming error',
         is_final: true
@@ -115,7 +117,7 @@ export class SibilService {
   }
 
   // Vision refinement streaming flow
-  private static async *streamVisionRefinement(request: SibilRequest): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamVisionRefinement(request: ChatRequest): AsyncGenerator<ChatStreamChunk> {
     const { message, starship_id, user_id } = request;
     
     // Get current vision
@@ -155,8 +157,8 @@ export class SibilService {
   private static async *handleConfirmationResponse(
     session: VisionRefinementSession, 
     message: string, 
-    request: SibilRequest
-  ): AsyncGenerator<SibilStreamChunk> {
+    request: ChatRequest
+  ): AsyncGenerator<ChatStreamChunk> {
     const analysis = SibilService.getAffirmationDetector().analyzeResponse(message);
     
     // Add analysis metadata to session message
@@ -190,11 +192,12 @@ export class SibilService {
   // Accept vision refinement and update database
   private static async *acceptVisionRefinement(
     session: VisionRefinementSession,
-    request: SibilRequest
-  ): AsyncGenerator<SibilStreamChunk> {
+    request: ChatRequest
+  ): AsyncGenerator<ChatStreamChunk> {
     if (!session.proposedVision) {
       console.error('No proposed vision in session:', session.sessionId);
       yield {
+        source: 'sibil',
         type: 'error',
         error: 'No vision refinement to accept. Please propose a refinement first.',
         is_final: true
@@ -236,8 +239,8 @@ export class SibilService {
       SibilService.getSessionManager().acceptProposal(session.sessionId);
       
       // Calculate metrics for the new vision using the saved text
-      const metrics = await SibilService.getMetricsCalculator().calculateMetrics(
-        proposedVisionText, 
+      await SibilService.getMetricsCalculator().calculateMetrics(
+        proposedVisionText,
         updatedVision?.refinementCount || 0
       );
 
@@ -254,6 +257,7 @@ export class SibilService {
     } catch (error) {
       console.error('Vision update error:', error);
       yield {
+        source: 'sibil',
         type: 'error',
         error: `Failed to update vision statement: ${error instanceof Error ? error.message : 'Unknown error'}`,
         is_final: true
@@ -265,8 +269,8 @@ export class SibilService {
   private static async *rejectVisionRefinement(
     session: VisionRefinementSession,
     feedback: string[],
-    request: SibilRequest
-  ): AsyncGenerator<SibilStreamChunk> {
+    request: ChatRequest
+  ): AsyncGenerator<ChatStreamChunk> {
     // Update session state
     SibilService.getSessionManager().rejectProposal(session.sessionId, feedback);
     
@@ -289,8 +293,8 @@ export class SibilService {
     session: VisionRefinementSession,
     feedback: string[],
     message: string,
-    request: SibilRequest
-  ): AsyncGenerator<SibilStreamChunk> {
+    request: ChatRequest
+  ): AsyncGenerator<ChatStreamChunk> {
     // Update session state
     SibilService.getSessionManager().rejectProposal(session.sessionId, feedback);
     
@@ -301,8 +305,8 @@ export class SibilService {
   // Handle unclear responses
   private static async *handleUnclearResponse(
     session: VisionRefinementSession,
-    request: SibilRequest
-  ): AsyncGenerator<SibilStreamChunk> {
+    request: ChatRequest
+  ): AsyncGenerator<ChatStreamChunk> {
     const response = "I want to make sure I understand correctly. Are you happy with this vision refinement, or would you like me to make some adjustments? You can say 'yes' to accept it, or tell me what you'd like me to change.";
     
     yield* this.streamTextResponse(response, request);
@@ -315,8 +319,8 @@ export class SibilService {
   private static async *processVisionRefinement(
     session: VisionRefinementSession,
     message: string,
-    request: SibilRequest
-  ): AsyncGenerator<SibilStreamChunk> {
+    request: ChatRequest
+  ): AsyncGenerator<ChatStreamChunk> {
     // Get conversation context
     const conversationHistory = session.conversationContext.slice(-5); // Last 5 messages
     
@@ -363,7 +367,7 @@ export class SibilService {
   }
 
   // Stream normal chat (non-vision related)
-  private static async *streamNormalChat(request: SibilRequest): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamNormalChat(request: ChatRequest): AsyncGenerator<ChatStreamChunk> {
     const { provider, model, message, starship_id } = request;
 
     // Get system prompt with starship context (including vision refinement capabilities)
@@ -377,6 +381,7 @@ export class SibilService {
       }
     } catch (error) {
       yield {
+        source: 'sibil',
         type: 'error',
         error: error instanceof Error ? error.message : 'Unknown streaming error',
         is_final: true
@@ -385,7 +390,7 @@ export class SibilService {
   }
 
   // Stream a simple text response
-  private static async *streamTextResponse(text: string, request: SibilRequest): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamTextResponse(text: string, request: ChatRequest): AsyncGenerator<ChatStreamChunk> {
     const { provider, model } = request;
     const words = text.split(' ');
     let content = '';
@@ -397,6 +402,7 @@ export class SibilService {
       chunkId++;
 
       yield {
+        source: 'sibil',
         type: 'content',
         content: word + (words.indexOf(word) < words.length - 1 ? ' ' : ''),
         structured_content: [{ type: 'markdown', content }],
@@ -412,6 +418,7 @@ export class SibilService {
 
     // Final chunk
     yield {
+      source: 'sibil',
       type: 'complete',
       content: text,
       structured_content: [{ type: 'markdown', content: text }],
@@ -445,7 +452,7 @@ export class SibilService {
     return formattedAreas.slice(0, -1).join(', ') + ', and ' + formattedAreas[formattedAreas.length - 1];
   }
 
-  private static async *streamWithOpenAI(model: string, message: string, systemPrompt: string): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamWithOpenAI(model: string, message: string, systemPrompt: string): AsyncGenerator<ChatStreamChunk> {
     const stream = await this.openai.chat.completions.create({
       model,
       messages: [
@@ -476,6 +483,7 @@ export class SibilService {
         const structuredContent = this.parseStructuredContentProgressive(fullContent);
 
         yield {
+          source: 'sibil',
           type: 'content',
           content,
           structured_content: structuredContent,
@@ -489,6 +497,7 @@ export class SibilService {
 
     // Final chunk with complete content
     yield {
+      source: 'sibil',
       type: 'complete',
       content: fullContent,
       structured_content: this.parseStructuredContent(fullContent),
@@ -498,7 +507,7 @@ export class SibilService {
     };
   }
 
-  private static async *streamWithAnthropic(model: string, message: string, systemPrompt: string): AsyncGenerator<SibilStreamChunk> {
+  private static async *streamWithAnthropic(model: string, message: string, systemPrompt: string): AsyncGenerator<ChatStreamChunk> {
     const stream = await this.anthropic.messages.create({
       model,
       max_tokens: 4096,
@@ -525,6 +534,7 @@ export class SibilService {
         const structuredContent = this.parseStructuredContentProgressive(fullContent);
 
         yield {
+          source: 'sibil',
           type: 'content',
           content,
           structured_content: structuredContent,
@@ -538,6 +548,7 @@ export class SibilService {
 
     // Final chunk
     yield {
+      source: 'sibil',
       type: 'complete',
       content: fullContent,
       structured_content: this.parseStructuredContent(fullContent),

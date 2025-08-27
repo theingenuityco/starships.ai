@@ -4,7 +4,6 @@
  */
 
 import type {
-  Mission,
   CreateMissionRequest,
   UpdateMissionRequest,
   MissionFilters,

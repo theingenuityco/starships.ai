@@ -55,7 +55,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     maxTokens: agent?.maxTokens,
     customInstructions: agent?.customInstructions || '',
     allowedStarshipClasses: agent?.allowedStarshipClasses || ['scout', 'cruiser'],
-    starshipId: (agent as any)?.starshipId || '',
+    starshipId: agent?.starshipId || '',
   } as CreateAgentRequest)
 
   const [newTag, setNewTag] = useState('')
@@ -166,7 +166,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <Input
                   value={formData.name}
-                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Agent name"
                   className="border-muted-foreground/20 focus:border-primary"
                   required
@@ -223,9 +223,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   Starship Assignment
                 </label>
                 <StarshipSelector
-                  value={(formData as any).starshipId}
+                  value={formData.starshipId}
                   onValueChange={(starshipId) =>
-                    setFormData(prev => ({ ...prev, starshipId } as any))
+                    setFormData(prev => ({ ...prev, starshipId }))
                   }
                   placeholder="Select a starship to deploy this agent"
                   className={`border-muted-foreground/20 focus:border-primary ${
@@ -257,7 +257,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <Textarea
                   value={formData.description}
-                  onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Brief description of what this agent does"
                   className="border-muted-foreground/20 focus:border-primary min-h-[80px]"
                   rows={2}
@@ -274,7 +274,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <Textarea
                   value={formData.systemPrompt}
-                  onChange={e => setFormData(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, systemPrompt: e.target.value }))}
                   placeholder="Instructions that define the agent's behavior and personality"
                   className="border-muted-foreground/20 focus:border-primary min-h-[120px]"
                   rows={4}
@@ -325,10 +325,10 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 <div className="flex gap-2">
                   <Input
                     value={newTag}
-                    onChange={e => setNewTag(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTag(e.target.value)}
                     placeholder="Add tag"
                     className="border-muted-foreground/20 focus:border-primary"
-                    onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                   />
                   <Button type="button" onClick={addTag} size="sm" className="px-3">
                     <Plus className="w-4 h-4 mr-1" />
@@ -453,7 +453,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                       max="2"
                       step="0.1"
                       value={formData.temperature || ''}
-                      onChange={e =>
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                         setFormData(prev => ({
                           ...prev,
                           temperature: e.target.value ? parseFloat(e.target.value) : undefined,
@@ -478,7 +478,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                       min="1"
                       max="8192"
                       value={formData.maxTokens || ''}
-                      onChange={e =>
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                         setFormData(prev => ({
                           ...prev,
                           maxTokens: e.target.value ? parseInt(e.target.value) : undefined,
@@ -500,7 +500,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   </label>
                   <Textarea
                     value={formData.customInstructions}
-                    onChange={e =>
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                       setFormData(prev => ({ ...prev, customInstructions: e.target.value }))
                     }
                     placeholder="Additional instructions or constraints"

@@ -9,7 +9,7 @@
 import { RepositoryFactory } from '@starships/models';
 import { MissionService } from './MissionService';
 import { Logger } from '../utils/logger';
-import { chat, LangChainMemoryStore } from '@starships/agent-engine';
+import { chat } from '@starships/agent-engine';
 import type { 
   MissionWorkflow, 
   WorkflowNode, 
@@ -167,6 +167,7 @@ export class MissionExecutionEngine {
       try {
         // Create ChatRequest for the agent
         const chatRequest: ChatRequest = {
+          source: 'agent',
           agent_id: agentId,
           user_id: effectiveUserId,
           message: `Mission Task: ${instructions}
@@ -193,13 +194,13 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
           agentName: agent.name,
           missionId,
           executionTime,
-          responseLength: response.reply.length,
+          responseLength: response.content.length,
           tokenUsage: response.usage,
           attempt: attempt + 1
         });
 
-        // Return the agent's reply directly
-        return response.reply;
+        // Return the agent's content directly
+        return response.content;
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error during agent execution';

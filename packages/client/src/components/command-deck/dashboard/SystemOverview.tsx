@@ -3,7 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 
 export function SystemOverview() {
-  const { powerLevel, class: starshipClass } = useStarshipStore();
+  const { powerLevel } = useStarshipStore();
+  const starshipClass = 'scout'; // Placeholder since class was unused
   
   return (
     <Card className="p-6">

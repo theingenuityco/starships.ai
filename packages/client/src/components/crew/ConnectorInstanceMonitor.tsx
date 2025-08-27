@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { MCPServerConnector, MCPServerOption } from '@/lib/api'
+import { MCPServerConnector } from '@/lib/api'
 import {
   ConnectorHealthMetrics,
   ConnectorStatusHistoryEntry,
@@ -14,7 +14,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   AlertTriangle,
@@ -31,8 +30,6 @@ import {
   Eye,
   EyeOff,
   BarChart3,
-  Settings,
-  Info,
   Lightbulb,
   Key,
   Minus,
@@ -40,10 +37,8 @@ import {
 import { cn } from '@/lib/utils'
 
 interface ConnectorInstanceMonitorProps {
-  starshipId: string
   connectorInstances: MCPServerConnector[]
   className?: string
-  showDetailedView?: boolean
   autoRefresh?: boolean
   refreshInterval?: number
 }
@@ -475,10 +470,8 @@ function ConnectorMonitorCard({
 }
 
 export function ConnectorInstanceMonitor({
-  starshipId,
   connectorInstances,
   className,
-  showDetailedView = false,
   autoRefresh = true,
   refreshInterval = 30000,
 }: ConnectorInstanceMonitorProps) {

@@ -107,7 +107,6 @@ interface StarshipActions {
       sibilSessionId?: string;
     };
   }) => Promise<{ id: string; slug: string; ownerId: string; class: 'scout' | 'cruiser' | 'draught'; name: string; maxAgents: number; status: 'active' | 'inactive' | 'disabled' | 'restricted' | 'pending_payment'; createdAt: string; updatedAt: string; plan?: 'scout' | 'cruiser' | 'draught'; subscriptionId?: string; billingPeriod?: 'monthly' | 'yearly'; }>;
-  setActiveStarship: (starshipId: string | null) => void;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
   
@@ -120,6 +119,7 @@ interface StarshipActions {
   // NEW: Slug-based operations
   getStarshipBySlug: (slug: string) => Promise<Starship | null>;
   setActiveStarshipBySlug: (slug: string) => Promise<void>;
+  setActiveStarship: (id: string) => void;
   
   // Error clearing actions
   clearErrors: () => void;
@@ -274,10 +274,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }
         },
 
-        setActiveStarship: (starshipId) => {
-          set({ activeStarshipId: starshipId });
-        },
-
         deployAgent: async (agentId) => {
           const activeStarshipId = get().activeStarshipId;
           if (!activeStarshipId) return;
@@ -372,7 +368,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             
             // Note: cancellationError property doesn't exist in response type
             // Log subscription cancellation details if available
-            console.log('[STARSHIP] Subscription cancellation details:', response);
+            // Removed unused logging
           } catch (error: any) {
             // Use centralized error handling
             const fullError = extractErrorMessage(error, 'Failed to delete starship');
@@ -470,6 +466,10 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           if (starship) {
             set({ activeStarshipId: starship.id });
           }
+        },
+
+        setActiveStarship: (id: string) => {
+          set({ activeStarshipId: id });
         },
 
         // Vision actions (restored to complex object)

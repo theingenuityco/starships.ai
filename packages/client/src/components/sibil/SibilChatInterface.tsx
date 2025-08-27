@@ -27,6 +27,9 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const [streaming, setStreaming] = useState(false)
   const [typingIndicator, setTypingIndicator] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Provider and model configuration
+  const provider = 'openai'
+  const model = 'gpt-4'
   // Removed unused state variables
   const sessionId = useRef<string>('sibil-session')
   const streamController = useRef<{ abort: () => void } | null>(null)
@@ -42,8 +45,8 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
         : '❌ Vision refinement proposal rejected. Current vision remains unchanged.',
       timestamp: new Date().toISOString(),
       sessionId: sessionId.current,
-      provider,
-      model
+      provider: provider,
+      model: model
     }
     
     const updatedMessages = [...messages, actionMessage]
@@ -110,8 +113,8 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
         role: 'assistant',
         timestamp: new Date().toISOString(),
         sessionId: currentSessionId,
-        provider,
-        model,
+        provider: provider,
+        model: model,
         streaming: true,
         structured_content: []
       }

@@ -279,7 +279,7 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
                   <div className="flex gap-2">
                     <Input
                       value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="Ask Sibil anything..."
                       className="flex-1 bg-background/50"

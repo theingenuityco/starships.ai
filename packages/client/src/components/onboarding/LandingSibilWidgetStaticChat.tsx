@@ -344,7 +344,7 @@ export function LandingSibilWidgetStaticChat({
           <Textarea
             ref={textareaRef}
             value={inputValue}
-            onChange={(e) => handleInputChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder=""
             className={cn(

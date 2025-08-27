@@ -273,7 +273,7 @@ export function MissionList({ starshipId, starshipSlug, showCreateButton = true 
           <Input
             placeholder="Search missions..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
           />
         </div>
         
@@ -567,7 +567,7 @@ function CreateMissionForm({
           <Input
             id="name"
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
             placeholder="Enter mission name"
             required
           />
@@ -578,7 +578,7 @@ function CreateMissionForm({
           <Textarea
             id="description"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Describe the mission objectives and details"
             rows={3}
             required
@@ -725,7 +725,7 @@ function EditMissionForm({
           <Input
             id="edit-name"
             value={formData.name || ''}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
             placeholder="Enter mission name"
           />
         </div>
@@ -735,7 +735,7 @@ function EditMissionForm({
           <Textarea
             id="edit-description"
             value={formData.description || ''}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Describe the mission objectives and details"
             rows={3}
           />

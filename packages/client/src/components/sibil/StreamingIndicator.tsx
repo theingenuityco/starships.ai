@@ -7,7 +7,7 @@ import type { ConnectionStatus } from '@starships/protocol'
 interface StreamingIndicatorProps {
   onStop: () => void
   connectionStatus?: ConnectionStatus
-  // Removed unused prop
+  isTyping?: boolean
   agentName?: string
 }
 

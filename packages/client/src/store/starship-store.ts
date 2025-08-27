@@ -119,6 +119,7 @@ interface StarshipActions {
   // NEW: Slug-based operations
   getStarshipBySlug: (slug: string) => Promise<Starship | null>;
   setActiveStarshipBySlug: (slug: string) => Promise<void>;
+  setActiveStarship: (id: string) => void;
   
   // Error clearing actions
   clearErrors: () => void;
@@ -465,6 +466,10 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           if (starship) {
             set({ activeStarshipId: starship.id });
           }
+        },
+
+        setActiveStarship: (id: string) => {
+          set({ activeStarshipId: id });
         },
 
         // Vision actions (restored to complex object)

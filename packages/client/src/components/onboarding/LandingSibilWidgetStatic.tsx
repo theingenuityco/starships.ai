@@ -151,7 +151,7 @@ export function LandingSibilWidgetStatic({
           <Textarea
             ref={textareaRef}
             value={vision}
-            onChange={(e) => handleVisionChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleVisionChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={displayedPlaceholder || "What's your vision?"}
             className={cn(

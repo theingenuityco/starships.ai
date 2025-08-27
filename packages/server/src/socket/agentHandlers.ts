@@ -1,5 +1,5 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
-import type { SocketEvents, ChatSocketRequest, ChatSocketStreamChunk, ChatRequest } from '@starships/protocol';
+import type { SocketEvents, ChatRequest, ChatStreamChunk } from '@starships/protocol';
 import { chatStream } from '@starships/agent-engine';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
@@ -11,7 +11,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
     const socketService = SocketIOService.getInstance();
 
     // Handle agent stream start
-    socket.on('chat:start-stream', async (request: ChatSocketRequest) => {
+    socket.on('chat:start-stream', async (request: ChatRequest) => {
       if (request.source !== 'agent' || !request.agent_id) return;
       console.log(`[AGENT SOCKET] Starting stream for user ${userId}, agent ${request.agent_id}:`, request.stream_id);
 
@@ -83,7 +83,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
                 const char = characters[i];
                 const delay = 1000 / typingSpeed; // milliseconds per character
 
-                const typewriterChunk: ChatSocketStreamChunk = {
+                const typewriterChunk: ChatStreamChunk = {
                   source: 'agent' as const,
                   stream_id: request.stream_id,
                   agent_id: request.agent_id,
@@ -110,7 +110,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
               }
             } else {
               // Send chunk without typewriter effect
-              const streamChunk: ChatSocketStreamChunk = {
+              const streamChunk: ChatStreamChunk = {
                 source: 'agent' as const,
                 stream_id: request.stream_id,
                 agent_id: request.agent_id,

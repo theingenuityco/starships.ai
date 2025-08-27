@@ -1,7 +1,7 @@
 import api from './api';
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { ChatRequest, ChatSocketRequest, ChatSocketStreamChunk, ChatSocketStreamError } from '@starships/protocol';
+import type { ChatRequest, ChatStreamChunk, ChatStreamError } from '@starships/protocol';
 
 export interface SibilMessage {
   id: string;
@@ -66,11 +66,11 @@ export const sibilAPI = {
     };
   },
 
-  // Socket.IO Streaming method - uses ChatSocketRequest
+  // Socket.IO Streaming method - uses unified ChatRequest
   sendMessageStream: (
     request: SibilRequest,
     callbacks: {
-      onChunk: (chunk: ChatSocketStreamChunk, accumulatedContent: string) => void;
+      onChunk: (chunk: ChatStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: SibilMessage) => void;
       onError: (error: string) => void;
       onTypingStart?: () => void;
@@ -89,7 +89,7 @@ export const sibilAPI = {
     let accumulatedContent = '';
     let isAborted = false;
 
-    const socketRequest: ChatSocketRequest = {
+    const socketRequest: ChatRequest = {
       source: 'sibil' as const,
       provider: request.provider,
       model: request.model,
@@ -108,7 +108,7 @@ export const sibilAPI = {
       }
     };
 
-    const handleStreamChunk = (chunk: ChatSocketStreamChunk) => {
+    const handleStreamChunk = (chunk: ChatStreamChunk) => {
       if (chunk.stream_id === streamId && chunk.source === 'sibil' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
@@ -135,7 +135,7 @@ export const sibilAPI = {
       }
     };
 
-    const handleStreamError = (error: ChatSocketStreamError) => {
+    const handleStreamError = (error: ChatStreamError) => {
       if (error.stream_id === streamId && error.source === 'sibil' && !isAborted) {
         callbacks.onError(error.message);
         cleanup();

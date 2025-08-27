@@ -2,7 +2,7 @@
  * Chat Domain Types
  *
  * Core chat system types and domain-specific interfaces.
- * Extracted from contracts/chat-socket.ts to establish chat as an independent domain.
+ * Simplified and consolidated for better maintainability.
  */
 
 // Import pure socket infrastructure types
@@ -13,7 +13,7 @@ import type {
 } from '../contracts/socket';
 
 // ============================================================================
-// USAGE STATISTICS
+// CORE TYPES
 // ============================================================================
 
 /**
@@ -23,44 +23,6 @@ export interface UsageStats {
   prompt_tokens: number;
   completion_tokens: number;
 }
-
-// ============================================================================
-// MEMORY TYPES
-// ============================================================================
-
-/**
- * Basic memory entry for conversation history
- */
-export interface MemoryEntry {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: number;
-}
-
-/**
- * Enhanced memory entry with additional metadata
- */
-export interface EnhancedMemoryEntry extends MemoryEntry {
-  importance?: number;
-  summary?: string;
-}
-
-/**
- * Memory search result
- */
-export interface MemorySearchResult {
-  entries: EnhancedMemoryEntry[];
-  relevanceScores: number[];
-}
-
-/**
- * Session key for memory management
- */
-export type SessionKey = string;
-
-// ============================================================================
-// CONTENT BLOCKS
-// ============================================================================
 
 /**
  * Content block for structured responses
@@ -74,17 +36,41 @@ export interface ContentBlock {
   };
 }
 
-// ============================================================================
-// CHAT TYPES
-// ============================================================================
-
 /**
  * Chat source type - distinguishes between different chat systems
  */
 export type ChatSourceType = 'sibil' | 'agent';
 
+// ============================================================================
+// MEMORY TYPES
+// ============================================================================
+
 /**
- * Base chat request (works for both REST API and Socket.IO)
+ * Memory entry for conversation history with optional enhancement metadata
+ */
+export interface MemoryEntry {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;
+  // Enhancement fields (previously in EnhancedMemoryEntry)
+  importance?: number;
+  summary?: string;
+}
+
+/**
+ * Memory search result
+ */
+export interface MemorySearchResult {
+  entries: MemoryEntry[];
+  relevanceScores: number[];
+}
+
+// ============================================================================
+// CHAT REQUEST/RESPONSE TYPES
+// ============================================================================
+
+/**
+ * Unified chat request (works for both REST API and Socket.IO)
  */
 export interface ChatRequest {
   source: ChatSourceType;
@@ -100,12 +86,17 @@ export interface ChatRequest {
   // Agent-specific fields
   agent_id?: string;
   
-  // Optional streaming flag for REST API
+  // Streaming control
   stream?: boolean;
+  
+  // Socket.IO specific fields (optional for REST API)
+  stream_id?: string;
+  typewriter_enabled?: boolean;
+  typing_speed?: number; // characters per second (default: 75)
 }
 
 /**
- * Base chat response (works for both REST API and Socket.IO)
+ * Unified chat response (works for both REST API and Socket.IO)
  */
 export interface ChatResponse {
   source: ChatSourceType;
@@ -121,17 +112,13 @@ export interface ChatResponse {
   
   // Agent-specific fields
   agent_id?: string;
+  
+  // Socket.IO specific fields (optional for REST API)
+  stream_id?: string;
 }
 
 /**
- * Streaming request (extends ChatRequest)
- */
-export interface ChatStreamRequest extends ChatRequest {
-  stream: true;
-}
-
-/**
- * Streaming chunk (works for both REST API and Socket.IO)
+ * Unified streaming chunk (works for both REST API and Socket.IO)
  */
 export interface ChatStreamChunk {
   source: ChatSourceType;
@@ -151,7 +138,12 @@ export interface ChatStreamChunk {
   error?: string;
   chunk_id?: string;
   is_final?: boolean;
-  stream_id?: string; // Optional for REST, required for Socket.IO
+  
+  // Socket.IO specific fields (optional for REST API)
+  stream_id?: string;
+  timestamp?: number;
+  typewriter?: TypewriterData;
+  typing_speed?: number;
 }
 
 /**
@@ -211,45 +203,13 @@ export interface ChatMessage {
 }
 
 // ============================================================================
-// SOCKET.IO & TYPEWRITER INTERFACES
+// ERROR HANDLING
 // ============================================================================
 
-
 /**
- * Socket.IO enhanced chat request (extends base ChatRequest)
+ * Stream error interface
  */
-export interface ChatSocketRequest extends ChatRequest {
-  stream_id: string; // Required for Socket.IO
-  
-  // Socket enhancements
-  typewriter_enabled?: boolean;
-  typing_speed?: number; // characters per second (default: 75)
-}
-
-/**
- * Socket.IO enhanced chat streaming chunk (extends base ChatStreamChunk)
- */
-export interface ChatSocketStreamChunk extends ChatStreamChunk {
-  stream_id: string; // Required for Socket.IO
-  timestamp: number; // Required for Socket.IO
-  
-  // Socket enhancements
-  typewriter?: TypewriterData;
-  typing_speed?: number;
-}
-
-/**
- * Socket.IO enhanced chat response (extends base ChatResponse)
- */
-export interface ChatSocketResponse extends ChatResponse {
-  stream_id?: string;
-  timestamp: string; // Required for Socket.IO
-}
-
-/**
- * Socket.IO stream error interface
- */
-export interface ChatSocketStreamError {
+export interface ChatStreamError {
   source: ChatSourceType;
   stream_id?: string;
   agent_id?: string;
@@ -259,15 +219,8 @@ export interface ChatSocketStreamError {
   recoverable: boolean;
 }
 
-/**
- * Socket.IO stream response metadata (extends base ChatStreamResponse)
- */
-export interface ChatSocketStreamResponse extends ChatStreamResponse {
-  // Inherits from base ChatStreamResponse
-}
-
 // ============================================================================
-// CHAT-SPECIFIC SOCKET EVENTS
+// SOCKET EVENT DEFINITIONS
 // ============================================================================
 
 /**
@@ -279,38 +232,34 @@ export interface ChatSocketEvents {
   'ping': () => void;
   'pong': () => void;
 
-  // Unified Chat Client to Server events
-  'chat:start-stream': (request: ChatSocketRequest) => void;
+  // Chat Client to Server events
+  'chat:start-stream': (request: ChatRequest) => void;
   'chat:stop-stream': (streamId: string) => void;
   'chat:join-room': (data: { userId: string; agentId?: string; source: ChatSourceType }) => void;
   'chat:leave-room': (data: { userId: string; agentId?: string; source: ChatSourceType }) => void;
 
-  // Unified Chat Server to Client events
+  // Chat Server to Client events
   'chat:stream-start': (data: { streamId: string; source: ChatSourceType; agentId?: string }) => void;
-  'chat:stream-chunk': (chunk: ChatSocketStreamChunk) => void;
-  'chat:stream-complete': (response: ChatSocketResponse) => void;
-  'chat:stream-error': (error: ChatSocketStreamError) => void;
+  'chat:stream-chunk': (chunk: ChatStreamChunk) => void;
+  'chat:stream-complete': (response: ChatResponse) => void;
+  'chat:stream-error': (error: ChatStreamError) => void;
   'chat:typing-start': (data: { source: ChatSourceType; agentId?: string }) => void;
   'chat:typing-stop': (data: { source: ChatSourceType; agentId?: string }) => void;
 }
 
+/**
+ * Combined socket events interface
+ */
+export interface SocketEvents extends BaseSocketEvents, ChatSocketEvents {}
+
 // ============================================================================
-// COMBINED SOCKET EVENTS
+// TYPE ALIASES
 // ============================================================================
 
 /**
- * Combined chat socket events interface
+ * Session key for memory management
  */
-export interface ChatSocketIOEvents extends BaseSocketEvents, ChatSocketEvents {}
-
-/**
- * Main Chat and Socket Events interface
- */
-export type SocketEvents = ChatSocketIOEvents;
-
-// ============================================================================
-// UTILITY TYPES
-// ============================================================================
+export type SessionKey = string;
 
 /**
  * Type helper for chat socket event data

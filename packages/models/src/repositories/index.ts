@@ -29,6 +29,9 @@ export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 // Export waitlist repository
 export { WaitlistRepository } from './WaitlistRepository';
 
+// Export chat session repository
+export { ChatSessionRepository } from './ChatSessionRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -48,6 +51,9 @@ import { MissionClarityRepository } from './MissionClarityRepository';
 
 // Import native tool API key repository
 import { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
+
+// Import chat session repository
+import { ChatSessionRepository } from './ChatSessionRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -86,6 +92,9 @@ export class RepositoryFactory {
 
   // Waitlist repository instance
   private static waitlistRepo: WaitlistRepository | null = null;
+
+  // Chat session repository instance
+  private static chatSessionRepo: ChatSessionRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -155,6 +164,9 @@ export class RepositoryFactory {
       // Initialize native tool API key repository (no dependencies)
       this.nativeToolApiKeyRepo = new NativeToolApiKeyRepository();
 
+      // Initialize chat session repository (no dependencies)
+      this.chatSessionRepo = new ChatSessionRepository();
+
       // Initialize repositories with dependencies
       this.starshipRepo = new StarshipRepository();
 
@@ -217,6 +229,7 @@ export class RepositoryFactory {
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
         waitlistRepo: this.waitlistRepo !== null,
+        chatSessionRepo: this.chatSessionRepo !== null,
       }
     };
   }
@@ -394,6 +407,16 @@ export class RepositoryFactory {
     return this.waitlistRepo;
   }
 
+  /**
+   * Get ChatSessionRepository instance (synchronous)
+   */
+  static getChatSessionRepository(): ChatSessionRepository {
+    this.ensureInitialized();
+    if (!this.chatSessionRepo) {
+      throw new Error('ChatSessionRepository not initialized');
+    }
+    return this.chatSessionRepo;
+  }
 
   // ========================================================================
   // UTILITY METHODS
@@ -420,6 +443,7 @@ export class RepositoryFactory {
     this.missionClarityRepo = null;
     this.nativeToolApiKeyRepo = null;
     this.waitlistRepo = null;
+    this.chatSessionRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

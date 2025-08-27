@@ -164,21 +164,15 @@ export interface ChatStreamResponse {
  */
 export interface ChatSession {
   id: string;
-  user_id: string;
   source: ChatSourceType;
+  created_by: string;
   created_at: string;
-  last_activity: string;
+  last_activity_at: string;
+  total_tokens: number;
   
-  // Session metadata
+  // Session metadata (via relationships)
   starship_id?: string;
   agent_id?: string;
-  provider?: 'openai' | 'anthropic';
-  model?: string;
-  
-  // Session state
-  message_count: number;
-  total_tokens?: number;
-  is_active: boolean;
 }
 
 /**

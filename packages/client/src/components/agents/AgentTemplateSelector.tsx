@@ -6,13 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -66,7 +59,6 @@ const categoryColors = {
 }
 
 export function AgentTemplateSelector({
-  onSelectTemplate,
   onCreateFromTemplate,
   trigger,
 }: AgentTemplateSelectorProps) {

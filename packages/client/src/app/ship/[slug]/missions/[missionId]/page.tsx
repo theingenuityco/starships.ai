@@ -2,13 +2,12 @@
 
 import { use, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Target, Users, Clock, Calendar, Send, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Target, Clock, Calendar, Send, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { missionApi } from '@/lib/missionApi';
-import { starshipAPI, agentAPI } from '@/lib/api';
+import { agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
 import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity, MissionPhase } from '@starships/protocol';
@@ -41,7 +40,7 @@ const statusIcons: Record<MissionStatus, React.ReactNode> = {
 };
 
 export default function MissionDetailPage({ params }: MissionDetailPageProps) {
-  const { slug, missionId } = use(params);
+  const { missionId } = use(params);
   const router = useRouter();
   const [mission, setMission] = useState<Mission | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -51,7 +50,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   
   // Clarity state
   const [clarity, setClarity] = useState<MissionClarity | null>(null);
-  const [clarityLoading, setClarityLoading] = useState(true);
   const [clarityUpdated, setClarityUpdated] = useState(false);
   
   // Chat state
@@ -250,7 +248,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   // Fetch clarity data
   const loadClarity = async () => {
     try {
-      setClarityLoading(true);
       const response = await missionApi.getMissionClarity(missionId);
       if (response.data) {
         setClarity(response.data);
@@ -260,8 +257,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     } catch (error) {
       console.error('Failed to load clarity:', error);
       setClarity(null);
-    } finally {
-      setClarityLoading(false);
     }
   };
 
@@ -644,7 +639,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           <div className="text-xs font-medium text-muted-foreground mb-2">
                             Agent Task Outputs:
                           </div>
-                          {nodeResults.map((result, index) => (
+                          {nodeResults.map((result) => (
                             <div key={result.nodeId} className="p-3 rounded-lg bg-muted/10 border border-muted/30">
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
@@ -767,7 +762,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                               {/* Task Results */}
                               <div className="space-y-2">
                                 <div className="text-xs font-medium text-muted-foreground">Task Results:</div>
-                                {mission.executionResult.nodeResults.map((result, index) => (
+                                {mission.executionResult.nodeResults.map((result) => (
                                   <div key={result.nodeId} className="flex items-start gap-2 p-2 rounded bg-background/50">
                                     <span className="text-xs mt-0.5">
                                       {result.success ? '✅' : '❌'}

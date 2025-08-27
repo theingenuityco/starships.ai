@@ -9,7 +9,6 @@ import { useToast } from '@/hooks/useToast'
 import {
   BarChart3,
   TrendingUp,
-  Users,
   Star,
   Activity,
   Calendar,
@@ -35,7 +34,6 @@ interface AgentAnalyticsProps {
 export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsProps) {
   const [analytics, setAnalytics] = useState<AgentAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
-  const [rating, setRating] = useState(0)
   const [submittingRating, setSubmittingRating] = useState(false)
   const { toast } = useToast()
 
@@ -245,11 +243,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
                 key={star}
                 onClick={() => submitRating(star)}
                 disabled={submittingRating}
-                className={`p-1 rounded transition-colors ${
-                  star <= rating
-                    ? 'text-yellow-500 hover:text-yellow-600'
-                    : 'text-gray-300 hover:text-yellow-400'
-                } disabled:opacity-50`}
+                className="p-1 rounded transition-colors text-gray-300 hover:text-yellow-400 disabled:opacity-50"
               >
                 <Star className="h-6 w-6 fill-current" />
               </button>

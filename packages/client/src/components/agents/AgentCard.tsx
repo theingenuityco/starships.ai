@@ -7,7 +7,6 @@ import {
   Bot,
   Edit,
   Trash2,
-  Eye,
   EyeOff,
   Star,
   TestTube,
@@ -20,13 +19,8 @@ import {
   Database,
   PenTool,
   MoreVertical,
-  Rocket,
-  Loader2,
   Sparkles,
-  Shield,
   Brain,
-  Zap,
-  Activity,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -61,8 +55,8 @@ export function AgentCard({
   onAnalytics,
   showActions = false,
 }: AgentCardProps) {
-  const [starship, setStarship] = useState<Starship | null>(null)
-  const [loadingStarship, setLoadingStarship] = useState(false)
+  const [, setStarship] = useState<Starship | null>(null)
+  const [, setLoadingStarship] = useState(false)
 
   // Fetch starship information if agent has starshipId
   useEffect(() => {
@@ -99,20 +93,6 @@ export function AgentCard({
     fetchStarship()
   }, [(agent as any)?.starshipId])
 
-  const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
-    switch (starshipClass) {
-      case 'scout': return '🚀'
-      case 'cruiser': return '🛸'
-      case 'draught': return '🚢'
-      default: return '🚀'
-    }
-  }
-
-  const getStarshipStatusColor = (status: 'active' | 'inactive') => {
-    return status === 'active'
-      ? 'bg-green-500/20 text-green-400 border-green-500/30'
-      : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
-  }
 
   const getCategoryColor = (category: Agent['category']) => {
     const colors = {
@@ -150,28 +130,6 @@ export function AgentCard({
     }
   }
 
-  const getAgentAvatarIcon = (agent: Agent) => {
-    // Determine icon based on agent name or category
-    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
-      return <Headphones className="h-6 w-6" />
-    } else if (
-      agent.name.toLowerCase().includes('data') ||
-      agent.name.toLowerCase().includes('analyst') ||
-      agent.category === 'analysis'
-    ) {
-      return <Database className="h-6 w-6" />
-    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
-      return <PenTool className="h-6 w-6" />
-    } else if (
-      agent.name.toLowerCase().includes('code') ||
-      agent.name.toLowerCase().includes('coding') ||
-      agent.category === 'coding'
-    ) {
-      return <Code className="h-6 w-6" />
-    } else {
-      return <Bot className="h-6 w-6" />
-    }
-  }
 
   const getAgentAvatarContent = (agent: Agent) => {
     // Determine emoji-like icon based on agent name or category

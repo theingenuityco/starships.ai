@@ -9,13 +9,12 @@ import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Send, RotateCcw, Play, Save, Trash2, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react'
+import { Send, RotateCcw, Play, Trash2, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { useTypewriter } from '@/hooks/useTypewriter'
-import { StreamingIndicator } from '@/components/sibil/StreamingIndicator'
 
 interface AgentTesterProps {
   agent: Agent
@@ -41,7 +40,7 @@ interface TestResult {
 }
 
 export function AgentTester({ agent, onClose }: AgentTesterProps) {
-  const { userId } = useAuth()
+  const { } = useAuth()
   const { toast } = useToast()
 
   // Socket.IO connection
@@ -59,7 +58,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const [sessionId] = useState(`test-${agent.id}-${Date.now()}`)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isTyping, setIsTyping] = useState(false)
+  const [, setIsTyping] = useState(false)
   const [currentStreamAbort, setCurrentStreamAbort] = useState<(() => void) | null>(null)
 
   // Test case management state
@@ -71,7 +70,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     expectedBehavior: '',
     category: 'functionality',
   })
-  const [editingTestCase, setEditingTestCase] = useState<string | null>(null)
+  const [, setEditingTestCase] = useState<string | null>(null)
 
   // Load saved test cases for this agent
   useEffect(() => {
@@ -295,11 +294,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       setLoading(true)
 
       // Use Socket.IO streaming for test case execution
-      const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
+      agentSocketAPI.sendMessageStream(agent.id, {
         sessionId: `test-case-${testCase.id}-${Date.now()}`,
         message: testCase.input
       }, {
-        onChunk: (chunk, accumulated) => {
+        onChunk: () => {
           // Test cases don't need real-time display, just collect the response
         },
         onComplete: (finalMessage) => {

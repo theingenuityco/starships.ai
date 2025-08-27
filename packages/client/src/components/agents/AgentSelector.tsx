@@ -4,14 +4,12 @@ import { useState, useEffect } from 'react'
 import { Agent, agentAPI } from '@/lib/api'
 import { AgentCard } from './AgentCard'
 import { AgentForm } from './AgentForm'
-import { AgentFilters } from './AgentFilters'
 import { AgentTester } from './AgentTester'
 import { AgentAnalytics } from './AgentAnalytics'
 import { AgentTemplateSelector } from './AgentTemplateSelector'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plus, Search, Sparkles, Bot } from 'lucide-react'
+import { Loader2, Plus, Sparkles, Bot } from 'lucide-react'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
 
 interface AgentSelectorProps {
@@ -56,7 +54,7 @@ export function AgentSelector({
   const [analyticsAgent, setAnalyticsAgent] = useState<Agent | null>(null)
 
   // Filter state
-  const [filters, setFilters] = useState<FilterState>({
+  const [filters] = useState<FilterState>({
     tags: [],
     searchQuery: '',
   })

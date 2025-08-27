@@ -65,7 +65,7 @@ export default function WaitlistPage() {
         setMessage(data.message);
         setMessageType('info');
       }
-    } catch (error) {
+    } catch {
       setMessage('Service temporarily unavailable. Please try again.');
       setMessageType('error');
     } finally {

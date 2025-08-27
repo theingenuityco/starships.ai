@@ -17,7 +17,7 @@ spec:
     targetPort: 3000
   - name: backend
     port: 4000
-    targetPort: 4000
+    targetPort: 3001
   - name: neo4j-http
     port: 7474
     targetPort: 7474

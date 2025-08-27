@@ -1,8 +1,20 @@
 /**
- * Chat & Socket Contract Types
+ * Chat Domain Types
  *
- * Interface definitions for chat communication and Socket.IO integration.
+ * Core chat system types and domain-specific interfaces.
+ * Extracted from contracts/chat-socket.ts to establish chat as an independent domain.
  */
+
+// Import pure socket infrastructure types
+import type {
+  TypewriterData,
+  SocketConnectionState,
+  BaseSocketEvents,
+  ConnectionStatusEvent,
+  ConnectionStatus,
+  EventEmissionOptions,
+  EventEmissionResult,
+} from '../contracts/socket';
 
 // ============================================================================
 // USAGE STATISTICS
@@ -51,20 +63,6 @@ export interface MemorySearchResult {
 export type SessionKey = string;
 
 // ============================================================================
-// TYPEWRITER INTERFACES
-// ============================================================================
-
-/**
- * Minimal typewriter interface for streaming effects
- * Client packages can extend this with additional properties
- */
-export interface TypewriterData {
-  type: string;
-  content: string;
-  [key: string]: unknown; // Allow extensions by client
-}
-
-// ============================================================================
 // CONTENT BLOCKS
 // ============================================================================
 
@@ -81,7 +79,7 @@ export interface ContentBlock {
 }
 
 // ============================================================================
-// CHAT TYPES (REST + Socket.IO)
+// CHAT TYPES
 // ============================================================================
 
 /**
@@ -170,8 +168,56 @@ export interface ChatStreamResponse {
 }
 
 // ============================================================================
-// SOCKET.IO ENHANCED INTERFACES
+// CHAT SESSION MANAGEMENT
 // ============================================================================
+
+/**
+ * Chat session configuration
+ */
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  source: ChatSourceType;
+  created_at: string;
+  last_activity: string;
+  
+  // Session metadata
+  starship_id?: string;
+  agent_id?: string;
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  
+  // Session state
+  message_count: number;
+  total_tokens?: number;
+  is_active: boolean;
+}
+
+/**
+ * Chat message record
+ */
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  structured_content?: ContentBlock[];
+  timestamp: string;
+  
+  // Metadata
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  usage?: UsageStats;
+  
+  // Optional fields
+  agent_id?: string;
+  stream_id?: string;
+}
+
+// ============================================================================
+// SOCKET.IO & TYPEWRITER INTERFACES
+// ============================================================================
+
 
 /**
  * Socket.IO enhanced chat request (extends base ChatRequest)
@@ -225,51 +271,7 @@ export interface ChatSocketStreamResponse extends ChatStreamResponse {
 }
 
 // ============================================================================
-// CONNECTION STATE
-// ============================================================================
-
-/**
- * Socket.IO client connection state
- */
-export interface SocketConnectionState {
-  connected: boolean;
-  authenticated: boolean;
-  room_joined: boolean;
-  user_id?: string;
-  connection_id?: string;
-  last_ping?: number;
-}
-
-// ============================================================================
-// BASE SOCKET EVENTS
-// ============================================================================
-
-/**
- * Base socket events
- */
-export interface BaseSocketEvents {
-  connect: () => void;
-  disconnect: () => void;
-  error: (error: Error) => void;
-}
-
-/**
- * Connection status event data
- */
-export interface ConnectionStatusEvent {
-  status: 'connected' | 'disconnected' | 'reconnecting' | 'error';
-  userId: string;
-  connectionId: string;
-  timestamp: string;
-}
-
-/**
- * Connection status type
- */
-export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'error';
-
-// ============================================================================
-// CHAT SOCKET EVENTS
+// CHAT-SPECIFIC SOCKET EVENTS
 // ============================================================================
 
 /**
@@ -315,30 +317,6 @@ export type SocketEvents = ChatSocketIOEvents;
 // ============================================================================
 
 /**
- * Type helper for socket event data
+ * Type helper for chat socket event data
  */
-export type SocketEventData<T extends keyof SocketEvents> = Parameters<SocketEvents[T]>[0];
-
-/**
- * Event emission options
- */
-export interface EventEmissionOptions {
-  excludeUser?: string;
-  includeUsers?: string[];
-  retryCount?: number;
-  timeout?: number;
-}
-
-/**
- * Event emission result
- */
-export interface EventEmissionResult {
-  success: boolean;
-  eventType: string;
-  recipientCount: number;
-  errors?: Array<{
-    userId: string;
-    error: string;
-  }>;
-  timestamp: string;
-}
+export type ChatSocketEventData<T extends keyof SocketEvents> = Parameters<SocketEvents[T]>[0];

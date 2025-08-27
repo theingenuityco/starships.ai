@@ -5,7 +5,7 @@
  * Moved from contracts/llm.ts as LLM is now a domain concept.
  */
 
-import type { UsageStats } from '../contracts/chat-socket';
+import type { UsageStats } from './chat';
 
 // ============================================================================
 // LLM TOOL INTERFACES

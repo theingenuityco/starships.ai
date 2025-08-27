@@ -50,12 +50,11 @@
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
-    "@starships/client#type-check": {
-      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+    "@starships/protocol#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
-     "type-check": {
+    "@starships/env-config#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
@@ -66,6 +65,20 @@
     },
     "@starships/agent-engine#type-check": {
       "dependsOn": ["@starships/models#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
+    },
+    "@starships/server#type-check": {
+      "dependsOn": ["@starships/agent-engine#build", "@starships/env-config#build", "@starships/models#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
+    },
+    "@starships/client#type-check": {
+      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
+    },
+    "type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },

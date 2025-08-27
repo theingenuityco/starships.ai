@@ -5,7 +5,6 @@ import { Users, Plus, UserMinus, UserCheck, Bot, Settings, Star, AlertCircle } f
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Avatar } from '@/components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useStarshipStore } from '@/store/starship-store'
 import { agentAPI, starshipAPI, type Agent } from '@/lib/api'

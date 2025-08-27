@@ -9,34 +9,27 @@ import { ApiKeyInputModal } from './ApiKeyInputModal'
 import { ConnectorApiKeyManager } from '@/lib/connector-api-keys'
 import { ApiKeyRequirement } from '@/types/connector-api-keys'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Loader2,
-  Search,
   ChevronDown,
   Check,
   X,
   Plug,
   AlertCircle,
-  Wifi,
   WifiOff,
   Clock,
   XCircle,
   AlertTriangle,
   CheckCircle,
-  Settings,
   Key,
-  Minus,
   Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -69,20 +62,6 @@ function formatEnvForDisplay(envString: string): string {
   const envVars = parseConnectorEnv(envString)
   const keys = Object.keys(envVars)
   return keys.length > 0 ? `Requires: ${keys.join(', ')}` : 'No configuration required'
-}
-
-// Get command badge variant based on command type
-function getCommandBadgeVariant(command: string): 'default' | 'secondary' | 'outline' {
-  switch (command.toLowerCase()) {
-    case 'docker':
-      return 'default'
-    case 'npx':
-      return 'secondary'
-    case 'uvx':
-      return 'outline'
-    default:
-      return 'outline'
-  }
 }
 
 export function ConnectorSelector({
@@ -159,12 +138,6 @@ export function ConnectorSelector({
   // Get connector instance for a template (if exists)
   const getConnectorInstance = (connector: MCPServerOption): MCPServerConnector | undefined => {
     return connectorInstanceMap.get(connector.id)
-  }
-
-  // Check if a connector has an active instance
-  const isConnectorConnected = (connector: MCPServerOption): boolean => {
-    const instance = getConnectorInstance(connector)
-    return instance ? instance.isActive && instance.status === 'active' : false
   }
 
   // Get connector status for display
@@ -643,9 +616,6 @@ export function ConnectorSelector({
                 }
 
                 if (healthMetrics) {
-                  const healthColor = connectorMonitoring.getHealthStatusColor()
-                  const healthBg = connectorMonitoring.getHealthStatusBgColor()
-
                   return {
                     icon: <CheckCircle className="w-4 h-4 text-green-500" />,
                     badge: (

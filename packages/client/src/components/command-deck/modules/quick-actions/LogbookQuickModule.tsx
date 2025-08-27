@@ -1,11 +1,11 @@
-import { BookOpen, Search, FileText, Plus } from 'lucide-react';
+import { Search, FileText } from 'lucide-react';
 
 interface LogbookQuickModuleProps {
   data: any;
   onAction: (action: string, data?: any) => void;
 }
 
-export function LogbookQuickModule({ data: _data, onAction }: LogbookQuickModuleProps) {
+export function LogbookQuickModule({ onAction }: LogbookQuickModuleProps) {
   const totalEntries = 247;
   const unreadEntries = 3;
 
@@ -35,4 +35,4 @@ export function LogbookQuickModule({ data: _data, onAction }: LogbookQuickModule
       </div>
     </div>
   );
-} 
+}

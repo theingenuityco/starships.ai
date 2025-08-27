@@ -5,7 +5,6 @@ import { MCPServerConnector } from '@/lib/api'
 import {
   ConnectorHealthMetrics,
   monitoringService,
-  connectorMonitoring,
 } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +31,7 @@ interface ConnectorStatusDashboardProps {
 }
 
 export function ConnectorStatusDashboard({
-  starshipId,
+  starshipId: _starshipId,
   connectorInstances,
   className,
   compact = false,

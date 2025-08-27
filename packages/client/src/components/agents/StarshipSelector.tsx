@@ -24,7 +24,6 @@ export function StarshipSelector({
   value,
   onValueChange,
   placeholder = 'Select a starship',
-  required = false,
   disabled = false,
   className,
 }: StarshipSelectorProps) {
@@ -91,7 +90,6 @@ export function StarshipSelector({
     )
   }
 
-  const selectedStarship = starships.find(s => s.id === value)
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>

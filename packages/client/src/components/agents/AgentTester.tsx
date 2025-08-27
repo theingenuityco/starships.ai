@@ -40,7 +40,6 @@ interface TestResult {
 }
 
 export function AgentTester({ agent, onClose }: AgentTesterProps) {
-  const { } = useAuth()
   const { toast } = useToast()
 
   // Socket.IO connection
@@ -70,7 +69,6 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     expectedBehavior: '',
     category: 'functionality',
   })
-  const [, setEditingTestCase] = useState<string | null>(null)
 
   // Load saved test cases for this agent
   useEffect(() => {

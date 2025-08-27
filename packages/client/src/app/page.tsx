@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useScroll } from 'motion/react';
+import { motion } from 'motion/react';
 import { useEffect, useState, memo, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';

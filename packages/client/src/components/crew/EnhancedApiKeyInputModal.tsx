@@ -1,6 +1,5 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import {
   Eye,
   EyeOff,
-  ExternalLink,
   AlertCircle,
   Loader2,
   Key,
@@ -31,7 +29,6 @@ import { cn } from '@/lib/utils'
 import {
   ApiKeyRequirement,
   ApiKeyValidationResult,
-  ConnectorApiKeyState,
 } from '@/types/connector-api-keys'
 import { ApiKeyValidator, ServiceType } from '@/lib/api-key-validation'
 import { MCPServerOption } from '@/lib/api'
@@ -46,8 +43,9 @@ import {
 import { ErrorBoundary, useErrorHandler } from '@/components/ui/error-boundary'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 
 interface EnhancedApiKeyInputModalProps {
   isOpen: boolean

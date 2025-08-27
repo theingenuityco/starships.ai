@@ -140,11 +140,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          no-cache: true
+          cache-from: ''
+          cache-to: ''
           build-args: |
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VERSION=${{ github.event.release.tag_name || github.sha }}
             ENVIRONMENT=production
+            CACHE_BUST=${{ github.run_number }}
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}

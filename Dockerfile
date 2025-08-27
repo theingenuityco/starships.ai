@@ -83,6 +83,10 @@ ENV DOCKER_BUILD=true
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
+# Cache bust to force rebuild when environment variables change
+ARG CACHE_BUST=1
+RUN echo "Cache bust: ${CACHE_BUST}"
+
 # Build the application with secrets mounted (not stored in layers)
 # Secrets are only available during this RUN command, not in the final image
 RUN --mount=type=secret,id=stripe_secret_key \

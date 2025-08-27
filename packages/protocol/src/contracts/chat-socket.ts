@@ -99,11 +99,114 @@ export interface ContentBlock {
 }
 
 // ============================================================================
-// SIBIL CHAT INTERFACES
+// UNIFIED CHAT INTERFACES
 // ============================================================================
 
 /**
- * Sibil request interface
+ * Chat source type - distinguishes between different chat systems
+ */
+export type ChatSourceType = 'sibil' | 'agent';
+
+/**
+ * Unified chat request interface
+ */
+export interface ChatSocketRequest {
+  source: ChatSourceType;
+  message: string;
+  user_id: string;
+  stream_id: string;
+  session_id?: string;
+  
+  // Sibil-specific fields
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  starship_id?: string;
+  
+  // Agent-specific fields
+  agent_id?: string;
+  
+  // Socket enhancements
+  typewriter_enabled?: boolean;
+  typing_speed?: number; // characters per second (default: 75)
+}
+
+/**
+ * Unified chat streaming chunk
+ */
+export interface ChatSocketStreamChunk {
+  source: ChatSourceType;
+  stream_id: string;
+  type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
+  content?: string;
+  structured_content?: ContentBlock[];
+  
+  // Sibil-specific fields
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  usage?: UsageStats;
+  
+  // Agent-specific fields
+  agent_id?: string;
+  
+  // Socket enhancements
+  typewriter?: TypewriterData;
+  typing_speed?: number;
+  timestamp: number;
+  
+  // Error handling
+  error?: string;
+  chunk_id?: string;
+  is_final?: boolean;
+}
+
+/**
+ * Unified chat response
+ */
+export interface ChatSocketResponse {
+  source: ChatSourceType;
+  content: string;
+  stream_id?: string;
+  session_id?: string;
+  timestamp: string;
+  
+  // Sibil-specific fields
+  structured_content?: ContentBlock[];
+  provider?: 'openai' | 'anthropic';
+  model?: string;
+  usage?: UsageStats;
+  
+  // Agent-specific fields
+  agent_id?: string;
+}
+
+/**
+ * Unified stream error interface
+ */
+export interface ChatSocketStreamError {
+  source: ChatSourceType;
+  stream_id?: string;
+  agent_id?: string;
+  error_code: string;
+  message: string;
+  timestamp: number;
+  recoverable: boolean;
+}
+
+/**
+ * Stream response metadata
+ */
+export interface ChatSocketStreamResponse {
+  stream_id: string;
+  source: ChatSourceType;
+  status: 'started' | 'streaming' | 'completed' | 'error';
+}
+
+// ============================================================================
+// STANDALONE SIBIL INTERFACES (for non-socket usage)
+// ============================================================================
+
+/**
+ * Basic Sibil request interface (for REST API)
  */
 export interface SibilRequest {
   provider: 'openai' | 'anthropic';
@@ -115,7 +218,7 @@ export interface SibilRequest {
 }
 
 /**
- * Sibil response interface
+ * Basic Sibil response interface (for REST API)
  */
 export interface SibilResponse {
   content: string;
@@ -126,14 +229,14 @@ export interface SibilResponse {
 }
 
 /**
- * Sibil streaming request
+ * Sibil streaming request (for REST API)
  */
 export interface SibilStreamRequest extends SibilRequest {
   stream: true;
 }
 
 /**
- * Sibil streaming chunk
+ * Sibil streaming chunk (for REST API)
  */
 export interface SibilStreamChunk {
   type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
@@ -149,100 +252,11 @@ export interface SibilStreamChunk {
 }
 
 /**
- * Sibil streaming response
+ * Sibil streaming response (for REST API)
  */
 export interface SibilStreamResponse {
   stream_id: string;
   status: 'started' | 'streaming' | 'completed' | 'error';
-}
-
-/**
- * Sibil stream completion response - extends SibilResponse with stream info
- */
-export interface SibilStreamCompleteResponse extends SibilResponse {
-  stream_id?: string;
-}
-
-// ============================================================================
-// SOCKET.IO CHAT INTERFACES
-// ============================================================================
-
-/**
- * Enhanced Sibil request for Socket.IO
- */
-export interface SibilSocketRequest extends SibilRequest {
-  stream_id: string;
-  typewriter_enabled?: boolean;
-  typing_speed?: number; // characters per second (default: 75)
-}
-
-/**
- * Enhanced Sibil streaming chunk for Socket.IO
- */
-export interface SibilSocketStreamChunk extends SibilStreamChunk {
-  stream_id: string;
-  typewriter?: TypewriterData; // Client-side typewriter functionality
-  typing_speed?: number;
-  timestamp: number;
-}
-
-/**
- * Sibil stream error interface
- */
-export interface SibilStreamError {
-  stream_id?: string;
-  error_code: string;
-  message: string;
-  timestamp: number;
-  recoverable: boolean;
-}
-
-/**
- * Agent Socket.IO request
- */
-export interface AgentSocketRequest {
-  agent_id: string;
-  session_id: string;
-  message: string;
-  stream_id: string;
-  typewriter_enabled?: boolean;
-  typing_speed?: number; // characters per second (default: 75)
-  user_id: string; // From auth context
-}
-
-/**
- * Agent Socket.IO streaming chunk
- */
-export interface AgentSocketStreamChunk {
-  stream_id: string;
-  agent_id: string;
-  type: 'content' | 'complete' | 'error';
-  content?: string;
-  typewriter?: TypewriterData; // Client-side typewriter functionality
-  timestamp: number;
-}
-
-/**
- * Agent chat response
- */
-export interface AgentChatResponse {
-  content: string;
-  agent_id: string;
-  session_id: string;
-  timestamp: string;
-  usage?: UsageStats;
-}
-
-/**
- * Agent stream error
- */
-export interface AgentStreamError {
-  stream_id?: string;
-  agent_id?: string;
-  error_code: string;
-  message: string;
-  timestamp: number;
-  recoverable: boolean;
 }
 
 // ============================================================================
@@ -294,7 +308,7 @@ export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | '
 // ============================================================================
 
 /**
- * Chat-related Socket.IO events for Sibil and Agent chat
+ * Unified Chat Socket.IO events
  */
 export interface ChatSocketEvents {
   // Connection events
@@ -302,33 +316,19 @@ export interface ChatSocketEvents {
   'ping': () => void;
   'pong': () => void;
 
-  // Sibil Client to Server events
-  'sibil:start-stream': (request: SibilSocketRequest) => void;
-  'sibil:stop-stream': (streamId: string) => void;
-  'sibil:join-room': (userId: string) => void;
-  'sibil:leave-room': (userId: string) => void;
+  // Unified Chat Client to Server events
+  'chat:start-stream': (request: ChatSocketRequest) => void;
+  'chat:stop-stream': (streamId: string) => void;
+  'chat:join-room': (data: { userId: string; agentId?: string; source: ChatSourceType }) => void;
+  'chat:leave-room': (data: { userId: string; agentId?: string; source: ChatSourceType }) => void;
 
-  // Sibil Server to Client events
-  'sibil:stream-start': (streamId: string) => void;
-  'sibil:stream-chunk': (chunk: SibilSocketStreamChunk) => void;
-  'sibil:stream-complete': (response: SibilStreamCompleteResponse) => void;
-  'sibil:stream-error': (error: SibilStreamError) => void;
-  'sibil:typing-start': () => void;
-  'sibil:typing-stop': () => void;
-
-  // Agent Chat Client to Server events
-  'agent:start-stream': (request: AgentSocketRequest) => void;
-  'agent:stop-stream': (streamId: string) => void;
-  'agent:join-room': (userId: string, agentId: string) => void;
-  'agent:leave-room': (userId: string, agentId: string) => void;
-
-  // Agent Chat Server to Client events
-  'agent:stream-start': (streamId: string, agentId: string) => void;
-  'agent:stream-chunk': (chunk: AgentSocketStreamChunk) => void;
-  'agent:stream-complete': (response: AgentChatResponse) => void;
-  'agent:stream-error': (error: AgentStreamError) => void;
-  'agent:typing-start': (agentId: string) => void;
-  'agent:typing-stop': (agentId: string) => void;
+  // Unified Chat Server to Client events
+  'chat:stream-start': (data: { streamId: string; source: ChatSourceType; agentId?: string }) => void;
+  'chat:stream-chunk': (chunk: ChatSocketStreamChunk) => void;
+  'chat:stream-complete': (response: ChatSocketResponse) => void;
+  'chat:stream-error': (error: ChatSocketStreamError) => void;
+  'chat:typing-start': (data: { source: ChatSourceType; agentId?: string }) => void;
+  'chat:typing-stop': (data: { source: ChatSourceType; agentId?: string }) => void;
 }
 
 // ============================================================================

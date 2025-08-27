@@ -1,6 +1,6 @@
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { AgentSocketRequest, AgentSocketStreamChunk, AgentStreamError, AgentChatResponse } from '@starships/protocol';
+import type { ChatSocketRequest, ChatSocketStreamChunk, ChatSocketStreamError, ChatSocketResponse } from '@starships/protocol';
 
 export interface Message {
   id: string;
@@ -29,7 +29,7 @@ export const agentSocketAPI = {
     agentId: string,
     request: { sessionId: string; message: string },
     callbacks: {
-      onChunk: (chunk: AgentSocketStreamChunk, accumulatedContent: string) => void;
+      onChunk: (chunk: ChatSocketStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: Message) => void;
       onError: (error: string) => void;
       onTypingStart?: () => void;
@@ -48,7 +48,8 @@ export const agentSocketAPI = {
     let accumulatedContent = '';
     let isAborted = false;
 
-    const socketRequest: AgentSocketRequest = {
+    const socketRequest: ChatSocketRequest = {
+      source: 'agent',
       agent_id: agentId,
       session_id: request.sessionId,
       message: request.message,
@@ -64,8 +65,8 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamChunk = (chunk: AgentSocketStreamChunk) => {
-      if (chunk.stream_id === streamId && chunk.agent_id === agentId && !isAborted) {
+    const handleStreamChunk = (chunk: ChatSocketStreamChunk) => {
+      if (chunk.stream_id === streamId && chunk.agent_id === agentId && chunk.source === 'agent' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
           callbacks.onChunk(chunk, accumulatedContent);
@@ -77,14 +78,14 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamComplete = (response: AgentChatResponse) => {
-      if (response.agent_id === agentId && !isAborted) {
+    const handleStreamComplete = (response: ChatSocketResponse) => {
+      if (response.agent_id === agentId && response.source === 'agent' && !isAborted) {
         const finalMessage: Message = {
           id: generateId(),
           content: response.content,
           role: 'assistant',
           timestamp: response.timestamp,
-          sessionId: response.session_id,
+          sessionId: response.session_id || '',
           agentId: response.agent_id,
           streaming: false,
           usage: response.usage
@@ -94,8 +95,8 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamError = (error: AgentStreamError) => {
-      if (error.stream_id === streamId && error.agent_id === agentId && !isAborted) {
+    const handleStreamError = (error: ChatSocketStreamError) => {
+      if (error.stream_id === streamId && error.agent_id === agentId && error.source === 'agent' && !isAborted) {
         callbacks.onError(error.message);
         cleanup();
       }

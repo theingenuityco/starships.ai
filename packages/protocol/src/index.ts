@@ -57,22 +57,20 @@ export type {
   TypewriterData,
   ContentBlock,
   
-  // Sibil types
+  // Unified chat types
+  ChatSourceType,
+  ChatSocketRequest,
+  ChatSocketStreamChunk,
+  ChatSocketResponse,
+  ChatSocketStreamError,
+  ChatSocketStreamResponse,
+  
+  // Sibil REST API types
   SibilRequest,
   SibilResponse,
   SibilStreamRequest,
   SibilStreamChunk,
   SibilStreamResponse,
-  SibilStreamCompleteResponse,
-  SibilSocketRequest,
-  SibilSocketStreamChunk,
-  SibilStreamError,
-  
-  // Agent types
-  AgentSocketRequest,
-  AgentSocketStreamChunk,
-  AgentChatResponse,
-  AgentStreamError,
   
   // Connection and socket types
   SocketConnectionState,

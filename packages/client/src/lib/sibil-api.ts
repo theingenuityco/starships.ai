@@ -1,7 +1,7 @@
 import api from './api';
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { SibilSocketRequest, SibilSocketStreamChunk, SibilStreamError } from '@starships/protocol';
+import type { ChatSocketRequest, ChatSocketStreamChunk, ChatSocketStreamError } from '@starships/protocol';
 
 export interface SibilMessage {
   id: string;
@@ -98,7 +98,7 @@ export const sibilAPI = {
   sendMessageStream: (
     request: SibilRequest,
     callbacks: {
-      onChunk: (chunk: SibilSocketStreamChunk, accumulatedContent: string) => void;
+      onChunk: (chunk: ChatSocketStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: SibilMessage) => void;
       onError: (error: string) => void;
       onTypingStart?: () => void;
@@ -117,7 +117,8 @@ export const sibilAPI = {
     let accumulatedContent = '';
     let isAborted = false;
 
-    const socketRequest: SibilSocketRequest = {
+    const socketRequest: ChatSocketRequest = {
+      source: 'sibil',
       provider: request.provider,
       model: request.model,
       message: request.message,
@@ -135,8 +136,8 @@ export const sibilAPI = {
       }
     };
 
-    const handleStreamChunk = (chunk: SibilSocketStreamChunk) => {
-      if (chunk.stream_id === streamId && !isAborted) {
+    const handleStreamChunk = (chunk: ChatSocketStreamChunk) => {
+      if (chunk.stream_id === streamId && chunk.source === 'sibil' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
           callbacks.onChunk(chunk, accumulatedContent);
@@ -162,8 +163,8 @@ export const sibilAPI = {
       }
     };
 
-    const handleStreamError = (error: SibilStreamError) => {
-      if (error.stream_id === streamId && !isAborted) {
+    const handleStreamError = (error: ChatSocketStreamError) => {
+      if (error.stream_id === streamId && error.source === 'sibil' && !isAborted) {
         callbacks.onError(error.message);
         cleanup();
       }

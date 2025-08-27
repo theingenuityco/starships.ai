@@ -2,8 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import { motion } from 'motion/react';
-import { useStarshipStore } from '@/store/starship-store';
 import {
+  Home,
   Users, BookOpen, Brain,
   Zap, Eye, Command,
   Target
@@ -11,6 +11,7 @@ import {
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NavigationSection } from './NavigationSection';
+import { useMediaQuery } from 'react-responsive';
 
 interface NavigationProps {
   mode?: 'sidebar' | 'module';

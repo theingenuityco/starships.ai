@@ -16,7 +16,6 @@ interface ContentBlock {
 
 interface IntelligentContentRendererProps {
   content: string;
-  structured_content?: ContentBlock[];
   isStreaming?: boolean;
 }
 
@@ -31,7 +30,6 @@ interface ParsedSegment {
 
 export function IntelligentContentRenderer({ 
   content, 
-  structured_content, 
   isStreaming = false 
 }: IntelligentContentRendererProps) {
   

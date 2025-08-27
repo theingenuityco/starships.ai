@@ -51,8 +51,6 @@ interface EnhancedConnectorSelectorProps {
   disabled?: boolean
   className?: string
   connectorInstances?: MCPServerConnector[]
-  onConfigUpdate?: (connectorId: string, config: any) => Promise<void>
-  onTemplateApply?: (connectorId: string, templateId: string) => Promise<void>
   showAdvancedFeatures?: boolean
   autoRefresh?: boolean
   refreshInterval?: number
@@ -77,8 +75,6 @@ export function EnhancedConnectorSelector({
   disabled = false,
   className,
   connectorInstances = [],
-  onConfigUpdate,
-  onTemplateApply,
   showAdvancedFeatures = true,
   autoRefresh = true,
   refreshInterval = 30000,
@@ -97,6 +93,8 @@ export function EnhancedConnectorSelector({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [filterBy, setFilterBy] = useState<FilterOption>('all')
   const [refreshing, setRefreshing] = useState(false)
+  const [isConfiguring, setIsConfiguring] = useState(false)
+  const [isTesting, setIsTesting] = useState(false)
 
   // API Key Modal state
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false)
@@ -240,14 +238,8 @@ export function EnhancedConnectorSelector({
 
         setAvailableConnectors(available)
       } catch (error) {
-        handleError(
-          error as Error,
-          ErrorRecoveryManager.createContext('fetch-connectors', 'EnhancedConnectorSelector', {
-            starshipId,
-            showLoading,
-          })
-        )
-        setError(error as Error)
+        setError(new Error('Failed to fetch connector details'))
+        console.error('Error fetching connector details:', error)
       } finally {
         setLoading(false)
         setRefreshing(false)

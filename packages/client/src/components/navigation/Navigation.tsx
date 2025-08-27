@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import {
   Users, BookOpen, Brain,
   Zap, Eye, Command,
-  Target
+  Target, MessageSquare
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -22,6 +22,7 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: "Starship Systems",
     items: [
+      { href: `/ship/${starshipSlug}/chat`, label: "Unified Chat", icon: MessageSquare, status: "optimal" },
       { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" },
       { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },

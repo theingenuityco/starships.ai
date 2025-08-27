@@ -1,13 +1,13 @@
 'use client'
 
-import { Square, Wifi } from 'lucide-react'
+import { Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { ConnectionStatus } from '@starships/protocol'
 
 interface StreamingIndicatorProps {
   onStop: () => void
   connectionStatus?: ConnectionStatus
-  isTyping?: boolean
+  // Removed unused prop
   agentName?: string
 }
 

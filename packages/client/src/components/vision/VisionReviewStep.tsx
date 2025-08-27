@@ -56,9 +56,7 @@ export function VisionReviewStep({
     setError(null);
   };
 
-  const handleConfirm = () => {
-    onConfirm(isEditing ? editedVision : initialVision);
-  };
+  // Removed unused function
 
   return (
     <div className="space-y-5">

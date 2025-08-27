@@ -26,7 +26,7 @@ export function VisionChamberContent({ slug }: VisionChamberContentProps) {
   const [showFloatingMessage, setShowFloatingMessage] = useState(false)
   const [isManualOpen, setIsManualOpen] = useState(false)
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false)
-  const {  } = useStarshipStore()
+  // Removed unused destructuring
   const searchParams = useSearchParams()
 
   // Fetch starship data and check if first starship

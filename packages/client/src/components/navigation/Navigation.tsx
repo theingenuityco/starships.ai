@@ -3,7 +3,6 @@
 import { usePathname } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  Home,
   Users, BookOpen, Brain,
   Zap, Eye, Command,
   Target
@@ -11,7 +10,6 @@ import {
 import { UserProfile } from '@/components/auth/UserProfile';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NavigationSection } from './NavigationSection';
-import { useMediaQuery } from 'react-responsive';
 
 interface NavigationProps {
   mode?: 'sidebar' | 'module';
@@ -60,8 +58,7 @@ const itemVariants: any = {
 };
 
 export function Navigation({
-  mode = 'sidebar',
-  isMobile: _isMobile = false
+  mode = 'sidebar'
 }: NavigationProps) {
   const pathname = usePathname();
 

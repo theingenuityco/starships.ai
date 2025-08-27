@@ -93,8 +93,7 @@ export function EnhancedConnectorSelector({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [filterBy, setFilterBy] = useState<FilterOption>('all')
   const [refreshing, setRefreshing] = useState(false)
-  const [isConfiguring, setIsConfiguring] = useState(false)
-  const [isTesting, setIsTesting] = useState(false)
+  // Removed unused state variables
 
   // API Key Modal state
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false)
@@ -534,7 +533,7 @@ export function EnhancedConnectorSelector({
                   <Input
                     placeholder="Search connectors..."
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                     className="pl-10"
                     disabled={disabled}
                   />

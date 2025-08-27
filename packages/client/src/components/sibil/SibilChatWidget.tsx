@@ -20,7 +20,6 @@ interface SibilChatWidgetProps {
 
 export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilChatWidgetProps) {
   const { userId, isAuthenticated } = useAuth();
-  const {  } = useStarshipStore();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);

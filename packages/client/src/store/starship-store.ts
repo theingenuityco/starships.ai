@@ -367,7 +367,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             
             // Note: cancellationError property doesn't exist in response type
             // Log subscription cancellation details if available
-            console.log('[STARSHIP] Subscription cancellation details:', response);
+            // Removed unused logging
           } catch (error: any) {
             // Use centralized error handling
             const fullError = extractErrorMessage(error, 'Failed to delete starship');

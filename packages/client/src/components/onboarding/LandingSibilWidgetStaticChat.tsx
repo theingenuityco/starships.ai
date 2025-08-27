@@ -5,14 +5,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Send, 
+import {
+  Send,
   Bot,
   Loader2,
   AlertCircle,
   ArrowUp,
   ArrowRight,
-  Eye,
   User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';

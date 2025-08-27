@@ -27,8 +27,7 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const [streaming, setStreaming] = useState(false)
   const [typingIndicator, setTypingIndicator] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [provider, setProvider] = useState<'openai' | 'anthropic'>('openai')
-  const [model, setModel] = useState<string>('gpt-4')
+  // Removed unused state variables
   const sessionId = useRef<string>('sibil-session')
   const streamController = useRef<{ abort: () => void } | null>(null)
 

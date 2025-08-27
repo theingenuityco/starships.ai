@@ -6,7 +6,6 @@ import {
   CACHE_KEYS,
   invalidateAgentCaches,
   invalidateConnectorInstanceCaches,
-  invalidateMCPServerCaches,
 } from './cache'
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
@@ -810,7 +809,7 @@ export const mcpServerAPI = {
   getConnectorConfigHistory: async (
     starshipId: string,
     connectorId: string,
-    limit?: number
+    // Removed unused parameter
   ): Promise<any[]> => {
     console.warn('[API] MCP Configuration history retrieval has been removed:', { starshipId, connectorId })
     return []
@@ -821,7 +820,7 @@ export const mcpServerAPI = {
     starshipId: string,
     connectorId: string,
     historyId: string,
-    changeReason?: string
+    // Removed unused parameter
   ): Promise<void> => {
     console.warn('[API] MCP Configuration rollback has been removed:', { starshipId, connectorId, historyId })
     // No-op for compatibility

@@ -19,7 +19,7 @@ interface SibilContentProps {
 export function SibilContent({ slug }: SibilContentProps) {
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
-  const {  } = useStarshipStore()
+  // Removed unused destructuring
   
   // Floating message state
   const [showFloatingMessage, setShowFloatingMessage] = useState(false)

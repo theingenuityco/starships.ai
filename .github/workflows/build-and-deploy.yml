@@ -92,6 +92,8 @@ jobs:
             kinde_site_url=${{ vars.KINDE_SITE_URL }}
             kinde_post_login_redirect_url=${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}
             kinde_post_logout_redirect_url=${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}
+            next_public_api_url=${{ vars.NEXT_PUBLIC_API_URL }}
+            next_public_server_url=${{ vars.NEXT_PUBLIC_SERVER_URL }}
 
   # Production Build (triggered on release)
   build-prod:
@@ -138,12 +140,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: ''
+          cache-to: ''
           build-args: |
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VERSION=${{ github.event.release.tag_name || github.sha }}
             ENVIRONMENT=production
+            CACHE_BUST=${{ github.run_number }}
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -153,6 +156,8 @@ jobs:
             kinde_site_url=${{ vars.KINDE_SITE_URL }}
             kinde_post_login_redirect_url=${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}
             kinde_post_logout_redirect_url=${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}
+            next_public_api_url=${{ vars.NEXT_PUBLIC_API_URL }}
+            next_public_server_url=${{ vars.NEXT_PUBLIC_SERVER_URL }}
 
   # Deploy to Development
   deploy-dev:

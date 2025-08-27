@@ -4,26 +4,21 @@ import { useState, useEffect } from 'react'
 // import { motion, AnimatePresence } from 'motion/react'
 import {
   Agent,
-  MCPServerOption,
   MCPServerConnector,
   mcpServerAPI,
   starshipAPI,
   Starship,
 } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
-import { ConnectorSelector } from '@/components/crew/ConnectorSelector'
-import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { CrewConsoleFloatingMessage } from '@/components/sibil/CrewConsoleFloatingMessage'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   ArrowLeft, Users, Plug, Bot, Loader2, Activity,
-  Shield, Zap, Brain, MessageSquare, Sparkles,
-  Star, UserCheck, Settings, Network, Info
+  Shield, Zap, MessageSquare, Info
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
@@ -44,9 +39,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
-  const [connectorsLoading, setConnectorsLoading] = useState(false)
-  const [connectorsError, setConnectorsError] = useState<string | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoRefresh] = useState(true)
 
   // Floating message state
   const [showFloatingMessage, setShowFloatingMessage] = useState(false)
@@ -94,8 +87,24 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // Fetch starship data on component mount
   useEffect(() => {
+    const fetchStarship = async () => {
+      try {
+        setStarshipLoading(true)
+        const data = await starshipAPI.getStarshipBySlug(slug)
+        setStarship(data.starship)
+      } catch (error) {
+        console.error('Failed to fetch starship:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load starship data',
+          variant: 'destructive',
+        })
+      } finally {
+        setStarshipLoading(false)
+      }
+    }
     fetchStarship()
-  }, [slug])
+  }, [slug, toast])
 
   // Check if this is the user's first starship and show onboarding
   useEffect(() => {
@@ -109,14 +118,32 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // Fetch connector instances when starship is loaded
   useEffect(() => {
+    const fetchConnectorInstances = async () => {
+      try {
+        const instances = await mcpServerAPI.getConnectorInstances(slug)
+        setConnectorInstances(instances)
+      } catch (error) {
+        console.error('Failed to fetch connector instances:', error)
+      }
+    }
+
     if (starship) {
       fetchConnectorInstances()
     }
-  }, [starship])
+  }, [starship, slug])
 
   // Auto-refresh connector instances every 30 seconds
   useEffect(() => {
     if (!autoRefresh) return
+
+    const fetchConnectorInstances = async () => {
+      try {
+        const instances = await mcpServerAPI.getConnectorInstances(slug)
+        setConnectorInstances(instances)
+      } catch (error) {
+        console.error('Failed to fetch connector instances:', error)
+      }
+    }
 
     const interval = setInterval(() => {
       fetchConnectorInstances()
@@ -124,144 +151,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
     return () => clearInterval(interval)
   }, [autoRefresh, slug])
-
-  const fetchStarship = async () => {
-    try {
-      setStarshipLoading(true)
-      const data = await starshipAPI.getStarshipBySlug(slug)
-      setStarship(data.starship)
-    } catch (error) {
-      console.error('Failed to fetch starship:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load starship data',
-        variant: 'destructive',
-      })
-    } finally {
-      setStarshipLoading(false)
-    }
-  }
-
-  const fetchConnectorInstances = async () => {
-    try {
-      setConnectorsLoading(true)
-      setConnectorsError(null)
-      const instances = await mcpServerAPI.getConnectorInstances(slug)
-      setConnectorInstances(instances)
-    } catch (error) {
-      console.error('Failed to fetch connector instances:', error)
-      setConnectorsError('Failed to load connectors. Please try again.')
-    } finally {
-      setConnectorsLoading(false)
-    }
-  }
-
-  // Handle connector changes with proper error handling and loading states
-  const handleConnectorsChange = async (newConnectors: MCPServerOption[]) => {
-    try {
-      setConnectorsLoading(true)
-      setConnectorsError(null)
-
-      console.log('[StarshipCrewContent] Handling connector changes:', newConnectors.length)
-
-      // Compare with current connector instances to determine what changed
-      const currentTemplateIds = new Set(connectorInstances.map(instance => instance.templateId))
-      const newTemplateIds = new Set(newConnectors.map(template => template.id))
-
-      // Find templates to create instances for (in new but not in current)
-      const toCreate = newConnectors.filter(template => !currentTemplateIds.has(template.id))
-
-      // Find instances to remove (in current but not in new)
-      const toRemove = connectorInstances.filter(
-        instance => !newTemplateIds.has(instance.templateId)
-      )
-
-      console.log(
-        '[StarshipCrewContent] To create:',
-        toCreate.length,
-        'To remove:',
-        toRemove.length
-      )
-
-      // Show notification for connector creation
-      if (toCreate.length > 0) {
-        const connectorNames = toCreate.map(t => t.name).join(', ')
-        toast({
-          title: 'Setting up connection',
-          description: `We are setting up your connection with ${connectorNames} and will notify you once done.`,
-          duration: 5000,
-        })
-      }
-
-      // Execute connector instance operations
-      const operations = [
-        ...toCreate.map(template => {
-          console.log(
-            '[StarshipCrewContent] Creating connector instance for template:',
-            template.name
-          )
-
-          // Check if template has API keys configured
-          let env: string | undefined = undefined
-          if (template.env) {
-            console.log('[StarshipCrewContent] Template has environment variables:', template.env)
-            // Store the API keys directly in the env field
-            env = template.env
-            console.log('[StarshipCrewContent] Creating connector with env:', env)
-          }
-
-          return mcpServerAPI.createConnectorInstance(slug, template.id, env)
-        }),
-        ...toRemove.map(instance => {
-          console.log('[StarshipCrewContent] Removing connector instance:', instance.id)
-          return mcpServerAPI.removeConnectorInstance(slug, instance.id)
-        }),
-      ]
-
-      if (operations.length > 0) {
-        await Promise.all(operations)
-
-        // Show success notification
-        if (toCreate.length > 0) {
-          const connectorNames = toCreate.map(t => t.name).join(', ')
-          toast({
-            title: 'Connection established',
-            description: `Successfully connected to ${connectorNames}`,
-            variant: 'success',
-            duration: 5000,
-          })
-        }
-
-        if (toRemove.length > 0) {
-          toast({
-            title: 'Disconnected',
-            description: `Connectors removed successfully`,
-            variant: 'default',
-            duration: 3000,
-          })
-        }
-      }
-
-      // Refresh connector instances to get current state
-      await fetchConnectorInstances()
-    } catch (error) {
-      console.error('Failed to update connector instances:', error)
-      setConnectorsError('Failed to update connectors. Please try again.')
-
-      // Show error notification
-      toast({
-        title: 'Connection failed',
-        description: 'Failed to set up connector. Please try again or check the logs for details.',
-        variant: 'destructive',
-        duration: 5000,
-      })
-
-      // Refresh connector instances to get current state
-      await fetchConnectorInstances()
-    } finally {
-      setConnectorsLoading(false)
-    }
-  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background to-muted/5">
@@ -575,7 +464,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         show={showFloatingMessage} 
         onDismiss={handleDismissMessage}
         isManualOpen={isManualOpen}
-        currentTab={currentTab}
         onTabChange={handleTabChange}
       />
     </div>

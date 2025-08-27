@@ -55,12 +55,6 @@ function generateCorrelationId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
-/**
- * Determine if an error should be logged based on severity
- */
-function shouldLogError(severity: ErrorSeverity): boolean {
-  return severity === 'high' || severity === 'critical';
-}
 
 // ============================================================================
 // CONFIGURATION AND TYPES
@@ -291,7 +285,6 @@ function convertToStandardError(error: any, req: Request): BaseError {
     return error;
   }
 
-  const userId = (req as any).user?.id;
   const requestId = req.get('X-Request-ID');
   // Handle specific error types
   if (error.name === 'ValidationError' || error.type === 'validation') {
@@ -393,7 +386,7 @@ export function errorHandler(config: Partial<ErrorHandlerConfig> = {}) {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   const logger = ErrorLogger.getInstance(finalConfig);
 
-  return (error: any, req: Request, res: Response, next: NextFunction): void => {
+  return (error: any, req: Request, res: Response): void => {
     // Convert to StandardError if needed
     const standardError = convertToStandardError(error, req);
 

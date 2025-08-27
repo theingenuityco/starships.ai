@@ -9,14 +9,11 @@ import { MissionService } from '../services/MissionService';
 import { WorkflowService } from '../services/WorkflowService';
 import { AgentService } from '../services/AgentService';
 import type {
-  Mission,
   CreateMissionRequest,
   UpdateMissionRequest,
   MissionFilters,
   MissionSort,
-  MissionListResponse,
-  SendMissionMessageRequest,
-  MissionChatResponse
+  SendMissionMessageRequest
 } from '@starships/protocol';
 import {
   ValidationError,
@@ -65,7 +62,6 @@ const getErrorMessage = (error: unknown): string => {
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
 
     // Parse query parameters
     const filters: MissionFilters = {};
@@ -324,7 +320,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       );
     }
 
-    const mission = await MissionService.updateMission(id, updates, userId);
+    const mission = await MissionService.updateMission(id, updates);
     res.json({ mission });
 
   } catch (error) {
@@ -360,7 +356,7 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
 
     validateUUID(id, 'id');
 
-    await MissionService.deleteMission(id, userId);
+    await MissionService.deleteMission(id);
     res.status(204).send();
 
   } catch (error) {

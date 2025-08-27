@@ -329,7 +329,7 @@ export function StarshipEditModal({
               <Input
                 id="starship-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                 className={cn(
                   "bg-background/50 backdrop-blur-sm border-border/50",
                   errors.name && "border-destructive"

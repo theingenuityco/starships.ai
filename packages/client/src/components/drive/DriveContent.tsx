@@ -18,8 +18,6 @@ interface DriveContentProps {
 export function DriveContent({ slug }: DriveContentProps) {
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
-  const [powerOutput, setPowerOutput] = useState(0)
-  const [efficiency, setEfficiency] = useState(0)
 
   // Fetch starship data
   useEffect(() => {

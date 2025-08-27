@@ -1,17 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
-} from '@/components/ui/tooltip';
 import {
   Wifi,
   WifiOff,
@@ -21,7 +15,6 @@ import {
   Clock,
   Activity,
   Shield,
-  Loader2,
   X
 } from 'lucide-react';
 // Note: ConnectionMetrics type definition for socket client connections

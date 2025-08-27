@@ -56,7 +56,7 @@ export class StartNodeHandler extends BaseWorkflowNodeHandler {
     return `[START] ${node.name}`;
   }
 
-  getEstimatedTime(node: WorkflowDSLNode): number {
+  getEstimatedTime(): number {
     return 0; // Start nodes execute instantly
   }
 }
@@ -106,7 +106,7 @@ export class EndNodeHandler extends BaseWorkflowNodeHandler {
     return `[END] ${node.name}`;
   }
 
-  getEstimatedTime(node: WorkflowDSLNode): number {
+  getEstimatedTime(): number {
     return 0; // End nodes execute instantly
   }
 }

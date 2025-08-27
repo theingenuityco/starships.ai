@@ -214,7 +214,7 @@ const calculateVerticalPositions = (nodes: any[]) => {
 // Calculate canvas height based on workflow size
 const calculateCanvasHeight = (nodeCount: number) => {
   const baseHeight = 100; // Top padding
-  const nodeHeight = 160; // Estimated height per node including content
+  // Removed unused variable
   const nodeSpacing = 320; // Vertical spacing between nodes
   const bottomPadding = 100; // Bottom padding
   

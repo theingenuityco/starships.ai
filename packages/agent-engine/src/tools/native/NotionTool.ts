@@ -1,10 +1,9 @@
 import { DynamicTool } from '@langchain/core/tools';
 import { Client } from '@notionhq/client';
-import { 
-  PageObjectResponse, 
+import {
   DatabaseObjectResponse,
   BlockObjectResponse,
-  PartialBlockObjectResponse 
+  PartialBlockObjectResponse
 } from '@notionhq/client/build/src/api-endpoints';
 
 interface NotionSearchInput {
@@ -353,7 +352,7 @@ IMPORTANT: To list all pages, use search with empty query: {"action": "search", 
           if (typeof input === 'string') {
             try {
               params = JSON.parse(input) as NotionToolInput;
-            } catch (parseError) {
+            } catch {
               // Try to detect intent from plain text
               const lowerInput = input.toLowerCase();
               if (lowerInput.includes('search')) {

@@ -126,9 +126,8 @@ export const invalidateTemplateCaches = (templateId?: string) => {
 }
 
 // Deprecated: MCP functionality has been removed
-export const invalidateMCPServerCaches = (starshipId?: string) => {
-  console.warn('[CACHE] MCP functionality has been removed - cache invalidation skipped')
-}
+// Deprecated: MCP functionality has been removed
+// Removed unused function
 
 // NEW: Helper function to invalidate connector instance caches
 export const invalidateConnectorInstanceCaches = (starshipId?: string) => {

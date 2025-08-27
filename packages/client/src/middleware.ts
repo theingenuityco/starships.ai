@@ -13,13 +13,6 @@ const publicPaths = [
   '/public'
 ];
 
-// Paths that require authentication (bypass waitlist check)
-const authRequiredPaths = [
-  '/fleet',
-  '/ship',
-  '/agents'
-];
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 

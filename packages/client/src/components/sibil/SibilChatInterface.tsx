@@ -1,19 +1,17 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
 import { SibilMessage, sibilAPI } from '@/lib/sibil-api'
 import { getChatHistory, saveChatHistory, generateSibilSessionId } from '@/lib/storage'
 import { MessageInput } from '../chat/MessageInput'
 import { MessageList } from '../chat/MessageList'
 import { SibilMessageBubble } from './SibilMessageBubble'
-import { ModernProviderSelector } from './ModernProviderSelector'
 import { StreamingIndicator } from './StreamingIndicator'
 import { VisionChatContextIndicator } from '../vision/VisionChatContextIndicator'
 import { ERROR_TEXT } from '@/constants/text'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
-import { headerVariants, inputVariants, pageVariants } from '@/lib/animations'
 import { Bot } from 'lucide-react'
 import type { VisionRefinementProposal } from '@starships/protocol'
 
@@ -23,14 +21,16 @@ interface SibilChatInterfaceProps {
 
 export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
-  const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
+  const { isConnected, connectionStatus } = useSocketConnection()
   const [messages, setMessages] = useState<SibilMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [typingIndicator, setTypingIndicator] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [provider, setProvider] = useState<'openai' | 'anthropic'>('openai')
-  const [model, setModel] = useState<string>('gpt-4')
+  // Provider and model configuration
+  const provider = 'openai'
+  const model = 'gpt-4'
+  // Removed unused state variables
   const sessionId = useRef<string>('sibil-session')
   const streamController = useRef<{ abort: () => void } | null>(null)
 
@@ -45,8 +45,8 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
         : '❌ Vision refinement proposal rejected. Current vision remains unchanged.',
       timestamp: new Date().toISOString(),
       sessionId: sessionId.current,
-      provider,
-      model
+      provider: provider,
+      model: model
     }
     
     const updatedMessages = [...messages, actionMessage]
@@ -113,8 +113,8 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
         role: 'assistant',
         timestamp: new Date().toISOString(),
         sessionId: currentSessionId,
-        provider,
-        model,
+        provider: provider,
+        model: model,
         streaming: true,
         structured_content: []
       }
@@ -187,12 +187,6 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
       streamController.current.abort()
       setStreaming(false)
     }
-  }
-
-  const handleProviderChange = (newProvider: 'openai' | 'anthropic') => {
-    setProvider(newProvider)
-    // Reset model to default for new provider
-    setModel(newProvider === 'openai' ? 'gpt-4' : 'claude-3-sonnet-20240229')
   }
 
   // Show loading state while auth is loading

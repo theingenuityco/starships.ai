@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Agent, chatAPI, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 import { getChatHistory, saveChatHistory, generateSessionId } from '@/lib/storage'
 import { MessageList } from './MessageList'
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { useTypewriter } from '@/hooks/useTypewriter'
-import { Wifi, WifiOff, AlertCircle, CheckCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle } from 'lucide-react'
 
 interface ChatInterfaceProps {
   agent: Agent
@@ -30,7 +30,7 @@ export function ChatInterface({
   const { userId, isAuthenticated, isLoading } = useAuth()
 
   // Socket.IO connection
-  const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
+  const { isConnected, error: connectionError } = useSocketConnection()
 
   // Typewriter effect
   const typewriter = useTypewriter({
@@ -40,13 +40,13 @@ export function ChatInterface({
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
-  const [currentStreamAbort, setCurrentStreamAbort] = useState<(() => void) | null>(null)
+  const [, setStreamingMessageId] = useState<string | null>(null)
+  const [, setCurrentStreamAbort] = useState<(() => void) | null>(null)
   const currentSessionId = useRef<string | null>(sessionId)
 
   // Connector instances state
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
-  const [loadingConnectors, setLoadingConnectors] = useState(false)
+  const [, setLoadingConnectors] = useState(false)
 
   // Initialize session when agent changes and user is available
   useEffect(() => {

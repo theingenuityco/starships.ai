@@ -194,16 +194,13 @@ export function ConnectorStatusDemo() {
 
         <TabsContent value="dashboard" className="space-y-4">
           <ConnectorStatusDashboard
-            starshipId="demo-ship"
             connectorInstances={connectorInstances}
           />
         </TabsContent>
 
         <TabsContent value="monitor" className="space-y-4">
           <ConnectorInstanceMonitor
-            starshipId="demo-ship"
             connectorInstances={connectorInstances}
-            showDetailedView={true}
             autoRefresh={false}
           />
         </TabsContent>

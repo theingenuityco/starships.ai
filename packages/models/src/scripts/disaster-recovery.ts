@@ -1,12 +1,11 @@
-import { BackupManager, BackupData } from './backup-restore';
+import { BackupManager } from './backup-restore';
 import { getConnection } from '../helpers/database';
-import { Session } from 'neo4j-driver';
 import * as fs from 'fs';
 import * as path from 'path';
 
 // Stub for removed ConnectorInstanceMigration
 class ConnectorInstanceMigration {
-  async rollback(_rollbackData: any): Promise<boolean> {
+  async rollback(): Promise<boolean> {
     console.warn('ConnectorInstanceMigration.rollback: MCP functionality removed');
     return false;
   }
@@ -146,8 +145,8 @@ export class DisasterRecoveryManager {
       if (options.rollbackDataPath && fs.existsSync(options.rollbackDataPath)) {
         console.log('[RECOVERY] 📂 Found rollback data, attempting migration rollback...');
         const migration = new ConnectorInstanceMigration();
-        const rollbackData = JSON.parse(fs.readFileSync(options.rollbackDataPath, 'utf8'));
-        const rollbackSuccess = await migration.rollback(rollbackData.rollbackData || rollbackData);
+        JSON.parse(fs.readFileSync(options.rollbackDataPath, 'utf8'));
+        const rollbackSuccess = await migration.rollback();
 
         if (rollbackSuccess) {
           actionsPerformed.push('Migration rollback completed successfully');
@@ -669,7 +668,7 @@ export class DisasterRecoveryManager {
       let validation = { valid: true };
       try {
         await this.backupManager['loadBackupFromFile'](backupPath);
-      } catch (error) {
+      } catch {
         validation = { valid: false };
       }
       if (validation.valid) {
@@ -713,7 +712,7 @@ export class DisasterRecoveryManager {
       try {
         JSON.parse(content);
         return { success: true };
-      } catch (parseError) {
+      } catch {
         // Attempt basic JSON repair (remove trailing commas, fix brackets, etc.)
         const repairedContent = content
           .replace(/,(\s*[}\]])/g, '$1') // Remove trailing commas
@@ -771,13 +770,13 @@ export class DisasterRecoveryManager {
     // This is a simplified implementation
     // In a real scenario, you'd use a library like 'statvfs' or 'diskusage'
     try {
-      const stats = fs.statSync(process.cwd());
+      fs.statSync(process.cwd());
       // Mock values for demonstration
       return {
         availableGB: 10.5,
         totalGB: 100.0,
       };
-    } catch (error) {
+    } catch {
       return {
         availableGB: 0,
         totalGB: 0,

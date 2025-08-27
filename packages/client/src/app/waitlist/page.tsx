@@ -65,7 +65,7 @@ export default function WaitlistPage() {
         setMessage(data.message);
         setMessageType('info');
       }
-    } catch (error) {
+    } catch {
       setMessage('Service temporarily unavailable. Please try again.');
       setMessageType('error');
     } finally {
@@ -123,7 +123,7 @@ export default function WaitlistPage() {
                   type="email"
                   placeholder="captain@starship.ai"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                   disabled={isLoading || isValidated}
                   className="bg-gray-800/50 dark:bg-gray-800/50 border-gray-600 dark:border-gray-600 text-white dark:text-white placeholder-gray-400 dark:placeholder-gray-400 focus:border-primary focus:ring-primary"
                   required

@@ -6,13 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Send, 
   Sparkles,
   Loader2,
   AlertCircle,
-  ArrowRight,
-  Eye,
-  Bot
+  ArrowRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
@@ -154,7 +151,7 @@ export function LandingSibilWidgetStatic({
           <Textarea
             ref={textareaRef}
             value={vision}
-            onChange={(e) => handleVisionChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleVisionChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={displayedPlaceholder || "What's your vision?"}
             className={cn(

@@ -8,7 +8,7 @@ interface TableRendererProps {
   headers?: string[]
 }
 
-export function TableRenderer({ content, headers }: TableRendererProps) {
+export function TableRenderer({ content }: TableRendererProps) {
   return (
     <div className="overflow-x-auto max-w-full">
       <div className="prose prose-sm dark:prose-invert max-w-none">

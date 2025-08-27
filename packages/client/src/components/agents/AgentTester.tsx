@@ -9,13 +9,11 @@ import { Card } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Send, RotateCcw, Play, Save, Trash2, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
+import { Send, RotateCcw, Play, Trash2, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react'
 import { useToast } from '@/hooks/useToast'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { useTypewriter } from '@/hooks/useTypewriter'
-import { StreamingIndicator } from '@/components/sibil/StreamingIndicator'
 
 interface AgentTesterProps {
   agent: Agent
@@ -41,7 +39,6 @@ interface TestResult {
 }
 
 export function AgentTester({ agent, onClose }: AgentTesterProps) {
-  const { userId } = useAuth()
   const { toast } = useToast()
 
   // Socket.IO connection
@@ -59,7 +56,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const [sessionId] = useState(`test-${agent.id}-${Date.now()}`)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isTyping, setIsTyping] = useState(false)
+  const [, setIsTyping] = useState(false)
   const [currentStreamAbort, setCurrentStreamAbort] = useState<(() => void) | null>(null)
 
   // Test case management state
@@ -71,7 +68,6 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     expectedBehavior: '',
     category: 'functionality',
   })
-  const [editingTestCase, setEditingTestCase] = useState<string | null>(null)
 
   // Load saved test cases for this agent
   useEffect(() => {
@@ -295,11 +291,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       setLoading(true)
 
       // Use Socket.IO streaming for test case execution
-      const { abort } = agentSocketAPI.sendMessageStream(agent.id, {
+      agentSocketAPI.sendMessageStream(agent.id, {
         sessionId: `test-case-${testCase.id}-${Date.now()}`,
         message: testCase.input
       }, {
-        onChunk: (chunk, accumulated) => {
+        onChunk: () => {
           // Test cases don't need real-time display, just collect the response
         },
         onComplete: (finalMessage) => {
@@ -488,11 +484,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             <div className="flex gap-2">
               <Textarea
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
                 placeholder={isConnected ? "Type a message to test the agent..." : "Connect to Socket.IO to send messages..."}
                 className="flex-1 min-h-[60px] resize-none bg-zinc-800 text-white placeholder-zinc-500 border-none rounded-lg focus:ring-1 focus:ring-blue-500"
                 disabled={!isConnected}
-                onKeyPress={e => {
+                onKeyPress={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     handleSendMessage()

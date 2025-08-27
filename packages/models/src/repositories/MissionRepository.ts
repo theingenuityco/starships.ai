@@ -1,8 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
-import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
 import {
   Mission,
   MissionStatus,

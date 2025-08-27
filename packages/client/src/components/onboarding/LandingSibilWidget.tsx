@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { 
   Bot, 
   Minimize2, 
@@ -294,7 +293,7 @@ export function LandingSibilWidget({
                 <Textarea
                   ref={textareaRef}
                   value={vision}
-                  onChange={(e) => handleVisionChange(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleVisionChange(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Type your vision here..."
                   className={cn(

@@ -6,7 +6,7 @@
  */
 
 import { StateGraph, END, START, Annotation, MemorySaver, MessagesAnnotation } from '@langchain/langgraph';
-import { AIMessage, HumanMessage, SystemMessage, BaseMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { LangChainProvider } from '@starships/agent-engine';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
@@ -17,13 +17,12 @@ import { MissionExecutionEngine } from './MissionExecutionEngine';
 import { MissionService } from './MissionService';
 import { MISSION_PHASES } from '@starships/protocol';
 import { WorkflowParsingService } from './WorkflowParsingService';
-import type { 
-  Mission, 
+import type {
+  Mission,
   MissionPhase,
   MissionClarity,
   MissionWorkflow,
   CreateMissionClarityRequest,
-  CreateWorkflowRequest,
   LLMChatPrompt,
   LLMProvider
 } from '@starships/protocol';
@@ -432,7 +431,7 @@ export class MissionOrchestratorAgent {
    */
   private async planPhaseNode(state: MissionChatState): Promise<Partial<MissionChatState>> {
     try {
-      const { metadata, clarity } = state;
+      const { metadata } = state;
       
       if (!metadata) throw new Error('Missing metadata in state');
       
@@ -810,9 +809,9 @@ export class MissionOrchestratorAgent {
 
       // Extract final AI response from the graph result
       const lastMessage = result.messages[result.messages.length - 1];
-      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
-        ? lastMessage.content 
-        : this.getFallbackResponse(missionId);
+      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string'
+        ? lastMessage.content
+        : this.getFallbackResponse();
 
       return { response, state: result };
 
@@ -859,9 +858,9 @@ export class MissionOrchestratorAgent {
 
       // Extract final response
       const lastMessage = result.messages[result.messages.length - 1];
-      const finalResponse = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
-        ? lastMessage.content 
-        : this.getFallbackResponse(missionId);
+      const finalResponse = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string'
+        ? lastMessage.content
+        : this.getFallbackResponse();
 
       // Clear callback storage
       this.currentCallbacks = undefined;
@@ -910,7 +909,7 @@ export class MissionOrchestratorAgent {
         return typeof lastMessage.content === 'string' ? lastMessage.content : '';
       }
 
-      return this.getFallbackResponse(missionId);
+      return this.getFallbackResponse();
 
     } catch (error) {
       this.logger.error('Failed to generate orchestrator response', {
@@ -918,7 +917,7 @@ export class MissionOrchestratorAgent {
         operation: 'generateResponse',
         missionId
       }, error as Error);
-      return this.getFallbackResponse(missionId);
+      return this.getFallbackResponse();
     }
   }
 
@@ -946,9 +945,9 @@ export class MissionOrchestratorAgent {
       );
 
       const lastMessage = result.messages[result.messages.length - 1];
-      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string' 
-        ? lastMessage.content 
-        : this.getFallbackResponse(missionId);
+      const response = lastMessage instanceof AIMessage && typeof lastMessage.content === 'string'
+        ? lastMessage.content
+        : this.getFallbackResponse();
 
       return { response, state: result };
 
@@ -984,11 +983,11 @@ export class MissionOrchestratorAgent {
         return typeof lastMessage.content === 'string' ? lastMessage.content : '';
       }
 
-      return this.getFallbackResponse(missionId);
+      return this.getFallbackResponse();
 
     } catch (error) {
       this.logger.error('Failed to generate system response', error as Error);
-      return this.getFallbackResponse(missionId);
+      return this.getFallbackResponse();
     }
   }
 
@@ -1050,7 +1049,7 @@ export class MissionOrchestratorAgent {
   /**
    * Generate fallback response when LLM fails
    */
-  private getFallbackResponse(_missionId: string): string {
+  private getFallbackResponse(): string {
     return `I'm here to help guide your mission. Could you provide more details about what you need assistance with?`;
   }
 

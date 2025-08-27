@@ -289,7 +289,7 @@ export function StarshipDeleteDialog({
                     <Input
                       id="confirmation"
                       value={confirmationText}
-                      onChange={(e) => setConfirmationText(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmationText(e.target.value)}
                       placeholder="Type the starship name here..."
                       className={cn(
                         "bg-background/50 backdrop-blur-sm border-border/50",

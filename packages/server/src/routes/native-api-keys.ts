@@ -55,7 +55,7 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
 router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req, res) => {
   try {
     const { starshipId } = req.params;
-    const { toolName, apiKey, config } = req.body;
+    const { toolName, apiKey } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {

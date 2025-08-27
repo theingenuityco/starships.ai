@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { SibilChatInterface } from './SibilChatInterface'
 import { SibilPageFloatingMessage } from './SibilPageFloatingMessage'
 import { 
   ArrowLeft, Brain, Loader2, Activity, 
-  MessageSquare, Lightbulb, Info
+  MessageSquare, Info
 } from 'lucide-react'
 import Link from 'next/link'
 import { starshipAPI, Starship } from '@/lib/api'
@@ -20,9 +19,7 @@ interface SibilContentProps {
 export function SibilContent({ slug }: SibilContentProps) {
   const [starship, setStarship] = useState<Starship | null>(null)
   const [starshipLoading, setStarshipLoading] = useState(true)
-  const [activeConversations, setActiveConversations] = useState(0)
-  const [insights, setInsights] = useState(0)
-  const { starships } = useStarshipStore()
+  // Removed unused destructuring
   
   // Floating message state
   const [showFloatingMessage, setShowFloatingMessage] = useState(false)
@@ -48,13 +45,13 @@ export function SibilContent({ slug }: SibilContentProps) {
 
   // Check if this is the user's first starship and show onboarding
   useEffect(() => {
-    if (starship && starships && starships.length === 1) {
+    if (starship) {
       const dismissed = localStorage.getItem('sibil-page-message-dismissed')
       if (!dismissed) {
         setShowFloatingMessage(true)
       }
     }
-  }, [starship, starships])
+  }, [starship])
 
   // Function to manually show the info modal
   const handleShowInfo = () => {

@@ -1,9 +1,7 @@
 import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
 import { LLMRepository } from './LLMRepository';
-import { AgentTemplateRepository } from './AgentTemplateRepository';
 import { getConnection } from '../helpers/database';
-import { NotFoundError } from '../helpers/errors';
 
 export { AgentRepository } from './AgentRepository';
 export { UserRepository } from './UserRepository';
@@ -164,7 +162,7 @@ export class RepositoryFactory {
       try {
         const connection = getConnection();
         this.waitlistRepo = new WaitlistRepository(connection);
-      } catch (connectionError) {
+      } catch {
         console.warn('[RepositoryFactory] Database connection not available for WaitlistRepository, will retry later');
         // Don't fail initialization for these - they can be retried later
         this.waitlistRepo = null;

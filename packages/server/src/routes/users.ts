@@ -7,7 +7,7 @@ const router: Router = Router();
 
 // Validation middleware for user sync requests
 const validateSyncRequest = (req: Request, res: Response, next: any) => {
-  const { kindeId, email, name, avatar } = req.body;
+  const { kindeId, email } = req.body;
   
   if (!kindeId || typeof kindeId !== 'string') {
     res.status(400).json({ error: 'kindeId is required and must be a string' });

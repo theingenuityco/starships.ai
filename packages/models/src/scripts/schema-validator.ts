@@ -467,7 +467,7 @@ export class SchemaValidator {
           message: 'Full-text search analyzers are available (expedition search skipped)',
           severity: 'info'
         });
-      } catch (searchError) {
+      } catch {
         results.push({
           category: 'Full-Text Search',
           test: 'Full-text search analyzers available',

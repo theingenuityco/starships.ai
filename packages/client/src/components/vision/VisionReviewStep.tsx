@@ -13,7 +13,6 @@ import {
   Sparkles,
   AlertCircle,
   Eye,
-  ArrowRight,
   CheckCircle
 } from 'lucide-react';
 import { VisionAnalysis } from '@/lib/onboarding/types';
@@ -24,18 +23,12 @@ interface VisionReviewStepProps {
   initialVision: string;
   analysis?: VisionAnalysis | null;
   onConfirm: (vision: string) => void;
-  onEdit?: () => void;
-  onSkip?: () => void;
-  allowSkip?: boolean;
 }
 
 export function VisionReviewStep({
   initialVision,
   analysis,
   onConfirm,
-  onEdit,
-  onSkip,
-  allowSkip = false
 }: VisionReviewStepProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedVision, setEditedVision] = useState(initialVision);
@@ -63,9 +56,7 @@ export function VisionReviewStep({
     setError(null);
   };
 
-  const handleConfirm = () => {
-    onConfirm(isEditing ? editedVision : initialVision);
-  };
+  // Removed unused function
 
   return (
     <div className="space-y-5">
@@ -86,7 +77,7 @@ export function VisionReviewStep({
             <div className="relative">
               <Textarea
                 value={editedVision}
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                   setEditedVision(e.target.value);
                   setError(null);
                 }}

@@ -1,7 +1,6 @@
 import { RepositoryFactory } from '@starships/models';
 import { Agent } from '@starships/protocol';
 import { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { env } from '../config/environment';
 
 /**
  * Service for managing AI agents with Neo4j persistence
@@ -240,8 +239,7 @@ export class AgentService {
   }
 
   static async trackUsage(
-    agentId: string,
-    userId: string
+    agentId: string
   ): Promise<{
     success: boolean;
     newUsageCount: number;

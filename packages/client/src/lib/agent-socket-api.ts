@@ -1,6 +1,6 @@
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { AgentSocketRequest, AgentSocketStreamChunk, AgentStreamError, AgentChatResponse } from '@starships/protocol';
+import type { ChatSocketRequest, ChatSocketStreamChunk, ChatSocketStreamError, ChatSocketResponse } from '@starships/protocol';
 
 export interface Message {
   id: string;
@@ -29,7 +29,7 @@ export const agentSocketAPI = {
     agentId: string,
     request: { sessionId: string; message: string },
     callbacks: {
-      onChunk: (chunk: AgentSocketStreamChunk, accumulatedContent: string) => void;
+      onChunk: (chunk: ChatSocketStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: Message) => void;
       onError: (error: string) => void;
       onTypingStart?: () => void;
@@ -48,7 +48,8 @@ export const agentSocketAPI = {
     let accumulatedContent = '';
     let isAborted = false;
 
-    const socketRequest: AgentSocketRequest = {
+    const socketRequest: ChatSocketRequest = {
+      source: 'agent',
       agent_id: agentId,
       session_id: request.sessionId,
       message: request.message,
@@ -58,14 +59,14 @@ export const agentSocketAPI = {
       typing_speed: 75
     };
 
-    const handleStreamStart = (receivedStreamId: string, receivedAgentId: string) => {
-      if (receivedStreamId === streamId && receivedAgentId === agentId) {
+    const handleStreamStart = (data: { streamId: string; source: 'agent' | 'sibil'; agentId?: string }) => {
+      if (data.streamId === streamId && data.agentId === agentId && data.source === 'agent') {
         console.log('[AGENT API] Stream started:', streamId, 'for agent:', agentId);
       }
     };
 
-    const handleStreamChunk = (chunk: AgentSocketStreamChunk) => {
-      if (chunk.stream_id === streamId && chunk.agent_id === agentId && !isAborted) {
+    const handleStreamChunk = (chunk: ChatSocketStreamChunk) => {
+      if (chunk.stream_id === streamId && chunk.agent_id === agentId && chunk.source === 'agent' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
           callbacks.onChunk(chunk, accumulatedContent);
@@ -77,14 +78,14 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamComplete = (response: AgentChatResponse) => {
-      if (response.agent_id === agentId && !isAborted) {
+    const handleStreamComplete = (response: ChatSocketResponse) => {
+      if (response.agent_id === agentId && response.source === 'agent' && !isAborted) {
         const finalMessage: Message = {
           id: generateId(),
           content: response.content,
           role: 'assistant',
           timestamp: response.timestamp,
-          sessionId: response.session_id,
+          sessionId: response.session_id || '',
           agentId: response.agent_id,
           streaming: false,
           usage: response.usage
@@ -94,52 +95,52 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamError = (error: AgentStreamError) => {
-      if (error.stream_id === streamId && error.agent_id === agentId && !isAborted) {
+    const handleStreamError = (error: ChatSocketStreamError) => {
+      if (error.stream_id === streamId && error.agent_id === agentId && error.source === 'agent' && !isAborted) {
         callbacks.onError(error.message);
         cleanup();
       }
     };
 
-    const handleTypingStart = (receivedAgentId: string) => {
-      if (receivedAgentId === agentId) {
+    const handleTypingStart = (data: { source: 'agent' | 'sibil'; agentId?: string }) => {
+      if (data.agentId === agentId && data.source === 'agent') {
         callbacks.onTypingStart?.();
       }
     };
 
-    const handleTypingStop = (receivedAgentId: string) => {
-      if (receivedAgentId === agentId) {
+    const handleTypingStop = (data: { source: 'agent' | 'sibil'; agentId?: string }) => {
+      if (data.agentId === agentId && data.source === 'agent') {
         callbacks.onTypingStop?.();
       }
     };
 
     const cleanup = () => {
-      socket.off('agent:stream-start', handleStreamStart);
-      socket.off('agent:stream-chunk', handleStreamChunk);
-      socket.off('agent:stream-complete', handleStreamComplete);
-      socket.off('agent:stream-error', handleStreamError);
-      socket.off('agent:typing-start', handleTypingStart);
-      socket.off('agent:typing-stop', handleTypingStop);
+      socket.off('chat:stream-start', handleStreamStart);
+      socket.off('chat:stream-chunk', handleStreamChunk);
+      socket.off('chat:stream-complete', handleStreamComplete);
+      socket.off('chat:stream-error', handleStreamError);
+      socket.off('chat:typing-start', handleTypingStart);
+      socket.off('chat:typing-stop', handleTypingStop);
     };
 
     // Set up event listeners
-    socket.on('agent:stream-start', handleStreamStart);
-    socket.on('agent:stream-chunk', handleStreamChunk);
-    socket.on('agent:stream-complete', handleStreamComplete);
-    socket.on('agent:stream-error', handleStreamError);
-    socket.on('agent:typing-start', handleTypingStart);
-    socket.on('agent:typing-stop', handleTypingStop);
+    socket.on('chat:stream-start', handleStreamStart);
+    socket.on('chat:stream-chunk', handleStreamChunk);
+    socket.on('chat:stream-complete', handleStreamComplete);
+    socket.on('chat:stream-error', handleStreamError);
+    socket.on('chat:typing-start', handleTypingStart);
+    socket.on('chat:typing-stop', handleTypingStop);
 
     // Join agent room for this session
     socketClient.joinAgentRoom(agentId, 'current-user'); // Will be overridden by server auth
 
     // Start the stream
-    socket.emit('agent:start-stream', socketRequest);
+    socket.emit('chat:start-stream', socketRequest);
 
     return {
       abort: () => {
         isAborted = true;
-        socket.emit('agent:stop-stream', streamId);
+        socket.emit('chat:stop-stream', streamId);
         socketClient.leaveAgentRoom(agentId, 'current-user');
         cleanup();
       }

@@ -1,6 +1,5 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +14,6 @@ import { Label } from '@/components/ui/label'
 import {
   Eye,
   EyeOff,
-  ExternalLink,
   AlertCircle,
   Loader2,
   Key,
@@ -31,7 +29,6 @@ import { cn } from '@/lib/utils'
 import {
   ApiKeyRequirement,
   ApiKeyValidationResult,
-  ConnectorApiKeyState,
 } from '@/types/connector-api-keys'
 import { ApiKeyValidator, ServiceType } from '@/lib/api-key-validation'
 import { MCPServerOption } from '@/lib/api'
@@ -46,8 +43,9 @@ import {
 import { ErrorBoundary, useErrorHandler } from '@/components/ui/error-boundary'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 
 interface EnhancedApiKeyInputModalProps {
   isOpen: boolean
@@ -195,7 +193,7 @@ export function EnhancedApiKeyInputModal({
           clearError()
         }
       } catch (error) {
-        const enhanced = handleError(
+        handleError(
           error as Error,
           ErrorRecoveryManager.createContext('validate-field', 'EnhancedApiKeyInputModal', {
             envKey,
@@ -365,7 +363,7 @@ export function EnhancedApiKeyInputModal({
 
       onClose()
     } catch (error) {
-      const enhanced = handleError(
+      handleError(
         error as Error,
         ErrorRecoveryManager.createContext('submit-form', 'EnhancedApiKeyInputModal', {
           connector: connector.id,
@@ -373,7 +371,7 @@ export function EnhancedApiKeyInputModal({
         })
       )
 
-      setFormError(enhanced)
+      setFormError(error as Error)
       focusFirstInvalidField()
     } finally {
       setIsSubmitting(false)
@@ -538,7 +536,7 @@ export function EnhancedApiKeyInputModal({
             id={requirement.envKey}
             type={inputType}
             value={value}
-            onChange={e => handleInputChange(requirement.envKey, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(requirement.envKey, e.target.value)}
             onBlur={() => handleFieldBlur(requirement.envKey)}
             placeholder={requirement.placeholder}
             className={cn(

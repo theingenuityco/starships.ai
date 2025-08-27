@@ -1,14 +1,12 @@
-import { Zap, AlertTriangle, Gauge } from 'lucide-react';
+import { AlertTriangle, Gauge } from 'lucide-react';
 
 interface DriveQuickModuleProps {
   data: any;
   onAction: (action: string, data?: any) => void;
 }
 
-export function DriveQuickModule({ data, onAction }: DriveQuickModuleProps) {
-  const driveStatus = 'warning'; // warning from navigation
+export function DriveQuickModule({ onAction }: DriveQuickModuleProps) {
   const thrusterPower = 78;
-  const fuelLevel = 45;
 
   return (
     <div className="space-y-3">
@@ -36,4 +34,4 @@ export function DriveQuickModule({ data, onAction }: DriveQuickModuleProps) {
       </div>
     </div>
   );
-} 
+}

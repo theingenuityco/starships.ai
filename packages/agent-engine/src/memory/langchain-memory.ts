@@ -1,9 +1,9 @@
 import { BufferMemory } from "langchain/memory";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import { v4 as uuidv4 } from "uuid";
+// import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
 import * as path from "path";
-import { MemoryEntry, EnhancedMemoryEntry, MemorySearchResult, SessionKey } from "@starships/protocol";
+import { MemoryEntry, MemorySearchResult, SessionKey } from "@starships/protocol";
 
 /**
  * Simple LangChain-based memory store for chat history
@@ -80,7 +80,7 @@ export class LangChainMemoryStore {
     await this.saveSession(sessionKey);
   }
 
-  async semanticSearch(sessionKey: SessionKey, query: string, limit: number = 5): Promise<MemorySearchResult> {
+  async semanticSearch(sessionKey: SessionKey, query: string, _limit: number = 5): Promise<MemorySearchResult> {
     // Semantic search is no longer supported - return empty results
     console.log('⚠️ [MEMORY-STORE] Semantic search not available (vector storage removed)');
     return { entries: [], relevanceScores: [] };

@@ -2,10 +2,8 @@
 // MAIN PROTOCOL EXPORTS
 // ============================================================================
 
-// Export contract types (API boundaries)
-export * from './contracts/chat';
-export * from './contracts/sibil';
-export * from './contracts/socket';
+// Export unified chat and socket contract types (API boundaries)
+export * from './contracts/chat-socket';
 
 // Export domain types (database domains)
 export * from './domains/agent';
@@ -44,28 +42,53 @@ export type {
   RateTemplateRequest
 } from './domains/agent-template';
 
-
-// Export Sibil types with explicit exports to avoid conflicts
+// Export Chat and Socket types with explicit exports to avoid conflicts
 export type {
+  // Basic types
+  UsageStats,
+  ChatRequest,
+  ChatResponse,
+  MemoryEntry,
+  EnhancedMemoryEntry,
+  MemorySearchResult,
+  SessionKey,
+  
+  // Content and typewriter
+  TypewriterData,
   ContentBlock,
+  
+  // Sibil types
   SibilRequest,
   SibilResponse,
   SibilStreamRequest,
   SibilStreamChunk,
   SibilStreamResponse,
+  SibilStreamCompleteResponse,
   SibilSocketRequest,
   SibilSocketStreamChunk,
   SibilStreamError,
+  
+  // Agent types
   AgentSocketRequest,
   AgentSocketStreamChunk,
   AgentChatResponse,
   AgentStreamError,
+  
+  // Connection and socket types
   SocketConnectionState,
-} from './contracts/sibil';
-
-// Export socket types
-export type {
+  BaseSocketEvents,
+  ConnectionStatusEvent,
+  ConnectionStatus,
+  ChatSocketEvents,
+  ChatSocketIOEvents,
+  SocketEvents,
+  SocketEventData,
   EventEmissionOptions,
   EventEmissionResult,
-} from './contracts/socket';
+} from './contracts/chat-socket';
+
+// Export Vision Socket Events
+export type {
+  VisionSocketEvents,
+} from './domains/vision';
 

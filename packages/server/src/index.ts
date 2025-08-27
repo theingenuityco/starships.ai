@@ -8,11 +8,9 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { initializeSocketIO } from './socket';
-import getStore from './store';
 import {
   AgentRepository,
   UserRepository,
-  LLMRepository,
   StarshipRepository,
   VisionRepository,
   RepositoryFactory,
@@ -35,16 +33,12 @@ import agentTemplateRoutes from './routes/agent-templates';
 import missionRoutes from './routes/missions';
 import nativeApiKeysRoutes from './routes/native-api-keys';
 import waitlistRoutes from './routes/waitlist';
-import { AgentService } from './services/AgentService';
 import { AgentTemplateService } from './services/AgentTemplateService';
 import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 
 // Import new error handling and health check routes
 import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRoutes from './routes/health';
-import { logger } from '@starships/models';
-
-import { authMiddleware } from './middleware/auth';
 
 /**
  * Validate required environment variables
@@ -103,13 +97,9 @@ const dbConnection = createConnection({
   database: process.env.NEO4J_DATABASE || 'neo4j',
 });
 
-// Initialize store and repositories
-const store = getStore();
-
 // Core repositories
 const agentRepository = new AgentRepository();
 const userRepository = new UserRepository();
-const llmRepository = new LLMRepository();
 
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
@@ -215,7 +205,7 @@ httpServer.listen(PORT, async () => {
     
     // Ensure WaitlistRepository is properly initialized
     try {
-      const waitlistRepo = RepositoryFactory.getWaitlistRepository();
+      RepositoryFactory.getWaitlistRepository();
       console.log('✅ WaitlistRepository initialized and ready');
     } catch (error) {
       console.error('❌ Failed to initialize WaitlistRepository:', error);

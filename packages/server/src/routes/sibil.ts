@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ChatRequest, ChatStreamChunk } from '@starships/protocol';
+import type { ChatRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { SibilService } from '../services/SibilService';

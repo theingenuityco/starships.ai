@@ -1,4 +1,4 @@
-import { Brain, Lightbulb, Zap, Eye, Target, AlertCircle } from 'lucide-react';
+import { Lightbulb, Zap, Eye, Target, AlertCircle } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import SocketClient from '@/lib/socket-client';
 import { useAuth } from '@/hooks/useAuth';

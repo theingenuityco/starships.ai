@@ -2,7 +2,6 @@
 
 import React from 'react';
 import type { Agent } from '@starships/protocol';
-import { motion } from 'motion/react';
 import {
   Bot,
   Edit,

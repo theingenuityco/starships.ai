@@ -27,7 +27,6 @@ interface ConnectorInstanceConfigProps {
   connectorId: string
   connectorName: string
   currentConfig?: ConnectorInstanceConfig
-  onConfigUpdate: (config: ConnectorInstanceConfig) => Promise<void>
   onTemplateApply: (templateId: string) => Promise<void>
   disabled?: boolean
   className?: string
@@ -37,7 +36,6 @@ export function ConnectorInstanceConfig({
   connectorId,
   connectorName,
   currentConfig,
-  onConfigUpdate,
   onTemplateApply,
   disabled = false,
   className,

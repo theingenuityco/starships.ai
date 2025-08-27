@@ -1,19 +1,17 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { AnimatePresence } from 'motion/react'
 import { SibilMessage, sibilAPI } from '@/lib/sibil-api'
 import { getChatHistory, saveChatHistory, generateSibilSessionId } from '@/lib/storage'
 import { MessageInput } from '../chat/MessageInput'
 import { MessageList } from '../chat/MessageList'
 import { SibilMessageBubble } from './SibilMessageBubble'
-import { ModernProviderSelector } from './ModernProviderSelector'
 import { StreamingIndicator } from './StreamingIndicator'
 import { VisionChatContextIndicator } from '../vision/VisionChatContextIndicator'
 import { ERROR_TEXT } from '@/constants/text'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
-import { headerVariants, inputVariants, pageVariants } from '@/lib/animations'
 import { Bot } from 'lucide-react'
 import type { VisionRefinementProposal } from '@starships/protocol'
 
@@ -187,12 +185,6 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
       streamController.current.abort()
       setStreaming(false)
     }
-  }
-
-  const handleProviderChange = (newProvider: 'openai' | 'anthropic') => {
-    setProvider(newProvider)
-    // Reset model to default for new provider
-    setModel(newProvider === 'openai' ? 'gpt-4' : 'claude-3-sonnet-20240229')
   }
 
   // Show loading state while auth is loading

@@ -1,9 +1,7 @@
-import { useStarshipStore } from '@/store/starship-store';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 export function ExpeditionControl() {
-  const { activeStarshipId } = useStarshipStore();
   const deployedAgents = 0; // Placeholder since starshipAgents was unused
   
   return (
@@ -32,4 +30,4 @@ export function ExpeditionControl() {
       </div>
     </Card>
   );
-} 
+}

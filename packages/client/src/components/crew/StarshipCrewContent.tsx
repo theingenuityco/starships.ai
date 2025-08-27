@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 // import { motion, AnimatePresence } from 'motion/react'
 import {
   Agent,
-  MCPServerOption,
   MCPServerConnector,
   mcpServerAPI,
   starshipAPI,
@@ -465,7 +464,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         show={showFloatingMessage} 
         onDismiss={handleDismissMessage}
         isManualOpen={isManualOpen}
-        currentTab={currentTab}
         onTabChange={handleTabChange}
       />
     </div>

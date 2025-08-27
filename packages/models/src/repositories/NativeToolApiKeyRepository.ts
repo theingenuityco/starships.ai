@@ -1,5 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
+import { NativeToolApiKey } from '@starships/protocol';
 import crypto from 'crypto';
 
 export class NativeToolApiKeyRepository extends BaseRepository {

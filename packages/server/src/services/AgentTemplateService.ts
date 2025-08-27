@@ -55,7 +55,7 @@ export class AgentTemplateService {
 
   async updateTemplate(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | null> {
     // Don't allow updating certain fields
-    const { id: _, createdAt, ...allowedUpdates } = updates;
+    const { id: _id, createdAt: _createdAt, ...allowedUpdates } = updates;
 
     return this.templateRepository.update(id, {
       ...allowedUpdates,

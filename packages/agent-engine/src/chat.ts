@@ -61,15 +61,15 @@ export async function chat(
   
   // Step 1: Attempt to resolve internal user ID from Kinde user ID
   let internalUserId = req.user_id;
-  let userResolutionSuccess = false;
-  let fallbackToKindeId = false;
+  // let userResolutionSuccess = false;
+  // let fallbackToKindeId = false;
   
   try {
     console.log('🔍 [AGENT-ENGINE] Attempting to resolve internal user from Kinde ID...');
     const user = await userRepo.findByKindeId(req.user_id);
     if (user) {
       internalUserId = user.id;
-      userResolutionSuccess = true;
+      // userResolutionSuccess = true;
       console.log('✅ [AGENT-ENGINE] Internal user found successfully:', {
         internalUserId: internalUserId,
         username: user.username,
@@ -79,7 +79,7 @@ export async function chat(
     } else {
       console.warn('⚠️ [AGENT-ENGINE] No internal user found for Kinde ID');
       console.log('🔄 [AGENT-ENGINE] Will attempt starship lookup with Kinde ID as fallback');
-      fallbackToKindeId = true;
+      // fallbackToKindeId = true;
     }
   } catch (userError) {
     console.error('❌ [AGENT-ENGINE] Error during user ID resolution:', {
@@ -87,7 +87,7 @@ export async function chat(
       stack: (userError as Error).stack
     });
     console.log('🔄 [AGENT-ENGINE] Will attempt starship lookup with Kinde ID as fallback');
-    fallbackToKindeId = true;
+    // fallbackToKindeId = true;
   }
   
   let visionContext = "";

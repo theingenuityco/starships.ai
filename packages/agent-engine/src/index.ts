@@ -36,9 +36,9 @@ export async function* chatStream(
   
   const agentRepo = RepositoryFactory.getAgentRepository();
   const llmRepo = RepositoryFactory.getLLMRepository();
-  const starshipRepo = RepositoryFactory.getStarshipRepository();
-  const visionRepo = RepositoryFactory.getVisionRepository();
-  const userRepo = RepositoryFactory.getUserRepository();
+  // const starshipRepo = RepositoryFactory.getStarshipRepository();
+  // const visionRepo = RepositoryFactory.getVisionRepository();
+  // const userRepo = RepositoryFactory.getUserRepository();
   
   ProviderFactory.initialize(agentRepo, llmRepo);
 

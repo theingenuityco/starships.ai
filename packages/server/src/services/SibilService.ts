@@ -85,7 +85,7 @@ export class SibilService {
 
   // NEW: Enhanced streaming method with vision refinement
   static async *chatStream(request: ChatRequest): AsyncGenerator<ChatStreamChunk> {
-    const { provider, model, message, starship_id, user_id } = request;
+    const { message, starship_id, user_id } = request;
 
     if (!starship_id || !user_id) {
       yield* this.streamNormalChat(request);

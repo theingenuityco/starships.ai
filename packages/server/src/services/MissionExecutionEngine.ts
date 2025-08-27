@@ -9,7 +9,7 @@
 import { RepositoryFactory } from '@starships/models';
 import { MissionService } from './MissionService';
 import { Logger } from '../utils/logger';
-import { chat, LangChainMemoryStore } from '@starships/agent-engine';
+import { chat } from '@starships/agent-engine';
 import type { 
   MissionWorkflow, 
   WorkflowNode, 

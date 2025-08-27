@@ -1,6 +1,6 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketEvents, ChatSocketRequest, ChatSocketStreamChunk, ChatRequest } from '@starships/protocol';
-import { chat, chatStream } from '@starships/agent-engine';
+import { chatStream } from '@starships/agent-engine';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import getStore from '../store';

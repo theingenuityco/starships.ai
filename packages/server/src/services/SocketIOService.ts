@@ -565,8 +565,8 @@ export class SocketIOService {
     data: Parameters<SocketEvents[K]>[0],
     options: EventEmissionOptions
   ): Promise<EventEmissionResult> {
-    const startTime = Date.now();
-    const errors: Array<{ userId: string; error: string }> = [];
+    // const startTime = Date.now();
+    // const errors: Array<{ userId: string; error: string }> = [];
     let recipientCount = 0;
 
     try {

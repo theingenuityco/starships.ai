@@ -454,10 +454,10 @@ ${taskList}
     if (!executionResult) return '';
     
     const successfulTasks = executionResult.nodeResults.filter((r: any) => r.success).length;
-    const failedTasks = executionResult.nodeResults.filter((r: any) => !r.success).length;
+    // const failedTasks = executionResult.nodeResults.filter((r: any) => !r.success).length;
     const statusIcon = executionResult.success ? '✅' : '❌';
     
-    const taskResults = executionResult.nodeResults.map((result: any, index: number) => {
+    const taskResults = executionResult.nodeResults.map((result: any, _index: number) => {
       const icon = result.success ? '✅' : '❌';
       const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
       return `├─ ${icon} ${result.nodeName}${output}`;

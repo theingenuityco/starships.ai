@@ -179,7 +179,7 @@ function generateFallbackName(vision: string): string {
   return 'Vision Starship';
 }
 
-function determineClass(vision: string): 'scout' | 'cruiser' {
+function determineClass(_vision: string): 'scout' | 'cruiser' {
   // Always return cruiser - never recommend scout
   return 'cruiser';
 }

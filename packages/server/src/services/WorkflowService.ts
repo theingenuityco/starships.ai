@@ -6,16 +6,15 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
-import { 
-  MissionWorkflow, 
-  WorkflowNode, 
+import {
+  MissionWorkflow,
+  WorkflowNode,
   WorkflowEdge,
   CreateWorkflowRequest,
-  UpdateWorkflowApprovalRequest,
-  WorkflowResponse 
+  UpdateWorkflowApprovalRequest
 } from '@starships/protocol';
 import { Logger } from '../utils/logger';
-import { v4 as uuidv4 } from 'uuid';
+// import { v4 as uuidv4 } from 'uuid';
 
 export class WorkflowService {
   private static logger = Logger.getInstance();
@@ -173,7 +172,7 @@ export class WorkflowService {
   static extractTasksFromWorkflow(workflow: MissionWorkflow): any[] {
     return workflow.nodes
       .filter(node => node.type === 'agent')
-      .map((node, index) => ({
+      .map((node, _index) => ({
         id: node.id,
         title: node.name,
         description: node.description,

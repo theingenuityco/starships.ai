@@ -172,7 +172,7 @@ export class WorkflowService {
   static extractTasksFromWorkflow(workflow: MissionWorkflow): any[] {
     return workflow.nodes
       .filter(node => node.type === 'agent')
-      .map((node, _index) => ({
+      .map((node) => ({
         id: node.id,
         title: node.name,
         description: node.description,

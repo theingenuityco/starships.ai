@@ -239,8 +239,8 @@ export class SibilService {
       SibilService.getSessionManager().acceptProposal(session.sessionId);
       
       // Calculate metrics for the new vision using the saved text
-      const metrics = await SibilService.getMetricsCalculator().calculateMetrics(
-        proposedVisionText, 
+      await SibilService.getMetricsCalculator().calculateMetrics(
+        proposedVisionText,
         updatedVision?.refinementCount || 0
       );
 

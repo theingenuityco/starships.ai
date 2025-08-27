@@ -316,7 +316,7 @@ export class MissionOrchestratorService {
         service: 'MissionOrchestratorService',
         operation: 'initializeSocketService'
       });
-    } catch (_error) {
+    } catch {
       this.logger.warn('WebSocket service not available - continuing without real-time updates', {
         service: 'MissionOrchestratorService',
         operation: 'initializeSocketService'

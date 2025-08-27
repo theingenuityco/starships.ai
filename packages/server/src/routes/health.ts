@@ -270,7 +270,7 @@ router.get('/detailed', async (req, res) => {
           },
         };
       }
-    } catch (_error) {
+    } catch {
       healthCheck.services.llm = {
         status: 'degraded',
         error: 'LLM provider check failed',

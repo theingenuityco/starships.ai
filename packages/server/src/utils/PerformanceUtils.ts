@@ -117,7 +117,7 @@ export class Memoizer<T> {
   private generateKey(args: any[]): string {
     try {
       return JSON.stringify(args);
-    } catch (error) {
+    } catch {
       // Fallback for non-serializable args
       return args.map(arg => String(arg)).join('|');
     }

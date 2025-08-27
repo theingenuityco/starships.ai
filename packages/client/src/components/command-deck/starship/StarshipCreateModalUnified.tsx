@@ -420,7 +420,7 @@ export function StarshipCreateModalUnified({
                 id="vision"
                 placeholder="What would you like to build?"
                 value={formData.vision}
-                onChange={(e) => setFormData({ ...formData, vision: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, vision: e.target.value })}
                 onBlur={handleAnalyzeVision}
                 className={cn(
                   "min-h-[100px] bg-background/50 backdrop-blur-sm border border-border/50",
@@ -450,7 +450,7 @@ export function StarshipCreateModalUnified({
                   id="starship-name"
                   placeholder="Enter a memorable name for your starship."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                   className={cn(
                     "pr-10 bg-background/50 backdrop-blur-sm border border-border/50",
                     "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",

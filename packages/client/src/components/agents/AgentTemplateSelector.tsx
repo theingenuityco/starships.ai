@@ -266,7 +266,7 @@ export function AgentTemplateSelector({
               <Input
                 placeholder="Search templates..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pl-10 h-10"
               />
             </div>
@@ -333,7 +333,7 @@ export function AgentTemplateSelector({
               <label className="text-sm font-medium">Agent Name</label>
               <Input
                 value={agentName}
-                onChange={e => setAgentName(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)}
                 placeholder="Enter agent name..."
                 className="mt-1"
               />

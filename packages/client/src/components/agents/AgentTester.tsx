@@ -484,11 +484,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             <div className="flex gap-2">
               <Textarea
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
                 placeholder={isConnected ? "Type a message to test the agent..." : "Connect to Socket.IO to send messages..."}
                 className="flex-1 min-h-[60px] resize-none bg-zinc-800 text-white placeholder-zinc-500 border-none rounded-lg focus:ring-1 focus:ring-blue-500"
                 disabled={!isConnected}
-                onKeyPress={e => {
+                onKeyPress={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     handleSendMessage()

@@ -17,6 +17,7 @@ import type { Mission, MissionWorkflow } from '@starships/protocol';
 interface WorkflowPhaseContentProps {
   mission: Mission;
   onWorkflowApproval?: (approved: boolean) => void;
+  readonly?: boolean;
 }
 
 export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPhaseContentProps) {
@@ -250,7 +251,7 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
             </p>
             <Textarea
               value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRejectionReason(e.target.value)}
               placeholder="Describe the changes you'd like to see..."
               className="mb-4"
               rows={4}

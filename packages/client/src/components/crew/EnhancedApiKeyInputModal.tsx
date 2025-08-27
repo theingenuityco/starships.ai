@@ -536,7 +536,7 @@ export function EnhancedApiKeyInputModal({
             id={requirement.envKey}
             type={inputType}
             value={value}
-            onChange={e => handleInputChange(requirement.envKey, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(requirement.envKey, e.target.value)}
             onBlur={() => handleFieldBlur(requirement.envKey)}
             placeholder={requirement.placeholder}
             className={cn(

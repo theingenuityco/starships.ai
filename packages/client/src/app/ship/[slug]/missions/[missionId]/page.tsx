@@ -474,7 +474,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                 <Input
                   ref={inputRef}
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Ask the orchestrator..."
                   disabled={chatLoading}

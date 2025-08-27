@@ -45,8 +45,6 @@ interface StarshipCardProps {
 
 export function StarshipCard({
   starship,
-  isActive: _isActive,
-  viewMode: _viewMode,
   onSelect,
   onEdit,
   onDelete,

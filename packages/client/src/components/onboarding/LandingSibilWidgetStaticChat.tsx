@@ -5,16 +5,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Send, 
+import {
+  Send,
   Bot,
   Loader2,
   AlertCircle,
   ArrowUp,
   ArrowRight,
-  Eye,
-  User,
-  Rocket
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
@@ -346,7 +344,7 @@ export function LandingSibilWidgetStaticChat({
           <Textarea
             ref={textareaRef}
             value={inputValue}
-            onChange={(e) => handleInputChange(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder=""
             className={cn(

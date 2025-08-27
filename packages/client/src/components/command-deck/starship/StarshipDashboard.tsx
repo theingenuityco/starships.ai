@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Rocket, AlertCircle, Filter, Check, Activity, User, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -38,7 +38,6 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     activeStarshipId,
     loading,
     error,
-    setActiveStarship,
     clearErrors
   } = useStarshipStore();
 
@@ -103,7 +102,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   });
 
   const handleStarshipSelect = (starshipId: string) => {
-    setActiveStarship(starshipId);
+    useStarshipStore.setState({ activeStarshipId: starshipId });
   };
 
   const handleCreateSuccess = async () => {
@@ -340,7 +339,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
               <Input
                 placeholder="Search starships..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
                 className="pl-12 pr-4 h-12 bg-background border-2 border-primary/30 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
               />
             </div>

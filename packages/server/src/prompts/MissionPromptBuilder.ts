@@ -454,10 +454,10 @@ ${taskList}
     if (!executionResult) return '';
     
     const successfulTasks = executionResult.nodeResults.filter((r: any) => r.success).length;
-    const failedTasks = executionResult.nodeResults.filter((r: any) => !r.success).length;
+    // const failedTasks = executionResult.nodeResults.filter((r: any) => !r.success).length;
     const statusIcon = executionResult.success ? '✅' : '❌';
     
-    const taskResults = executionResult.nodeResults.map((result: any, index: number) => {
+    const taskResults = executionResult.nodeResults.map((result: any) => {
       const icon = result.success ? '✅' : '❌';
       const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
       return `├─ ${icon} ${result.nodeName}${output}`;
@@ -608,7 +608,7 @@ WORKFLOW STRUCTURE:`;
     });
 
     workflowText += '\n\nEXECUTION FLOW:';
-    workflow.edges.forEach((edge, index) => {
+    workflow.edges.forEach((edge) => {
       const fromNode = workflow.nodes.find(n => n.id === edge.from);
       const toNode = workflow.nodes.find(n => n.id === edge.to);
       workflowText += `\n├─ ${fromNode?.name || edge.from} → ${toNode?.name || edge.to}`;

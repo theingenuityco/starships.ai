@@ -1,4 +1,4 @@
-import neo4j, { Driver, Session, auth, ManagedTransaction, Integer, isInt } from 'neo4j-driver';
+import neo4j, { Driver, Session, auth, ManagedTransaction, isInt } from 'neo4j-driver';
 
 export interface Neo4jConfig {
   uri: string;

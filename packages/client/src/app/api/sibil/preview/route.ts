@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         analysis: {
           summary: "That's an exciting vision! Let's turn your idea into reality by creating your starship.",
           suggestedName: generateFallbackName(vision),
-          recommendedClass: determineClass(vision),
+          recommendedClass: determineClass(),
           confidence: 0.7,
           keywords: extractKeywords(vision)
         },
@@ -179,7 +179,7 @@ function generateFallbackName(vision: string): string {
   return 'Vision Starship';
 }
 
-function determineClass(vision: string): 'scout' | 'cruiser' {
+function determineClass(): 'scout' | 'cruiser' {
   // Always return cruiser - never recommend scout
   return 'cruiser';
 }

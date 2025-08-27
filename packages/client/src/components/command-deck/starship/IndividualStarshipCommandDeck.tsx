@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { 
   ArrowLeft, Terminal, Activity, Loader2,
   Shield, Navigation, MonitorSpeaker, Lock

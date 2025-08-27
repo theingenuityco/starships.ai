@@ -5,7 +5,7 @@
  * for real-time mission coordination.
  */
 
-import { MissionOrchestratorAgent, type MissionChatState, type GraphExecutionCallbacks } from './MissionOrchestratorAgent';
+import { MissionOrchestratorAgent, type MissionChatState } from './MissionOrchestratorAgent';
 import { SYSTEM_INSTRUCTIONS } from '../prompts/MissionPromptBuilder';
 import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
@@ -13,10 +13,9 @@ import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ErrorFactory, InternalServerError } from '@starships/models';
 import { AIMessage } from '@langchain/core/messages';
-import type { 
+import type {
   MissionMessage,
   MissionChatResponse,
-  SendMissionMessageRequest,
   MissionPhase
 } from '@starships/protocol';
 
@@ -317,7 +316,7 @@ export class MissionOrchestratorService {
         service: 'MissionOrchestratorService',
         operation: 'initializeSocketService'
       });
-    } catch (error) {
+    } catch {
       this.logger.warn('WebSocket service not available - continuing without real-time updates', {
         service: 'MissionOrchestratorService',
         operation: 'initializeSocketService'

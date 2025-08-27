@@ -6,7 +6,7 @@ import { visionAPI } from '@/lib/api';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Eye, Save, Edit, AlertTriangle, Sparkles, Target, Lightbulb, Brain } from 'lucide-react';
+import { Eye, Save, Edit, AlertTriangle, Sparkles, Brain } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VisionMetricsDisplay } from '@/components/vision/VisionMetricsDisplay';
 import SocketClient from '@/lib/socket-client';
@@ -513,7 +513,7 @@ export function SimpleVisionChamber() {
                 <div className="relative">
                   <Textarea
                     value={editingVision}
-                    onChange={(e) => setEditingVision(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditingVision(e.target.value)}
                     placeholder="Enter your starship's vision statement..."
                     className="min-h-[250px] resize-none bg-background/50 border-border/50 focus:border-purple-500/50 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors text-base leading-relaxed"
                     disabled={loading}

@@ -1,8 +1,8 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { 
-  SocketIOEvents, 
-  SibilSocketRequest, 
-  SibilSocketStreamChunk,
+  SocketEvents,
+  ChatSocketRequest,
+  ChatSocketStreamChunk,
   VisionAnalysisRequest,
   VisionRefinementRequest,
   VisionUpdateRequest,
@@ -51,7 +51,7 @@ function checkVisionRateLimit(userId: string): boolean {
   return true;
 }
 
-export function setupSibilHandlers(io: SocketIOServer<SocketIOEvents>) {
+export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
   // Lazy-initialize vision refinement services
   let visionRefinementService: VisionRefinementService | null = null;
   let visionSessionManager: VisionRefinementSessionManager | null = null;
@@ -91,7 +91,8 @@ export function setupSibilHandlers(io: SocketIOServer<SocketIOEvents>) {
     const socketService = SocketIOService.getInstance();
 
     // Handle stream start
-    socket.on('sibil:start-stream', async (request: SibilSocketRequest) => {
+    socket.on('chat:start-stream', async (request: ChatSocketRequest) => {
+      if (request.source !== 'sibil') return;
       console.log(`[SIBIL SOCKET] Starting stream for user ${userId}:`, request.stream_id);
 
       try {
@@ -113,6 +114,7 @@ export function setupSibilHandlers(io: SocketIOServer<SocketIOEvents>) {
 
         // Convert to standard SibilRequest
         const sibilRequest = {
+          source: 'sibil' as const,
           provider: request.provider,
           model: request.model,
           message: request.message,
@@ -140,8 +142,9 @@ export function setupSibilHandlers(io: SocketIOServer<SocketIOEvents>) {
                 const char = characters[i];
                 const delay = 1000 / typingSpeed; // milliseconds per character
 
-                const typewriterChunk: SibilSocketStreamChunk = {
+                const typewriterChunk: ChatSocketStreamChunk = {
                   ...chunk,
+                  source: 'sibil' as const,
                   stream_id: request.stream_id,
                   content: char,
                   typewriter: {
@@ -166,8 +169,9 @@ export function setupSibilHandlers(io: SocketIOServer<SocketIOEvents>) {
               }
             } else {
               // Send chunk without typewriter effect
-              const socketChunk: SibilSocketStreamChunk = {
+              const socketChunk: ChatSocketStreamChunk = {
                 ...chunk,
+                source: 'sibil' as const,
                 stream_id: request.stream_id,
                 timestamp: Date.now()
               };

@@ -94,7 +94,7 @@ export class FirecrawlTool {
           } else {
             return JSON.stringify(await this.scrape(params.url, params.options));
           }
-        } catch (error) {
+        } catch {
           // Fallback to simple URL scraping if JSON parsing fails
           const result = await this.scrape(input);
           return JSON.stringify(result);

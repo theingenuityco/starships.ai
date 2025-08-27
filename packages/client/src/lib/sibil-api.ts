@@ -1,7 +1,7 @@
 import api from './api';
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { SibilSocketRequest, SibilSocketStreamChunk, SibilStreamError } from '@starships/protocol';
+import type { ChatRequest, ChatSocketRequest, ChatSocketStreamChunk, ChatSocketStreamError } from '@starships/protocol';
 
 export interface SibilMessage {
   id: string;
@@ -17,31 +17,13 @@ export interface SibilMessage {
   stream_id?: string;
 }
 
+// Legacy interface - now mapped to unified ChatRequest
 export interface SibilRequest {
   provider: 'openai' | 'anthropic';
   model?: string;
   message: string;
   sessionId?: string;
   starshipId?: string;
-}
-
-interface SibilBackendRequest {
-  provider: 'openai' | 'anthropic';
-  model?: string;
-  message: string;
-  session_id?: string;
-  starship_id?: string;
-}
-
-interface SibilBackendResponse {
-  content: string;
-  structured_content?: ContentBlock[];
-  provider: 'openai' | 'anthropic';
-  model: string;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-  };
 }
 
 interface ContentBlock {
@@ -53,34 +35,24 @@ interface ContentBlock {
   };
 }
 
-interface SibilStreamChunk {
-  type: 'content' | 'structured' | 'complete' | 'error' | 'connected';
-  content?: string;
-  structured_content?: ContentBlock[];
-  provider?: 'openai' | 'anthropic';
-  model?: string;
-  error?: string;
-  chunk_id?: string;
-  is_final?: boolean;
-  stream_id?: string;
-}
-
-function toSibilBackendRequest(req: SibilRequest): SibilBackendRequest {
+function toChatRequest(req: SibilRequest): ChatRequest {
   return {
+    source: 'sibil' as const,
     provider: req.provider,
     model: req.model,
     message: req.message,
+    user_id: 'client-user', // This will be overridden by server auth
     session_id: req.sessionId,
     starship_id: req.starshipId,
   };
 }
 
 export const sibilAPI = {
-  // Existing non-streaming method
+  // Non-streaming method - uses ChatRequest
   sendMessage: async (request: SibilRequest): Promise<SibilMessage> => {
-    const backendRequest = toSibilBackendRequest(request);
-    const response = await api.post('/api/sibil/chat', backendRequest);
-    const backendResponse = response.data as SibilBackendResponse;
+    const chatRequest = toChatRequest(request);
+    const response = await api.post('/api/sibil/chat', chatRequest);
+    const backendResponse = response.data;
 
     return {
       id: generateId(),
@@ -94,11 +66,11 @@ export const sibilAPI = {
     };
   },
 
-  // Socket.IO Streaming method
+  // Socket.IO Streaming method - uses ChatSocketRequest
   sendMessageStream: (
     request: SibilRequest,
     callbacks: {
-      onChunk: (chunk: SibilSocketStreamChunk, accumulatedContent: string) => void;
+      onChunk: (chunk: ChatSocketStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: SibilMessage) => void;
       onError: (error: string) => void;
       onTypingStart?: () => void;
@@ -117,26 +89,27 @@ export const sibilAPI = {
     let accumulatedContent = '';
     let isAborted = false;
 
-    const socketRequest: SibilSocketRequest = {
+    const socketRequest: ChatSocketRequest = {
+      source: 'sibil' as const,
       provider: request.provider,
       model: request.model,
       message: request.message,
       user_id: 'client-user', // This will be overridden by server auth
       session_id: request.sessionId,
+      starship_id: request.starshipId,
       stream_id: streamId,
       typewriter_enabled: true,
       typing_speed: 75,
-      starship_id: request.starshipId
     };
 
-    const handleStreamStart = (receivedStreamId: string) => {
-      if (receivedStreamId === streamId) {
+    const handleStreamStart = (data: { streamId: string; source: string }) => {
+      if (data.streamId === streamId && data.source === 'sibil') {
         console.log('[SIBIL API] Stream started:', streamId);
       }
     };
 
-    const handleStreamChunk = (chunk: SibilSocketStreamChunk) => {
-      if (chunk.stream_id === streamId && !isAborted) {
+    const handleStreamChunk = (chunk: ChatSocketStreamChunk) => {
+      if (chunk.stream_id === streamId && chunk.source === 'sibil' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
           callbacks.onChunk(chunk, accumulatedContent);
@@ -144,8 +117,8 @@ export const sibilAPI = {
       }
     };
 
-    const handleStreamComplete = (response: SibilBackendResponse) => {
-      if (!isAborted) {
+    const handleStreamComplete = (response: any) => {
+      if (response.source === 'sibil' && !isAborted) {
         const finalMessage: SibilMessage = {
           id: generateId(),
           content: response.content,
@@ -162,43 +135,47 @@ export const sibilAPI = {
       }
     };
 
-    const handleStreamError = (error: SibilStreamError) => {
-      if (error.stream_id === streamId && !isAborted) {
+    const handleStreamError = (error: ChatSocketStreamError) => {
+      if (error.stream_id === streamId && error.source === 'sibil' && !isAborted) {
         callbacks.onError(error.message);
         cleanup();
       }
     };
 
-    const handleTypingStart = () => {
-      callbacks.onTypingStart?.();
+    const handleTypingStart = (data: { source: string }) => {
+      if (data.source === 'sibil') {
+        callbacks.onTypingStart?.();
+      }
     };
 
-    const handleTypingStop = () => {
-      callbacks.onTypingStop?.();
+    const handleTypingStop = (data: { source: string }) => {
+      if (data.source === 'sibil') {
+        callbacks.onTypingStop?.();
+      }
     };
 
     const cleanup = () => {
-      socket.off('sibil:stream-start', handleStreamStart);
-      socket.off('sibil:stream-chunk', handleStreamChunk);
-      socket.off('sibil:stream-complete', handleStreamComplete);
-      socket.off('sibil:stream-error', handleStreamError);
-      socket.off('sibil:typing-start', handleTypingStart);
-      socket.off('sibil:typing-stop', handleTypingStop);
+      socket.off('chat:stream-start', handleStreamStart);
+      socket.off('chat:stream-chunk', handleStreamChunk);
+      socket.off('chat:stream-complete', handleStreamComplete);
+      socket.off('chat:stream-error', handleStreamError);
+      socket.off('chat:typing-start', handleTypingStart);
+      socket.off('chat:typing-stop', handleTypingStop);
     };
 
-    socket.on('sibil:stream-start', handleStreamStart);
-    socket.on('sibil:stream-chunk', handleStreamChunk);
-    socket.on('sibil:stream-complete', handleStreamComplete);
-    socket.on('sibil:stream-error', handleStreamError);
-    socket.on('sibil:typing-start', handleTypingStart);
-    socket.on('sibil:typing-stop', handleTypingStop);
+    socket.on('chat:stream-start', handleStreamStart);
+    socket.on('chat:stream-chunk', handleStreamChunk);
+    socket.on('chat:stream-complete', handleStreamComplete);
+    socket.on('chat:stream-error', handleStreamError);
+    socket.on('chat:typing-start', handleTypingStart);
+    socket.on('chat:typing-stop', handleTypingStop);
 
-    socket.emit('sibil:start-stream', socketRequest);
+    socket.emit('chat:start-stream', socketRequest);
 
     return {
       abort: () => {
         isAborted = true;
-        socket.emit('sibil:stop-stream', streamId);
+        socket.emit('chat:stop-stream', streamId);
         cleanup();
       }
     };

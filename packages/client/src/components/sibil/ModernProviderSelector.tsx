@@ -1,10 +1,9 @@
 'use client'
 
-import { motion, AnimatePresence } from 'motion/react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { motion } from 'motion/react'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Bot, Zap, Sparkles } from 'lucide-react'
-import { providerSwitchVariants, buttonVariants } from '@/lib/animations'
 
 interface ModernProviderSelectorProps {
   provider: 'openai' | 'anthropic'

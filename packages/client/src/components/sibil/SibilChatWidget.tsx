@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Bot, X, Minimize2, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { SibilMessage, sibilAPI } from '@/lib/sibil-api';
 import { getChatHistory, saveChatHistory, generateSibilSessionId } from '@/lib/storage';
@@ -21,21 +20,18 @@ interface SibilChatWidgetProps {
 
 export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilChatWidgetProps) {
   const { userId, isAuthenticated } = useAuth();
-  const { starships, activeStarshipId } = useStarshipStore();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<SibilMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const [hasShownOnboarding, setHasShownOnboarding] = useState(false);
   const sessionId = useRef<string>('sibil-widget-session');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamController = useRef<{ abort: () => void } | null>(null);
 
   // Determine if this is the user's first visit to vision-chamber
-  const isVisionChamberFirstVisit = pathname?.includes('/vision-chamber') && isFirstStarship && !hasShownOnboarding;
+  const isVisionChamberFirstVisit = pathname?.includes('/vision-chamber') && isFirstStarship;
 
   // Initialize session and onboarding messages
   useEffect(() => {
@@ -48,16 +44,6 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
       
       // Load existing messages without auto-opening
       setMessages(storedMessages);
-      // Onboarding temporarily disabled
-      /*
-      if (isVisionChamberFirstVisit && storedMessages.length === 0) {
-        initializeOnboarding();
-        setIsOpen(true); // Auto-open for onboarding
-        setHasShownOnboarding(true);
-      } else {
-        setMessages(storedMessages);
-      }
-      */
     }
   }, [userId, isAuthenticated, starshipId, isVisionChamberFirstVisit]);
 
@@ -65,50 +51,6 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const initializeOnboarding = async () => {
-    // Temporarily disabled onboarding messages
-    // Will revisit the onboarding flow later
-    /*
-    const starship = starships?.find(s => s.id === starshipId);
-    const vision = starship?.vision?.statement || 'your vision';
-    
-    const onboardingMessages: SibilMessage[] = [
-      {
-        id: '1',
-        role: 'assistant',
-        content: "Let's get you started!",
-        timestamp: Date.now(),
-        model: 'gpt-4',
-        provider: 'openai'
-      },
-      {
-        id: '2',
-        role: 'assistant',
-        content: "Let's first review your company's vision statement.",
-        timestamp: Date.now() + 1000,
-        model: 'gpt-4',
-        provider: 'openai'
-      },
-      {
-        id: '3',
-        role: 'assistant',
-        content: `Your vision is: "${vision}". Would you like me to refine it for you?`,
-        timestamp: Date.now() + 2000,
-        model: 'gpt-4',
-        provider: 'openai'
-      }
-    ];
-
-    // Add messages with delay for natural flow
-    for (let i = 0; i < onboardingMessages.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 1500));
-      setMessages(prev => [...prev, onboardingMessages[i]]);
-    }
-    
-    saveChatHistory(sessionId.current, onboardingMessages);
-    */
-  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || streaming) return;
@@ -337,7 +279,7 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
                   <div className="flex gap-2">
                     <Input
                       value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
                       onKeyPress={handleKeyPress}
                       placeholder="Ask Sibil anything..."
                       className="flex-1 bg-background/50"

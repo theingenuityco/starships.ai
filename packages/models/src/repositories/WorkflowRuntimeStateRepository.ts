@@ -237,8 +237,6 @@ export class WorkflowRuntimeStateRepository extends BaseRepository {
     try {
       this.validateRequired({ id, nodeId, result }, ['id', 'nodeId', 'result'], 'updateNodeResult');
       
-      const connection = getConnection();
-      
       // First, get current execution results
       const currentState = await this.findById(id);
       if (!currentState) {

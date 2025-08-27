@@ -7,7 +7,6 @@ interface NavigationItemProps {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  status: string;
   isActive: boolean;
   compact?: boolean;
 }
@@ -16,7 +15,6 @@ export function NavigationItem({
   href, 
   label, 
   icon: Icon, 
-  status, 
   isActive, 
   compact = false 
 }: NavigationItemProps) {

@@ -15,7 +15,7 @@ interface QuickActionModuleProps {
   className?: string;
 }
 
-export function QuickActionModule({ moduleId, className = '' }: QuickActionModuleProps) {
+export function QuickActionModule({ className = '' }: QuickActionModuleProps) {
   const pathname = usePathname();
   const starshipData = useStarshipStore();
   

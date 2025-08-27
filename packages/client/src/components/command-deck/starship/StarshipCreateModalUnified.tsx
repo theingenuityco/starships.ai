@@ -1,27 +1,24 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Rocket, 
-  Users, 
-  Zap, 
-  Navigation,
+import {
+  ChevronLeft,
+  ChevronRight,
+  Rocket,
+  Users,
   Check,
   CheckCircle,
   Loader2,
@@ -29,10 +26,8 @@ import {
   Sparkles,
   AlertCircle,
   ArrowRight,
-  X,
   Brain,
-  Bot,
-  AlertTriangle
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -122,7 +117,6 @@ export function StarshipCreateModalUnified({
   // New state for API-driven pricing data
   const [starshipClasses, setStarshipClasses] = useState<Record<string, any>>({});
   const [classesLoading, setClassesLoading] = useState(true);
-  const [pricingData, setPricingData] = useState<any[]>([]);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   
   // Try to get session from hook or fallback to localStorage for onboarding
@@ -197,7 +191,6 @@ export function StarshipCreateModalUnified({
             }, {});
           
           setStarshipClasses(classesFromAPI);
-          setPricingData(pricingData);
         }
       } catch (error) {
         console.error('Failed to fetch starship data:', error);
@@ -427,7 +420,7 @@ export function StarshipCreateModalUnified({
                 id="vision"
                 placeholder="What would you like to build?"
                 value={formData.vision}
-                onChange={(e) => setFormData({ ...formData, vision: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, vision: e.target.value })}
                 onBlur={handleAnalyzeVision}
                 className={cn(
                   "min-h-[100px] bg-background/50 backdrop-blur-sm border border-border/50",
@@ -457,7 +450,7 @@ export function StarshipCreateModalUnified({
                   id="starship-name"
                   placeholder="Enter a memorable name for your starship."
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
                   className={cn(
                     "pr-10 bg-background/50 backdrop-blur-sm border border-border/50",
                     "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
@@ -939,14 +932,6 @@ export function StarshipCreateModalUnified({
     return null;
   };
 
-  const getStepTitle = () => {
-    switch (step) {
-      case 1: return 'Vision';
-      case 2: return 'Choose Your Class';
-      case 3: return 'Review & Launch';
-      default: return '';
-    }
-  };
 
   return (
     <>

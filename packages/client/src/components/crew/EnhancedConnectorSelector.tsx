@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
-import { monitoringService, connectorMonitoring } from '@/lib/connector-monitoring'
+import { monitoringService } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { ConnectorInstanceConfig } from './ConnectorInstanceConfig'
 import { EnhancedApiKeyInputModal } from './EnhancedApiKeyInputModal'
@@ -11,7 +11,6 @@ import { ApiKeyRequirement } from '@/types/connector-api-keys'
 import { useErrorRecovery, ErrorRecoveryManager } from '@/lib/error-recovery'
 import { ErrorBoundary, useErrorHandler } from '@/components/ui/error-boundary'
 import {
-  LoadingSpinner,
   ConnectorListSkeleton,
   ConnectionStatus,
   InlineLoading,
@@ -37,19 +36,12 @@ import {
   X,
   Plug,
   AlertCircle,
-  Wifi,
-  WifiOff,
-  Clock,
-  XCircle,
   AlertTriangle,
-  CheckCircle,
-  Settings,
   Key,
   RefreshCw,
   Filter,
   SortAsc,
   SortDesc,
-  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -63,7 +55,6 @@ interface EnhancedConnectorSelectorProps {
   onConfigUpdate?: (connectorId: string, config: any) => Promise<void>
   onTemplateApply?: (connectorId: string, templateId: string) => Promise<void>
   showAdvancedFeatures?: boolean
-  enableBulkActions?: boolean
   autoRefresh?: boolean
   refreshInterval?: number
 }
@@ -90,7 +81,6 @@ export function EnhancedConnectorSelector({
   onConfigUpdate,
   onTemplateApply,
   showAdvancedFeatures = true,
-  enableBulkActions = true,
   autoRefresh = true,
   refreshInterval = 30000,
 }: EnhancedConnectorSelectorProps) {
@@ -883,7 +873,6 @@ export function EnhancedConnectorSelector({
                       {connectorInstance && onConfigUpdate && onTemplateApply && (
                         <ConnectorInstanceConfig
                           connectorId={connectorInstance.id}
-                          starshipId={starshipId}
                           connectorName={connector.name}
                           currentConfig={(connectorInstance as any).config}
                           onConfigUpdate={config => onConfigUpdate(connectorInstance.id, config)}

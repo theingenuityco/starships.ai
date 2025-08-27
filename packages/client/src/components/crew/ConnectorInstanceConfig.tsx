@@ -25,7 +25,6 @@ export interface ConnectorInstanceConfig {
 
 interface ConnectorInstanceConfigProps {
   connectorId: string
-  starshipId: string
   connectorName: string
   currentConfig?: ConnectorInstanceConfig
   onConfigUpdate: (config: ConnectorInstanceConfig) => Promise<void>
@@ -36,7 +35,6 @@ interface ConnectorInstanceConfigProps {
 
 export function ConnectorInstanceConfig({
   connectorId,
-  starshipId,
   connectorName,
   currentConfig,
   onConfigUpdate,
@@ -60,29 +58,6 @@ export function ConnectorInstanceConfig({
 
   const envVars = getEnvVars()
   const hasConfig = Object.keys(envVars).length > 0
-
-  const handleConfigUpdate = async (newConfig: Partial<ConnectorInstanceConfig>) => {
-    if (disabled) return
-
-    try {
-      setIsUpdating(true)
-      setError(null)
-
-      const updatedConfig: ConnectorInstanceConfig = {
-        environmentVariables: currentConfig?.environmentVariables || '{}',
-        templateId: currentConfig?.templateId,
-        version: (currentConfig?.version || 0) + 1,
-        lastModified: new Date().toISOString(),
-        ...newConfig,
-      }
-
-      await onConfigUpdate(updatedConfig)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update configuration')
-    } finally {
-      setIsUpdating(false)
-    }
-  }
 
   const handleTemplateApply = async (templateId: string) => {
     if (disabled) return

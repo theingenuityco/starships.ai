@@ -37,10 +37,8 @@ import {
 import { cn } from '@/lib/utils'
 
 interface ConnectorInstanceMonitorProps {
-  starshipId: string
   connectorInstances: MCPServerConnector[]
   className?: string
-  showDetailedView?: boolean
   autoRefresh?: boolean
   refreshInterval?: number
 }
@@ -472,10 +470,8 @@ function ConnectorMonitorCard({
 }
 
 export function ConnectorInstanceMonitor({
-  starshipId: _starshipId,
   connectorInstances,
   className,
-  showDetailedView: _showDetailedView = false,
   autoRefresh = true,
   refreshInterval = 30000,
 }: ConnectorInstanceMonitorProps) {

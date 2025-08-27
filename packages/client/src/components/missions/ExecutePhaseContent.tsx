@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Play, CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, Zap } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { missionApi } from '@/lib/missionApi';

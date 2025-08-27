@@ -13,7 +13,6 @@ import {
   XCircle,
   Clock,
   AlertCircle,
-  Filter,
   SortAsc,
   SortDesc,
   Users
@@ -36,7 +35,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
-import { starshipAPI, type Agent } from '@/lib/api';
+import { starshipAPI } from '@/lib/api';
 
 // Type for deployed agents - use the API response type directly
 type DeployedAgent = {

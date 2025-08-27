@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,13 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { 
   Eye, 
@@ -33,11 +25,9 @@ import {
   Trash2,
   Settings,
   Check,
-  X,
   Key,
   Info,
   CheckCircle2,
-  ChevronDown
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -101,8 +91,6 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
   const [toolConfigs, setToolConfigs] = useState<Record<string, Record<string, string>>>({});
   const [showKey, setShowKey] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   
@@ -125,7 +113,6 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
 
   const loadApiKeys = async () => {
     try {
-      setLoading(true);
       const response = await api.get(`/api/starships/${starshipId}/native-api-keys`);
       
       if (response.data) {
@@ -142,8 +129,6 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
         keys[tool.name] = '';
       });
       setApiKeys(keys);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -177,7 +162,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
   const saveApiKey = async () => {
     if (!selectedTool) return;
     
-    setSaving(true);
+    setDeleting(true);
     setMessage(null);
 
     try {
@@ -206,7 +191,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
       setMessage({ type: 'error', text: 'Failed to save configuration' });
       console.error('Error saving API key:', error);
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
   };
 
@@ -504,7 +489,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       variant="ghost"
                       size="sm"
                       onClick={deleteApiKey}
-                      disabled={deleting || saving}
+                      disabled={deleting}
                       className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
                     >
                       {deleting ? (
@@ -525,17 +510,17 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   <Button
                     variant="outline"
                     onClick={closeModal}
-                    disabled={saving || deleting}
+                    disabled={deleting}
                     className="border-border/50"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={saveApiKey}
-                    disabled={!tempApiKey || saving || deleting}
+                    disabled={!tempApiKey || deleting}
                     className="bg-primary hover:bg-primary/90"
                   >
-                    {saving ? (
+                    {deleting ? (
                       <span className="flex items-center gap-2">
                         <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         Saving...

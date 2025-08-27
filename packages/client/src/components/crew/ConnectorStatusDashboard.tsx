@@ -24,14 +24,12 @@ import {
 import { cn } from '@/lib/utils'
 
 interface ConnectorStatusDashboardProps {
-  starshipId: string
   connectorInstances: MCPServerConnector[]
   className?: string
   compact?: boolean
 }
 
 export function ConnectorStatusDashboard({
-  starshipId: _starshipId,
   connectorInstances,
   className,
   compact = false,

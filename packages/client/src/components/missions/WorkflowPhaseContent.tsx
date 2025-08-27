@@ -1,32 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { 
   CheckCircle, 
   Clock, 
-  AlertCircle, 
-  Users, 
-  Target,
-  RefreshCw,
-  X
+  AlertCircle
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
 import { WorkflowVisualization } from '@/components/workflow';
-import type { Mission, WorkflowResponse, MissionWorkflow } from '@starships/protocol';
+import type { Mission, MissionWorkflow } from '@starships/protocol';
 
 interface WorkflowPhaseContentProps {
   mission: Mission;
   onWorkflowApproval?: (approved: boolean) => void;
-  readonly?: boolean;
 }
 
-export function WorkflowPhaseContent({ mission, onWorkflowApproval, readonly = false }: WorkflowPhaseContentProps) {
+export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPhaseContentProps) {
   const [workflow, setWorkflow] = useState<MissionWorkflow | null>(null);
   const [agents, setAgents] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -36,10 +29,6 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval, readonly = f
   const [showRejectionDialog, setShowRejectionDialog] = useState(false);
   
   const { toast } = useToast();
-
-  useEffect(() => {
-    loadWorkflow();
-  }, [mission.id]);
 
   const loadWorkflow = async () => {
     try {
@@ -70,6 +59,10 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval, readonly = f
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadWorkflow();
+  }, [mission.id]);
 
   const handleApproval = async (approved: boolean, reason?: string) => {
     if (!workflow) return;
@@ -106,38 +99,6 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval, readonly = f
     } finally {
       setActionLoading(false);
       setShowRejectionDialog(false);
-    }
-  };
-
-  const handleRegenerate = async () => {
-    try {
-      setActionLoading(true);
-      
-      const response = await missionApi.regenerateMissionWorkflow(mission.id);
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      
-      toast({
-        title: 'Workflow Regeneration Initiated',
-        description: response.data?.message || 'Generating new execution workflow',
-        variant: 'default',
-      });
-      
-      // Reload workflow
-      await loadWorkflow();
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to regenerate workflow';
-      setError(errorMessage);
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setActionLoading(false);
     }
   };
 

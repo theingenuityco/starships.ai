@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { Agent, starshipAPI, Starship } from '@/lib/api'
-import { useState, useEffect } from 'react'
-// import { motion } from 'motion/react'
+import React from 'react';
+import type { Agent } from '@starships/protocol';
+import { motion } from 'motion/react';
 import {
   Bot,
   Edit,
@@ -18,18 +18,18 @@ import {
   MoreVertical,
   Sparkles,
   Brain,
-} from 'lucide-react'
-import { Card } from '@/components/ui/card'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
+} from '@/components/ui/dropdown-menu';
 
 interface AgentCardProps {
   agent: Agent
@@ -52,45 +52,6 @@ export function AgentCard({
   onAnalytics,
   showActions = false,
 }: AgentCardProps) {
-  const [, setStarship] = useState<Starship | null>(null)
-  const [, setLoadingStarship] = useState(false)
-
-  // Fetch starship information if agent has starshipId
-  useEffect(() => {
-    const fetchStarship = async () => {
-      if (!(agent as any)?.starshipId) return
-
-      try {
-        setLoadingStarship(true)
-        console.log('[AGENT-CARD] Attempting to fetch starship:', (agent as any).starshipId)
-        console.log('[AGENT-CARD] Agent details:', {
-          id: agent.id,
-          name: agent.name,
-          starshipId: (agent as any).starshipId,
-        })
-
-        const starshipData = await starshipAPI.getStarship((agent as any).starshipId)
-        console.log('[AGENT-CARD] Successfully fetched starship:', starshipData.starship.name)
-        setStarship(starshipData.starship)
-      } catch (error) {
-        console.error('[AGENT-CARD] Failed to fetch starship:', {
-          starshipId: (agent as any).starshipId,
-          agentId: agent.id,
-          agentName: agent.name,
-          error: error,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          errorStatus: (error as any)?.response?.status,
-          timestamp: new Date().toISOString(),
-        })
-      } finally {
-        setLoadingStarship(false)
-      }
-    }
-
-    fetchStarship()
-  }, [(agent as any)?.starshipId])
-
-
   const getCategoryColor = (category: Agent['category']) => {
     const colors = {
       general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',

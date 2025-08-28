@@ -30,4 +30,8 @@ export async function GET(request: NextRequest, { params }: { params: { kindeAut
   }
   
   return response;
+}
+
+export async function POST(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
+  return GET(request, { params });
 } 

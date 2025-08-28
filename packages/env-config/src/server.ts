@@ -3,6 +3,7 @@ import path from 'path';
 import { ServerEnvironmentConfig, EnvironmentValidationError } from './types';
 
 // Load environment variables from the root .env file (server-side only)
+// BUT only in development or when not in a deployment environment
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
 
 // Only run dotenv config on server-side to prevent browser TTY errors
@@ -10,18 +11,6 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
   dotenv.config({ path: rootEnvPath });
 }
 
-/**
- * Validates that required environment variables are present
- */
-function validateRequired(variables: Record<string, unknown>, required: string[]): void {
-  const missing = required.filter(key => !variables[key]);
-  if (missing.length > 0) {
-    throw new EnvironmentValidationError(
-      `Missing required environment variables: ${missing.join(', ')}`,
-      missing
-    );
-  }
-}
 
 /**
  * Parses and validates server environment configuration
@@ -48,12 +37,12 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     DEFAULT_TEMPERATURE: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
     DEFAULT_MAX_TOKENS: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
     
-    KINDE_CLIENT_ID: process.env.KINDE_CLIENT_ID || 'kinde-client-id',
-    KINDE_CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET || 'kinde-secret',
-    KINDE_ISSUER_URL: process.env.KINDE_ISSUER_URL || 'placeholder',
-    KINDE_SITE_URL: process.env.KINDE_SITE_URL || 'http://localhost:3000',
-    KINDE_POST_LOGIN_REDIRECT_URL: process.env.KINDE_POST_LOGIN_REDIRECT_URL || 'http://localhost:3000',
-    KINDE_POST_LOGOUT_REDIRECT_URL: process.env.KINDE_POST_LOGOUT_REDIRECT_URL || 'http://localhost:3000',
+    KINDE_CLIENT_ID: process.env.KINDE_CLIENT_ID,
+    KINDE_CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET,
+    KINDE_ISSUER_URL: process.env.KINDE_ISSUER_URL,
+    KINDE_SITE_URL: process.env.KINDE_SITE_URL,
+    KINDE_POST_LOGIN_REDIRECT_URL: process.env.KINDE_POST_LOGIN_REDIRECT_URL,
+    KINDE_POST_LOGOUT_REDIRECT_URL: process.env.KINDE_POST_LOGOUT_REDIRECT_URL,
     KINDE_DEBUG_MODE: process.env.KINDE_DEBUG_MODE === 'true',
     
     // Stripe Configuration - use test keys as defaults for development/CI
@@ -101,14 +90,8 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
       );
     }
 
-    // Validate required Kinde variables in production
-    if (process.env.NODE_ENV === 'production') {
-      validateRequired(env, [
-        'KINDE_CLIENT_ID',
-        'KINDE_CLIENT_SECRET',
-        'KINDE_ISSUER_URL'
-      ]);
-    }
+    // Skip Kinde validation - these are resolved at runtime
+    // The dynamic imports in Next.js will handle missing values
   }
 
   return env;

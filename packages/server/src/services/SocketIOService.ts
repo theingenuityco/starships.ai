@@ -4,13 +4,15 @@ import type {
   SocketConnectionState,
   SocketEvents,
   EventEmissionOptions,
-  EventEmissionResult
+  EventEmissionResult,
 } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from './UserService';
+import { loadServerEnvironment } from '@starships/env-config';
 
 // Kinde JWKS endpoint for token verification
-const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
+const env = loadServerEnvironment();
+const kindeIssuerUrl = env.KINDE_ISSUER_URL;
 const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
 
 // JWT verification function for Socket.IO
@@ -21,21 +23,21 @@ async function verifySocketJWT(token: string) {
     if (parts.length !== 3) {
       throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`);
     }
-    
+
     // Decode header and payload for debugging
     const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
     const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-    
+
     console.log('[SOCKET.IO] JWT Debug - Header:', header);
     console.log('[SOCKET.IO] JWT Debug - Issuer:', payload.iss);
     console.log('[SOCKET.IO] JWT Debug - Expected Issuer:', kindeIssuerUrl);
     console.log('[SOCKET.IO] JWT Debug - Kid:', header.kid);
-    
+
     // Now verify the token
     const result = await jwtVerify(token, JWKS, {
       issuer: kindeIssuerUrl,
     });
-    
+
     return result.payload;
   } catch (error) {
     console.error('[SOCKET.IO] JWT verification error details:', error);
@@ -53,16 +55,17 @@ export class SocketIOService {
   private connections: Map<string, SocketConnectionState> = new Map();
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
-  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> = new Map();
+  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> =
+    new Map();
   private healthCheckInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
 
   private constructor(httpServer: HTTPServer) {
     this.io = new SocketIOServer(httpServer, {
       cors: {
-        origin: process.env.CLIENT_URL || "http://localhost:3000",
-        methods: ["GET", "POST"],
-        credentials: true
+        origin: process.env.CLIENT_URL || 'http://localhost:3000',
+        methods: ['GET', 'POST'],
+        credentials: true,
       },
       transports: ['websocket', 'polling'],
       pingTimeout: 60000,
@@ -72,7 +75,7 @@ export class SocketIOService {
       allowEIO3: true,
       maxHttpBufferSize: 1e6, // 1MB
       httpCompression: true,
-      perMessageDeflate: true
+      perMessageDeflate: true,
     });
 
     this.setupMiddleware();
@@ -114,15 +117,16 @@ export class SocketIOService {
     // Non-blocking authentication middleware
     this.io.use(async (socket, next) => {
       try {
-        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
-        
+        const token =
+          socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+
         if (!token) {
           return next(new Error('Authentication token required'));
         }
 
         // Verify JWT token - this is the only blocking operation
         const payload = await verifySocketJWT(token);
-        
+
         // Store Kinde ID immediately for connection
         socket.data.kindeId = payload.sub as string;
         socket.data.email = payload.email as string;
@@ -130,14 +134,16 @@ export class SocketIOService {
         socket.data.avatar = payload.picture as string;
         socket.data.authenticated = true;
         socket.data.connectedAt = Date.now();
-        
+
         // Set temporary user ID using Kinde ID until database resolution
         socket.data.userId = `temp:${payload.sub}`;
         socket.data.userResolved = false;
         socket.data.userResolutionAttempts = 0;
-        
-        console.log(`[SOCKET.IO] JWT verified for Kinde ID: ${payload.sub}, allowing connection with temporary ID`);
-        
+
+        console.log(
+          `[SOCKET.IO] JWT verified for Kinde ID: ${payload.sub}, allowing connection with temporary ID`
+        );
+
         // Allow connection immediately - user resolution happens in background
         next();
       } catch (error) {
@@ -152,8 +158,10 @@ export class SocketIOService {
       const tempUserId = socket.data.userId;
       const kindeId = socket.data.kindeId;
       const socketId = socket.id;
-      
-      console.log(`[SOCKET.IO] Connection established for Kinde ID: ${kindeId}, socket: ${socketId}`);
+
+      console.log(
+        `[SOCKET.IO] Connection established for Kinde ID: ${kindeId}, socket: ${socketId}`
+      );
 
       // Initialize connection state with temporary user ID
       this.connections.set(socketId, {
@@ -162,7 +170,7 @@ export class SocketIOService {
         room_joined: false,
         user_id: tempUserId,
         connection_id: socketId,
-        last_ping: Date.now()
+        last_ping: Date.now(),
       });
 
       // Track user sockets using temporary ID initially
@@ -181,7 +189,7 @@ export class SocketIOService {
         status: 'connected',
         userId: tempUserId,
         connectionId: socketId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       // Start background user resolution
@@ -192,7 +200,6 @@ export class SocketIOService {
         this.updateConnectionState(socketId, { last_ping: Date.now() });
         socket.emit('pong');
       });
-
 
       // Handle disconnection with cleanup
       socket.on('disconnect', (reason) => {
@@ -210,13 +217,14 @@ export class SocketIOService {
     });
   }
 
-
   private handleDisconnection(socketId: string, userId: string, reason: string) {
-    console.log(`[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`);
-    
+    console.log(
+      `[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`
+    );
+
     // Clean up connection state
     this.connections.delete(socketId);
-    
+
     // Remove from user sockets tracking (works for both temp and resolved IDs)
     const userSockets = this.userSockets.get(userId);
     if (userSockets) {
@@ -225,7 +233,6 @@ export class SocketIOService {
         this.userSockets.delete(userId);
       }
     }
-
 
     // Reset reconnection attempts if clean disconnect
     if (reason === 'client namespace disconnect' || reason === 'server namespace disconnect') {
@@ -240,12 +247,13 @@ export class SocketIOService {
 
   private handleSocketError(socketId: string, userId: string, error: any) {
     console.warn(`[SOCKET.IO] Socket error for user ${userId}:`, error);
-    
+
     const attempts = this.reconnectionAttempts.get(userId) || 0;
     this.reconnectionAttempts.set(userId, attempts + 1);
 
     // More lenient error handling - only disconnect for severe errors
-    if (attempts > 10) { // Increased threshold
+    if (attempts > 10) {
+      // Increased threshold
       console.warn(`[SOCKET.IO] Too many errors for user ${userId}, temporarily blocking`);
       const socket = this.io.sockets.sockets.get(socketId);
       if (socket) {
@@ -254,9 +262,9 @@ export class SocketIOService {
           status: 'error',
           userId: userId,
           connectionId: socketId,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
-        
+
         // Delay disconnection to allow user to see the warning
         setTimeout(() => {
           if (socket.connected) {
@@ -272,7 +280,7 @@ export class SocketIOService {
           status: 'reconnecting',
           userId: userId,
           connectionId: socketId,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       }
     }
@@ -283,12 +291,14 @@ export class SocketIOService {
     if (queuedEvents && queuedEvents.length > 0) {
       const socket = this.io.sockets.sockets.get(socketId);
       if (socket) {
-        console.log(`[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`);
-        
+        console.log(
+          `[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`
+        );
+
         queuedEvents.forEach(({ event, data }) => {
           socket.emit(event as any, data);
         });
-        
+
         this.eventQueue.delete(userId);
       }
     }
@@ -301,23 +311,26 @@ export class SocketIOService {
     const kindeId = socket.data.kindeId;
     const socketId = socket.id;
     const tempUserId = socket.data.userId;
-    
+
     // Prevent multiple resolution attempts for the same socket
     if (socket.data.userResolutionInProgress) {
       return;
     }
-    
+
     socket.data.userResolutionInProgress = true;
-    
+
     try {
       console.log(`[SOCKET.IO] Starting background user resolution for Kinde ID: ${kindeId}`);
-      
+
       // Attempt to find existing user
       let user = null;
       try {
         user = await UserService.getUserByKindeId(kindeId);
       } catch (dbError) {
-        console.warn(`[SOCKET.IO] Database error during user lookup for ${kindeId}, will retry later:`, dbError);
+        console.warn(
+          `[SOCKET.IO] Database error during user lookup for ${kindeId}, will retry later:`,
+          dbError
+        );
         // Schedule retry
         setTimeout(() => {
           if (socket.connected && !socket.data.userResolved) {
@@ -330,8 +343,10 @@ export class SocketIOService {
 
       // If user not found, attempt to sync
       if (!user) {
-        console.log(`[SOCKET.IO] User not found for Kinde ID: ${kindeId}, attempting background sync`);
-        
+        console.log(
+          `[SOCKET.IO] User not found for Kinde ID: ${kindeId}, attempting background sync`
+        );
+
         try {
           user = await UserService.syncUser({
             kindeId: kindeId,
@@ -339,16 +354,24 @@ export class SocketIOService {
             name: socket.data.name,
             avatar: socket.data.avatar,
           });
-          console.log(`[SOCKET.IO] User successfully synced in background: ${user.id} (${user.displayName || user.username})`);
+          console.log(
+            `[SOCKET.IO] User successfully synced in background: ${user.id} (${user.displayName || user.username})`
+          );
         } catch (syncError) {
-          console.warn(`[SOCKET.IO] Background user sync failed for ${kindeId}, providing degraded service:`, syncError);
+          console.warn(
+            `[SOCKET.IO] Background user sync failed for ${kindeId}, providing degraded service:`,
+            syncError
+          );
           // Continue with degraded service - don't disconnect
           socket.data.userResolutionInProgress = false;
           socket.data.userResolutionAttempts = (socket.data.userResolutionAttempts || 0) + 1;
-          
+
           // Retry with exponential backoff if not too many attempts
           if (socket.data.userResolutionAttempts < 5) {
-            const retryDelay = Math.min(30000, 1000 * Math.pow(2, socket.data.userResolutionAttempts));
+            const retryDelay = Math.min(
+              30000,
+              1000 * Math.pow(2, socket.data.userResolutionAttempts)
+            );
             setTimeout(() => {
               if (socket.connected && !socket.data.userResolved) {
                 socket.data.userResolutionInProgress = false;
@@ -363,14 +386,14 @@ export class SocketIOService {
       // User resolution successful - update socket data and tracking
       const oldUserId = socket.data.userId;
       const newUserId = user.id;
-      
+
       socket.data.userId = newUserId;
       socket.data.userResolved = true;
       socket.data.userResolutionInProgress = false;
-      
+
       // Update connection state
       this.updateConnectionState(socketId, { user_id: newUserId });
-      
+
       // Update user socket tracking
       // Remove from old tracking
       const oldUserSockets = this.userSockets.get(oldUserId);
@@ -380,45 +403,49 @@ export class SocketIOService {
           this.userSockets.delete(oldUserId);
         }
       }
-      
+
       // Add to new tracking
       if (!this.userSockets.has(newUserId)) {
         this.userSockets.set(newUserId, new Set());
       }
       this.userSockets.get(newUserId)!.add(socketId);
-      
+
       // Update room membership
       const oldRoom = this.getUserRoom(oldUserId);
       const newRoom = this.getUserRoom(newUserId);
-      
+
       if (oldRoom !== newRoom) {
         socket.leave(oldRoom);
         socket.join(newRoom);
       }
-      
+
       // Process any queued events for the resolved user
       this.processQueuedEvents(newUserId, socketId);
-      
+
       // Notify client of successful user resolution using connection-status
       socket.emit('connection-status', {
         status: 'connected',
         userId: newUserId,
         connectionId: socketId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-      
-      console.log(`[SOCKET.IO] User resolution completed: ${kindeId} -> ${newUserId} (${user.displayName || user.username})`);
-      
+
+      console.log(
+        `[SOCKET.IO] User resolution completed: ${kindeId} -> ${newUserId} (${user.displayName || user.username})`
+      );
     } catch (error) {
-      console.error(`[SOCKET.IO] Unexpected error during background user resolution for ${kindeId}:`, error);
+      console.error(
+        `[SOCKET.IO] Unexpected error during background user resolution for ${kindeId}:`,
+        error
+      );
       socket.data.userResolutionInProgress = false;
-      
+
       // Continue with degraded service - don't disconnect the user
       socket.emit('connection-status', {
         status: 'error',
         userId: tempUserId,
         connectionId: socketId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -444,7 +471,7 @@ export class SocketIOService {
       // Clean up old queued events (older than 5 minutes)
       const eventThreshold = 300000; // 5 minutes
       this.eventQueue.forEach((events, userId) => {
-        const filteredEvents = events.filter(event => now - event.timestamp < eventThreshold);
+        const filteredEvents = events.filter((event) => now - event.timestamp < eventThreshold);
         if (filteredEvents.length !== events.length) {
           if (filteredEvents.length === 0) {
             this.eventQueue.delete(userId);
@@ -460,7 +487,7 @@ export class SocketIOService {
     const shutdown = () => {
       console.log('[SOCKET.IO] Graceful shutdown initiated...');
       this.isShuttingDown = true;
-      
+
       if (this.healthCheckInterval) {
         clearInterval(this.healthCheckInterval);
       }
@@ -470,7 +497,7 @@ export class SocketIOService {
         status: 'disconnected',
         userId: 'system',
         connectionId: 'system',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
 
       // Close all connections
@@ -498,7 +525,6 @@ export class SocketIOService {
   getUserRoom(userId: string): string {
     return `user:${userId}`;
   }
-
 
   // Agent-specific room management (backward compatibility)
   getAgentRoom(agentId: string, userId: string): string {
@@ -535,7 +561,6 @@ export class SocketIOService {
     return this.userSockets.size;
   }
 
-
   // Enhanced event emission with error handling and retry logic
   async emitToUser<K extends keyof SocketEvents>(
     userId: string,
@@ -547,7 +572,6 @@ export class SocketIOService {
     return this.emitToRoom(userRoom, event, data, { ...options });
   }
 
-
   // Legacy method for backward compatibility
   async emitToUserWithRetry(
     userId: string,
@@ -557,7 +581,6 @@ export class SocketIOService {
   ): Promise<EventEmissionResult> {
     return this.emitToUser(userId, event, data, options);
   }
-
 
   private async emitToRoom<K extends keyof SocketEvents>(
     room: string,
@@ -576,7 +599,9 @@ export class SocketIOService {
 
       if (recipientCount === 0) {
         // Queue the event if no recipients are currently connected
-        console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`);
+        console.log(
+          `[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`
+        );
       }
 
       // Emit to room with timeout
@@ -592,23 +617,24 @@ export class SocketIOService {
 
       await emissionPromise;
 
-      console.log(`[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`);
+      console.log(
+        `[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`
+      );
 
       return {
         success: true,
         eventType: event as string,
         recipientCount,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
-
     } catch (error) {
       console.error(`[SOCKET.IO] Failed to emit ${String(event)} to room ${room}:`, error);
-      
+
       // Retry logic
       const retryCount = options.retryCount || 0;
       if (retryCount < 3) {
         console.log(`[SOCKET.IO] Retrying emission (attempt ${retryCount + 1})`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (retryCount + 1)));
         return this.emitToRoom(room, event, data, { ...options, retryCount: retryCount + 1 });
       }
 
@@ -616,8 +642,10 @@ export class SocketIOService {
         success: false,
         eventType: event as string,
         recipientCount,
-        errors: [{ userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' }],
-        timestamp: new Date().toISOString()
+        errors: [
+          { userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' },
+        ],
+        timestamp: new Date().toISOString(),
       };
     }
   }
@@ -627,12 +655,12 @@ export class SocketIOService {
     if (!this.eventQueue.has(userId)) {
       this.eventQueue.set(userId, []);
     }
-    
+
     const queue = this.eventQueue.get(userId)!;
     queue.push({
       event,
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
 
     // Limit queue size to prevent memory issues
@@ -654,26 +682,31 @@ export class SocketIOService {
       totalUsers: this.userSockets.size,
       connectedUsers: this.userSockets.size, // For backward compatibility
       contextRooms: this.userSockets.size, // Migration note: was expeditionRooms, now represents user context rooms
-      queuedEvents: Array.from(this.eventQueue.values()).reduce((sum, queue) => sum + queue.length, 0),
+      queuedEvents: Array.from(this.eventQueue.values()).reduce(
+        (sum, queue) => sum + queue.length,
+        0
+      ),
       averagePingTime: this.getAveragePingTime(),
       healthyConnections: this.getHealthyConnectionsCount(),
-      isHealthy: !this.isShuttingDown
+      isHealthy: !this.isShuttingDown,
     };
   }
 
   private getAveragePingTime(): number {
     const now = Date.now();
     const pingTimes = Array.from(this.connections.values())
-      .map(conn => now - (conn.last_ping || now))
-      .filter(time => time < 60000); // Only consider pings within last minute
-    
-    return pingTimes.length > 0 ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length : 0;
+      .map((conn) => now - (conn.last_ping || now))
+      .filter((time) => time < 60000); // Only consider pings within last minute
+
+    return pingTimes.length > 0
+      ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length
+      : 0;
   }
 
   private getHealthyConnectionsCount(): number {
     const now = Date.now();
-    return Array.from(this.connections.values())
-      .filter(conn => conn.connected && (now - (conn.last_ping || 0)) < 60000)
-      .length;
+    return Array.from(this.connections.values()).filter(
+      (conn) => conn.connected && now - (conn.last_ping || 0) < 60000
+    ).length;
   }
 }

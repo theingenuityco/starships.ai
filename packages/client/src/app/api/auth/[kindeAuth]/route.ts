@@ -1,43 +1,49 @@
-import { handleAuth } from "@kinde-oss/kinde-auth-nextjs/server";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-// Default Kinde auth handler - let the SDK handle everything
-const authHandler = handleAuth();
-
+// Dynamically import Kinde at runtime to avoid build-time env validation
 export async function GET(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
-  // Get the response from the default handler
-  const response = await authHandler(request, { params });
-  
-  // Only modify cookies for actual HTTP deployments (not HTTPS)
-  // dev.starships.ai uses HTTPS, so it doesn't need modifications
-  if (process.env.NODE_ENV === 'production' && 
-      process.env.KINDE_SITE_URL?.startsWith('http://') && 
-      !process.env.KINDE_SITE_URL?.startsWith('https://')) {
+  try {
+    // Check if Kinde is configured
+    if (!process.env.KINDE_ISSUER_URL) {
+      console.warn('Kinde is not configured. Set KINDE_ISSUER_URL in your environment variables.');
+      return NextResponse.json(
+        { error: 'Authentication service not configured' },
+        { status: 503 }
+      );
+    }
     
-    // Clone the response to modify headers
-    const modifiedResponse = new Response(response.body, response);
-    
-    // Get all Set-Cookie headers
-    const cookies = modifiedResponse.headers.getSetCookie();
-    
-    // Clear existing cookies
-    modifiedResponse.headers.delete('set-cookie');
-    
-    // Re-add cookies without Secure flag for HTTP
-    cookies.forEach((cookie: string) => {
-      // Remove Secure flag for HTTP deployment
-      const modifiedCookie = cookie.replace(/;\s*Secure/gi, '');
-      modifiedResponse.headers.append('set-cookie', modifiedCookie);
-    });
-    
-    return modifiedResponse;
+    // Only import and initialize Kinde when configured
+    const { handleAuth } = await import("@kinde-oss/kinde-auth-nextjs/server");
+    const handler = handleAuth();
+    return handler(request, { params });
+  } catch (error) {
+    console.error('Kinde auth error:', error);
+    return NextResponse.json(
+      { error: 'Authentication service error' },
+      { status: 500 }
+    );
   }
-  
-  // For HTTPS (including dev.starships.ai), return unmodified response
-  // Let Kinde SDK handle cookies properly
-  return response;
 }
 
 export async function POST(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
-  return GET(request, { params });
-}
+  try {
+    // Check if Kinde is configured
+    if (!process.env.KINDE_ISSUER_URL) {
+      console.warn('Kinde is not configured. Set KINDE_ISSUER_URL in your environment variables.');
+      return NextResponse.json(
+        { error: 'Authentication service not configured' },
+        { status: 503 }
+      );
+    }
+    
+    const { handleAuth } = await import("@kinde-oss/kinde-auth-nextjs/server");
+    const handler = handleAuth();
+    return handler(request, { params });
+  } catch (error) {
+    console.error('Kinde auth error:', error);
+    return NextResponse.json(
+      { error: 'Authentication service error' },
+      { status: 500 }
+    );
+  }
+} 

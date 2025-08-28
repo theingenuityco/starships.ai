@@ -87,11 +87,39 @@ export const authMiddleware = async (
       return;
     }
 
-    // Verify JWT token using Kinde's public keys
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: kindeIssuerUrl,
-      // Note: Kinde tokens may have empty audience, so we skip audience validation
-    });
+    // Verify JWT token
+    let payload: any;
+    
+    // In development, also accept tokens signed with the client secret
+    if (process.env.NODE_ENV === 'development' && process.env.KINDE_CLIENT_SECRET) {
+      try {
+        // First try with JWKS (production tokens)
+        const result = await jwtVerify(token, JWKS, {
+          issuer: kindeIssuerUrl,
+        });
+        payload = result.payload;
+      } catch (jwksError) {
+        // If JWKS fails in dev, try with client secret (dev tokens)
+        console.log('[AUTH] JWKS validation failed, trying development token validation');
+        try {
+          const secret = new TextEncoder().encode(process.env.KINDE_CLIENT_SECRET);
+          const result = await jwtVerify(token, secret, {
+            issuer: kindeIssuerUrl,
+          });
+          payload = result.payload;
+          console.log('[AUTH] Development token validated successfully');
+        } catch (devError) {
+          console.error('[AUTH] Both JWKS and development token validation failed');
+          throw jwksError; // Throw original error
+        }
+      }
+    } else {
+      // Production: only use JWKS
+      const result = await jwtVerify(token, JWKS, {
+        issuer: kindeIssuerUrl,
+      });
+      payload = result.payload;
+    }
 
     console.log(`[AUTH] Token validated for user: ${payload.sub}`);
 

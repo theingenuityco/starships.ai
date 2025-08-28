@@ -24,11 +24,14 @@ export async function middleware(request: NextRequest) {
   // Check if user is authenticated with Kinde
   const { isAuthenticated } = getKindeServerSession();
   const isUserAuthenticated = await isAuthenticated();
+  
+  console.log('[Middleware] Path:', pathname, 'Authenticated:', isUserAuthenticated);
 
   // If authenticated, allow access to all routes (bypass waitlist)
   if (isUserAuthenticated) {
     // If trying to access root, redirect to fleet
     if (pathname === '/') {
+      console.log('[Middleware] Authenticated user at root, redirecting to /fleet');
       return NextResponse.redirect(new URL('/fleet', request.url));
     }
     return NextResponse.next();

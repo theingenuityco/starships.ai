@@ -13,12 +13,21 @@ importers:
 
   .:
     devDependencies:
+      '@semantic-release/commit-analyzer':
+        specifier: ^13.0.1
+        version: 13.0.1(semantic-release@24.2.7(typescript@5.8.3))
       '@semantic-release/git':
         specifier: ^10.0.1
         version: 10.0.1(semantic-release@24.2.7(typescript@5.8.3))
       '@semantic-release/github':
         specifier: ^11.0.4
         version: 11.0.4(semantic-release@24.2.7(typescript@5.8.3))
+      '@semantic-release/npm':
+        specifier: ^12.0.2
+        version: 12.0.2(semantic-release@24.2.7(typescript@5.8.3))
+      '@semantic-release/release-notes-generator':
+        specifier: ^14.0.3
+        version: 14.0.3(semantic-release@24.2.7(typescript@5.8.3))
       '@types/node':
         specifier: ^24.0.10
         version: 24.0.10

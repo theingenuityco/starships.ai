@@ -73,19 +73,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Run semantic-release in dry-run mode to check if new version should be published
-          npx semantic-release --dry-run > semantic-output.txt 2>&1 || true
-          
-          # Check if a new version would be published
-          if grep -q "The next release version is" semantic-output.txt; then
-            NEXT_VERSION=$(grep -oP 'The next release version is \K[0-9]+\.[0-9]+\.[0-9]+' semantic-output.txt)
-            echo "New version would be published: ${NEXT_VERSION}"
-            echo "new_release_published=true" >> $GITHUB_OUTPUT
-            echo "new_release_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          # For main branch, actually create the release
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "Running semantic-release to create version..."
+            npx semantic-release > semantic-output.txt 2>&1 || true
+            
+            if grep -q "Published release" semantic-output.txt; then
+              NEXT_VERSION=$(grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' semantic-output.txt)
+              echo "Published version: ${NEXT_VERSION}"
+              echo "new_release_published=true" >> $GITHUB_OUTPUT
+              echo "new_release_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+            else
+              echo "No new version published"
+              echo "new_release_published=false" >> $GITHUB_OUTPUT
+              echo "new_release_version=" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "No new version would be published"
-            echo "new_release_published=false" >> $GITHUB_OUTPUT
-            echo "new_release_version=" >> $GITHUB_OUTPUT
+            # For other branches or manual runs, just check what would be published
+            npx semantic-release --dry-run > semantic-output.txt 2>&1 || true
+            
+            if grep -q "The next release version is" semantic-output.txt; then
+              NEXT_VERSION=$(grep -oP 'The next release version is \K[0-9]+\.[0-9]+\.[0-9]+' semantic-output.txt)
+              echo "Next version would be: ${NEXT_VERSION}"
+              echo "new_release_published=true" >> $GITHUB_OUTPUT
+              echo "new_release_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+            else
+              echo "No new version would be published"
+              echo "new_release_published=false" >> $GITHUB_OUTPUT
+              echo "new_release_version=" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Determine build decision
@@ -136,9 +152,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
+            type=raw,value=${{ needs.calculate-version.outputs.new_release_version }},enable=${{ needs.calculate-version.outputs.new_release_published == 'true' }}
             type=sha,format=short
             type=raw,value=latest
+            type=raw,value=dev-latest
 
       - name: Build and push Dev Docker image
         uses: docker/build-push-action@v5
@@ -291,10 +308,16 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Use SHA-based tag for guaranteed pod restart (SHA changes with every commit)
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          # Use semantic version tag if available, otherwise use SHA
+          if [ -n "${{ needs.calculate-version.outputs.new_release_version }}" ]; then
+            IMAGE_TAG="${{ needs.calculate-version.outputs.new_release_version }}"
+          else
+            IMAGE_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
+          fi
+          
+          echo "Deploying image with tag: ${IMAGE_TAG}"
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA} \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
             -n starships-dev
           
           # Wait for rollout

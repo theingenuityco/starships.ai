@@ -13,11 +13,35 @@ const publicPaths = [
   '/public'
 ];
 
+// Kinde auth callback paths that must be excluded from middleware
+const kindeAuthPaths = [
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/register',
+  '/api/auth/callback',
+  '/api/auth/kinde_callback',
+  '/api/auth/setup'
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip middleware for public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  // CRITICAL: Skip middleware for Kinde auth callback paths
+  // This prevents interference with the OAuth flow
+  if (kindeAuthPaths.some(path => pathname === path)) {
+    return NextResponse.next();
+  }
+
+  // Also skip for the fleet page during auth redirect
+  // to prevent middleware from running before auth state is synchronized
+  const isAuthCallback = request.nextUrl.searchParams.has('code') || 
+                         request.nextUrl.searchParams.has('state');
+  if (isAuthCallback) {
     return NextResponse.next();
   }
 

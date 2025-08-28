@@ -37,7 +37,7 @@ spec:
       
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:latest
+        image: ghcr.io/theingenuityco/starships.ai:3.8.2
         imagePullPolicy: Always
         
         ports:

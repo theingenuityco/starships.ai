@@ -13,12 +13,11 @@ export class ChatSessionRepository extends BaseRepository {
    */
   async create(data: {
     source: ChatSourceType;
-    created_by: string;
     starship_id?: string;
     agent_id?: string;
   }): Promise<ChatSession> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired(data, ['source', 'created_by'], 'create');
+      this.validateRequired(data, ['source'], 'create');
       this.validateEnums(data, { source: ['sibil', 'agent'] }, 'create');
 
       const connection = getConnection();
@@ -28,7 +27,6 @@ export class ChatSessionRepository extends BaseRepository {
       const sessionData = {
         id,
         source: data.source,
-        created_by: data.created_by,
         created_at: now,
         last_activity_at: now,
         total_tokens: 0
@@ -86,36 +84,17 @@ export class ChatSessionRepository extends BaseRepository {
   }
 
   /**
-   * Find sessions by user ID
+   * Find sessions by starship ID only (removed user-based filtering)
    */
-  async findByUser(userId: string, limit: number = 50): Promise<ChatSession[]> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ userId }, ['userId'], 'findByUser');
 
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ s: any }>(
-        `MATCH (s:ChatSession {created_by: $userId})
-         RETURN s
-         ORDER BY s.last_activity_at DESC
-         LIMIT $limit`,
-        { userId, limit: Math.floor(Number(limit)) }
-      );
-
-      return result.map(record => record.s as ChatSession);
-    }, 'findByUser', 'ChatSession');
-  }
-
-  /**
-   * Find sessions by starship ID (no user filtering)
-   */
-  async findByStarship(starshipId: string, userId?: string, limit: number = 50): Promise<ChatSession[]> {
+  async findByStarship(starshipId: string, limit: number = 50): Promise<ChatSession[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ starshipId }, ['starshipId'], 'findByStarship');
 
       const connection = getConnection();
       const params: any = { starshipId, limit: Math.floor(Number(limit)) };
 
-      console.log('🔍 [ChatSessionRepository] findByStarship query params (no user filter):', {
+      console.log('🔍 [ChatSessionRepository] findByStarship query params:', {
         starshipId,
         limit,
         params
@@ -136,7 +115,6 @@ export class ChatSessionRepository extends BaseRepository {
         results: result.map(r => ({
           sessionId: r.s?.id,
           sessionSource: r.s?.source,
-          sessionCreatedBy: r.s?.created_by,
           starshipId: r.st?.id,
           agentId: r.a?.id
         }))
@@ -153,7 +131,6 @@ export class ChatSessionRepository extends BaseRepository {
         sessions: mappedResults.map(s => ({
           id: s.id,
           source: s.source,
-          created_by: s.created_by,
           starship_id: s.starship_id,
           agent_id: s.agent_id
         }))

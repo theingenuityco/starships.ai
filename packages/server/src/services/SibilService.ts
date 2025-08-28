@@ -67,10 +67,9 @@ export class SibilService {
   private static async getOrCreateChatSession(userId: string, starshipId: string): Promise<ChatSession> {
     const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
     
-    // Try to find active session for this user and starship
-    const activeSessions = await chatSessionRepo.findByUser(userId, 10);
-    const existingSession = activeSessions.find((session: ChatSession) => 
-      session.starship_id === starshipId && 
+    // Try to find active session for this starship
+    const activeSessions = await chatSessionRepo.findByStarship(starshipId, 10);
+    const existingSession = activeSessions.find((session: ChatSession) =>
       session.source === 'sibil' &&
       this.isSessionActive(session)
     );
@@ -84,7 +83,6 @@ export class SibilService {
     // Create new session
     return await chatSessionRepo.create({
       source: 'sibil',
-      created_by: userId,
       starship_id: starshipId
     });
   }

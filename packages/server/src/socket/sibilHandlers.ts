@@ -90,10 +90,9 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
   const getOrCreateChatSession = async (userId: string, starshipId: string): Promise<any> => {
     const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
     
-    // Try to find active session
-    const activeSessions = await chatSessionRepo.findByUser(userId, 10);
+    // Try to find active session for this starship
+    const activeSessions = await chatSessionRepo.findByStarship(starshipId, 10);
     const existingSession = activeSessions.find((session: any) =>
-      session.starship_id === starshipId &&
       session.source === 'sibil' &&
       isSessionActive(session)
     );
@@ -106,7 +105,6 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
     // Create new session
     return await chatSessionRepo.create({
       source: 'sibil',
-      created_by: userId,
       starship_id: starshipId
     });
   };

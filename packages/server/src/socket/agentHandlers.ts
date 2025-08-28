@@ -24,12 +24,11 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
       return null;
     }
     
-    // Try to find active session for this agent/user/starship combination
-    const activeSessions = await chatSessionRepo.findByUser(userId, 10);
+    // Try to find active session for this agent/starship combination
+    const activeSessions = await chatSessionRepo.findByStarship(agent.starshipId, 10);
     const existingSession = activeSessions.find((session: any) =>
       session.agent_id === agentId &&
       session.source === 'agent' &&
-      session.starship_id === agent.starshipId &&
       isSessionActive(session)
     );
     
@@ -43,7 +42,6 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
     // Create new session with proper starship relationship
     return await chatSessionRepo.create({
       source: 'agent',
-      created_by: userId,
       agent_id: agentId,
       starship_id: agent.starshipId  // Required - no undefined check
     });

@@ -234,15 +234,7 @@ router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Res
       return;
     }
 
-    // Check if user has access to this session
-    if (session.created_by !== userId) {
-      res.status(403).json({
-        success: false,
-        error: 'Access denied to this chat session',
-        code: 'ACCESS_DENIED'
-      });
-      return;
-    }
+    // Note: Removed user-based access control as sessions are no longer tied to specific users
 
     // Fetch messages for the session
     const messages = await chatMessageRepository.findBySession(sessionId, limit, offset);
@@ -334,7 +326,6 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
     const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
     const sessions = await chatSessionRepository.findByStarship(
       starshipId,
-      undefined, // No user filtering - get all sessions for this starship
       limit
     );
 
@@ -343,7 +334,6 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
       sessions: sessions.map(s => ({
         id: s.id,
         source: s.source,
-        created_by: s.created_by,
         starship_id: s.starship_id
       }))
     });

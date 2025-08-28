@@ -165,7 +165,6 @@ export interface ChatStreamResponse {
 export interface ChatSession {
   id: string;
   source: ChatSourceType;
-  created_by: string;
   created_at: string;
   last_activity_at: string;
   total_tokens: number;

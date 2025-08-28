@@ -8,6 +8,21 @@ export async function GET(request: NextRequest, { params }: { params: { kindeAut
   // Get the response from the default handler
   const response = await authHandler(request, { params });
   
+  // Check if this is a callback (has auth cookies being set)
+  const isCallback = params.kindeAuth === 'kinde_callback';
+  
+  if (isCallback) {
+    // For callbacks, add a flag to force client refresh
+    const modifiedResponse = new Response(response.body, response);
+    
+    // Add a temporary cookie to signal client needs refresh
+    modifiedResponse.headers.append('set-cookie', 
+      `kinde_auth_completed=true; Max-Age=10; Path=/; ${process.env.NODE_ENV === 'production' ? 'Secure;' : ''} SameSite=Lax`
+    );
+    
+    return modifiedResponse;
+  }
+  
   // Only modify cookies for actual HTTP deployments (not HTTPS)
   // dev.starships.ai uses HTTPS, so it doesn't need modifications
   if (process.env.NODE_ENV === 'production' && 

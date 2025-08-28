@@ -46,11 +46,16 @@ export function useAuth() {
           console.log('[AUTH] Server auth check:', data)
           
           if (data.authenticated && !isAuthenticated) {
-            console.log('[AUTH] Server authenticated but client not - forcing refresh')
-            // Force a re-render to sync client state
-            setForceRefresh(prev => prev + 1)
-            // Also try to reload the auth state by triggering a setup call
-            await fetch('/api/auth/setup')
+            console.log('[AUTH] Server authenticated but client not - checking for refresh flag')
+            
+            // Check if we need to force a page reload
+            const refreshResponse = await fetch('/api/auth/refresh')
+            const refreshData = await refreshResponse.json()
+            
+            if (refreshData.needsClientRefresh) {
+              console.log('[AUTH] Setting refresh flag and reloading page')
+              // The refresh endpoint sets a cookie, page will reload when detected
+            }
           }
         } catch (error) {
           console.error('[AUTH] Server auth check failed:', error)

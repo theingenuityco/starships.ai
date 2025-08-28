@@ -8,6 +8,27 @@ import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { toast } from 'sonner';
 
 export default function ShipsPage() {
+  // Check if we need to force reload after auth
+  useEffect(() => {
+    // Check for auth completion flag
+    const checkAuthCompletion = () => {
+      if (document.cookie.includes('kinde_auth_completed=true') || 
+          document.cookie.includes('kinde_needs_refresh=true')) {
+        console.log('[Fleet] Auth completed, forcing page reload to sync state');
+        // Clear the flag cookies
+        document.cookie = 'kinde_auth_completed=; Max-Age=0; Path=/';
+        document.cookie = 'kinde_needs_refresh=; Max-Age=0; Path=/';
+        // Force reload to reinitialize Kinde SDK with new auth state
+        window.location.reload();
+      }
+    };
+    
+    // Check immediately and after a short delay
+    checkAuthCompletion();
+    const timer = setTimeout(checkAuthCompletion, 500);
+    
+    return () => clearTimeout(timer);
+  }, []);
   const searchParams = useSearchParams();
   const { restoreSession, updateStep, clearSession } = useOnboardingSession();
   const [shouldOpenCreate, setShouldOpenCreate] = useState(false);

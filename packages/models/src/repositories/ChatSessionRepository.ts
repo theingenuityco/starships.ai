@@ -85,6 +85,38 @@ export class ChatSessionRepository extends BaseRepository {
   }
 
   /**
+   * Find sessions by starship ID
+   */
+  async findByStarship(starshipId: string, userId?: string, limit: number = 50): Promise<ChatSession[]> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired({ starshipId }, ['starshipId'], 'findByStarship');
+
+      const connection = getConnection();
+      
+      // Build query with optional user filter
+      const userFilter = userId ? 'AND s.created_by = $userId' : '';
+      const params: any = { starshipId, limit };
+      if (userId) params.userId = userId;
+
+      const result = await connection.executeQuery<{ s: any, st: any, a: any }>(
+        `MATCH (s:ChatSession)-[:BELONGS_TO]->(st:Starship {id: $starshipId})
+         WHERE 1=1 ${userFilter}
+         OPTIONAL MATCH (s)-[:USES_AGENT]->(a:Agent)
+         RETURN s, st, a
+         ORDER BY s.last_activity_at DESC
+         LIMIT $limit`,
+        params
+      );
+
+      return result.map(record => ({
+        ...record.s,
+        starship_id: starshipId,
+        agent_id: record.a?.id
+      } as ChatSession));
+    }, 'findByStarship', 'ChatSession');
+  }
+
+  /**
    * Update last activity and token count
    */
   async updateActivity(sessionId: string, tokensUsed: number = 0): Promise<boolean> {

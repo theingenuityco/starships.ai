@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 import getStore from '../store';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
+import { RepositoryFactory } from '@starships/models';
 
 const router: Router = Router();
 
@@ -76,6 +77,31 @@ router.delete('/:sessionKey/memory', authMiddleware, async (req, res) => {
     res.json({ message: 'Memory cleared successfully' });
   } catch (err) {
     console.error('Memory clear error:', err);
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// GET endpoint for fetching chat sessions by starship
+router.get('/sessions/starship/:starshipId', authMiddleware, async (req, res) => {
+  try {
+    const { starshipId } = req.params;
+    const { limit } = req.query;
+
+    if (!starshipId) {
+      res.status(400).json({ error: 'starshipId is required' });
+      return;
+    }
+
+    const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
+    const sessions = await chatSessionRepository.findByStarship(
+      starshipId,
+      req.user!.id, // Only get sessions for the authenticated user
+      limit ? parseInt(limit as string) : 50
+    );
+
+    res.json({ sessions });
+  } catch (err) {
+    console.error('Chat sessions fetch error:', err);
     res.status(500).json({ error: (err as Error).message });
   }
 });

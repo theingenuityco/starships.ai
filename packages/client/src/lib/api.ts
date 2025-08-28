@@ -68,7 +68,8 @@ api.interceptors.request.use(
     const requiresAuth =
       config.url?.includes('/api/starships') ||
       config.url?.includes('/api/agents') ||
-      config.url?.includes('/api/users')
+      config.url?.includes('/api/users') ||
+      config.url?.includes('/api/chat')
 
     if (requiresAuth) {
       console.log('[API] Authenticated endpoint detected, waiting for token provider...')
@@ -184,14 +185,15 @@ import {
   StarshipListResponse,
   StarshipDetailsResponse,
   CreateStarshipRequest,
+  ChatSession,
 } from '@starships/protocol'
 
 // Re-export types for use in other client components
-export type { 
-  Agent, 
-  AgentConfig, 
-  CreateAgentRequest, 
-  UpdateAgentRequest, 
+export type {
+  Agent,
+  AgentConfig,
+  CreateAgentRequest,
+  UpdateAgentRequest,
   AgentTemplate,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
@@ -199,7 +201,8 @@ export type {
   StarshipAgentsResponse,
   StarshipListResponse,
   StarshipDetailsResponse,
-  CreateStarshipRequest
+  CreateStarshipRequest,
+  ChatSession
 }
 
 // MCP Server Option interface (matching backend model)
@@ -550,6 +553,12 @@ export const chatAPI = {
       sessionId: request.sessionId || `agent-${request.agentId}`,
     }
   },
+
+  // Get chat sessions by starship ID
+  getSessionsByStarship: (starshipId: string): Promise<{ sessions: ChatSession[] }> =>
+    api
+      .get(`/api/chat/sessions/starship/${starshipId}`)
+      .then((res: AxiosResponse<{ sessions: ChatSession[] }>) => res.data),
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>

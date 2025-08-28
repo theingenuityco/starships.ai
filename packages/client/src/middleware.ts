@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 
 // Paths that don't require any validation (neither auth nor waitlist)
 const publicPaths = [
@@ -21,11 +20,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check if user is authenticated with Kinde
-  const { isAuthenticated } = getKindeServerSession();
-  const isUserAuthenticated = await isAuthenticated();
-  
-  console.log('[Middleware] Path:', pathname, 'Authenticated:', isUserAuthenticated);
+  // Dynamically import Kinde to check authentication
+  // This avoids build-time env validation
+  let isUserAuthenticated = false;
+  try {
+    const { getKindeServerSession } = await import("@kinde-oss/kinde-auth-nextjs/server");
+    const { isAuthenticated } = getKindeServerSession();
+    isUserAuthenticated = await isAuthenticated();
+  } catch (error) {
+    // If Kinde is not configured, treat as unauthenticated
+    console.error('Kinde auth check failed:', error);
+  }
 
   // If authenticated, allow access to all routes (bypass waitlist)
   if (isUserAuthenticated) {

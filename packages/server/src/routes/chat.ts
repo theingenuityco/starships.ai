@@ -291,7 +291,16 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
     const { starshipId } = req.params;
     const userId = req.user?.id;
 
+    console.log('🚀 [CHAT ROUTE] GET sessions/starship endpoint called:', {
+      starshipId,
+      userId,
+      userObject: req.user,
+      headers: req.headers.authorization ? 'Bearer token present' : 'No auth header',
+      timestamp: new Date().toISOString()
+    });
+
     if (!userId) {
+      console.error('🚀 [CHAT ROUTE] User not authenticated - missing userId');
       res.status(401).json({
         success: false,
         error: 'User not authenticated',
@@ -302,6 +311,7 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
 
     // Validate starshipId format (consistent with other routes)
     validateUUID(starshipId, 'starshipId');
+    console.log('🚀 [CHAT ROUTE] StarshipId validation passed:', starshipId);
 
     // Parse limit parameter (consistent with agents route pattern)
     const limit = Math.floor(parseInt(req.query.limit as string) || 50);
@@ -316,12 +326,27 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
       return;
     }
 
+    console.log('🚀 [CHAT ROUTE] Calling repository with params:', {
+      starshipId,
+      limit
+    });
+
     const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
     const sessions = await chatSessionRepository.findByStarship(
       starshipId,
-      userId, // Only get sessions for the authenticated user
+      undefined, // No user filtering - get all sessions for this starship
       limit
     );
+
+    console.log('🚀 [CHAT ROUTE] Repository returned:', {
+      sessionsCount: sessions.length,
+      sessions: sessions.map(s => ({
+        id: s.id,
+        source: s.source,
+        created_by: s.created_by,
+        starship_id: s.starship_id
+      }))
+    });
 
     res.json({
       sessions

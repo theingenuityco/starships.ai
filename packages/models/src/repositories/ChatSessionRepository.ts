@@ -106,29 +106,22 @@ export class ChatSessionRepository extends BaseRepository {
   }
 
   /**
-   * Find sessions by starship ID
+   * Find sessions by starship ID (no user filtering)
    */
   async findByStarship(starshipId: string, userId?: string, limit: number = 50): Promise<ChatSession[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ starshipId }, ['starshipId'], 'findByStarship');
 
       const connection = getConnection();
-      
-      // Build query with optional user filter
-      const userFilter = userId ? 'AND s.created_by = $userId' : '';
       const params: any = { starshipId, limit: Math.floor(Number(limit)) };
-      if (userId) params.userId = userId;
 
-      console.log('🔍 [ChatSessionRepository] findByStarship query params:', {
+      console.log('🔍 [ChatSessionRepository] findByStarship query params (no user filter):', {
         starshipId,
-        userId,
         limit,
-        userFilter,
         params
       });
 
       const query = `MATCH (s:ChatSession)-[:BELONGS_TO]->(st:Starship {id: $starshipId})
-         WHERE 1=1 ${userFilter}
          OPTIONAL MATCH (s)-[:USES_AGENT]->(a:Agent)
          RETURN s, st, a
          ORDER BY s.last_activity_at DESC

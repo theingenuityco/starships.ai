@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from '../services/UserService';
+import { loadServerEnvironment } from '@starships/env-config';
 
 // Kinde JWKS endpoint for token verification
-const kindeIssuerUrl = process.env.KINDE_ISSUER_URL || 'https://starships.kinde.com';
+const env = loadServerEnvironment();
+const kindeIssuerUrl = env.KINDE_ISSUER_URL;
 const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
 
 /**
@@ -19,10 +21,10 @@ export const authMiddleware = async (
     // TESTING BACKDOOR: Only activate when explicitly enabled via environment variable
     const enableTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
     const hasKindeConfig = process.env.KINDE_CLIENT_ID && process.env.KINDE_ISSUER_URL;
-    
+
     if (enableTestingBackdoor && !hasKindeConfig) {
       console.log(`[AUTH] Testing backdoor activated for ${req.method} ${req.path}`);
-      
+
       // Create a mock user for testing
       const mockUser = {
         id: 'test-user-1',
@@ -32,12 +34,12 @@ export const authMiddleware = async (
         avatar: undefined,
         kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
-      
+
       req.user = mockUser;
       req.kindeId = 'test-user-1';
-      
+
       console.log(`[AUTH] Mock user attached: ${mockUser.id} (${mockUser.displayName})`);
       next();
       return;
@@ -76,12 +78,12 @@ export const authMiddleware = async (
         avatar: undefined,
         kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       };
-      
+
       req.user = mockUser;
       req.kindeId = 'test-user-1';
-      
+
       console.log(`[AUTH] Test token validated: ${mockUser.id} (${mockUser.displayName})`);
       next();
       return;
@@ -89,7 +91,7 @@ export const authMiddleware = async (
 
     // Verify JWT token
     let payload: any;
-    
+
     // In development, also accept tokens signed with the client secret
     if (process.env.NODE_ENV === 'development' && process.env.KINDE_CLIENT_SECRET) {
       try {
@@ -128,7 +130,9 @@ export const authMiddleware = async (
     try {
       console.log(`[AUTH] Attempting database lookup for Kinde ID: ${payload.sub}`);
       user = await UserService.getUserByKindeId(payload.sub as string);
-      console.log(`[AUTH] Database lookup completed for Kinde ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`);
+      console.log(
+        `[AUTH] Database lookup completed for Kinde ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`
+      );
     } catch (dbError: any) {
       console.error(`[AUTH] Database error when looking up user: ${payload.sub}`);
       console.error(`[AUTH] Error type: ${dbError?.constructor?.name}`);
@@ -155,12 +159,10 @@ export const authMiddleware = async (
         console.log(`[AUTH] User auto-synced: ${user.id} (${user.displayName || user.username})`);
       } catch (syncError: any) {
         console.error(`[AUTH] Failed to auto-sync user for Kinde ID: ${payload.sub}`, syncError);
-        res
-          .status(500)
-          .json({
-            error: 'Failed to sync user',
-            details: syncError?.message || 'Unknown sync error',
-          });
+        res.status(500).json({
+          error: 'Failed to sync user',
+          details: syncError?.message || 'Unknown sync error',
+        });
         return;
       }
     }
@@ -183,12 +185,10 @@ export const authMiddleware = async (
     } else if (error?.message?.includes('JWKSNoMatchingKey')) {
       res.status(401).json({ error: 'Token signature verification failed' });
     } else {
-      res
-        .status(500)
-        .json({
-          error: 'Authentication service error',
-          details: error?.message || 'Unknown auth error',
-        });
+      res.status(500).json({
+        error: 'Authentication service error',
+        details: error?.message || 'Unknown auth error',
+      });
     }
     return;
   }

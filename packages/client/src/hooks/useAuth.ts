@@ -10,59 +10,13 @@ import { userAPI, type SyncedUser, setTokenProvider } from '@/lib/api'
 export function useAuth() {
   const {
     user,
-    isAuthenticated: kindeIsAuthenticated,
+    isAuthenticated,
     isLoading: kindeLoading,
     getToken,
     getClaim,
     getAccessTokenRaw,
     accessTokenRaw,
   } = useKindeBrowserClient()
-
-  // Check if we have auth cookies as a fallback
-  const [hasCookies, setHasCookies] = useState(false)
-  
-  useEffect(() => {
-    // Check if auth cookies exist
-    const checkCookies = () => {
-      if (typeof document !== 'undefined') {
-        const cookies = document.cookie
-        const hasAccessToken = cookies.includes('access_token=')
-        const hasIdToken = cookies.includes('id_token=')
-        const hasBothCookies = hasAccessToken && hasIdToken
-        
-        // Log cookie status for debugging
-        console.log('[AUTH] Cookie check:', {
-          hasAccessToken,
-          hasIdToken,
-          hasBothCookies,
-          cookieCount: cookies.split(';').length,
-          cookies: cookies.substring(0, 100) + '...'
-        })
-        
-        setHasCookies(hasBothCookies)
-      }
-    }
-    
-    checkCookies()
-    
-    // Check periodically in case cookies change
-    const interval = setInterval(checkCookies, 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Use cookie presence as fallback for authentication state
-  const isAuthenticated = kindeIsAuthenticated || (!kindeLoading && hasCookies)
-  
-  // Debug logging
-  useEffect(() => {
-    console.log('[AUTH] Auth state:', {
-      kindeIsAuthenticated,
-      kindeLoading,
-      hasCookies,
-      isAuthenticated,
-      user
-    })
-  }, [kindeIsAuthenticated, kindeLoading, hasCookies, isAuthenticated, user])
 
   // TESTING BACKDOOR: Only activate when explicitly enabled
   const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
@@ -118,9 +72,7 @@ export function useAuth() {
       '[AUTH] Setting up token provider, isAuthenticated:',
       isAuthenticated,
       'kindeLoading:',
-      kindeLoading,
-      'hasCookies:',
-      hasCookies
+      kindeLoading
     )
 
     // Critical: Only set up token provider after loading is complete
@@ -130,17 +82,6 @@ export function useAuth() {
         if (shouldUseTestingBackdoor) {
           console.log('[AUTH] Providing test token for testing backdoor')
           return 'test-auth-token'
-        }
-        
-        // Try to get token from cookies if Kinde SDK fails
-        if (hasCookies && !kindeIsAuthenticated) {
-          const cookies = document.cookie.split(';')
-          const accessTokenCookie = cookies.find(c => c.trim().startsWith('access_token='))
-          if (accessTokenCookie) {
-            const token = accessTokenCookie.split('=')[1]
-            console.log('[AUTH] Using token from cookie')
-            return token
-          }
         }
         
         if (isAuthenticated) {
@@ -201,7 +142,7 @@ export function useAuth() {
         return null
       })
     }
-  }, [isAuthenticated, kindeLoading, hasCookies])
+  }, [isAuthenticated, kindeLoading])
 
   const isLoading = kindeLoading || syncLoading
 

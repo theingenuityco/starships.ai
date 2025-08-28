@@ -291,7 +291,11 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Use the latest image (dev build)
+          # Force a new rollout by updating with timestamp annotation
+          kubectl patch deployment starships-app -n starships-dev \
+            -p '{"spec":{"template":{"metadata":{"annotations":{"deployment.kubernetes.io/revision":"'$(date +%s)'"}}}}}'
+          
+          # Also ensure we're using the latest image
           kubectl set image deployment/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
             -n starships-dev
@@ -362,7 +366,11 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Use the new prod image
+          # Force a new rollout by updating with timestamp annotation
+          kubectl patch deployment starships-app -n starships-prod \
+            -p '{"spec":{"template":{"metadata":{"annotations":{"deployment.kubernetes.io/revision":"'$(date +%s)'"}}}}}'
+          
+          # Also ensure we're using the latest image
           kubectl set image deployment/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod-latest \
             -n starships-prod

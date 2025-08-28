@@ -182,6 +182,37 @@ jobs:
           doctl kubernetes cluster kubeconfig save starships-dev
           kubectl config use-context do-nyc1-starships-dev
 
+      - name: Update Kubernetes secrets
+        run: |
+          # Delete existing secrets if they exist
+          kubectl delete secret starships-secrets -n starships-dev --ignore-not-found=true
+          kubectl delete secret kinde-auth-secret -n starships-dev --ignore-not-found=true
+          
+          # Create new secrets from GitHub secrets
+          kubectl create secret generic starships-secrets \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD || '[NEO4J-PASSWORD]' }}" \
+            -n starships-dev
+          
+          kubectl create secret generic kinde-auth-secret \
+            --from-literal=KINDE_CLIENT_ID="${{ secrets.KINDE_CLIENT_ID }}" \
+            --from-literal=KINDE_CLIENT_SECRET="${{ secrets.KINDE_CLIENT_SECRET }}" \
+            -n starships-dev
+          
+          # Create GitHub registry secret
+          kubectl delete secret ghcr-pull-secret -n starships-dev --ignore-not-found=true
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-[DEFAULT-PASSWORD]=${{ secrets.GITHUB_TOKEN }} \
+            -n starships-dev
+          
+          echo "✅ Dev secrets updated successfully"
+
       - name: Update image in deployment
         run: |
           # Use the latest image (dev build)
@@ -221,6 +252,37 @@ jobs:
         run: |
           doctl kubernetes cluster kubeconfig save starships-prod
           kubectl config use-context do-nyc1-starships-prod
+
+      - name: Update Kubernetes secrets
+        run: |
+          # Delete existing secrets if they exist
+          kubectl delete secret starships-secrets -n starships-prod --ignore-not-found=true
+          kubectl delete secret kinde-auth-secret -n starships-prod --ignore-not-found=true
+          
+          # Create new secrets from GitHub secrets
+          kubectl create secret generic starships-secrets \
+            --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --from-literal=ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
+            --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
+            --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD || 'prod[DEFAULT-PASSWORD]123' }}" \
+            -n starships-prod
+          
+          kubectl create secret generic kinde-auth-secret \
+            --from-literal=KINDE_CLIENT_ID="${{ secrets.KINDE_CLIENT_ID }}" \
+            --from-literal=KINDE_CLIENT_SECRET="${{ secrets.KINDE_CLIENT_SECRET }}" \
+            -n starships-prod
+          
+          # Create GitHub registry secret
+          kubectl delete secret ghcr-pull-secret -n starships-prod --ignore-not-found=true
+          kubectl create secret docker-registry ghcr-pull-secret \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-[DEFAULT-PASSWORD]=${{ secrets.GITHUB_TOKEN }} \
+            -n starships-prod
+          
+          echo "✅ Prod secrets updated successfully"
 
       - name: Update image in deployment
         run: |

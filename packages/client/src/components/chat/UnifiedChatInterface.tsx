@@ -2,11 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { Bot, Users, Settings, Sparkles } from 'lucide-react'
+import { Bot, Users, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { UnifiedMessageInput } from './UnifiedMessageInput'
 import { UnifiedMessageList } from './UnifiedMessageList'
 import { ChatModeSelector } from './ChatModeSelector'
@@ -15,7 +13,6 @@ import { ProviderSelector } from './ProviderSelector'
 import type { Agent } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 import type { SibilMessage } from '@/lib/sibil-api'
-import type { ChatSourceType } from '@starships/protocol'
 
 export type ChatMode = 'agent' | 'sibil'
 
@@ -24,12 +21,12 @@ interface UnifiedChatInterfaceProps {
   starshipId?: string
 }
 
-export function UnifiedChatInterface({ 
+export function UnifiedChatInterface({
   defaultMode = 'sibil',
-  starshipId 
+  starshipId
 }: UnifiedChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
-  const { isConnected, connectionStatus } = useSocketConnection()
+  const { isConnected } = useSocketConnection()
   
   // Chat mode state
   const [chatMode, setChatMode] = useState<ChatMode>(defaultMode)
@@ -38,8 +35,7 @@ export function UnifiedChatInterface({
   const [model, setModel] = useState<string>('gpt-4')
   
   // UI state
-  const [showSettings, setShowSettings] = useState(false)
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [hasMessages, setHasMessages] = useState(false)
   const [refreshMessages, setRefreshMessages] = useState(0)
   
   const sessionId = useRef<string | null>(null)
@@ -47,14 +43,14 @@ export function UnifiedChatInterface({
   // Initialize session
   useEffect(() => {
     if (userId && isAuthenticated) {
-      setIsInitialized(true)
+      // Component is ready
     }
   }, [userId, isAuthenticated])
 
   // Show loading state
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-gradient-to-br from-background via-background/95 to-muted/10">
+      <div className="flex flex-col h-screen items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -72,7 +68,7 @@ export function UnifiedChatInterface({
   // Show auth required state
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-gradient-to-br from-background via-background/95 to-muted/10">
+      <div className="flex flex-col h-screen items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -87,224 +83,227 @@ export function UnifiedChatInterface({
     )
   }
 
+  // Handle first message to trigger layout transition
+  const handleFirstMessage = (message: Message | SibilMessage) => {
+    setHasMessages(true)
+    setRefreshMessages(prev => prev + 1)
+  }
+
+  // Handle suggestion click
+  const handleSuggestionClick = (suggestion: string) => {
+    // TODO: Implement sending suggestion as message
+    console.log('Suggestion clicked:', suggestion)
+  }
+
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-background via-background/95 to-muted/10">
-      {/* Header */}
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex-shrink-0 border-b border-border/40 bg-card/50 backdrop-blur-sm"
-      >
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            {/* Logo and Title */}
-            <div className="flex items-center gap-4">
-              <motion.div 
-                className="relative"
-                whileHover={{ scale: 1.05 }}
-              >
-                <div className="absolute inset-0 bg-primary/10 blur-sm rounded-xl" />
-                <div className="relative bg-gradient-to-br from-primary/15 to-primary/5 p-3 rounded-xl border border-primary/20">
-                  {chatMode === 'agent' ? (
-                    <Users className="h-6 w-6 text-primary" />
-                  ) : (
-                    <Bot className="h-6 w-6 text-primary" />
-                  )}
-                </div>
-              </motion.div>
-              
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                  Chat
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {chatMode === 'agent' ? 'Agent Assistant' : 'AI Assistant'}
-                </p>
-              </div>
-            </div>
-
-            {/* Connection Status & Settings */}
-            <div className="flex items-center gap-3">
-              {/* Connection Status */}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <div className={`w-2 h-2 rounded-full ${
-                  connectionStatus === 'connected' ? 'bg-green-500' :
-                  connectionStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
-                  'bg-red-500'
-                }`} />
-                {connectionStatus === 'connected' ? 'Connected' :
-                 connectionStatus === 'reconnecting' ? 'Reconnecting...' :
-                 'Disconnected'}
-              </div>
-
-              {/* Settings Toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowSettings(!showSettings)}
-                className="h-9 w-9"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Mode Selector and Controls */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mt-4 flex items-center justify-between"
+    <div className="flex flex-col h-screen bg-background">
+      {/* Messages Area - Only shown when there are messages */}
+      <AnimatePresence>
+        {hasMessages && sessionId.current && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            transition={{ duration: 0.4, ease: 'easeInOut' }}
+            className="flex-1 min-h-0 overflow-hidden"
           >
-            <ChatModeSelector
+            <UnifiedMessageList
               mode={chatMode}
-              onModeChange={setChatMode}
-              disabled={!isConnected}
+              sessionId={sessionId.current}
+              starshipId={starshipId}
+              key={`${chatMode}-${sessionId.current}-${refreshMessages}`}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      {/* Main Content Area */}
+      <div className="relative flex-1 flex flex-col">
+        {/* Centered Content Container */}
+        <motion.div
+          className="flex-1 flex flex-col"
+          animate={{
+            justifyContent: hasMessages ? 'flex-end' : 'center',
+            alignItems: 'center'
+          }}
+          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+        >
+          <motion.div
+            className="w-full max-w-2xl mx-auto px-6"
+            animate={{
+              paddingBottom: hasMessages ? '2rem' : '0'
+            }}
+            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
+          >
+            {/* Welcome Section - Only shown when no messages */}
             <AnimatePresence>
-              {showSettings && (
+              {!hasMessages && (
                 <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="flex items-center gap-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }}
+                  className="text-center mb-8"
                 >
+                  <motion.h1
+                    className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                  >
+                    {chatMode === 'agent' ? 'Meet Agent Mode' : 'Meet AI Mode'}
+                  </motion.h1>
+                  <motion.p
+                    className="text-muted-foreground text-lg font-light"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    {chatMode === 'agent'
+                      ? 'Connect with specialized agents for focused assistance'
+                      : 'Ask detailed questions for better responses'
+                    }
+                  </motion.p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Main Input Section with Footer Selectors */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                delay: hasMessages ? 0 : 0.35,
+                duration: 0.5,
+                ease: [0.4, 0, 0.2, 1]
+              }}
+              className="relative"
+            >
+              <UnifiedMessageInput
+                mode={chatMode}
+                selectedAgent={selectedAgent}
+                provider={provider}
+                model={model}
+                starshipId={starshipId}
+                onSessionStart={(id: string) => {
+                  sessionId.current = id
+                }}
+                onMessageSent={handleFirstMessage}
+                onMessageReceived={(message: Message | SibilMessage) => {
+                  setRefreshMessages(prev => prev + 1)
+                }}
+                disabled={!isConnected || (chatMode === 'agent' && !selectedAgent)}
+                minimal={hasMessages}
+              >
+                {/* Footer Content - Selectors */}
+                <ChatModeSelector
+                  mode={chatMode}
+                  onModeChange={setChatMode}
+                  disabled={!isConnected}
+                  compact={true}
+                />
+                
+                <AnimatePresence mode="wait">
                   {chatMode === 'agent' ? (
-                    <AgentSelector
-                      selectedAgent={selectedAgent}
-                      onAgentChange={setSelectedAgent}
-                      starshipId={starshipId}
-                    />
+                    <motion.div
+                      key="agent-selector"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <AgentSelector
+                        selectedAgent={selectedAgent}
+                        onAgentChange={setSelectedAgent}
+                        starshipId={starshipId}
+                        compact={true}
+                      />
+                    </motion.div>
                   ) : (
-                    <ProviderSelector
-                      provider={provider}
-                      model={model}
-                      onProviderChange={setProvider}
-                      onModelChange={setModel}
-                    />
+                    <motion.div
+                      key="provider-selector"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ProviderSelector
+                        provider={provider}
+                        model={model}
+                        onProviderChange={setProvider}
+                        onModelChange={setModel}
+                        compact={true}
+                      />
+                    </motion.div>
                   )}
+                </AnimatePresence>
+              </UnifiedMessageInput>
+            </motion.div>
+
+            {/* Suggestions - Only shown when no messages */}
+            <AnimatePresence>
+              {!hasMessages && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
+                  transition={{ delay: 0.45, duration: 0.4 }}
+                  className="mt-8 space-y-3"
+                >
+                  {(chatMode === 'agent' ? AGENT_SUGGESTIONS : SIBIL_SUGGESTIONS).map((suggestion, index) => (
+                    <motion.button
+                      key={suggestion}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ 
+                        delay: 0.5 + (index * 0.1),
+                        duration: 0.3
+                      }}
+                      whileHover={{ 
+                        scale: 1.01,
+                        backgroundColor: 'hsl(var(--muted) / 0.6)'
+                      }}
+                      whileTap={{ scale: 0.99 }}
+                      className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                        <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                      </div>
+                      <span className="flex-1">{suggestion}</span>
+                    </motion.button>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
-        </div>
-      </motion.div>
-
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Welcome Message */}
-        <AnimatePresence>
-          {!sessionId.current && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex-shrink-0 max-w-4xl mx-auto px-6 py-8"
-            >
-              <div className="text-center space-y-4">
-                <motion.h2 
-                  className="text-3xl font-bold text-foreground"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
-                >
-                  {chatMode === 'agent' ? 'Meet Your Agent' : 'Meet AI Mode'}
-                </motion.h2>
-                <motion.p 
-                  className="text-muted-foreground text-lg max-w-2xl mx-auto"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  {chatMode === 'agent' 
-                    ? 'Connect with specialized AI agents to boost your productivity and creativity'
-                    : 'Ask detailed questions for better responses'
-                  }
-                </motion.p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Messages */}
-        <div className="flex-1 min-h-0">
-          <UnifiedMessageList
-            mode={chatMode}
-            sessionId={sessionId.current}
-            starshipId={starshipId}
-            key={`${chatMode}-${sessionId.current}-${refreshMessages}`}
-          />
-        </div>
-
-        {/* Input Area */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex-shrink-0 max-w-4xl mx-auto w-full px-6 py-6"
-        >
-          <UnifiedMessageInput
-            mode={chatMode}
-            selectedAgent={selectedAgent}
-            provider={provider}
-            model={model}
-            starshipId={starshipId}
-            onSessionStart={(id: string) => {
-              sessionId.current = id
-              setRefreshMessages(prev => prev + 1) // Refresh message list
-            }}
-            onMessageSent={(message: Message | SibilMessage) => {
-              // Trigger refresh to show user message immediately
-              setRefreshMessages(prev => prev + 1)
-            }}
-            onMessageReceived={(message: Message | SibilMessage) => {
-              // Trigger refresh to show assistant message
-              setRefreshMessages(prev => prev + 1)
-            }}
-            disabled={!isConnected || (chatMode === 'agent' && !selectedAgent)}
-          />
-          
-          {/* Quick Suggestions */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-4 flex flex-wrap gap-2 justify-center"
-          >
-            {(chatMode === 'agent' ? AGENT_SUGGESTIONS : SIBIL_SUGGESTIONS).map((suggestion, index) => (
-              <motion.button
-                key={suggestion}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1 * index }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="px-3 py-1.5 text-sm text-muted-foreground bg-muted/50 hover:bg-muted/80 rounded-full border border-border/40 transition-colors"
-                onClick={() => {
-                  // TODO: Implement suggestion click
-                }}
-              >
-                {suggestion}
-              </motion.button>
-            ))}
-          </motion.div>
         </motion.div>
       </div>
+
+      {/* Connection Status Indicator */}
+      <AnimatePresence>
+        {!isConnected && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-4 right-4 px-3 py-2 bg-yellow-500/10 text-yellow-600 text-xs rounded-lg border border-yellow-500/20"
+          >
+            Reconnecting...
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
 
-// Quick suggestion examples
+// Suggestion examples
 const AGENT_SUGGESTIONS = [
-  "Help me plan my project",
-  "Analyze this data",
-  "Write code for me",
-  "Research this topic"
+  "Help me plan a project timeline with milestones",
+  "Analyze this data set and find patterns",  
+  "Write code for a responsive navigation component"
 ]
 
 const SIBIL_SUGGESTIONS = [
   "Help me pack for my trip to Jaipur next week",
-  "Compare leather sofas vs fabric sofas", 
-  "How to identify if the pashmina shawl I am buying is genuine?",
-  "What are the best productivity apps?"
+  "Compare leather sofas vs fabric sofas",
+  "How to identify if the pashmina shawl I am buying is genuine?"
 ]

@@ -25,6 +25,8 @@ interface UnifiedMessageInputProps {
   onMessageSent?: (message: Message | SibilMessage) => void
   onMessageReceived?: (message: Message | SibilMessage) => void
   disabled?: boolean
+  minimal?: boolean
+  children?: React.ReactNode // For footer content
 }
 
 export function UnifiedMessageInput({
@@ -36,7 +38,9 @@ export function UnifiedMessageInput({
   onSessionStart,
   onMessageSent,
   onMessageReceived,
-  disabled = false
+  disabled = false,
+  minimal = false,
+  children
 }: UnifiedMessageInputProps) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -153,7 +157,7 @@ export function UnifiedMessageInput({
     // Auto-resize textarea
     const textarea = e.target
     textarea.style.height = 'auto'
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
+    textarea.style.height = `${Math.min(textarea.scrollHeight, minimal ? 80 : 120)}px`
   }
 
   const handleVoiceToggle = () => {
@@ -167,7 +171,7 @@ export function UnifiedMessageInput({
         ? `Ask ${selectedAgent.name}...` 
         : 'Select an agent to start chatting'
     }
-    return 'Ask anything...'
+    return minimal ? 'Ask anything...' : 'Ask anything...'
   }
 
   const canSend = message.trim() && !disabled && !sending && 
@@ -176,98 +180,128 @@ export function UnifiedMessageInput({
   return (
     <motion.div 
       className="relative"
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: minimal ? 10 : 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
       {/* Input Container */}
       <div className={cn(
-        "relative flex items-end gap-3 p-4 rounded-2xl border border-border/40 transition-all",
-        "bg-card/50 backdrop-blur-sm shadow-lg",
-        "focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40",
+        "relative transition-all",
+        minimal 
+          ? "rounded-xl border border-border/30" 
+          : "rounded-2xl border border-border/40",
+        "bg-card/50 backdrop-blur-sm",
+        minimal 
+          ? "shadow-sm focus-within:ring-1 focus-within:ring-primary/15" 
+          : "shadow-lg focus-within:ring-2 focus-within:ring-primary/20",
+        "focus-within:border-primary/40",
         disabled && "opacity-50"
       )}>
-        {/* File Attachment */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full shrink-0 text-muted-foreground hover:text-foreground"
-          disabled={disabled}
-        >
-          <Paperclip className="h-5 w-5" />
-        </Button>
-
-        {/* Text Input */}
-        <div className="flex-1 min-w-0">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={handleTextareaChange}
-            onKeyPress={handleKeyPress}
-            placeholder={getPlaceholder()}
-            disabled={disabled || sending}
-            className={cn(
-              "w-full min-h-[24px] max-h-[120px] bg-transparent resize-none",
-              "text-foreground placeholder-muted-foreground",
-              "border-0 outline-none focus:ring-0",
-              "scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent"
-            )}
-            rows={1}
-          />
+        
+        {/* Main Input Section - Only Text Input */}
+        <div className={cn(
+          "flex items-end",
+          minimal ? "p-3" : "p-4"
+        )}>
+          {/* Text Input */}
+          <div className="flex-1 min-w-0">
+            <textarea
+              ref={textareaRef}
+              value={message}
+              onChange={handleTextareaChange}
+              onKeyPress={handleKeyPress}
+              placeholder={getPlaceholder()}
+              disabled={disabled || sending}
+              className={cn(
+                "w-full bg-transparent resize-none",
+                minimal ? "min-h-[20px] max-h-[80px]" : "min-h-[24px] max-h-[120px]",
+                "text-foreground placeholder-muted-foreground",
+                "border-0 outline-none focus:ring-0",
+                "scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
+                minimal && "text-sm"
+              )}
+              rows={1}
+            />
+          </div>
         </div>
 
-        {/* Voice Recording */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleVoiceToggle}
-          className={cn(
-            "h-10 w-10 rounded-full shrink-0 transition-colors",
-            isRecording 
-              ? "text-red-500 hover:text-red-600 bg-red-500/10" 
-              : "text-muted-foreground hover:text-foreground"
-          )}
-          disabled={disabled}
-        >
-          {isRecording ? (
-            <StopCircle className="h-5 w-5" />
-          ) : (
-            <Mic className="h-5 w-5" />
-          )}
-        </Button>
+        {/* Footer Section - Selectors and Action Buttons */}
+        {!minimal && (
+          <div className="border-t border-border/20 bg-muted/10 px-4 py-3">
+            <div className="flex items-center justify-between">
+              {/* Left Side - Selectors */}
+              <div className="flex items-center gap-3">
+                {children}
+              </div>
+              
+              {/* Right Side - Action Buttons */}
+              <div className="flex items-center gap-2">
+                {/* File Attachment */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground"
+                  disabled={disabled}
+                >
+                  <Paperclip className="h-4 w-4" />
+                </Button>
 
-        {/* Send Button */}
-        <motion.div
-          animate={{
-            scale: canSend ? 1 : 0.8,
-            opacity: canSend ? 1 : 0.5
-          }}
-        >
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSend}
-            size="icon"
-            className={cn(
-              "h-10 w-10 rounded-full shrink-0 transition-all",
-              canSend
-                ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl"
-                : "bg-muted text-muted-foreground cursor-not-allowed"
-            )}
-          >
-            {sending ? (
-              <motion.div
-                className="h-5 w-5 border-2 border-current border-t-transparent rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
-          </Button>
-        </motion.div>
+                {/* Voice Recording */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleVoiceToggle}
+                  className={cn(
+                    "h-8 w-8 rounded-full shrink-0 transition-colors",
+                    isRecording 
+                      ? "text-red-500 hover:text-red-600 bg-red-500/10" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  disabled={disabled}
+                >
+                  {isRecording ? (
+                    <StopCircle className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </Button>
+
+                {/* Send Button */}
+                <motion.div
+                  animate={{
+                    scale: canSend ? 1 : 0.8,
+                    opacity: canSend ? 1 : 0.5
+                  }}
+                >
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!canSend}
+                    size="icon"
+                    className={cn(
+                      "h-8 w-8 rounded-full shrink-0 transition-all",
+                      canSend
+                        ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl"
+                        : "bg-muted text-muted-foreground cursor-not-allowed"
+                    )}
+                  >
+                    {sending ? (
+                      <motion.div
+                        className="h-4 w-4 border-2 border-current border-t-transparent rounded-full"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Mode Indicator */}
-      {mode === 'agent' && selectedAgent && (
+      {/* Mode Indicator - Only show in non-minimal mode */}
+      {!minimal && mode === 'agent' && selectedAgent && (
         <div className="absolute -top-3 left-4 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">
           Chatting with {selectedAgent.name}
         </div>

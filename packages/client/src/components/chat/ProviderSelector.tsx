@@ -18,6 +18,7 @@ interface ProviderSelectorProps {
   model: string
   onProviderChange: (provider: 'openai' | 'anthropic') => void
   onModelChange: (model: string) => void
+  compact?: boolean
 }
 
 const PROVIDERS = {
@@ -40,7 +41,7 @@ const PROVIDERS = {
   }
 } as const
 
-export function ProviderSelector({ provider, model, onProviderChange, onModelChange }: ProviderSelectorProps) {
+export function ProviderSelector({ provider, model, onProviderChange, onModelChange, compact = false }: ProviderSelectorProps) {
   const [open, setOpen] = useState(false)
   const currentProvider = PROVIDERS[provider]
   const currentModel = currentProvider.models.find(m => m.id === model) || currentProvider.models[0]
@@ -55,24 +56,43 @@ export function ProviderSelector({ provider, model, onProviderChange, onModelCha
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2 min-w-[220px] justify-between">
+        <Button 
+          variant="outline" 
+          className={cn(
+            "gap-2 justify-between",
+            compact ? "h-8 px-3 text-xs min-w-[160px]" : "min-w-[220px]"
+          )}
+        >
           <div className="flex items-center gap-2">
-            <Icon className="w-4 h-4" />
-            <span className="truncate">{currentProvider.name}</span>
-            <Badge variant="secondary" className="text-xs">
-              {currentModel.name}
+            <Icon className={compact ? "w-3 h-3" : "w-4 h-4"} />
+            <span className="truncate">
+              {compact ? currentProvider.name.slice(0, 8) : currentProvider.name}
+            </span>
+            <Badge 
+              variant="secondary" 
+              className={cn(
+                compact ? "text-[10px] px-1 py-0 h-4" : "text-xs"
+              )}
+            >
+              {compact ? currentModel.name.slice(0, 10) : currentModel.name}
             </Badge>
           </div>
-          <ChevronDown className="w-4 h-4 opacity-50" />
+          <ChevronDown className={cn(compact ? "w-3 h-3" : "w-4 h-4", "opacity-50")} />
         </Button>
       </DropdownMenuTrigger>
       
-      <DropdownMenuContent align="end" className="min-w-[280px]">
+      <DropdownMenuContent 
+        align="end" 
+        className={cn(compact ? "min-w-[250px]" : "min-w-[280px]")}
+      >
         {Object.entries(PROVIDERS).map(([providerId, providerInfo]) => (
           <div key={providerId}>
-            <div className="px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/50">
+            <div className={cn(
+              "px-3 py-2 text-sm font-medium text-muted-foreground bg-muted/50",
+              compact && "py-1"
+            )}>
               <div className="flex items-center gap-2">
-                <providerInfo.icon className="w-4 h-4" />
+                <providerInfo.icon className={compact ? "w-3 h-3" : "w-4 h-4"} />
                 {providerInfo.name}
               </div>
             </div>
@@ -81,16 +101,27 @@ export function ProviderSelector({ provider, model, onProviderChange, onModelCha
               <DropdownMenuItem
                 key={modelOption.id}
                 onClick={() => handleProviderModelChange(providerId as 'openai' | 'anthropic', modelOption.id)}
-                className="flex items-start gap-3 p-3 cursor-pointer"
+                className={cn(
+                  "flex items-start gap-3 cursor-pointer",
+                  compact ? "p-2" : "p-3"
+                )}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{modelOption.name}</span>
+                    <span className={cn(
+                      "font-medium",
+                      compact && "text-sm"
+                    )}>
+                      {modelOption.name}
+                    </span>
                     {provider === providerId && model === modelOption.id && (
-                      <Check className="w-4 h-4 text-primary" />
+                      <Check className={cn(compact ? "w-3 h-3" : "w-4 h-4", "text-primary")} />
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className={cn(
+                    "text-muted-foreground",
+                    compact ? "text-xs" : "text-sm"
+                  )}>
                     {modelOption.description}
                   </p>
                 </div>

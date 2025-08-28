@@ -85,6 +85,8 @@ spec:
           value: "neo4j/mcppassword"
         
         # Kinde OAuth
+        - name: KINDE_ISSUER_URL
+          value: "https://starshipsai.kinde.com"
         - name: KINDE_SITE_URL
           value: "https://dev.starships.ai"
         - name: KINDE_POST_LOGIN_REDIRECT_URL

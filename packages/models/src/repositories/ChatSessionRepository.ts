@@ -77,7 +77,7 @@ export class ChatSessionRepository extends BaseRepository {
          RETURN s
          ORDER BY s.last_activity_at DESC
          LIMIT $limit`,
-        { userId, limit }
+        { userId, limit: Math.floor(Number(limit)) }
       );
 
       return result.map(record => record.s as ChatSession);
@@ -95,7 +95,7 @@ export class ChatSessionRepository extends BaseRepository {
       
       // Build query with optional user filter
       const userFilter = userId ? 'AND s.created_by = $userId' : '';
-      const params: any = { starshipId, limit };
+      const params: any = { starshipId, limit: Math.floor(Number(limit)) };
       if (userId) params.userId = userId;
 
       const result = await connection.executeQuery<{ s: any, st: any, a: any }>(

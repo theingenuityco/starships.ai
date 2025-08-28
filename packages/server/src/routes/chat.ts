@@ -5,42 +5,83 @@ import type { Request, Response } from 'express';
 import getStore from '../store';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
-import { RepositoryFactory } from '@starships/models';
+import { RepositoryFactory, ValidationError, NotFoundError } from '@starships/models';
 
 const router: Router = Router();
 
-// Validation middleware for chat requests
-const validateChatRequest = (req: Request, res: Response, next: any) => {
-  const { agent_id, message } = req.body;
-
-  if (!agent_id || typeof agent_id !== 'string') {
-    res.status(400).json({ error: 'agent_id is required and must be a string' });
-    return;
+/**
+ * UUID validation helper (consistent with other routes)
+ */
+const validateUUID = (id: string, fieldName: string): void => {
+  if (!id || typeof id !== 'string') {
+    throw new ValidationError(
+      `${fieldName} is required and must be a string`,
+      fieldName
+    );
   }
 
-  if (!message || typeof message !== 'string') {
-    res.status(400).json({ error: 'message is required and must be a string' });
-    return;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    throw new ValidationError(
+      `${fieldName} must be a valid UUID format`,
+      fieldName
+    );
   }
-
-  // Note: user_id is now derived from the authenticated user (req.user)
-  // and does not need to be provided by the client
-
-  next();
 };
 
-router.post('/', authMiddleware, validateChatRequest, async (req, res) => {
+/**
+ * Error helper consistent with project patterns
+ */
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+};
+
+// POST /chat - Send message to agent
+router.post('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user?.id;
+    const { agent_id, message } = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+
+    // Validate required fields
+    if (!agent_id || typeof agent_id !== 'string') {
+      throw new ValidationError(
+        'agent_id is required and must be a string',
+        'agent_id'
+      );
+    }
+
+    if (!message || typeof message !== 'string') {
+      throw new ValidationError(
+        'message is required and must be a string',
+        'message'
+      );
+    }
+
+    // Validate agent_id format
+    validateUUID(agent_id, 'agent_id');
+
     // Build chat request using authenticated user ID from middleware
     const chatRequest: ChatRequest = {
       source: 'agent',
-      agent_id: req.body.agent_id,
-      user_id: req.user!.id, // Use authenticated user ID, not client-provided
-      message: req.body.message,
+      agent_id,
+      user_id: userId,
+      message,
       stream: false,
     };
 
-    console.log(`[CHAT] Processing message for authenticated user: ${req.user!.id}`);
+    console.log(`[CHAT] Processing message for authenticated user: ${userId}`);
 
     const store = getStore();
     const result = await agentChat(chatRequest, store);
@@ -54,55 +95,160 @@ router.post('/', authMiddleware, validateChatRequest, async (req, res) => {
       console.warn('Failed to track agent usage:', trackingError);
     }
 
-    res.json(result);
-  } catch (err) {
-    console.error('Chat error:', err);
-    const statusCode = (err as Error).message.includes('not found') ? 404 : 500;
-    res.status(statusCode).json({ error: (err as Error).message });
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('Chat error:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'AGENT_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
   }
 });
 
-// DELETE endpoint for memory management
-router.delete('/:sessionKey/memory', authMiddleware, async (req, res) => {
+// DELETE /:sessionKey/memory - Clear memory for a chat session
+router.delete('/:sessionKey/memory', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionKey } = req.params;
+    const userId = req.user?.id;
 
-    if (!sessionKey) {
-      res.status(400).json({ error: 'sessionKey is required' });
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
       return;
+    }
+
+    if (!sessionKey || typeof sessionKey !== 'string') {
+      throw new ValidationError(
+        'sessionKey is required and must be a string',
+        'sessionKey'
+      );
     }
 
     const store = getStore();
     await store.clear(sessionKey);
-    res.json({ message: 'Memory cleared successfully' });
-  } catch (err) {
-    console.error('Memory clear error:', err);
-    res.status(500).json({ error: (err as Error).message });
+
+    res.json({
+      success: true,
+      data: { message: 'Memory cleared successfully' }
+    });
+
+  } catch (error) {
+    console.error('Memory clear error:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
   }
 });
 
 // GET endpoint for fetching chat sessions by starship
-router.get('/sessions/starship/:starshipId', authMiddleware, async (req, res) => {
+router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { starshipId } = req.params;
-    const { limit } = req.query;
+    const userId = req.user?.id;
 
-    if (!starshipId) {
-      res.status(400).json({ error: 'starshipId is required' });
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+
+    // Validate starshipId format (consistent with other routes)
+    validateUUID(starshipId, 'starshipId');
+
+    // Parse limit parameter (consistent with agents route pattern)
+    const limit = Math.floor(parseInt(req.query.limit as string) || 50);
+    
+    // Validate limit range (consistent with missions route)
+    if (limit < 1 || limit > 200) {
+      res.status(400).json({
+        success: false,
+        error: 'Limit must be between 1 and 200',
+        code: 'VALIDATION_ERROR'
+      });
       return;
     }
 
     const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
     const sessions = await chatSessionRepository.findByStarship(
       starshipId,
-      req.user!.id, // Only get sessions for the authenticated user
-      limit ? parseInt(limit as string) : 50
+      userId, // Only get sessions for the authenticated user
+      limit
     );
 
-    res.json({ sessions });
-  } catch (err) {
-    console.error('Chat sessions fetch error:', err);
-    res.status(500).json({ error: (err as Error).message });
+    res.json({
+      success: true,
+      data: { sessions },
+      count: sessions.length
+    });
+
+  } catch (error) {
+    console.error('Chat sessions fetch error:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'STARSHIP_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
   }
 });
 

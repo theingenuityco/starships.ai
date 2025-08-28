@@ -10,13 +10,37 @@ import { userAPI, type SyncedUser, setTokenProvider } from '@/lib/api'
 export function useAuth() {
   const {
     user,
-    isAuthenticated,
+    isAuthenticated: kindeIsAuthenticated,
     isLoading: kindeLoading,
     getToken,
     getClaim,
     getAccessTokenRaw,
     accessTokenRaw,
   } = useKindeBrowserClient()
+
+  // Check if we have auth cookies as a fallback
+  const [hasCookies, setHasCookies] = useState(false)
+  
+  useEffect(() => {
+    // Check if auth cookies exist
+    const checkCookies = () => {
+      if (typeof document !== 'undefined') {
+        const cookies = document.cookie
+        const hasAccessToken = cookies.includes('access_token=')
+        const hasIdToken = cookies.includes('id_token=')
+        setHasCookies(hasAccessToken && hasIdToken)
+      }
+    }
+    
+    checkCookies()
+    
+    // Check periodically in case cookies change
+    const interval = setInterval(checkCookies, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Use cookie presence as fallback for authentication state
+  const isAuthenticated = kindeIsAuthenticated || (!kindeLoading && hasCookies)
 
   // TESTING BACKDOOR: Only activate when explicitly enabled
   const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
@@ -72,7 +96,9 @@ export function useAuth() {
       '[AUTH] Setting up token provider, isAuthenticated:',
       isAuthenticated,
       'kindeLoading:',
-      kindeLoading
+      kindeLoading,
+      'hasCookies:',
+      hasCookies
     )
 
     // Critical: Only set up token provider after loading is complete
@@ -82,6 +108,17 @@ export function useAuth() {
         if (shouldUseTestingBackdoor) {
           console.log('[AUTH] Providing test token for testing backdoor')
           return 'test-auth-token'
+        }
+        
+        // Try to get token from cookies if Kinde SDK fails
+        if (hasCookies && !kindeIsAuthenticated) {
+          const cookies = document.cookie.split(';')
+          const accessTokenCookie = cookies.find(c => c.trim().startsWith('access_token='))
+          if (accessTokenCookie) {
+            const token = accessTokenCookie.split('=')[1]
+            console.log('[AUTH] Using token from cookie')
+            return token
+          }
         }
         
         if (isAuthenticated) {
@@ -142,7 +179,7 @@ export function useAuth() {
         return null
       })
     }
-  }, [isAuthenticated, kindeLoading])
+  }, [isAuthenticated, kindeLoading, hasCookies])
 
   const isLoading = kindeLoading || syncLoading
 

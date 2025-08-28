@@ -291,13 +291,10 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Force a new rollout by updating with timestamp annotation
-          kubectl patch deployment starships-app -n starships-dev \
-            -p '{"spec":{"template":{"metadata":{"annotations":{"deployment.kubernetes.io/revision":"'$(date +%s)'"}}}}}'
-          
-          # Also ensure we're using the latest image
+          # Use SHA-based tag for guaranteed pod restart (SHA changes with every commit)
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA} \
             -n starships-dev
           
           # Wait for rollout
@@ -366,13 +363,10 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Force a new rollout by updating with timestamp annotation
-          kubectl patch deployment starships-app -n starships-prod \
-            -p '{"spec":{"template":{"metadata":{"annotations":{"deployment.kubernetes.io/revision":"'$(date +%s)'"}}}}}'
-          
-          # Also ensure we're using the latest image
+          # Use SHA-based tag for guaranteed pod restart (SHA changes with every commit)
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod-latest \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod-${SHORT_SHA} \
             -n starships-prod
           
           # Wait for rollout

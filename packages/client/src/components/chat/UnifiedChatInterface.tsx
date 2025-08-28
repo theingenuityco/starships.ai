@@ -101,8 +101,9 @@ export function UnifiedChatInterface({
     )
   }
 
-  // Handle session start
+  // Handle session start - receive actual database session ID
   const handleSessionStart = (sessionId: string) => {
+    console.log('[UnifiedChatInterface] Session started with ID:', sessionId)
     setCurrentSessionId(sessionId)
   }
 

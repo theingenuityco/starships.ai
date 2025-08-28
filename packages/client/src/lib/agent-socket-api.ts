@@ -80,12 +80,17 @@ export const agentSocketAPI = {
 
     const handleStreamComplete = (response: ChatResponse) => {
       if (response.agent_id === agentId && response.source === 'agent' && !isAborted) {
+        // Ensure we have a session ID from server
+        if (!response.session_id) {
+          console.error('[AGENT API] No session_id in response, using fallback');
+        }
+        
         const finalMessage: Message = {
           id: generateId(),
           content: response.content,
           role: 'assistant',
           timestamp: response.timestamp || new Date().toISOString(),
-          sessionId: response.session_id || '',
+          sessionId: response.session_id || 'missing-session-id', // Server should always provide this
           agentId: response.agent_id,
           streaming: false,
           usage: response.usage

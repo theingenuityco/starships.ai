@@ -194,13 +194,8 @@ router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Res
       return;
     }
 
-    // Validate sessionId format
-    if (!sessionId || typeof sessionId !== 'string') {
-      throw new ValidationError(
-        'sessionId is required and must be a string',
-        'sessionId'
-      );
-    }
+    // Validate sessionId is a UUID
+    validateUUID(sessionId, 'sessionId');
 
     // Parse limit and offset parameters
     const limit = Math.floor(parseInt(req.query.limit as string) || 50);

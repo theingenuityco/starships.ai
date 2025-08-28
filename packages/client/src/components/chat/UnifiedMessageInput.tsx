@@ -102,6 +102,10 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
+              // Update session ID with the one from server response
+              if (assistantMessage.sessionId && assistantMessage.sessionId !== currentSessionId) {
+                onSessionStart?.(assistantMessage.sessionId)
+              }
               // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
@@ -126,6 +130,10 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
+              // Update session ID with the one from server response
+              if (assistantMessage.sessionId && assistantMessage.sessionId !== currentSessionId) {
+                onSessionStart?.(assistantMessage.sessionId)
+              }
               // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
@@ -201,6 +209,10 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
+              // Update session ID with the one from server response
+              if (assistantMessage.sessionId && assistantMessage.sessionId !== currentSessionId) {
+                onSessionStart?.(assistantMessage.sessionId)
+              }
               // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null

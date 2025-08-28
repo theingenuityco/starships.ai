@@ -124,7 +124,7 @@ export const sibilAPI = {
           content: response.content,
           role: 'assistant',
           timestamp: new Date().toISOString(),
-          sessionId: request.sessionId || 'sibil-session',
+          sessionId: response.session_id, // Only use server-provided session ID
           provider: response.provider,
           model: response.model,
           structured_content: response.structured_content,

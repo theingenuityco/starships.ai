@@ -1,7 +1,7 @@
 {
   "name": "starships.ai",
   "private": true,
-  "version": "3.7.0",
+  "version": "3.7.1",
   "packageManager": "pnpm@10.12.4",
   "workspaces": [
     "packages/*"
@@ -34,8 +34,11 @@
     "backup:list": "cd deploy && npm run backup:list"
   },
   "devDependencies": {
+    "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.4",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.0.3",
     "@types/node": "^24.0.10",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@typescript-eslint/parser": "^8.36.0",

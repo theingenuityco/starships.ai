@@ -10,6 +10,7 @@ import { UnifiedMessageList } from './UnifiedMessageList'
 import { ChatModeSelector } from './ChatModeSelector'
 import { AgentSelector } from './AgentSelector'
 import { ProviderSelector } from './ProviderSelector'
+import { generateSessionId as generateAgentSessionId, generateSibilSessionId } from '@/lib/storage'
 import type { Agent } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 import type { SibilMessage } from '@/lib/sibil-api'
@@ -37,15 +38,32 @@ export function UnifiedChatInterface({
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [refreshMessages, setRefreshMessages] = useState(0)
-  
-  const sessionId = useRef<string | null>(null)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
-  // Initialize session
+  // Initialize or update session when mode/agent/starship changes
   useEffect(() => {
     if (userId && isAuthenticated) {
-      // Component is ready
+      let newSessionId: string
+      
+      if (chatMode === 'agent' && selectedAgent) {
+        newSessionId = generateAgentSessionId(selectedAgent.id, userId)
+      } else if (chatMode === 'sibil') {
+        newSessionId = generateSibilSessionId(userId, starshipId)
+      } else {
+        // No session for agent mode without selected agent
+        setCurrentSessionId(null)
+        setHasMessages(false)
+        return
+      }
+
+      // Only update if session actually changed
+      if (newSessionId !== currentSessionId) {
+        setCurrentSessionId(newSessionId)
+        setHasMessages(false) // Reset UI state for new session
+        setRefreshMessages(prev => prev + 1)
+      }
     }
-  }, [userId, isAuthenticated])
+  }, [userId, isAuthenticated, chatMode, selectedAgent, starshipId, currentSessionId])
 
   // Show loading state
   if (isLoading) {
@@ -83,6 +101,11 @@ export function UnifiedChatInterface({
     )
   }
 
+  // Handle session start
+  const handleSessionStart = (sessionId: string) => {
+    setCurrentSessionId(sessionId)
+  }
+
   // Handle first message to trigger layout transition
   const handleFirstMessage = (message: Message | SibilMessage) => {
     setHasMessages(true)
@@ -91,15 +114,19 @@ export function UnifiedChatInterface({
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
-    // TODO: Implement sending suggestion as message
-    console.log('Suggestion clicked:', suggestion)
+    if (typeof window !== 'undefined' && (window as any).unifiedMessageInputRef) {
+      const inputRef = (window as any).unifiedMessageInputRef
+      if (inputRef.current?.handleSuggestionSubmit) {
+        inputRef.current.handleSuggestionSubmit(suggestion)
+      }
+    }
   }
 
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Messages Area - Only shown when there are messages */}
       <AnimatePresence>
-        {hasMessages && sessionId.current && (
+        {hasMessages && currentSessionId && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -108,9 +135,9 @@ export function UnifiedChatInterface({
           >
             <UnifiedMessageList
               mode={chatMode}
-              sessionId={sessionId.current}
+              sessionId={currentSessionId}
               starshipId={starshipId}
-              key={`${chatMode}-${sessionId.current}-${refreshMessages}`}
+              key={`${chatMode}-${currentSessionId}-${refreshMessages}`}
             />
           </motion.div>
         )}
@@ -183,9 +210,8 @@ export function UnifiedChatInterface({
                 provider={provider}
                 model={model}
                 starshipId={starshipId}
-                onSessionStart={(id: string) => {
-                  sessionId.current = id
-                }}
+                sessionId={currentSessionId}
+                onSessionStart={handleSessionStart}
                 onMessageSent={handleFirstMessage}
                 onMessageReceived={(message: Message | SibilMessage) => {
                   setRefreshMessages(prev => prev + 1)

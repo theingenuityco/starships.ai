@@ -7,8 +7,9 @@ import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { sibilAPI } from '@/lib/sibil-api'
-import { getChatHistory, saveChatHistory } from '@/lib/storage'
+import { getChatHistory, saveChatHistory, generateSessionId as generateAgentSessionId, generateSibilSessionId } from '@/lib/storage'
 import { generateId } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 import type { Agent } from '@/lib/api'
 import type { ChatMode } from './ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
@@ -21,6 +22,7 @@ interface UnifiedMessageInputProps {
   provider?: 'openai' | 'anthropic'
   model?: string
   starshipId?: string
+  sessionId?: string | null
   onSessionStart?: (sessionId: string) => void
   onMessageSent?: (message: Message | SibilMessage) => void
   onMessageReceived?: (message: Message | SibilMessage) => void
@@ -35,6 +37,7 @@ export function UnifiedMessageInput({
   provider = 'openai',
   model = 'gpt-4',
   starshipId,
+  sessionId,
   onSessionStart,
   onMessageSent,
   onMessageReceived,
@@ -42,6 +45,7 @@ export function UnifiedMessageInput({
   minimal = false,
   children
 }: UnifiedMessageInputProps) {
+  const { userId } = useAuth()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -49,8 +53,8 @@ export function UnifiedMessageInput({
   const currentStreamRef = useRef<{ abort: () => void } | null>(null)
 
   const handleSubmit = async () => {
-    const trimmedMessage = message.trim()
-    if (!trimmedMessage || sending || disabled) return
+    const messageToSend = message.trim()
+    if (!messageToSend || sending || disabled) return
 
     // Validation for agent mode
     if (mode === 'agent' && !selectedAgent) {
@@ -58,42 +62,52 @@ export function UnifiedMessageInput({
       return
     }
 
+    if (!userId) {
+      console.error('User not authenticated')
+      return
+    }
+
     try {
       setSending(true)
       
-      // Generate session ID if needed
-      const sessionId = generateSessionId()
-      onSessionStart?.(sessionId)
+      // Generate or use existing session ID
+      let currentSessionId = sessionId
+      if (!currentSessionId) {
+        currentSessionId = mode === 'agent' && selectedAgent
+          ? generateAgentSessionId(selectedAgent.id, userId)
+          : generateSibilSessionId(userId, starshipId)
+        onSessionStart?.(currentSessionId)
+      }
 
       // Create user message first
       const userMessage: Message | SibilMessage = {
         id: generateId(),
-        content: trimmedMessage,
+        content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId,
+        sessionId: currentSessionId,
         ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
       }
 
       // Store user message and emit
-      const currentHistory = getChatHistory(sessionId)
+      const currentHistory = getChatHistory(currentSessionId)
       const updatedHistory = [...currentHistory, userMessage as any]
-      saveChatHistory(sessionId, updatedHistory)
+      saveChatHistory(currentSessionId, updatedHistory)
       onMessageSent?.(userMessage)
 
       // Send to appropriate API
       if (mode === 'agent') {
         currentStreamRef.current = agentSocketAPI.sendMessageStream(
           selectedAgent!.id,
-          { sessionId, message: trimmedMessage },
+          { sessionId: currentSessionId, message: messageToSend },
           {
             onChunk: (chunk, accumulatedContent) => {
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              const currentHistory = getChatHistory(sessionId)
+              const currentHistory = getChatHistory(currentSessionId!)
               const updatedHistory = [...currentHistory, assistantMessage as any]
-              saveChatHistory(sessionId, updatedHistory)
+              saveChatHistory(currentSessionId!, updatedHistory)
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
             },
@@ -108,8 +122,8 @@ export function UnifiedMessageInput({
           {
             provider,
             model,
-            message: trimmedMessage,
-            sessionId,
+            message: messageToSend,
+            sessionId: currentSessionId,
             starshipId
           },
           {
@@ -117,9 +131,9 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              const currentHistory = getChatHistory(sessionId)
+              const currentHistory = getChatHistory(currentSessionId!)
               const updatedHistory = [...currentHistory, assistantMessage as any]
-              saveChatHistory(sessionId, updatedHistory)
+              saveChatHistory(currentSessionId!, updatedHistory)
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
             },
@@ -139,6 +153,105 @@ export function UnifiedMessageInput({
       }
     } catch (error) {
       console.error('Failed to send message:', error)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  // Handle suggestion clicks
+  const handleSuggestionSubmit = async (suggestionText: string) => {
+    if (!suggestionText || sending || disabled) return
+
+    // Validation for agent mode
+    if (mode === 'agent' && !selectedAgent) {
+      console.error('No agent selected for agent mode')
+      return
+    }
+
+    if (!userId) {
+      console.error('User not authenticated')
+      return
+    }
+
+    try {
+      setSending(true)
+      
+      // Generate or use existing session ID
+      let currentSessionId = sessionId
+      if (!currentSessionId) {
+        currentSessionId = mode === 'agent' && selectedAgent
+          ? generateAgentSessionId(selectedAgent.id, userId)
+          : generateSibilSessionId(userId, starshipId)
+        onSessionStart?.(currentSessionId)
+      }
+
+      // Create user message first
+      const userMessage: Message | SibilMessage = {
+        id: generateId(),
+        content: suggestionText,
+        role: 'user',
+        timestamp: new Date().toISOString(),
+        sessionId: currentSessionId,
+        ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
+      }
+
+      // Store user message and emit
+      const currentHistory = getChatHistory(currentSessionId)
+      const updatedHistory = [...currentHistory, userMessage as any]
+      saveChatHistory(currentSessionId, updatedHistory)
+      onMessageSent?.(userMessage)
+
+      // Send to appropriate API
+      if (mode === 'agent') {
+        currentStreamRef.current = agentSocketAPI.sendMessageStream(
+          selectedAgent!.id,
+          { sessionId: currentSessionId, message: suggestionText },
+          {
+            onChunk: (chunk, accumulatedContent) => {
+              // Handle streaming updates if needed
+            },
+            onComplete: (assistantMessage) => {
+              const currentHistory = getChatHistory(currentSessionId!)
+              const updatedHistory = [...currentHistory, assistantMessage as any]
+              saveChatHistory(currentSessionId!, updatedHistory)
+              onMessageReceived?.(assistantMessage)
+              currentStreamRef.current = null
+            },
+            onError: (error) => {
+              console.error('Agent chat error:', error)
+              currentStreamRef.current = null
+            }
+          }
+        )
+      } else {
+        currentStreamRef.current = sibilAPI.sendMessageStream(
+          {
+            provider,
+            model,
+            message: suggestionText,
+            sessionId: currentSessionId,
+            starshipId
+          },
+          {
+            onChunk: (chunk, accumulatedContent) => {
+              // Handle streaming updates if needed
+            },
+            onComplete: (assistantMessage) => {
+              const currentHistory = getChatHistory(currentSessionId!)
+              const updatedHistory = [...currentHistory, assistantMessage as any]
+              saveChatHistory(currentSessionId!, updatedHistory)
+              onMessageReceived?.(assistantMessage)
+              currentStreamRef.current = null
+            },
+            onError: (error) => {
+              console.error('Sibil chat error:', error)
+              currentStreamRef.current = null
+            }
+          }
+        )
+      }
+    } catch (error) {
+      console.error('Failed to send suggestion:', error)
     } finally {
       setSending(false)
     }
@@ -177,8 +290,14 @@ export function UnifiedMessageInput({
   const canSend = message.trim() && !disabled && !sending && 
     (mode === 'sibil' || (mode === 'agent' && selectedAgent))
 
+  // Expose handleSuggestionSubmit for parent component
+  const inputRef = useRef({ handleSuggestionSubmit })
+  if (typeof window !== 'undefined') {
+    (window as any).unifiedMessageInputRef = inputRef
+  }
+
   return (
-    <motion.div 
+    <motion.div
       className="relative"
       initial={{ opacity: 0, y: minimal ? 10 : 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -308,9 +427,4 @@ export function UnifiedMessageInput({
       )}
     </motion.div>
   )
-}
-
-// Helper function
-function generateSessionId(): string {
-  return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }

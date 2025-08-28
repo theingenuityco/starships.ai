@@ -22,6 +22,16 @@ spec:
   - host: starships.ai
     http:
       paths:
+      # Auth routes must go to frontend (Next.js/Kinde handles these)
+      # This must come BEFORE the general /api rule
+      - path: /api/auth/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Other API routes go to backend
       - path: /api/(.*)
         pathType: ImplementationSpecific
         backend:
@@ -29,6 +39,7 @@ spec:
             name: starships-app-internal
             port:
               number: 4000
+      # Everything else goes to frontend
       - path: /
         pathType: Prefix
         backend:
@@ -39,6 +50,16 @@ spec:
   - host: www.starships.ai
     http:
       paths:
+      # Auth routes must go to frontend (Next.js/Kinde handles these)
+      # This must come BEFORE the general /api rule
+      - path: /api/auth/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Other API routes go to backend
       - path: /api/(.*)
         pathType: ImplementationSpecific
         backend:
@@ -46,6 +67,7 @@ spec:
             name: starships-app-internal
             port:
               number: 4000
+      # Everything else goes to frontend
       - path: /
         pathType: Prefix
         backend:

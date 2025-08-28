@@ -93,10 +93,8 @@ spec:
           value: "https://dev.starships.ai/fleet"
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
           value: "https://dev.starships.ai"
-        - name: KINDE_REDIRECT_URL
-          value: "https://dev.starships.ai/api/auth/kinde_callback"
-        - name: KINDE_COOKIE_DOMAIN
-          value: "dev.starships.ai"
+        # Note: Removed KINDE_REDIRECT_URL - not a valid Kinde env var
+        # Callback URL must be configured in Kinde dashboard instead
         
         # Security: Disable testing backdoor, enable debug for dev
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR

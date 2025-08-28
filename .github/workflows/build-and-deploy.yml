@@ -73,10 +73,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get the latest tag to use as fallback
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
-          echo "Latest tag: ${LATEST_TAG}"
-          
           # For main branch, actually create the release
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] && [[ "${{ github.event_name }}" == "push" ]]; then
             echo "Running semantic-release to create version..."
@@ -84,15 +80,13 @@ jobs:
             
             if grep -q "Published release" semantic-output.txt; then
               NEXT_VERSION=$(grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' semantic-output.txt)
-              echo "Published version: ${NEXT_VERSION}"
+              echo "✅ Published new version: ${NEXT_VERSION}"
               echo "new_release_published=true" >> $GITHUB_OUTPUT
               echo "new_release_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
             else
-              echo "No new version published, using latest tag with commit SHA"
+              echo "ℹ️ No new version needed - skipping build and deploy"
               echo "new_release_published=false" >> $GITHUB_OUTPUT
-              # Use latest tag + SHA for unique identification
-              SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-              echo "new_release_version=${LATEST_TAG}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+              echo "new_release_version=" >> $GITHUB_OUTPUT
             fi
           else
             # For other branches or manual runs, just check what would be published
@@ -104,26 +98,24 @@ jobs:
               echo "new_release_published=true" >> $GITHUB_OUTPUT
               echo "new_release_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
             else
-              echo "No new version would be published, using SHA tag"
+              echo "No new version would be published"
               echo "new_release_published=false" >> $GITHUB_OUTPUT
-              SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-              echo "new_release_version=dev-${SHORT_SHA}" >> $GITHUB_OUTPUT
+              echo "new_release_version=" >> $GITHUB_OUTPUT
             fi
           fi
 
       - name: Determine build decision
         id: build_decision
         run: |
-          # Build should proceed if:
-          # 1. Push to main branch (always build for main)
-          # 2. New release would be published
-          # 3. Manual workflow dispatch
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ steps.semantic.outputs.new_release_published }}" == "true" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          # Build should proceed ONLY if:
+          # 1. New release was published (semantic version created), OR
+          # 2. Manual workflow dispatch (allows override)
+          if [[ "${{ steps.semantic.outputs.new_release_published }}" == "true" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "Build will proceed"
+            echo "✅ Build will proceed"
           else
             echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "Build will be skipped - not a main branch push"
+            echo "⏭️ Build skipped - no new version created"
           fi
 
   # Development Build and Deploy (triggered on semantic version or manual override)
@@ -316,16 +308,13 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Always use the version from calculate-version step
+          # Use the semantic version tag
           IMAGE_TAG="${{ needs.calculate-version.outputs.new_release_version }}"
           
-          echo "Deploying image with tag: ${IMAGE_TAG}"
+          echo "📦 Deploying version: ${IMAGE_TAG}"
           kubectl set image deployment/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
             -n starships-dev
-          
-          # Force pod restart even if same tag (for rebuilds without version change)
-          kubectl rollout restart deployment/starships-app -n starships-dev
           
           # Wait for rollout
           kubectl rollout status deployment/starships-app -n starships-dev --timeout=300s

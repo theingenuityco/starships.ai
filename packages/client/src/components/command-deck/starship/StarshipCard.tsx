@@ -127,6 +127,18 @@ export function StarshipCard({
   }
 
   const handleCardClick = () => {
+    // Prevent navigation if payment is pending
+    if (starship.status === 'pending_payment') {
+      toast.warning('Payment required', {
+        description: 'Please complete payment to access this starship',
+        action: {
+          label: 'Pay Now',
+          onClick: () => handleRetryPayment(new MouseEvent('click') as any)
+        }
+      })
+      return
+    }
+    
     onSelect()
     // Load agent data when selecting a starship
     if (!agentData) {
@@ -137,6 +149,17 @@ export function StarshipCard({
   }
 
   const handleCommandDeckClick = () => {
+    // Prevent navigation if payment is pending
+    if (starship.status === 'pending_payment') {
+      toast.warning('Payment required', {
+        description: 'Please complete payment to access this starship',
+        action: {
+          label: 'Pay Now',
+          onClick: () => handleRetryPayment(new MouseEvent('click') as any)
+        }
+      })
+      return
+    }
     router.push(`/ship/${starship.slug}/command-deck`)
   }
 
@@ -168,23 +191,29 @@ export function StarshipCard({
 
   return (
     <motion.div
-      whileHover={{ scale: 1.01, y: -1 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={starship.status !== 'pending_payment' ? { scale: 1.01, y: -1 } : {}}
+      whileTap={starship.status !== 'pending_payment' ? { scale: 0.99 } : {}}
       transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
     >
       <Card
         className={cn(
-          'cursor-pointer transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden',
+          'transition-all duration-300 bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden',
           'h-[240px] flex flex-col', // Fixed height with flex layout
-          isHovered && 'shadow-xl border-border/80 bg-card/70',
-          'hover:shadow-2xl hover:shadow-primary/5'
+          starship.status === 'pending_payment' ? 'cursor-not-allowed opacity-75' : 'cursor-pointer',
+          isHovered && starship.status !== 'pending_payment' && 'shadow-xl border-border/80 bg-card/70',
+          starship.status !== 'pending_payment' && 'hover:shadow-2xl hover:shadow-primary/5'
         )}
         onClick={handleCardClick}
       >
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
+        
+        {/* Disabled overlay for pending payment */}
+        {starship.status === 'pending_payment' && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] pointer-events-none z-[1]" />
+        )}
 
         <CardHeader className="pb-0 relative space-y-3">
           <div className="flex items-center justify-between">
@@ -231,6 +260,7 @@ export function StarshipCard({
                       e.stopPropagation()
                       handleCommandDeckClick()
                     }}
+                    disabled={starship.status === 'pending_payment'}
                   >
                     <Command className="w-4 h-4 mr-2" />
                     Command Deck
@@ -309,7 +339,7 @@ export function StarshipCard({
         <CardContent className="pt-3 relative flex-1 flex flex-col justify-between">
           {/* Payment Required Banner */}
           {starship.status === 'pending_payment' && (
-            <div className="absolute inset-x-0 top-0 bg-yellow-100/90 border-b border-yellow-200 p-2 flex items-center justify-between">
+            <div className="absolute inset-x-0 top-0 bg-yellow-100/90 border-b border-yellow-200 p-2 flex items-center justify-between z-10">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-yellow-700" />
                 <span className="text-xs font-medium text-yellow-800">Payment required to activate</span>

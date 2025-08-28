@@ -28,7 +28,7 @@ export class ProviderFactory {
         console.warn(`Agent not found: ${agentId}, using default LLM configuration`);
         const defaultModel = {
           id: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
-          name: process.env.DEFAULT_CHAT_MODEL || 'gpt-4',
+          name: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
           provider: (process.env.DEFAULT_PROVIDER as 'openai' | 'anthropic') || 'openai',
           temperature: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
           maxTokens: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
@@ -44,7 +44,7 @@ export class ProviderFactory {
       if (!llm) {
         const defaultModel = {
           id: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
-          name: process.env.DEFAULT_CHAT_MODEL || 'gpt-4',
+          name: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
           provider: (process.env.DEFAULT_PROVIDER as 'openai' | 'anthropic') || 'openai',
           temperature: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
           maxTokens: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),

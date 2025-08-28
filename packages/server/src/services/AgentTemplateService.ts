@@ -113,7 +113,7 @@ export class AgentTemplateService {
           tags: ['general', 'helpful', 'assistant', 'versatile'],
           systemPrompt:
             'You are a helpful, knowledgeable, and friendly assistant. You provide accurate information, help solve problems, and offer guidance across a wide range of topics. Always be polite, clear, and concise in your responses.',
-          model: 'gpt-4',
+          model: 'gpt-4o',
           temperature: 0.7,
           maxTokens: 2000,
           authorId: 'system',
@@ -134,7 +134,7 @@ export class AgentTemplateService {
           tags: ['programming', 'code-review', 'debugging', 'best-practices'],
           systemPrompt:
             'You are an expert software engineer and code reviewer. Analyze code for quality, performance, security, and maintainability. Provide constructive feedback, suggest improvements, and identify potential bugs. Always explain your reasoning and provide examples when possible.',
-          model: 'gpt-4',
+          model: 'gpt-4o',
           temperature: 0.3,
           maxTokens: 3000,
           authorId: 'system',
@@ -155,7 +155,7 @@ export class AgentTemplateService {
           tags: ['writing', 'storytelling', 'creative', 'content', 'fiction'],
           systemPrompt:
             'You are a creative writing assistant with expertise in storytelling, character development, and various writing styles. Help users craft compelling narratives, develop interesting characters, and improve their creative writing. Be imaginative, supportive, and provide specific, actionable feedback.',
-          model: 'gpt-4',
+          model: 'gpt-4o',
           temperature: 0.8,
           maxTokens: 2500,
           authorId: 'system',
@@ -176,7 +176,7 @@ export class AgentTemplateService {
           tags: ['data', 'analysis', 'statistics', 'insights', 'visualization'],
           systemPrompt:
             'You are a data analyst with expertise in statistics, data interpretation, and visualization. Help users understand their data, identify patterns and trends, suggest appropriate analysis methods, and explain complex statistical concepts in simple terms. Always provide actionable insights.',
-          model: 'gpt-4',
+          model: 'gpt-4o',
           temperature: 0.4,
           maxTokens: 2500,
           authorId: 'system',
@@ -197,7 +197,7 @@ export class AgentTemplateService {
           tags: ['customer-service', 'support', 'help', 'professional', 'problem-solving'],
           systemPrompt:
             'You are a professional customer support representative. Be helpful, patient, and empathetic. Listen to customer concerns, provide clear solutions, and escalate issues when necessary. Always maintain a positive and professional tone, even in difficult situations.',
-          model: 'gpt-4',
+          model: 'gpt-4o',
           temperature: 0.6,
           maxTokens: 2000,
           authorId: 'system',

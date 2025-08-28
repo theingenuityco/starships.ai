@@ -166,7 +166,7 @@ export class SibilService {
     let usage: UsageStats | undefined;
     
     if (provider === 'openai') {
-      const result = await this.chatWithOpenAI(model || 'gpt-4', message, systemPrompt);
+      const result = await this.chatWithOpenAI(model || 'gpt-4o', message, systemPrompt);
       content = result.content;
       usage = result.usage;
     } else {
@@ -183,7 +183,7 @@ export class SibilService {
       content,
       structured_content,
       provider,
-      model: model || (provider === 'openai' ? 'gpt-4' : 'claude-3-5-sonnet-20241022'),
+      model: model || (provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
       usage,
     };
   }
@@ -497,7 +497,7 @@ export class SibilService {
 
     try {
       if (provider === 'openai') {
-        yield* this.streamWithOpenAI(model || 'gpt-4', message, systemPrompt);
+        yield* this.streamWithOpenAI(model || 'gpt-4o', message, systemPrompt);
       } else {
         yield* this.streamWithAnthropic(model || 'claude-3-5-sonnet-20241022', message, systemPrompt);
       }
@@ -529,7 +529,7 @@ export class SibilService {
         content: word + (words.indexOf(word) < words.length - 1 ? ' ' : ''),
         structured_content: [{ type: 'markdown', content }],
         provider,
-        model: model || (provider === 'openai' ? 'gpt-4' : 'claude-3-5-sonnet-20241022'),
+        model: model || (provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
         chunk_id: chunkId.toString(),
         is_final: false
       };
@@ -545,7 +545,7 @@ export class SibilService {
       content: text,
       structured_content: [{ type: 'markdown', content: text }],
       provider,
-      model: model || (provider === 'openai' ? 'gpt-4' : 'claude-3-5-sonnet-20241022'),
+      model: model || (provider === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20241022'),
       is_final: true
     };
   }

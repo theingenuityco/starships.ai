@@ -38,7 +38,7 @@ export function useAgents(starshipId?: string): UseAgentsReturn {
             id: 'fallback-research-assistant',
             name: 'Research Assistant',
             description: 'Helps with research and data analysis',
-            model: 'gpt-4',
+            model: 'gpt-4o',
             systemPrompt: 'You are a research assistant specializing in data analysis and research.',
             starshipId: starshipId || 'default',
             tags: ['research', 'analysis'],

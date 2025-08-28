@@ -134,7 +134,7 @@ export class AgentRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       // Validate required starshipId field
       if (!entity.starshipId) {
-        this.handleValidationError([{ field: 'starshipId', message: 'starshipId is required when creating an agent' }], 'create', 'Agent');
+        this.handleValidationError([{ field: 'starshipId', message: 'starshipId is required when creating an agent' }], 'create');
       }
 
       const connection = getConnection();

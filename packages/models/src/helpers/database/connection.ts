@@ -1,4 +1,4 @@
-import neo4j, { Driver, Session, auth, ManagedTransaction, isInt } from 'neo4j-driver';
+import neo4j, { Driver, Session, auth, ManagedTransaction, isInt, int } from 'neo4j-driver';
 
 export interface Neo4jConfig {
   uri: string;
@@ -232,9 +232,19 @@ export class Neo4jConnection {
     if (typeof params === 'object' && params.constructor === Object) {
       const sanitized: any = {};
       for (const [key, value] of Object.entries(params)) {
-        sanitized[key] = this.sanitizeParameters(value, depth + 1);
+        // Special handling for limit parameter - ensure it's a Neo4j Integer
+        if (key === 'limit' && typeof value === 'number' && Number.isInteger(value)) {
+          sanitized[key] = int(value);
+        } else {
+          sanitized[key] = this.sanitizeParameters(value, depth + 1);
+        }
       }
       return sanitized;
+    }
+
+    // Handle numbers that should be Neo4j integers (particularly for LIMIT clauses)
+    if (typeof params === 'number' && Number.isInteger(params)) {
+      return int(params);
     }
 
     // For primitives (string, number, boolean) and Neo4j objects (Node, Relationship, etc.), return as-is

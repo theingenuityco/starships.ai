@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { AnimatePresence } from 'motion/react'
 import { SibilMessage, sibilAPI } from '@/lib/sibil-api'
-import { getChatHistory, saveChatHistory, generateSibilSessionId } from '@/lib/storage'
 import { MessageInput } from '../chat/MessageInput'
 import { MessageList } from '../chat/MessageList'
 import { SibilMessageBubble } from './SibilMessageBubble'
@@ -51,31 +50,19 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
     
     const updatedMessages = [...messages, actionMessage]
     setMessages(updatedMessages)
-    saveChatHistory(sessionId.current, updatedMessages)
+    // No need to save to localStorage - server handles all message storage
   }
 
   // Initialize session when user and starship are available
   useEffect(() => {
     if (userId && isAuthenticated) {
-      const newSessionId = generateSibilSessionId(userId, starshipId)
-      sessionId.current = newSessionId
-      loadMessages(newSessionId)
+      // Reset session - let server provide the actual session ID
+      sessionId.current = ''
+      // Start fresh without pre-loading messages since we don't have a real session ID yet
+      setMessages([])
     }
   }, [userId, isAuthenticated, starshipId])
 
-  const loadMessages = (sessionId: string) => {
-    try {
-      setLoading(true)
-      const storedMessages = getChatHistory(sessionId) as SibilMessage[]
-      setMessages(storedMessages)
-      setError(null)
-    } catch (err) {
-      console.error('Failed to load messages:', err)
-      setError(ERROR_TEXT.FAILED_TO_LOAD_MESSAGES)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSendMessage = async (content: string) => {
     if (!sessionId.current) {
@@ -144,6 +131,11 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
             ))
           },
           onComplete: (finalMessage) => {
+            // Update session ID with the one from server
+            if (finalMessage.sessionId && finalMessage.sessionId !== currentSessionId) {
+              sessionId.current = finalMessage.sessionId
+            }
+            
             setMessages(prev => prev.map(msg =>
               msg.id === streamingMessage.id
                 ? { ...finalMessage, id: msg.id }
@@ -152,8 +144,7 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
             setStreaming(false)
             setTypingIndicator(false)
             
-            const finalMessages = [...messages, finalUserMessage, finalMessage]
-            saveChatHistory(currentSessionId, finalMessages)
+            // No need to save to localStorage - server handles all message storage
           },
           onError: (error) => {
             setError(error)
@@ -178,7 +169,7 @@ export function SibilChatInterface({ starshipId }: SibilChatInterfaceProps) {
       setTypingIndicator(false)
       
       setMessages(messages)
-      saveChatHistory(currentSessionId, messages)
+      // No need to save to localStorage - server handles all message storage
     }
   }
 

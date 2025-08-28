@@ -10,23 +10,93 @@ import { LLMRepository } from '../repositories/LLMRepository';
 
 
 export async function seedLLMModels() {
-  console.log('🌱 LLM models are now seeded automatically during schema initialization');
-  console.log('✅ No additional seeding required - models are created in 001_initialize_schema.cypher');
+  console.log('🌱 Seeding LLM models...');
   
-  // List existing models for verification
   try {
     const llmRepo = new LLMRepository();
     const existingModels = await llmRepo.findAll();
-    console.log(`📋 Found ${existingModels.length} LLM models in database`);
+    console.log(`📋 Found ${existingModels.length} existing LLM models in database`);
     
     if (existingModels.length > 0) {
-      console.log('📋 Available LLM models:');
+      console.log('✅ LLM models already seeded. Available models:');
       existingModels.forEach(model => {
         console.log(`  - ${model.name} (${model.provider})`);
       });
+      return;
     }
+    
+    console.log('📦 Seeding LLM models...');
+    
+    const modelsToSeed = [
+      // OpenAI Models
+      {
+        name: 'gpt-4o',
+        provider: 'openai' as const,
+        maxTokens: 128000,
+        temperature: 0.7,
+        supportsStreaming: true,
+        supportsTools: true,
+        costPer1kTokens: 0.015,
+        createdAt: new Date().toISOString()
+      },
+      {
+        name: 'gpt-4o-mini',
+        provider: 'openai' as const,
+        maxTokens: 128000,
+        temperature: 0.7,
+        supportsStreaming: true,
+        supportsTools: true,
+        costPer1kTokens: 0.0015,
+        createdAt: new Date().toISOString()
+      },
+      {
+        name: 'gpt-3.5-turbo',
+        provider: 'openai' as const,
+        maxTokens: 16385,
+        temperature: 0.7,
+        supportsStreaming: true,
+        supportsTools: true,
+        costPer1kTokens: 0.002,
+        createdAt: new Date().toISOString()
+      },
+      // Anthropic Models
+      {
+        name: 'claude-3-5-sonnet-20241022',
+        provider: 'anthropic' as const,
+        maxTokens: 8192,
+        temperature: 0.7,
+        supportsStreaming: true,
+        supportsTools: true,
+        costPer1kTokens: 0.018,
+        createdAt: new Date().toISOString()
+      },
+      {
+        name: 'claude-3-haiku-20240307',
+        provider: 'anthropic' as const,
+        maxTokens: 4096,
+        temperature: 0.7,
+        supportsStreaming: true,
+        supportsTools: true,
+        costPer1kTokens: 0.00125,
+        createdAt: new Date().toISOString()
+      }
+    ];
+    
+    for (const modelData of modelsToSeed) {
+      try {
+        const created = await llmRepo.create(modelData);
+        console.log(`✅ Created LLM model: ${created.name} (${created.provider})`);
+      } catch (error) {
+        console.error(`❌ Failed to create model ${modelData.name}:`, error);
+      }
+    }
+    
+    const finalModels = await llmRepo.findAll();
+    console.log(`🎉 Seeding completed! Total LLM models: ${finalModels.length}`);
+    
   } catch (error) {
-    console.error('❌ Error checking LLM models:', error);
+    console.error('❌ Error during LLM model seeding:', error);
+    throw error;
   }
 }
 

@@ -1,8 +1,8 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
-import type { 
+import type {
   SocketEvents,
-  ChatSocketRequest,
-  ChatSocketStreamChunk,
+  ChatRequest,
+  ChatStreamChunk,
   VisionAnalysisRequest,
   VisionRefinementRequest,
   VisionUpdateRequest,
@@ -52,7 +52,7 @@ function checkVisionRateLimit(userId: string): boolean {
 }
 
 export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
-  // Lazy-initialize vision refinement services
+  // Lazy-initialize services
   let visionRefinementService: VisionRefinementService | null = null;
   let visionSessionManager: VisionRefinementSessionManager | null = null;
   let visionMetricsCalculator: VisionMetricsCalculator | null = null;
@@ -86,12 +86,53 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
     return visionRepo;
   };
 
+  // Helper functions for chat session management (new database-backed approach)
+  const getOrCreateChatSession = async (userId: string, starshipId: string): Promise<any> => {
+    const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
+    
+    // Try to find active session for this starship
+    const activeSessions = await chatSessionRepo.findByStarship(starshipId, 10);
+    const existingSession = activeSessions.find((session: any) =>
+      session.source === 'sibil' &&
+      isSessionActive(session)
+    );
+    
+    if (existingSession) {
+      await chatSessionRepo.updateActivity(existingSession.id);
+      return existingSession;
+    }
+    
+    // Create new session
+    return await chatSessionRepo.create({
+      source: 'sibil',
+      starship_id: starshipId
+    });
+  };
+  
+  const isSessionActive = (session: any): boolean => {
+    const lastActivity = new Date(session.last_activity_at);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
+    return diffMinutes < 30; // 30 minute timeout
+  };
+  
+  const storeMessage = async (sessionId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> => {
+    const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
+    await chatMessageRepo.create({
+      session_id: sessionId,
+      role,
+      content,
+      structured_content: metadata?.structured_content,
+      stream_id: metadata?.stream_id
+    });
+  };
+
   io.on('connection', (socket: Socket) => {
     const userId = socket.data.userId;
     const socketService = SocketIOService.getInstance();
 
     // Handle stream start
-    socket.on('chat:start-stream', async (request: ChatSocketRequest) => {
+    socket.on('chat:start-stream', async (request: ChatRequest) => {
       if (request.source !== 'sibil') return;
       console.log(`[SIBIL SOCKET] Starting stream for user ${userId}:`, request.stream_id);
 
@@ -112,14 +153,34 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
         socket.emit('sibil:stream-start', request.stream_id);
         socket.emit('sibil:typing-start');
 
-        // Convert to standard SibilRequest
+        // Get or create chat session in database
+        const chatSession = await getOrCreateChatSession(userId, request.starship_id!);
+        if (!chatSession) {
+          socket.emit('sibil:stream-error', {
+            stream_id: request.stream_id,
+            error_code: 'SESSION_CREATION_FAILED',
+            message: 'Failed to create or retrieve chat session',
+            timestamp: Date.now(),
+            recoverable: true
+          });
+          return;
+        }
+
+        console.log(`✅ [SIBIL SESSION] Using session: ${chatSession.id}`);
+
+        // Store user message
+        await storeMessage(chatSession.id, 'user', request.message, {
+          stream_id: request.stream_id
+        });
+
+        // Convert to standard SibilRequest with actual session ID
         const sibilRequest = {
           source: 'sibil' as const,
           provider: request.provider,
           model: request.model,
           message: request.message,
           user_id: userId,
-          session_id: request.session_id,
+          session_id: chatSession.id, // Use actual database session ID
           starship_id: request.starship_id
         };
 
@@ -142,7 +203,7 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
                 const char = characters[i];
                 const delay = 1000 / typingSpeed; // milliseconds per character
 
-                const typewriterChunk: ChatSocketStreamChunk = {
+                const typewriterChunk: ChatStreamChunk = {
                   ...chunk,
                   source: 'sibil' as const,
                   stream_id: request.stream_id,
@@ -169,7 +230,7 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
               }
             } else {
               // Send chunk without typewriter effect
-              const socketChunk: ChatSocketStreamChunk = {
+              const socketChunk: ChatStreamChunk = {
                 ...chunk,
                 source: 'sibil' as const,
                 stream_id: request.stream_id,
@@ -178,14 +239,24 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
               socket.emit('sibil:stream-chunk', socketChunk);
             }
           } else if (chunk.type === 'complete') {
+            const finalContent = chunk.content || accumulatedContent;
+            
+            // Store assistant message
+            await storeMessage(chatSession.id, 'assistant', finalContent, {
+              stream_id: request.stream_id,
+              structured_content: chunk.structured_content,
+              usage: chunk.usage
+            });
+
             // Send completion
             socket.emit('sibil:typing-stop');
             socket.emit('sibil:stream-complete', {
-              content: chunk.content || accumulatedContent,
+              content: finalContent,
               structured_content: chunk.structured_content,
               provider: chunk.provider!,
               model: chunk.model!,
-              usage: chunk.usage
+              usage: chunk.usage,
+              session_id: chatSession.id // Include the actual session ID
             });
 
             // Check for vision-related content and trigger refinement

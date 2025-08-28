@@ -1,6 +1,6 @@
 import { useKindeBrowserClient } from '@kinde-oss/kinde-auth-nextjs'
 import { LoginLink, LogoutLink, RegisterLink } from '@kinde-oss/kinde-auth-nextjs/components'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { userAPI, type SyncedUser, setTokenProvider } from '@/lib/api'
 
 /**
@@ -18,6 +18,10 @@ export function useAuth() {
     accessTokenRaw,
   } = useKindeBrowserClient()
 
+  // Force refresh authentication state on mount
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [forceRefresh, setForceRefresh] = useState(0)
+
   // TESTING BACKDOOR: Only activate when explicitly enabled
   const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
   const shouldUseTestingBackdoor = enableTestingBackdoor && !kindeLoading && !isAuthenticated
@@ -29,6 +33,33 @@ export function useAuth() {
   const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+
+  // Check server-side auth state and force client refresh if needed
+  useEffect(() => {
+    if (!isInitialized && !kindeLoading) {
+      const checkServerAuth = async () => {
+        try {
+          // Check if we have auth cookies by calling a protected endpoint
+          const response = await fetch('/api/auth/me')
+          const data = await response.json()
+          
+          console.log('[AUTH] Server auth check:', data)
+          
+          if (data.authenticated && !isAuthenticated) {
+            console.log('[AUTH] Server authenticated but client not - forcing refresh')
+            // Force a re-render to sync client state
+            setForceRefresh(prev => prev + 1)
+            // Also try to reload the auth state by triggering a setup call
+            await fetch('/api/auth/setup')
+          }
+        } catch (error) {
+          console.error('[AUTH] Server auth check failed:', error)
+        }
+        setIsInitialized(true)
+      }
+      checkServerAuth()
+    }
+  }, [isAuthenticated, kindeLoading, isInitialized])
 
   // Auto-sync user when Kinde authentication completes
   useEffect(() => {

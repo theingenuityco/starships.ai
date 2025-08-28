@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
 
 /**
  * Kinde SDK auto-configuration endpoint
@@ -11,10 +12,22 @@ import { NextResponse } from 'next/server';
  * special setup is required.
  */
 export async function GET() {
-  return NextResponse.json({ 
-    configured: true,
-    timestamp: new Date().toISOString()
-  });
+  try {
+    const { isAuthenticated } = getKindeServerSession();
+    const authenticated = await isAuthenticated();
+    
+    return NextResponse.json({ 
+      configured: true,
+      authenticated,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    return NextResponse.json({ 
+      configured: true,
+      authenticated: false,
+      timestamp: new Date().toISOString()
+    });
+  }
 }
 
 export async function POST() {

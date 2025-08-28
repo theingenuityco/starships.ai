@@ -156,7 +156,7 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
         socket.emit('sibil:typing-start');
 
         // Get or create chat session in database
-        const chatSession = await getOrCreateChatSession(userId, request.starship_id || 'default');
+        const chatSession = await getOrCreateChatSession(userId, request.starship_id!);
         if (!chatSession) {
           socket.emit('sibil:stream-error', {
             stream_id: request.stream_id,

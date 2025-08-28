@@ -8,7 +8,7 @@ import { SibilMessageBubble } from '@/components/sibil/SibilMessageBubble'
 import type { Message } from '@/lib/agent-socket-api'
 import type { SibilMessage } from '@/lib/sibil-api'
 import type { ChatMode } from './ChatModeSelector'
-import { getChatHistory, saveChatHistory } from '@/lib/storage'
+import { chatAPI } from '@/lib/api'
 
 interface UnifiedMessageListProps {
   mode: ChatMode
@@ -39,17 +39,32 @@ export function UnifiedMessageList({
     }
   }, [sessionId, mode])
 
-  const loadMessages = (sessionId: string) => {
+  const loadMessages = async (sessionId: string) => {
     try {
       setLoading(true)
       setError(null)
       
-      // Load messages from storage
-      const storedMessages = getChatHistory(sessionId) as UnifiedMessage[]
-      setMessages(storedMessages || [])
+      // Load messages from database
+      const dbMessages = await chatAPI.getMessagesBySession(sessionId)
+      
+      // Convert to unified message format
+      const unifiedMessages: UnifiedMessage[] = dbMessages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role,
+        timestamp: msg.timestamp,
+        sessionId: msg.sessionId,
+        // Add mode-specific fields based on message structure
+        ...(mode === 'agent' ? { agentId: sessionId.split(':')[0]?.replace('agent-', '') } : {}),
+        ...(mode === 'sibil' ? { provider: 'openai', model: 'gpt-4' } : {})
+      } as UnifiedMessage))
+      
+      setMessages(unifiedMessages)
     } catch (err) {
       console.error('Failed to load messages:', err)
       setError('Failed to load chat history')
+      // Fallback to empty array on error
+      setMessages([])
     } finally {
       setLoading(false)
     }
@@ -60,10 +75,8 @@ export function UnifiedMessageList({
     setMessages(prevMessages => {
       const updatedMessages = [...prevMessages, newMessage]
       
-      // Update storage if sessionId exists
-      if (sessionId) {
-        saveChatHistory(sessionId, updatedMessages as any)
-      }
+      // Note: Messages are now saved to database via socket handlers
+      // No need to manually save to localStorage anymore
       
       onMessageAdded?.(newMessage)
       return updatedMessages

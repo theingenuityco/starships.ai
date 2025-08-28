@@ -554,6 +554,28 @@ export const chatAPI = {
     }
   },
 
+  // Get chat messages by session ID from database
+  getMessagesBySession: async (sessionId: string, limit: number = 50, offset: number = 0): Promise<Message[]> => {
+    const response = await api.get(`/api/chat/messages/${sessionId}`, {
+      params: { limit, offset }
+    })
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to fetch messages')
+    }
+
+    // Convert database messages to client Message format
+    const dbMessages = response.data.data.messages
+    return dbMessages.map((dbMsg: any) => ({
+      id: dbMsg.id,
+      content: dbMsg.content,
+      role: dbMsg.role as 'user' | 'assistant',
+      timestamp: dbMsg.timestamp,
+      sessionId: dbMsg.session_id,
+      ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content })
+    }))
+  },
+
   // Get chat sessions by starship ID
   getSessionsByStarship: (starshipId: string): Promise<{ sessions: ChatSession[] }> =>
     api

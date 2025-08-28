@@ -7,7 +7,7 @@ import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { sibilAPI } from '@/lib/sibil-api'
-import { getChatHistory, saveChatHistory, generateSessionId as generateAgentSessionId, generateSibilSessionId } from '@/lib/storage'
+import { generateSessionId as generateAgentSessionId, generateSibilSessionId } from '@/lib/storage'
 import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import type { Agent } from '@/lib/api'
@@ -89,10 +89,7 @@ export function UnifiedMessageInput({
         ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
       }
 
-      // Store user message and emit
-      const currentHistory = getChatHistory(currentSessionId)
-      const updatedHistory = [...currentHistory, userMessage as any]
-      saveChatHistory(currentSessionId, updatedHistory)
+      // Emit user message (no need to store manually - server handles this)
       onMessageSent?.(userMessage)
 
       // Send to appropriate API
@@ -105,9 +102,7 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              const currentHistory = getChatHistory(currentSessionId!)
-              const updatedHistory = [...currentHistory, assistantMessage as any]
-              saveChatHistory(currentSessionId!, updatedHistory)
+              // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
             },
@@ -131,9 +126,7 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              const currentHistory = getChatHistory(currentSessionId!)
-              const updatedHistory = [...currentHistory, assistantMessage as any]
-              saveChatHistory(currentSessionId!, updatedHistory)
+              // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
             },
@@ -195,10 +188,7 @@ export function UnifiedMessageInput({
         ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
       }
 
-      // Store user message and emit
-      const currentHistory = getChatHistory(currentSessionId)
-      const updatedHistory = [...currentHistory, userMessage as any]
-      saveChatHistory(currentSessionId, updatedHistory)
+      // Emit user message (no need to store manually - server handles this)
       onMessageSent?.(userMessage)
 
       // Send to appropriate API
@@ -211,9 +201,7 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              const currentHistory = getChatHistory(currentSessionId!)
-              const updatedHistory = [...currentHistory, assistantMessage as any]
-              saveChatHistory(currentSessionId!, updatedHistory)
+              // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
             },
@@ -237,9 +225,7 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              const currentHistory = getChatHistory(currentSessionId!)
-              const updatedHistory = [...currentHistory, assistantMessage as any]
-              saveChatHistory(currentSessionId!, updatedHistory)
+              // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null
             },

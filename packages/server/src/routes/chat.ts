@@ -179,6 +179,117 @@ router.delete('/:sessionKey/memory', authMiddleware, async (req: Request, res: R
   }
 });
 
+// GET endpoint for fetching chat messages by session ID
+router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+
+    // Validate sessionId format
+    if (!sessionId || typeof sessionId !== 'string') {
+      throw new ValidationError(
+        'sessionId is required and must be a string',
+        'sessionId'
+      );
+    }
+
+    // Parse limit and offset parameters
+    const limit = Math.floor(parseInt(req.query.limit as string) || 50);
+    const offset = Math.floor(parseInt(req.query.offset as string) || 0);
+    
+    // Validate limit range
+    if (limit < 1 || limit > 200) {
+      res.status(400).json({
+        success: false,
+        error: 'Limit must be between 1 and 200',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    if (offset < 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Offset must be non-negative',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    const chatMessageRepository = RepositoryFactory.getChatMessageRepository();
+    const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
+    
+    // First, verify the session exists and belongs to the user
+    const session = await chatSessionRepository.findById(sessionId);
+    if (!session) {
+      res.status(404).json({
+        success: false,
+        error: 'Chat session not found',
+        code: 'SESSION_NOT_FOUND'
+      });
+      return;
+    }
+
+    // Check if user has access to this session
+    if (session.created_by !== userId) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied to this chat session',
+        code: 'ACCESS_DENIED'
+      });
+      return;
+    }
+
+    // Fetch messages for the session
+    const messages = await chatMessageRepository.findBySession(sessionId, limit, offset);
+
+    res.json({
+      success: true,
+      data: {
+        messages,
+        sessionId,
+        total: messages.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Chat messages fetch error:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+    
+    if (error instanceof NotFoundError) {
+      res.status(404).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
 // GET endpoint for fetching chat sessions by starship
 router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

@@ -35,12 +35,13 @@ export interface ServerEnvironmentConfig {
   
 
   // Kinde Authentication Configuration (Server-side)
-  KINDE_CLIENT_ID: string;
-  KINDE_CLIENT_SECRET: string;
-  KINDE_ISSUER_URL: string;
-  KINDE_SITE_URL: string;
-  KINDE_POST_LOGIN_REDIRECT_URL: string;
-  KINDE_POST_LOGOUT_REDIRECT_URL: string;
+  // These are optional to allow runtime resolution
+  KINDE_CLIENT_ID?: string;
+  KINDE_CLIENT_SECRET?: string;
+  KINDE_ISSUER_URL?: string;
+  KINDE_SITE_URL?: string;
+  KINDE_POST_LOGIN_REDIRECT_URL?: string;
+  KINDE_POST_LOGOUT_REDIRECT_URL?: string;
   KINDE_DEBUG_MODE?: boolean;
   
   // Stripe Configuration

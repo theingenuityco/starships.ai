@@ -1,8 +1,7 @@
 import type { NextConfig } from 'next'
-import { getServerConfig, getClientConfig } from '@starships/env-config'
+import { getClientConfig } from '@starships/env-config'
 
-// Load environment configuration using our centralized package
-const serverEnv = getServerConfig()
+// Load client configuration for public variables
 const clientEnv = getClientConfig()
 
 const nextConfig: NextConfig = {
@@ -47,17 +46,11 @@ const nextConfig: NextConfig = {
     }
     return config
   },
+  // DON'T set server-side env vars here - Next.js automatically provides them at runtime
+  // The env config is ONLY for:
+  // 1. Client-side variables (NEXT_PUBLIC_*)
+  // 2. Providing build-time defaults
   env: {
-    // Kinde environment variables with dynamic defaults for deployment
-    KINDE_CLIENT_ID: serverEnv.KINDE_CLIENT_ID,
-    KINDE_CLIENT_SECRET: serverEnv.KINDE_CLIENT_SECRET,
-    KINDE_ISSUER_URL: serverEnv.KINDE_ISSUER_URL,
-    KINDE_SITE_URL: serverEnv.KINDE_SITE_URL ?? `https://${process.env.VERCEL_URL}`,
-    KINDE_POST_LOGOUT_REDIRECT_URL:
-      serverEnv.KINDE_POST_LOGOUT_REDIRECT_URL ?? `https://${process.env.VERCEL_URL}`,
-    KINDE_POST_LOGIN_REDIRECT_URL:
-      serverEnv.KINDE_POST_LOGIN_REDIRECT_URL ?? `https://${process.env.VERCEL_URL}`,
-    KINDE_DEBUG_MODE: serverEnv.KINDE_DEBUG_MODE ? 'true' : 'false',
     // Public environment variables (exposed to browser)
     NEXT_PUBLIC_API_URL: clientEnv.NEXT_PUBLIC_API_URL,
   },

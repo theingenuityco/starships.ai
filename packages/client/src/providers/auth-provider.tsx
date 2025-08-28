@@ -1,7 +1,6 @@
 'use client';
 
 import { KindeProvider } from "@kinde-oss/kinde-auth-nextjs";
-import { AuthInitializer } from "@/components/auth/AuthInitializer";
 
 interface AuthProviderProps {
   children: React.ReactNode;
@@ -14,9 +13,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   return (
     <KindeProvider>
-      <AuthInitializer>
-        {children}
-      </AuthInitializer>
+      {children}
     </KindeProvider>
   );
 } 

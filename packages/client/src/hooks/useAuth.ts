@@ -66,8 +66,83 @@ export function useAuth() {
     syncUser()
   }, [isAuthenticated, user?.id]) // Fixed: Only depend on auth state and user ID
 
-  // Note: Token provider is now set up globally in AuthInitializer component
-  // This ensures it's configured once at app startup, not in every component
+  // Set up token provider for API client authentication
+  useEffect(() => {
+    console.log(
+      '[AUTH] Setting up token provider, isAuthenticated:',
+      isAuthenticated,
+      'kindeLoading:',
+      kindeLoading
+    )
+
+    // Critical: Only set up token provider after loading is complete
+    if (!kindeLoading) {
+      setTokenProvider(async () => {
+        // TESTING BACKDOOR: Provide test token when explicitly enabled
+        if (shouldUseTestingBackdoor) {
+          console.log('[AUTH] Providing test token for testing backdoor')
+          return 'test-auth-token'
+        }
+        
+        if (isAuthenticated) {
+          try {
+            console.log('[AUTH] Attempting to get access token...')
+
+            // Try multiple token methods for compatibility
+            let accessToken = null
+
+            // First try getToken() which is the most reliable method
+            try {
+              accessToken = await getToken()
+              console.log('[AUTH] getToken result:', accessToken ? 'Token present' : 'No token')
+            } catch (tokenError) {
+              console.warn('[AUTH] getToken failed:', tokenError)
+            }
+
+            // Fallback to raw token methods
+            if (!accessToken && getAccessTokenRaw) {
+              try {
+                accessToken = getAccessTokenRaw()
+                console.log(
+                  '[AUTH] getAccessTokenRaw result:',
+                  accessToken ? 'Token present' : 'No token'
+                )
+              } catch (rawError) {
+                console.warn('[AUTH] getAccessTokenRaw failed:', rawError)
+              }
+            }
+
+            if (!accessToken && accessTokenRaw) {
+              accessToken = accessTokenRaw
+              console.log(
+                '[AUTH] accessTokenRaw result:',
+                accessToken ? 'Token present' : 'No token'
+              )
+            }
+
+            if (accessToken) {
+              console.log('[AUTH] Access token retrieved for API - length:', accessToken.length)
+              // Validate token format (JWT should have 3 parts separated by dots)
+              const tokenParts = accessToken.split('.')
+              if (tokenParts.length !== 3) {
+                console.error('[AUTH] Invalid token format - not a valid JWT')
+                return null
+              }
+            } else {
+              console.error('[AUTH] No access token available despite being authenticated')
+            }
+
+            return accessToken
+          } catch (error) {
+            console.error('[AUTH] Failed to get access token:', error)
+            return null
+          }
+        }
+        console.log('[AUTH] Not authenticated, returning null token')
+        return null
+      })
+    }
+  }, [isAuthenticated, kindeLoading])
 
   const isLoading = kindeLoading || syncLoading
 

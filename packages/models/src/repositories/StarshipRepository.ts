@@ -292,7 +292,7 @@ export class StarshipRepository extends BaseRepository {
     );
 
     const { maxAgents, deployedCount } = result[0] || { maxAgents: 0, deployedCount: 0 };
-    return maxAgents - Number(deployedCount);
+    return Number(maxAgents) - Number(deployedCount);
   }
 
 

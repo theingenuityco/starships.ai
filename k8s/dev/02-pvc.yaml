@@ -5,11 +5,11 @@ metadata:
   namespace: starships-dev
 spec:
   accessModes:
-  - ReadWriteOnce
-  storageClassName: do-block-storage
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi
+      storage: 40Gi
+  storageClassName: do-block-storage
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -18,8 +18,8 @@ metadata:
   namespace: starships-dev
 spec:
   accessModes:
-  - ReadWriteOnce
-  storageClassName: do-block-storage
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 5Gi
+  storageClassName: do-block-storage

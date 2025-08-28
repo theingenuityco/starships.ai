@@ -2,70 +2,122 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: starships-app
-  namespace: starships-dev
+  namespace: starships-prod
   labels:
     app: starships-ai
-    environment: dev
+    environment: production
 spec:
   replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: starships-ai
-      environment: dev
+      environment: production
   template:
     metadata:
       labels:
         app: starships-ai
-        environment: dev
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
     spec:
+      # Security Context
+      securityContext:
+        runAsUser: 0
+        fsGroup: 1000
+      
+      # Anti-affinity for HA
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - starships-ai
+              topologyKey: kubernetes.io/hostname
+      
       imagePullSecrets:
       - name: ghcr-pull-secret
+      
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:latest
+        image: ghcr.io/theingenuityco/starships.ai:prod-latest
         imagePullPolicy: Always
+        
         ports:
         - containerPort: 3000
           name: frontend
+          protocol: TCP
         - containerPort: 4000
           name: backend
+          protocol: TCP
         - containerPort: 7474
           name: neo4j-http
+          protocol: TCP
         - containerPort: 7687
           name: neo4j-bolt
+          protocol: TCP
+        
+        # Production Environment Variables
         env:
+        # Core Settings
         - name: NODE_ENV
           value: "production"
         - name: SKIP_BUILD
           value: "true"
+        - name: SKIP_INSTALL
+          value: "true"
+        
+        # URLs
+        - name: CLIENT_URL
+          value: "https://starships.ai"
+        - name: NEXT_PUBLIC_API_URL
+          value: "https://starships.ai/api"
+        - name: NEXT_PUBLIC_SERVER_URL
+          value: "https://starships.ai/api"
+        - name: SERVER_URL
+          value: "http://localhost:4000"
+        
+        # Neo4j Configuration (with auth enabled)
         - name: NEO4J_URI
           value: "bolt://localhost:7687"
         - name: NEO4J_USERNAME
           value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "mcppassword"
-        - name: SKIP_INSTALL
-          value: "true"
-        - name: CLIENT_URL
-          value: "https://dev.starships.ai"
-        - name: NEXT_PUBLIC_API_URL
-          value: "https://dev.starships.ai/api"
-        - name: SERVER_URL
-          value: "http://localhost:4000"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEO4J_PASSWORD
+        - name: NEO4J_AUTH
+          value: "neo4j/$(NEO4J_PASSWORD)"
+        
+        # Kinde OAuth
         - name: KINDE_SITE_URL
-          value: "https://dev.starships.ai"
+          value: "https://starships.ai"
         - name: KINDE_POST_LOGIN_REDIRECT_URL
-          value: "https://dev.starships.ai/fleet"
+          value: "https://starships.ai/fleet"
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          value: "https://dev.starships.ai"
-        - name: KINDE_COOKIE_DOMAIN
-          value: "dev.starships.ai"
+          value: "https://starships.ai"
         - name: KINDE_REDIRECT_URL
-          value: "https://dev.starships.ai/api/auth/kinde_callback"
+          value: "https://starships.ai/api/auth/kinde_callback"
+        
+        # Security: Disable debug modes
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
-          value: "true"
+          value: "false"
         - name: KINDE_DEBUG_MODE
-          value: "true"
+          value: "false"
+        
+        # API Keys from Secrets
         - name: OPENAI_API_KEY
           valueFrom:
             secretKeyRef:
@@ -91,9 +143,13 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: STRIPE_PUBLISHABLE_KEY
+        
+        # Pull Kinde secrets
         envFrom:
         - secretRef:
             name: kinde-auth-secret
+        
+        # Resource Limits
         resources:
           requests:
             memory: "512Mi"
@@ -101,11 +157,16 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "1000m"
+        
+        
+        # Volume Mounts
         volumeMounts:
         - name: neo4j-data
           mountPath: /var/lib/neo4j/data
         - name: app-sessions
           mountPath: /app/data/sessions
+        
+      # Volumes
       volumes:
       - name: neo4j-data
         persistentVolumeClaim:

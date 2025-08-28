@@ -138,8 +138,7 @@ export abstract class BaseRepository {
    */
   protected handleValidationError(
     fieldErrors: Array<{ field: string; message: string; value?: any }>,
-    operation?: string,
-    _resource?: string
+    operation?: string
   ): never {
     const message = fieldErrors.map(e => `${e.field}: ${e.message}`).join(', ');
     throw new ValidationError(

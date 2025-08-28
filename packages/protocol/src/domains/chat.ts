@@ -261,10 +261,9 @@ export interface ChatSocketStreamError {
 
 /**
  * Socket.IO stream response metadata (extends base ChatStreamResponse)
+ * Currently identical to base ChatStreamResponse but reserved for future Socket.IO-specific properties
  */
-export interface ChatSocketStreamResponse extends ChatStreamResponse {
-  // Inherits from base ChatStreamResponse
-}
+export type ChatSocketStreamResponse = ChatStreamResponse;
 
 // ============================================================================
 // CHAT-SPECIFIC SOCKET EVENTS

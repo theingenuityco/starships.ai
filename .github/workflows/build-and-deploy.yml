@@ -149,12 +149,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: ''
+          cache-to: ''
           build-args: |
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VERSION=dev-${{ github.sha }}
             ENVIRONMENT=development
+            CACHE_BUST=${{ github.run_number }}
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -290,9 +291,10 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Use the latest image (dev build)
+          # Use SHA-based tag for guaranteed pod restart (SHA changes with every commit)
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA} \
             -n starships-dev
           
           # Wait for rollout
@@ -361,9 +363,10 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Use the new prod image
+          # Use SHA-based tag for guaranteed pod restart (SHA changes with every commit)
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod-latest \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:prod-${SHORT_SHA} \
             -n starships-prod
           
           # Wait for rollout

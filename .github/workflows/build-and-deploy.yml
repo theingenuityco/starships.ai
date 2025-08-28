@@ -80,11 +80,11 @@ jobs:
             
             if grep -q "Published release" semantic-output.txt; then
               NEXT_VERSION=$(grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' semantic-output.txt)
-              echo "Published version: ${NEXT_VERSION}"
+              echo "✅ Published new version: ${NEXT_VERSION}"
               echo "new_release_published=true" >> $GITHUB_OUTPUT
               echo "new_release_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
             else
-              echo "No new version published"
+              echo "ℹ️ No new version needed - skipping build and deploy"
               echo "new_release_published=false" >> $GITHUB_OUTPUT
               echo "new_release_version=" >> $GITHUB_OUTPUT
             fi
@@ -107,15 +107,15 @@ jobs:
       - name: Determine build decision
         id: build_decision
         run: |
-          # Build should proceed if:
-          # 1. New release would be published, OR
-          # 2. Manual workflow dispatch (workflow_dispatch allows override)
+          # Build should proceed ONLY if:
+          # 1. New release was published (semantic version created), OR
+          # 2. Manual workflow dispatch (allows override)
           if [[ "${{ steps.semantic.outputs.new_release_published }}" == "true" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "should_build=true" >> $GITHUB_OUTPUT
-            echo "Build will proceed"
+            echo "✅ Build will proceed"
           else
             echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "Build will be skipped - no meaningful changes detected"
+            echo "⏭️ Build skipped - no new version created"
           fi
 
   # Development Build and Deploy (triggered on semantic version or manual override)
@@ -308,14 +308,10 @@ jobs:
 
       - name: Update image in deployment
         run: |
-          # Use semantic version tag if available, otherwise use SHA
-          if [ -n "${{ needs.calculate-version.outputs.new_release_version }}" ]; then
-            IMAGE_TAG="${{ needs.calculate-version.outputs.new_release_version }}"
-          else
-            IMAGE_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
-          fi
+          # Use the semantic version tag
+          IMAGE_TAG="${{ needs.calculate-version.outputs.new_release_version }}"
           
-          echo "Deploying image with tag: ${IMAGE_TAG}"
+          echo "📦 Deploying version: ${IMAGE_TAG}"
           kubectl set image deployment/starships-app \
             starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
             -n starships-dev

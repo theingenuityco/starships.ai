@@ -85,6 +85,8 @@ spec:
           value: "neo4j/[NEO4J-PASSWORD]"
         
         # Kinde OAuth
+        - name: KINDE_ISSUER_URL
+          value: "[KINDE-ISSUER-URL]"
         - name: KINDE_SITE_URL
           value: "[DEV-DOMAIN-URL]"
         - name: KINDE_POST_LOGIN_REDIRECT_URL

@@ -166,7 +166,6 @@ jobs:
             kinde_post_logout_redirect_url=${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}
             next_public_api_url=${{ vars.NEXT_PUBLIC_API_URL }}
             next_public_server_url=${{ vars.NEXT_PUBLIC_SERVER_URL }}
-            next_public_enable_auth_testing_backdoor=${{ vars.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR }}
 
   # Production Build (triggered on release)
   build-prod:
@@ -231,7 +230,6 @@ jobs:
             kinde_post_logout_redirect_url=${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}
             next_public_api_url=${{ vars.NEXT_PUBLIC_API_URL }}
             next_public_server_url=${{ vars.NEXT_PUBLIC_SERVER_URL }}
-            next_public_enable_auth_testing_backdoor=${{ vars.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR }}
 
   # Deploy to Development
   deploy-dev:

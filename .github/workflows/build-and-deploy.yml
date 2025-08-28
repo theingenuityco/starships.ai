@@ -66,8 +66,8 @@ jobs:
           # Configure pnpm to use npmmirror.com (reliable mirror in case npm is down)
           pnpm config set registry https://registry.npmmirror.com
 
-      - name: Install semantic-release dependencies
-        run: pnpm add -D semantic-release @semantic-release/git @semantic-release/github @semantic-release/commit-analyzer @semantic-release/release-notes-generator @semantic-release/npm
+      - name: Install dependencies
+        run: pnpm install
 
       - name: Calculate Semantic Version
         id: semantic

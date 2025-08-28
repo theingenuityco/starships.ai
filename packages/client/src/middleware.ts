@@ -16,14 +16,19 @@ const publicPaths = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  console.log('[Middleware] Checking path:', pathname);
+
   // Skip middleware for public paths
   if (publicPaths.some(path => pathname.startsWith(path))) {
+    console.log('[Middleware] Public path, skipping auth check');
     return NextResponse.next();
   }
 
   // Check if user is authenticated with Kinde
   const { isAuthenticated } = getKindeServerSession();
   const isUserAuthenticated = await isAuthenticated();
+  
+  console.log('[Middleware] Path:', pathname, 'Authenticated:', isUserAuthenticated);
 
   // If authenticated, allow access to all routes (bypass waitlist)
   if (isUserAuthenticated) {

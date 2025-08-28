@@ -7,14 +7,12 @@ import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { sibilAPI } from '@/lib/sibil-api'
-import { generateSessionId as generateAgentSessionId, generateSibilSessionId } from '@/lib/storage'
 import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import type { Agent } from '@/lib/api'
 import type { ChatMode } from './ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
 import type { SibilMessage } from '@/lib/sibil-api'
-import { CHAT_TEXT } from '@/constants/text'
 
 interface UnifiedMessageInputProps {
   mode: ChatMode
@@ -70,22 +68,21 @@ export function UnifiedMessageInput({
     try {
       setSending(true)
       
-      // Generate or use existing session ID
+      // Use existing session ID or let server create one
       let currentSessionId = sessionId
       if (!currentSessionId) {
-        currentSessionId = mode === 'agent' && selectedAgent
-          ? generateAgentSessionId(selectedAgent.id, userId)
-          : generateSibilSessionId(userId, starshipId)
-        onSessionStart?.(currentSessionId)
+        // Don't generate complex client-side session IDs
+        // Let the server create and provide the actual database session ID
+        currentSessionId = undefined
       }
 
-      // Create user message first
+      // Create user message (sessionId will be provided by server)
       const userMessage: Message | SibilMessage = {
         id: generateId(),
         content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentSessionId,
+        sessionId: currentSessionId || 'pending', // Temporary until server provides real sessionId
         ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
       }
 
@@ -102,8 +99,8 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              // Update session ID with the one from server response
-              if (assistantMessage.sessionId && assistantMessage.sessionId !== currentSessionId) {
+              // Always use the session ID from server response for future requests
+              if (assistantMessage.sessionId) {
                 onSessionStart?.(assistantMessage.sessionId)
               }
               // No need to store manually - server handles this via socket handlers
@@ -130,8 +127,8 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              // Update session ID with the one from server response
-              if (assistantMessage.sessionId && assistantMessage.sessionId !== currentSessionId) {
+              // Always use the session ID from server response for future requests
+              if (assistantMessage.sessionId) {
                 onSessionStart?.(assistantMessage.sessionId)
               }
               // No need to store manually - server handles this via socket handlers
@@ -177,22 +174,21 @@ export function UnifiedMessageInput({
     try {
       setSending(true)
       
-      // Generate or use existing session ID
+      // Use existing session ID or let server create one
       let currentSessionId = sessionId
       if (!currentSessionId) {
-        currentSessionId = mode === 'agent' && selectedAgent
-          ? generateAgentSessionId(selectedAgent.id, userId)
-          : generateSibilSessionId(userId, starshipId)
-        onSessionStart?.(currentSessionId)
+        // Don't generate complex client-side session IDs
+        // Let the server create and provide the actual database session ID
+        currentSessionId = undefined
       }
 
-      // Create user message first
+      // Create user message (sessionId will be provided by server)
       const userMessage: Message | SibilMessage = {
         id: generateId(),
         content: suggestionText,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentSessionId,
+        sessionId: currentSessionId || 'pending', // Temporary until server provides real sessionId
         ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
       }
 
@@ -209,8 +205,8 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
-              // Update session ID with the one from server response
-              if (assistantMessage.sessionId && assistantMessage.sessionId !== currentSessionId) {
+              // Always use the session ID from server response for future requests
+              if (assistantMessage.sessionId) {
                 onSessionStart?.(assistantMessage.sessionId)
               }
               // No need to store manually - server handles this via socket handlers
@@ -237,6 +233,10 @@ export function UnifiedMessageInput({
               // Handle streaming updates if needed
             },
             onComplete: (assistantMessage) => {
+              // Always use the session ID from server response for future requests
+              if (assistantMessage.sessionId) {
+                onSessionStart?.(assistantMessage.sessionId)
+              }
               // No need to store manually - server handles this via socket handlers
               onMessageReceived?.(assistantMessage)
               currentStreamRef.current = null

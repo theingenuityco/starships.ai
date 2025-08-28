@@ -129,15 +129,6 @@ export class DatabaseMemoryStore {
    */
   private async getOrCreateSession(agentId: string, userId: string): Promise<ChatSession | null> {
     try {
-      // Try to find existing active session
-      const existingSession = await this.findExistingSession(agentId, userId);
-      if (existingSession) {
-        // Update activity timestamp
-        const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
-        await chatSessionRepo.updateActivity(existingSession.id);
-        return existingSession;
-      }
-
       // Get agent to retrieve starship_id for proper session association
       const agentRepo = RepositoryFactory.getAgentRepository();
       const agent = await agentRepo.findById(agentId);
@@ -146,6 +137,27 @@ export class DatabaseMemoryStore {
         console.error('❌ [DATABASE-MEMORY] Agent not found:', agentId);
         return null;
       }
+
+      // CRITICAL FIX: Ensure agent has a starshipId before creating session
+      if (!agent.starshipId) {
+        console.error('❌ [DATABASE-MEMORY] Agent has no starshipId assigned:', agentId);
+        return null;
+      }
+
+      // Try to find existing active session
+      const existingSession = await this.findExistingSession(agentId, userId, agent.starshipId);
+      if (existingSession) {
+        // Update activity timestamp
+        const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
+        await chatSessionRepo.updateActivity(existingSession.id);
+        return existingSession;
+      }
+
+      console.log('✅ [DATABASE-MEMORY] Creating new session for agent on starship:', {
+        agentId: agentId,
+        starshipId: agent.starshipId,
+        userId: userId
+      });
 
       // Create new session
       const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
@@ -173,14 +185,15 @@ export class DatabaseMemoryStore {
   /**
    * Find existing active session for agent/user combination
    */
-  private async findExistingSession(agentId: string, userId: string): Promise<ChatSession | null> {
+  private async findExistingSession(agentId: string, userId: string, starshipId?: string): Promise<ChatSession | null> {
     try {
       const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
       const sessions = await chatSessionRepo.findByUser(userId, 10);
 
-      // Find session for this agent that's still active (within 30 minutes)
+      // Find session for this agent/starship that's still active (within 30 minutes)
       const activeSession = sessions.find((session: any) => {
         if (session.agent_id !== agentId) return false;
+        if (starshipId && session.starship_id !== starshipId) return false;  // Also check starship match if provided
         
         const lastActivity = new Date(session.last_activity_at);
         const now = new Date();

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
-import { getChatHistory, saveChatHistory, generateSessionId } from '@/lib/storage'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { ERROR_TEXT } from '@/constants/text'
@@ -55,13 +54,9 @@ export function ChatInterface({
     }
   }, [agent, sessionId, userId, isAuthenticated])
 
-  // Load messages when session changes
+  // Reset messages when session changes - server will provide messages via socket
   useEffect(() => {
-    if (sessionId) {
-      loadMessages(sessionId)
-    } else {
-      setMessages([])
-    }
+    setMessages([])
   }, [sessionId])
 
   // Fetch connector instances if starshipSlug is provided
@@ -89,32 +84,12 @@ export function ChatInterface({
       return
     }
 
-    // TODO: Add debouncing for rapid agent switching
-    let newSessionId = generateSessionId(agent.id, userId) // Use real user ID from auth
-
-    // If we have a starship slug, modify the session ID to include it
-    if (starshipSlug) {
-      newSessionId = `starship-${starshipSlug}:${newSessionId}`
-    }
-
-    currentSessionId.current = newSessionId
-    onSessionCreated(newSessionId)
+    // Reset session - let server provide the actual session ID
+    currentSessionId.current = null
+    onSessionCreated('')
     setError(null)
   }
 
-  const loadMessages = (sessionId: string) => {
-    try {
-      setLoading(true)
-      const storedMessages = getChatHistory(sessionId)
-      setMessages(storedMessages)
-      setError(null)
-    } catch (err) {
-      console.error('Failed to load messages:', err)
-      setError(ERROR_TEXT.FAILED_TO_LOAD_MESSAGES)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSendMessage = async (content: string) => {
     if (!currentSessionId.current) {
@@ -195,6 +170,12 @@ export function ChatInterface({
           })
         },
         onComplete: finalMessage => {
+          // Update session ID with the one from server
+          if (finalMessage.sessionId && finalMessage.sessionId !== sessionId) {
+            currentSessionId.current = finalMessage.sessionId
+            onSessionCreated(finalMessage.sessionId)
+          }
+          
           // Update the streaming message to final state
           setMessages(prev => {
             const updatedMessages = prev.map(msg =>
@@ -207,8 +188,7 @@ export function ChatInterface({
                 : msg
             )
 
-            // Save to history
-            saveChatHistory(sessionId, updatedMessages)
+            // No need to save to localStorage - server handles all message storage
             return updatedMessages
           })
 
@@ -225,12 +205,9 @@ export function ChatInterface({
           setStreamingMessageId(null)
           setLoading(false)
 
-          // Save messages without the failed attempt
-          setMessages(prev => {
-            const cleanMessages = prev.filter(msg => msg.id !== assistantMessageId)
-            saveChatHistory(sessionId, cleanMessages)
-            return cleanMessages
-          })
+          // Remove messages without the failed attempt
+          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
+          // No need to save to localStorage - server handles all message storage
         },
         onTypingStart: () => {
           // Removed typing indicator - content streams directly

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { Bot, Users, Sparkles } from 'lucide-react'
+import { Users, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { UnifiedMessageInput } from './UnifiedMessageInput'
@@ -10,7 +10,6 @@ import { UnifiedMessageList } from './UnifiedMessageList'
 import { ChatModeSelector } from './ChatModeSelector'
 import { AgentSelector } from './AgentSelector'
 import { ProviderSelector } from './ProviderSelector'
-import { generateSessionId as generateAgentSessionId, generateSibilSessionId } from '@/lib/storage'
 import type { Agent } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 import type { SibilMessage } from '@/lib/sibil-api'
@@ -40,30 +39,26 @@ export function UnifiedChatInterface({
   const [refreshMessages, setRefreshMessages] = useState(0)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
-  // Initialize or update session when mode/agent/starship changes
+  // Reset session when mode/agent/starship changes - let server manage session IDs
   useEffect(() => {
     if (userId && isAuthenticated) {
-      let newSessionId: string
-      
       if (chatMode === 'agent' && selectedAgent) {
-        newSessionId = generateAgentSessionId(selectedAgent.id, userId)
+        // Reset session for agent mode - server will provide actual session ID
+        setCurrentSessionId(null)
+        setHasMessages(false)
+        setRefreshMessages(prev => prev + 1)
       } else if (chatMode === 'sibil') {
-        newSessionId = generateSibilSessionId(userId, starshipId)
+        // Reset session for sibil mode - server will provide actual session ID
+        setCurrentSessionId(null)
+        setHasMessages(false)
+        setRefreshMessages(prev => prev + 1)
       } else {
         // No session for agent mode without selected agent
         setCurrentSessionId(null)
         setHasMessages(false)
-        return
-      }
-
-      // Only update if session actually changed
-      if (newSessionId !== currentSessionId) {
-        setCurrentSessionId(newSessionId)
-        setHasMessages(false) // Reset UI state for new session
-        setRefreshMessages(prev => prev + 1)
       }
     }
-  }, [userId, isAuthenticated, chatMode, selectedAgent, starshipId, currentSessionId])
+  }, [userId, isAuthenticated, chatMode, selectedAgent, starshipId])
 
   // Show loading state
   if (isLoading) {

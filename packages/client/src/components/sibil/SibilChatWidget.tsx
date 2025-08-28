@@ -7,11 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { SibilMessage, sibilAPI } from '@/lib/sibil-api';
-import { getChatHistory, saveChatHistory, generateSibilSessionId } from '@/lib/storage';
 import { useAuth } from '@/hooks/useAuth';
-import { useStarshipStore } from '@/store/starship-store';
 import { usePathname } from 'next/navigation';
-import { SibilMessageBubble } from './SibilMessageBubble';
 
 interface SibilChatWidgetProps {
   starshipId?: string;
@@ -36,14 +33,11 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
   // Initialize session and onboarding messages
   useEffect(() => {
     if (userId && isAuthenticated && starshipId) {
-      const newSessionId = generateSibilSessionId(userId, starshipId + '-widget');
-      sessionId.current = newSessionId;
+      // Reset session - let server provide the actual session ID
+      sessionId.current = '';
       
-      // Load existing messages
-      const storedMessages = getChatHistory(newSessionId) as SibilMessage[];
-      
-      // Load existing messages without auto-opening
-      setMessages(storedMessages);
+      // Start fresh without pre-loading messages since we don't have a real session ID yet
+      setMessages([]);
     }
   }, [userId, isAuthenticated, starshipId, isVisionChamberFirstVisit]);
 
@@ -98,6 +92,11 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
             ));
           },
           onComplete: (finalMessage) => {
+            // Update session ID with the one from server
+            if (finalMessage.sessionId && finalMessage.sessionId !== sessionId.current) {
+              sessionId.current = finalMessage.sessionId;
+            }
+            
             setMessages(prev => prev.map(msg =>
               msg.id === streamingMessage.id
                 ? { ...finalMessage, id: msg.id, streaming: false }
@@ -105,8 +104,7 @@ export function SibilChatWidget({ starshipId, isFirstStarship = false }: SibilCh
             ));
             setStreaming(false);
             
-            const allMessages = [...messages, userMessage, finalMessage];
-            saveChatHistory(sessionId.current, allMessages);
+            // No need to save to localStorage - server handles all message storage
           },
           onError: (error) => {
             console.error('Streaming error:', error);

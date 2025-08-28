@@ -1,5 +1,5 @@
 import { buildPrompt } from "./prompt/builder";
-import { LangChainMemoryStore } from "./memory/langchain-memory";
+import { DatabaseMemoryStore } from "./memory/database-memory";
 import { ProviderFactory } from "./llm/provider-factory";
 import { RepositoryFactory } from "@starships/models";
 import { NativeToolWrapper } from "./tools/NativeToolWrapper";
@@ -16,7 +16,7 @@ import { HumanMessage, AIMessage } from "@langchain/core/messages";
  */
 export async function chat(
   req: ChatRequest,
-  store: LangChainMemoryStore,
+  store: DatabaseMemoryStore,
   options?: { overrideStarshipId?: string }
 ): Promise<ChatResponse> {
   // Validate that agent_id is provided for agent chat
@@ -444,8 +444,8 @@ When users ask about page content using words like "stored", "inside", "text", "
 
 // Keep the old function name for backward compatibility during migration
 export async function chatWithMCP(
-  req: ChatRequest, 
-  store: LangChainMemoryStore, 
+  req: ChatRequest,
+  store: DatabaseMemoryStore,
   options?: { overrideStarshipId?: string }
 ): Promise<ChatResponse> {
   return chat(req, store, options);

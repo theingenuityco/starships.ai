@@ -68,7 +68,8 @@ api.interceptors.request.use(
     const requiresAuth =
       config.url?.includes('/api/starships') ||
       config.url?.includes('/api/agents') ||
-      config.url?.includes('/api/users')
+      config.url?.includes('/api/users') ||
+      config.url?.includes('/api/chat')
 
     if (requiresAuth) {
       console.log('[API] Authenticated endpoint detected, waiting for token provider...')
@@ -184,14 +185,15 @@ import {
   StarshipListResponse,
   StarshipDetailsResponse,
   CreateStarshipRequest,
+  ChatSession,
 } from '@starships/protocol'
 
 // Re-export types for use in other client components
-export type { 
-  Agent, 
-  AgentConfig, 
-  CreateAgentRequest, 
-  UpdateAgentRequest, 
+export type {
+  Agent,
+  AgentConfig,
+  CreateAgentRequest,
+  UpdateAgentRequest,
   AgentTemplate,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
@@ -199,7 +201,8 @@ export type {
   StarshipAgentsResponse,
   StarshipListResponse,
   StarshipDetailsResponse,
-  CreateStarshipRequest
+  CreateStarshipRequest,
+  ChatSession
 }
 
 // MCP Server Option interface (matching backend model)
@@ -550,6 +553,34 @@ export const chatAPI = {
       sessionId: request.sessionId || `agent-${request.agentId}`,
     }
   },
+
+  // Get chat messages by session ID from database
+  getMessagesBySession: async (sessionId: string, limit: number = 50, offset: number = 0): Promise<Message[]> => {
+    const response = await api.get(`/api/chat/messages/${sessionId}`, {
+      params: { limit, offset }
+    })
+    
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to fetch messages')
+    }
+
+    // Convert database messages to client Message format
+    const dbMessages = response.data.data.messages
+    return dbMessages.map((dbMsg: any) => ({
+      id: dbMsg.id,
+      content: dbMsg.content,
+      role: dbMsg.role as 'user' | 'assistant',
+      timestamp: dbMsg.timestamp,
+      sessionId: dbMsg.session_id,
+      ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content })
+    }))
+  },
+
+  // Get chat sessions by starship ID
+  getSessionsByStarship: (starshipId: string): Promise<{ sessions: ChatSession[] }> =>
+    api
+      .get(`/api/chat/sessions/starship/${starshipId}`)
+      .then((res: AxiosResponse<{ sessions: ChatSession[] }>) => res.data),
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>

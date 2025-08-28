@@ -29,6 +29,12 @@ export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 // Export waitlist repository
 export { WaitlistRepository } from './WaitlistRepository';
 
+// Export chat session repository
+export { ChatSessionRepository } from './ChatSessionRepository';
+
+// Export chat message repository
+export { ChatMessageRepository } from './ChatMessageRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -48,6 +54,12 @@ import { MissionClarityRepository } from './MissionClarityRepository';
 
 // Import native tool API key repository
 import { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
+
+// Import chat session repository
+import { ChatSessionRepository } from './ChatSessionRepository';
+
+// Import chat message repository
+import { ChatMessageRepository } from './ChatMessageRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -86,6 +98,12 @@ export class RepositoryFactory {
 
   // Waitlist repository instance
   private static waitlistRepo: WaitlistRepository | null = null;
+
+  // Chat session repository instance
+  private static chatSessionRepo: ChatSessionRepository | null = null;
+
+  // Chat message repository instance
+  private static chatMessageRepo: ChatMessageRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -155,6 +173,12 @@ export class RepositoryFactory {
       // Initialize native tool API key repository (no dependencies)
       this.nativeToolApiKeyRepo = new NativeToolApiKeyRepository();
 
+      // Initialize chat session repository (no dependencies)
+      this.chatSessionRepo = new ChatSessionRepository();
+
+      // Initialize chat message repository (no dependencies)
+      this.chatMessageRepo = new ChatMessageRepository();
+
       // Initialize repositories with dependencies
       this.starshipRepo = new StarshipRepository();
 
@@ -217,6 +241,8 @@ export class RepositoryFactory {
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
         waitlistRepo: this.waitlistRepo !== null,
+        chatSessionRepo: this.chatSessionRepo !== null,
+        chatMessageRepo: this.chatMessageRepo !== null,
       }
     };
   }
@@ -394,6 +420,27 @@ export class RepositoryFactory {
     return this.waitlistRepo;
   }
 
+  /**
+   * Get ChatSessionRepository instance (synchronous)
+   */
+  static getChatSessionRepository(): ChatSessionRepository {
+    this.ensureInitialized();
+    if (!this.chatSessionRepo) {
+      throw new Error('ChatSessionRepository not initialized');
+    }
+    return this.chatSessionRepo;
+  }
+
+  /**
+   * Get ChatMessageRepository instance (synchronous)
+   */
+  static getChatMessageRepository(): ChatMessageRepository {
+    this.ensureInitialized();
+    if (!this.chatMessageRepo) {
+      throw new Error('ChatMessageRepository not initialized');
+    }
+    return this.chatMessageRepo;
+  }
 
   // ========================================================================
   // UTILITY METHODS
@@ -420,6 +467,8 @@ export class RepositoryFactory {
     this.missionClarityRepo = null;
     this.nativeToolApiKeyRepo = null;
     this.waitlistRepo = null;
+    this.chatSessionRepo = null;
+    this.chatMessageRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

@@ -1,13 +1,13 @@
-import { LangChainMemoryStore } from "@starships/agent-engine";
+import { DatabaseMemoryStore } from "@starships/agent-engine";
 
-let store: LangChainMemoryStore | null = null;
+let store: DatabaseMemoryStore | null = null;
 
 /**
- * Get singleton memory store instance
+ * Get singleton memory store instance (now database-backed)
  */
-export default function getStore(): LangChainMemoryStore {
+export default function getStore(): DatabaseMemoryStore {
   if (!store) {
-    store = new LangChainMemoryStore();
+    store = new DatabaseMemoryStore();
   }
   return store;
 }

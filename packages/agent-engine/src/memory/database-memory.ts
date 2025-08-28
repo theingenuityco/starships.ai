@@ -138,15 +138,30 @@ export class DatabaseMemoryStore {
         return existingSession;
       }
 
+      // Get agent to retrieve starship_id for proper session association
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agent = await agentRepo.findById(agentId);
+      
+      if (!agent) {
+        console.error('❌ [DATABASE-MEMORY] Agent not found:', agentId);
+        return null;
+      }
+
       // Create new session
       const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
       const newSession = await chatSessionRepo.create({
         source: 'agent',
         created_by: userId,
-        agent_id: agentId
+        agent_id: agentId,
+        starship_id: agent.starshipId  // CRITICAL: Include starship_id for proper relationships
       });
 
-      console.log('✅ [DATABASE-MEMORY] Created new session:', newSession.id);
+      console.log('✅ [DATABASE-MEMORY] Created new session:', {
+        sessionId: newSession.id,
+        agentId: agentId,
+        starshipId: agent.starshipId,
+        userId: userId
+      });
       return newSession;
 
     } catch (error) {

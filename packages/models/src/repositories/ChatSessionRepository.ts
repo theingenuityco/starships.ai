@@ -34,10 +34,31 @@ export class ChatSessionRepository extends BaseRepository {
         total_tokens: 0
       };
 
-      await connection.executeWrite(
-        'CREATE (s:ChatSession $props) RETURN s',
-        { props: sessionData }
-      );
+      // Build query to create session and relationships
+      let query = 'CREATE (s:ChatSession $props)';
+      const params: any = { props: sessionData };
+
+      // Add starship relationship if provided
+      if (data.starship_id) {
+        query += `
+          WITH s
+          MATCH (st:Starship {id: $starshipId})
+          CREATE (s)-[:BELONGS_TO]->(st)`;
+        params.starshipId = data.starship_id;
+      }
+
+      // Add agent relationship if provided
+      if (data.agent_id) {
+        query += `
+          WITH s
+          MATCH (a:Agent {id: $agentId})
+          CREATE (s)-[:USES_AGENT]->(a)`;
+        params.agentId = data.agent_id;
+      }
+
+      query += ' RETURN s';
+
+      await connection.executeWrite(query, params);
 
       return {
         ...sessionData,

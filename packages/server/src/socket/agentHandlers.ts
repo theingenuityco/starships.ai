@@ -3,9 +3,61 @@ import type { SocketEvents, ChatRequest, ChatStreamChunk } from '@starships/prot
 import { chat } from '@starships/agent-engine';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
+import { RepositoryFactory } from '@starships/models';
 import getStore from '../store';
 
 export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
+  // Helper functions for agent chat session management (following sibil pattern)
+  const getOrCreateAgentChatSession = async (userId: string, agentId: string): Promise<any> => {
+    const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
+    
+    // Try to find active session for this agent/user combination
+    const activeSessions = await chatSessionRepo.findByUser(userId, 10);
+    const existingSession = activeSessions.find((session: any) =>
+      session.agent_id === agentId &&
+      session.source === 'agent' &&
+      isSessionActive(session)
+    );
+    
+    if (existingSession) {
+      await chatSessionRepo.updateActivity(existingSession.id);
+      return existingSession;
+    }
+    
+    // Get agent to retrieve starship_id for proper session association
+    const agent = await AgentService.getAgent(agentId);
+    if (!agent) {
+      console.error(`❌ [AGENT SESSION] Agent not found: ${agentId}`);
+      return null;
+    }
+    
+    // Create new session
+    return await chatSessionRepo.create({
+      source: 'agent',
+      created_by: userId,
+      agent_id: agentId,
+      starship_id: agent.starshipId || undefined
+    });
+  };
+  
+  const isSessionActive = (session: any): boolean => {
+    const lastActivity = new Date(session.last_activity_at);
+    const now = new Date();
+    const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
+    return diffMinutes < 30; // 30 minute timeout
+  };
+  
+  const storeMessage = async (sessionId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> => {
+    const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
+    await chatMessageRepo.create({
+      session_id: sessionId,
+      role,
+      content,
+      structured_content: metadata?.structured_content,
+      stream_id: metadata?.stream_id
+    });
+  };
+
   io.on('connection', (socket: Socket) => {
     const userId = socket.data.userId;
     const socketService = SocketIOService.getInstance();
@@ -17,17 +69,38 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
 
       try {
         // Validate request
-        if (!request.message || !request.agent_id || !request.session_id) {
+        if (!request.message || !request.agent_id) {
           socket.emit('agent:stream-error', {
             stream_id: request.stream_id,
             agent_id: request.agent_id,
             error_code: 'INVALID_REQUEST',
-            message: 'Message, agent_id, and session_id are required',
+            message: 'Message and agent_id are required',
             timestamp: Date.now(),
             recoverable: false
           });
           return;
         }
+
+        // Get or create chat session in database
+        const chatSession = await getOrCreateAgentChatSession(userId, request.agent_id);
+        if (!chatSession) {
+          socket.emit('agent:stream-error', {
+            stream_id: request.stream_id,
+            agent_id: request.agent_id,
+            error_code: 'SESSION_CREATION_FAILED',
+            message: 'Failed to create or retrieve chat session',
+            timestamp: Date.now(),
+            recoverable: true
+          });
+          return;
+        }
+
+        console.log(`✅ [AGENT SESSION] Using session: ${chatSession.id} for agent ${request.agent_id}`);
+
+        // Store user message
+        await storeMessage(chatSession.id, 'user', request.message, {
+          stream_id: request.stream_id
+        });
 
         // Verify agent exists
         const agent = await AgentService.getAgent(request.agent_id);
@@ -55,12 +128,13 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
           // Continue with streaming - don't fail on analytics
         }
 
-        // Convert to ChatRequest for agent engine
+        // Convert to ChatRequest for agent engine with proper session_id
         const chatRequest: ChatRequest = {
           source: 'agent',
           agent_id: request.agent_id,
           user_id: userId,
           message: request.message,
+          session_id: chatSession.id, // Use the actual database session ID
           stream: true // Enable true streaming
         };
 
@@ -121,12 +195,18 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
             socket.emit('chat:stream-chunk', streamChunk);
           }
 
+          // Store assistant message
+          await storeMessage(chatSession.id, 'assistant', fullResponse, {
+            stream_id: request.stream_id,
+            usage: response.usage
+          });
+
           // Send completion
           socket.emit('chat:typing-stop', { source: 'agent', agentId: request.agent_id });
           socket.emit('chat:stream-complete', {
             content: fullResponse,
             agent_id: request.agent_id,
-            session_id: request.session_id,
+            session_id: chatSession.id, // Use the actual database session ID
             timestamp: new Date().toISOString(),
             source: 'agent',
             usage: response.usage

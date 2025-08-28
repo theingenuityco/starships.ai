@@ -218,9 +218,7 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
     );
 
     res.json({
-      success: true,
-      data: { sessions },
-      count: sessions.length
+      sessions
     });
 
   } catch (error) {

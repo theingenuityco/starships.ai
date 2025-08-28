@@ -155,14 +155,34 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
         socket.emit('sibil:stream-start', request.stream_id);
         socket.emit('sibil:typing-start');
 
-        // Convert to standard SibilRequest
+        // Get or create chat session in database
+        const chatSession = await getOrCreateChatSession(userId, request.starship_id || 'default');
+        if (!chatSession) {
+          socket.emit('sibil:stream-error', {
+            stream_id: request.stream_id,
+            error_code: 'SESSION_CREATION_FAILED',
+            message: 'Failed to create or retrieve chat session',
+            timestamp: Date.now(),
+            recoverable: true
+          });
+          return;
+        }
+
+        console.log(`✅ [SIBIL SESSION] Using session: ${chatSession.id}`);
+
+        // Store user message
+        await storeMessage(chatSession.id, 'user', request.message, {
+          stream_id: request.stream_id
+        });
+
+        // Convert to standard SibilRequest with actual session ID
         const sibilRequest = {
           source: 'sibil' as const,
           provider: request.provider,
           model: request.model,
           message: request.message,
           user_id: userId,
-          session_id: request.session_id,
+          session_id: chatSession.id, // Use actual database session ID
           starship_id: request.starship_id
         };
 
@@ -221,14 +241,24 @@ export function setupSibilHandlers(io: SocketIOServer<SocketEvents>) {
               socket.emit('sibil:stream-chunk', socketChunk);
             }
           } else if (chunk.type === 'complete') {
+            const finalContent = chunk.content || accumulatedContent;
+            
+            // Store assistant message
+            await storeMessage(chatSession.id, 'assistant', finalContent, {
+              stream_id: request.stream_id,
+              structured_content: chunk.structured_content,
+              usage: chunk.usage
+            });
+
             // Send completion
             socket.emit('sibil:typing-stop');
             socket.emit('sibil:stream-complete', {
-              content: chunk.content || accumulatedContent,
+              content: finalContent,
               structured_content: chunk.structured_content,
               provider: chunk.provider!,
               model: chunk.model!,
-              usage: chunk.usage
+              usage: chunk.usage,
+              session_id: chatSession.id // Include the actual session ID
             });
 
             // Check for vision-related content and trigger refinement

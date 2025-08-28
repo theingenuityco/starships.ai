@@ -13,7 +13,7 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
 /**
  * Validates that required environment variables are present
  */
-function validateRequired(variables: Record<string, any>, required: string[]): void {
+function validateRequired(variables: Record<string, unknown>, required: string[]): void {
   const missing = required.filter(key => !variables[key]);
   if (missing.length > 0) {
     throw new EnvironmentValidationError(

@@ -1,15 +1,19 @@
 import { handleAuth } from "@kinde-oss/kinde-auth-nextjs/server";
 import { NextRequest } from "next/server";
 
-// Custom handler to work with HTTP in production (temporary for MVP)
+// Default Kinde auth handler - let the SDK handle everything
 const authHandler = handleAuth();
 
 export async function GET(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
   // Get the response from the default handler
   const response = await authHandler(request, { params });
   
-  // If we're in production with HTTP, we need to modify cookie settings
-  if (process.env.NODE_ENV === 'production' && process.env.KINDE_SITE_URL?.startsWith('http://')) {
+  // Only modify cookies for actual HTTP deployments (not HTTPS)
+  // dev.starships.ai uses HTTPS, so it doesn't need modifications
+  if (process.env.NODE_ENV === 'production' && 
+      process.env.KINDE_SITE_URL?.startsWith('http://') && 
+      !process.env.KINDE_SITE_URL?.startsWith('https://')) {
+    
     // Clone the response to modify headers
     const modifiedResponse = new Response(response.body, response);
     
@@ -20,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: { kindeAut
     modifiedResponse.headers.delete('set-cookie');
     
     // Re-add cookies without Secure flag for HTTP
-    cookies.forEach(cookie => {
+    cookies.forEach((cookie: string) => {
       // Remove Secure flag for HTTP deployment
       const modifiedCookie = cookie.replace(/;\s*Secure/gi, '');
       modifiedResponse.headers.append('set-cookie', modifiedCookie);
@@ -29,9 +33,11 @@ export async function GET(request: NextRequest, { params }: { params: { kindeAut
     return modifiedResponse;
   }
   
+  // For HTTPS (including dev.starships.ai), return unmodified response
+  // Let Kinde SDK handle cookies properly
   return response;
 }
 
 export async function POST(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
   return GET(request, { params });
-} 
+}

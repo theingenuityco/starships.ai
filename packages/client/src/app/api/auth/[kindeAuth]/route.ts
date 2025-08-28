@@ -4,7 +4,15 @@ import { NextRequest, NextResponse } from "next/server";
 // Custom handler to work with HTTP in production (temporary for MVP)
 const authHandler = handleAuth();
 
-export async function GET(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
+export async function GET(
+  request: NextRequest, 
+  context: { params: Promise<{ kindeAuth: string }> | { kindeAuth: string } }
+) {
+  // Handle both async and sync params for compatibility
+  const params = 'then' in context.params 
+    ? await context.params 
+    : context.params;
+    
   // Get the response from the default handler
   const response = await authHandler(request, { params });
   
@@ -55,6 +63,9 @@ export async function GET(request: NextRequest, { params }: { params: { kindeAut
   return response;
 }
 
-export async function POST(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
-  return GET(request, { params });
+export async function POST(
+  request: NextRequest, 
+  context: { params: Promise<{ kindeAuth: string }> | { kindeAuth: string } }
+) {
+  return GET(request, context);
 }

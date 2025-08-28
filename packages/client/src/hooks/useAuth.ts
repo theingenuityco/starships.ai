@@ -28,7 +28,18 @@ export function useAuth() {
         const cookies = document.cookie
         const hasAccessToken = cookies.includes('access_token=')
         const hasIdToken = cookies.includes('id_token=')
-        setHasCookies(hasAccessToken && hasIdToken)
+        const hasBothCookies = hasAccessToken && hasIdToken
+        
+        // Log cookie status for debugging
+        console.log('[AUTH] Cookie check:', {
+          hasAccessToken,
+          hasIdToken,
+          hasBothCookies,
+          cookieCount: cookies.split(';').length,
+          cookies: cookies.substring(0, 100) + '...'
+        })
+        
+        setHasCookies(hasBothCookies)
       }
     }
     
@@ -41,6 +52,17 @@ export function useAuth() {
 
   // Use cookie presence as fallback for authentication state
   const isAuthenticated = kindeIsAuthenticated || (!kindeLoading && hasCookies)
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('[AUTH] Auth state:', {
+      kindeIsAuthenticated,
+      kindeLoading,
+      hasCookies,
+      isAuthenticated,
+      user
+    })
+  }, [kindeIsAuthenticated, kindeLoading, hasCookies, isAuthenticated, user])
 
   // TESTING BACKDOOR: Only activate when explicitly enabled
   const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'

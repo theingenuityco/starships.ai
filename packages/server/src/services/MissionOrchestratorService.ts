@@ -234,7 +234,7 @@ export class MissionOrchestratorService {
       temperature: 0.7,
       maxTokens: 1000,
       provider: 'openai',
-      model: 'gpt-4'
+      model: 'gpt-4o'
     });
   }
 

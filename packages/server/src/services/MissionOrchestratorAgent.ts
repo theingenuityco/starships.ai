@@ -151,7 +151,7 @@ export class MissionOrchestratorAgent {
     temperature: 0.9,
     maxTokens: 1000,
     provider: 'openai',
-    model: 'gpt-4'
+    model: 'gpt-4o'
   };
 
   constructor(config?: Partial<MissionOrchestratorAgentConfig>) {

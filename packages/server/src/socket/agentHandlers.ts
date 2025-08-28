@@ -11,11 +11,25 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
   const getOrCreateAgentChatSession = async (userId: string, agentId: string): Promise<any> => {
     const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
     
-    // Try to find active session for this agent/user combination
+    // Get agent to retrieve starship_id for proper session association
+    const agent = await AgentService.getAgent(agentId);
+    if (!agent) {
+      console.error(`❌ [AGENT SESSION] Agent not found: ${agentId}`);
+      return null;
+    }
+
+    // CRITICAL FIX: Ensure agent has a starshipId before creating session
+    if (!agent.starshipId) {
+      console.error(`❌ [AGENT SESSION] Agent ${agentId} has no starshipId assigned - cannot create session`);
+      return null;
+    }
+    
+    // Try to find active session for this agent/user/starship combination
     const activeSessions = await chatSessionRepo.findByUser(userId, 10);
     const existingSession = activeSessions.find((session: any) =>
       session.agent_id === agentId &&
       session.source === 'agent' &&
+      session.starship_id === agent.starshipId &&
       isSessionActive(session)
     );
     
@@ -24,19 +38,14 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
       return existingSession;
     }
     
-    // Get agent to retrieve starship_id for proper session association
-    const agent = await AgentService.getAgent(agentId);
-    if (!agent) {
-      console.error(`❌ [AGENT SESSION] Agent not found: ${agentId}`);
-      return null;
-    }
+    console.log(`✅ [AGENT SESSION] Creating new session for agent ${agentId} on starship ${agent.starshipId}`);
     
-    // Create new session
+    // Create new session with proper starship relationship
     return await chatSessionRepo.create({
       source: 'agent',
       created_by: userId,
       agent_id: agentId,
-      starship_id: agent.starshipId || undefined
+      starship_id: agent.starshipId  // Required - no undefined check
     });
   };
   

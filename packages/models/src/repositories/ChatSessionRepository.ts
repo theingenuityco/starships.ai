@@ -119,21 +119,54 @@ export class ChatSessionRepository extends BaseRepository {
       const params: any = { starshipId, limit: Math.floor(Number(limit)) };
       if (userId) params.userId = userId;
 
-      const result = await connection.executeQuery<{ s: any, st: any, a: any }>(
-        `MATCH (s:ChatSession)-[:BELONGS_TO]->(st:Starship {id: $starshipId})
+      console.log('🔍 [ChatSessionRepository] findByStarship query params:', {
+        starshipId,
+        userId,
+        limit,
+        userFilter,
+        params
+      });
+
+      const query = `MATCH (s:ChatSession)-[:BELONGS_TO]->(st:Starship {id: $starshipId})
          WHERE 1=1 ${userFilter}
          OPTIONAL MATCH (s)-[:USES_AGENT]->(a:Agent)
          RETURN s, st, a
          ORDER BY s.last_activity_at DESC
-         LIMIT $limit`,
-        params
-      );
+         LIMIT $limit`;
 
-      return result.map(record => ({
+      console.log('🔍 [ChatSessionRepository] Executing query:', query);
+
+      const result = await connection.executeQuery<{ s: any, st: any, a: any }>(query, params);
+
+      console.log('🔍 [ChatSessionRepository] Raw query result:', {
+        resultCount: result.length,
+        results: result.map(r => ({
+          sessionId: r.s?.id,
+          sessionSource: r.s?.source,
+          sessionCreatedBy: r.s?.created_by,
+          starshipId: r.st?.id,
+          agentId: r.a?.id
+        }))
+      });
+
+      const mappedResults = result.map(record => ({
         ...record.s,
         starship_id: starshipId,
         agent_id: record.a?.id
       } as ChatSession));
+
+      console.log('🔍 [ChatSessionRepository] Mapped results:', {
+        mappedCount: mappedResults.length,
+        sessions: mappedResults.map(s => ({
+          id: s.id,
+          source: s.source,
+          created_by: s.created_by,
+          starship_id: s.starship_id,
+          agent_id: s.agent_id
+        }))
+      });
+
+      return mappedResults;
     }, 'findByStarship', 'ChatSession');
   }
 

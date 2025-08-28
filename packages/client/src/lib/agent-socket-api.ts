@@ -21,13 +21,13 @@ export interface Message {
 export interface AgentRequest {
   agentId: string;
   message: string;
-  sessionId: string;
+  sessionId?: string;
 }
 
 export const agentSocketAPI = {
   sendMessageStream: (
     agentId: string,
-    request: { sessionId: string; message: string },
+    request: { sessionId?: string; message: string },
     callbacks: {
       onChunk: (chunk: ChatStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: Message) => void;

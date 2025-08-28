@@ -1,11 +1,9 @@
 'use client'
 
-import { useServerAuth } from '@/hooks/useServerAuth'
+import { useAuth } from '@/hooks/useAuth'
 import { LoginButton } from './LoginButton'
 import { motion } from 'motion/react'
 import { Rocket, Stars, Zap } from 'lucide-react'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 interface AuthGateProps {
   children: React.ReactNode
@@ -14,20 +12,10 @@ interface AuthGateProps {
 /**
  * Authentication gate component
  * Shows login UI for unauthenticated users, or renders children for authenticated users
- * Uses server-side auth state as source of truth
+ * Integrates with the existing space-themed design
  */
 export function AuthGate({ children }: AuthGateProps) {
-  const { isAuthenticated, isLoading } = useServerAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    // Check auth state periodically in case of changes
-    const interval = setInterval(() => {
-      router.refresh()
-    }, 30000) // Refresh every 30 seconds
-
-    return () => clearInterval(interval)
-  }, [router])
+  const { isAuthenticated, isLoading } = useAuth()
 
   // Show loading state while checking authentication
   if (isLoading) {

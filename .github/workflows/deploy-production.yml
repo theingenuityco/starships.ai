@@ -1,12 +1,15 @@
-name: Deploy to Production
+name: Deploy to Production (Manual)
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Docker image version to deploy (e.g., 3.7.0)'
+        description: 'Version to deploy (same as dev, e.g., 3.9.0)'
+        required: true
+        type: string
+        default: 'latest'
+      confirm_production:
+        description: 'Type "DEPLOY" to confirm production deployment'
         required: true
         type: string
 
@@ -27,20 +30,23 @@ jobs:
       name: prod
       url: https://starships.ai
     steps:
+      - name: Validate deployment confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY" ]; then
+            echo "❌ Production deployment not confirmed. Type DEPLOY to confirm."
+            exit 1
+          fi
+          echo "✅ Production deployment confirmed"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Determine version to deploy
+      - name: Set version to deploy
         id: version
         run: |
-          if [ "${{ github.event_name }}" == "release" ]; then
-            VERSION="${{ github.event.release.tag_name }}"
-            VERSION="${VERSION#v}"  # Remove 'v' prefix if present
-          else
-            VERSION="${{ github.event.inputs.version }}"
-          fi
+          VERSION="${{ github.event.inputs.version }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Deploying version: $VERSION"
+          echo "📦 Deploying version: $VERSION to production"
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -87,27 +93,22 @@ jobs:
             --docker-password=${{ secrets.GITHUB_TOKEN }} \
             -n starships-prod
 
-      - name: Apply Let's Encrypt Issuers
-        run: |
-          kubectl apply -f k8s/prod/06-letsencrypt-issuer.yaml
-
       - name: Deploy to Production
         run: |
-          # Apply all manifests
+          # Apply simplified manifests (same as dev)
           kubectl apply -f k8s/prod/00-namespace.yaml
           kubectl apply -f k8s/prod/02-pvc.yaml
           kubectl apply -f k8s/prod/03-deployment.yaml
           kubectl apply -f k8s/prod/04-service.yaml
           kubectl apply -f k8s/prod/05-ingress.yaml
-          kubectl apply -f k8s/prod/07-hpa.yaml
-          kubectl apply -f k8s/prod/08-network-policy.yaml
-          kubectl apply -f k8s/prod/09-pdb.yaml
           
-          # Update deployment with new image
+          # Update deployment with same image as dev (no prod- prefix)
           IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           kubectl set image deployment/starships-app \
             starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }} \
             -n starships-prod
+          
+          echo "✅ Using same image as dev: ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }}"
           
           # Wait for rollout
           kubectl rollout status deployment/starships-app -n starships-prod --timeout=600s
@@ -149,7 +150,7 @@ jobs:
       - name: Create deployment summary
         if: always()
         run: |
-          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Production Deployment (Manual)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ job.status }}" == "success" ]; then
@@ -159,6 +160,8 @@ jobs:
           fi
           
           echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Using dev image:** ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "**Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
           echo "**Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -169,4 +172,4 @@ jobs:
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Monitor application health" >> $GITHUB_STEP_SUMMARY
           echo "2. Check error logs if issues arise" >> $GITHUB_STEP_SUMMARY
-          echo "3. Rollback if necessary: \`kubectl rollout undo deployment/starships-app -n starships-prod\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Rollback if necessary: \`kubectl rollout undo deployment/starships-app -n starships-prod\`" >> $GITHUB_STEP_SUMMARY# Trigger rebuild to update secrets

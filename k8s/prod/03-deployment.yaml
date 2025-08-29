@@ -32,26 +32,12 @@ spec:
         runAsUser: 0
         fsGroup: 1000
       
-      # Anti-affinity for HA
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - starships-ai
-              topologyKey: kubernetes.io/hostname
-      
       imagePullSecrets:
       - name: ghcr-pull-secret
       
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:prod-latest
+        image: ghcr.io/theingenuityco/starships.ai:latest
         imagePullPolicy: Always
         
         ports:

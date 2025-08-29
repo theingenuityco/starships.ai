@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # All-in-One Container: Frontend + Backend + Neo4j (configurable)
   starships:
-    image: [DOCKER-REGISTRY-URL]:latest
+    image: ghcr.io/theingenuityco/starships.ai:latest
     container_name: starships-all-in-one
     restart: unless-stopped
     ports:

@@ -86,11 +86,11 @@ jobs:
             --from-literal=KINDE_ISSUER_URL="${{ secrets.KINDE_ISSUER_URL }}" \
             -n starships-prod
           
-          # Create GHCR pull secret
+          # Create GHCR pull secret using persistent PAT
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
-            --docker-username=${{ github.actor }} \
-            --docker-[DEFAULT-PASSWORD]=${{ secrets.GITHUB_TOKEN }} \
+            --docker-username=dewangsolanki3 \
+            --docker-[DEFAULT-PASSWORD]=${{ secrets.GHCR_PULL_TOKEN }} \
             -n starships-prod
 
       - name: Deploy to Production

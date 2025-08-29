@@ -226,12 +226,12 @@ jobs:
             --from-literal=KINDE_CLIENT_SECRET="${{ secrets.KINDE_CLIENT_SECRET }}" \
             -n starships-dev
           
-          # Create GitHub registry secret
+          # Create GitHub registry secret using persistent PAT
           kubectl delete secret ghcr-pull-secret -n starships-dev --ignore-not-found=true
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
-            --docker-username=${{ github.actor }} \
-            --docker-[DEFAULT-PASSWORD]=${{ secrets.GITHUB_TOKEN }} \
+            --docker-username=dewangsolanki3 \
+            --docker-[DEFAULT-PASSWORD]=${{ secrets.GHCR_PULL_TOKEN }} \
             -n starships-dev
           
           echo "✅ Dev secrets updated successfully"

@@ -77,6 +77,13 @@ jobs:
             --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
             --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
+            --from-literal=KINDE_SITE_URL="${{ secrets.KINDE_SITE_URL }}" \
+            --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${{ secrets.KINDE_POST_LOGIN_REDIRECT_URL }}" \
+            --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${{ secrets.KINDE_POST_LOGOUT_REDIRECT_URL }}" \
+            --from-literal=KINDE_REDIRECT_URL="${{ secrets.KINDE_REDIRECT_URL }}" \
+            --from-literal=CLIENT_URL="${{ secrets.CLIENT_URL }}" \
+            --from-literal=NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
+            --from-literal=NEXT_PUBLIC_SERVER_URL="${{ secrets.NEXT_PUBLIC_SERVER_URL }}" \
             -n starships-prod
           
           # Create Kinde secrets
@@ -90,7 +97,7 @@ jobs:
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
             --docker-username=dewangsolanki3 \
-            --docker-[DEFAULT-PASSWORD]=${{ secrets.GHCR_PULL_TOKEN }} \
+            --docker-[DEFAULT-PASSWORD]="${{ secrets.GHCR_PULL_TOKEN }}" \
             -n starships-prod
 
       - name: Deploy to Production

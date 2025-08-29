@@ -172,4 +172,4 @@ jobs:
           echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. Monitor application health" >> $GITHUB_STEP_SUMMARY
           echo "2. Check error logs if issues arise" >> $GITHUB_STEP_SUMMARY
-          echo "3. Rollback if necessary: \`kubectl rollout undo deployment/starships-app -n starships-prod\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Rollback if necessary: \`kubectl rollout undo deployment/starships-app -n starships-prod\`" >> $GITHUB_STEP_SUMMARY# Trigger rebuild to update secrets

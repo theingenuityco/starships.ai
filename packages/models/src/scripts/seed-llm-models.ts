@@ -130,14 +130,14 @@ if (require.main === module) {
     const config: Neo4jConfig = {
       uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
       username: process.env.NEO4J_USERNAME || 'neo4j',
-      [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
+      password: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
       database: process.env.NEO4J_DATABASE || 'neo4j'
     };
     
     console.log('🔧 Using Neo4j config:', {
       uri: config.uri,
       username: config.username,
-      [DEFAULT-PASSWORD]: '***masked***',
+      password: '***masked***',
       database: config.database
     });
     

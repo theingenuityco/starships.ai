@@ -135,7 +135,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          [DEFAULT-PASSWORD]: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -240,7 +240,7 @@ jobs:
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
             --docker-username=dewangsolanki3 \
-            --docker-[DEFAULT-PASSWORD]="${{ secrets.GHCR_PULL_TOKEN }}" \
+            --docker-password="${{ secrets.GHCR_PULL_TOKEN }}" \
             -n starships-dev
           
           echo "✅ Dev secrets updated successfully"

@@ -33,7 +33,7 @@ GitHub repository settings should have two environments configured:
 ### Database Configuration
 | Secret Name | Description | Example |
 |------------|-------------|---------|
-| `NEO4J_PASSWORD` | Neo4j database [DEFAULT-PASSWORD] | Strong generated [DEFAULT-PASSWORD] |
+| `NEO4J_PASSWORD` | Neo4j database password | Strong generated password |
 
 ### Infrastructure
 | Secret Name | Description | Example |
@@ -121,7 +121,7 @@ gh secret set KINDE_POST_LOGIN_REDIRECT_URL --env prod --body "[PROD-DOMAIN-URL]
 1. **Never commit secrets to the repository**
 2. **Use different API keys for dev and prod** (especially for Stripe)
 3. **Rotate secrets regularly**
-4. **Use strong, generated [DEFAULT-PASSWORD]s for databases**
+4. **Use strong, generated passwords for databases**
 5. **Limit GitHub PAT permissions to minimum required** (`packages:read` for GHCR)
 6. **Keep production Kinde app separate from development**
 

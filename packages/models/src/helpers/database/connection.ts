@@ -3,7 +3,7 @@ import neo4j, { Driver, Session, auth, ManagedTransaction, isInt, int } from 'ne
 export interface Neo4jConfig {
   uri: string;
   username: string;
-  [DEFAULT-PASSWORD]: string;
+  password: string;
   database?: string;
 }
 
@@ -26,7 +26,7 @@ export class Neo4jConnection {
     try {
       this.driver = neo4j.driver(
         this.config.uri,
-        auth.basic(this.config.username, this.config.[DEFAULT-PASSWORD]),
+        auth.basic(this.config.username, this.config.password),
         {
           connectionTimeout: 5000, // 5 second timeout
           maxConnectionLifetime: 30000, // 30 second max lifetime

@@ -15,13 +15,13 @@ async function updateVision() {
   const neo4jConfig = {
     uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
     username: process.env.NEO4J_USERNAME || 'neo4j',
-    [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[DEFAULT-PASSWORD]'
+    password: process.env.NEO4J_PASSWORD || 'password'
   };
 
   // Initialize Neo4j driver for RepositoryFactory
   const driver = neo4j.driver(
     neo4jConfig.uri,
-    neo4j.auth.basic(neo4jConfig.username, neo4jConfig.[DEFAULT-PASSWORD])
+    neo4j.auth.basic(neo4jConfig.username, neo4jConfig.password)
   );
 
   try {

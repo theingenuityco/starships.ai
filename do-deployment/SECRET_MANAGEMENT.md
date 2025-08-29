@@ -76,7 +76,7 @@ For production deployment, you need these in GitHub Secrets:
 | `KINDE_CLIENT_ID` | OAuth client ID | Kinde Dashboard → Applications |
 | `KINDE_CLIENT_SECRET` | OAuth secret | Kinde Dashboard → Applications |
 | `KINDE_ISSUER_URL` | Kinde domain | https://[your-domain].kinde.com |
-| `NEO4J_PASSWORD` | Database [DEFAULT-PASSWORD] | Generate with `openssl rand -base64 32` |
+| `NEO4J_PASSWORD` | Database password | Generate with `openssl rand -base64 32` |
 | `OPENAI_API_KEY` | OpenAI API | OpenAI Dashboard |
 | `ANTHROPIC_API_KEY` | Claude API | Anthropic Console |
 | `STRIPE_SECRET_KEY` | Payment processing | Stripe Dashboard (live mode) |

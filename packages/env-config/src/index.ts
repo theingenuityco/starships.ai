@@ -12,6 +12,16 @@ export function getServerConfig() {
   throw new Error('Server config not available in browser environment');
 }
 
+export function loadKindeRuntimeConfig() {
+  if (typeof window === 'undefined') {
+    // Only import server module in Node.js environment
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { loadKindeRuntimeConfig } = require('./server');
+    return loadKindeRuntimeConfig();
+  }
+  throw new Error('Kinde runtime config not available in browser environment');
+}
+
 export function getClientConfig() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { loadClientEnvironment } = require('./client');

@@ -7,7 +7,7 @@
 
 import { StateGraph, END, START, Annotation, MemorySaver, MessagesAnnotation } from '@langchain/langgraph';
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { LangChainProvider } from '@starships/agent-engine';
+import { LangChainProvider } from '../agents';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';

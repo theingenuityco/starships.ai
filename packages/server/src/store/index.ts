@@ -1,4 +1,4 @@
-import { DatabaseMemoryStore } from "@starships/agent-engine";
+import { DatabaseMemoryStore } from "../agents";
 
 let store: DatabaseMemoryStore | null = null;
 

@@ -19,39 +19,46 @@ fi
 echo "Current context: $CURRENT_CONTEXT"
 echo ""
 
-# Kinde OAuth credentials (from your production app)
-KINDE_CLIENT_ID="95be67f727634e25aa2e29311c5162c8"
-KINDE_CLIENT_SECRET="${KINDE_CLIENT_SECRET:-1OXzXWTEwLhQXZlSo9CtsevZwGR1nd0XCLWA5NBD1mT0CClMpTfq}"
-KINDE_ISSUER_URL="https://starshipsai.kinde.com"
+# All secrets should be provided as environment variables
+# These will be automatically set by GitHub Actions from GitHub Secrets
 
-# Neo4j password (generated earlier)
-NEO4J_PASSWORD="pHc+7xT+qltp6hY1JBGGW/n3Tf1iwalqCEo4ZGf5M5c="
+# Check required environment variables
+REQUIRED_VARS=(
+    "OPENAI_API_KEY"
+    "ANTHROPIC_API_KEY"
+    "STRIPE_SECRET_KEY"
+    "STRIPE_PUBLISHABLE_KEY"
+    "STRIPE_WEBHOOK_SECRET"
+    "NEO4J_PASSWORD"
+    "KINDE_CLIENT_ID"
+    "KINDE_CLIENT_SECRET"
+    "KINDE_ISSUER_URL"
+    "KINDE_SITE_URL"
+    "KINDE_POST_LOGIN_REDIRECT_URL"
+    "KINDE_POST_LOGOUT_REDIRECT_URL"
+    "KINDE_REDIRECT_URL"
+    "CLIENT_URL"
+    "NEXT_PUBLIC_API_URL"
+    "NEXT_PUBLIC_SERVER_URL"
+    "GHCR_PULL_TOKEN"
+)
 
-# You need to set these environment variables or replace them
-echo "Please ensure you have set the following environment variables:"
-echo "- OPENAI_API_KEY"
-echo "- ANTHROPIC_API_KEY"
-echo "- STRIPE_SECRET_KEY"
-echo "- STRIPE_PUBLISHABLE_KEY"
-echo "- STRIPE_WEBHOOK_SECRET"
-echo "- KINDE_CLIENT_SECRET"
-echo "- GITHUB_USERNAME (your GitHub username)"
-echo "- GITHUB_PAT (GitHub Personal Access Token with packages:read)"
-echo ""
+MISSING_VARS=()
 
-read -p "Have you set all required environment variables? (yes/no): " confirm
-if [ "$confirm" != "yes" ]; then
-    echo "Please set the required environment variables and run this script again."
+for VAR in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!VAR}" ]; then
+        MISSING_VARS+=("$VAR")
+    fi
+done
+
+if [ ${#MISSING_VARS[@]} -ne 0 ]; then
+    echo "Error: The following required environment variables are not set:"
+    for VAR in "${MISSING_VARS[@]}"; do
+        echo "  - $VAR"
+    done
     echo ""
-    echo "Example:"
-    echo "export OPENAI_API_KEY='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'"
-    echo "export ANTHROPIC_API_KEY='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'"
-    echo "export STRIPE_SECRET_KEY='sk_test_51Rt5WzBjIjJoPxobIRPi2lJf4spU9D167mXMpybh8vDjJmVEEA9l9gdIa4FWcXTw6eNhlfyFJr2UgACzOMCKP7s900QFRoHOEi'"
-    echo "export STRIPE_PUBLISHABLE_KEY='pk_test_51Rt5WzBjIjJoPxobe0C5hSs65CDrxt507E3OPVG8NCfiKiFbHwHqfXjg23kGyX77HowmhwPoHAv3abSbAfcWRYtg00lh7eFhVG'"
-    echo "export STRIPE_WEBHOOK_SECRET='whsec_7b55abd64990e9d6152812fd21054c3655bf213abbaa3ec04e6ca1fa9c8bc6c5'"
-    echo "export KINDE_CLIENT_SECRET='1OXzXWTEwLhQXZlSo9CtsevZwGR1nd0XCLWA5NBD1mT0CClMpTfq'"
-    echo "export GITHUB_USERNAME='dsolanski'"
-    echo "export GITHUB_PAT='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'"
+    echo "These should be set by GitHub Actions from GitHub Secrets."
+    echo "If running manually, export them before running this script."
     exit 1
 fi
 
@@ -70,6 +77,13 @@ kubectl create secret generic starships-secrets \
     --from-literal=STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET}" \
     --from-literal=STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY}" \
     --from-literal=NEO4J_PASSWORD="${NEO4J_PASSWORD}" \
+    --from-literal=KINDE_SITE_URL="${KINDE_SITE_URL}" \
+    --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${KINDE_POST_LOGIN_REDIRECT_URL}" \
+    --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${KINDE_POST_LOGOUT_REDIRECT_URL}" \
+    --from-literal=KINDE_REDIRECT_URL="${KINDE_REDIRECT_URL}" \
+    --from-literal=CLIENT_URL="${CLIENT_URL}" \
+    --from-literal=NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
+    --from-literal=NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL}" \
     -n starships-prod
 
 # Create Kinde secrets
@@ -84,8 +98,8 @@ kubectl create secret generic kinde-auth-secret \
 echo "Creating GitHub Container Registry pull secret..."
 kubectl create secret docker-registry ghcr-pull-secret \
     --docker-server=ghcr.io \
-    --docker-username="${GITHUB_USERNAME}" \
-    --docker-password="${GITHUB_PAT}" \
+    --docker-username=dewangsolanki3 \
+    --docker-password="${GHCR_PULL_TOKEN}" \
     -n starships-prod
 
 echo ""

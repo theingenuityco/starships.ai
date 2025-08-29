@@ -64,15 +64,24 @@ spec:
         - name: SKIP_INSTALL
           value: "true"
         
-        # URLs
+        # URLs (from secrets for flexibility)
         - name: CLIENT_URL
-          value: "https://starships.ai"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: CLIENT_URL
         - name: NEXT_PUBLIC_API_URL
-          value: "https://starships.ai/api"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_API_URL
         - name: NEXT_PUBLIC_SERVER_URL
-          value: "https://starships.ai/api"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_SERVER_URL
         - name: SERVER_URL
-          value: "http://localhost:4000"
+          value: "http://localhost:4000"  # Internal service URL, always the same
         
         # Neo4j Configuration (with auth enabled)
         - name: NEO4J_URI
@@ -87,15 +96,27 @@ spec:
         - name: NEO4J_AUTH
           value: "neo4j/$(NEO4J_PASSWORD)"
         
-        # Kinde OAuth
+        # Kinde OAuth URLs (from secrets for flexibility across environments)
         - name: KINDE_SITE_URL
-          value: "https://starships.ai"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_SITE_URL
         - name: KINDE_POST_LOGIN_REDIRECT_URL
-          value: "https://starships.ai/fleet"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_POST_LOGIN_REDIRECT_URL
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          value: "https://starships.ai"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_POST_LOGOUT_REDIRECT_URL
         - name: KINDE_REDIRECT_URL
-          value: "https://starships.ai/api/auth/kinde_callback"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_REDIRECT_URL
         
         # Security: Disable debug modes
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR

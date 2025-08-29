@@ -96,3 +96,47 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
 
   return env;
 }
+
+/**
+ * Loads Kinde configuration at runtime and sets it in process.env
+ * This is specifically for Next.js API routes that need Kinde auth
+ * It ensures the Kinde SDK has access to the necessary environment variables
+ */
+export function loadKindeRuntimeConfig(): ServerEnvironmentConfig {
+  // Force reload from root .env file to ensure runtime values
+  // Use process.cwd() which is more reliable in Next.js context
+  // Next.js runs from packages/client, so we go up two directories to reach root
+  const rootEnvPath = path.resolve(process.cwd(), '../../.env');
+  
+  // Load the .env file again to ensure we have the latest values
+  dotenv.config({ path: rootEnvPath, override: true });
+  
+  // Get the server config with freshly loaded values
+  const config = loadServerEnvironment();
+  
+  // Set Kinde environment variables in process.env for the SDK to use
+  // The Kinde SDK reads directly from process.env, not from our config object
+  if (config.KINDE_ISSUER_URL) {
+    process.env.KINDE_ISSUER_URL = config.KINDE_ISSUER_URL;
+  }
+  if (config.KINDE_CLIENT_ID) {
+    process.env.KINDE_CLIENT_ID = config.KINDE_CLIENT_ID;
+  }
+  if (config.KINDE_CLIENT_SECRET) {
+    process.env.KINDE_CLIENT_SECRET = config.KINDE_CLIENT_SECRET;
+  }
+  if (config.KINDE_SITE_URL) {
+    process.env.KINDE_SITE_URL = config.KINDE_SITE_URL;
+  }
+  if (config.KINDE_POST_LOGIN_REDIRECT_URL) {
+    process.env.KINDE_POST_LOGIN_REDIRECT_URL = config.KINDE_POST_LOGIN_REDIRECT_URL;
+  }
+  if (config.KINDE_POST_LOGOUT_REDIRECT_URL) {
+    process.env.KINDE_POST_LOGOUT_REDIRECT_URL = config.KINDE_POST_LOGOUT_REDIRECT_URL;
+  }
+  if (config.KINDE_DEBUG_MODE !== undefined) {
+    process.env.KINDE_DEBUG_MODE = String(config.KINDE_DEBUG_MODE);
+  }
+  
+  return config;
+}

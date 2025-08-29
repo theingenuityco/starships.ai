@@ -29,7 +29,7 @@ kubectl create secret generic starships-secrets \
   --from-literal=ANTHROPIC_API_KEY="sk-ant-new-key" \
   --from-literal=STRIPE_SECRET_KEY="sk_test_new" \
   --from-literal=STRIPE_WEBHOOK_SECRET="whsec_new" \
-  --from-literal=NEO4J_PASSWORD="new[DEFAULT-PASSWORD]" \
+  --from-literal=NEO4J_PASSWORD="newpassword" \
   --namespace starships-prod \
   --dry-run=client -o yaml | kubectl apply -f -
 ```

@@ -420,7 +420,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   <div className="relative">
                     <Input
                       id="api-key"
-                      type={showKey ? 'text' : '[DEFAULT-PASSWORD]'}
+                      type={showKey ? 'text' : 'password'}
                       placeholder={getSelectedTool()!.apiKeyPlaceholder}
                       value={tempApiKey}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempApiKey(e.target.value)}

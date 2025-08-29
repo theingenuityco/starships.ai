@@ -113,7 +113,7 @@ export function ApiKeyInputModal({
     [requirements, serviceType, submitError]
   )
 
-  // Toggle [DEFAULT-PASSWORD] visibility
+  // Toggle password visibility
   const toggleFieldVisibility = useCallback((envKey: string) => {
     setFieldVisibility(prev => ({
       ...prev,
@@ -217,7 +217,7 @@ export function ApiKeyInputModal({
     const value = state.values[requirement.envKey] || ''
     const validationResult = state.validationResults[requirement.envKey]
     const isVisible = fieldVisibility[requirement.envKey]
-    const inputType = requirement.sensitive && !isVisible ? '[DEFAULT-PASSWORD]' : 'text'
+    const inputType = requirement.sensitive && !isVisible ? 'password' : 'text'
     const hasError = validationResult && !validationResult.isValid && value.trim() !== ''
 
     return (

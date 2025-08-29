@@ -25,7 +25,7 @@ import {
 const config: Neo4jConfig = {
   uri: '[NEO4J-LOCAL-URL]',
   username: 'neo4j',
-  [DEFAULT-PASSWORD]: '[DEFAULT-PASSWORD]',
+  password: 'password',
   database: 'starships'
 };
 
@@ -225,7 +225,7 @@ Required environment variables:
 # Neo4j Configuration
 NEO4J_URI=[NEO4J-LOCAL-URL]
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your-[DEFAULT-PASSWORD]
+NEO4J_PASSWORD=your-password
 NEO4J_DATABASE=starships
 
 # Logging Configuration

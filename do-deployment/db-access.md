@@ -11,13 +11,13 @@ kubectl port-forward deployment/starships-all -n starships-prod 7474:7474 7687:7
 # Browser: http://localhost:7474
 # Bolt: [NEO4J-LOCAL-URL]
 # Username: neo4j
-# Password: [DEFAULT-PASSWORD]
+# Password: password
 ```
 
 ### Method 2: Direct Cypher Shell Access
 ```bash
 # Run Cypher queries directly in the pod
-kubectl exec -it deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p [DEFAULT-PASSWORD]
+kubectl exec -it deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p password
 
 # Example queries:
 # MATCH (n) RETURN count(n);
@@ -37,13 +37,13 @@ kubectl cp starships-prod/$(kubectl get pod -l app=starships-all -n starships-pr
 ### Method 4: View Database Stats
 ```bash
 # Quick database statistics
-kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p [DEFAULT-PASSWORD] "CALL dbms.components() YIELD name, versions, edition RETURN name, versions, edition"
+kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p password "CALL dbms.components() YIELD name, versions, edition RETURN name, versions, edition"
 
 # Count all nodes
-kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p [DEFAULT-PASSWORD] "MATCH (n) RETURN count(n) as nodeCount"
+kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p password "MATCH (n) RETURN count(n) as nodeCount"
 
 # Show all node labels
-kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p [DEFAULT-PASSWORD] "CALL db.labels() YIELD label RETURN label"
+kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/cypher-shell -u neo4j -p password "CALL db.labels() YIELD label RETURN label"
 ```
 
 ### Method 5: Remote Connection Setup
@@ -75,7 +75,7 @@ Then apply: `kubectl apply -f neo4j-external.yaml`
 1. Set up port forwarding (Method 1)
 2. Use Neo4j Desktop or any Neo4j client
 3. Connect to: `[NEO4J-LOCAL-URL]`
-4. Credentials: neo4j / [DEFAULT-PASSWORD]
+4. Credentials: neo4j / password
 
 ## Common Database Operations
 
@@ -106,9 +106,9 @@ kubectl exec deployment/starships-all -n starships-prod -- /opt/neo4j/bin/neo4j 
 Your backend connects internally using:
 - **URI**: `[NEO4J-LOCAL-URL]`
 - **Username**: `neo4j`
-- **Password**: `[DEFAULT-PASSWORD]`
+- **Password**: `password`
 
 ## Security Notes
-- Current setup uses default [DEFAULT-PASSWORD] (change for production!)
+- Current setup uses default password (change for production!)
 - Port forwarding is secure (only accessible from your machine)
 - Don't expose Neo4j publicly without proper security

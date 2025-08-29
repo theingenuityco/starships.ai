@@ -82,7 +82,7 @@ ${CYPHER_QUERY}
 EOF
 
 # Use cypher-shell to execute the query
-/app/neo4j/bin/cypher-shell -u neo4j -p [DEFAULT-PASSWORD] --format plain < /tmp/add-user.cypher
+/app/neo4j/bin/cypher-shell -u neo4j -p password --format plain < /tmp/add-user.cypher
 "
 
 if [ $? -eq 0 ]; then
@@ -104,6 +104,6 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     print_info "Fetching all approved users..."
     kubectl exec -n "$NAMESPACE" "$POD_NAME" -- bash -c "
     echo 'MATCH (w:WaitlistEntry {isApproved: true}) RETURN w.email as Email, w.addedBy as AddedBy, w.notes as Notes ORDER BY w.createdAt DESC;' | \
-    /app/neo4j/bin/cypher-shell -u neo4j -p [DEFAULT-PASSWORD] --format table
+    /app/neo4j/bin/cypher-shell -u neo4j -p password --format table
     "
 fi

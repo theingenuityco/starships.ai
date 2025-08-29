@@ -20,7 +20,7 @@ async function main() {
   const config = {
     uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
     username: process.env.NEO4J_USERNAME || 'neo4j',
-    [DEFAULT-PASSWORD]: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
+    password: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
     database: process.env.NEO4J_DATABASE || 'neo4j',
   };
 
@@ -181,7 +181,7 @@ Global Options:
 Environment Variables:
   NEO4J_URI         Neo4j connection URI (default: [NEO4J-LOCAL-URL])
   NEO4J_USERNAME    Neo4j username (default: neo4j)
-  NEO4J_PASSWORD    Neo4j [DEFAULT-PASSWORD] (default: [DEFAULT-PASSWORD])
+  NEO4J_PASSWORD    Neo4j password (default: password)
   NEO4J_DATABASE    Neo4j database name (default: neo4j)
 
 Examples:

@@ -130,7 +130,7 @@ kubectl get secrets -n starships-prod
 
 # Update a secret
 kubectl create secret generic starships-secrets \
-  --from-literal=NEO4J_PASSWORD="new-[DEFAULT-PASSWORD]" \
+  --from-literal=NEO4J_PASSWORD="new-password" \
   -n starships-prod --dry-run=client -o yaml | kubectl apply -f -
 ```
 

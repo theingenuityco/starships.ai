@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
   try {
     const { getKindeServerSession } = await import("@kinde-oss/kinde-auth-nextjs/server");
     const { isAuthenticated } = getKindeServerSession();
-    isUserAuthenticated = (await isAuthenticated()) ?? false
+    isUserAuthenticated = (await isAuthenticated()) ?? false;
   } catch (error) {
     // If Kinde is not configured, treat as unauthenticated
     console.error('Kinde auth check failed:', error);

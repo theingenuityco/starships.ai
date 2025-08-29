@@ -1,6 +1,6 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { SocketEvents, ChatRequest, ChatStreamChunk } from '@starships/protocol';
-import { chat } from '../agents';
+import { AgentExecutionService } from '../services/AgentExecutionService';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import { RepositoryFactory } from '@starships/models';
@@ -154,7 +154,7 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
         
         try {
           // Call the full agent engine
-          const response = await chat(chatRequest, store);
+          const response = await AgentExecutionService.executeChat(chatRequest);
           const fullResponse = response.content;
 
           // Simulate streaming with typewriter effect for better UX

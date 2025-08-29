@@ -2,7 +2,7 @@ import { RepositoryFactory } from "@starships/models";
 
 /**
  * Load vision context for an agent's starship
- * Extracted from chat.ts to improve separation of concerns
+ * Moved from agents/vision.ts to utils for cleaner architecture
  */
 export async function loadVisionContext(
   agentId: string, 

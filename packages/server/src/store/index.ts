@@ -1,4 +1,4 @@
-import { DatabaseMemoryStore } from "../agents";
+import { DatabaseMemoryStore } from "../utils/database-memory";
 
 let store: DatabaseMemoryStore | null = null;
 

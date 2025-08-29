@@ -3,7 +3,7 @@ import type { MemoryEntry, MemorySearchResult, SessionKey, ChatSession, ChatMess
 
 /**
  * Database-backed memory store using ChatSession and ChatMessage repositories
- * Replaces file-based LangChainMemoryStore with robust database persistence
+ * Moved from agents/memory to utils for cleaner architecture
  */
 export class DatabaseMemoryStore {
   constructor() {

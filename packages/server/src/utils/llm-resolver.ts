@@ -2,7 +2,7 @@ import { RepositoryFactory } from "@starships/models";
 
 /**
  * Centralized LLM model resolution logic
- * Extracted from chat.ts to eliminate duplication
+ * Moved from agents/llm-resolver.ts to utils for cleaner architecture
  */
 export async function resolveLLMModel(modelIdOrName: string): Promise<any> {
   const llmRepo = RepositoryFactory.getLLMRepository();

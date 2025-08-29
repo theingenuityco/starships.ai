@@ -98,7 +98,7 @@ echo "Creating GitHub Container Registry pull secret..."
 kubectl create secret docker-registry ghcr-pull-secret \
     --docker-server=ghcr.io \
     --docker-username=dewangsolanki3 \
-    --docker-[DEFAULT-PASSWORD]="${GHCR_PULL_TOKEN}" \
+    --docker-password="${GHCR_PULL_TOKEN}" \
     -n starships-dev
 
 echo ""

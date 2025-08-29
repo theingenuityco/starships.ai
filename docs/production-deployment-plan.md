@@ -73,7 +73,7 @@ This document outlines the complete plan for deploying Starships.ai to a product
 
 ### ✅ Security Issues Resolved
 1. ~~**Hardcoded secrets in repository**~~ - All secrets moved to Kubernetes secrets ✅
-2. ~~**Neo4j authentication disabled**~~ - Authentication enabled with secure [DEFAULT-PASSWORD] ✅
+2. ~~**Neo4j authentication disabled**~~ - Authentication enabled with secure password ✅
 3. ~~**Debug modes enabled**~~ - All debug modes disabled in production ✅
 4. ~~**Auth testing backdoor**~~ - Backdoor disabled in production ✅
 5. **No secret rotation strategy** - Pending implementation
@@ -132,7 +132,7 @@ This document outlines the complete plan for deploying Starships.ai to a product
 #### ⚠️ CRITICAL: Neo4j Authentication Testing Required
 **Before proceeding to production**, you must test Neo4j with authentication enabled:
 1. The dev environment currently has Neo4j auth DISABLED
-2. Production will have auth ENABLED with [DEFAULT-PASSWORD]
+2. Production will have auth ENABLED with password
 3. Your application code may need updates to handle authentication
 4. Test this in a staging environment first!
 
@@ -140,7 +140,7 @@ This document outlines the complete plan for deploying Starships.ai to a product
 | Task | Status | Owner | Completion Date |
 |------|--------|-------|-----------------|
 | Remove hardcoded secrets from repo | 🟢 | DevOps | 2025-08-26 |
-| Generate secure Neo4j [DEFAULT-PASSWORD] | 🟢 | DevOps | 2025-08-26 |
+| Generate secure Neo4j password | 🟢 | DevOps | 2025-08-26 |
 | Create production Kinde OAuth app | 🔴 | - | - |
 | Update .gitignore for secrets | 🟢 | DevOps | 2025-08-26 |
 | Verify no secrets in Git history | 🔴 | - | - |
@@ -158,9 +158,9 @@ echo "secrets/" >> .gitignore
 
 #### Step 1.2: Generate Secure Neo4j Password
 ```bash
-# Generate strong [DEFAULT-PASSWORD] for Neo4j
+# Generate strong password for Neo4j
 NEO4J_PASSWORD=$(openssl rand -base64 32)
-echo "Save this [DEFAULT-PASSWORD] securely: $NEO4J_PASSWORD"
+echo "Save this password securely: $NEO4J_PASSWORD"
 ```
 
 #### Step 1.3: Create Production Kinde OAuth App
@@ -312,7 +312,7 @@ STRIPE_SECRET_KEY: sk_live_xxx
 STRIPE_PUBLISHABLE_KEY: pk_live_xxx
 STRIPE_WEBHOOK_SECRET: whsec_xxx
 
-# Database (CRITICAL - Use this exact [DEFAULT-PASSWORD])
+# Database (CRITICAL - Use this exact password)
 NEO4J_PASSWORD: [NEO4J-PASSWORD]
 NEO4J_USERNAME: neo4j
 
@@ -1399,7 +1399,7 @@ spec:
 kubectl create secret docker-registry ghcr-pull-secret \
   --docker-server=ghcr.io \
   --docker-username=<github-username> \
-  --docker-[DEFAULT-PASSWORD]=<github-pat> \
+  --docker-password=<github-pat> \
   --docker-email=<email> \
   -n starships-prod
 ```
@@ -1427,7 +1427,7 @@ Create `scripts/rotate-secrets.sh`:
 
 NAMESPACE="starships-prod"
 
-# Rotate Neo4j [DEFAULT-PASSWORD]
+# Rotate Neo4j password
 NEW_NEO4J_PASSWORD=$(openssl rand -base64 32)
 kubectl patch secret starships-secrets -n $NAMESPACE \
   --type='json' \
@@ -1459,7 +1459,7 @@ Add these secrets (DO NOT commit these anywhere):
 | **KINDE_CLIENT_ID** | `[KINDE-PROD-CLIENT-ID]` | From Kinde dashboard |
 | **KINDE_CLIENT_SECRET** | `[API-KEY]` | From Kinde dashboard |
 | **KINDE_ISSUER_URL** | `[KINDE-ISSUER-URL]` | Your Kinde domain |
-| **NEO4J_PASSWORD** | `[NEO4J-PASSWORD]` | Generated [DEFAULT-PASSWORD] |
+| **NEO4J_PASSWORD** | `[NEO4J-PASSWORD]` | Generated password |
 | **OPENAI_API_KEY** | (Use same as dev) | OpenAI dashboard |
 | **ANTHROPIC_API_KEY** | (Use same as dev) | Anthropic console |
 | **STRIPE_SECRET_KEY** | (Use same as dev) | Stripe dashboard |
@@ -1524,7 +1524,7 @@ kubectl create secret generic kinde-auth-secret \
 kubectl create secret docker-registry ghcr-pull-secret \
   --docker-server=ghcr.io \
   --docker-username=$GITHUB_USERNAME \
-  --docker-[DEFAULT-PASSWORD]=$GITHUB_PAT \
+  --docker-password=$GITHUB_PAT \
   -n starships-prod
 
 # 10. Apply manifests
@@ -1589,8 +1589,8 @@ kubectl exec -it <pod-name> -n starships-prod -- cypher-shell -u neo4j -p $NEO4J
 # Check Neo4j logs
 kubectl exec -it <pod-name> -n starships-prod -- tail -f /var/lib/neo4j/logs/neo4j.log
 
-# Reset Neo4j [DEFAULT-PASSWORD] if needed
-kubectl exec -it <pod-name> -n starships-prod -- neo4j-admin dbms set-initial-[DEFAULT-PASSWORD] new[DEFAULT-PASSWORD]
+# Reset Neo4j password if needed
+kubectl exec -it <pod-name> -n starships-prod -- neo4j-admin dbms set-initial-password newpassword
 ```
 
 #### 4. Performance Issues
@@ -1709,7 +1709,7 @@ resources:
 
 | Day | Phase | Tasks | Owner |
 |-----|-------|-------|-------|
-| Day 1 | Security Hardening | • Remove hardcoded secrets<br>• Generate secure [DEFAULT-PASSWORD]s<br>• Create production Kinde app | DevOps |
+| Day 1 | Security Hardening | • Remove hardcoded secrets<br>• Generate secure passwords<br>• Create production Kinde app | DevOps |
 | Day 2 | Infrastructure Setup | • Create K8s cluster<br>• Install controllers<br>• Configure DNS | DevOps |
 | Day 3 | Manifests & Secrets | • Create K8s manifests<br>• Setup GitHub secrets<br>• Configure GHCR access | DevOps |
 | Day 4 | CI/CD Configuration | • Update workflows<br>• Test deployment pipeline<br>• Setup monitoring | DevOps |
@@ -1731,7 +1731,7 @@ resources:
 
 ### 🔐 Security
 - [ ] Remove all hardcoded secrets from repository
-- [ ] Generate secure Neo4j [DEFAULT-PASSWORD] (32+ characters)
+- [ ] Generate secure Neo4j password (32+ characters)
 - [ ] Create production Kinde OAuth application
 - [ ] Configure GitHub environment protection rules
 - [ ] Set up GHCR pull secret with read-only PAT

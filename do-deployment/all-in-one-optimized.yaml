@@ -69,7 +69,7 @@ spec:
           export SKIP_VECTOR_STORE=true
           export NEO4J_URI=[NEO4J-LOCAL-URL]
           export NEO4J_USERNAME=neo4j
-          export NEO4J_PASSWORD=[DEFAULT-PASSWORD]
+          export NEO4J_PASSWORD=password
           PORT=4000 nohup node dist/index.js > /tmp/backend.log 2>&1 &
           
           # Wait for backend

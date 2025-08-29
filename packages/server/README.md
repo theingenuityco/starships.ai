@@ -601,7 +601,7 @@ CORS_ORIGIN=http://localhost:3000
 # Database Configuration  
 NEO4J_URI=[NEO4J-LOCAL-URL]
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=[DEFAULT-PASSWORD]
+NEO4J_PASSWORD=password
 
 # LLM Provider Configuration
 OPENAI_API_KEY=your_openai_key
@@ -894,7 +894,7 @@ services:
       - NODE_ENV=production
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USERNAME=neo4j
-      - NEO4J_PASSWORD=[DEFAULT-PASSWORD]
+      - NEO4J_PASSWORD=password
     depends_on:
       - neo4j
     restart: unless-stopped
@@ -905,7 +905,7 @@ services:
       - "7474:7474"
       - "7687:7687"
     environment:
-      - NEO4J_AUTH=neo4j/[DEFAULT-PASSWORD]
+      - NEO4J_AUTH=neo4j/password
       - NEO4J_PLUGINS=["apoc"]
     volumes:
       - neo4j_data:/data
@@ -960,7 +960,7 @@ GET /health/detailed # Detailed health information
 2. **Database connection issues**
    ```bash
    # Test Neo4j connection
-   cypher-shell -u neo4j -p [DEFAULT-PASSWORD]
+   cypher-shell -u neo4j -p password
    
    # Check database logs
    docker logs neo4j-container

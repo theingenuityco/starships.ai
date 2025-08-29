@@ -85,7 +85,7 @@ add_user() {
     
     const driver = neo4j.driver(
       '[NEO4J-LOCAL-URL]',
-      neo4j.auth.basic('neo4j', '[DEFAULT-PASSWORD]')
+      neo4j.auth.basic('neo4j', 'password')
     );
     
     async function addUser() {
@@ -187,7 +187,7 @@ list_users() {
     
     const driver = neo4j.driver(
       '[NEO4J-LOCAL-URL]',
-      neo4j.auth.basic('neo4j', '[DEFAULT-PASSWORD]')
+      neo4j.auth.basic('neo4j', 'password')
     );
     
     async function listUsers() {
@@ -242,7 +242,7 @@ check_user() {
     
     const driver = neo4j.driver(
       '[NEO4J-LOCAL-URL]',
-      neo4j.auth.basic('neo4j', '[DEFAULT-PASSWORD]')
+      neo4j.auth.basic('neo4j', 'password')
     );
     
     async function checkUser() {

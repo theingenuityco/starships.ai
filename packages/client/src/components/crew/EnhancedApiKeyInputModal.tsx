@@ -453,7 +453,7 @@ export function EnhancedApiKeyInputModal({
     if (!fieldState) return null
 
     const { value, isVisible, isValidating, validationResult, hasBeenTouched } = fieldState
-    const inputType = requirement.sensitive && !isVisible ? '[DEFAULT-PASSWORD]' : 'text'
+    const inputType = requirement.sensitive && !isVisible ? 'password' : 'text'
     const hasError = validationResult && !validationResult.isValid && hasBeenTouched
     const hasSuccess =
       validationResult && validationResult.isValid && hasBeenTouched && value.trim()

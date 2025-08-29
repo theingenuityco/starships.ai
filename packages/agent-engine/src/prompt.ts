@@ -2,6 +2,7 @@ import type { MemoryEntry, LLMChatPrompt } from "@starships/protocol";
 
 /**
  * Build LLM chat prompt from system prompt, memory, and current message
+ * Moved from prompt/builder.ts to simplify directory structure
  */
 export function buildPrompt(
   systemPrompt: string | undefined, 
@@ -48,4 +49,4 @@ export function buildPrompt(
   messages.push({ role: "user" as const, content: currentMessage });
 
   return { messages };
-} 
+}

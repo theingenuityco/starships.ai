@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { chat as agentChat } from '@starships/agent-engine';
+import { AgentExecutionService } from '../services/AgentExecutionService';
 import type { ChatRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
-import getStore from '../store';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
 import { RepositoryFactory, ValidationError, NotFoundError } from '@starships/models';
@@ -83,8 +82,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
     console.log(`[CHAT] Processing message for authenticated user: ${userId}`);
 
-    const store = getStore();
-    const result = await agentChat(chatRequest, store);
+    const result = await AgentExecutionService.executeChat(chatRequest);
 
     // Track agent usage after successful chat
     try {
@@ -151,7 +149,7 @@ router.delete('/:sessionKey/memory', authMiddleware, async (req: Request, res: R
       );
     }
 
-    const store = getStore();
+    const store = AgentExecutionService.getMemoryStore();
     await store.clear(sessionKey);
 
     res.json({

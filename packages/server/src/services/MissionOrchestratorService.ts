@@ -12,7 +12,7 @@ import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ErrorFactory, InternalServerError } from '@starships/models';
-import { AIMessage } from '@langchain/core/messages';
+import { AIMessage } from '../utils/message-types';
 import type {
   MissionMessage,
   MissionChatResponse,
@@ -97,11 +97,11 @@ export class MissionOrchestratorService {
       this.emitMessageEvent(missionId, savedUserMessage);
     }
 
-    // Execute graph with callbacks
+    // Execute with callbacks
     const orchestrator = this.createOrchestratorAgent();
-    const { finalResponse, state } = await orchestrator.executeGraphWithCallbacks(
-      missionId, 
-      message, 
+    const { finalResponse, state } = await orchestrator.executeWithCallbacks(
+      missionId,
+      message,
       {
         onMessageGenerated: async (aiMessage: AIMessage) => {
           const savedMessage = await this.saveOrchestratorMessage(missionId, aiMessage.content as string);

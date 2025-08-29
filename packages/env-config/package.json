@@ -29,11 +29,11 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "test": "echo 'No tests yet' && exit 0"
   },
-  "dependencies": {
-    "dotenv": "^17.1.0"
-  },
   "devDependencies": {
     "@types/node": "^24.0.10",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "dotenv": "^17.1.0"
   }
 }

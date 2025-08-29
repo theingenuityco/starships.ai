@@ -1,31 +1,22 @@
 /**
- * Workflow Execution Service
+ * Workflow Execution Engine
  * 
- * Core service for executing workflow DSL graphs. Handles sequential execution,
+ * Core engine for executing workflow DSL graphs. Handles sequential execution,
  * state management, error recovery, and user interaction coordination.
  */
 
-import {
-  WorkflowDSL,
-  WorkflowDSLNode,
-  WorkflowNodeResult,
-  WorkflowExecutionContext,
-  WorkflowRuntimeState
-} from '@starships/protocol';
-import { workflowNodeRegistry, WorkflowNodeRegistry } from './WorkflowNodeRegistry';
-// import { AgentService } from './AgentService';
-// import { RepositoryFactory } from '@starships/models';
-import { Logger } from '../utils/logger';
+import { Workflow, RuntimeState, ExecutionContext, Node, NodeResult } from '../types';
+import { Registry } from '../nodes/Registry';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Events that can be emitted during workflow execution
  */
-export interface WorkflowExecutionEvent {
+export interface ExecutionEvent {
   type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' | 
         'workflow_paused' | 'workflow_resumed' | 'workflow_completed' | 'workflow_failed';
   workflowId: string;
-  contextId: string; // Migration note: was expeditionId
+  contextId: string;
   nodeId?: string;
   data?: any;
   timestamp: string;
@@ -34,47 +25,31 @@ export interface WorkflowExecutionEvent {
 /**
  * Callback for workflow execution events
  */
-export type WorkflowExecutionEventCallback = (event: WorkflowExecutionEvent) => Promise<void>;
+export type EventCallback = (event: ExecutionEvent) => Promise<void>;
 
 /**
- * Main workflow execution service
+ * Main workflow execution engine
  */
-export class WorkflowExecutionService {
-  private static instance: WorkflowExecutionService;
-  private logger = Logger.getInstance();
-  private nodeRegistry: WorkflowNodeRegistry;
-  private eventCallbacks: WorkflowExecutionEventCallback[] = [];
-  private runningExecutions: Map<string, WorkflowRuntimeState> = new Map();
+export class Engine {
+  private registry: Registry;
+  private eventCallbacks: EventCallback[] = [];
+  private runningExecutions: Map<string, RuntimeState> = new Map();
 
-  constructor(nodeRegistry?: WorkflowNodeRegistry) {
-    this.nodeRegistry = nodeRegistry || workflowNodeRegistry;
-  }
-
-  static getInstance(): WorkflowExecutionService {
-    if (!WorkflowExecutionService.instance) {
-      WorkflowExecutionService.instance = new WorkflowExecutionService();
-    }
-    return WorkflowExecutionService.instance;
+  constructor(registry?: Registry) {
+    this.registry = registry || new Registry();
   }
 
   /**
    * Execute a workflow from start to completion
    */
-  async executeWorkflow(
-    workflow: WorkflowDSL,
-    context: Partial<WorkflowExecutionContext>
-  ): Promise<WorkflowRuntimeState> {
+  async execute(
+    workflow: Workflow,
+    context: Partial<ExecutionContext>
+  ): Promise<RuntimeState> {
     const executionId = uuidv4();
-    const logContext = {
-      workflowId: workflow.id,
-      contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
-      executionId
-    };
-
-    this.logger.info('Starting workflow execution', logContext);
-
+    
     // Initialize runtime state
-    const runtimeState: WorkflowRuntimeState = {
+    const runtimeState: RuntimeState = {
       id: executionId,
       workflowId: workflow.id,
       currentNodeId: undefined,
@@ -89,7 +64,7 @@ export class WorkflowExecutionService {
 
     try {
       // Validate workflow before execution
-      await this.validateWorkflowForExecution(workflow);
+      await this.validateForExecution(workflow);
 
       // Find start node
       const startNode = this.getStartNode(workflow);
@@ -101,7 +76,7 @@ export class WorkflowExecutionService {
       await this.emitEvent({
         type: 'workflow_started',
         workflowId: workflow.id,
-        contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
+        contextId: workflow.expeditionId,
         timestamp: new Date().toISOString()
       });
 
@@ -111,7 +86,7 @@ export class WorkflowExecutionService {
       runtimeState.updatedAt = new Date().toISOString();
 
       // Execute workflow graph
-      await this.executeWorkflowGraph(workflow, runtimeState, context);
+      await this.executeGraph(workflow, runtimeState, context);
 
       // Mark as completed if no errors
       if (runtimeState.status === 'running') {
@@ -122,16 +97,10 @@ export class WorkflowExecutionService {
         await this.emitEvent({
           type: 'workflow_completed',
           workflowId: workflow.id,
-          contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
+          contextId: workflow.expeditionId,
           timestamp: new Date().toISOString()
         });
       }
-
-      this.logger.info('Workflow execution completed', {
-        ...logContext,
-        status: runtimeState.status,
-        nodesExecuted: runtimeState.executionResults.size
-      });
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -149,14 +118,9 @@ export class WorkflowExecutionService {
       await this.emitEvent({
         type: 'workflow_failed',
         workflowId: workflow.id,
-        contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
+        contextId: workflow.expeditionId,
         data: { error: errorMessage },
         timestamp: new Date().toISOString()
-      });
-
-      this.logger.error('Workflow execution failed', {
-        ...logContext,
-        error: errorMessage
       });
     } finally {
       // Clean up running execution
@@ -169,20 +133,20 @@ export class WorkflowExecutionService {
   /**
    * Execute the workflow graph node by node
    */
-  private async executeWorkflowGraph(
-    workflow: WorkflowDSL,
-    runtimeState: WorkflowRuntimeState,
-    contextData: Partial<WorkflowExecutionContext>
+  private async executeGraph(
+    workflow: Workflow,
+    runtimeState: RuntimeState,
+    contextData: Partial<ExecutionContext>
   ): Promise<void> {
     let currentNode = this.getStartNode(workflow);
     
     // Build execution context
-    const context: WorkflowExecutionContext = {
-      expeditionId: workflow.expeditionId, // Migration note: keeping for backward compatibility
+    const context: ExecutionContext = {
+      expeditionId: workflow.expeditionId,
       workflowId: workflow.id,
       userId: contextData.userId || 'system',
       previousResults: runtimeState.executionResults,
-      expeditionState: contextData.expeditionState || {}, // Migration note: keeping for backward compatibility
+      expeditionState: contextData.expeditionState || {},
       services: contextData.services || {}
     };
 
@@ -192,18 +156,11 @@ export class WorkflowExecutionService {
         runtimeState.currentNodeId = currentNode.id;
         runtimeState.updatedAt = new Date().toISOString();
 
-        this.logger.info('Executing workflow node', {
-          workflowId: workflow.id,
-          nodeId: currentNode.id,
-          nodeName: currentNode.name,
-          nodeType: currentNode.type
-        });
-
         // Emit node start event
         await this.emitEvent({
           type: 'node_started',
           workflowId: workflow.id,
-          contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
+          contextId: workflow.expeditionId,
           nodeId: currentNode.id,
           data: { nodeName: currentNode.name, nodeType: currentNode.type },
           timestamp: new Date().toISOString()
@@ -220,7 +177,7 @@ export class WorkflowExecutionService {
           await this.emitEvent({
             type: 'node_completed',
             workflowId: workflow.id,
-            contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
+            contextId: workflow.expeditionId,
             nodeId: currentNode.id,
             data: { result: result.data },
             timestamp: new Date().toISOString()
@@ -230,11 +187,7 @@ export class WorkflowExecutionService {
           const nextNode = this.getNextNode(workflow, currentNode, result.nextEdgeCondition);
           
           if (!nextNode) {
-            this.logger.info('No next node found, workflow complete', {
-              workflowId: workflow.id,
-              nodeId: currentNode.id
-            });
-            break;
+            break; // No next node, workflow complete
           }
 
           currentNode = nextNode;
@@ -244,28 +197,20 @@ export class WorkflowExecutionService {
           await this.emitEvent({
             type: 'node_failed',
             workflowId: workflow.id,
-            contextId: workflow.expeditionId, // Migration note: using expeditionId as contextId
+            contextId: workflow.expeditionId,
             nodeId: currentNode.id,
             data: { error: result.error },
             timestamp: new Date().toISOString()
           });
 
-          // For now, fail the entire workflow on node failure
-          // In the future, this could support retry logic or error recovery
           throw new Error(`Node execution failed: ${result.error}`);
         }
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
         
-        this.logger.error('Node execution error', {
-          workflowId: workflow.id,
-          nodeId: currentNode.id,
-          error: errorMessage
-        });
-
         // Store failed result
-        const failedResult: WorkflowNodeResult = {
+        const failedResult: NodeResult = {
           nodeId: currentNode.id,
           success: false,
           error: errorMessage,
@@ -287,19 +232,14 @@ export class WorkflowExecutionService {
    * Execute a single node
    */
   private async executeNode(
-    node: WorkflowDSLNode,
-    context: WorkflowExecutionContext
-  ): Promise<WorkflowNodeResult> {
+    node: Node,
+    context: ExecutionContext
+  ): Promise<NodeResult> {
     // Get handler for node type
-    const handler = this.nodeRegistry.getHandlerForNode(node);
+    const handler = this.registry.getHandler(node.type);
     if (!handler) {
       throw new Error(`No handler found for node type: ${node.type}`);
     }
-
-    this.logger.debug('Executing node with handler', {
-      nodeId: node.id,
-      handlerType: handler.type
-    });
 
     // Execute the node
     const startTime = Date.now();
@@ -317,7 +257,7 @@ export class WorkflowExecutionService {
   /**
    * Find the start node in the workflow
    */
-  private getStartNode(workflow: WorkflowDSL): WorkflowDSLNode | null {
+  private getStartNode(workflow: Workflow): Node | null {
     return workflow.nodes.find(node => node.type === 'start') || null;
   }
 
@@ -325,10 +265,10 @@ export class WorkflowExecutionService {
    * Find the next node based on current node and edge condition
    */
   private getNextNode(
-    workflow: WorkflowDSL,
-    currentNode: WorkflowDSLNode,
+    workflow: Workflow,
+    currentNode: Node,
     edgeCondition?: string
-  ): WorkflowDSLNode | null {
+  ): Node | null {
     // Find edges from current node
     const outgoingEdges = workflow.edges.filter(edge => edge.from === currentNode.id);
 
@@ -352,11 +292,6 @@ export class WorkflowExecutionService {
 
     // If no matching edge found and we have edges, take the first one
     if (outgoingEdges.length > 0) {
-      this.logger.warn('No matching edge condition, using first available edge', {
-        nodeId: currentNode.id,
-        edgeCondition,
-        availableEdges: outgoingEdges.map(e => ({ to: e.to, condition: e.condition }))
-      });
       return workflow.nodes.find(node => node.id === outgoingEdges[0].to) || null;
     }
 
@@ -366,7 +301,7 @@ export class WorkflowExecutionService {
   /**
    * Validate workflow before execution
    */
-  private async validateWorkflowForExecution(workflow: WorkflowDSL): Promise<void> {
+  private async validateForExecution(workflow: Workflow): Promise<void> {
     // Check for start node
     const startNode = this.getStartNode(workflow);
     if (!startNode) {
@@ -376,7 +311,7 @@ export class WorkflowExecutionService {
     // Check that all node types have handlers
     const unsupportedNodes = [];
     for (const node of workflow.nodes) {
-      const handler = this.nodeRegistry.getHandlerForNode(node);
+      const handler = this.registry.getHandler(node.type);
       if (!handler) {
         unsupportedNodes.push({ id: node.id, type: node.type });
       }
@@ -385,47 +320,12 @@ export class WorkflowExecutionService {
     if (unsupportedNodes.length > 0) {
       throw new Error(`Unsupported node types: ${unsupportedNodes.map(n => n.type).join(', ')}`);
     }
-
-    // Validate graph connectivity (basic check)
-    const reachableNodes = this.findReachableNodes(workflow, startNode.id);
-    const unreachableNodes = workflow.nodes.filter(node => 
-      !reachableNodes.has(node.id) && node.type !== 'start'
-    );
-
-    if (unreachableNodes.length > 0) {
-      this.logger.warn('Found unreachable nodes in workflow', {
-        workflowId: workflow.id,
-        unreachableNodes: unreachableNodes.map(n => ({ id: n.id, name: n.name }))
-      });
-    }
-  }
-
-  /**
-   * Find all nodes reachable from a starting node
-   */
-  private findReachableNodes(workflow: WorkflowDSL, startNodeId: string): Set<string> {
-    const reachable = new Set<string>();
-    const queue = [startNodeId];
-
-    while (queue.length > 0) {
-      const currentId = queue.shift()!;
-      if (reachable.has(currentId)) continue;
-
-      reachable.add(currentId);
-
-      // Find outgoing edges and add target nodes to queue
-      workflow.edges
-        .filter(edge => edge.from === currentId)
-        .forEach(edge => queue.push(edge.to));
-    }
-
-    return reachable;
   }
 
   /**
    * Pause workflow execution
    */
-  public pauseExecution(executionId: string): boolean {
+  pause(executionId: string): boolean {
     const runtimeState = this.runningExecutions.get(executionId);
     if (!runtimeState || runtimeState.status !== 'running') {
       return false;
@@ -438,7 +338,7 @@ export class WorkflowExecutionService {
     this.emitEvent({
       type: 'workflow_paused',
       workflowId: runtimeState.workflowId,
-      contextId: '', // Migration note: Would need to get this from context
+      contextId: '',
       timestamp: new Date().toISOString()
     });
 
@@ -448,7 +348,7 @@ export class WorkflowExecutionService {
   /**
    * Resume workflow execution
    */
-  public resumeExecution(executionId: string): boolean {
+  resume(executionId: string): boolean {
     const runtimeState = this.runningExecutions.get(executionId);
     if (!runtimeState || runtimeState.status !== 'paused') {
       return false;
@@ -461,7 +361,7 @@ export class WorkflowExecutionService {
     this.emitEvent({
       type: 'workflow_resumed',
       workflowId: runtimeState.workflowId,
-      contextId: '', // Migration note: Would need to get this from context
+      contextId: '',
       timestamp: new Date().toISOString()
     });
 
@@ -469,23 +369,9 @@ export class WorkflowExecutionService {
   }
 
   /**
-   * Get execution status
-   */
-  public getExecutionStatus(executionId: string): WorkflowRuntimeState | null {
-    return this.runningExecutions.get(executionId) || null;
-  }
-
-  /**
-   * Get all running executions
-   */
-  public getRunningExecutions(): WorkflowRuntimeState[] {
-    return Array.from(this.runningExecutions.values());
-  }
-
-  /**
    * Cancel workflow execution
    */
-  public cancelExecution(executionId: string): boolean {
+  cancel(executionId: string): boolean {
     const runtimeState = this.runningExecutions.get(executionId);
     if (!runtimeState || runtimeState.status === 'completed' || runtimeState.status === 'failed') {
       return false;
@@ -496,26 +382,34 @@ export class WorkflowExecutionService {
     runtimeState.updatedAt = new Date().toISOString();
 
     this.runningExecutions.delete(executionId);
-
-    this.logger.info('Workflow execution cancelled', {
-      executionId,
-      workflowId: runtimeState.workflowId
-    });
-
     return true;
+  }
+
+  /**
+   * Get execution status
+   */
+  getExecutionStatus(executionId: string): RuntimeState | null {
+    return this.runningExecutions.get(executionId) || null;
+  }
+
+  /**
+   * Get all running executions
+   */
+  getRunningExecutions(): RuntimeState[] {
+    return Array.from(this.runningExecutions.values());
   }
 
   /**
    * Register event callback
    */
-  public onEvent(callback: WorkflowExecutionEventCallback): void {
+  onEvent(callback: EventCallback): void {
     this.eventCallbacks.push(callback);
   }
 
   /**
    * Remove event callback
    */
-  public offEvent(callback: WorkflowExecutionEventCallback): void {
+  offEvent(callback: EventCallback): void {
     const index = this.eventCallbacks.indexOf(callback);
     if (index > -1) {
       this.eventCallbacks.splice(index, 1);
@@ -525,18 +419,14 @@ export class WorkflowExecutionService {
   /**
    * Emit workflow execution event
    */
-  private async emitEvent(event: WorkflowExecutionEvent): Promise<void> {
-    this.logger.debug('Emitting workflow event', event);
-
+  private async emitEvent(event: ExecutionEvent): Promise<void> {
     // Call all registered callbacks
     for (const callback of this.eventCallbacks) {
       try {
         await callback(event);
       } catch (error) {
-        this.logger.error('Error in workflow event callback', {
-          eventType: event.type,
-          error: error instanceof Error ? error.message : String(error)
-        });
+        // Silent fail for event callbacks to not interrupt execution
+        console.error('Error in workflow event callback:', error);
       }
     }
   }

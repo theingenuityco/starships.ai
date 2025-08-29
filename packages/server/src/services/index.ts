@@ -28,19 +28,7 @@ export { AgentExecutionService } from './AgentExecutionService';
 export { LLMService } from './LLMService';
 export { ToolService } from './ToolService';
 
-// Workflow execution engine (if needed for other purposes)
-export { 
-  WorkflowNodeRegistry, 
-  workflowNodeRegistry,
-  BaseWorkflowNodeHandler,
-  type WorkflowNodeHandler
-} from './WorkflowNodeRegistry';
-export { StartNodeHandler, EndNodeHandler, OutputNodeHandler } from './BasicNodeHandlers';
-export { 
-  WorkflowExecutionService,
-  type WorkflowExecutionEvent,
-  type WorkflowExecutionEventCallback
-} from './WorkflowExecutionService';
+// Note: Workflow execution engine has been moved to @starships/autopilot package
 
 // Vision refinement types
 export type {

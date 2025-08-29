@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loadKindeRuntimeConfig } from '@starships/env-config';
 
 // Dynamically import Kinde at runtime to avoid build-time env validation
 export async function GET(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
   try {
+    // Load Kinde config at runtime and set in process.env
+    const config = loadKindeRuntimeConfig();
+    
     // Check if Kinde is configured
-    if (!process.env.KINDE_ISSUER_URL) {
+    if (!config.KINDE_ISSUER_URL) {
       console.warn('Kinde is not configured. Set KINDE_ISSUER_URL in your environment variables.');
       return NextResponse.json(
         { error: 'Authentication service not configured' },
@@ -27,8 +31,11 @@ export async function GET(request: NextRequest, { params }: { params: { kindeAut
 
 export async function POST(request: NextRequest, { params }: { params: { kindeAuth: string } }) {
   try {
+    // Load Kinde config at runtime and set in process.env
+    const config = loadKindeRuntimeConfig();
+    
     // Check if Kinde is configured
-    if (!process.env.KINDE_ISSUER_URL) {
+    if (!config.KINDE_ISSUER_URL) {
       console.warn('Kinde is not configured. Set KINDE_ISSUER_URL in your environment variables.');
       return NextResponse.json(
         { error: 'Authentication service not configured' },

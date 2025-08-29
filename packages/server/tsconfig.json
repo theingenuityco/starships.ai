@@ -8,7 +8,6 @@
   "exclude": ["dist"],
   "references": [
     { "path": "../protocol" },
-    { "path": "../models" },
-    { "path": "../agent-engine" }
+    { "path": "../models" }
   ]
 }

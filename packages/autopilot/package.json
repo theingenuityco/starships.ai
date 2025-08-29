@@ -1,0 +1,29 @@
+{
+  "name": "@starships/autopilot",
+  "version": "1.0.0",
+  "description": "Generic workflow DSL execution engine",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0",
+    "jsonata": "^2.0.3"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.1.1",
+    "ts-jest": "^29.4.1",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@starships/protocol": "workspace:*"
+  }
+}

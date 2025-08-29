@@ -19,39 +19,46 @@ fi
 echo "Current context: $CURRENT_CONTEXT"
 echo ""
 
-# Kinde OAuth credentials (from your production app)
-KINDE_CLIENT_ID="[KINDE-PROD-CLIENT-ID]"
-KINDE_CLIENT_SECRET="${KINDE_CLIENT_SECRET:-[API-KEY]}"
-KINDE_ISSUER_URL="[KINDE-ISSUER-URL]"
+# All secrets should be provided as environment variables
+# These will be automatically set by GitHub Actions from GitHub Secrets
 
-# Neo4j [DEFAULT-PASSWORD] (generated earlier)
-NEO4J_PASSWORD="[NEO4J-PASSWORD]"
+# Check required environment variables
+REQUIRED_VARS=(
+    "OPENAI_API_KEY"
+    "ANTHROPIC_API_KEY"
+    "STRIPE_SECRET_KEY"
+    "STRIPE_PUBLISHABLE_KEY"
+    "STRIPE_WEBHOOK_SECRET"
+    "NEO4J_PASSWORD"
+    "KINDE_CLIENT_ID"
+    "KINDE_CLIENT_SECRET"
+    "KINDE_ISSUER_URL"
+    "KINDE_SITE_URL"
+    "KINDE_POST_LOGIN_REDIRECT_URL"
+    "KINDE_POST_LOGOUT_REDIRECT_URL"
+    "KINDE_REDIRECT_URL"
+    "CLIENT_URL"
+    "NEXT_PUBLIC_API_URL"
+    "NEXT_PUBLIC_SERVER_URL"
+    "GHCR_PULL_TOKEN"
+)
 
-# You need to set these environment variables or replace them
-echo "Please ensure you have set the following environment variables:"
-echo "- OPENAI_API_KEY"
-echo "- ANTHROPIC_API_KEY"
-echo "- STRIPE_SECRET_KEY"
-echo "- STRIPE_PUBLISHABLE_KEY"
-echo "- STRIPE_WEBHOOK_SECRET"
-echo "- KINDE_CLIENT_SECRET"
-echo "- GITHUB_USERNAME (your GitHub username)"
-echo "- GITHUB_PAT (GitHub Personal Access Token with packages:read)"
-echo ""
+MISSING_VARS=()
 
-read -p "Have you set all required environment variables? (yes/no): " confirm
-if [ "$confirm" != "yes" ]; then
-    echo "Please set the required environment variables and run this script again."
+for VAR in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!VAR}" ]; then
+        MISSING_VARS+=("$VAR")
+    fi
+done
+
+if [ ${#MISSING_VARS[@]} -ne 0 ]; then
+    echo "Error: The following required environment variables are not set:"
+    for VAR in "${MISSING_VARS[@]}"; do
+        echo "  - $VAR"
+    done
     echo ""
-    echo "Example:"
-    echo "export OPENAI_API_KEY='[OPENAI-API-KEY]'"
-    echo "export ANTHROPIC_API_KEY='[ANTHROPIC-API-KEY]'"
-    echo "export STRIPE_SECRET_KEY='[STRIPE-SECRET-KEY]'"
-    echo "export STRIPE_PUBLISHABLE_KEY='[STRIPE-PUBLISHABLE-KEY]'"
-    echo "export STRIPE_WEBHOOK_SECRET='[STRIPE-WEBHOOK-SECRET]'"
-    echo "export KINDE_CLIENT_SECRET='[API-KEY]'"
-    echo "export GITHUB_USERNAME='dsolanski'"
-    echo "export GITHUB_PAT='[GITHUB-PAT]'"
+    echo "These should be set by GitHub Actions from GitHub Secrets."
+    echo "If running manually, export them before running this script."
     exit 1
 fi
 
@@ -70,6 +77,13 @@ kubectl create secret generic starships-secrets \
     --from-literal=STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET}" \
     --from-literal=STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY}" \
     --from-literal=NEO4J_PASSWORD="${NEO4J_PASSWORD}" \
+    --from-literal=KINDE_SITE_URL="${KINDE_SITE_URL}" \
+    --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${KINDE_POST_LOGIN_REDIRECT_URL}" \
+    --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${KINDE_POST_LOGOUT_REDIRECT_URL}" \
+    --from-literal=KINDE_REDIRECT_URL="${KINDE_REDIRECT_URL}" \
+    --from-literal=CLIENT_URL="${CLIENT_URL}" \
+    --from-literal=NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
+    --from-literal=NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL}" \
     -n starships-prod
 
 # Create Kinde secrets
@@ -84,8 +98,8 @@ kubectl create secret generic kinde-auth-secret \
 echo "Creating GitHub Container Registry pull secret..."
 kubectl create secret docker-registry ghcr-pull-secret \
     --docker-server=ghcr.io \
-    --docker-username="${GITHUB_USERNAME}" \
-    --docker-[DEFAULT-PASSWORD]="${GITHUB_PAT}" \
+    --docker-username=dewangsolanki3 \
+    --docker-[DEFAULT-PASSWORD]="${GHCR_PULL_TOKEN}" \
     -n starships-prod
 
 echo ""

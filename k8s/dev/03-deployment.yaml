@@ -37,7 +37,7 @@ spec:
       
       containers:
       - name: starships
-        image: [DOCKER-REGISTRY-URL]:3.8.2
+        image: [DOCKER-REGISTRY-URL]:latest  # Updated by CI/CD
         imagePullPolicy: Always
         
         ports:
@@ -64,15 +64,24 @@ spec:
         - name: SKIP_INSTALL
           value: "true"
         
-        # URLs
+        # URLs (from secrets for flexibility)
         - name: CLIENT_URL
-          value: "[DEV-DOMAIN-URL]"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: CLIENT_URL
         - name: NEXT_PUBLIC_API_URL
-          value: "[DEV-DOMAIN-URL]/api"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_API_URL
         - name: NEXT_PUBLIC_SERVER_URL
-          value: "[DEV-DOMAIN-URL]/api"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_SERVER_URL
         - name: SERVER_URL
-          value: "http://localhost:4000"
+          value: "http://localhost:4000"  # Internal service URL, always the same
         
         # Neo4j Configuration
         - name: NEO4J_URI
@@ -80,23 +89,44 @@ spec:
         - name: NEO4J_USERNAME
           value: "neo4j"
         - name: NEO4J_PASSWORD
-          value: "[NEO4J-PASSWORD]"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEO4J_PASSWORD
         - name: NEO4J_AUTH
-          value: "neo4j/[NEO4J-PASSWORD]"
+          value: "neo4j/$(NEO4J_PASSWORD)"
         
-        # Kinde OAuth
+        # Kinde OAuth URLs (from secrets for flexibility)
         - name: KINDE_ISSUER_URL
-          value: "[KINDE-ISSUER-URL]"
+          valueFrom:
+            secretKeyRef:
+              name: kinde-auth-secret
+              key: KINDE_ISSUER_URL
         - name: KINDE_SITE_URL
-          value: "[DEV-DOMAIN-URL]"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_SITE_URL
         - name: KINDE_POST_LOGIN_REDIRECT_URL
-          value: "[DEV-DOMAIN-URL]/fleet"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_POST_LOGIN_REDIRECT_URL
         - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          value: "[DEV-DOMAIN-URL]"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_POST_LOGOUT_REDIRECT_URL
         - name: KINDE_REDIRECT_URL
-          value: "[DEV-DOMAIN-URL]/api/auth/kinde_callback"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_REDIRECT_URL
         - name: KINDE_COOKIE_DOMAIN
-          value: "dev.starships.ai"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_COOKIE_DOMAIN
         
         # Security: Disable testing backdoor, enable debug for dev
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR

@@ -34,20 +34,18 @@ export class WorkflowHandler extends BaseHandler {
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
           output: 'Workflow completed successfully'
-        }, Date.now() - startTime);
+        });
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
         return this.createErrorResult(execution,
-          `Workflow execution failed: ${errorMessage}`,
-          Date.now() - startTime
+          `Workflow execution failed: ${errorMessage}`
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResult(execution,
-        `Workflow execution failed: ${errorMessage}`,
-        Date.now() - startTime
+        `Workflow execution failed: ${errorMessage}`
       );
     }
   }

@@ -55,8 +55,6 @@ describe('ConditionalHandler', () => {
       expect(nodeResult?.nodeRef).toBe('conditional-node');
       expect((nodeResult?.data as any)?.conditionMet).toBe('high_value'); // First matching condition
       expect(nodeResult?.nextEdgeCondition).toBe('high_value');
-      expect(nodeResult?.metadata?.duration).toBe(10);
-      expect(nodeResult?.metadata?.executedAt).toBeDefined();
     });
 
     it('should return default condition when no conditions match', async () => {
@@ -75,10 +73,8 @@ describe('ConditionalHandler', () => {
     it('should handle missing source node', async () => {
       mockExecution.executionResults.clear();
 
-      const result = await handler.execute(mockExecution);
-      
-      const nodeResult = result.executionResults.get('conditional-node');
-      expect(nodeResult?.error).toContain('Source node source-node not found');
+      await expect(handler.execute(mockExecution))
+        .rejects.toThrow('Source node source-node not found in execution results');
     });
 
     it('should handle JSONata evaluation errors', async () => {

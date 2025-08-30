@@ -2,45 +2,51 @@
  * HTTP Request Node Handler
  * 
  * Handles HTTP request nodes for making external API calls using axios
+ * Uses BaseHandler pattern
  */
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, HttpRequestNodeParameters } from '../../types';
+import { BaseHandler } from '../Handler';
+import { ExecutionContext, ValidationResult, HttpRequestNodeParameters } from '../../types';
 
-export class HttpRequestHandler implements Handler {
+export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
+  private params: HttpRequestNodeParameters;
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as unknown as HttpRequestNodeParameters;
+  constructor(parameters: any, nodeId: string) {
+    super(parameters, nodeId);
+    this.params = parameters as HttpRequestNodeParameters;
+  }
+
+  async execute(context: ExecutionContext) {
     const startTime = Date.now();
     
     try {
       // Build axios request configuration
       const requestConfig: AxiosRequestConfig = {
-        method: params.method,
-        url: params.url,
+        method: this.params.method,
+        url: this.params.url,
         headers: {
           'Content-Type': 'application/json',
-          ...params.headers
+          ...this.params.headers
         },
-        timeout: params.timeout || 30000,
-        maxRedirects: params.followRedirects !== false ? 5 : 0,
+        timeout: this.params.timeout || 30000,
+        maxRedirects: this.params.followRedirects !== false ? 5 : 0,
         validateStatus: () => true, // Don't throw on any status code
       };
 
       // Add authentication if provided
-      if (params.authentication) {
-        this.addAuthentication(requestConfig, params.authentication);
+      if (this.params.authentication) {
+        this.addAuthentication(requestConfig, this.params.authentication);
       }
 
       // Add body for non-GET requests
-      if (params.method !== 'GET' && params.method !== 'HEAD' && params.body) {
-        requestConfig.data = params.body;
+      if (this.params.method !== 'GET' && this.params.method !== 'HEAD' && this.params.body) {
+        requestConfig.data = this.params.body;
       }
 
       // Execute request with retries
-      const maxRetries = params.retries || 0;
+      const maxRetries = this.params.retries || 0;
       let lastError: Error | null = null;
       let response: AxiosResponse | null = null;
 
@@ -67,46 +73,24 @@ export class HttpRequestHandler implements Handler {
       const duration = Date.now() - startTime;
 
       if (response) {
-        return {
-          nodeId: node.id,
-          success: response.status >= 200 && response.status < 300,
-          data: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            body: response.data,
-            url: response.config.url
-          },
-          executedAt: new Date().toISOString(),
-          duration
-        };
+        return this.createSuccessResult({
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          body: response.data,
+          url: response.config.url
+        }, duration);
       } else {
         // If we get here, all retries failed
-        return {
-          nodeId: node.id,
-          success: false,
-          data: { 
-            error: lastError?.message || 'HTTP request failed',
-            attempts: maxRetries + 1,
-            errorCode: (lastError as AxiosError)?.code
-          },
-          executedAt: new Date().toISOString(),
+        return this.createErrorResult(
+          lastError?.message || 'HTTP request failed',
           duration
-        };
+        );
       }
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      return {
-        nodeId: node.id,
-        success: false,
-        data: { 
-          error: (error as Error).message,
-          errorCode: (error as AxiosError)?.code
-        },
-        executedAt: new Date().toISOString(),
-        duration
-      };
+      return this.createErrorResult((error as Error).message, duration);
     }
   }
 
@@ -135,109 +119,90 @@ export class HttpRequestHandler implements Handler {
     }
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as unknown as HttpRequestNodeParameters;
+  validate(): ValidationResult {
     const errors = [];
     const warnings = [];
 
     // Required fields validation
-    if (!params.url) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'URL is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (!this.params.url) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'URL is required'
+      ));
     }
 
-    if (!params.method) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'HTTP method is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (!this.params.method) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'HTTP method is required'
+      ));
     }
 
     // URL format validation
-    if (params.url) {
+    if (this.params.url) {
       try {
-        new URL(params.url);
+        new URL(this.params.url);
       } catch {
-        errors.push({
-          code: 'INVALID_URL',
-          message: 'URL format is invalid',
-          nodeId: node.id,
-          severity: 'error' as const
-        });
+        errors.push(this.createValidationError(
+          'INVALID_URL',
+          'URL format is invalid'
+        ));
       }
     }
 
     // Method validation
     const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
-    if (params.method && !validMethods.includes(params.method)) {
-      errors.push({
-        code: 'INVALID_HTTP_METHOD',
-        message: `Invalid HTTP method. Must be one of: ${validMethods.join(', ')}`,
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (this.params.method && !validMethods.includes(this.params.method)) {
+      errors.push(this.createValidationError(
+        'INVALID_HTTP_METHOD',
+        `Invalid HTTP method. Must be one of: ${validMethods.join(', ')}`
+      ));
     }
 
     // Authentication validation
-    if (params.authentication) {
-      const auth = params.authentication;
+    if (this.params.authentication) {
+      const auth = this.params.authentication;
       switch (auth.type) {
         case 'bearer':
           if (!auth.token) {
-            errors.push({
-              code: 'MISSING_AUTH_TOKEN',
-              message: 'Bearer token is required for bearer authentication',
-              nodeId: node.id,
-              severity: 'error' as const
-            });
+            errors.push(this.createValidationError(
+              'MISSING_AUTH_TOKEN',
+              'Bearer token is required for bearer authentication'
+            ));
           }
           break;
         case 'basic':
           if (!auth.username || !auth.password) {
-            errors.push({
-              code: 'MISSING_AUTH_CREDENTIALS',
-              message: 'Username and password are required for basic authentication',
-              nodeId: node.id,
-              severity: 'error' as const
-            });
+            errors.push(this.createValidationError(
+              'MISSING_AUTH_CREDENTIALS',
+              'Username and password are required for basic authentication'
+            ));
           }
           break;
         case 'api-key':
           if (!auth.apiKey || !auth.headerName) {
-            errors.push({
-              code: 'MISSING_API_KEY',
-              message: 'API key and header name are required for API key authentication',
-              nodeId: node.id,
-              severity: 'error' as const
-            });
+            errors.push(this.createValidationError(
+              'MISSING_API_KEY',
+              'API key and header name are required for API key authentication'
+            ));
           }
           break;
       }
     }
 
     // Warnings for common issues
-    if (params.timeout && params.timeout < 1000) {
-      warnings.push({
-        code: 'LOW_TIMEOUT',
-        message: 'Timeout is very low, this may cause frequent failures',
-        nodeId: node.id,
-        severity: 'warning' as const
-      });
+    if (this.params.timeout && this.params.timeout < 1000) {
+      warnings.push(this.createValidationWarning(
+        'LOW_TIMEOUT',
+        'Timeout is very low, this may cause frequent failures'
+      ));
     }
 
-    if (params.retries && params.retries > 5) {
-      warnings.push({
-        code: 'HIGH_RETRY_COUNT',
-        message: 'High retry count may cause long execution times',
-        nodeId: node.id,
-        severity: 'warning' as const
-      });
+    if (this.params.retries && this.params.retries > 5) {
+      warnings.push(this.createValidationWarning(
+        'HIGH_RETRY_COUNT',
+        'High retry count may cause long execution times'
+      ));
     }
 
     return {

@@ -1,53 +1,49 @@
 /**
  * User Prompt Handler
  * 
- * User prompt handler - will need UI integration
+ * User prompt handler using BaseHandler pattern - will need UI integration
  */
 
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, UserPromptNodeParameters } from '../../types';
+import { BaseHandler } from '../Handler';
+import { ExecutionContext, ValidationResult, UserPromptNodeParameters } from '../../types';
 
-export class PromptHandler implements Handler {
+export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
+  private params: UserPromptNodeParameters;
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as UserPromptNodeParameters;
-    
-    // TODO: Integrate with UI system for user prompts
-    // This will need to pause execution and wait for user input
-    console.log(`User prompt: ${params.promptText}`);
-    console.log('Choices:', params.choices);
-    
-    // For now, return a placeholder result
-    return {
-      nodeId: node.id,
-      success: true,
-      data: { choice: params.choices[0], userInput: 'placeholder' },
-      executedAt: new Date().toISOString(),
-      duration: 100
-    };
+  constructor(parameters: any, nodeId: string) {
+    super(parameters, nodeId);
+    this.params = parameters as UserPromptNodeParameters;
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as UserPromptNodeParameters;
+  async execute(context: ExecutionContext) {
+    // TODO: Integrate with UI system for user prompts
+    // This will need to pause execution and wait for user input
+    console.log(`User prompt: ${this.params.promptText}`);
+    console.log('Choices:', this.params.choices);
+    
+    // For now, return a placeholder result
+    return this.createSuccessResult({
+      choice: this.params.choices[0], 
+      userInput: 'placeholder'
+    }, 100);
+  }
+
+  validate(): ValidationResult {
     const errors = [];
 
-    if (!params.promptText) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Prompt text is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (!this.params.promptText) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Prompt text is required'
+      ));
     }
 
-    if (!params.choices || params.choices.length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'At least one choice is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (!this.params.choices || this.params.choices.length === 0) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'At least one choice is required'
+      ));
     }
 
     return {

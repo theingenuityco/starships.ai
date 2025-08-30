@@ -9,6 +9,18 @@ import { Blueprint, RuntimeState, ExecutionContext, Node, NodeResult } from '../
 import { Handler, HandlerConstructor } from '../nodes/Handler';
 import { v4 as uuidv4 } from 'uuid';
 
+// Dynamic imports for handlers - pure lazy loading
+const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
+  'start': () => import('../nodes/handlers/StartHandler').then(m => m.StartHandler),
+  'end': () => import('../nodes/handlers/EndHandler').then(m => m.EndHandler),
+  'agent': () => import('../nodes/handlers/AgentHandler').then(m => m.AgentHandler),
+  'conditional': () => import('../nodes/handlers/ConditionalHandler').then(m => m.ConditionalHandler),
+  'user_prompt': () => import('../nodes/handlers/PromptHandler').then(m => m.PromptHandler),
+  'output': () => import('../nodes/handlers/OutputHandler').then(m => m.OutputHandler),
+  'http_request': () => import('../nodes/handlers/HttpRequestHandler').then(m => m.HttpRequestHandler),
+  'llm': () => import('../nodes/handlers/LlmHandler').then(m => m.LlmHandler),
+};
+
 /**
  * Events that can be emitted during workflow execution
  */
@@ -31,51 +43,39 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
  * Main workflow execution engine
  */
 export class Engine {
-  private handlerConstructors: Map<string, HandlerConstructor> = new Map();
   private eventCallbacks: EventCallback[] = [];
   private runningExecutions: Map<string, RuntimeState> = new Map();
 
   constructor() {
-    // Engine now starts empty - handlers registered dynamically as needed
-  }
-
-
-  /**
-   * Register a node handler constructor
-   */
-  registerHandlerConstructor(type: string, handlerConstructor: HandlerConstructor): void {
-    if (this.handlerConstructors.has(type)) {
-      console.warn(`Overriding existing handler for node type: ${type}`);
-    }
-    
-    this.handlerConstructors.set(type, handlerConstructor);
-    console.log(`Registered node handler constructor: ${type}`);
+    // Engine is completely stateless for handlers - pure dynamic loading
   }
 
   /**
-   * Create handler instance for a node
+   * Create handler instance for a node with pure dynamic loading
    */
-  createHandler(node: Node): Handler {
-    const handlerConstructor = this.handlerConstructors.get(node.type);
-    if (!handlerConstructor) {
-      throw new Error(`No handler constructor found for node type: ${node.type}`);
+  async createHandler(node: Node): Promise<Handler> {
+    const loader = HANDLER_MAP[node.type];
+    if (!loader) {
+      throw new Error(`No handler available for node type: ${node.type}`);
     }
     
+    // Load handler constructor dynamically each time
+    const handlerConstructor = await loader();
     return new handlerConstructor(node.parameters, node.id);
   }
 
   /**
-   * Get all registered handler types
+   * Get all available handler types
    */
   getSupportedTypes(): string[] {
-    return Array.from(this.handlerConstructors.keys());
+    return Object.keys(HANDLER_MAP);
   }
 
   /**
    * Check if a node type is supported
    */
   hasHandler(type: string): boolean {
-    return this.handlerConstructors.has(type);
+    return type in HANDLER_MAP;
   }
 
   /**
@@ -273,8 +273,8 @@ export class Engine {
     node: Node,
     context: ExecutionContext
   ): Promise<NodeResult> {
-    // Create handler instance with parameters
-    const handler = this.createHandler(node);
+    // Create handler instance with parameters (now async)
+    const handler = await this.createHandler(node);
 
     // Execute the node
     const startTime = Date.now();
@@ -343,11 +343,10 @@ export class Engine {
       throw new Error('Workflow must have a start node');
     }
 
-    // Check that all node types have handler constructors
+    // Check that all node types have available handlers
     const unsupportedNodes = [];
     for (const node of blueprint.nodes) {
-      const handlerConstructor = this.handlerConstructors.get(node.type);
-      if (!handlerConstructor) {
+      if (!(node.type in HANDLER_MAP)) {
         unsupportedNodes.push({ id: node.id, type: node.type });
       }
     }

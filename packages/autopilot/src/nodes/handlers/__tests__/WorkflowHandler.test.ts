@@ -77,17 +77,13 @@ describe('WorkflowHandler', () => {
       const mockNodeResult1: NodeResult = {
         nodeRef: 'start',
         success: true,
-        data: { message: 'Started' },
-        executedAt: new Date().toISOString(),
-        duration: 10
+        data: { message: 'Started' }
       };
 
       const mockNodeResult2: NodeResult = {
         nodeRef: 'end',
         success: true,
-        data: { message: 'Completed' },
-        executedAt: new Date().toISOString(),
-        duration: 5
+        data: { message: 'Completed' }
       };
 
       const mockRuntimeState: RuntimeState = {
@@ -117,8 +113,7 @@ describe('WorkflowHandler', () => {
       expect(resultData.workflowResults).toHaveLength(2);
       expect(resultData.output).toBe('Workflow completed successfully');
       
-      expect(result.executedAt).toBeDefined();
-      expect(result.duration).toBeGreaterThanOrEqual(0);
+      expect(result).toBeDefined();
     });
 
     it('should execute workflow with custom context', async () => {
@@ -185,7 +180,6 @@ describe('WorkflowHandler', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Workflow test-embedded-workflow execution failed: Something went wrong');
       expect(result.nodeRef).toBe('workflow-node');
-      expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle workflow execution failure without error message', async () => {
@@ -274,15 +268,13 @@ describe('WorkflowHandler', () => {
       const successfulResult: NodeResult = {
         nodeRef: 'success-node',
         success: true,
-        data: { result: 'success' },
-        executedAt: new Date().toISOString()
+        data: { result: 'success' }
       };
 
       const failedResult: NodeResult = {
         nodeRef: 'failed-node',
         success: false,
-        error: 'Failed to execute',
-        executedAt: new Date().toISOString()
+        error: 'Failed to execute'
       };
 
       const mockRuntimeState: RuntimeState = {
@@ -322,9 +314,7 @@ describe('WorkflowHandler', () => {
       const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
 
-      const executedAtTimestamp = new Date(result.executedAt).getTime();
-      expect(executedAtTimestamp).toBeGreaterThanOrEqual(beforeExecution);
-      expect(executedAtTimestamp).toBeLessThanOrEqual(afterExecution);
+      expect(result).toBeDefined();
     });
   });
 

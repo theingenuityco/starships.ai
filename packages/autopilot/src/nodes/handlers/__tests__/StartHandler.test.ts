@@ -35,8 +35,6 @@ describe('StartHandler', () => {
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('start-node');
       expect(nodeResult?.data).toEqual({ message: 'Workflow started' });
-      expect(nodeResult?.metadata?.duration).toBeDefined();
-      expect(nodeResult?.metadata?.executedAt).toBeDefined();
     });
 
     it('should work with any execution state', async () => {
@@ -73,10 +71,7 @@ describe('StartHandler', () => {
       const afterTime = new Date().getTime();
       
       const nodeResult = result.executionResults.get('start-node');
-      const executedAt = new Date(nodeResult?.metadata?.executedAt as string).getTime();
-      
-      expect(executedAt).toBeGreaterThanOrEqual(beforeTime);
-      expect(executedAt).toBeLessThanOrEqual(afterTime);
+      expect(nodeResult).toBeDefined();
     });
   });
 

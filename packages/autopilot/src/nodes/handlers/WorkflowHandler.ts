@@ -13,7 +13,6 @@ export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
 
   async execute(execution: Execution) {
-    const startTime = Date.now();
     const params = this.node.parameters as WorkflowNodeParameters;
     
     try {

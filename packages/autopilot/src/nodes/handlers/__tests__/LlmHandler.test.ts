@@ -79,9 +79,7 @@ describe('LlmHandler', () => {
               }
             }]
           }
-        },
-        duration: 1500,
-        executedAt: new Date().toISOString()
+        }
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -93,7 +91,6 @@ describe('LlmHandler', () => {
       const resultData = result.data as LlmResponseData;
       expect(resultData.llmResponse).toBe('Hello! I am doing well, thank you for asking.');
       expect(resultData.model).toBe('anthropic/claude-3.5-sonnet');
-      expect(result.duration).toBe(1500);
     });
 
     it('should execute with full parameters', async () => {
@@ -126,9 +123,7 @@ describe('LlmHandler', () => {
               }
             }]
           }
-        },
-        duration: 2000,
-        executedAt: new Date().toISOString()
+        }
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -192,9 +187,7 @@ describe('LlmHandler', () => {
               }
             }]
           }
-        },
-        duration: 1200,
-        executedAt: new Date().toISOString()
+        }
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -269,9 +262,7 @@ describe('LlmHandler', () => {
         const mockHttpResult = {
           success: true,
           nodeRef: 'llm-node-http',
-          ...testCase,
-          duration: 1000,
-          executedAt: new Date().toISOString()
+          ...testCase
         };
 
         mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -287,9 +278,7 @@ describe('LlmHandler', () => {
       const mockHttpResult = {
         success: false,
         nodeRef: 'llm-node-http',
-        error: 'HTTP request failed',
-        duration: 500,
-        executedAt: new Date().toISOString()
+        error: 'HTTP request failed'
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -305,9 +294,7 @@ describe('LlmHandler', () => {
       const mockHttpResult = {
         success: true,
         nodeRef: 'llm-node-http',
-        data: {}, // No body
-        duration: 1000,
-        executedAt: new Date().toISOString()
+        data: {} // No body
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -332,9 +319,7 @@ describe('LlmHandler', () => {
       const mockHttpResult = {
         success: true,
         nodeRef: 'llm-node-http',
-        data: { body: { choices: [{ message: { content: 'Response' } }] } },
-        duration: 1000,
-        executedAt: new Date().toISOString()
+        data: { body: { choices: [{ message: { content: 'Response' } }] } }
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
@@ -343,7 +328,7 @@ describe('LlmHandler', () => {
       const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
 
-      expect(result.executedAt).toBeDefined();
+      expect(result).toBeDefined();
     });
   });
 
@@ -585,9 +570,7 @@ describe('LlmHandler', () => {
       const mockHttpResult = {
         success: true,
         nodeRef: 'llm-node-http',
-        data: { body: { choices: [{ message: { content: 'Response' } }] } },
-        duration: 1000,
-        executedAt: new Date().toISOString()
+        data: { body: { choices: [{ message: { content: 'Response' } }] } }
       };
 
       mockHttpHandler.execute.mockResolvedValue(mockHttpResult);

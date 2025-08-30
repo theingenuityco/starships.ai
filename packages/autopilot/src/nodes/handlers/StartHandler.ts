@@ -27,6 +27,6 @@ export class StartHandler extends BaseHandler {
   }
 
   getIcon(): string {
-    return 'play-circle';
+    return 'play';
   }
 }

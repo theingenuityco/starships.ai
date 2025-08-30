@@ -1,27 +1,96 @@
 /**
- * Node Handler Interface
- * 
- * Base interface for workflow node handlers
+ * Node Handler Interface and Base Class
+ *
+ * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { Node, NodeResult, ExecutionContext, ValidationResult } from '../types';
+import { NodeResult, ExecutionContext, ValidationResult } from '../types';
 
 /**
  * Base interface for workflow node handlers
+ * Handlers are now instantiated with parameters via constructor
  */
 export interface Handler {
   /** The node type this handler manages */
   readonly type: string;
   
-  /** Execute the node with the given context */
-  execute(
-    node: Node, 
-    context: ExecutionContext
-  ): Promise<NodeResult>;
+  /** Execute with parameters already injected via constructor */
+  execute(context: ExecutionContext): Promise<NodeResult>;
   
-  /** Validate the node configuration */
-  validate(node: Node): ValidationResult;
+  /** Validate the handler's configuration */
+  validate(): ValidationResult;
   
   /** Get icon for UI representation */
   getIcon(): string;
+}
+
+/**
+ * Constructor type for handlers that accept parameters and nodeId
+ */
+export type HandlerConstructor = new (parameters: any, nodeId: string) => Handler;
+
+/**
+ * Abstract base class for handlers with common functionality
+ */
+export abstract class BaseHandler implements Handler {
+  abstract readonly type: string;
+
+  constructor(
+    protected parameters: any,
+    protected nodeId: string
+  ) {}
+
+  abstract execute(context: ExecutionContext): Promise<NodeResult>;
+  abstract validate(): ValidationResult;
+  abstract getIcon(): string;
+
+  /**
+   * Helper to create successful result
+   */
+  protected createSuccessResult(data: any, duration?: number): NodeResult {
+    return {
+      nodeId: this.nodeId,
+      success: true,
+      data,
+      executedAt: new Date().toISOString(),
+      duration: duration || 0
+    };
+  }
+
+  /**
+   * Helper to create error result
+   */
+  protected createErrorResult(error: string, duration?: number): NodeResult {
+    return {
+      nodeId: this.nodeId,
+      success: false,
+      error,
+      executedAt: new Date().toISOString(),
+      duration: duration || 0
+    };
+  }
+
+  /**
+   * Helper to create validation error
+   */
+  protected createValidationError(code: string, message: string) {
+    return {
+      code,
+      message,
+      nodeId: this.nodeId,
+      severity: 'error' as const
+    };
+  }
+
+  /**
+   * Helper to create validation warning
+   */
+  protected createValidationWarning(code: string, message: string) {
+    return {
+      code,
+      message,
+      nodeId: this.nodeId,
+      severity: 'warning' as const
+    };
+  }
 }

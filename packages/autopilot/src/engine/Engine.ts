@@ -7,6 +7,16 @@
 
 import { Blueprint, RuntimeState, ExecutionContext, Node, NodeResult } from '../types';
 import { Handler } from '../nodes/Handler';
+import {
+  StartHandler,
+  EndHandler,
+  AgentHandler,
+  ConditionalHandler,
+  PromptHandler,
+  OutputHandler,
+  HttpRequestHandler,
+  LlmHandler
+} from '../nodes/handlers';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -31,12 +41,60 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
  * Main workflow execution engine
  */
 export class Engine {
-  private handlers: Map<string, Handler>;
+  private handlers: Map<string, Handler> = new Map();
   private eventCallbacks: EventCallback[] = [];
   private runningExecutions: Map<string, RuntimeState> = new Map();
 
-  constructor(handlers: Map<string, Handler>) {
-    this.handlers = handlers;
+  constructor() {
+    // Initialize default handlers for all supported node types
+    this.initializeDefaultHandlers();
+  }
+
+  /**
+   * Initialize default handlers for all supported node types
+   */
+  private initializeDefaultHandlers(): void {
+    this.registerHandler(new StartHandler());
+    this.registerHandler(new EndHandler());
+    this.registerHandler(new AgentHandler());
+    this.registerHandler(new ConditionalHandler());
+    this.registerHandler(new PromptHandler());
+    this.registerHandler(new OutputHandler());
+    this.registerHandler(new HttpRequestHandler());
+    this.registerHandler(new LlmHandler());
+  }
+
+  /**
+   * Register a node handler
+   */
+  registerHandler(handler: Handler): void {
+    if (this.handlers.has(handler.type)) {
+      console.warn(`Overriding existing handler for node type: ${handler.type}`);
+    }
+    
+    this.handlers.set(handler.type, handler);
+    console.log(`Registered node handler: ${handler.type}`);
+  }
+
+  /**
+   * Get handler for a node type
+   */
+  getHandler(type: string): Handler | null {
+    return this.handlers.get(type) || null;
+  }
+
+  /**
+   * Get all registered handler types
+   */
+  getSupportedTypes(): string[] {
+    return Array.from(this.handlers.keys());
+  }
+
+  /**
+   * Check if a node type is supported
+   */
+  hasHandler(type: string): boolean {
+    return this.handlers.has(type);
   }
 
   /**

@@ -10,31 +10,30 @@ import { Blueprint, ExecutionContext, NodeResult } from '../../types';
 
 describe('Engine', () => {
   let engine: Engine;
-  let handlers: Map<string, Handler>;
   let mockBlueprint: Blueprint;
   let mockContext: Partial<ExecutionContext>;
 
   beforeEach(() => {
-    handlers = new Map();
-    handlers.set('start', new StartHandler());
-    handlers.set('end', new EndHandler());
-    
-    engine = new Engine(handlers);
+    // Engine now manages handlers internally
+    engine = new Engine();
     
     mockBlueprint = global.createMockBlueprint();
     mockContext = global.createMockContext();
   });
 
   describe('constructor', () => {
-    it('should create engine with provided handlers', () => {
-      const customHandlers = new Map<string, Handler>();
-      const customEngine = new Engine(customHandlers);
+    it('should create engine with internal handlers', () => {
+      const customEngine = new Engine();
       expect(customEngine).toBeInstanceOf(Engine);
     });
 
-    it('should require handlers map to be provided', () => {
-      // Engine now requires handlers map
-      expect(() => new Engine(new Map())).not.toThrow();
+    it('should initialize default handlers automatically', () => {
+      // Engine now manages handlers internally
+      expect(() => new Engine()).not.toThrow();
+      expect(engine.hasHandler('start')).toBe(true);
+      expect(engine.hasHandler('end')).toBe(true);
+      expect(engine.hasHandler('agent')).toBe(true);
+      expect(engine.hasHandler('llm')).toBe(true);
     });
   });
 
@@ -121,7 +120,7 @@ describe('Engine', () => {
         }
       }
       
-      handlers.set('failing', new FailingHandler());
+      engine.registerHandler(new FailingHandler());
       
       const workflowWithFailingNode = global.createMockBlueprint({
         nodes: [
@@ -274,8 +273,8 @@ describe('Engine', () => {
         }
       }
       
-      handlers.set('conditional', new ConditionalHandler());
-      handlers.set('path', new PathHandler());
+      engine.registerHandler(new ConditionalHandler());
+      engine.registerHandler(new PathHandler());
       
       const conditionalBlueprint = global.createMockBlueprint({
         nodes: [

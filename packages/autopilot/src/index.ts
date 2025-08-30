@@ -37,7 +37,7 @@ export type {
   NodeParameters,
   
   // Execution types
-  RuntimeState,
+  Execution,
   NodeResult,
   ExecutionStatus,
   

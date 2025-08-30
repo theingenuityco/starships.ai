@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { Blueprint, RuntimeState, Node as WorkflowNode, NodeResult } from '../types';
+import { Blueprint, Execution, Node as WorkflowNode, NodeResult } from '../types';
 import { Handler, HandlerConstructor } from '../nodes/Handler';
 
 // Dynamic imports for handlers - pure lazy loading
@@ -43,7 +43,7 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
  */
 export class Engine {
   private eventCallbacks: EventCallback[] = [];
-  private runtimeState!: RuntimeState;
+  private execution!: Execution;
 
   constructor() {
     // Engine is completely stateless for handlers - pure dynamic loading
@@ -82,10 +82,10 @@ export class Engine {
    */
   async execute(
     blueprint: Blueprint,
-    runtimeState?: RuntimeState
-  ): Promise<RuntimeState> {
-    // Set the provided runtime state or create a default one
-    this.runtimeState = runtimeState || {
+    execution?: Execution
+  ): Promise<Execution> {
+    // Set the provided execution or create a default one
+    this.execution = execution || {
       currentNodeRef: undefined,
       status: 'not_started',
       executionResults: new Map()
@@ -108,15 +108,15 @@ export class Engine {
         timestamp: new Date().toISOString()
       });
 
-      // Update runtime state
-      this.runtimeState.status = 'running';
+      // Update execution state
+      this.execution.status = 'running';
 
       // Execute workflow graph
-      await this.executeGraph(blueprint, this.runtimeState);
+      await this.executeGraph(blueprint, this.execution);
 
       // Mark as completed if no errors
-      if (this.runtimeState.status === 'running') {
-        this.runtimeState.status = 'completed';
+      if (this.execution.status === 'running') {
+        this.execution.status = 'completed';
 
         await this.emitEvent({
           type: 'workflow_completed',
@@ -128,8 +128,8 @@ export class Engine {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      this.runtimeState.status = 'failed';
-      this.runtimeState.error = {
+      this.execution.status = 'failed';
+      this.execution.error = {
         code: 'SYSTEM_ERROR',
         message: errorMessage,
         timestamp: new Date().toISOString(),
@@ -146,7 +146,7 @@ export class Engine {
       // Execution cleanup completed
     }
 
-    return this.runtimeState;
+    return this.execution;
   }
 
   /**
@@ -154,14 +154,14 @@ export class Engine {
    */
   private async executeGraph(
     blueprint: Blueprint,
-    runtimeState: RuntimeState
+    execution: Execution
   ): Promise<void> {
     let currentNode = this.getStartNode(blueprint);
 
-    while (currentNode && runtimeState.status === 'running') {
+    while (currentNode && execution.status === 'running') {
       try {
         // Update current node
-        runtimeState.currentNodeRef = currentNode.ref;
+        execution.currentNodeRef = currentNode.ref;
 
         // Emit node start event
         await this.emitEvent({
@@ -173,10 +173,10 @@ export class Engine {
         });
 
         // Execute the node
-        const result = await this.executeNode(currentNode, runtimeState);
+        const result = await this.executeNode(currentNode, execution);
         
         // Store result
-        runtimeState.executionResults.set(currentNode.ref, result);
+        execution.executionResults.set(currentNode.ref, result);
 
         if (result.success) {
           // Emit node completed event
@@ -221,14 +221,14 @@ export class Engine {
           executedAt: new Date().toISOString(),
           duration: 0
         };
-        runtimeState.executionResults.set(currentNode.ref, failedResult);
+        execution.executionResults.set(currentNode.ref, failedResult);
 
         throw error;
       }
     }
 
     // Clear current node when done
-    runtimeState.currentNodeRef = undefined;
+    execution.currentNodeRef = undefined;
   }
 
   /**
@@ -236,14 +236,14 @@ export class Engine {
    */
   private async executeNode(
     node: WorkflowNode,
-    runtimeState: RuntimeState
+    execution: Execution
   ): Promise<NodeResult> {
     // Create handler instance with parameters (now async)
     const handler = await this.createHandler(node);
 
     // Execute the node
     const startTime = Date.now();
-    const result = await handler.execute(runtimeState);
+    const result = await handler.execute(execution);
     const duration = Date.now() - startTime;
 
     // Update duration if not set by handler
@@ -325,11 +325,11 @@ export class Engine {
    * Pause workflow execution
    */
   pause(): boolean {
-    if (this.runtimeState.status !== 'running') {
+    if (this.execution.status !== 'running') {
       return false;
     }
 
-    this.runtimeState.status = 'paused';
+    this.execution.status = 'paused';
 
     this.emitEvent({
       type: 'workflow_paused',
@@ -344,11 +344,11 @@ export class Engine {
    * Resume workflow execution
    */
   resume(): boolean {
-    if (this.runtimeState.status !== 'paused') {
+    if (this.execution.status !== 'paused') {
       return false;
     }
 
-    this.runtimeState.status = 'running';
+    this.execution.status = 'running';
 
     this.emitEvent({
       type: 'workflow_resumed',
@@ -363,11 +363,11 @@ export class Engine {
    * Cancel workflow execution
    */
   cancel(): boolean {
-    if (this.runtimeState.status === 'completed' || this.runtimeState.status === 'failed') {
+    if (this.execution.status === 'completed' || this.execution.status === 'failed') {
       return false;
     }
 
-    this.runtimeState.status = 'cancelled';
+    this.execution.status = 'cancelled';
 
     return true;
   }
@@ -375,15 +375,15 @@ export class Engine {
   /**
    * Get execution status
    */
-  getExecutionStatus(): RuntimeState {
-    return this.runtimeState;
+  getExecutionStatus(): Execution {
+    return this.execution;
   }
 
   /**
    * Get current execution state
    */
-  getCurrentExecution(): RuntimeState {
-    return this.runtimeState;
+  getCurrentExecution(): Execution {
+    return this.execution;
   }
 
   /**

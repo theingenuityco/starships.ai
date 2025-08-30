@@ -5,9 +5,9 @@
  */
 
 /**
- * Runtime state of workflow execution
+ * Workflow execution state
  */
-export interface RuntimeState {
+export interface Execution {
   currentNodeRef?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;

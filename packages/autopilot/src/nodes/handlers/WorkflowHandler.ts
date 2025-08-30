@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { RuntimeState, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
 
-  async execute(runtimeState: RuntimeState) {
+  async execute(execution: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as WorkflowNodeParameters;
     

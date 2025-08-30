@@ -5,7 +5,7 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, RuntimeState } from './types';
+import { Blueprint, Node, Edge, Execution } from './types';
 import { Engine } from './engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -117,8 +117,8 @@ export class Workflow {
   /**
    * Execute the workflow (delegates to internal Engine)
    */
-  async execute(runtimeState?: RuntimeState): Promise<RuntimeState> {
-    return this.engine.execute(this.blueprint, runtimeState);
+  async execute(execution?: Execution): Promise<Execution> {
+    return this.engine.execute(this.blueprint, execution);
   }
 
   /**

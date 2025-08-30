@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { RuntimeState, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
-  async execute(runtimeState: RuntimeState) {
+  async execute(execution: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as AgentNodeParameters;
     

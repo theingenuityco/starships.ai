@@ -6,16 +6,16 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { RuntimeState, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
-  async execute(runtimeState: RuntimeState) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
-    const sourceResult = runtimeState.executionResults.get(params.sourceNodeId);
+    const sourceResult = execution.executionResults.get(params.sourceNodeId);
     if (!sourceResult) {
       throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }

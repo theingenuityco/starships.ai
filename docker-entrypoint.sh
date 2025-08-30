@@ -96,9 +96,14 @@ else
         exit 1
     fi
     
-    # Use internal Neo4j
-    NEO4J_URI="[NEO4J-LOCAL-URL]"
-    export NEO4J_URI
+    # Only set NEO4J_URI if it's not already set by the environment
+    if [ -z "$NEO4J_URI" ]; then
+        NEO4J_URI="bolt://localhost:7687"
+        export NEO4J_URI
+        echo "Set NEO4J_URI to default: $NEO4J_URI"
+    else
+        echo "Using existing NEO4J_URI: $NEO4J_URI"
+    fi
 fi
 
 # Display Neo4j connection info

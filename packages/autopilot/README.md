@@ -67,6 +67,8 @@ console.log('Execution result:', result);
 - **conditional** - Smart routing with JSONata expressions
 - **user_prompt** - Interactive user input
 - **output** - Result formatting and delivery
+- **http_request** - HTTP API calls with authentication and retry support
+- **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
 
 ## Agent Framework
 
@@ -161,33 +163,130 @@ const workflow = {
   expeditionId: 'exp-1',
   nodes: [
     { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-    { 
-      id: 'agent-task', 
-      type: 'agent', 
-      name: 'Process Request', 
+    {
+      id: 'http-call',
+      type: 'http_request',
+      name: 'Fetch User Data',
+      description: 'Get user information from API',
+      parameters: {
+        url: 'https://api.example.com/users/123',
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ${API_TOKEN}' },
+        timeout: 10000,
+        retries: 2
+      }
+    },
+    {
+      id: 'llm-task',
+      type: 'llm',
+      name: 'Generate Response',
+      description: 'Create personalized response using AI',
+      parameters: {
+        model: 'gpt-4',
+        provider: 'openai',
+        prompt: 'Generate a helpful response for the user based on their data',
+        temperature: 0.7,
+        maxTokens: 500,
+        systemMessage: 'You are a helpful customer support assistant.'
+      }
+    },
+    {
+      id: 'agent-task',
+      type: 'agent',
+      name: 'Process Request',
       description: 'Handle user request',
       parameters: { agentId: 'support-001', instructions: 'Help the user' }
     },
     { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
   ],
   edges: [
-    { id: 'edge-1', from: 'start', to: 'agent-task' },
-    { id: 'edge-2', from: 'agent-task', to: 'end' }
+    { id: 'edge-1', from: 'start', to: 'http-call' },
+    { id: 'edge-2', from: 'http-call', to: 'llm-task' },
+    { id: 'edge-3', from: 'llm-task', to: 'agent-task' },
+    { id: 'edge-4', from: 'agent-task', to: 'end' }
   ],
   approvalStatus: 'approved',
   visualization: '',
   createdAt: new Date().toISOString()
 };
 
-// 3. Execute workflow with agent integration
+// 3. Execute workflow with all node types
 const registry = new Registry();
 registry.register(new StartHandler());
 registry.register(new EndHandler());
+registry.register(new HttpRequestHandler());
+registry.register(new LlmHandler());
 registry.register(new AgentHandler()); // Can integrate with agent framework
 
 const engine = new Engine(registry);
 const result = await engine.execute(workflow, { userId: 'user-123' });
 ```
+
+## New Node Types
+
+### HTTP Request Node
+
+Makes HTTP API calls with comprehensive support for authentication, retries, and response handling.
+
+```typescript
+{
+  id: 'api-call',
+  type: 'http_request',
+  name: 'Call External API',
+  description: 'Fetch data from external service',
+  parameters: {
+    url: 'https://api.example.com/data',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer your-token'
+    },
+    body: { query: 'search term' },
+    timeout: 30000,
+    retries: 3,
+    followRedirects: true,
+    authentication: {
+      type: 'bearer',
+      token: 'your-api-token'
+    }
+  }
+}
+```
+
+**Authentication Types:**
+- `bearer` - Bearer token authentication
+- `basic` - Basic username/password authentication
+- `api-key` - Custom API key in header
+
+### LLM Node
+
+Integrates with various Large Language Model providers by converting parameters to HTTP requests.
+
+```typescript
+{
+  id: 'ai-response',
+  type: 'llm',
+  name: 'Generate AI Response',
+  description: 'Create intelligent response using LLM',
+  parameters: {
+    model: 'gpt-4',
+    provider: 'openai',
+    prompt: 'Analyze this data and provide insights',
+    systemMessage: 'You are an expert data analyst',
+    temperature: 0.7,
+    maxTokens: 1000,
+    topP: 0.9,
+    timeout: 60000
+  }
+}
+```
+
+**Supported Providers:**
+- `openai` - OpenAI GPT models
+- `anthropic` - Anthropic Claude models
+- `google` - Google Gemini models
+- `local` - Local models (Ollama)
+- `custom` - Custom provider endpoints
 
 ## API Reference
 

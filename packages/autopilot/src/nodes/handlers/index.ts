@@ -1,6 +1,6 @@
 /**
  * Node Handlers Index
- * 
+ *
  * Export all handlers
  */
 
@@ -10,3 +10,5 @@ export { AgentHandler } from './AgentHandler';
 export { ConditionalHandler } from './ConditionalHandler';
 export { PromptHandler } from './PromptHandler';
 export { OutputHandler } from './OutputHandler';
+export { HttpRequestHandler } from './HttpRequestHandler';
+export { LlmHandler } from './LlmHandler';

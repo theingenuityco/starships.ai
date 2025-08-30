@@ -4,10 +4,9 @@ Workflow execution engine and agent development framework for starships.ai.
 
 ## Overview
 
-Autopilot provides two complementary systems:
+Autopilot provides a powerful workflow execution system:
 
-1. **Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing
-2. **Agent Development Framework** - Build and manage AI agents with lifecycle management
+**Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing, interactive user prompts, and AI model integration
 
 ## Workflow System
 
@@ -70,59 +69,17 @@ console.log('Execution result:', result);
 - **http_request** - HTTP API calls with authentication and retry support
 - **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
 
-## Agent Framework
+## Node Types
 
-### Features
+Autopilot supports various node types for building complex workflows:
 
-- **Clean Agent Abstraction** - Simple base class with lifecycle hooks
-- **Fluent Builder API** - Easy agent creation with validation
-- **Pluggable Execution** - Custom handlers for different agent types
-- **Type-safe Interfaces** - Full TypeScript support
-- **Zero Dependencies** - Pure framework with no external requirements
-
-### Quick Start - Agents
-
-```typescript
-import { AgentBuilder, type ExecutionHandler } from '@starships/autopilot';
-
-// Create a custom execution handler
-class ChatExecutionHandler implements ExecutionHandler {
-  async handle(request: AgentRequest, agent: Agent): Promise<AgentResponse> {
-    // Your implementation here - call LLM, access memory, etc.
-    return {
-      content: `Hello! I'm ${agent.name}. You said: "${request.message}"`,
-      timestamp: new Date().toISOString(),
-      sessionId: request.sessionId
-    };
-  }
-}
-
-// Build an agent
-const agent = new AgentBuilder()
-  .setName('Customer Support Agent')
-  .setDescription('Helps customers with inquiries')
-  .setHandler(new ChatExecutionHandler())
-  .build();
-
-// Initialize and use the agent
-await agent.onInitialize({ userId: 'user-123' });
-
-const response = await agent.execute({
-  message: 'Hello, I need help',
-  sessionId: 'session-456'
-});
-
-console.log(response.content);
-```
-
-### Agent Lifecycle
-
-Every agent follows a simple lifecycle:
-
-1. **Create** - Build agent with configuration using AgentBuilder
-2. **Initialize** - Setup with context (user, services, etc.)
-3. **Execute** - Process requests and return responses  
-4. **Destroy** - Cleanup when done
+- **start/end** - Flow control nodes
+- **agent** - AI agent task execution with embedded configuration
+- **conditional** - Smart routing with JSONata expressions
+- **user_prompt** - Interactive user input
+- **output** - Result formatting and delivery
+- **http_request** - HTTP API calls with authentication and retry support
+- **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
 
 ## Integration Example
 
@@ -194,7 +151,12 @@ const workflow = {
       type: 'agent',
       name: 'Process Request',
       description: 'Handle user request',
-      parameters: { agentId: 'support-001', instructions: 'Help the user' }
+      parameters: {
+        name: 'Support Agent',
+        model: 'anthropic/claude-3.5-sonnet',
+        instructions: 'Help the user',
+        systemPrompt: 'You are a helpful customer support agent.'
+      }
     },
     { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
   ],
@@ -209,13 +171,13 @@ const workflow = {
   createdAt: new Date().toISOString()
 };
 
-// 3. Execute workflow with all node types
+// Execute workflow with all node types
 const registry = new Registry();
 registry.register(new StartHandler());
 registry.register(new EndHandler());
 registry.register(new HttpRequestHandler());
 registry.register(new LlmHandler());
-registry.register(new AgentHandler()); // Can integrate with agent framework
+registry.register(new AgentHandler()); // Handles embedded agent configuration
 
 const engine = new Engine(registry);
 const result = await engine.execute(workflow, { userId: 'user-123' });
@@ -316,58 +278,43 @@ const validator = new Validator();
 const result = validator.validate(workflow);
 ```
 
-### Agent Framework
+### Agent Node Configuration
 
-#### Agent (Abstract Base Class)
+Agents are now embedded directly in workflow nodes with full configuration:
+
 ```typescript
-abstract class Agent {
-  abstract readonly id: string;
-  abstract readonly name: string; 
-  abstract readonly description: string;
+interface AgentNodeParameters {
+  // Core agent identity
+  name: string;
+  description?: string;
   
-  abstract onInitialize(context: AgentContext): Promise<void>;
-  abstract onExecute(request: AgentRequest): Promise<AgentResponse>;
-  abstract onDestroy(): Promise<void>;
+  // LLM configuration
+  model: string;
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
   
-  execute(request: AgentRequest): Promise<AgentResponse>; // Includes validation
+  // Execution parameters
+  instructions?: string;
+  timeout?: number;
 }
 ```
 
-#### AgentBuilder
+Example agent node:
 ```typescript
-class AgentBuilder {
-  setId(id: string): this;
-  setName(name: string): this;
-  setDescription(description: string): this;
-  setHandler(handler: ExecutionHandler): this;
-  build(): Agent;
-  reset(): this;
-}
-```
-
-#### Types
-```typescript
-interface AgentContext {
-  userId: string;
-  starshipId?: string;
-  services?: Record<string, unknown>;
-}
-
-interface AgentRequest {
-  message: string;
-  sessionId: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface AgentResponse {
-  content: string;
-  timestamp: string;
-  sessionId: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface ExecutionHandler {
-  handle(request: AgentRequest, agent: Agent): Promise<AgentResponse>;
+{
+  id: 'support-agent',
+  type: 'agent',
+  name: 'Customer Support',
+  description: 'Handles customer inquiries',
+  parameters: {
+    name: 'Support Agent',
+    model: 'anthropic/claude-3.5-sonnet',
+    systemPrompt: 'You are a helpful customer support agent.',
+    temperature: 0.7,
+    maxTokens: 500,
+    instructions: 'Help the customer with their inquiry'
+  }
 }
 ```
 

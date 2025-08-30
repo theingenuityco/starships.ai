@@ -15,14 +15,19 @@ export class AgentHandler implements Handler {
     
     // TODO: Integrate with agent service
     // This will need to be connected to the actual agent execution system
-    console.log(`Executing agent: ${params.agentId} with instructions: ${params.instructions}`);
+    console.log(`Executing agent: ${params.name} (model: ${params.model}) with instructions: ${params.instructions}`);
     
     return {
       nodeId: node.id,
       success: true,
-      data: { output: 'Agent execution completed' },
+      data: {
+        output: 'Agent execution completed',
+        agentName: params.name,
+        model: params.model,
+        systemPrompt: params.systemPrompt
+      },
       executedAt: new Date().toISOString(),
-      duration: 1000
+      duration: params.timeout || 1000
     };
   }
 
@@ -30,10 +35,20 @@ export class AgentHandler implements Handler {
     const params = node.parameters as AgentNodeParameters;
     const errors = [];
 
-    if (!params.agentId) {
+    // Check for required fields
+    if (!params.name) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
-        message: 'Agent ID is required',
+        message: 'Agent name is required',
+        nodeId: node.id,
+        severity: 'error' as const
+      });
+    }
+
+    if (!params.model) {
+      errors.push({
+        code: 'MISSING_REQUIRED_FIELD',
+        message: 'Agent model is required',
         nodeId: node.id,
         severity: 'error' as const
       });

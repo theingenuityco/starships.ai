@@ -18,12 +18,14 @@ describe('AgentHandler', () => {
       name: 'Test Agent Node',
       description: 'Agent node for testing',
       parameters: {
-        agentId: 'test-agent-123',
+        name: 'Customer Support Agent',
+        description: 'Helps customers with inquiries',
+        model: 'anthropic/claude-3.5-sonnet',
+        systemPrompt: 'You are a helpful customer support agent.',
+        temperature: 0.7,
+        maxTokens: 500,
         instructions: 'Test instructions for the agent',
-        taskIds: ['task-1', 'task-2'],
-        expectedOutput: 'Expected test output',
-        timeout: 5000,
-        estimatedTime: 2000
+        timeout: 5000
       } as AgentNodeParameters
     };
     mockContext = global.createMockContext();
@@ -43,14 +45,19 @@ describe('AgentHandler', () => {
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('agent-node');
-      expect(result.data).toEqual({ output: 'Agent execution completed' });
-      expect(result.duration).toBe(1000);
+      expect(result.data).toEqual({ 
+        output: 'Agent execution completed',
+        agentName: 'Customer Support Agent',
+        model: 'anthropic/claude-3.5-sonnet',
+        systemPrompt: 'You are a helpful customer support agent.'
+      });
+      expect(result.duration).toBe(5000); // Uses timeout value
       expect(result.executedAt).toBeDefined();
       expect(result.error).toBeUndefined();
       
       // Verify console.log was called with correct parameters
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Executing agent: test-agent-123 with instructions: Test instructions for the agent'
+        'Executing agent: Customer Support Agent (model: anthropic/claude-3.5-sonnet) with instructions: Test instructions for the agent'
       );
       
       consoleSpy.mockRestore();
@@ -60,7 +67,8 @@ describe('AgentHandler', () => {
       const minimalNode = {
         ...mockNode,
         parameters: {
-          agentId: 'minimal-agent'
+          name: 'Basic Agent',
+          model: 'openai/gpt-4'
         } as AgentNodeParameters
       };
       
@@ -70,11 +78,16 @@ describe('AgentHandler', () => {
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('agent-node');
-      expect(result.data).toEqual({ output: 'Agent execution completed' });
+      expect(result.data).toEqual({ 
+        output: 'Agent execution completed',
+        agentName: 'Basic Agent',
+        model: 'openai/gpt-4',
+        systemPrompt: undefined
+      });
       
       // Verify console.log handles undefined instructions
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Executing agent: minimal-agent with instructions: undefined'
+        'Executing agent: Basic Agent (model: openai/gpt-4) with instructions: undefined'
       );
       
       consoleSpy.mockRestore();
@@ -114,7 +127,8 @@ describe('AgentHandler', () => {
       const minimalNode = {
         ...mockNode,
         parameters: {
-          agentId: 'test-agent'
+          name: 'Test Agent',
+          model: 'openai/gpt-4'
         } as AgentNodeParameters
       };
       
@@ -122,45 +136,66 @@ describe('AgentHandler', () => {
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
     });
 
-    it('should fail validation when agentId is missing', () => {
-      const nodeWithoutAgentId = {
+    it('should fail validation when name is missing', () => {
+      const nodeWithoutName = {
         ...mockNode,
         parameters: {
+          model: 'openai/gpt-4',
           instructions: 'Some instructions'
         } as AgentNodeParameters
       };
       
-      const result = handler.validate(nodeWithoutAgentId);
+      const result = handler.validate(nodeWithoutName);
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
-        message: 'Agent ID is required',
+        message: 'Agent name is required',
         nodeId: 'agent-node',
         severity: 'error'
       });
       expect(result.warnings).toHaveLength(0);
-      expect(result.suggestions).toHaveLength(0);
     });
 
-    it('should fail validation when agentId is empty string', () => {
-      const nodeWithEmptyAgentId = {
+    it('should fail validation when model is missing', () => {
+      const nodeWithoutModel = {
         ...mockNode,
         parameters: {
-          agentId: '',
+          name: 'Test Agent',
           instructions: 'Some instructions'
         } as AgentNodeParameters
       };
       
-      const result = handler.validate(nodeWithEmptyAgentId);
+      const result = handler.validate(nodeWithoutModel);
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toEqual({
+        code: 'MISSING_REQUIRED_FIELD',
+        message: 'Agent model is required',
+        nodeId: 'agent-node',
+        severity: 'error'
+      });
+    });
+
+    it('should fail validation when both name and model are missing', () => {
+      const nodeWithoutRequiredParams = {
+        ...mockNode,
+        parameters: {
+          instructions: 'Some instructions'
+        } as AgentNodeParameters
+      };
+      
+      const result = handler.validate(nodeWithoutRequiredParams);
+      
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(2);
       expect(result.errors[0].code).toBe('MISSING_REQUIRED_FIELD');
-      expect(result.errors[0].message).toBe('Agent ID is required');
+      expect(result.errors[1].code).toBe('MISSING_REQUIRED_FIELD');
     });
 
     it('should fail validation when parameters are completely missing', () => {
@@ -172,8 +207,25 @@ describe('AgentHandler', () => {
       const result = handler.validate(nodeWithoutParams);
       
       expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(1);
+      expect(result.errors).toHaveLength(2);
       expect(result.errors[0].code).toBe('MISSING_REQUIRED_FIELD');
+      expect(result.errors[1].code).toBe('MISSING_REQUIRED_FIELD');
+    });
+
+    it('should handle empty string values as invalid', () => {
+      const nodeWithEmptyValues = {
+        ...mockNode,
+        parameters: {
+          name: '',
+          model: '',
+          instructions: 'Some instructions'
+        } as AgentNodeParameters
+      };
+      
+      const result = handler.validate(nodeWithEmptyValues);
+      
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(2);
     });
   });
 

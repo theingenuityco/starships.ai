@@ -19,7 +19,6 @@ global.console = {
 
 // Global test utilities with type assertions
 (global as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
-  id: 'test-blueprint',
   nodes: [
     { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
     { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -35,7 +34,6 @@ global.console = {
 (global as any).createMockWorkflow = (global as any).createMockBlueprint;
 
 (global as any).createMockContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
-  workflowId: 'test-blueprint',
   userId: 'test-user',
   previousResults: new Map(),
   expeditionState: {},

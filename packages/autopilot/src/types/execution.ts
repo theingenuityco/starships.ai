@@ -9,7 +9,6 @@
  */
 export interface RuntimeState {
   id: string;
-  workflowId: string;
   currentNodeId?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;
@@ -39,7 +38,6 @@ export interface NodeResult {
  * Context passed to node handlers during execution
  */
 export interface ExecutionContext {
-  workflowId: string;
   userId: string;
   previousResults: Map<string, NodeResult>;
   expeditionState: unknown;

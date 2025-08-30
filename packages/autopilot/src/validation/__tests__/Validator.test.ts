@@ -15,7 +15,6 @@ describe('Validator', () => {
   describe('validate', () => {
     it('should validate successfully with valid workflow', () => {
       const validBlueprint: Blueprint = {
-        id: 'valid-workflow',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -36,7 +35,6 @@ describe('Validator', () => {
 
     it('should fail validation when nodes are missing', () => {
       const blueprintWithoutNodes: Blueprint = {
-        id: 'no-nodes',
         nodes: [],
         edges: [],
         metadata: {}
@@ -54,7 +52,6 @@ describe('Validator', () => {
 
     it('should fail validation when nodes array is undefined', () => {
       const blueprintWithUndefinedNodes = {
-        id: 'undefined-nodes',
         edges: [],
         metadata: {}
       } as unknown as Blueprint;
@@ -71,7 +68,6 @@ describe('Validator', () => {
 
     it('should fail validation when edges are missing', () => {
       const blueprintWithoutEdges: Blueprint = {
-        id: 'no-edges',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
@@ -91,7 +87,6 @@ describe('Validator', () => {
 
     it('should fail validation when edges array is undefined', () => {
       const blueprintWithUndefinedEdges = {
-        id: 'undefined-edges',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
@@ -110,7 +105,6 @@ describe('Validator', () => {
 
     it('should fail validation when start node is missing', () => {
       const blueprintWithoutStart: Blueprint = {
-        id: 'no-start',
         nodes: [
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
@@ -132,7 +126,6 @@ describe('Validator', () => {
 
     it('should fail validation when end node is missing', () => {
       const blueprintWithoutEnd: Blueprint = {
-        id: 'no-end',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
@@ -154,7 +147,6 @@ describe('Validator', () => {
 
     it('should detect unreachable nodes', () => {
       const blueprintWithUnreachableNode: Blueprint = {
-        id: 'unreachable-node',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
@@ -180,7 +172,6 @@ describe('Validator', () => {
 
     it('should detect circular dependencies', () => {
       const blueprintWithCircularDep: Blueprint = {
-        id: 'circular-dep',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'node1', type: 'conditional', name: 'Node 1', description: 'Node 1', parameters: {} },
@@ -207,7 +198,6 @@ describe('Validator', () => {
 
     it('should handle complex circular dependencies', () => {
       const blueprintWithComplexCycle: Blueprint = {
-        id: 'complex-cycle',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'a', type: 'conditional', name: 'A', description: 'Node A', parameters: {} },
@@ -233,7 +223,6 @@ describe('Validator', () => {
 
     it('should handle workflows without start node for connectivity validation', () => {
       const blueprintWithoutStartForConnectivity: Blueprint = {
-        id: 'no-start-connectivity',
         nodes: [
           { id: 'node1', type: 'conditional', name: 'Node 1', description: 'Node 1', parameters: {} },
           { id: 'node2', type: 'conditional', name: 'Node 2', description: 'Node 2', parameters: {} },
@@ -255,7 +244,6 @@ describe('Validator', () => {
 
     it('should handle self-referencing nodes', () => {
       const blueprintWithSelfReference: Blueprint = {
-        id: 'self-reference',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'self-ref', type: 'conditional', name: 'Self Ref', description: 'Self referencing node', parameters: {} },
@@ -277,7 +265,6 @@ describe('Validator', () => {
 
     it('should handle multiple validation errors', () => {
       const invalidBlueprint: Blueprint = {
-        id: 'multiple-errors',
         nodes: [], // Missing nodes
         edges: [], // Missing edges
         metadata: {}
@@ -311,7 +298,6 @@ describe('Validator', () => {
 
     it('should pass validation for workflow with multiple paths', () => {
       const multiPathBlueprint: Blueprint = {
-        id: 'multi-path',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'decision', type: 'conditional', name: 'Decision', description: 'Decision node', parameters: {} },
@@ -337,7 +323,6 @@ describe('Validator', () => {
 
     it('should detect nodes that only connect to themselves', () => {
       const blueprintWithIsolatedSelfLoop: Blueprint = {
-        id: 'isolated-self-loop',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'self-loop', type: 'conditional', name: 'Self Loop', description: 'Self loop node', parameters: {} },
@@ -360,7 +345,6 @@ describe('Validator', () => {
 
     it('should handle workflow with no edges correctly', () => {
       const blueprintWithNoEdgesButNodes: Blueprint = {
-        id: 'no-edges-with-nodes',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -381,7 +365,6 @@ describe('Validator', () => {
 
     it('should return early when basic structure validation fails', () => {
       const blueprintWithBasicErrors: Blueprint = {
-        id: 'basic-errors',
         nodes: [],
         edges: [],
         metadata: {}
@@ -397,7 +380,6 @@ describe('Validator', () => {
 
     it('should properly track visited nodes in cycle detection', () => {
       const blueprintWithMultipleComponents: Blueprint = {
-        id: 'multiple-components',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'a', type: 'conditional', name: 'A', description: 'Node A', parameters: {} },
@@ -427,7 +409,6 @@ describe('Validator', () => {
   describe('edge cases', () => {
     it('should handle empty workflow gracefully', () => {
       const emptyBlueprint: Blueprint = {
-        id: 'empty',
         nodes: [],
         edges: [],
         metadata: {}
@@ -441,7 +422,6 @@ describe('Validator', () => {
 
     it('should handle workflow with only start node', () => {
       const startOnlyBlueprint: Blueprint = {
-        id: 'start-only',
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
@@ -458,7 +438,6 @@ describe('Validator', () => {
 
     it('should handle workflow with only end node', () => {
       const endOnlyBlueprint: Blueprint = {
-        id: 'end-only',
         nodes: [
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],

@@ -6,7 +6,7 @@
 
 import { Handler } from '../Handler';
 import { Node, NodeResult, ExecutionContext, ValidationResult, ConditionalNodeParameters } from '../../types';
-import * as jsonata from 'jsonata';
+import jsonata from 'jsonata';
 
 export class ConditionalHandler implements Handler {
   readonly type = 'conditional';

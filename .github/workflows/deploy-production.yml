@@ -26,6 +26,8 @@ jobs:
   deploy-to-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
+    # Explicit condition to ONLY run on manual trigger
+    if: github.event_name == 'workflow_dispatch'
     environment: 
       name: prod
       url: [PROD-DOMAIN-URL]

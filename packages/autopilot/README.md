@@ -1,8 +1,17 @@
 # @starships/autopilot
 
-Generic workflow DSL execution engine for starships.ai.
+Workflow execution engine and agent development framework for starships.ai.
 
-## Features
+## Overview
+
+Autopilot provides two complementary systems:
+
+1. **Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing
+2. **Agent Development Framework** - Build and manage AI agents with lifecycle management
+
+## Workflow System
+
+### Features
 
 - **Graph-based execution** - True DAG support with conditional routing
 - **Extensible node system** - Plugin architecture for custom node types  
@@ -11,10 +20,10 @@ Generic workflow DSL execution engine for starships.ai.
 - **Event-driven** - Comprehensive lifecycle hooks
 - **Visual programming** - React Flow integration ready
 
-## Quick Start
+### Quick Start - Workflows
 
 ```typescript
-import { Engine, defaultRegistry, Validator, type Workflow } from '@starships/autopilot';
+import { Engine, Registry, Validator, type Workflow } from '@starships/autopilot';
 
 // Create workflow
 const workflow: Workflow = {
@@ -42,7 +51,8 @@ if (!validation.valid) {
 }
 
 // Execute workflow
-const engine = new Engine(defaultRegistry);
+const registry = new Registry();
+const engine = new Engine(registry);
 const result = await engine.execute(workflow, {
   userId: 'user-1'
 });
@@ -50,73 +60,210 @@ const result = await engine.execute(workflow, {
 console.log('Execution result:', result);
 ```
 
-## Node Types
+### Node Types
 
 - **start/end** - Flow control nodes
-- **agent** - AI agent task execution
+- **agent** - AI agent task execution (integrates with agent framework)
 - **conditional** - Smart routing with JSONata expressions
 - **user_prompt** - Interactive user input
 - **output** - Result formatting and delivery
 
-## Extension
+## Agent Framework
+
+### Features
+
+- **Clean Agent Abstraction** - Simple base class with lifecycle hooks
+- **Fluent Builder API** - Easy agent creation with validation
+- **Pluggable Execution** - Custom handlers for different agent types
+- **Type-safe Interfaces** - Full TypeScript support
+- **Zero Dependencies** - Pure framework with no external requirements
+
+### Quick Start - Agents
 
 ```typescript
-import { Handler, Registry, type Node, type NodeResult } from '@starships/autopilot';
+import { AgentBuilder, type ExecutionHandler } from '@starships/autopilot';
 
-class CustomHandler implements Handler {
-  readonly type = 'custom';
-
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    // Custom logic here
+// Create a custom execution handler
+class ChatExecutionHandler implements ExecutionHandler {
+  async handle(request: AgentRequest, agent: Agent): Promise<AgentResponse> {
+    // Your implementation here - call LLM, access memory, etc.
     return {
-      nodeId: node.id,
-      success: true,
-      data: { result: 'custom execution' },
-      executedAt: new Date().toISOString()
+      content: `Hello! I'm ${agent.name}. You said: "${request.message}"`,
+      timestamp: new Date().toISOString(),
+      sessionId: request.sessionId
     };
-  }
-
-  validate(node: Node) {
-    return { valid: true, errors: [], warnings: [], suggestions: [] };
-  }
-
-  getIcon() {
-    return 'custom-icon';
   }
 }
 
-// Register custom handler
+// Build an agent
+const agent = new AgentBuilder()
+  .setName('Customer Support Agent')
+  .setDescription('Helps customers with inquiries')
+  .setHandler(new ChatExecutionHandler())
+  .build();
+
+// Initialize and use the agent
+await agent.onInitialize({ userId: 'user-123' });
+
+const response = await agent.execute({
+  message: 'Hello, I need help',
+  sessionId: 'session-456'
+});
+
+console.log(response.content);
+```
+
+### Agent Lifecycle
+
+Every agent follows a simple lifecycle:
+
+1. **Create** - Build agent with configuration using AgentBuilder
+2. **Initialize** - Setup with context (user, services, etc.)
+3. **Execute** - Process requests and return responses  
+4. **Destroy** - Cleanup when done
+
+## Integration Example
+
+### Using Both Systems Together
+
+```typescript
+import { 
+  // Workflow system
+  Engine, Registry, StartHandler, EndHandler, AgentHandler,
+  // Agent framework  
+  AgentBuilder, type ExecutionHandler 
+} from '@starships/autopilot';
+
+// 1. Create agents using the framework
+class ServerExecutionHandler implements ExecutionHandler {
+  async handle(request: AgentRequest, agent: Agent): Promise<AgentResponse> {
+    // Server implements actual agent logic
+    return {
+      content: `${agent.name} processed: ${request.message}`,
+      timestamp: new Date().toISOString(),
+      sessionId: request.sessionId
+    };
+  }
+}
+
+const supportAgent = new AgentBuilder()
+  .setId('support-001')
+  .setName('Support Agent')
+  .setDescription('Customer support specialist')
+  .setHandler(new ServerExecutionHandler())
+  .build();
+
+await supportAgent.onInitialize({ userId: 'user-123' });
+
+// 2. Create workflow that uses the agent
+const workflow = {
+  id: 'support-workflow',
+  expeditionId: 'exp-1',
+  nodes: [
+    { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+    { 
+      id: 'agent-task', 
+      type: 'agent', 
+      name: 'Process Request', 
+      description: 'Handle user request',
+      parameters: { agentId: 'support-001', instructions: 'Help the user' }
+    },
+    { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+  ],
+  edges: [
+    { id: 'edge-1', from: 'start', to: 'agent-task' },
+    { id: 'edge-2', from: 'agent-task', to: 'end' }
+  ],
+  approvalStatus: 'approved',
+  visualization: '',
+  createdAt: new Date().toISOString()
+};
+
+// 3. Execute workflow with agent integration
 const registry = new Registry();
-registry.register(new CustomHandler());
+registry.register(new StartHandler());
+registry.register(new EndHandler());
+registry.register(new AgentHandler()); // Can integrate with agent framework
+
+const engine = new Engine(registry);
+const result = await engine.execute(workflow, { userId: 'user-123' });
 ```
 
 ## API Reference
 
-### Engine
+### Workflow System
 
-Main workflow execution engine.
-
+#### Engine
 ```typescript
 const engine = new Engine(registry);
 const result = await engine.execute(workflow, context);
 ```
 
-### Registry
-
-Node handler registry for managing workflow node types.
-
+#### Registry
 ```typescript
 const registry = new Registry();
 registry.register(new CustomHandler());
 ```
 
-### Validator
-
-Workflow structure validator.
-
+#### Validator
 ```typescript
 const validator = new Validator();
 const result = validator.validate(workflow);
+```
+
+### Agent Framework
+
+#### Agent (Abstract Base Class)
+```typescript
+abstract class Agent {
+  abstract readonly id: string;
+  abstract readonly name: string; 
+  abstract readonly description: string;
+  
+  abstract onInitialize(context: AgentContext): Promise<void>;
+  abstract onExecute(request: AgentRequest): Promise<AgentResponse>;
+  abstract onDestroy(): Promise<void>;
+  
+  execute(request: AgentRequest): Promise<AgentResponse>; // Includes validation
+}
+```
+
+#### AgentBuilder
+```typescript
+class AgentBuilder {
+  setId(id: string): this;
+  setName(name: string): this;
+  setDescription(description: string): this;
+  setHandler(handler: ExecutionHandler): this;
+  build(): Agent;
+  reset(): this;
+}
+```
+
+#### Types
+```typescript
+interface AgentContext {
+  userId: string;
+  starshipId?: string;
+  services?: Record<string, unknown>;
+}
+
+interface AgentRequest {
+  message: string;
+  sessionId: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface AgentResponse {
+  content: string;
+  timestamp: string;
+  sessionId: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface ExecutionHandler {
+  handle(request: AgentRequest, agent: Agent): Promise<AgentResponse>;
+}
 ```
 
 ## Development
@@ -130,6 +277,9 @@ pnpm run type-check
 
 # Lint code
 pnpm run lint
+
+# Run tests
+pnpm run test
 ```
 
 ## License

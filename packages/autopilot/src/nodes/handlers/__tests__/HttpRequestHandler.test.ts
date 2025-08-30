@@ -5,13 +5,12 @@
 import { HttpRequestHandler } from '../HttpRequestHandler';
 import { Node, ExecutionContext, HttpRequestNodeParameters } from '../../../types';
 
-// Mock axios completely
+// Mock axios
 jest.mock('axios', () => {
-  const axiosMock = jest.fn();
   const isCancelMock = jest.fn(() => false);
-  
-  // Add isCancel to the axios function itself
-  (axiosMock as any).isCancel = isCancelMock;
+  const axiosMock = Object.assign(jest.fn(), {
+    isCancel: isCancelMock
+  });
   
   return {
     __esModule: true,
@@ -23,7 +22,6 @@ jest.mock('axios', () => {
 import axios from 'axios';
 
 const mockedAxios = axios as jest.MockedFunction<typeof axios>;
-const mockedIsCancel = axios.isCancel as jest.MockedFunction<typeof axios.isCancel>;
 
 describe('HttpRequestHandler', () => {
   let handler: HttpRequestHandler;

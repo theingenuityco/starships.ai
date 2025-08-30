@@ -62,7 +62,7 @@ export class Neo4jConnection {
     }
 
     return this.driver.session({
-      database: this.config.database || 'neo4j',
+      database: this.config.database,
     });
   }
 

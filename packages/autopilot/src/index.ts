@@ -1,9 +1,10 @@
 /**
  * @starships/autopilot
- * 
- * Generic workflow DSL execution engine
+ *
+ * Workflow execution engine and agent development framework for starships.ai
  */
 
+// ===== WORKFLOW SYSTEM =====
 // Core engine
 export { Engine } from './engine/Engine';
 export type { EventCallback, ExecutionEvent } from './engine/Engine';
@@ -25,7 +26,7 @@ export {
 // Validation
 export { Validator } from './validation/Validator';
 
-// Types - clean exports
+// Workflow Types - clean exports
 export type {
   // Core workflow types
   Workflow,
@@ -56,7 +57,20 @@ export type {
 // Configuration
 export { config } from './constants';
 
-// Import for creating default instances
+// ===== AGENT FRAMEWORK =====
+// Core Agent Framework
+export { Agent } from './agent/Agent';
+export { ConfigurableAgent } from './agent/ConfigurableAgent';
+export { AgentBuilder } from './builder/AgentBuilder';
+
+// Agent Framework Types
+export type {
+  AgentContext,
+  AgentRequest,
+  AgentResponse,
+  AgentConfiguration,
+  ExecutionHandler
+} from './types/agent';
 import { Engine } from './engine/Engine';
 import { Registry } from './nodes/Registry';
 import { Validator } from './validation/Validator';

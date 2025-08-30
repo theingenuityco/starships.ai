@@ -1,7 +1,7 @@
 {
   "name": "@starships/autopilot",
   "version": "1.0.0",
-  "description": "Generic workflow DSL execution engine",
+  "description": "Workflow execution engine and agent development framework for starships.ai",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

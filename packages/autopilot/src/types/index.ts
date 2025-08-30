@@ -4,6 +4,7 @@
  * Re-exports all types for the autopilot package
  */
 
+// ===== WORKFLOW SYSTEM TYPES =====
 // Core workflow types (includes node parameter types)
 export * from './workflow';
 
@@ -23,3 +24,14 @@ export type {
   UserPromptChoice,
   OutputFormat
 } from './nodes';
+
+// ===== AGENT FRAMEWORK TYPES =====
+// Agent framework types
+export type {
+  AgentContext,
+  AgentRequest,
+  AgentResponse,
+  AgentConfiguration,
+  ExecutionHandler,
+  Agent
+} from './agent';

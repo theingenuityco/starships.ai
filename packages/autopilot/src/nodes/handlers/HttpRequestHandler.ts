@@ -7,7 +7,7 @@
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, HttpRequestNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '../../types';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
@@ -115,8 +115,8 @@ export class HttpRequestHandler extends BaseHandler {
   }
 
   validate(): ValidationResult {
-    const errors = [];
-    const warnings = [];
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
     const params = this.node.parameters as HttpRequestNodeParameters;
 
     // Required fields validation
@@ -140,7 +140,7 @@ export class HttpRequestHandler extends BaseHandler {
         new URL(params.url);
       } catch {
         errors.push(this.createValidationError(
-          'INVALID_URL',
+          'INVALID_PARAMETERS',
           'URL format is invalid'
         ));
       }
@@ -150,7 +150,7 @@ export class HttpRequestHandler extends BaseHandler {
     const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
     if (params.method && !validMethods.includes(params.method)) {
       errors.push(this.createValidationError(
-        'INVALID_HTTP_METHOD',
+        'INVALID_PARAMETERS',
         `Invalid HTTP method. Must be one of: ${validMethods.join(', ')}`
       ));
     }
@@ -162,7 +162,7 @@ export class HttpRequestHandler extends BaseHandler {
         case 'bearer':
           if (!auth.token) {
             errors.push(this.createValidationError(
-              'MISSING_AUTH_TOKEN',
+              'MISSING_REQUIRED_FIELD',
               'Bearer token is required for bearer authentication'
             ));
           }
@@ -170,7 +170,7 @@ export class HttpRequestHandler extends BaseHandler {
         case 'basic':
           if (!auth.username || !auth.password) {
             errors.push(this.createValidationError(
-              'MISSING_AUTH_CREDENTIALS',
+              'MISSING_REQUIRED_FIELD',
               'Username and password are required for basic authentication'
             ));
           }
@@ -178,7 +178,7 @@ export class HttpRequestHandler extends BaseHandler {
         case 'api-key':
           if (!auth.apiKey || !auth.headerName) {
             errors.push(this.createValidationError(
-              'MISSING_API_KEY',
+              'MISSING_REQUIRED_FIELD',
               'API key and header name are required for API key authentication'
             ));
           }
@@ -189,14 +189,14 @@ export class HttpRequestHandler extends BaseHandler {
     // Warnings for common issues
     if (params.timeout && params.timeout < 1000) {
       warnings.push(this.createValidationWarning(
-        'LOW_TIMEOUT',
+        'POTENTIAL_TIMEOUT',
         'Timeout is very low, this may cause frequent failures'
       ));
     }
 
     if (params.retries && params.retries > 5) {
       warnings.push(this.createValidationWarning(
-        'HIGH_RETRY_COUNT',
+        'POTENTIAL_TIMEOUT',
         'High retry count may cause long execution times'
       ));
     }

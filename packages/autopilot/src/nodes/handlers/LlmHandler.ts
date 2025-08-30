@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node } from '../../types';
+import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node, ValidationError, ValidationWarning } from '../../types';
 import { HttpRequestHandler } from './HttpRequestHandler';
 
 export class LlmHandler extends BaseHandler {
@@ -127,8 +127,8 @@ export class LlmHandler extends BaseHandler {
   }
 
   validate(): ValidationResult {
-    const errors = [];
-    const warnings = [];
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
     const params = this.node.parameters as LlmNodeParameters;
 
     // Required fields validation
@@ -149,21 +149,21 @@ export class LlmHandler extends BaseHandler {
     // Parameter range validation
     if (params.temperature !== undefined && (params.temperature < 0 || params.temperature > 2)) {
       errors.push(this.createValidationError(
-        'INVALID_TEMPERATURE',
+        'INVALID_PARAMETERS',
         'Temperature must be between 0 and 2'
       ));
     }
 
     if (params.maxTokens !== undefined && params.maxTokens < 1) {
       errors.push(this.createValidationError(
-        'INVALID_MAX_TOKENS',
+        'INVALID_PARAMETERS',
         'Max tokens must be greater than 0'
       ));
     }
 
     if (params.topP !== undefined && (params.topP < 0 || params.topP > 1)) {
       errors.push(this.createValidationError(
-        'INVALID_TOP_P',
+        'INVALID_PARAMETERS',
         'Top P must be between 0 and 1'
       ));
     }
@@ -171,21 +171,21 @@ export class LlmHandler extends BaseHandler {
     // Warnings for common issues
     if (params.maxTokens && params.maxTokens > 4000) {
       warnings.push(this.createValidationWarning(
-        'HIGH_TOKEN_COUNT',
+        'LARGE_WORKFLOW_SIZE',
         'High token count may result in expensive API calls'
       ));
     }
 
     if (!params.systemMessage) {
       warnings.push(this.createValidationWarning(
-        'NO_SYSTEM_MESSAGE',
+        'MISSING_DESCRIPTIONS',
         'Consider adding a system message for better AI behavior control'
       ));
     }
 
     if (params.timeout && params.timeout < 10000) {
       warnings.push(this.createValidationWarning(
-        'LOW_TIMEOUT',
+        'POTENTIAL_TIMEOUT',
         'LLM requests may take longer than the specified timeout'
       ));
     }

@@ -46,7 +46,7 @@ describe('Workflow', () => {
       expect(workflow.getEdges()).toHaveLength(1);
       
       const blueprint = workflow.getBlueprint();
-      expect(blueprint.metadata.version).toBe('1.0');
+      expect(blueprint.metadata?.version).toBe('1.0');
     });
 
     it('should create a copy of the blueprint to avoid mutations', () => {

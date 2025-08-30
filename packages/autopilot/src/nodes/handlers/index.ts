@@ -12,3 +12,4 @@ export { PromptHandler } from './PromptHandler';
 export { OutputHandler } from './OutputHandler';
 export { HttpRequestHandler } from './HttpRequestHandler';
 export { LlmHandler } from './LlmHandler';
+export { WorkflowHandler } from './WorkflowHandler';

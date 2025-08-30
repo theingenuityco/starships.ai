@@ -26,7 +26,8 @@ export type {
   HttpRequestNodeParameters,
   HttpMethod,
   HttpAuthentication,
-  LlmNodeParameters
+  LlmNodeParameters,
+  WorkflowNodeParameters
 } from './nodes';
 
 // Agent framework types were removed - autopilot now focuses on workflow execution only

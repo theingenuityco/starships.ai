@@ -55,6 +55,7 @@ console.log('Execution result:', result);
 - **output** - Result formatting and delivery
 - **http_request** - HTTP API calls with authentication and retry support
 - **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
+- **workflow** - Execute embedded workflow blueprints
 
 ## Node Types
 
@@ -67,6 +68,7 @@ Autopilot supports various node types for building complex workflows:
 - **output** - Result formatting and delivery
 - **http_request** - HTTP API calls with authentication and retry support
 - **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
+- **workflow** - Execute embedded workflow blueprints
 
 ## Integration Example
 
@@ -220,6 +222,73 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
 - Rate limit handling
 - Model performance analytics
 
+### Workflow Node
+
+Executes embedded workflow blueprints, enabling modular and reusable workflow composition. Unlike agent nodes, workflow nodes focus purely on blueprint execution without agent-specific configuration.
+
+```typescript
+{
+  id: 'sub-workflow',
+  type: 'workflow',
+  name: 'Data Processing Pipeline',
+  description: 'Execute data processing workflow',
+  parameters: {
+    blueprint: {
+      id: 'data-processing',
+      nodes: [
+        { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+        {
+          id: 'fetch-data',
+          type: 'http_request',
+          name: 'Fetch Data',
+          description: 'Get data from API',
+          parameters: {
+            url: 'https://api.example.com/data',
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer {{token}}' }
+          }
+        },
+        {
+          id: 'process-data',
+          type: 'llm',
+          name: 'Process Data',
+          description: 'Transform data using AI',
+          parameters: {
+            model: 'anthropic/claude-3.5-sonnet',
+            prompt: 'Process this data: {{data}}'
+          }
+        },
+        { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+      ],
+      edges: [
+        { id: 'edge-1', from: 'start', to: 'fetch-data' },
+        { id: 'edge-2', from: 'fetch-data', to: 'process-data' },
+        { id: 'edge-3', from: 'process-data', to: 'end' }
+      ],
+      metadata: {}
+    },
+    workflowContext: {
+      token: 'your-api-token',
+      data: 'input-data'
+    },
+    timeout: 120000
+  }
+}
+```
+
+**Key Features:**
+- **Blueprint Storage**: Store and execute complete workflow definitions
+- **Context Passing**: Pass custom context to embedded workflows
+- **Modular Composition**: Build workflows from reusable sub-workflows
+- **Clean Separation**: Focus on blueprint execution without agent overhead
+- **Validation**: Comprehensive validation of embedded blueprints
+
+**Use Cases:**
+- Modular workflow composition
+- Reusable workflow components
+- Clean separation of concerns
+- Sub-workflow execution within larger workflows
+
 ## API Reference
 
 ### Workflow System
@@ -239,6 +308,7 @@ The engine is created and managed internally by the Workflow class. All supporte
 - output - Result formatting and delivery
 - http_request - HTTP API calls
 - llm - Large Language Model interactions
+- workflow - Execute embedded workflow blueprints
 
 #### Validator
 ```typescript

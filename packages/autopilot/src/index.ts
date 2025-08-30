@@ -57,20 +57,7 @@ export type {
 // Configuration
 export { config } from './constants';
 
-// ===== AGENT FRAMEWORK =====
-// Core Agent Framework
-export { Agent } from './agent/Agent';
-export { ConfigurableAgent } from './agent/ConfigurableAgent';
-export { AgentBuilder } from './builder/AgentBuilder';
-
-// Agent Framework Types
-export type {
-  AgentContext,
-  AgentRequest,
-  AgentResponse,
-  AgentConfiguration,
-  ExecutionHandler
-} from './types/agent';
+// Agent framework was removed - autopilot now focuses on workflow execution only
 import { Engine } from './engine/Engine';
 import { Registry } from './nodes/Registry';
 import { Validator } from './validation/Validator';

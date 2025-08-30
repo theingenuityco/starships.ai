@@ -94,8 +94,6 @@ export type NodeType =
  * Base interface for all workflow node parameters
  */
 interface BaseNodeParameters {
-  agentId?: string;
-  estimatedTime?: number;
   [key: string]: unknown;
 }
 

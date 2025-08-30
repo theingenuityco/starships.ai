@@ -6,14 +6,22 @@
 
 /**
  * Agent-specific node parameters
+ * Contains full agent configuration for workflow execution
  */
 export interface AgentNodeParameters {
-  agentId: string;
-  taskIds?: string[];
+  // Core agent identity
+  name: string;
+  description?: string;
+  
+  // LLM configuration
+  model: string;
+  systemPrompt?: string;
+  temperature?: number;
+  maxTokens?: number;
+  
+  // Execution parameters
   instructions?: string;
-  expectedOutput?: string;
   timeout?: number;
-  estimatedTime?: number;
 }
 
 /**

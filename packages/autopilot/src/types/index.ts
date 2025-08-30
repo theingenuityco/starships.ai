@@ -29,13 +29,4 @@ export type {
   LlmNodeParameters
 } from './nodes';
 
-// ===== AGENT FRAMEWORK TYPES =====
-// Agent framework types
-export type {
-  AgentContext,
-  AgentRequest,
-  AgentResponse,
-  AgentConfiguration,
-  ExecutionHandler,
-  Agent
-} from './agent';
+// Agent framework types were removed - autopilot now focuses on workflow execution only

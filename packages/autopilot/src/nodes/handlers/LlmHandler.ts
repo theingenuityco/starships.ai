@@ -2,32 +2,32 @@
  * LLM Node Handler
  * 
  * Handles LLM (Large Language Model) nodes using OpenRouter unified API
+ * Uses BaseHandler pattern and delegates to HttpRequestHandler
  */
 
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters } from '../../types';
+import { BaseHandler } from '../Handler';
+import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters } from '../../types';
 import { HttpRequestHandler } from './HttpRequestHandler';
 
-export class LlmHandler implements Handler {
+export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
-  private httpHandler = new HttpRequestHandler();
+  private params: LlmNodeParameters;
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as unknown as LlmNodeParameters;
-    
+  constructor(parameters: any, nodeId: string) {
+    super(parameters, nodeId);
+    this.params = parameters as LlmNodeParameters;
+  }
+
+  async execute(context: ExecutionContext) {
     try {
       // Convert LLM parameters to HTTP request parameters
-      const httpParams = this.convertToHttpRequest(params);
+      const httpParams = this.convertToHttpRequest(this.params);
       
-      // Create a temporary HTTP request node
-      const httpNode: Node = {
-        ...node,
-        type: 'http_request',
-        parameters: httpParams
-      };
+      // Create HttpRequestHandler instance for delegation
+      const httpHandler = new HttpRequestHandler(httpParams, `${this.nodeId}-http`);
       
       // Delegate to HttpRequestHandler
-      const result = await this.httpHandler.execute(httpNode, context);
+      const result = await httpHandler.execute(context);
       
       // Process the result to extract LLM-specific data
       if (result.success && result.data && typeof result.data === 'object') {
@@ -35,31 +35,21 @@ export class LlmHandler implements Handler {
         if (httpData.body) {
           const llmResponse = this.extractLlmResponse(httpData.body);
           
-          return {
-            ...result,
-            nodeId: node.id,
-            data: {
-              ...httpData,
-              llmResponse,
-              model: params.model,            
-            }
-          };
+          return this.createSuccessResult({
+            ...httpData,
+            llmResponse,
+            model: this.params.model,            
+          }, result.duration);
         }
       }
       
       return {
         ...result,
-        nodeId: node.id
+        nodeId: this.nodeId
       };
       
     } catch (error) {
-      return {
-        nodeId: node.id,
-        success: false,
-        data: { error: (error as Error).message },
-        executedAt: new Date().toISOString(),
-        duration: 0
-      };
+      return this.createErrorResult((error as Error).message);
     }
   }
 
@@ -130,84 +120,67 @@ export class LlmHandler implements Handler {
     }
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as unknown as LlmNodeParameters;
+  validate(): ValidationResult {
     const errors = [];
     const warnings = [];
 
     // Required fields validation
-    if (!params.model) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Model is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (!this.params.model) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Model is required'
+      ));
     }
 
-    if (!params.prompt) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Prompt is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (!this.params.prompt) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Prompt is required'
+      ));
     }
 
     // Parameter range validation
-    if (params.temperature !== undefined && (params.temperature < 0 || params.temperature > 2)) {
-      errors.push({
-        code: 'INVALID_TEMPERATURE',
-        message: 'Temperature must be between 0 and 2',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
+      errors.push(this.createValidationError(
+        'INVALID_TEMPERATURE',
+        'Temperature must be between 0 and 2'
+      ));
     }
 
-    if (params.maxTokens !== undefined && params.maxTokens < 1) {
-      errors.push({
-        code: 'INVALID_MAX_TOKENS',
-        message: 'Max tokens must be greater than 0',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (this.params.maxTokens !== undefined && this.params.maxTokens < 1) {
+      errors.push(this.createValidationError(
+        'INVALID_MAX_TOKENS',
+        'Max tokens must be greater than 0'
+      ));
     }
 
-    if (params.topP !== undefined && (params.topP < 0 || params.topP > 1)) {
-      errors.push({
-        code: 'INVALID_TOP_P',
-        message: 'Top P must be between 0 and 1',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+    if (this.params.topP !== undefined && (this.params.topP < 0 || this.params.topP > 1)) {
+      errors.push(this.createValidationError(
+        'INVALID_TOP_P',
+        'Top P must be between 0 and 1'
+      ));
     }
 
     // Warnings for common issues
-    if (params.maxTokens && params.maxTokens > 4000) {
-      warnings.push({
-        code: 'HIGH_TOKEN_COUNT',
-        message: 'High token count may result in expensive API calls',
-        nodeId: node.id,
-        severity: 'warning' as const
-      });
+    if (this.params.maxTokens && this.params.maxTokens > 4000) {
+      warnings.push(this.createValidationWarning(
+        'HIGH_TOKEN_COUNT',
+        'High token count may result in expensive API calls'
+      ));
     }
 
-    if (!params.systemMessage) {
-      warnings.push({
-        code: 'NO_SYSTEM_MESSAGE',
-        message: 'Consider adding a system message for better AI behavior control',
-        nodeId: node.id,
-        severity: 'warning' as const
-      });
+    if (!this.params.systemMessage) {
+      warnings.push(this.createValidationWarning(
+        'NO_SYSTEM_MESSAGE',
+        'Consider adding a system message for better AI behavior control'
+      ));
     }
 
-    if (params.timeout && params.timeout < 10000) {
-      warnings.push({
-        code: 'LOW_TIMEOUT',
-        message: 'LLM requests may take longer than the specified timeout',
-        nodeId: node.id,
-        severity: 'warning' as const
-      });
+    if (this.params.timeout && this.params.timeout < 10000) {
+      warnings.push(this.createValidationWarning(
+        'LOW_TIMEOUT',
+        'LLM requests may take longer than the specified timeout'
+      ));
     }
 
     return {

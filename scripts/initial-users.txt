@@ -1,7 +1,0 @@
-# Initial users for Starships.ai waitlist
-# Format: email,notes (notes are optional)
-
-dewang@theingenuity.co,Founder access
-dewang@theingenuit.co,Founder alternate email
-# Add your third user here
-# user3@example.com,Early access user

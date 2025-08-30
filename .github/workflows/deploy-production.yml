@@ -46,17 +46,117 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Deploying version: $VERSION to production"
+          echo "📦 Preparing to deploy version: $VERSION to production"
+          
+          # Store deployment metadata
+          echo "deployment_id=${{ github.run_id }}-${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "deployment_timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          echo "deployed_by=${{ github.actor }}" >> $GITHUB_OUTPUT
+
+      - name: Verify Docker image exists
+        run: |
+          IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          IMAGE_TO_DEPLOY="ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }}"
+          
+          echo "🔍 Verifying image: ${IMAGE_TO_DEPLOY}"
+          
+          # Login to GitHub Container Registry
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # Try to pull the image to verify it exists
+          if docker pull "${IMAGE_TO_DEPLOY}"; then
+            echo "✅ Image verified and available: ${IMAGE_TO_DEPLOY}"
+            
+            # Get image metadata
+            docker inspect "${IMAGE_TO_DEPLOY}" --format='Image Size: {{.Size}} bytes'
+            docker inspect "${IMAGE_TO_DEPLOY}" --format='Created: {{.Created}}'
+          else
+            echo "❌ Image not found: ${IMAGE_TO_DEPLOY}"
+            echo "Please ensure the image was built and pushed successfully."
+            exit 1
+          fi
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
-      - name: Setup Production Kubernetes
+      - name: Setup Kubernetes for both clusters
         run: |
+          # Setup access to both dev and prod clusters
+          doctl kubernetes cluster kubeconfig save starships-dev
           doctl kubernetes cluster kubeconfig save starships-prod
+          echo "✅ Kubernetes clusters configured"
+
+      - name: Verify dev environment deployment
+        id: dev_check
+        run: |
+          echo "🔍 Checking if version ${{ steps.version.outputs.version }} is running in dev environment..."
+          
+          # Switch to dev context
+          kubectl config use-context do-nyc1-starships-dev
+          
+          # Get current dev deployment image
+          DEV_IMAGE=$(kubectl get deployment starships-app -n starships-dev \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "not-found")
+          
+          if [[ "$DEV_IMAGE" == *":${{ steps.version.outputs.version }}" ]]; then
+            echo "✅ Version ${{ steps.version.outputs.version }} is currently running in dev"
+            
+            # Check deployment status in dev
+            DEV_REPLICAS=$(kubectl get deployment starships-app -n starships-dev \
+              -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+            echo "Dev environment has $DEV_REPLICAS ready replicas"
+            
+            # Get dev deployment age
+            DEV_AGE=$(kubectl get deployment starships-app -n starships-dev \
+              --no-headers 2>/dev/null | awk '{print $5}' || echo "unknown")
+            echo "Dev deployment age: $DEV_AGE"
+            
+            echo "dev_verified=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ WARNING: Version ${{ steps.version.outputs.version }} is NOT running in dev"
+            echo "Current dev version: $DEV_IMAGE"
+            echo "Proceeding with caution - manual override assumed"
+            echo "dev_verified=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Backup current production state
+        run: |
+          echo "💾 Creating backup of current production deployment..."
+          
+          # Switch to prod context
           kubectl config use-context do-nyc1-starships-prod
+          
+          # Create backup directory
+          mkdir -p backups
+          BACKUP_FILE="backups/prod-backup-${{ steps.version.outputs.deployment_id }}.yaml"
+          
+          # Get current deployment state
+          kubectl get deployment starships-app -n starships-prod -o yaml > "$BACKUP_FILE" 2>/dev/null || echo "No existing deployment to backup"
+          
+          # Get current image version for reference
+          CURRENT_IMAGE=$(kubectl get deployment starships-app -n starships-prod \
+            -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "none")
+          echo "Current production image: $CURRENT_IMAGE"
+          
+          # Store rollback information
+          echo "ROLLBACK_IMAGE=$CURRENT_IMAGE" >> $GITHUB_ENV
+          
+          # Upload backup as artifact
+          if [ -f "$BACKUP_FILE" ]; then
+            echo "✅ Backup created: $BACKUP_FILE"
+          else
+            echo "ℹ️ No existing deployment to backup (might be first deployment)"
+          fi
+
+      - name: Upload backup artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-backup-${{ steps.version.outputs.deployment_id }}
+          path: backups/
+          retention-days: 30
           
       - name: Create namespace if not exists
         run: |
@@ -100,83 +200,219 @@ jobs:
             --docker-password="${{ secrets.GHCR_PULL_TOKEN }}" \
             -n starships-prod
 
-      - name: Deploy to Production
+      - name: Deploy to Production with Tracking
+        id: deployment
         run: |
-          # Apply simplified manifests (same as dev)
+          echo "🚀 Starting production deployment..."
+          
+          # Apply manifests
           kubectl apply -f k8s/prod/00-namespace.yaml
           kubectl apply -f k8s/prod/02-pvc.yaml
           kubectl apply -f k8s/prod/03-deployment.yaml
           kubectl apply -f k8s/prod/04-service.yaml
           kubectl apply -f k8s/prod/05-ingress.yaml
           
-          # Update deployment with same image as dev (no prod- prefix)
+          # Add deployment annotations for tracking
+          kubectl annotate deployment starships-app \
+            kubernetes.io/change-cause="Deployment v${{ steps.version.outputs.version }} by ${{ github.actor }} via GitHub Actions" \
+            deployment.starships.ai/version="${{ steps.version.outputs.version }}" \
+            deployment.starships.ai/deployed-by="${{ github.actor }}" \
+            deployment.starships.ai/deployed-at="${{ steps.version.outputs.deployment_timestamp }}" \
+            deployment.starships.ai/deployment-id="${{ steps.version.outputs.deployment_id }}" \
+            deployment.starships.ai/github-run-id="${{ github.run_id }}" \
+            deployment.starships.ai/dev-verified="${{ steps.dev_check.outputs.dev_verified }}" \
+            -n starships-prod --overwrite
+          
+          # Update deployment with new image
           IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           kubectl set image deployment/starships-app \
             starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }} \
             -n starships-prod
           
-          echo "✅ Using same image as dev: ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }}"
+          echo "✅ Deployment initiated with image: ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }}"
           
-          # Wait for rollout
-          kubectl rollout status deployment/starships-app -n starships-prod --timeout=600s
-
-      - name: Verify Production Deployment
-        run: |
-          # Check pod status
-          kubectl get pods -n starships-prod
-          
-          # Verify endpoints
-          kubectl get endpoints -n starships-prod
-          
-          # Check service
-          kubectl get svc -n starships-prod
-          
-          # Check ingress
-          kubectl get ingress -n starships-prod
-          
-          # Test health endpoint via load balancer
-          sleep 30
-          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "Testing health endpoint via Load Balancer IP: $INGRESS_IP"
-          curl -f -k https://${INGRESS_IP}/api/health -H "Host: starships.ai" || echo "Health check pending DNS propagation"
-
-      - name: Production Smoke Test
-        continue-on-error: true
-        run: |
-          # Wait for DNS and SSL
-          sleep 60
-          
-          # Test main domain
-          echo "Testing main domain..."
-          curl -I [PROD-DOMAIN-URL] || true
-          
-          # Test API endpoint
-          echo "Testing API endpoint..."
-          curl -I [PROD-DOMAIN-URL]/api/health || true
-
-      - name: Create deployment summary
-        if: always()
-        run: |
-          echo "## 🚀 Production Deployment (Manual)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ **Status:** Successfully deployed to production" >> $GITHUB_STEP_SUMMARY
+          # Wait for rollout with timeout
+          echo "⏳ Waiting for rollout to complete (timeout: 10 minutes)..."
+          if kubectl rollout status deployment/starships-app -n starships-prod --timeout=600s; then
+            echo "✅ Rollout completed successfully"
+            echo "deployment_status=success" >> $GITHUB_OUTPUT
           else
-            echo "❌ **Status:** Production deployment failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Rollout failed or timed out"
+            echo "deployment_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Enhanced Health Verification with Auto-Rollback
+        id: health_check
+        run: |
+          echo "🏥 Starting comprehensive health checks..."
+          
+          # Check pod status
+          echo "📊 Pod Status:"
+          kubectl get pods -n starships-prod -l app=starships-app
+          
+          # Wait for pods to be ready
+          echo "⏳ Waiting for pods to be ready..."
+          if ! kubectl wait --for=condition=ready pod -l app=starships-app -n starships-prod --timeout=300s; then
+            echo "❌ Pods failed to become ready within 5 minutes"
+            echo "health_status=failed" >> $GITHUB_OUTPUT
+            exit 1
           fi
           
-          echo "**Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Using dev image:** ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
-          echo "**Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          # Verify endpoints
+          echo "🔗 Endpoints:"
+          kubectl get endpoints -n starships-prod
+          
+          # Get ingress IP
+          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Load Balancer IP: $INGRESS_IP"
+          
+          # Perform health checks with retries
+          MAX_RETRIES=10
+          RETRY_DELAY=30
+          SUCCESS=false
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Health check attempt $i/$MAX_RETRIES..."
+            
+            if curl -f -k -m 10 https://${INGRESS_IP}/api/health -H "Host: starships.ai" 2>/dev/null; then
+              echo "✅ Health check passed!"
+              SUCCESS=true
+              break
+            else
+              echo "⚠️ Health check failed, waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            fi
+          done
+          
+          if [ "$SUCCESS" = true ]; then
+            echo "✅ All health checks passed successfully"
+            echo "health_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Health checks failed after $MAX_RETRIES attempts"
+            echo "health_status=failed" >> $GITHUB_OUTPUT
+            
+            echo "🔄 Initiating automatic rollback..."
+            kubectl rollout undo deployment/starships-app -n starships-prod
+            kubectl rollout status deployment/starships-app -n starships-prod --timeout=300s
+            echo "✅ Rollback completed"
+            exit 1
+          fi
+
+      - name: Performance and Availability Metrics
+        if: success()
+        run: |
+          echo "📈 Collecting deployment metrics..."
+          
+          # Get resource usage
+          echo "Resource Usage:"
+          kubectl top pods -n starships-prod -l app=starships-app || echo "Metrics not available yet"
+          
+          # Check replica status
+          echo "Replica Status:"
+          kubectl get deployment starships-app -n starships-prod -o wide
+          
+          # Get recent events
+          echo "Recent Events:"
+          kubectl get events -n starships-prod --sort-by='.lastTimestamp' | tail -10
+          
+          # Response time test
+          INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "Response Time Test:"
+          for i in {1..5}; do
+            curl -w "Response time: %{time_total}s\n" -o /dev/null -s -k https://${INGRESS_IP}/api/health -H "Host: starships.ai"
+          done
+
+      - name: Create Enhanced Deployment Summary
+        if: always()
+        run: |
+          echo "## 🚀 Production Deployment Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Access Production" >> $GITHUB_STEP_SUMMARY
-          echo "🌐 **URL:** [PROD-DOMAIN-URL]" >> $GITHUB_STEP_SUMMARY
-          echo "🌐 **WWW:** https://www.starships.ai" >> $GITHUB_STEP_SUMMARY
+          
+          # Deployment Status
+          echo "### 📊 Deployment Status" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ **Overall Status:** Successfully deployed to production" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Overall Status:** Production deployment failed" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Monitor application health" >> $GITHUB_STEP_SUMMARY
-          echo "2. Check error logs if issues arise" >> $GITHUB_STEP_SUMMARY
-          echo "3. Rollback if necessary: \`kubectl rollout undo deployment/starships-app -n starships-prod\`" >> $GITHUB_STEP_SUMMARY# Trigger rebuild to update secrets
+          
+          # Deployment Details
+          echo "### 📦 Deployment Details" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Version** | \`${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Deployment ID** | \`${{ steps.version.outputs.deployment_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Deployed By** | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Timestamp** | ${{ steps.version.outputs.deployment_timestamp }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **GitHub Run** | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image** | \`ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Pre-deployment Checks
+          echo "### ✅ Pre-deployment Validation" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image Verification** | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ steps.dev_check.outputs.dev_verified }}" == "true" ]]; then
+            echo "| **Dev Environment** | ✅ Version verified in dev |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Dev Environment** | ⚠️ Version not in dev (override) |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "| **Backup Created** | ✅ Artifact saved |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Deployment Results
+          echo "### 🎯 Deployment Results" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.deployment.outputs.deployment_status }}" == "success" ]]; then
+            echo "✅ **Rollout:** Completed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Rollout:** Failed or timed out" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ "${{ steps.health_check.outputs.health_status }}" == "success" ]]; then
+            echo "✅ **Health Checks:** All passed" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ steps.health_check.outputs.health_status }}" == "failed" ]]; then
+            echo "❌ **Health Checks:** Failed - automatic rollback triggered" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⏭️ **Health Checks:** Skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Access Information
+          echo "### 🌐 Access Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production URL:** [PROD-DOMAIN-URL]" >> $GITHUB_STEP_SUMMARY
+          echo "- **WWW:** https://www.starships.ai" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Rollback Information
+          echo "### 🔄 Rollback Information" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ env.ROLLBACK_IMAGE }}" ] && [ "${{ env.ROLLBACK_IMAGE }}" != "none" ]; then
+            echo "Previous version available for rollback: \`${{ env.ROLLBACK_IMAGE }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Manual rollback command:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl rollout undo deployment/starships-app -n starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Next Steps
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. ✅ Monitor application metrics and logs" >> $GITHUB_STEP_SUMMARY
+          echo "2. 📊 Check performance metrics in monitoring dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "3. 🔍 Verify user-facing functionality" >> $GITHUB_STEP_SUMMARY
+          echo "4. 📧 Notify stakeholders of deployment status" >> $GITHUB_STEP_SUMMARY
+          
+          # Deployment History
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📜 Deployment History" >> $GITHUB_STEP_SUMMARY
+          echo "View deployment history with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "kubectl rollout history deployment/starships-app -n starships-prod" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

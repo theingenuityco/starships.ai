@@ -201,11 +201,24 @@ jobs:
           # Create GHCR pull secret using persistent PAT
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
-            --docker-username=dewangsolanki3 \
+            --docker-username=${{ github.repository_owner }} \
             --docker-password="${{ secrets.GHCR_PULL_TOKEN }}" \
             -n starships-prod
           
           echo "✅ Secrets updated successfully"
+
+      - name: Validate Kubernetes Manifests
+        run: |
+          echo "🔍 Validating Kubernetes manifests..."
+          
+          # Dry-run validation to catch syntax errors before deployment
+          kubectl apply --dry-run=client -f k8s/prod/00-namespace.yaml
+          kubectl apply --dry-run=client -f k8s/prod/02-pvc.yaml
+          kubectl apply --dry-run=client -f k8s/prod/03-deployment.yaml
+          kubectl apply --dry-run=client -f k8s/prod/04-service.yaml
+          kubectl apply --dry-run=client -f k8s/prod/05-ingress.yaml
+          
+          echo "✅ All manifests validated successfully"
 
       - name: Deploy to Production with Tracking
         id: deployment
@@ -329,6 +342,32 @@ jobs:
           for i in {1..5}; do
             curl -w "Response time: %{time_total}s\n" -o /dev/null -s -k https://${INGRESS_IP}/api/health -H "Host: starships.ai"
           done
+
+      - name: Send Deployment Notification
+        if: always()
+        continue-on-error: true
+        run: |
+          # Notification placeholder - uncomment and configure as needed
+          
+          # Slack notification example:
+          # if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
+          #   STATUS="${{ job.status }}"
+          #   COLOR=$([ "$STATUS" = "success" ] && echo "good" || echo "danger")
+          #   curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
+          #     -H 'Content-Type: application/json' \
+          #     -d "{
+          #       \"attachments\": [{
+          #         \"color\": \"$COLOR\",
+          #         \"title\": \"Production Deployment $STATUS\",
+          #         \"text\": \"Version: ${{ steps.version.outputs.version }}\nDeployed by: ${{ github.actor }}\"
+          #       }]
+          #     }"
+          # fi
+          
+          # Email notification example:
+          # Add email action here if needed
+          
+          echo "📧 Notification step placeholder - configure Slack/email as needed"
 
       - name: Create Enhanced Deployment Summary
         if: always()

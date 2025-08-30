@@ -11,8 +11,8 @@ global.console = {
 };
 
 // Global test utilities
-global.createMockWorkflow = (overrides = {}) => ({
-  id: 'test-workflow',
+global.createMockBlueprint = (overrides = {}) => ({
+  id: 'test-blueprint',
   nodes: [
     { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
     { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -20,14 +20,15 @@ global.createMockWorkflow = (overrides = {}) => ({
   edges: [
     { id: 'edge-1', from: 'start', to: 'end' }
   ],
-  approvalStatus: 'approved',
-  visualization: '',
-  createdAt: new Date().toISOString(),
+  metadata: {},
   ...overrides
 });
 
+// Legacy support for tests that haven't been updated yet
+global.createMockWorkflow = global.createMockBlueprint;
+
 global.createMockContext = (overrides = {}) => ({
-  workflowId: 'test-workflow',
+  workflowId: 'test-blueprint',
   userId: 'test-user',
   previousResults: new Map(),
   expeditionState: {},

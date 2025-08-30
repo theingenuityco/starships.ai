@@ -26,7 +26,7 @@ describe('AgentHandler', () => {
         maxTokens: 500,
         instructions: 'Test instructions for the agent',
         timeout: 5000,
-        workflow: global.createMockWorkflow()
+        blueprint: global.createMockBlueprint()
       } as AgentNodeParameters
     };
     mockContext = global.createMockContext();
@@ -72,7 +72,7 @@ describe('AgentHandler', () => {
         parameters: {
           name: 'Basic Agent',
           model: 'openai/gpt-4',
-          workflow: global.createMockWorkflow()
+          blueprint: global.createMockBlueprint()
         } as AgentNodeParameters
       };
       
@@ -133,7 +133,7 @@ describe('AgentHandler', () => {
         parameters: {
           name: 'Test Agent',
           model: 'openai/gpt-4',
-          workflow: global.createMockWorkflow()
+          blueprint: global.createMockBlueprint()
         } as AgentNodeParameters
       };
       
@@ -150,7 +150,7 @@ describe('AgentHandler', () => {
         parameters: {
           model: 'openai/gpt-4',
           instructions: 'Some instructions',
-          workflow: global.createMockWorkflow()
+          blueprint: global.createMockBlueprint()
         } as AgentNodeParameters
       };
       
@@ -173,7 +173,7 @@ describe('AgentHandler', () => {
         parameters: {
           name: 'Test Agent',
           instructions: 'Some instructions',
-          workflow: global.createMockWorkflow()
+          blueprint: global.createMockBlueprint()
         } as AgentNodeParameters
       };
       
@@ -194,7 +194,7 @@ describe('AgentHandler', () => {
         ...mockNode,
         parameters: {
           instructions: 'Some instructions',
-          workflow: global.createMockWorkflow()
+          blueprint: global.createMockBlueprint()
         } as AgentNodeParameters
       };
       
@@ -228,7 +228,7 @@ describe('AgentHandler', () => {
           name: '',
           model: '',
           instructions: 'Some instructions',
-          workflow: global.createMockWorkflow()
+          blueprint: global.createMockBlueprint()
         } as AgentNodeParameters
       };
       

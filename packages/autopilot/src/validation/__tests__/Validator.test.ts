@@ -3,7 +3,7 @@
  */
 
 import { Validator } from '../Validator';
-import { Workflow, Node, Edge, ValidationError } from '../../types';
+import { Blueprint, Node, Edge, ValidationError } from '../../types';
 
 describe('Validator', () => {
   let validator: Validator;
@@ -14,7 +14,7 @@ describe('Validator', () => {
 
   describe('validate', () => {
     it('should validate a simple valid workflow', () => {
-      const workflow: Workflow = global.createMockWorkflow();
+      const workflow: Blueprint = global.createMockBlueprint();
       
       const result = validator.validate(workflow);
       
@@ -25,7 +25,7 @@ describe('Validator', () => {
     });
 
     it('should fail validation when workflow has no nodes', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: []
       });
       
@@ -34,11 +34,11 @@ describe('Validator', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].code).toBe('MISSING_REQUIRED_FIELD');
-      expect(result.errors[0].message).toBe('Workflow must have nodes');
+      expect(result.errors[0].message).toBe('Blueprint must have nodes');
     });
 
     it('should fail validation when workflow has no edges', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         edges: []
       });
       
@@ -47,11 +47,11 @@ describe('Validator', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0].code).toBe('MISSING_REQUIRED_FIELD');
-      expect(result.errors[0].message).toBe('Workflow must have edges');
+      expect(result.errors[0].message).toBe('Blueprint must have edges');
     });
 
     it('should fail validation when workflow has no start node', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ]
@@ -63,13 +63,13 @@ describe('Validator', () => {
       expect(result.errors).toContainEqual(
         expect.objectContaining({
           code: 'MISSING_START_NODE',
-          message: 'Workflow must have a start node'
+          message: 'Blueprint must have a start node'
         })
       );
     });
 
     it('should fail validation when workflow has no end node', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ]
@@ -81,13 +81,13 @@ describe('Validator', () => {
       expect(result.errors).toContainEqual(
         expect.objectContaining({
           code: 'MISSING_END_NODE',
-          message: 'Workflow must have an end node'
+          message: 'Blueprint must have an end node'
         })
       );
     });
 
     it('should detect unreachable nodes', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
@@ -111,7 +111,7 @@ describe('Validator', () => {
     });
 
     it('should detect circular dependencies', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'node1', type: 'agent', name: 'Node 1', description: 'First node', parameters: {} },
@@ -139,9 +139,9 @@ describe('Validator', () => {
 
     it('should handle validation exceptions gracefully', () => {
       // Create an invalid workflow object that will cause an exception
-      const invalidWorkflow = null as any;
+      const invalidBlueprint = null as any;
       
-      const result = validator.validate(invalidWorkflow);
+      const result = validator.validate(invalidBlueprint);
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -150,7 +150,7 @@ describe('Validator', () => {
     });
 
     it('should validate complex workflow with conditional paths', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
           { id: 'conditional', type: 'conditional', name: 'Decision', description: 'Conditional node', parameters: {} },
@@ -176,7 +176,7 @@ describe('Validator', () => {
 
   describe('findReachableNodes', () => {
     it('should find all nodes reachable from start in linear workflow', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
           { id: 'middle', type: 'agent', name: 'Middle', description: 'Middle', parameters: {} },
@@ -200,7 +200,7 @@ describe('Validator', () => {
 
   describe('detectCircularDependencies', () => {
     it('should detect simple cycle', () => {
-      const workflow: Workflow = global.createMockWorkflow({
+      const workflow: Blueprint = global.createMockBlueprint({
         nodes: [
           { id: 'node1', type: 'agent', name: 'Node 1', description: 'Node 1', parameters: {} },
           { id: 'node2', type: 'agent', name: 'Node 2', description: 'Node 2', parameters: {} }
@@ -220,7 +220,7 @@ describe('Validator', () => {
     });
 
     it('should return empty array for acyclic graph', () => {
-      const workflow: Workflow = global.createMockWorkflow();
+      const workflow: Blueprint = global.createMockBlueprint();
 
       // Access private method through any to test it
       const cycles = (validator as any).detectCircularDependencies(workflow);

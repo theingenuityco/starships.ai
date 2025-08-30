@@ -15,9 +15,9 @@ import type {
 } from './nodes';
 
 /**
- * Main workflow DSL entity representing a complete workflow graph
+ * Blueprint represents the static workflow DSL structure (JSON/serializable)
  */
-export interface Workflow {
+export interface Blueprint {
   id: string;
   nodes: Node[];
   edges: Edge[];

@@ -38,7 +38,7 @@ export type {
   
   // Execution types
   RuntimeState,
-  ExecutionContext,
+  ExecutionInitialContext,
   NodeResult,
   ExecutionStatus,
   

@@ -5,13 +5,17 @@
  */
 
 /**
- * Runtime state of workflow execution
+ * Runtime state of workflow execution - now includes all execution context
  */
 export interface RuntimeState {
   currentNodeRef?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;
   error?: ExecutionError;
+  // Runtime execution context data
+  userId: string;
+  expeditionState: unknown;
+  services: unknown;
 }
 
 /**
@@ -29,13 +33,12 @@ export interface NodeResult {
 }
 
 /**
- * Context passed to node handlers during execution
+ * Initial execution context for starting workflows
  */
-export interface ExecutionContext {
-  userId: string;
-  previousResults: Map<string, NodeResult>;
-  expeditionState: unknown;
-  services: unknown;
+export interface ExecutionInitialContext {
+  userId?: string;
+  expeditionState?: unknown;
+  services?: unknown;
 }
 
 /**

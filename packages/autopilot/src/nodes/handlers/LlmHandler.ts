@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node, ValidationError, ValidationWarning } from '../../types';
+import { RuntimeState, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node, ValidationError, ValidationWarning } from '../../types';
 import { HttpRequestHandler } from './HttpRequestHandler';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     const params = this.node.parameters as LlmNodeParameters;
     try {
       // Convert LLM parameters to HTTP request parameters
@@ -29,7 +29,7 @@ export class LlmHandler extends BaseHandler {
       const httpHandler = new HttpRequestHandler(httpNode);
       
       // Delegate to HttpRequestHandler
-      const result = await httpHandler.execute(context);
+      const result = await httpHandler.execute(runtimeState);
       
       // Process the result to extract LLM-specific data
       if (result.success && result.data && typeof result.data === 'object') {

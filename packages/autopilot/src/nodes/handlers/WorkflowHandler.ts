@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '../../types';
+import { RuntimeState, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning, ExecutionInitialContext } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     const startTime = Date.now();
     const params = this.node.parameters as WorkflowNodeParameters;
     
@@ -20,9 +20,10 @@ export class WorkflowHandler extends BaseHandler {
       console.log('Executing embedded workflow');
       
       // Prepare workflow execution context
-      const existingState = (context.expeditionState as Record<string, unknown>) || {};
-      const workflowContext: Partial<ExecutionContext> = {
-        ...context,
+      const existingState = (runtimeState.expeditionState as Record<string, unknown>) || {};
+      const workflowContext: Partial<ExecutionInitialContext> = {
+        userId: runtimeState.userId,
+        services: runtimeState.services,
         // Merge existing context with workflow-specific context
         expeditionState: {
           ...existingState,

@@ -5,12 +5,12 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '../../types';
+import { RuntimeState, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '../../types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     const params = this.node.parameters as UserPromptNodeParameters;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input

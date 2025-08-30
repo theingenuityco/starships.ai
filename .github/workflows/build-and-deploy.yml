@@ -240,6 +240,16 @@ jobs:
           }
           echo "✅ All manifests are valid"
 
+      - name: Apply Kubernetes manifests
+        run: |
+          echo "📦 Applying Kubernetes manifests to dev environment..."
+          kubectl apply -f k8s/dev/00-namespace.yaml
+          kubectl apply -f k8s/dev/02-pvc.yaml
+          kubectl apply -f k8s/dev/03-deployment.yaml
+          kubectl apply -f k8s/dev/04-service.yaml
+          kubectl apply -f k8s/dev/05-ingress.yaml
+          echo "✅ All manifests applied successfully"
+
       - name: Update Kubernetes secrets
         run: |
           # Delete existing secrets if they exist

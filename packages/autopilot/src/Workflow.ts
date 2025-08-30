@@ -117,7 +117,7 @@ export class Workflow {
   /**
    * Execute the workflow (delegates to internal Engine)
    */
-  async execute(runtimeState: RuntimeState): Promise<RuntimeState> {
+  async execute(runtimeState?: RuntimeState): Promise<RuntimeState> {
     return this.engine.execute(this.blueprint, runtimeState);
   }
 

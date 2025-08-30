@@ -60,7 +60,7 @@ export interface UserPromptChoice {
 /**
  * Output formats for workflow results
  */
-export type OutputFormat = 
+export type OutputFormat =
   | 'text'
   | 'markdown'
   | 'json'
@@ -68,3 +68,68 @@ export type OutputFormat =
   | 'xml'
   | 'pdf'
   | 'csv';
+
+/**
+ * HTTP request node parameters for making HTTP calls
+ */
+export interface HttpRequestNodeParameters {
+  url: string;
+  method: HttpMethod;
+  headers?: Record<string, string>;
+  body?: string | object;
+  timeout?: number;
+  retries?: number;
+  followRedirects?: boolean;
+  authentication?: HttpAuthentication;
+}
+
+/**
+ * HTTP methods supported by the HTTP request node
+ */
+export type HttpMethod =
+  | 'GET'
+  | 'POST'
+  | 'PUT'
+  | 'DELETE'
+  | 'PATCH'
+  | 'HEAD'
+  | 'OPTIONS';
+
+/**
+ * HTTP authentication configuration
+ */
+export interface HttpAuthentication {
+  type: 'bearer' | 'basic' | 'api-key';
+  token?: string;
+  username?: string;
+  password?: string;
+  apiKey?: string;
+  headerName?: string; // for api-key type
+}
+
+/**
+ * LLM node parameters for AI model interactions
+ */
+export interface LlmNodeParameters {
+  model: string;
+  prompt: string;
+  temperature?: number;
+  maxTokens?: number;
+  systemMessage?: string;
+  provider?: LlmProvider;
+  timeout?: number;
+  stream?: boolean;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+}
+
+/**
+ * LLM providers supported by the LLM node
+ */
+export type LlmProvider =
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'local'
+  | 'custom';

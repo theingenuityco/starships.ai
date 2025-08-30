@@ -22,7 +22,12 @@ export type {
   UserPromptNodeParameters,
   OutputNodeParameters,
   UserPromptChoice,
-  OutputFormat
+  OutputFormat,
+  HttpRequestNodeParameters,
+  HttpMethod,
+  HttpAuthentication,
+  LlmNodeParameters,
+  LlmProvider
 } from './nodes';
 
 // ===== AGENT FRAMEWORK TYPES =====

@@ -18,7 +18,10 @@ export {
   AgentHandler,
   ConditionalHandler,
   PromptHandler,
-  OutputHandler
+  OutputHandler,
+  HttpRequestHandler,
+  LlmHandler,
+  WorkflowHandler
 } from './nodes/handlers';
 
 // Validation
@@ -44,6 +47,9 @@ export type {
   ConditionalNodeParameters,
   UserPromptNodeParameters,
   OutputNodeParameters,
+  HttpRequestNodeParameters,
+  LlmNodeParameters,
+  WorkflowNodeParameters,
   
   // Validation types
   ValidationResult,

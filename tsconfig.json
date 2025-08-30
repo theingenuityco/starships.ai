@@ -4,7 +4,7 @@
     { "path": "./packages/protocol" },
     { "path": "./packages/env-config" },
     { "path": "./packages/models" },
-    { "path": "./packages/agent-engine" },
+    { "path": "./packages/autopilot" },
     { "path": "./packages/server" },
     { "path": "./packages/client" }
   ]

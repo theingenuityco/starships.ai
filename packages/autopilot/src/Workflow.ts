@@ -23,7 +23,13 @@ export class Workflow {
         metadata: {}
       };
     } else {
-      this.blueprint = { ...blueprintOrId };
+      // Create a deep copy to avoid mutations to the original blueprint
+      this.blueprint = {
+        ...blueprintOrId,
+        nodes: blueprintOrId.nodes.map(node => ({ ...node })),
+        edges: blueprintOrId.edges.map(edge => ({ ...edge })),
+        metadata: { ...blueprintOrId.metadata }
+      };
     }
 
     // Create engine - handles all node types internally

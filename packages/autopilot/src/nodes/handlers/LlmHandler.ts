@@ -112,13 +112,17 @@ export class LlmHandler extends BaseHandler {
   private extractLlmResponse(responseBody: any): string {
     try {
       // OpenRouter uses OpenAI-compatible format
-      return responseBody.choices?.[0]?.message?.content || '';
-    } catch {
+      const openAIContent = responseBody.choices?.[0]?.message?.content;
+      if (openAIContent) return openAIContent;
+      
       // Fallback: try to extract any text content
       if (typeof responseBody === 'string') return responseBody;
       if (responseBody?.content) return responseBody.content;
       if (responseBody?.text) return responseBody.text;
       return JSON.stringify(responseBody);
+    } catch {
+      // If parsing fails completely, return empty string
+      return '';
     }
   }
 

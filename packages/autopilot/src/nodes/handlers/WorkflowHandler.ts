@@ -27,7 +27,7 @@ export class WorkflowHandler extends BaseHandler {
       if (workflowResult.status === 'completed') {
         // Collect all successful workflow results
         const workflowOutputs = Array.from(workflowResult.executionResults.values())
-          .filter(result => result.success)
+          .filter(result => !result.error)
           .map(result => result.data);
 
         return this.createSuccessResult(execution, {

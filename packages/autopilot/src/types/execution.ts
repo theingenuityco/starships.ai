@@ -53,7 +53,7 @@ export interface ExecutionError {
 /**
  * Workflow error codes
  */
-export type WorkflowErrorCode = 
+export type WorkflowErrorCode =
   | 'NODE_EXECUTION_FAILED'
   | 'TIMEOUT_EXCEEDED'
   | 'USER_INPUT_TIMEOUT'
@@ -65,3 +65,4 @@ export type WorkflowErrorCode =
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
   | 'JSONATA_ERROR';
+  

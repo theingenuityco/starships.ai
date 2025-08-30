@@ -2,8 +2,7 @@
  * Jest setup file for autopilot package tests
  */
 
-import type { Blueprint } from '../src/types';
-import type { ExecutionContext } from '../src/types';
+import type { Blueprint, Execution } from '../src/types';
 // import './global.d.ts';
 
 // Import Jest types for global availability
@@ -33,13 +32,12 @@ global.console = {
 // Legacy support for tests that haven't been updated yet
 (global as any).createMockWorkflow = (global as any).createMockBlueprint;
 
-(global as any).createMockContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
-  userId: 'test-user',
-  previousResults: new Map(),
-  expeditionState: {},
-  services: {},
+(global as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
+  status: 'not_started',
+  executionResults: new Map(),
   ...overrides
 });
+
 
 // Setup common test timeouts
 jest.setTimeout(10000);

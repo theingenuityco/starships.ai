@@ -45,7 +45,6 @@ export class WorkflowHandler extends BaseHandler {
         return this.createSuccessResult({
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
-          executionId: workflowResult.id,
           output: 'Workflow completed successfully'
         }, Date.now() - startTime);
       } else {

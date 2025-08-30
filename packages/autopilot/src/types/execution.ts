@@ -8,7 +8,6 @@
  * Runtime state of workflow execution
  */
 export interface RuntimeState {
-  id: string;
   currentNodeRef?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;

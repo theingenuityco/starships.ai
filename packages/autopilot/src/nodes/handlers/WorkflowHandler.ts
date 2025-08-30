@@ -17,7 +17,7 @@ export class WorkflowHandler extends BaseHandler {
     const params = this.node.parameters as WorkflowNodeParameters;
     
     try {
-      console.log(`Executing workflow: ${params.blueprint.id}`);
+      console.log('Executing embedded workflow');
       
       // Prepare workflow execution context
       const existingState = (context.expeditionState as Record<string, unknown>) || {};
@@ -43,24 +43,23 @@ export class WorkflowHandler extends BaseHandler {
           .map(result => result.data);
 
         return this.createSuccessResult({
-          workflowId: params.blueprint.id,
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
           executionId: workflowResult.id,
-          output: `Workflow ${params.blueprint.id} completed successfully`
+          output: 'Workflow completed successfully'
         }, Date.now() - startTime);
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
         return this.createErrorResult(
-          `Workflow ${params.blueprint.id} execution failed: ${errorMessage}`,
+          `Workflow execution failed: ${errorMessage}`,
           Date.now() - startTime
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResult(
-        `Workflow ${params.blueprint.id} execution failed: ${errorMessage}`,
+        `Workflow execution failed: ${errorMessage}`,
         Date.now() - startTime
       );
     }
@@ -79,13 +78,6 @@ export class WorkflowHandler extends BaseHandler {
       ));
     } else {
       // Validate blueprint structure
-      if (!params.blueprint.id) {
-        errors.push(this.createValidationError(
-          'VALIDATION_FAILED',
-          'Blueprint must have an id'
-        ));
-      }
-
       if (!params.blueprint.nodes || params.blueprint.nodes.length === 0) {
         errors.push(this.createValidationError(
           'VALIDATION_FAILED',

@@ -26,9 +26,8 @@ const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
  * Events that can be emitted during workflow execution
  */
 export interface ExecutionEvent {
-  type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' | 
+  type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' |
         'workflow_paused' | 'workflow_resumed' | 'workflow_completed' | 'workflow_failed';
-  workflowId: string;
   contextId: string;
   nodeId?: string;
   data?: any;
@@ -91,7 +90,7 @@ export class Engine {
     // Initialize runtime state
     const runtimeState: RuntimeState = {
       id: executionId,
-      workflowId: blueprint.id,
+      
       currentNodeId: undefined,
       status: 'not_started',
       executionResults: new Map(),
@@ -115,8 +114,8 @@ export class Engine {
       // Emit start event
       await this.emitEvent({
         type: 'workflow_started',
-        workflowId: blueprint.id,
-        contextId: blueprint.id,
+        
+        contextId: runtimeState.id,
         timestamp: new Date().toISOString()
       });
 
@@ -136,8 +135,8 @@ export class Engine {
 
         await this.emitEvent({
           type: 'workflow_completed',
-          workflowId: blueprint.id,
-          contextId: blueprint.id,
+          
+          contextId: runtimeState.id,
           timestamp: new Date().toISOString()
         });
       }
@@ -157,8 +156,8 @@ export class Engine {
 
       await this.emitEvent({
         type: 'workflow_failed',
-        workflowId: blueprint.id,
-        contextId: blueprint.id,
+        
+        contextId: runtimeState.id,
         data: { error: errorMessage },
         timestamp: new Date().toISOString()
       });
@@ -182,7 +181,7 @@ export class Engine {
     
     // Build execution context
     const context: ExecutionContext = {
-      workflowId: blueprint.id,
+      
       userId: contextData.userId || 'system',
       previousResults: runtimeState.executionResults,
       expeditionState: contextData.expeditionState || {},
@@ -198,8 +197,8 @@ export class Engine {
         // Emit node start event
         await this.emitEvent({
           type: 'node_started',
-          workflowId: blueprint.id,
-          contextId: blueprint.id,
+          
+          contextId: runtimeState.id,
           nodeId: currentNode.id,
           data: { nodeName: currentNode.name, nodeType: currentNode.type },
           timestamp: new Date().toISOString()
@@ -215,8 +214,8 @@ export class Engine {
           // Emit node completed event
           await this.emitEvent({
             type: 'node_completed',
-            workflowId: blueprint.id,
-            contextId: blueprint.id,
+            
+            contextId: runtimeState.id,
             nodeId: currentNode.id,
             data: { result: result.data },
             timestamp: new Date().toISOString()
@@ -235,8 +234,8 @@ export class Engine {
           // Node execution failed
           await this.emitEvent({
             type: 'node_failed',
-            workflowId: blueprint.id,
-            contextId: blueprint.id,
+            
+            contextId: runtimeState.id,
             nodeId: currentNode.id,
             data: { error: result.error },
             timestamp: new Date().toISOString()
@@ -372,7 +371,7 @@ export class Engine {
 
     this.emitEvent({
       type: 'workflow_paused',
-      workflowId: runtimeState.workflowId,
+      
       contextId: '',
       timestamp: new Date().toISOString()
     });
@@ -395,7 +394,7 @@ export class Engine {
 
     this.emitEvent({
       type: 'workflow_resumed',
-      workflowId: runtimeState.workflowId,
+      
       contextId: '',
       timestamp: new Date().toISOString()
     });

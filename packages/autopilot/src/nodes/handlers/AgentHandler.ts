@@ -50,7 +50,6 @@ export class AgentHandler extends BaseHandler {
           model: params.model,
           systemPrompt: params.systemPrompt,
           instructions: params.instructions,
-          workflowId: params.blueprint.id,
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
           output: `Agent ${params.name} completed workflow execution successfully`

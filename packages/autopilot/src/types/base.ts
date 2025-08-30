@@ -53,7 +53,6 @@ export interface Edge {
  * Base Blueprint interface (untyped nodes)
  */
 export interface BaseBlueprint {
-  id: string;
   nodes: BaseNode[];
   edges: Edge[];
   metadata?: Record<string, unknown>;

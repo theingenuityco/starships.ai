@@ -42,7 +42,6 @@ describe('Engine', () => {
       const result = await engine.execute(mockBlueprint, mockContext);
       
       expect(result.status).toBe('completed');
-      expect(result.workflowId).toBe(mockBlueprint.id);
       expect(result.executionResults.size).toBe(2); // start and end nodes
       expect(result.startTime).toBeDefined();
       expect(result.endTime).toBeDefined();

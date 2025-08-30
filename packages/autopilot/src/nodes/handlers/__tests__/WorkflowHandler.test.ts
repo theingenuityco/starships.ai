@@ -11,7 +11,6 @@ jest.mock('../../../Workflow');
 
 // Type definitions for test data structures
 interface WorkflowResponseData {
-  workflowId: string;
   workflowResults: unknown[];
   workflowStatus: string;
   executionId: string;
@@ -25,7 +24,6 @@ describe('WorkflowHandler', () => {
   let mockWorkflow: jest.Mocked<Workflow>;
 
   const mockBlueprint: Blueprint = {
-    id: 'test-embedded-workflow',
     nodes: [
       { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
       { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -94,7 +92,7 @@ describe('WorkflowHandler', () => {
 
       const mockRuntimeState: RuntimeState = {
         id: 'execution-123',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'completed',
         executionResults: new Map([
           ['start', mockNodeResult1],
@@ -114,11 +112,10 @@ describe('WorkflowHandler', () => {
       expect(result.nodeId).toBe('workflow-node');
       
       const resultData = result.data as WorkflowResponseData;
-      expect(resultData.workflowId).toBe('test-embedded-workflow');
       expect(resultData.workflowStatus).toBe('completed');
       expect(resultData.executionId).toBe('execution-123');
       expect(resultData.workflowResults).toHaveLength(2);
-      expect(resultData.output).toBe('Workflow test-embedded-workflow completed successfully');
+      expect(resultData.output).toBe('Workflow completed successfully');
       
       expect(result.executedAt).toBeDefined();
       expect(result.duration).toBeGreaterThanOrEqual(0);
@@ -140,7 +137,7 @@ describe('WorkflowHandler', () => {
 
       const mockRuntimeState: RuntimeState = {
         id: 'execution-456',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'completed',
         executionResults: new Map(),
         createdAt: new Date().toISOString(),
@@ -168,7 +165,7 @@ describe('WorkflowHandler', () => {
     it('should handle workflow execution failure', async () => {
       const mockRuntimeState: RuntimeState = {
         id: 'execution-failed',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'failed',
         executionResults: new Map(),
         error: {
@@ -194,7 +191,7 @@ describe('WorkflowHandler', () => {
     it('should handle workflow execution failure without error message', async () => {
       const mockRuntimeState: RuntimeState = {
         id: 'execution-failed-no-message',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'failed',
         executionResults: new Map(),
         createdAt: new Date().toISOString(),
@@ -252,7 +249,7 @@ describe('WorkflowHandler', () => {
 
       const mockRuntimeState: RuntimeState = {
         id: 'execution-merge',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'completed',
         executionResults: new Map(),
         createdAt: new Date().toISOString(),
@@ -290,7 +287,7 @@ describe('WorkflowHandler', () => {
 
       const mockRuntimeState: RuntimeState = {
         id: 'execution-mixed',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'completed',
         executionResults: new Map([
           ['success-node', successfulResult],
@@ -312,7 +309,7 @@ describe('WorkflowHandler', () => {
     it('should set execution timestamp', async () => {
       const mockRuntimeState: RuntimeState = {
         id: 'execution-timestamp',
-        workflowId: 'test-embedded-workflow',
+        
         status: 'completed',
         executionResults: new Map(),
         createdAt: new Date().toISOString(),
@@ -378,7 +375,7 @@ describe('WorkflowHandler', () => {
     it('should fail validation when blueprint has no id', () => {
       const blueprintWithoutId: Blueprint = {
         ...mockBlueprint,
-        id: ''
+        
       };
 
       const nodeWithInvalidBlueprint: Node = {
@@ -509,7 +506,6 @@ describe('WorkflowHandler', () => {
 
     it('should handle multiple validation errors', () => {
       const invalidBlueprint: Blueprint = {
-        id: '', // Invalid: empty id
         nodes: [], // Invalid: no nodes
         edges: [],
         metadata: {}

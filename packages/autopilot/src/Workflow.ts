@@ -13,11 +13,10 @@ export class Workflow {
   private blueprint: Blueprint;
   private engine: Engine;
 
-  constructor(blueprintOrId: Blueprint | string) {
+  constructor(blueprint?: Blueprint) {
     // Initialize blueprint
-    if (typeof blueprintOrId === 'string') {
+    if (!blueprint) {
       this.blueprint = {
-        id: blueprintOrId,
         nodes: [],
         edges: [],
         metadata: {}
@@ -25,10 +24,10 @@ export class Workflow {
     } else {
       // Create a deep copy to avoid mutations to the original blueprint
       this.blueprint = {
-        ...blueprintOrId,
-        nodes: blueprintOrId.nodes.map(node => ({ ...node })),
-        edges: blueprintOrId.edges.map(edge => ({ ...edge })),
-        metadata: { ...blueprintOrId.metadata }
+        ...blueprint,
+        nodes: blueprint.nodes.map(node => ({ ...node })),
+        edges: blueprint.edges.map(edge => ({ ...edge })),
+        metadata: { ...blueprint.metadata }
       };
     }
 
@@ -100,12 +99,6 @@ export class Workflow {
     return JSON.parse(JSON.stringify(this.blueprint));
   }
 
-  /**
-   * Get workflow ID
-   */
-  getId(): string {
-    return this.blueprint.id;
-  }
 
   /**
    * Get workflow nodes
@@ -162,12 +155,11 @@ export class Workflow {
   }
 
   /**
-   * Clone workflow with a new ID
+   * Clone workflow
    */
-  clone(newId?: string): Workflow {
+  clone(): Workflow {
     const clonedBlueprint: Blueprint = {
       ...this.blueprint,
-      id: newId || `${this.blueprint.id}-copy`,
       nodes: this.blueprint.nodes.map(node => ({ ...node })),
       edges: this.blueprint.edges.map(edge => ({ ...edge }))
     };

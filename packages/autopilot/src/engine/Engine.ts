@@ -6,17 +6,7 @@
  */
 
 import { Blueprint, RuntimeState, ExecutionContext, Node, NodeResult } from '../types';
-import { Handler } from '../nodes/Handler';
-import {
-  StartHandler,
-  EndHandler,
-  AgentHandler,
-  ConditionalHandler,
-  PromptHandler,
-  OutputHandler,
-  HttpRequestHandler,
-  LlmHandler
-} from '../nodes/handlers';
+import { Handler, HandlerConstructor } from '../nodes/Handler';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -41,60 +31,51 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
  * Main workflow execution engine
  */
 export class Engine {
-  private handlers: Map<string, Handler> = new Map();
+  private handlerConstructors: Map<string, HandlerConstructor> = new Map();
   private eventCallbacks: EventCallback[] = [];
   private runningExecutions: Map<string, RuntimeState> = new Map();
 
   constructor() {
-    // Initialize default handlers for all supported node types
-    this.initializeDefaultHandlers();
+    // Engine now starts empty - handlers registered dynamically as needed
   }
 
-  /**
-   * Initialize default handlers for all supported node types
-   */
-  private initializeDefaultHandlers(): void {
-    this.registerHandler(new StartHandler());
-    this.registerHandler(new EndHandler());
-    this.registerHandler(new AgentHandler());
-    this.registerHandler(new ConditionalHandler());
-    this.registerHandler(new PromptHandler());
-    this.registerHandler(new OutputHandler());
-    this.registerHandler(new HttpRequestHandler());
-    this.registerHandler(new LlmHandler());
-  }
 
   /**
-   * Register a node handler
+   * Register a node handler constructor
    */
-  registerHandler(handler: Handler): void {
-    if (this.handlers.has(handler.type)) {
-      console.warn(`Overriding existing handler for node type: ${handler.type}`);
+  registerHandlerConstructor(type: string, handlerConstructor: HandlerConstructor): void {
+    if (this.handlerConstructors.has(type)) {
+      console.warn(`Overriding existing handler for node type: ${type}`);
     }
     
-    this.handlers.set(handler.type, handler);
-    console.log(`Registered node handler: ${handler.type}`);
+    this.handlerConstructors.set(type, handlerConstructor);
+    console.log(`Registered node handler constructor: ${type}`);
   }
 
   /**
-   * Get handler for a node type
+   * Create handler instance for a node
    */
-  getHandler(type: string): Handler | null {
-    return this.handlers.get(type) || null;
+  createHandler(node: Node): Handler {
+    const handlerConstructor = this.handlerConstructors.get(node.type);
+    if (!handlerConstructor) {
+      throw new Error(`No handler constructor found for node type: ${node.type}`);
+    }
+    
+    return new handlerConstructor(node.parameters, node.id);
   }
 
   /**
    * Get all registered handler types
    */
   getSupportedTypes(): string[] {
-    return Array.from(this.handlers.keys());
+    return Array.from(this.handlerConstructors.keys());
   }
 
   /**
    * Check if a node type is supported
    */
   hasHandler(type: string): boolean {
-    return this.handlers.has(type);
+    return this.handlerConstructors.has(type);
   }
 
   /**
@@ -286,21 +267,18 @@ export class Engine {
   }
 
   /**
-   * Execute a single node
+   * Execute a single node with lazy loading
    */
   private async executeNode(
     node: Node,
     context: ExecutionContext
   ): Promise<NodeResult> {
-    // Get handler for node type
-    const handler = this.handlers.get(node.type);
-    if (!handler) {
-      throw new Error(`No handler found for node type: ${node.type}`);
-    }
+    // Create handler instance with parameters
+    const handler = this.createHandler(node);
 
     // Execute the node
     const startTime = Date.now();
-    const result = await handler.execute(node, context);
+    const result = await handler.execute(context);
     const duration = Date.now() - startTime;
 
     // Update duration if not set by handler
@@ -365,11 +343,11 @@ export class Engine {
       throw new Error('Workflow must have a start node');
     }
 
-    // Check that all node types have handlers
+    // Check that all node types have handler constructors
     const unsupportedNodes = [];
     for (const node of blueprint.nodes) {
-      const handler = this.handlers.get(node.type);
-      if (!handler) {
+      const handlerConstructor = this.handlerConstructors.get(node.type);
+      if (!handlerConstructor) {
         unsupportedNodes.push({ id: node.id, type: node.type });
       }
     }

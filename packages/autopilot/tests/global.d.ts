@@ -2,8 +2,8 @@
  * Global test utilities type declarations
  */
 
-import type { Blueprint } from '../src/types/workflow';
-import type { ExecutionContext } from '../src/types/execution';
+import type { Blueprint } from '../src/types';
+import type { ExecutionContext } from '../src/types';
 
 declare global {
   namespace NodeJS {

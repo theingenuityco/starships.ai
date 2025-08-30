@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, AgentNodeParameters, Node as WorkflowNode } from '../../types';
+import { ExecutionContext, ValidationResult, AgentNodeParameters } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {

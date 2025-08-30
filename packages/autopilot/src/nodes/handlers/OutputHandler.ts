@@ -5,7 +5,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, OutputNodeParameters, Node as WorkflowNode } from '../../types';
+import { ExecutionContext, ValidationResult, OutputNodeParameters } from '../../types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';

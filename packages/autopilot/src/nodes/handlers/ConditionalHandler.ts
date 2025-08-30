@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, ConditionalNodeParameters, Node as WorkflowNode } from '../../types';
+import { ExecutionContext, ValidationResult, ConditionalNodeParameters } from '../../types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {

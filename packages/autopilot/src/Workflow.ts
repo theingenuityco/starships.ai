@@ -5,7 +5,7 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, ExecutionContext, RuntimeState, NodeType } from './types';
+import { Blueprint, Node, Edge, ExecutionContext, RuntimeState } from './types';
 import { Engine } from './engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 

@@ -12,10 +12,10 @@ import jsonata from 'jsonata';
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
-  async execute(execution: Execution) {
+  async execute(initialExecution?: Execution) {
     const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
-    const sourceResult = execution.executionResults.get(params.sourceNodeId);
+    const sourceResult = initialExecution?.executionResults.get(params.sourceNodeId);
     if (!sourceResult) {
       throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }

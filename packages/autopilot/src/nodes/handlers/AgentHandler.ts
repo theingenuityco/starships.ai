@@ -12,7 +12,7 @@ import { Workflow } from '../../Workflow';
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
-  async execute(execution: Execution) {
+  async execute(initialExecution?: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as AgentNodeParameters;
     

@@ -12,7 +12,7 @@ import { HttpRequestHandler } from './HttpRequestHandler';
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
 
-  async execute(execution: Execution) {
+  async execute(initialExecution?: Execution) {
     const params = this.node.parameters as LlmNodeParameters;
     try {
       // Convert LLM parameters to HTTP request parameters
@@ -29,7 +29,7 @@ export class LlmHandler extends BaseHandler {
       const httpHandler = new HttpRequestHandler(httpNode);
       
       // Delegate to HttpRequestHandler
-      const result = await httpHandler.execute(execution);
+      const result = await httpHandler.execute(initialExecution);
       
       // Process the result to extract LLM-specific data
       if (result.success && result.data && typeof result.data === 'object') {

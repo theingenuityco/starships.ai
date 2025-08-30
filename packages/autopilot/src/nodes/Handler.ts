@@ -15,7 +15,7 @@ export interface Handler {
   readonly type: string;
   
   /** Execute with parameters already injected via constructor */
-  execute(execution: Execution): Promise<NodeResult>;
+  execute(initialExecution?: Execution): Promise<NodeResult>;
   
   /** Validate the handler's configuration */
   validate(): ValidationResult;
@@ -37,7 +37,7 @@ export abstract class BaseHandler implements Handler {
 
   constructor(protected node: WorkflowNode) {}
 
-  abstract execute(execution: Execution): Promise<NodeResult>;
+  abstract execute(initialExecution?: Execution): Promise<NodeResult>;
   abstract validate(): ValidationResult;
   abstract getIcon(): string;
 

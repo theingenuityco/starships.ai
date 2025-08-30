@@ -10,7 +10,7 @@ import { Execution, ValidationResult, UserPromptNodeParameters, Node as Workflow
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
 
-  async execute(execution: Execution) {
+  async execute(initialExecution?: Execution) {
     const params = this.node.parameters as UserPromptNodeParameters;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input

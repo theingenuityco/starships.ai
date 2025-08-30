@@ -51,7 +51,7 @@ describe('Engine', () => {
     it('should fail when workflow has no start node', async () => {
       const workflowWithoutStart = global.createMockBlueprint({
         nodes: [
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ]
       });
       
@@ -64,13 +64,13 @@ describe('Engine', () => {
     it('should fail when node handler is missing', async () => {
       const workflowWithUnsupportedNode = global.createMockBlueprint({
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
-          { id: 'unsupported', type: 'unsupported-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
+          { ref: 'unsupported', type: 'unsupported-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'unsupported' },
-          { id: 'edge-2', from: 'unsupported', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'unsupported' },
+          { ref: 'edge-2', from: 'unsupported', to: 'end' }
         ]
       });
       
@@ -99,13 +99,13 @@ describe('Engine', () => {
       // Test with an unsupported node type to simulate failure
       const workflowWithUnsupportedNode = global.createMockBlueprint({
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
-          { id: 'unsupported-node', type: 'unsupported-failing-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
+          { ref: 'unsupported-node', type: 'unsupported-failing-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'unsupported-node' },
-          { id: 'edge-2', from: 'unsupported-node', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'unsupported-node' },
+          { ref: 'edge-2', from: 'unsupported-node', to: 'end' }
         ]
       });
       
@@ -206,19 +206,19 @@ describe('Engine', () => {
       // Test conditional workflow using existing conditional handler
       const conditionalBlueprint = global.createMockBlueprint({
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
-          { id: 'conditional', type: 'conditional', name: 'Decision', description: 'Decision', parameters: {
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
+          { ref: 'conditional', type: 'conditional', name: 'Decision', description: 'Decision', parameters: {
             sourceNodeId: 'start',
             conditions: {
               'default': 'true' // Simple condition that will match
             },
             defaultCondition: 'default'
           }},
-          { id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
+          { ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'conditional' },
-          { id: 'edge-2', from: 'conditional', to: 'end', condition: 'default' },
+          { ref: 'edge-1', from: 'start', to: 'conditional' },
+          { ref: 'edge-2', from: 'conditional', to: 'end', condition: 'default' },
         ]
       });
       

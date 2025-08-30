@@ -36,7 +36,7 @@ describe('LlmHandler', () => {
 
   beforeEach(() => {
     mockNode = {
-      id: 'llm-node',
+      ref: 'llm-node',
       type: 'llm',
       name: 'Test LLM Node',
       description: 'LLM node for testing',
@@ -70,7 +70,7 @@ describe('LlmHandler', () => {
     it('should execute successfully with minimal parameters', async () => {
       const mockHttpResult = {
         success: true,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         data: {
           body: {
             choices: [{
@@ -89,7 +89,7 @@ describe('LlmHandler', () => {
       const result = await handler.execute(mockContext);
 
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('llm-node');
+      expect(result.nodeRef).toBe('llm-node');
       const resultData = result.data as LlmResponseData;
       expect(resultData.llmResponse).toBe('Hello! I am doing well, thank you for asking.');
       expect(resultData.model).toBe('anthropic/claude-3.5-sonnet');
@@ -117,7 +117,7 @@ describe('LlmHandler', () => {
 
       const mockHttpResult = {
         success: true,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         data: {
           body: {
             choices: [{
@@ -183,7 +183,7 @@ describe('LlmHandler', () => {
 
       const mockHttpResult = {
         success: true,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         data: {
           body: {
             choices: [{
@@ -268,7 +268,7 @@ describe('LlmHandler', () => {
       for (const testCase of testCases) {
         const mockHttpResult = {
           success: true,
-          nodeId: 'llm-node-http',
+          nodeRef: 'llm-node-http',
           ...testCase,
           duration: 1000,
           executedAt: new Date().toISOString()
@@ -286,7 +286,7 @@ describe('LlmHandler', () => {
     it('should handle HTTP request failure', async () => {
       const mockHttpResult = {
         success: false,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         error: 'HTTP request failed',
         duration: 500,
         executedAt: new Date().toISOString()
@@ -298,13 +298,13 @@ describe('LlmHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('HTTP request failed');
-      expect(result.nodeId).toBe('llm-node');
+      expect(result.nodeRef).toBe('llm-node');
     });
 
     it('should handle missing response body', async () => {
       const mockHttpResult = {
         success: true,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         data: {}, // No body
         duration: 1000,
         executedAt: new Date().toISOString()
@@ -315,7 +315,7 @@ describe('LlmHandler', () => {
       const result = await handler.execute(mockContext);
 
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('llm-node');
+      expect(result.nodeRef).toBe('llm-node');
     });
 
     it('should handle execution errors gracefully', async () => {
@@ -325,13 +325,13 @@ describe('LlmHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Network error');
-      expect(result.nodeId).toBe('llm-node');
+      expect(result.nodeRef).toBe('llm-node');
     });
 
     it('should set execution timestamp', async () => {
       const mockHttpResult = {
         success: true,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         data: { body: { choices: [{ message: { content: 'Response' } }] } },
         duration: 1000,
         executedAt: new Date().toISOString()
@@ -406,7 +406,7 @@ describe('LlmHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Model is required',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -427,7 +427,7 @@ describe('LlmHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Prompt is required',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -449,7 +449,7 @@ describe('LlmHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_TEMPERATURE',
         message: 'Temperature must be between 0 and 2',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -471,7 +471,7 @@ describe('LlmHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_MAX_TOKENS',
         message: 'Max tokens must be greater than 0',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -493,7 +493,7 @@ describe('LlmHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_TOP_P',
         message: 'Top P must be between 0 and 1',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -515,7 +515,7 @@ describe('LlmHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'HIGH_TOKEN_COUNT',
         message: 'High token count may result in expensive API calls',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'warning'
       });
     });
@@ -527,7 +527,7 @@ describe('LlmHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'NO_SYSTEM_MESSAGE',
         message: 'Consider adding a system message for better AI behavior control',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'warning'
       });
     });
@@ -549,7 +549,7 @@ describe('LlmHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'LOW_TIMEOUT',
         message: 'LLM requests may take longer than the specified timeout',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'warning'
       });
     });
@@ -584,7 +584,7 @@ describe('LlmHandler', () => {
     it('should build correct request body structure', async () => {
       const mockHttpResult = {
         success: true,
-        nodeId: 'llm-node-http',
+        nodeRef: 'llm-node-http',
         data: { body: { choices: [{ message: { content: 'Response' } }] } },
         duration: 1000,
         executedAt: new Date().toISOString()

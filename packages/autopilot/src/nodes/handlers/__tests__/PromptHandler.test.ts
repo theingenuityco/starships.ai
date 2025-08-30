@@ -18,7 +18,7 @@ describe('PromptHandler', () => {
     ];
 
     mockNode = {
-      id: 'prompt-node',
+      ref: 'prompt-node',
       type: 'user_prompt',
       name: 'Test Prompt Node',
       description: 'User prompt node for testing',
@@ -48,7 +48,7 @@ describe('PromptHandler', () => {
       const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('prompt-node');
+      expect(result.nodeRef).toBe('prompt-node');
       expect(result.data).toEqual({
         choice: (mockNode.parameters as UserPromptNodeParameters).choices[0],
         userInput: 'placeholder'
@@ -71,7 +71,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const minimalNode: Node = {
-        id: 'minimal-node',
+        ref: 'minimal-node',
         type: 'user_prompt',
         name: 'Minimal Prompt',
         description: 'Minimal prompt for testing',
@@ -108,7 +108,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const complexNode: Node = {
-        id: 'complex-node',
+        ref: 'complex-node',
         type: 'user_prompt',
         name: 'Complex Prompt',
         description: 'Complex prompt for testing',
@@ -132,7 +132,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const emptyChoicesNode: Node = {
-        id: 'empty-choices-node',
+        ref: 'empty-choices-node',
         type: 'user_prompt',
         name: 'Empty Choices Prompt',
         description: 'Empty choices prompt for testing',
@@ -165,7 +165,7 @@ describe('PromptHandler', () => {
       const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('prompt-node');
+      expect(result.nodeRef).toBe('prompt-node');
     });
   });
 
@@ -186,7 +186,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const minimalNode: Node = {
-        id: 'minimal-node',
+        ref: 'minimal-node',
         type: 'user_prompt',
         name: 'Minimal Prompt',
         description: 'Minimal prompt for testing',
@@ -205,7 +205,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const nodeWithoutPrompt: Node = {
-        id: 'no-prompt-node',
+        ref: 'no-prompt-node',
         type: 'user_prompt',
         name: 'Prompt without prompt text',
         description: 'Prompt without prompt text for testing',
@@ -231,7 +231,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const nodeWithEmptyPrompt: Node = {
-        id: 'empty-prompt-node',
+        ref: 'empty-prompt-node',
         type: 'user_prompt',
         name: 'Prompt with empty text',
         description: 'Prompt with empty text for testing',
@@ -252,7 +252,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const nodeWithoutChoices: Node = {
-        id: 'no-choices-node',
+        ref: 'no-choices-node',
         type: 'user_prompt',
         name: 'Prompt without choices',
         description: 'Prompt without choices for testing',
@@ -278,7 +278,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const nodeWithEmptyChoices: Node = {
-        id: 'empty-choices-node',
+        ref: 'empty-choices-node',
         type: 'user_prompt',
         name: 'Prompt with empty choices',
         description: 'Prompt with empty choices for testing',
@@ -299,7 +299,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const nodeWithMissingFields: Node = {
-        id: 'missing-fields-node',
+        ref: 'missing-fields-node',
         type: 'user_prompt',
         name: 'Prompt with missing fields',
         description: 'Prompt with missing fields for testing',
@@ -333,7 +333,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters;
       
       const nodeWithVariedChoices: Node = {
-        id: 'varied-choices-node',
+        ref: 'varied-choices-node',
         type: 'user_prompt',
         name: 'Prompt with varied choices',
         description: 'Prompt with varied choices for testing',

@@ -13,7 +13,7 @@ describe('ConditionalHandler', () => {
 
   beforeEach(() => {
     mockSourceResult = {
-      nodeId: 'source-node',
+      nodeRef: 'source-node',
       success: true,
       data: {
         score: 85,
@@ -25,7 +25,7 @@ describe('ConditionalHandler', () => {
     };
 
     mockNode = {
-      id: 'conditional-node',
+      ref: 'conditional-node',
       type: 'conditional',
       name: 'Test Conditional Node',
       description: 'Conditional node for testing',
@@ -62,7 +62,7 @@ describe('ConditionalHandler', () => {
       const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('conditional-node');
+      expect(result.nodeRef).toBe('conditional-node');
       expect(result.data).toEqual({
         conditionMet: 'high-score',
         sourceData: mockSourceResult.data
@@ -87,7 +87,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithNoMatches = new ConditionalHandler({
-        id: 'no-matches-node',
+        ref: 'no-matches-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -115,7 +115,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithoutDefault = new ConditionalHandler({
-        id: 'no-default-node',
+        ref: 'no-default-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -140,7 +140,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
 
       const complexHandler = new ConditionalHandler({
-        id: 'complex-node',
+        ref: 'complex-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -194,7 +194,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithInvalidExpression = new ConditionalHandler({
-        id: 'invalid-expression-node',
+        ref: 'invalid-expression-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -205,7 +205,7 @@ describe('ConditionalHandler', () => {
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('JSONata evaluation failed');
-      expect(result.nodeId).toBe('invalid-expression-node');
+      expect(result.nodeRef).toBe('invalid-expression-node');
       expect(result.duration).toBe(10);
     });
 
@@ -222,7 +222,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithFalsyConditions = new ConditionalHandler({
-        id: 'falsy-conditions-node',
+        ref: 'falsy-conditions-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -265,7 +265,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithoutSource = new ConditionalHandler({
-        id: 'no-source-node',
+        ref: 'no-source-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -278,7 +278,7 @@ describe('ConditionalHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Source node ID is required',
-        nodeId: 'no-source-node',
+        nodeRef: 'no-source-node',
         severity: 'error'
       });
     });
@@ -291,7 +291,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithEmptySource = new ConditionalHandler({
-        id: 'empty-source-node',
+        ref: 'empty-source-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -313,7 +313,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithoutConditions = new ConditionalHandler({
-        id: 'no-conditions-node',
+        ref: 'no-conditions-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -326,7 +326,7 @@ describe('ConditionalHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'At least one condition is required',
-        nodeId: 'no-conditions-node',
+        nodeRef: 'no-conditions-node',
         severity: 'error'
       });
     });
@@ -339,7 +339,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithEmptyConditions = new ConditionalHandler({
-        id: 'empty-conditions-node',
+        ref: 'empty-conditions-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -365,7 +365,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithInvalidExpressions = new ConditionalHandler({
-        id: 'invalid-expressions-node',
+        ref: 'invalid-expressions-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',
@@ -397,7 +397,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters;
       
       const handlerWithComplexExpressions = new ConditionalHandler({
-        id: 'complex-expressions-node',
+        ref: 'complex-expressions-node',
         type: 'conditional',
         name: 'Test Conditional Node',
         description: 'Conditional node for testing',

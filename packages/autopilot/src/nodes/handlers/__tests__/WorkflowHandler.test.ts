@@ -25,18 +25,18 @@ describe('WorkflowHandler', () => {
 
   const mockBlueprint: Blueprint = {
     nodes: [
-      { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-      { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+      { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+      { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
     ],
     edges: [
-      { id: 'edge-1', from: 'start', to: 'end' }
+      { ref: 'edge-1', from: 'start', to: 'end' }
     ],
     metadata: {}
   };
 
   beforeEach(() => {
     mockNode = {
-      id: 'workflow-node',
+      ref: 'workflow-node',
       type: 'workflow',
       name: 'Test Workflow Node',
       description: 'Workflow node for testing',
@@ -75,7 +75,7 @@ describe('WorkflowHandler', () => {
   describe('execute', () => {
     it('should execute embedded workflow successfully', async () => {
       const mockNodeResult1: NodeResult = {
-        nodeId: 'start',
+        nodeRef: 'start',
         success: true,
         data: { message: 'Started' },
         executedAt: new Date().toISOString(),
@@ -83,7 +83,7 @@ describe('WorkflowHandler', () => {
       };
 
       const mockNodeResult2: NodeResult = {
-        nodeId: 'end',
+        nodeRef: 'end',
         success: true,
         data: { message: 'Completed' },
         executedAt: new Date().toISOString(),
@@ -109,7 +109,7 @@ describe('WorkflowHandler', () => {
       const result = await handler.execute(mockContext);
 
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('workflow-node');
+      expect(result.nodeRef).toBe('workflow-node');
       
       const resultData = result.data as WorkflowResponseData;
       expect(resultData.workflowStatus).toBe('completed');
@@ -184,7 +184,7 @@ describe('WorkflowHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Workflow test-embedded-workflow execution failed: Something went wrong');
-      expect(result.nodeId).toBe('workflow-node');
+      expect(result.nodeRef).toBe('workflow-node');
       expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
@@ -213,7 +213,7 @@ describe('WorkflowHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Workflow test-embedded-workflow execution failed: Workflow crashed');
-      expect(result.nodeId).toBe('workflow-node');
+      expect(result.nodeRef).toBe('workflow-node');
     });
 
     it('should handle non-Error exceptions', async () => {
@@ -272,14 +272,14 @@ describe('WorkflowHandler', () => {
 
     it('should filter successful results from workflow execution', async () => {
       const successfulResult: NodeResult = {
-        nodeId: 'success-node',
+        nodeRef: 'success-node',
         success: true,
         data: { result: 'success' },
         executedAt: new Date().toISOString()
       };
 
       const failedResult: NodeResult = {
-        nodeId: 'failed-node',
+        nodeRef: 'failed-node',
         success: false,
         error: 'Failed to execute',
         executedAt: new Date().toISOString()
@@ -367,7 +367,7 @@ describe('WorkflowHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Blueprint is required',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'error'
       });
     });
@@ -392,7 +392,7 @@ describe('WorkflowHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_BLUEPRINT',
         message: 'Blueprint must have an id',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'error'
       });
     });
@@ -417,7 +417,7 @@ describe('WorkflowHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_BLUEPRINT',
         message: 'Blueprint must contain at least one node',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'error'
       });
     });
@@ -426,7 +426,7 @@ describe('WorkflowHandler', () => {
       const blueprintWithoutStart: Blueprint = {
         ...mockBlueprint,
         nodes: [
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ]
       };
 
@@ -444,7 +444,7 @@ describe('WorkflowHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_BLUEPRINT',
         message: 'Blueprint must have a start node',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'error'
       });
     });
@@ -453,8 +453,8 @@ describe('WorkflowHandler', () => {
       const blueprintWithInvalidEdges: Blueprint = {
         ...mockBlueprint,
         edges: [
-          { id: 'edge-1', from: 'start', to: 'nonexistent' },
-          { id: 'edge-2', from: 'nonexistent2', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'nonexistent' },
+          { ref: 'edge-2', from: 'nonexistent2', to: 'end' }
         ]
       };
 
@@ -472,13 +472,13 @@ describe('WorkflowHandler', () => {
       expect(result.errors).toContainEqual({
         code: 'INVALID_BLUEPRINT',
         message: 'Invalid edge reference in blueprint: start -> nonexistent',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'error'
       });
       expect(result.errors).toContainEqual({
         code: 'INVALID_BLUEPRINT',
         message: 'Invalid edge reference in blueprint: nonexistent2 -> end',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'error'
       });
     });
@@ -499,7 +499,7 @@ describe('WorkflowHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'LOW_TIMEOUT',
         message: 'Workflow timeout is less than 1 second, which may be too short for complex workflows',
-        nodeId: 'workflow-node',
+        nodeRef: 'workflow-node',
         severity: 'warning'
       });
     });

@@ -21,15 +21,7 @@ export class WorkflowHandler extends BaseHandler {
 
       // Create workflow instance from the blueprint and execute
       const workflow = new Workflow(params.blueprint);
-      
-      // Create a fresh runtime state for the nested workflow
-      const nestedRuntimeState: RuntimeState = {
-        currentNodeRef: undefined,
-        status: 'not_started',
-        executionResults: new Map()
-      };
-      
-      const workflowResult = await workflow.execute(nestedRuntimeState);
+      const workflowResult = await workflow.execute();
       
       // Check if workflow execution was successful
       if (workflowResult.status === 'completed') {

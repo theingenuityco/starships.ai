@@ -10,12 +10,12 @@ import { Execution, ValidationResult, OutputNodeParameters, ValidationError } fr
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
 
-  async execute(execution: Execution) {
+  async execute(initialExecution?: Execution) {
     const params = this.node.parameters as OutputNodeParameters;
     // Gather data from source nodes
     const sourceData: Record<string, any> = {};
     for (const sourceNodeId of params.sources) {
-      const sourceResult = execution.executionResults.get(sourceNodeId);
+      const sourceResult = initialExecution?.executionResults.get(sourceNodeId);
       if (sourceResult) {
         sourceData[sourceNodeId] = sourceResult.data;
       }

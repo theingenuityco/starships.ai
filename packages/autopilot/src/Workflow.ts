@@ -117,8 +117,8 @@ export class Workflow {
   /**
    * Execute the workflow (delegates to internal Engine)
    */
-  async execute(execution?: Execution): Promise<Execution> {
-    return this.engine.execute(this.blueprint, execution);
+  async execute(initialExecution?: Execution): Promise<Execution> {
+    return this.engine.execute(this.blueprint, initialExecution);
   }
 
   /**

@@ -12,7 +12,7 @@ import { Execution, ValidationResult, HttpRequestNodeParameters, ValidationError
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
 
-  async execute(execution: Execution) {
+  async execute(initialExecution?: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as HttpRequestNodeParameters;
     

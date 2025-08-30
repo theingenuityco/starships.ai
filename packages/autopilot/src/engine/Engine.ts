@@ -82,10 +82,10 @@ export class Engine {
    */
   async execute(
     blueprint: Blueprint,
-    execution?: Execution
+    initialExecution?: Execution
   ): Promise<Execution> {
-    // Set the provided execution or create a default one
-    this.execution = execution || {
+    // Set the provided initial execution or create a default one
+    this.execution = initialExecution || {
       currentNodeRef: undefined,
       status: 'not_started',
       executionResults: new Map()
@@ -241,7 +241,7 @@ export class Engine {
     // Create handler instance with parameters (now async)
     const handler = await this.createHandler(node);
 
-    // Execute the node
+    // Execute the node - pass execution as initialExecution
     const startTime = Date.now();
     const result = await handler.execute(execution);
     const duration = Date.now() - startTime;

@@ -11,7 +11,6 @@ describe('StartHandler', () => {
   let mockContext: ExecutionContext;
 
   beforeEach(() => {
-    handler = new StartHandler();
     mockNode = {
       id: 'start-node',
       type: 'start',
@@ -19,6 +18,7 @@ describe('StartHandler', () => {
       description: 'Start node for workflow',
       parameters: {}
     };
+    handler = new StartHandler(mockNode);
     mockContext = global.createMockContext();
   });
 
@@ -30,7 +30,7 @@ describe('StartHandler', () => {
 
   describe('execute', () => {
     it('should execute successfully', async () => {
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('start-node');
@@ -43,7 +43,7 @@ describe('StartHandler', () => {
     it('should always succeed regardless of context', async () => {
       const emptyContext = {} as ExecutionContext;
       
-      const result = await handler.execute(mockNode, emptyContext);
+      const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('start-node');
@@ -51,7 +51,7 @@ describe('StartHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
       
       const executedAtTimestamp = new Date(result.executedAt).getTime();
@@ -62,7 +62,7 @@ describe('StartHandler', () => {
 
   describe('validate', () => {
     it('should validate successfully for any node', () => {
-      const result = handler.validate(mockNode);
+      const result = handler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -71,12 +71,16 @@ describe('StartHandler', () => {
     });
 
     it('should validate even with empty parameters', () => {
-      const nodeWithoutParams = {
-        ...mockNode,
+      const nodeWithEmptyParams: Node = {
+        id: 'start-node-2',
+        type: 'start',
+        name: 'Start Node 2',
+        description: 'Start node with empty params',
         parameters: {}
       };
+      const handlerWithEmptyParams = new StartHandler(nodeWithEmptyParams);
       
-      const result = handler.validate(nodeWithoutParams);
+      const result = handlerWithEmptyParams.validate();
       
       expect(result.valid).toBe(true);
     });

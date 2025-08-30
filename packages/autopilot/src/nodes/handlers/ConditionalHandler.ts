@@ -2,18 +2,18 @@
  * Conditional Node Handler
  * 
  * Conditional logic handler with JSONata
+ * Uses BaseHandler pattern
  */
 
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, ConditionalNodeParameters } from '../../types';
-import * as jsonata from 'jsonata';
+import { BaseHandler } from '../Handler';
+import { ExecutionContext, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import jsonata from 'jsonata';
 
-export class ConditionalHandler implements Handler {
+export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as ConditionalNodeParameters;
-    
+  async execute(context: ExecutionContext) {
+    const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
     const sourceResult = context.previousResults.get(params.sourceNodeId);
     if (!sourceResult) {
@@ -24,11 +24,12 @@ export class ConditionalHandler implements Handler {
       // Evaluate conditions using JSONata
       for (const [conditionKey, expression] of Object.entries(params.conditions)) {
         const evaluator = jsonata(expression);
-        const result = evaluator.evaluate(sourceResult.data);
+        const result = await evaluator.evaluate(sourceResult.data);
         
-        if (result) {
+        // Check for explicit true result (not just truthy values)
+        if (result === true) {
           return {
-            nodeId: node.id,
+            nodeId: this.node.id,
             success: true,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
             nextEdgeCondition: conditionKey,
@@ -41,7 +42,7 @@ export class ConditionalHandler implements Handler {
       // Use default condition if provided
       const defaultCondition = params.defaultCondition || 'default';
       return {
-        nodeId: node.id,
+        nodeId: this.node.id,
         success: true,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
         nextEdgeCondition: defaultCondition,
@@ -50,36 +51,29 @@ export class ConditionalHandler implements Handler {
       };
 
     } catch (error) {
-      return {
-        nodeId: node.id,
-        success: false,
-        error: `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        executedAt: new Date().toISOString(),
-        duration: 10
-      };
+      return this.createErrorResult(
+        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        10
+      );
     }
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as ConditionalNodeParameters;
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: ValidationError[] = [];
+    const params = this.node.parameters as ConditionalNodeParameters;
 
     if (!params.sourceNodeId) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Source node ID is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Source node ID is required'
+      ));
     }
 
     if (!params.conditions || Object.keys(params.conditions).length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'At least one condition is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'At least one condition is required'
+      ));
     }
 
     // Validate JSONata expressions
@@ -88,12 +82,10 @@ export class ConditionalHandler implements Handler {
         try {
           jsonata(expression);
         } catch (error) {
-          errors.push({
-            code: 'INVALID_JSONATA_EXPRESSION',
-            message: `Invalid JSONata expression for condition '${key}': ${error instanceof Error ? error.message : 'Syntax error'}`,
-            nodeId: node.id,
-            severity: 'error' as const
-          });
+          errors.push(this.createValidationError(
+            'INVALID_JSONATA_EXPRESSION',
+            `Invalid JSONata expression for condition '${key}': ${error instanceof Error ? error.message : 'Syntax error'}`
+          ));
         }
       }
     }

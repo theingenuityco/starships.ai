@@ -1,16 +1,12 @@
 {
   "name": "starships.ai",
   "private": true,
-  "version": "3.12.0",
+  "version": "3.14.3",
   "packageManager": "pnpm@10.12.4",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "setup": "bash scripts/developer-setup.sh",
-    "setup:docker": "node scripts/setup-docker-path.js",
-    "setup:verify": "node scripts/verify-build-setup.js",
-    "postinstall": "node scripts/docker-check.js",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",

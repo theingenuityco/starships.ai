@@ -27,10 +27,12 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "3000"
     spec:
-      # Security Context
+      # Security Context - Run as non-root user for security
       securityContext:
-        runAsUser: 0
+        runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
+        runAsNonRoot: true
       
       imagePullSecrets:
       - name: ghcr-pull-secret

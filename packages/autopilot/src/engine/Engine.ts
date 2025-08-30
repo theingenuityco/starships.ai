@@ -44,7 +44,7 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
  */
 export class Engine {
   private eventCallbacks: EventCallback[] = [];
-  private runningExecutions: Map<string, RuntimeState> = new Map();
+  private runtimeState!: RuntimeState;
 
   constructor() {
     // Engine is completely stateless for handlers - pure dynamic loading
@@ -85,21 +85,14 @@ export class Engine {
     blueprint: Blueprint,
     context: Partial<ExecutionContext>
   ): Promise<RuntimeState> {
-    const executionId = uuidv4();
-    
     // Initialize runtime state
-    const runtimeState: RuntimeState = {
-      id: executionId,
-      
+    this.runtimeState = {
       currentNodeRef: undefined,
       status: 'not_started',
       executionResults: new Map(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-
-    // Store in running executions
-    this.runningExecutions.set(executionId, runtimeState);
 
     try {
       // Validate workflow before execution
@@ -114,29 +107,27 @@ export class Engine {
       // Emit start event
       await this.emitEvent({
         type: 'workflow_started',
-        
-        contextId: runtimeState.id,
+        contextId: 'workflow',
         timestamp: new Date().toISOString()
       });
 
       // Update runtime state
-      runtimeState.status = 'running';
-      runtimeState.startTime = new Date().toISOString();
-      runtimeState.updatedAt = new Date().toISOString();
+      this.runtimeState.status = 'running';
+      this.runtimeState.startTime = new Date().toISOString();
+      this.runtimeState.updatedAt = new Date().toISOString();
 
       // Execute workflow graph
-      await this.executeGraph(blueprint, runtimeState, context);
+      await this.executeGraph(blueprint, this.runtimeState, context);
 
       // Mark as completed if no errors
-      if (runtimeState.status === 'running') {
-        runtimeState.status = 'completed';
-        runtimeState.endTime = new Date().toISOString();
-        runtimeState.updatedAt = new Date().toISOString();
+      if (this.runtimeState.status === 'running') {
+        this.runtimeState.status = 'completed';
+        this.runtimeState.endTime = new Date().toISOString();
+        this.runtimeState.updatedAt = new Date().toISOString();
 
         await this.emitEvent({
           type: 'workflow_completed',
-          
-          contextId: runtimeState.id,
+          contextId: 'workflow',
           timestamp: new Date().toISOString()
         });
       }
@@ -144,10 +135,10 @@ export class Engine {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      runtimeState.status = 'failed';
-      runtimeState.endTime = new Date().toISOString();
-      runtimeState.updatedAt = new Date().toISOString();
-      runtimeState.error = {
+      this.runtimeState.status = 'failed';
+      this.runtimeState.endTime = new Date().toISOString();
+      this.runtimeState.updatedAt = new Date().toISOString();
+      this.runtimeState.error = {
         code: 'SYSTEM_ERROR',
         message: errorMessage,
         timestamp: new Date().toISOString(),
@@ -156,17 +147,15 @@ export class Engine {
 
       await this.emitEvent({
         type: 'workflow_failed',
-        
-        contextId: runtimeState.id,
+        contextId: 'workflow',
         data: { error: errorMessage },
         timestamp: new Date().toISOString()
       });
     } finally {
-      // Clean up running execution
-      this.runningExecutions.delete(executionId);
+      // Execution cleanup completed
     }
 
-    return runtimeState;
+    return this.runtimeState;
   }
 
   /**
@@ -197,8 +186,7 @@ export class Engine {
         // Emit node start event
         await this.emitEvent({
           type: 'node_started',
-          
-          contextId: runtimeState.id,
+          contextId: 'workflow',
           nodeId: currentNode.ref,
           data: { nodeName: currentNode.name, nodeType: currentNode.type },
           timestamp: new Date().toISOString()
@@ -214,8 +202,7 @@ export class Engine {
           // Emit node completed event
           await this.emitEvent({
             type: 'node_completed',
-            
-            contextId: runtimeState.id,
+            contextId: 'workflow',
             nodeId: currentNode.ref,
             data: { result: result.data },
             timestamp: new Date().toISOString()
@@ -234,8 +221,7 @@ export class Engine {
           // Node execution failed
           await this.emitEvent({
             type: 'node_failed',
-            
-            contextId: runtimeState.id,
+            contextId: 'workflow',
             nodeId: currentNode.ref,
             data: { error: result.error },
             timestamp: new Date().toISOString()
@@ -359,20 +345,18 @@ export class Engine {
   /**
    * Pause workflow execution
    */
-  pause(executionId: string): boolean {
-    const runtimeState = this.runningExecutions.get(executionId);
-    if (!runtimeState || runtimeState.status !== 'running') {
+  pause(): boolean {
+    if (this.runtimeState.status !== 'running') {
       return false;
     }
 
-    runtimeState.status = 'paused';
-    runtimeState.pausedAt = new Date().toISOString();
-    runtimeState.updatedAt = new Date().toISOString();
+    this.runtimeState.status = 'paused';
+    this.runtimeState.pausedAt = new Date().toISOString();
+    this.runtimeState.updatedAt = new Date().toISOString();
 
     this.emitEvent({
       type: 'workflow_paused',
-      
-      contextId: '',
+      contextId: 'workflow',
       timestamp: new Date().toISOString()
     });
 
@@ -382,20 +366,18 @@ export class Engine {
   /**
    * Resume workflow execution
    */
-  resume(executionId: string): boolean {
-    const runtimeState = this.runningExecutions.get(executionId);
-    if (!runtimeState || runtimeState.status !== 'paused') {
+  resume(): boolean {
+    if (this.runtimeState.status !== 'paused') {
       return false;
     }
 
-    runtimeState.status = 'running';
-    runtimeState.pausedAt = undefined;
-    runtimeState.updatedAt = new Date().toISOString();
+    this.runtimeState.status = 'running';
+    this.runtimeState.pausedAt = undefined;
+    this.runtimeState.updatedAt = new Date().toISOString();
 
     this.emitEvent({
       type: 'workflow_resumed',
-      
-      contextId: '',
+      contextId: 'workflow',
       timestamp: new Date().toISOString()
     });
 
@@ -405,32 +387,30 @@ export class Engine {
   /**
    * Cancel workflow execution
    */
-  cancel(executionId: string): boolean {
-    const runtimeState = this.runningExecutions.get(executionId);
-    if (!runtimeState || runtimeState.status === 'completed' || runtimeState.status === 'failed') {
+  cancel(): boolean {
+    if (this.runtimeState.status === 'completed' || this.runtimeState.status === 'failed') {
       return false;
     }
 
-    runtimeState.status = 'cancelled';
-    runtimeState.endTime = new Date().toISOString();
-    runtimeState.updatedAt = new Date().toISOString();
+    this.runtimeState.status = 'cancelled';
+    this.runtimeState.endTime = new Date().toISOString();
+    this.runtimeState.updatedAt = new Date().toISOString();
 
-    this.runningExecutions.delete(executionId);
     return true;
   }
 
   /**
    * Get execution status
    */
-  getExecutionStatus(executionId: string): RuntimeState | null {
-    return this.runningExecutions.get(executionId) || null;
+  getExecutionStatus(): RuntimeState {
+    return this.runtimeState;
   }
 
   /**
-   * Get all running executions
+   * Get current execution state
    */
-  getRunningExecutions(): RuntimeState[] {
-    return Array.from(this.runningExecutions.values());
+  getCurrentExecution(): RuntimeState {
+    return this.runtimeState;
   }
 
   /**

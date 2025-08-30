@@ -11,17 +11,12 @@ import { HttpRequestHandler } from './HttpRequestHandler';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
-  private params: LlmNodeParameters;
-
-  constructor(node: WorkflowNode) {
-    super(node);
-    this.params = node.parameters as LlmNodeParameters;
-  }
 
   async execute(context: ExecutionContext) {
+    const params = this.node.parameters as LlmNodeParameters;
     try {
       // Convert LLM parameters to HTTP request parameters
-      const httpParams = this.convertToHttpRequest(this.params);
+      const httpParams = this.convertToHttpRequest(params);
       
       // Create HttpRequestHandler instance for delegation
       const httpNode: WorkflowNode = {
@@ -45,7 +40,7 @@ export class LlmHandler extends BaseHandler {
           return this.createSuccessResult({
             ...httpData,
             llmResponse,
-            model: this.params.model,            
+            model: params.model,
           }, result.duration);
         }
       }
@@ -130,16 +125,17 @@ export class LlmHandler extends BaseHandler {
   validate(): ValidationResult {
     const errors = [];
     const warnings = [];
+    const params = this.node.parameters as LlmNodeParameters;
 
     // Required fields validation
-    if (!this.params.model) {
+    if (!params.model) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
         'Model is required'
       ));
     }
 
-    if (!this.params.prompt) {
+    if (!params.prompt) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
         'Prompt is required'
@@ -147,21 +143,21 @@ export class LlmHandler extends BaseHandler {
     }
 
     // Parameter range validation
-    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
+    if (params.temperature !== undefined && (params.temperature < 0 || params.temperature > 2)) {
       errors.push(this.createValidationError(
         'INVALID_TEMPERATURE',
         'Temperature must be between 0 and 2'
       ));
     }
 
-    if (this.params.maxTokens !== undefined && this.params.maxTokens < 1) {
+    if (params.maxTokens !== undefined && params.maxTokens < 1) {
       errors.push(this.createValidationError(
         'INVALID_MAX_TOKENS',
         'Max tokens must be greater than 0'
       ));
     }
 
-    if (this.params.topP !== undefined && (this.params.topP < 0 || this.params.topP > 1)) {
+    if (params.topP !== undefined && (params.topP < 0 || params.topP > 1)) {
       errors.push(this.createValidationError(
         'INVALID_TOP_P',
         'Top P must be between 0 and 1'
@@ -169,21 +165,21 @@ export class LlmHandler extends BaseHandler {
     }
 
     // Warnings for common issues
-    if (this.params.maxTokens && this.params.maxTokens > 4000) {
+    if (params.maxTokens && params.maxTokens > 4000) {
       warnings.push(this.createValidationWarning(
         'HIGH_TOKEN_COUNT',
         'High token count may result in expensive API calls'
       ));
     }
 
-    if (!this.params.systemMessage) {
+    if (!params.systemMessage) {
       warnings.push(this.createValidationWarning(
         'NO_SYSTEM_MESSAGE',
         'Consider adding a system message for better AI behavior control'
       ));
     }
 
-    if (this.params.timeout && this.params.timeout < 10000) {
+    if (params.timeout && params.timeout < 10000) {
       warnings.push(this.createValidationWarning(
         'LOW_TIMEOUT',
         'LLM requests may take longer than the specified timeout'

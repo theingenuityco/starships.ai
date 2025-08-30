@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { Blueprint, RuntimeState, ExecutionInitialContext, Node as WorkflowNode, NodeResult } from '../types';
+import { Blueprint, RuntimeState, Node as WorkflowNode, NodeResult } from '../types';
 import { Handler, HandlerConstructor } from '../nodes/Handler';
 
 // Dynamic imports for handlers - pure lazy loading
@@ -82,16 +82,13 @@ export class Engine {
    */
   async execute(
     blueprint: Blueprint,
-    context: Partial<ExecutionInitialContext> = {}
+    runtimeState?: RuntimeState
   ): Promise<RuntimeState> {
-    // Initialize runtime state with context data
-    this.runtimeState = {
+    // Set the provided runtime state or create a default one
+    this.runtimeState = runtimeState || {
       currentNodeRef: undefined,
       status: 'not_started',
-      executionResults: new Map(),
-      userId: context.userId || 'system',
-      expeditionState: context.expeditionState || {},
-      services: context.services || {}
+      executionResults: new Map()
     };
 
     try {

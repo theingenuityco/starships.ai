@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { RuntimeState, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning, ExecutionInitialContext } from '../../types';
+import { RuntimeState, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class WorkflowHandler extends BaseHandler {
@@ -18,23 +18,18 @@ export class WorkflowHandler extends BaseHandler {
     
     try {
       console.log('Executing embedded workflow');
-      
-      // Prepare workflow execution context
-      const existingState = (runtimeState.expeditionState as Record<string, unknown>) || {};
-      const workflowContext: Partial<ExecutionInitialContext> = {
-        userId: runtimeState.userId,
-        services: runtimeState.services,
-        // Merge existing context with workflow-specific context
-        expeditionState: {
-          ...existingState,
-          workflowNodeId: this.node.ref,
-          ...params.workflowContext
-        }
-      };
 
       // Create workflow instance from the blueprint and execute
       const workflow = new Workflow(params.blueprint);
-      const workflowResult = await workflow.execute(workflowContext);
+      
+      // Create a fresh runtime state for the nested workflow
+      const nestedRuntimeState: RuntimeState = {
+        currentNodeRef: undefined,
+        status: 'not_started',
+        executionResults: new Map()
+      };
+      
+      const workflowResult = await workflow.execute(nestedRuntimeState);
       
       // Check if workflow execution was successful
       if (workflowResult.status === 'completed') {

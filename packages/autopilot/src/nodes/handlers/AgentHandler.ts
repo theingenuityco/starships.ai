@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { RuntimeState, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning, ExecutionInitialContext } from '../../types';
+import { RuntimeState, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {
@@ -18,26 +18,18 @@ export class AgentHandler extends BaseHandler {
     
     try {
       console.log(`Executing agent: ${params.name} (model: ${params.model}) with workflow execution`);
-      
-      // Prepare workflow execution context
-      const existingState = (runtimeState.expeditionState as Record<string, unknown>) || {};
-      const workflowContext: Partial<ExecutionInitialContext> = {
-        userId: runtimeState.userId,
-        services: runtimeState.services,
-        // Merge agent context with workflow context
-        expeditionState: {
-          ...existingState,
-          agentName: params.name,
-          agentModel: params.model,
-          agentSystemPrompt: params.systemPrompt,
-          agentInstructions: params.instructions,
-          ...params.workflowContext
-        }
-      };
 
       // Create workflow instance from the agent's blueprint and execute
       const workflow = new Workflow(params.blueprint);
-      const workflowResult = await workflow.execute(workflowContext);
+      
+      // Create a fresh runtime state for the agent's workflow
+      const agentRuntimeState: RuntimeState = {
+        currentNodeRef: undefined,
+        status: 'not_started',
+        executionResults: new Map()
+      };
+      
+      const workflowResult = await workflow.execute(agentRuntimeState);
       
       // Check if workflow execution was successful
       if (workflowResult.status === 'completed') {

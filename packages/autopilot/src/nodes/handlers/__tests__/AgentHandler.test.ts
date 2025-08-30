@@ -3,7 +3,7 @@
  */
 
 import { AgentHandler } from '../AgentHandler';
-import { Node, ExecutionContext, AgentNodeParameters } from '../../../types';
+import { Node, Execution, AgentNodeParameters } from '../../../types';
 
 interface AgentExecutionResult {
   agentName: string;
@@ -19,7 +19,7 @@ interface AgentExecutionResult {
 describe('AgentHandler', () => {
   let handler: AgentHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
+  let mockExecution: Execution;
 
   beforeEach(() => {
     mockNode = {
@@ -40,7 +40,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters
     };
     handler = new AgentHandler(mockNode);
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
   });
 
   describe('type', () => {
@@ -53,23 +53,24 @@ describe('AgentHandler', () => {
     it('should execute successfully with valid parameters', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('agent-node');
-      expect(result.data).toEqual(expect.objectContaining({
+      const nodeResult = result.executionResults.get('agent-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('agent-node');
+      expect(nodeResult?.data).toEqual(expect.objectContaining({
         agentName: 'Customer Support Agent',
         model: 'anthropic/claude-3.5-sonnet',
         systemPrompt: 'You are a helpful customer support agent.',
         instructions: 'Test instructions for the agent',
-        workflowId: 'test-blueprint',
+        workflowResults: expect.any(Array),
         workflowStatus: 'completed',
         output: 'Agent Customer Support Agent completed workflow execution successfully'
       }));
-      const agentResult = result.data as AgentExecutionResult;
+      const agentResult = nodeResult?.data as AgentExecutionResult;
       expect(agentResult.workflowResults).toBeDefined();
       expect(Array.isArray(agentResult.workflowResults)).toBe(true);
-      expect(result.error).toBeUndefined();
       
       // Verify console.log was called with correct parameters
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -96,18 +97,20 @@ describe('AgentHandler', () => {
       const minimalHandler = new AgentHandler(minimalNode);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await minimalHandler.execute(mockContext);
+      const result = await minimalHandler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('minimal-agent-node');
-      expect(result.data).toEqual(expect.objectContaining({
+      const nodeResult = result.executionResults.get('minimal-agent-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('minimal-agent-node');
+      expect(nodeResult?.data).toEqual(expect.objectContaining({
         agentName: 'Basic Agent',
         model: 'openai/gpt-4',
-        workflowId: 'test-blueprint',
+        workflowResults: expect.any(Array),
         workflowStatus: 'completed',
         output: 'Agent Basic Agent completed workflow execution successfully'
       }));
-      const agentResult = result.data as AgentExecutionResult;
+      const agentResult = nodeResult?.data as AgentExecutionResult;
       expect(agentResult.workflowResults).toBeDefined();
       expect(Array.isArray(agentResult.workflowResults)).toBe(true);
       
@@ -121,19 +124,23 @@ describe('AgentHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       const afterExecution = Date.now();
       
       expect(result).toBeDefined();
+      const nodeResult = result.executionResults.get('agent-node');
+      expect(nodeResult).toBeDefined();
     });
 
-    it('should work with empty context', async () => {
-      const emptyContext = {} as ExecutionContext;
+    it('should work with empty execution', async () => {
+      const emptyExecution = global.createMockExecution();
       
-      const result = await handler.execute(emptyContext);
+      const result = await handler.execute(emptyExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('agent-node');
+      const nodeResult = result.executionResults.get('agent-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('agent-node');
     });
   });
 

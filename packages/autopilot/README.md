@@ -25,9 +25,9 @@ Autopilot provides a powerful workflow execution system:
 import { Workflow, Validator } from '@starships/autopilot';
 
 // Create workflow using the builder pattern
-const workflow = new Workflow('example-workflow')
-  .addNode({ type: 'start', name: 'Start', description: 'Begin', parameters: {} })
-  .addNode({ type: 'end', name: 'End', description: 'Complete', parameters: {} })
+const workflow = new Workflow()
+  .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} })
+  .addNode({ ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} })
   .addEdge('start', 'end');
 
 // Validate workflow
@@ -39,9 +39,11 @@ if (!validation.valid) {
 }
 
 // Execute workflow - engine with all handlers is created internally
-const result = await workflow.execute({
-  userId: 'user-1'
-});
+const execution = {
+  status: 'not_started' as const,
+  executionResults: new Map()
+};
+const result = await workflow.execute(execution);
 
 console.log('Execution result:', result);
 ```
@@ -78,16 +80,16 @@ Autopilot supports various node types for building complex workflows:
 import { Workflow } from '@starships/autopilot';
 
 // Create workflow with multiple node types - all handlers are automatically available
-const workflow = new Workflow('support-workflow')
+const workflow = new Workflow()
   .addNode({
-    id: 'start',
+    ref: 'start',
     type: 'start',
     name: 'Start',
     description: 'Begin',
     parameters: {}
   })
   .addNode({
-    id: 'http-call',
+    ref: 'http-call',
     type: 'http_request',
     name: 'Fetch User Data',
     description: 'Get user information from API',
@@ -100,7 +102,7 @@ const workflow = new Workflow('support-workflow')
     }
   })
   .addNode({
-    id: 'llm-task',
+    ref: 'llm-task',
     type: 'llm',
     name: 'Generate Response',
     description: 'Create personalized response using AI',
@@ -113,7 +115,7 @@ const workflow = new Workflow('support-workflow')
     }
   })
   .addNode({
-    id: 'agent-task',
+    ref: 'agent-task',
     type: 'agent',
     name: 'Process Request',
     description: 'Handle user request',
@@ -123,18 +125,17 @@ const workflow = new Workflow('support-workflow')
       instructions: 'Help the user',
       systemPrompt: 'You are a helpful customer support agent.',
       blueprint: {
-        id: 'agent-workflow',
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
         ],
-        edges: [{ id: 'edge-1', from: 'start', to: 'end' }],
+        edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
         metadata: {}
       }
     }
   })
   .addNode({
-    id: 'end',
+    ref: 'end',
     type: 'end',
     name: 'End',
     description: 'Complete',
@@ -146,7 +147,11 @@ const workflow = new Workflow('support-workflow')
   .addEdge('agent-task', 'end');
 
 // Execute workflow - engine with all node handlers is managed internally
-const result = await workflow.execute({ userId: 'user-123' });
+const execution = {
+  status: 'not_started' as const,
+  executionResults: new Map()
+};
+const result = await workflow.execute(execution);
 ```
 
 ## New Node Types
@@ -157,7 +162,7 @@ Makes HTTP API calls with comprehensive support for authentication, retries, and
 
 ```typescript
 {
-  id: 'api-call',
+  ref: 'api-call',
   type: 'http_request',
   name: 'Call External API',
   description: 'Fetch data from external service',
@@ -191,7 +196,7 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
 
 ```typescript
 {
-  id: 'ai-response',
+  ref: 'ai-response',
   type: 'llm',
   name: 'Generate AI Response',
   description: 'Create intelligent response using LLM via OpenRouter',
@@ -228,17 +233,16 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
 
 ```typescript
 {
-  id: 'sub-workflow',
+  ref: 'sub-workflow',
   type: 'workflow',
   name: 'Data Processing Pipeline',
   description: 'Execute data processing workflow',
   parameters: {
     blueprint: {
-      id: 'data-processing',
       nodes: [
-        { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+        { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
         {
-          id: 'fetch-data',
+          ref: 'fetch-data',
           type: 'http_request',
           name: 'Fetch Data',
           description: 'Get data from API',
@@ -249,7 +253,7 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
           }
         },
         {
-          id: 'process-data',
+          ref: 'process-data',
           type: 'llm',
           name: 'Process Data',
           description: 'Transform data using AI',
@@ -258,12 +262,12 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
             prompt: 'Process this data: {{data}}'
           }
         },
-        { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+        { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
       ],
       edges: [
-        { id: 'edge-1', from: 'start', to: 'fetch-data' },
-        { id: 'edge-2', from: 'fetch-data', to: 'process-data' },
-        { id: 'edge-3', from: 'process-data', to: 'end' }
+        { ref: 'edge-1', from: 'start', to: 'fetch-data' },
+        { ref: 'edge-2', from: 'fetch-data', to: 'process-data' },
+        { ref: 'edge-3', from: 'process-data', to: 'end' }
       ],
       metadata: {}
     },
@@ -295,8 +299,12 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
 
 #### Workflow
 ```typescript
-const workflow = new Workflow('my-workflow');
-const result = await workflow.execute(context);
+const workflow = new Workflow();
+const execution = {
+  status: 'not_started' as const,
+  executionResults: new Map()
+};
+const result = await workflow.execute(execution);
 ```
 
 #### Engine (Internal)
@@ -346,24 +354,24 @@ interface AgentNodeParameters {
 Example agent node with embedded workflow:
 ```typescript
 {
-  id: 'support-agent',
+  ref: 'support-agent',
   type: 'agent',
   name: 'Customer Support',
   description: 'Handles customer inquiries with multi-step workflow',
   parameters: {
     name: 'Support Agent',
     model: 'anthropic/claude-3.5-sonnet',
+    instructions: 'Help the customer with their inquiry',
     systemPrompt: 'You are a helpful customer support agent.',
     temperature: 0.7,
     maxTokens: 500,
-    instructions: 'Help the customer with their inquiry',
+    timeout: 5000,
     // Embedded workflow that the agent will execute
     blueprint: {
-      id: 'support-workflow',
       nodes: [
-        { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+        { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
         {
-          id: 'fetch-data',
+          ref: 'fetch-data',
           type: 'http_request',
           name: 'Get Customer Data',
           description: 'Fetch customer information',
@@ -374,7 +382,7 @@ Example agent node with embedded workflow:
           }
         },
         {
-          id: 'analyze',
+          ref: 'analyze',
           type: 'llm',
           name: 'Analyze Issue',
           description: 'Understand customer problem',
@@ -384,20 +392,14 @@ Example agent node with embedded workflow:
             systemMessage: 'You are a customer support analyst.'
           }
         },
-        { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+        { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
       ],
       edges: [
-        { id: 'edge-1', from: 'start', to: 'fetch-data' },
-        { id: 'edge-2', from: 'fetch-data', to: 'analyze' },
-        { id: 'edge-3', from: 'analyze', to: 'end' }
+        { ref: 'edge-1', from: 'start', to: 'fetch-data' },
+        { ref: 'edge-2', from: 'fetch-data', to: 'analyze' },
+        { ref: 'edge-3', from: 'analyze', to: 'end' }
       ],
       metadata: {}
-    },
-    // Context passed to the embedded workflow
-    workflowContext: {
-      customerId: '12345',
-      apiToken: 'your-api-token',
-      customerIssue: 'Login problems'
     }
   }
 }
@@ -422,17 +424,18 @@ Example agent node with embedded workflow:
 Example execution result:
 ```typescript
 {
-  nodeId: 'support-agent',
-  success: true,
+  nodeRef: 'support-agent',
   data: {
     agentName: 'Support Agent',
     model: 'anthropic/claude-3.5-sonnet',
-    workflowId: 'support-workflow',
+    systemPrompt: 'You are a helpful customer support agent.',
+    instructions: 'Help the customer with their inquiry',
     workflowStatus: 'completed',
     workflowResults: [
-      { /* start node result */ },
+      { message: 'Workflow started' },
       { /* http_request result with customer data */ },
-      { /* llm analysis result */ }
+      { /* llm analysis result */ },
+      { message: 'Workflow completed' }
     ],
     output: 'Agent Support Agent completed workflow execution successfully'
   }

@@ -3,12 +3,12 @@
  */
 
 import { PromptHandler } from '../PromptHandler';
-import { Node, ExecutionContext, UserPromptNodeParameters, UserPromptChoice } from '../../../types';
+import { Node, Execution, UserPromptNodeParameters, UserPromptChoice } from '../../../types';
 
 describe('PromptHandler', () => {
   let handler: PromptHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
+  let mockExecution: Execution;
 
   beforeEach(() => {
     const mockChoices: UserPromptChoice[] = [
@@ -32,7 +32,7 @@ describe('PromptHandler', () => {
     };
     
     handler = new PromptHandler(mockNode);
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
   });
 
   describe('type', () => {
@@ -45,15 +45,16 @@ describe('PromptHandler', () => {
     it('should execute successfully with valid parameters', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('prompt-node');
-      expect(result.data).toEqual({
+      const nodeResult = result.executionResults.get('prompt-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('prompt-node');
+      expect(nodeResult?.data).toEqual({
         choice: (mockNode.parameters as UserPromptNodeParameters).choices[0],
         userInput: 'placeholder'
       });
-      expect(result.error).toBeUndefined();
       
       // Verify console.log was called with correct parameters
       expect(consoleSpy).toHaveBeenCalledWith('User prompt: Please select an option:');
@@ -78,10 +79,12 @@ describe('PromptHandler', () => {
       const minimalHandler = new PromptHandler(minimalNode);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await minimalHandler.execute(mockContext);
+      const result = await minimalHandler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual({
+      const nodeResult = result.executionResults.get('minimal-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.data).toEqual({
         choice: { id: 'yes', text: 'Yes', value: true },
         userInput: 'placeholder'
       });
@@ -114,10 +117,12 @@ describe('PromptHandler', () => {
       };
       const complexHandler = new PromptHandler(complexNode);
       
-      const result = await complexHandler.execute(mockContext);
+      const result = await complexHandler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual({
+      const nodeResult = result.executionResults.get('complex-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.data).toEqual({
         choice: complexChoices[0], // Returns first choice as placeholder
         userInput: 'placeholder'
       });
@@ -138,10 +143,12 @@ describe('PromptHandler', () => {
       };
       const emptyChoicesHandler = new PromptHandler(emptyChoicesNode);
       
-      const result = await emptyChoicesHandler.execute(mockContext);
+      const result = await emptyChoicesHandler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.data).toEqual({
+      const nodeResult = result.executionResults.get('empty-choices-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.data).toEqual({
         choice: undefined, // No choices available
         userInput: 'placeholder'
       });
@@ -149,19 +156,23 @@ describe('PromptHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       const afterExecution = Date.now();
       
       expect(result).toBeDefined();
+      const nodeResult = result.executionResults.get('prompt-node');
+      expect(nodeResult).toBeDefined();
     });
 
-    it('should work with empty context', async () => {
-      const emptyContext = {} as ExecutionContext;
+    it('should work with empty execution', async () => {
+      const emptyExecution = global.createMockExecution();
       
-      const result = await handler.execute(emptyContext);
+      const result = await handler.execute(emptyExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('prompt-node');
+      const nodeResult = result.executionResults.get('prompt-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('prompt-node');
     });
   });
 
@@ -215,7 +226,7 @@ describe('PromptHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Prompt text is required',
-        nodeId: 'no-prompt-node',
+        nodeRef: 'no-prompt-node',
         severity: 'error'
       });
     });
@@ -262,7 +273,7 @@ describe('PromptHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'At least one choice is required',
-        nodeId: 'no-choices-node',
+        nodeRef: 'no-choices-node',
         severity: 'error'
       });
     });

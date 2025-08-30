@@ -8,10 +8,15 @@ import { Node, ExecutionContext, HttpRequestNodeParameters } from '../../../type
 // Mock axios completely
 jest.mock('axios', () => {
   const axiosMock = jest.fn();
+  const isCancelMock = jest.fn(() => false);
+  
+  // Add isCancel to the axios function itself
+  (axiosMock as any).isCancel = isCancelMock;
+  
   return {
     __esModule: true,
     default: axiosMock,
-    isCancel: jest.fn(() => false)
+    isCancel: isCancelMock
   };
 });
 

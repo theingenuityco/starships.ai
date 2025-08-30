@@ -11,8 +11,6 @@ describe('PromptHandler', () => {
   let mockContext: ExecutionContext;
 
   beforeEach(() => {
-    handler = new PromptHandler();
-    
     const mockChoices: UserPromptChoice[] = [
       { id: 'choice1', text: 'Option 1', description: 'First option', value: 'value1' },
       { id: 'choice2', text: 'Option 2', description: 'Second option', value: 'value2' },
@@ -33,6 +31,7 @@ describe('PromptHandler', () => {
       } as UserPromptNodeParameters
     };
     
+    handler = new PromptHandler(mockNode.parameters, mockNode.id);
     mockContext = global.createMockContext();
   });
 
@@ -46,7 +45,7 @@ describe('PromptHandler', () => {
     it('should execute successfully with valid parameters', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('prompt-node');
@@ -66,17 +65,15 @@ describe('PromptHandler', () => {
     });
 
     it('should execute with minimal parameters', async () => {
-      const minimalNode = {
-        ...mockNode,
-        parameters: {
-          promptText: 'Simple prompt',
-          choices: [{ id: 'yes', text: 'Yes', value: true }]
-        } as UserPromptNodeParameters
-      };
+      const minimalParams = {
+        promptText: 'Simple prompt',
+        choices: [{ id: 'yes', text: 'Yes', value: true }]
+      } as UserPromptNodeParameters;
       
+      const minimalHandler = new PromptHandler(minimalParams, 'minimal-node');
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await handler.execute(minimalNode, mockContext);
+      const result = await minimalHandler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
@@ -98,15 +95,14 @@ describe('PromptHandler', () => {
         { id: 'arr', text: 'Array Choice', value: [1, 2, 3] }
       ];
 
-      const nodeWithComplexChoices = {
-        ...mockNode,
-        parameters: {
-          promptText: 'Choose a complex option:',
-          choices: complexChoices
-        } as UserPromptNodeParameters
-      };
+      const complexParams = {
+        promptText: 'Choose a complex option:',
+        choices: complexChoices
+      } as UserPromptNodeParameters;
       
-      const result = await handler.execute(nodeWithComplexChoices, mockContext);
+      const complexHandler = new PromptHandler(complexParams, 'complex-node');
+      
+      const result = await complexHandler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
@@ -116,15 +112,14 @@ describe('PromptHandler', () => {
     });
 
     it('should handle empty choices array gracefully', async () => {
-      const nodeWithEmptyChoices = {
-        ...mockNode,
-        parameters: {
-          promptText: 'No choices available',
-          choices: []
-        } as UserPromptNodeParameters
-      };
+      const emptyChoicesParams = {
+        promptText: 'No choices available',
+        choices: []
+      } as UserPromptNodeParameters;
       
-      const result = await handler.execute(nodeWithEmptyChoices, mockContext);
+      const emptyChoicesHandler = new PromptHandler(emptyChoicesParams, 'empty-choices-node');
+      
+      const result = await emptyChoicesHandler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
@@ -135,7 +130,7 @@ describe('PromptHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
       
       const executedAtTimestamp = new Date(result.executedAt).getTime();
@@ -146,7 +141,7 @@ describe('PromptHandler', () => {
     it('should work with empty context', async () => {
       const emptyContext = {} as ExecutionContext;
       
-      const result = await handler.execute(mockNode, emptyContext);
+      const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('prompt-node');
@@ -155,7 +150,7 @@ describe('PromptHandler', () => {
 
   describe('validate', () => {
     it('should validate successfully with valid parameters', () => {
-      const result = handler.validate(mockNode);
+      const result = handler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -164,50 +159,44 @@ describe('PromptHandler', () => {
     });
 
     it('should validate successfully with minimal valid parameters', () => {
-      const minimalNode = {
-        ...mockNode,
-        parameters: {
-          promptText: 'Simple prompt',
-          choices: [{ id: 'ok', text: 'OK', value: 'ok' }]
-        } as UserPromptNodeParameters
-      };
+      const minimalParams = {
+        promptText: 'Simple prompt',
+        choices: [{ id: 'ok', text: 'OK', value: 'ok' }]
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(minimalNode);
+      const minimalHandler = new PromptHandler(minimalParams, 'minimal-node');
+      const result = minimalHandler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
     });
 
     it('should fail validation when promptText is missing', () => {
-      const nodeWithoutPrompt = {
-        ...mockNode,
-        parameters: {
-          choices: [{ id: 'yes', text: 'Yes', value: true }]
-        } as UserPromptNodeParameters
-      };
+      const paramsWithoutPrompt = {
+        choices: [{ id: 'yes', text: 'Yes', value: true }]
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(nodeWithoutPrompt);
+      const handlerWithoutPrompt = new PromptHandler(paramsWithoutPrompt, 'no-prompt-node');
+      const result = handlerWithoutPrompt.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Prompt text is required',
-        nodeId: 'prompt-node',
+        nodeId: 'no-prompt-node',
         severity: 'error'
       });
     });
 
     it('should fail validation when promptText is empty string', () => {
-      const nodeWithEmptyPrompt = {
-        ...mockNode,
-        parameters: {
-          promptText: '',
-          choices: [{ id: 'yes', text: 'Yes', value: true }]
-        } as UserPromptNodeParameters
-      };
+      const paramsWithEmptyPrompt = {
+        promptText: '',
+        choices: [{ id: 'yes', text: 'Yes', value: true }]
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(nodeWithEmptyPrompt);
+      const handlerWithEmptyPrompt = new PromptHandler(paramsWithEmptyPrompt, 'empty-prompt-node');
+      const result = handlerWithEmptyPrompt.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -216,35 +205,31 @@ describe('PromptHandler', () => {
     });
 
     it('should fail validation when choices are missing', () => {
-      const nodeWithoutChoices = {
-        ...mockNode,
-        parameters: {
-          promptText: 'Select something'
-        } as UserPromptNodeParameters
-      };
+      const paramsWithoutChoices = {
+        promptText: 'Select something'
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(nodeWithoutChoices);
+      const handlerWithoutChoices = new PromptHandler(paramsWithoutChoices, 'no-choices-node');
+      const result = handlerWithoutChoices.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'At least one choice is required',
-        nodeId: 'prompt-node',
+        nodeId: 'no-choices-node',
         severity: 'error'
       });
     });
 
     it('should fail validation when choices array is empty', () => {
-      const nodeWithEmptyChoices = {
-        ...mockNode,
-        parameters: {
-          promptText: 'Select something',
-          choices: []
-        } as UserPromptNodeParameters
-      };
+      const paramsWithEmptyChoices = {
+        promptText: 'Select something',
+        choices: []
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(nodeWithEmptyChoices);
+      const handlerWithEmptyChoices = new PromptHandler(paramsWithEmptyChoices, 'empty-choices-node');
+      const result = handlerWithEmptyChoices.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -253,14 +238,12 @@ describe('PromptHandler', () => {
     });
 
     it('should fail validation for both missing promptText and choices', () => {
-      const nodeWithMissingFields = {
-        ...mockNode,
-        parameters: {
-          timeout: 30000
-        } as UserPromptNodeParameters
-      };
+      const paramsWithMissingFields = {
+        timeout: 30000
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(nodeWithMissingFields);
+      const handlerWithMissingFields = new PromptHandler(paramsWithMissingFields, 'missing-fields-node');
+      const result = handlerWithMissingFields.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(2);
@@ -274,22 +257,20 @@ describe('PromptHandler', () => {
     });
 
     it('should validate choices with different value types', () => {
-      const nodeWithVariedChoices = {
-        ...mockNode,
-        parameters: {
-          promptText: 'Choose wisely',
-          choices: [
-            { id: 'str', text: 'String', value: 'text' },
-            { id: 'num', text: 'Number', value: 123 },
-            { id: 'bool', text: 'Boolean', value: false },
-            { id: 'null', text: 'Null', value: null },
-            { id: 'undef', text: 'Undefined', value: undefined },
-            { id: 'obj', text: 'Object', value: { nested: true } }
-          ]
-        } as UserPromptNodeParameters
-      };
+      const paramsWithVariedChoices = {
+        promptText: 'Choose wisely',
+        choices: [
+          { id: 'str', text: 'String', value: 'text' },
+          { id: 'num', text: 'Number', value: 123 },
+          { id: 'bool', text: 'Boolean', value: false },
+          { id: 'null', text: 'Null', value: null },
+          { id: 'undef', text: 'Undefined', value: undefined },
+          { id: 'obj', text: 'Object', value: { nested: true } }
+        ]
+      } as UserPromptNodeParameters;
       
-      const result = handler.validate(nodeWithVariedChoices);
+      const handlerWithVariedChoices = new PromptHandler(paramsWithVariedChoices, 'varied-choices-node');
+      const result = handlerWithVariedChoices.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);

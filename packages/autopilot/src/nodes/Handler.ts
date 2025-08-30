@@ -37,16 +37,6 @@ export abstract class BaseHandler implements Handler {
 
   constructor(protected node: WorkflowNode) {}
 
-  /** Convenience getter for nodeId */
-  protected get nodeId(): string {
-    return this.node.id;
-  }
-
-  /** Convenience getter for parameters */
-  protected get parameters(): any {
-    return this.node.parameters;
-  }
-
   abstract execute(context: ExecutionContext): Promise<NodeResult>;
   abstract validate(): ValidationResult;
   abstract getIcon(): string;
@@ -56,7 +46,7 @@ export abstract class BaseHandler implements Handler {
    */
   protected createSuccessResult(data: any, duration?: number): NodeResult {
     return {
-      nodeId: this.nodeId,
+      nodeId: this.node.id,
       success: true,
       data,
       executedAt: new Date().toISOString(),
@@ -69,7 +59,7 @@ export abstract class BaseHandler implements Handler {
    */
   protected createErrorResult(error: string, duration?: number): NodeResult {
     return {
-      nodeId: this.nodeId,
+      nodeId: this.node.id,
       success: false,
       error,
       executedAt: new Date().toISOString(),
@@ -84,7 +74,7 @@ export abstract class BaseHandler implements Handler {
     return {
       code,
       message,
-      nodeId: this.nodeId,
+      nodeId: this.node.id,
       severity: 'error' as const
     };
   }
@@ -96,7 +86,7 @@ export abstract class BaseHandler implements Handler {
     return {
       code,
       message,
-      nodeId: this.nodeId,
+      nodeId: this.node.id,
       severity: 'warning' as const
     };
   }

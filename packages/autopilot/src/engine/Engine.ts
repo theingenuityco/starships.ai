@@ -176,7 +176,7 @@ export class Engine {
           throw new Error(`Handler failed to store result for node ${currentNode.ref}`);
         }
 
-        if (result.success) {
+        if (!result.error) {
           // Emit node completed event
           await this.emitEvent({
             type: 'node_completed',
@@ -210,10 +210,7 @@ export class Engine {
         // Store failed result
         const failedResult: NodeResult = {
           nodeRef: currentNode.ref,
-          success: false,
-          error: errorMessage,
-          executedAt: new Date().toISOString(),
-          duration: 0
+          error: errorMessage
         };
         execution.executionResults.set(currentNode.ref, failedResult);
 

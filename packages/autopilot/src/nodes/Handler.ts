@@ -44,13 +44,10 @@ export abstract class BaseHandler implements Handler {
   /**
    * Helper to create successful result and push to execution results
    */
-  protected createSuccessResult(execution: Execution, data: any, duration?: number): Execution {
+  protected createSuccessResult(execution: Execution, data: any): Execution {
     const result: NodeResult = {
       nodeRef: this.node.ref,
-      success: true,
-      data,
-      executedAt: new Date().toISOString(),
-      duration: duration || 0
+      data
     };
     
     execution.executionResults.set(this.node.ref, result);
@@ -60,13 +57,10 @@ export abstract class BaseHandler implements Handler {
   /**
    * Helper to create error result and push to execution results
    */
-  protected createErrorResult(execution: Execution, error: string, duration?: number): Execution {
+  protected createErrorResult(execution: Execution, error: string): Execution {
     const result: NodeResult = {
       nodeRef: this.node.ref,
-      success: false,
-      error,
-      executedAt: new Date().toISOString(),
-      duration: duration || 0
+      error
     };
     
     execution.executionResults.set(this.node.ref, result);

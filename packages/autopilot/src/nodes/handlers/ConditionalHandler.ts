@@ -24,9 +24,10 @@ export class ConditionalHandler implements Handler {
       // Evaluate conditions using JSONata
       for (const [conditionKey, expression] of Object.entries(params.conditions)) {
         const evaluator = jsonata(expression);
-        const result = evaluator.evaluate(sourceResult.data);
+        const result = await evaluator.evaluate(sourceResult.data);
         
-        if (result) {
+        // Check for explicit true result (not just truthy values)
+        if (result === true) {
           return {
             nodeId: node.id,
             success: true,

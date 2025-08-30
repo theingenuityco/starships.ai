@@ -46,7 +46,7 @@ export abstract class BaseHandler implements Handler {
    */
   protected createSuccessResult(data: any, duration?: number): NodeResult {
     return {
-      nodeId: this.node.id,
+      nodeRef: this.node.ref,
       success: true,
       data,
       executedAt: new Date().toISOString(),
@@ -59,7 +59,7 @@ export abstract class BaseHandler implements Handler {
    */
   protected createErrorResult(error: string, duration?: number): NodeResult {
     return {
-      nodeId: this.node.id,
+      nodeRef: this.node.ref,
       success: false,
       error,
       executedAt: new Date().toISOString(),
@@ -74,7 +74,7 @@ export abstract class BaseHandler implements Handler {
     return {
       code,
       message,
-      nodeId: this.node.id,
+      nodeRef: this.node.ref,
       severity: 'error' as const
     };
   }
@@ -86,7 +86,7 @@ export abstract class BaseHandler implements Handler {
     return {
       code,
       message,
-      nodeId: this.node.id,
+      nodeRef: this.node.ref,
     };
   }
 }

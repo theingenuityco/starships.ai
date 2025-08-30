@@ -20,7 +20,7 @@ export class LlmHandler extends BaseHandler {
       
       // Create HttpRequestHandler instance for delegation
       const httpNode: Node = {
-        id: `${this.node.id}-http`,
+        ref: `${this.node.ref}-http`,
         type: 'http_request',
         name: `HTTP Request for ${this.node.name}`,
         description: `HTTP request delegated from LLM node ${this.node.name}`,
@@ -47,7 +47,7 @@ export class LlmHandler extends BaseHandler {
       
       return {
         ...result,
-        nodeId: this.node.id
+        nodeRef: this.node.ref
       };
       
     } catch (error) {

@@ -91,7 +91,7 @@ export class Engine {
     const runtimeState: RuntimeState = {
       id: executionId,
       
-      currentNodeId: undefined,
+      currentNodeRef: undefined,
       status: 'not_started',
       executionResults: new Map(),
       createdAt: new Date().toISOString(),
@@ -191,7 +191,7 @@ export class Engine {
     while (currentNode && runtimeState.status === 'running') {
       try {
         // Update current node
-        runtimeState.currentNodeId = currentNode.id;
+        runtimeState.currentNodeRef = currentNode.ref;
         runtimeState.updatedAt = new Date().toISOString();
 
         // Emit node start event
@@ -199,7 +199,7 @@ export class Engine {
           type: 'node_started',
           
           contextId: runtimeState.id,
-          nodeId: currentNode.id,
+          nodeId: currentNode.ref,
           data: { nodeName: currentNode.name, nodeType: currentNode.type },
           timestamp: new Date().toISOString()
         });
@@ -208,7 +208,7 @@ export class Engine {
         const result = await this.executeNode(currentNode, context);
         
         // Store result
-        runtimeState.executionResults.set(currentNode.id, result);
+        runtimeState.executionResults.set(currentNode.ref, result);
 
         if (result.success) {
           // Emit node completed event
@@ -216,7 +216,7 @@ export class Engine {
             type: 'node_completed',
             
             contextId: runtimeState.id,
-            nodeId: currentNode.id,
+            nodeId: currentNode.ref,
             data: { result: result.data },
             timestamp: new Date().toISOString()
           });
@@ -236,7 +236,7 @@ export class Engine {
             type: 'node_failed',
             
             contextId: runtimeState.id,
-            nodeId: currentNode.id,
+            nodeId: currentNode.ref,
             data: { error: result.error },
             timestamp: new Date().toISOString()
           });
@@ -249,20 +249,20 @@ export class Engine {
         
         // Store failed result
         const failedResult: NodeResult = {
-          nodeId: currentNode.id,
+          nodeRef: currentNode.ref,
           success: false,
           error: errorMessage,
           executedAt: new Date().toISOString(),
           duration: 0
         };
-        runtimeState.executionResults.set(currentNode.id, failedResult);
+        runtimeState.executionResults.set(currentNode.ref, failedResult);
 
         throw error;
       }
     }
 
     // Clear current node when done
-    runtimeState.currentNodeId = undefined;
+    runtimeState.currentNodeRef = undefined;
     runtimeState.updatedAt = new Date().toISOString();
   }
 
@@ -305,7 +305,7 @@ export class Engine {
     edgeCondition?: string
   ): WorkflowNode | null {
     // Find edges from current node
-    const outgoingEdges = blueprint.edges.filter(edge => edge.from === currentNode.id);
+    const outgoingEdges = blueprint.edges.filter(edge => edge.from === currentNode.ref);
 
     if (outgoingEdges.length === 0) {
       return null; // No outgoing edges, workflow complete
@@ -315,19 +315,19 @@ export class Engine {
     if (edgeCondition) {
       const matchingEdge = outgoingEdges.find(edge => edge.condition === edgeCondition);
       if (matchingEdge) {
-        return blueprint.nodes.find(node => node.id === matchingEdge.to) || null;
+        return blueprint.nodes.find(node => node.ref === matchingEdge.to) || null;
       }
     }
 
     // Look for default edge (no condition)
     const defaultEdge = outgoingEdges.find(edge => !edge.condition);
     if (defaultEdge) {
-      return blueprint.nodes.find(node => node.id === defaultEdge.to) || null;
+      return blueprint.nodes.find(node => node.ref === defaultEdge.to) || null;
     }
 
     // If no matching edge found and we have edges, take the first one
     if (outgoingEdges.length > 0) {
-      return blueprint.nodes.find(node => node.id === outgoingEdges[0].to) || null;
+      return blueprint.nodes.find(node => node.ref === outgoingEdges[0].to) || null;
     }
 
     return null;
@@ -347,7 +347,7 @@ export class Engine {
     const unsupportedNodes = [];
     for (const node of blueprint.nodes) {
       if (!(node.type in HANDLER_MAP)) {
-        unsupportedNodes.push({ id: node.id, type: node.type });
+        unsupportedNodes.push({ ref: node.ref, type: node.type });
       }
     }
 

@@ -116,9 +116,9 @@ export class AgentHandler extends BaseHandler {
 
       // Check for circular references in workflow
       if (params.blueprint.edges && params.blueprint.edges.length > 0) {
-        const nodeIds = new Set(params.blueprint.nodes.map(n => n.id));
+        const nodeRefs = new Set(params.blueprint.nodes.map(n => n.ref));
         for (const edge of params.blueprint.edges) {
-          if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+          if (!nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)) {
             errors.push(this.createValidationError(
               'INVALID_EDGE_CONNECTION',
               `Invalid edge reference in workflow: ${edge.from} -> ${edge.to}`

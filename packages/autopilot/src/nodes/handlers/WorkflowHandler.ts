@@ -26,7 +26,7 @@ export class WorkflowHandler extends BaseHandler {
         // Merge existing context with workflow-specific context
         expeditionState: {
           ...existingState,
-          workflowNodeId: this.node.id,
+          workflowNodeId: this.node.ref,
           ...params.workflowContext
         }
       };
@@ -98,9 +98,9 @@ export class WorkflowHandler extends BaseHandler {
 
       // Check for valid edge references
       if (params.blueprint.edges && params.blueprint.nodes) {
-        const nodeIds = new Set(params.blueprint.nodes.map(n => n.id));
+        const nodeRefs = new Set(params.blueprint.nodes.map(n => n.ref));
         for (const edge of params.blueprint.edges) {
-          if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+          if (!nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)) {
             errors.push(this.createValidationError(
               'INVALID_EDGE_CONNECTION',
               `Invalid edge reference in blueprint: ${edge.from} -> ${edge.to}`

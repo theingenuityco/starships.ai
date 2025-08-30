@@ -343,32 +343,6 @@ jobs:
             curl -w "Response time: %{time_total}s\n" -o /dev/null -s -k https://${INGRESS_IP}/api/health -H "Host: starships.ai"
           done
 
-      - name: Send Deployment Notification
-        if: always()
-        continue-on-error: true
-        run: |
-          # Notification placeholder - uncomment and configure as needed
-          
-          # Slack notification example:
-          # if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
-          #   STATUS="${{ job.status }}"
-          #   COLOR=$([ "$STATUS" = "success" ] && echo "good" || echo "danger")
-          #   curl -X POST ${{ secrets.SLACK_WEBHOOK_URL }} \
-          #     -H 'Content-Type: application/json' \
-          #     -d "{
-          #       \"attachments\": [{
-          #         \"color\": \"$COLOR\",
-          #         \"title\": \"Production Deployment $STATUS\",
-          #         \"text\": \"Version: ${{ steps.version.outputs.version }}\nDeployed by: ${{ github.actor }}\"
-          #       }]
-          #     }"
-          # fi
-          
-          # Email notification example:
-          # Add email action here if needed
-          
-          echo "📧 Notification step placeholder - configure Slack/email as needed"
-
       - name: Create Enhanced Deployment Summary
         if: always()
         run: |

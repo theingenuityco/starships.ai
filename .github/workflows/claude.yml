@@ -5,10 +5,12 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+     allowed_bots: '*'
   issues:
     types: [opened, assigned]
   pull_request_review:
-    types: [submitted]
+    types: [submitted] 
+    allowed_bots: '*'
 
 jobs:
   claude:

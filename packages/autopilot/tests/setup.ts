@@ -2,6 +2,13 @@
  * Jest setup file for autopilot package tests
  */
 
+import type { Blueprint } from '../src/types';
+import type { ExecutionContext } from '../src/types';
+// import './global.d.ts';
+
+// Import Jest types for global availability
+// import '@types/jest';
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,
@@ -10,10 +17,9 @@ global.console = {
   error: jest.fn()
 };
 
-// Global test utilities
-global.createMockWorkflow = (overrides = {}) => ({
-  id: 'test-workflow',
-  expeditionId: 'test-expedition',
+// Global test utilities with type assertions
+(global as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
+  id: 'test-blueprint',
   nodes: [
     { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
     { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -21,15 +27,15 @@ global.createMockWorkflow = (overrides = {}) => ({
   edges: [
     { id: 'edge-1', from: 'start', to: 'end' }
   ],
-  approvalStatus: 'approved',
-  visualization: '',
-  createdAt: new Date().toISOString(),
+  metadata: {},
   ...overrides
 });
 
-global.createMockContext = (overrides = {}) => ({
-  expeditionId: 'test-expedition',
-  workflowId: 'test-workflow',
+// Legacy support for tests that haven't been updated yet
+(global as any).createMockWorkflow = (global as any).createMockBlueprint;
+
+(global as any).createMockContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
+  workflowId: 'test-blueprint',
   userId: 'test-user',
   previousResults: new Map(),
   expeditionState: {},

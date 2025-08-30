@@ -1,18 +1,17 @@
 /**
  * Output Node Handler
  * 
- * Output formatting handler
+ * Output formatting handler using BaseHandler pattern
  */
 
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, OutputNodeParameters } from '../../types';
+import { BaseHandler } from '../Handler';
+import { ExecutionContext, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
 
-export class OutputHandler implements Handler {
+export class OutputHandler extends BaseHandler {
   readonly type = 'output';
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as OutputNodeParameters;
-    
+  async execute(context: ExecutionContext) {
+    const params = this.node.parameters as OutputNodeParameters;
     // Gather data from source nodes
     const sourceData: Record<string, any> = {};
     for (const sourceNodeId of params.sources) {
@@ -26,39 +25,29 @@ export class OutputHandler implements Handler {
     // For now, return simple formatted output
     const output = `# ${params.title || 'Workflow Output'}\n\n${JSON.stringify(sourceData, null, 2)}`;
     
-    return {
-      nodeId: node.id,
-      success: true,
-      data: { 
-        output, 
-        format: params.format,
-        sourceData 
-      },
-      executedAt: new Date().toISOString(),
-      duration: 50
-    };
+    return this.createSuccessResult({
+      output,
+      format: params.format,
+      sourceData
+    }, 50);
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as OutputNodeParameters;
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: ValidationError[] = [];
+    const params = this.node.parameters as OutputNodeParameters;
 
     if (!params.template) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Template is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Template is required'
+      ));
     }
 
     if (!params.sources || params.sources.length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'At least one source node is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'At least one source node is required'
+      ));
     }
 
     return {

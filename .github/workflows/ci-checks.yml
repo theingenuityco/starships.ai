@@ -20,8 +20,8 @@ jobs:
           chmod +x pnpm
           sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use npmmirror.com (reliable mirror in case npm is down)
-          pnpm config set registry https://registry.npmmirror.com
+          # Configure pnpm to use the official npm registry
+          pnpm config set registry https://registry.npmjs.org
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,8 +50,8 @@ jobs:
           chmod +x pnpm
           sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use npmmirror.com (reliable mirror in case npm is down)
-          pnpm config set registry https://registry.npmmirror.com
+          # Configure pnpm to use the official npm registry
+          pnpm config set registry https://registry.npmjs.org
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -86,8 +86,8 @@ jobs:
           chmod +x pnpm
           sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use npmmirror.com (reliable mirror in case npm is down)
-          pnpm config set registry https://registry.npmmirror.com
+          # Configure pnpm to use the official npm registry
+          pnpm config set registry https://registry.npmjs.org
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -100,4 +100,3 @@ jobs:
 
       - name: Build all packages
         run: pnpm run build
-

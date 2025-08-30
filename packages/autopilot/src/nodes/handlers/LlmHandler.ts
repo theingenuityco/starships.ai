@@ -35,7 +35,7 @@ export class LlmHandler extends BaseHandler {
       const httpResult = updatedExecution.executionResults.get(`${this.node.ref}-http`);
       
       // Process the result to extract LLM-specific data
-      if (httpResult && httpResult.success && httpResult.data && typeof httpResult.data === 'object') {
+      if (httpResult && !httpResult.error && httpResult.data && typeof httpResult.data === 'object') {
         const httpData = httpResult.data as any;
         if (httpData.body) {
           const llmResponse = this.extractLlmResponse(httpData.body);
@@ -44,7 +44,7 @@ export class LlmHandler extends BaseHandler {
             ...httpData,
             llmResponse,
             model: params.model,
-          }, httpResult.duration);
+          });
         }
       }
       

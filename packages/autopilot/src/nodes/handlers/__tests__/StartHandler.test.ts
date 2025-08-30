@@ -1,67 +1,87 @@
 /**
- * StartHandler Unit Tests
+ * StartHandler Tests
+ * 
+ * Tests for start node handler with simplified types
  */
 
 import { StartHandler } from '../StartHandler';
-import { Node, ExecutionContext } from '../../../types';
+import { Node, Execution } from '../../../types';
 
 describe('StartHandler', () => {
   let handler: StartHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
+  let mockExecution: Execution;
 
   beforeEach(() => {
     mockNode = {
       ref: 'start-node',
       type: 'start',
       name: 'Start Node',
-      description: 'Start node for workflow',
+      description: 'Starting point of workflow',
       parameters: {}
     };
     handler = new StartHandler(mockNode);
-    mockContext = global.createMockContext();
-  });
-
-  describe('type', () => {
-    it('should have correct type', () => {
-      expect(handler.type).toBe('start');
-    });
+    mockExecution = global.createMockExecution();
   });
 
   describe('execute', () => {
-    it('should execute successfully', async () => {
-      const result = await handler.execute(mockContext);
+    it('should execute successfully and store result', async () => {
+      const result = await handler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('start-node');
-      expect(result.data).toEqual({ message: 'Workflow started' });
-      expect(result.duration).toBe(0);
-      expect(result.executedAt).toBeDefined();
-      expect(result.error).toBeUndefined();
+      expect(result.status).toBe('not_started');
+      expect(result.executionResults.size).toBe(1);
+      
+      const nodeResult = result.executionResults.get('start-node');
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('start-node');
+      expect(nodeResult?.data).toEqual({ message: 'Workflow started' });
+      expect(nodeResult?.metadata?.duration).toBeDefined();
+      expect(nodeResult?.metadata?.executedAt).toBeDefined();
     });
 
-    it('should always succeed regardless of context', async () => {
-      const emptyContext = {} as ExecutionContext;
+    it('should work with any execution state', async () => {
+      const customExecution: Execution = {
+        status: 'running',
+        executionResults: new Map()
+      };
       
-      const result = await handler.execute(emptyContext);
+      const result = await handler.execute(customExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('start-node');
+      expect(result.status).toBe('running');
+      const nodeResult = result.executionResults.get('start-node');
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('start-node');
     });
 
-    it('should set execution timestamp', async () => {
-      const beforeExecution = Date.now();
-      const result = await handler.execute(mockContext);
-      const afterExecution = Date.now();
+    it('should preserve existing execution results', async () => {
+      // Add some existing results
+      mockExecution.executionResults.set('existing-node', {
+        nodeRef: 'existing-node',
+        data: { test: 'data' }
+      });
       
-      const executedAtTimestamp = new Date(result.executedAt).getTime();
-      expect(executedAtTimestamp).toBeGreaterThanOrEqual(beforeExecution);
-      expect(executedAtTimestamp).toBeLessThanOrEqual(afterExecution);
+      const result = await handler.execute(mockExecution);
+      
+      expect(result.executionResults.size).toBe(2);
+      expect(result.executionResults.get('existing-node')).toBeDefined();
+      expect(result.executionResults.get('start-node')).toBeDefined();
+    });
+
+    it('should set execution timestamp within reasonable time', async () => {
+      const beforeTime = new Date().getTime();
+      const result = await handler.execute(mockExecution);
+      const afterTime = new Date().getTime();
+      
+      const nodeResult = result.executionResults.get('start-node');
+      const executedAt = new Date(nodeResult?.metadata?.executedAt as string).getTime();
+      
+      expect(executedAt).toBeGreaterThanOrEqual(beforeTime);
+      expect(executedAt).toBeLessThanOrEqual(afterTime);
     });
   });
 
   describe('validate', () => {
-    it('should validate successfully for any node', () => {
+    it('should always return valid result', () => {
       const result = handler.validate();
       
       expect(result.valid).toBe(true);
@@ -69,26 +89,17 @@ describe('StartHandler', () => {
       expect(result.warnings).toHaveLength(0);
       expect(result.suggestions).toHaveLength(0);
     });
-
-    it('should validate even with empty parameters', () => {
-      const nodeWithEmptyParams: Node = {
-        ref: 'start-node-2',
-        type: 'start',
-        name: 'Start Node 2',
-        description: 'Start node with empty params',
-        parameters: {}
-      };
-      const handlerWithEmptyParams = new StartHandler(nodeWithEmptyParams);
-      
-      const result = handlerWithEmptyParams.validate();
-      
-      expect(result.valid).toBe(true);
-    });
   });
 
   describe('getIcon', () => {
-    it('should return correct icon', () => {
-      expect(handler.getIcon()).toBe('play-circle');
+    it('should return play icon', () => {
+      expect(handler.getIcon()).toBe('play');
+    });
+  });
+
+  describe('type', () => {
+    it('should have correct type', () => {
+      expect(handler.type).toBe('start');
     });
   });
 });

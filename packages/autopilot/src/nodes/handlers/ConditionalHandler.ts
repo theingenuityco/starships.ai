@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { Execution, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
@@ -28,13 +28,14 @@ export class ConditionalHandler extends BaseHandler {
         
         // Check for explicit true result (not just truthy values)
         if (result === true) {
-          const nodeResult = {
+          const nodeResult: NodeResult = {
             nodeRef: this.node.ref,
-            success: true,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
             nextEdgeCondition: conditionKey,
-            executedAt: new Date().toISOString(),
-            duration: 10
+            metadata: {
+              duration: 10,
+              executedAt: new Date().toISOString()
+            }
           };
           execution.executionResults.set(this.node.ref, nodeResult);
           return execution;
@@ -43,13 +44,14 @@ export class ConditionalHandler extends BaseHandler {
 
       // Use default condition if provided
       const defaultCondition = params.defaultCondition || 'default';
-      const nodeResult = {
+      const nodeResult: NodeResult = {
         nodeRef: this.node.ref,
-        success: true,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
         nextEdgeCondition: defaultCondition,
-        executedAt: new Date().toISOString(),
-        duration: 10
+        metadata: {
+          duration: 10,
+          executedAt: new Date().toISOString()
+        }
       };
       execution.executionResults.set(this.node.ref, nodeResult);
       return execution;

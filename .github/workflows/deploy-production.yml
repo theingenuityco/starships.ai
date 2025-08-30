@@ -1,6 +1,8 @@
 name: Deploy to Production (Manual)
 
 on:
+  # ONLY manual trigger - no other events
+  # This workflow should NEVER run on push, pull_request, or any other event
   workflow_dispatch:
     inputs:
       version:

@@ -39,7 +39,6 @@ export interface NodeResult {
  * Context passed to node handlers during execution
  */
 export interface ExecutionContext {
-  expeditionId: string;
   workflowId: string;
   userId: string;
   previousResults: Map<string, NodeResult>;

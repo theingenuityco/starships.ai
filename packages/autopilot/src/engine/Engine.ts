@@ -76,7 +76,7 @@ export class Engine {
       await this.emitEvent({
         type: 'workflow_started',
         workflowId: workflow.id,
-        contextId: workflow.expeditionId,
+        contextId: workflow.id,
         timestamp: new Date().toISOString()
       });
 
@@ -97,7 +97,7 @@ export class Engine {
         await this.emitEvent({
           type: 'workflow_completed',
           workflowId: workflow.id,
-          contextId: workflow.expeditionId,
+          contextId: workflow.id,
           timestamp: new Date().toISOString()
         });
       }
@@ -118,7 +118,7 @@ export class Engine {
       await this.emitEvent({
         type: 'workflow_failed',
         workflowId: workflow.id,
-        contextId: workflow.expeditionId,
+        contextId: workflow.id,
         data: { error: errorMessage },
         timestamp: new Date().toISOString()
       });
@@ -142,7 +142,6 @@ export class Engine {
     
     // Build execution context
     const context: ExecutionContext = {
-      expeditionId: workflow.expeditionId,
       workflowId: workflow.id,
       userId: contextData.userId || 'system',
       previousResults: runtimeState.executionResults,
@@ -160,7 +159,7 @@ export class Engine {
         await this.emitEvent({
           type: 'node_started',
           workflowId: workflow.id,
-          contextId: workflow.expeditionId,
+          contextId: workflow.id,
           nodeId: currentNode.id,
           data: { nodeName: currentNode.name, nodeType: currentNode.type },
           timestamp: new Date().toISOString()
@@ -177,7 +176,7 @@ export class Engine {
           await this.emitEvent({
             type: 'node_completed',
             workflowId: workflow.id,
-            contextId: workflow.expeditionId,
+            contextId: workflow.id,
             nodeId: currentNode.id,
             data: { result: result.data },
             timestamp: new Date().toISOString()
@@ -197,7 +196,7 @@ export class Engine {
           await this.emitEvent({
             type: 'node_failed',
             workflowId: workflow.id,
-            contextId: workflow.expeditionId,
+            contextId: workflow.id,
             nodeId: currentNode.id,
             data: { error: result.error },
             timestamp: new Date().toISOString()

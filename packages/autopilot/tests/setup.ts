@@ -13,7 +13,6 @@ global.console = {
 // Global test utilities
 global.createMockWorkflow = (overrides = {}) => ({
   id: 'test-workflow',
-  expeditionId: 'test-expedition',
   nodes: [
     { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
     { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
@@ -28,7 +27,6 @@ global.createMockWorkflow = (overrides = {}) => ({
 });
 
 global.createMockContext = (overrides = {}) => ({
-  expeditionId: 'test-expedition',
   workflowId: 'test-workflow',
   userId: 'test-user',
   previousResults: new Map(),

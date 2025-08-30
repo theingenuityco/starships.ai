@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { Blueprint, RuntimeState, ExecutionContext, Node as WorkflowNode, NodeResult } from '../types';
+import { Blueprint, RuntimeState, ExecutionInitialContext, Node as WorkflowNode, NodeResult } from '../types';
 import { Handler, HandlerConstructor } from '../nodes/Handler';
 
 // Dynamic imports for handlers - pure lazy loading
@@ -82,13 +82,16 @@ export class Engine {
    */
   async execute(
     blueprint: Blueprint,
-    context: Partial<ExecutionContext>
+    context: Partial<ExecutionInitialContext> = {}
   ): Promise<RuntimeState> {
-    // Initialize runtime state
+    // Initialize runtime state with context data
     this.runtimeState = {
       currentNodeRef: undefined,
       status: 'not_started',
-      executionResults: new Map()
+      executionResults: new Map(),
+      userId: context.userId || 'system',
+      expeditionState: context.expeditionState || {},
+      services: context.services || {}
     };
 
     try {
@@ -112,7 +115,7 @@ export class Engine {
       this.runtimeState.status = 'running';
 
       // Execute workflow graph
-      await this.executeGraph(blueprint, this.runtimeState, context);
+      await this.executeGraph(blueprint, this.runtimeState);
 
       // Mark as completed if no errors
       if (this.runtimeState.status === 'running') {
@@ -154,19 +157,9 @@ export class Engine {
    */
   private async executeGraph(
     blueprint: Blueprint,
-    runtimeState: RuntimeState,
-    contextData: Partial<ExecutionContext>
+    runtimeState: RuntimeState
   ): Promise<void> {
     let currentNode = this.getStartNode(blueprint);
-    
-    // Build execution context
-    const context: ExecutionContext = {
-      
-      userId: contextData.userId || 'system',
-      previousResults: runtimeState.executionResults,
-      expeditionState: contextData.expeditionState || {},
-      services: contextData.services || {}
-    };
 
     while (currentNode && runtimeState.status === 'running') {
       try {
@@ -183,7 +176,7 @@ export class Engine {
         });
 
         // Execute the node
-        const result = await this.executeNode(currentNode, context);
+        const result = await this.executeNode(currentNode, runtimeState);
         
         // Store result
         runtimeState.executionResults.set(currentNode.ref, result);
@@ -246,14 +239,14 @@ export class Engine {
    */
   private async executeNode(
     node: WorkflowNode,
-    context: ExecutionContext
+    runtimeState: RuntimeState
   ): Promise<NodeResult> {
     // Create handler instance with parameters (now async)
     const handler = await this.createHandler(node);
 
     // Execute the node
     const startTime = Date.now();
-    const result = await handler.execute(context);
+    const result = await handler.execute(runtimeState);
     const duration = Date.now() - startTime;
 
     // Update duration if not set by handler

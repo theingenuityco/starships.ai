@@ -7,12 +7,12 @@
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { RuntimeState, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '../../types';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     const startTime = Date.now();
     const params = this.node.parameters as HttpRequestNodeParameters;
     

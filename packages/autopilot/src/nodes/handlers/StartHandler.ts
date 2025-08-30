@@ -6,12 +6,12 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult } from '../../types';
+import { RuntimeState, ValidationResult } from '../../types';
 
 export class StartHandler extends BaseHandler {
   readonly type = 'start';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     return this.createSuccessResult({
       message: 'Workflow started'
     });

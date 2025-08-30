@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { RuntimeState, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning, ExecutionInitialContext } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     const startTime = Date.now();
     const params = this.node.parameters as AgentNodeParameters;
     
@@ -20,9 +20,10 @@ export class AgentHandler extends BaseHandler {
       console.log(`Executing agent: ${params.name} (model: ${params.model}) with workflow execution`);
       
       // Prepare workflow execution context
-      const existingState = (context.expeditionState as Record<string, unknown>) || {};
-      const workflowContext: Partial<ExecutionContext> = {
-        ...context,
+      const existingState = (runtimeState.expeditionState as Record<string, unknown>) || {};
+      const workflowContext: Partial<ExecutionInitialContext> = {
+        userId: runtimeState.userId,
+        services: runtimeState.services,
         // Merge agent context with workflow context
         expeditionState: {
           ...existingState,

@@ -5,17 +5,17 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
+import { RuntimeState, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
 
-  async execute(context: ExecutionContext) {
+  async execute(runtimeState: RuntimeState) {
     const params = this.node.parameters as OutputNodeParameters;
     // Gather data from source nodes
     const sourceData: Record<string, any> = {};
     for (const sourceNodeId of params.sources) {
-      const sourceResult = context.previousResults.get(sourceNodeId);
+      const sourceResult = runtimeState.executionResults.get(sourceNodeId);
       if (sourceResult) {
         sourceData[sourceNodeId] = sourceResult.data;
       }

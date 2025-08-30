@@ -11,42 +11,37 @@ import { ExecutionContext, ValidationResult, HttpRequestNodeParameters, Node as 
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
-  private params: HttpRequestNodeParameters;
-
-  constructor(node: WorkflowNode) {
-    super(node);
-    this.params = node.parameters as HttpRequestNodeParameters;
-  }
 
   async execute(context: ExecutionContext) {
     const startTime = Date.now();
+    const params = this.node.parameters as HttpRequestNodeParameters;
     
     try {
       // Build axios request configuration
       const requestConfig: AxiosRequestConfig = {
-        method: this.params.method,
-        url: this.params.url,
+        method: params.method,
+        url: params.url,
         headers: {
           'Content-Type': 'application/json',
-          ...this.params.headers
+          ...params.headers
         },
-        timeout: this.params.timeout || 30000,
-        maxRedirects: this.params.followRedirects !== false ? 5 : 0,
+        timeout: params.timeout || 30000,
+        maxRedirects: params.followRedirects !== false ? 5 : 0,
         validateStatus: () => true, // Don't throw on any status code
       };
 
       // Add authentication if provided
-      if (this.params.authentication) {
-        this.addAuthentication(requestConfig, this.params.authentication);
+      if (params.authentication) {
+        this.addAuthentication(requestConfig, params.authentication);
       }
 
       // Add body for non-GET requests
-      if (this.params.method !== 'GET' && this.params.method !== 'HEAD' && this.params.body) {
-        requestConfig.data = this.params.body;
+      if (params.method !== 'GET' && params.method !== 'HEAD' && params.body) {
+        requestConfig.data = params.body;
       }
 
       // Execute request with retries
-      const maxRetries = this.params.retries || 0;
+      const maxRetries = params.retries || 0;
       let lastError: Error | null = null;
       let response: AxiosResponse | null = null;
 
@@ -122,16 +117,17 @@ export class HttpRequestHandler extends BaseHandler {
   validate(): ValidationResult {
     const errors = [];
     const warnings = [];
+    const params = this.node.parameters as HttpRequestNodeParameters;
 
     // Required fields validation
-    if (!this.params.url) {
+    if (!params.url) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
         'URL is required'
       ));
     }
 
-    if (!this.params.method) {
+    if (!params.method) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
         'HTTP method is required'
@@ -139,9 +135,9 @@ export class HttpRequestHandler extends BaseHandler {
     }
 
     // URL format validation
-    if (this.params.url) {
+    if (params.url) {
       try {
-        new URL(this.params.url);
+        new URL(params.url);
       } catch {
         errors.push(this.createValidationError(
           'INVALID_URL',
@@ -152,7 +148,7 @@ export class HttpRequestHandler extends BaseHandler {
 
     // Method validation
     const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
-    if (this.params.method && !validMethods.includes(this.params.method)) {
+    if (params.method && !validMethods.includes(params.method)) {
       errors.push(this.createValidationError(
         'INVALID_HTTP_METHOD',
         `Invalid HTTP method. Must be one of: ${validMethods.join(', ')}`
@@ -160,8 +156,8 @@ export class HttpRequestHandler extends BaseHandler {
     }
 
     // Authentication validation
-    if (this.params.authentication) {
-      const auth = this.params.authentication;
+    if (params.authentication) {
+      const auth = params.authentication;
       switch (auth.type) {
         case 'bearer':
           if (!auth.token) {
@@ -191,14 +187,14 @@ export class HttpRequestHandler extends BaseHandler {
     }
 
     // Warnings for common issues
-    if (this.params.timeout && this.params.timeout < 1000) {
+    if (params.timeout && params.timeout < 1000) {
       warnings.push(this.createValidationWarning(
         'LOW_TIMEOUT',
         'Timeout is very low, this may cause frequent failures'
       ));
     }
 
-    if (this.params.retries && this.params.retries > 5) {
+    if (params.retries && params.retries > 5) {
       warnings.push(this.createValidationWarning(
         'HIGH_RETRY_COUNT',
         'High retry count may cause long execution times'

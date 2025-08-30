@@ -11,23 +11,18 @@ import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
-  private params: ConditionalNodeParameters;
-
-  constructor(node: WorkflowNode) {
-    super(node);
-    this.params = node.parameters as ConditionalNodeParameters;
-  }
 
   async execute(context: ExecutionContext) {
+    const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
-    const sourceResult = context.previousResults.get(this.params.sourceNodeId);
+    const sourceResult = context.previousResults.get(params.sourceNodeId);
     if (!sourceResult) {
-      throw new Error(`Source node ${this.params.sourceNodeId} not found in execution results`);
+      throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }
 
     try {
       // Evaluate conditions using JSONata
-      for (const [conditionKey, expression] of Object.entries(this.params.conditions)) {
+      for (const [conditionKey, expression] of Object.entries(params.conditions)) {
         const evaluator = jsonata(expression);
         const result = await evaluator.evaluate(sourceResult.data);
         
@@ -45,7 +40,7 @@ export class ConditionalHandler extends BaseHandler {
       }
 
       // Use default condition if provided
-      const defaultCondition = this.params.defaultCondition || 'default';
+      const defaultCondition = params.defaultCondition || 'default';
       return {
         nodeId: this.node.id,
         success: true,
@@ -65,15 +60,16 @@ export class ConditionalHandler extends BaseHandler {
 
   validate(): ValidationResult {
     const errors = [];
+    const params = this.node.parameters as ConditionalNodeParameters;
 
-    if (!this.params.sourceNodeId) {
+    if (!params.sourceNodeId) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
         'Source node ID is required'
       ));
     }
 
-    if (!this.params.conditions || Object.keys(this.params.conditions).length === 0) {
+    if (!params.conditions || Object.keys(params.conditions).length === 0) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
         'At least one condition is required'
@@ -81,8 +77,8 @@ export class ConditionalHandler extends BaseHandler {
     }
 
     // Validate JSONata expressions
-    if (this.params.conditions) {
-      for (const [key, expression] of Object.entries(this.params.conditions)) {
+    if (params.conditions) {
+      for (const [key, expression] of Object.entries(params.conditions)) {
         try {
           jsonata(expression);
         } catch (error) {

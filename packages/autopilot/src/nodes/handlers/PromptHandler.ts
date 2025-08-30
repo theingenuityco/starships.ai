@@ -21,7 +21,7 @@ export class PromptHandler extends BaseHandler {
     return this.createSuccessResult(execution, {
       choice: params.choices[0],
       userInput: 'placeholder'
-    }, 100);
+    });
   }
 
   validate(): ValidationResult {

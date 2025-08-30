@@ -25,7 +25,7 @@ export class LlmHandler extends BaseHandler {
       
       // Create HttpRequestHandler instance for delegation
       const httpNode: WorkflowNode = {
-        id: `${this.nodeId}-http`,
+        id: `${this.node.id}-http`,
         type: 'http_request',
         name: `HTTP Request for ${this.node.name}`,
         description: `HTTP request delegated from LLM node ${this.node.name}`,
@@ -52,7 +52,7 @@ export class LlmHandler extends BaseHandler {
       
       return {
         ...result,
-        nodeId: this.nodeId
+        nodeId: this.node.id
       };
       
     } catch (error) {

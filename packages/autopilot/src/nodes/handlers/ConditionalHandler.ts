@@ -34,7 +34,7 @@ export class ConditionalHandler extends BaseHandler {
         // Check for explicit true result (not just truthy values)
         if (result === true) {
           return {
-            nodeId: this.nodeId,
+            nodeId: this.node.id,
             success: true,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
             nextEdgeCondition: conditionKey,
@@ -47,7 +47,7 @@ export class ConditionalHandler extends BaseHandler {
       // Use default condition if provided
       const defaultCondition = this.params.defaultCondition || 'default';
       return {
-        nodeId: this.nodeId,
+        nodeId: this.node.id,
         success: true,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
         nextEdgeCondition: defaultCondition,

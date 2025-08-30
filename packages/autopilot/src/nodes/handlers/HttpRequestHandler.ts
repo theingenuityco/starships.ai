@@ -7,15 +7,15 @@
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, HttpRequestNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, HttpRequestNodeParameters, Node as WorkflowNode } from '../../types';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
   private params: HttpRequestNodeParameters;
 
-  constructor(parameters: any, nodeId: string) {
-    super(parameters, nodeId);
-    this.params = parameters as HttpRequestNodeParameters;
+  constructor(node: WorkflowNode) {
+    super(node);
+    this.params = node.parameters as HttpRequestNodeParameters;
   }
 
   async execute(context: ExecutionContext) {

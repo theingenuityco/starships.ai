@@ -39,7 +39,7 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters
     };
-    handler = new AgentHandler(mockNode.parameters, mockNode.id);
+    handler = new AgentHandler(mockNode);
     mockContext = global.createMockContext();
   });
 
@@ -88,7 +88,14 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
-      const minimalHandler = new AgentHandler(minimalParams, 'minimal-agent-node');
+      const minimalNode: Node = {
+        id: 'minimal-agent-node',
+        type: 'agent',
+        name: 'Minimal Agent',
+        description: 'Minimal agent for testing',
+        parameters: minimalParams
+      };
+      const minimalHandler = new AgentHandler(minimalNode);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
       const result = await minimalHandler.execute(mockContext);
@@ -151,7 +158,14 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
-      const minimalHandler = new AgentHandler(minimalParams, 'minimal-agent-node');
+      const minimalNode: Node = {
+        id: 'minimal-agent-node',
+        type: 'agent',
+        name: 'Minimal Agent',
+        description: 'Minimal agent for testing',
+        parameters: minimalParams
+      };
+      const minimalHandler = new AgentHandler(minimalNode);
       const result = minimalHandler.validate();
       
       expect(result.valid).toBe(true);
@@ -166,7 +180,14 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
-      const handlerWithoutName = new AgentHandler(paramsWithoutName, 'no-name-agent-node');
+      const nodeWithoutName: Node = {
+        id: 'no-name-agent-node',
+        type: 'agent',
+        name: 'Agent without name',
+        description: 'Agent without name for testing',
+        parameters: paramsWithoutName
+      };
+      const handlerWithoutName = new AgentHandler(nodeWithoutName);
       const result = handlerWithoutName.validate();
       
       expect(result.valid).toBe(false);
@@ -187,7 +208,14 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
-      const handlerWithoutModel = new AgentHandler(paramsWithoutModel, 'no-model-agent-node');
+      const nodeWithoutModel: Node = {
+        id: 'no-model-agent-node',
+        type: 'agent',
+        name: 'Agent without model',
+        description: 'Agent without model for testing',
+        parameters: paramsWithoutModel
+      };
+      const handlerWithoutModel = new AgentHandler(nodeWithoutModel);
       const result = handlerWithoutModel.validate();
       
       expect(result.valid).toBe(false);
@@ -206,7 +234,14 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
-      const handlerWithoutRequiredParams = new AgentHandler(paramsWithoutRequiredParams, 'no-required-agent-node');
+      const nodeWithoutRequiredParams: Node = {
+        id: 'no-required-agent-node',
+        type: 'agent',
+        name: 'Agent without required params',
+        description: 'Agent without required params for testing',
+        parameters: paramsWithoutRequiredParams
+      };
+      const handlerWithoutRequiredParams = new AgentHandler(nodeWithoutRequiredParams);
       const result = handlerWithoutRequiredParams.validate();
       
       expect(result.valid).toBe(false);
@@ -218,7 +253,14 @@ describe('AgentHandler', () => {
     it('should fail validation when parameters are completely missing', () => {
       const emptyParams = {} as AgentNodeParameters;
       
-      const handlerWithoutParams = new AgentHandler(emptyParams, 'empty-params-agent-node');
+      const nodeWithoutParams: Node = {
+        id: 'empty-params-agent-node',
+        type: 'agent',
+        name: 'Agent with empty params',
+        description: 'Agent with empty params for testing',
+        parameters: emptyParams
+      };
+      const handlerWithoutParams = new AgentHandler(nodeWithoutParams);
       const result = handlerWithoutParams.validate();
       
       expect(result.valid).toBe(false);
@@ -236,7 +278,14 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
-      const handlerWithEmptyValues = new AgentHandler(paramsWithEmptyValues, 'empty-values-agent-node');
+      const nodeWithEmptyValues: Node = {
+        id: 'empty-values-agent-node',
+        type: 'agent',
+        name: 'Agent with empty values',
+        description: 'Agent with empty values for testing',
+        parameters: paramsWithEmptyValues
+      };
+      const handlerWithEmptyValues = new AgentHandler(nodeWithEmptyValues);
       const result = handlerWithEmptyValues.validate();
       
       expect(result.valid).toBe(false);

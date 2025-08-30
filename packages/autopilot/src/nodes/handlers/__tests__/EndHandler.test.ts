@@ -18,7 +18,7 @@ describe('EndHandler', () => {
       description: 'End node for workflow',
       parameters: {}
     };
-    handler = new EndHandler(mockNode.parameters, mockNode.id);
+    handler = new EndHandler(mockNode);
     mockContext = global.createMockContext();
   });
 
@@ -71,7 +71,14 @@ describe('EndHandler', () => {
     });
 
     it('should validate even with empty parameters', () => {
-      const handlerWithEmptyParams = new EndHandler({}, 'end-node-2');
+      const nodeWithEmptyParams: Node = {
+        id: 'end-node-2',
+        type: 'end',
+        name: 'End Node 2',
+        description: 'End node with empty params',
+        parameters: {}
+      };
+      const handlerWithEmptyParams = new EndHandler(nodeWithEmptyParams);
       
       const result = handlerWithEmptyParams.validate();
       

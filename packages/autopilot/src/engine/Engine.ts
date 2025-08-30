@@ -5,7 +5,7 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { Blueprint, RuntimeState, ExecutionContext, Node, NodeResult } from '../types';
+import { Blueprint, RuntimeState, ExecutionContext, Node as WorkflowNode, NodeResult } from '../types';
 import { Handler, HandlerConstructor } from '../nodes/Handler';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -53,7 +53,7 @@ export class Engine {
   /**
    * Create handler instance for a node with pure dynamic loading
    */
-  async createHandler(node: Node): Promise<Handler> {
+  async createHandler(node: WorkflowNode): Promise<Handler> {
     const loader = HANDLER_MAP[node.type];
     if (!loader) {
       throw new Error(`No handler available for node type: ${node.type}`);
@@ -61,7 +61,7 @@ export class Engine {
     
     // Load handler constructor dynamically each time
     const handlerConstructor = await loader();
-    return new handlerConstructor(node.parameters, node.id);
+    return new handlerConstructor(node);
   }
 
   /**
@@ -270,7 +270,7 @@ export class Engine {
    * Execute a single node with lazy loading
    */
   private async executeNode(
-    node: Node,
+    node: WorkflowNode,
     context: ExecutionContext
   ): Promise<NodeResult> {
     // Create handler instance with parameters (now async)
@@ -292,7 +292,7 @@ export class Engine {
   /**
    * Find the start node in the workflow
    */
-  private getStartNode(blueprint: Blueprint): Node | null {
+  private getStartNode(blueprint: Blueprint): WorkflowNode | null {
     return blueprint.nodes.find(node => node.type === 'start') || null;
   }
 
@@ -301,9 +301,9 @@ export class Engine {
    */
   private getNextNode(
     blueprint: Blueprint,
-    currentNode: Node,
+    currentNode: WorkflowNode,
     edgeCondition?: string
-  ): Node | null {
+  ): WorkflowNode | null {
     // Find edges from current node
     const outgoingEdges = blueprint.edges.filter(edge => edge.from === currentNode.id);
 

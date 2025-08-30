@@ -5,15 +5,15 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, OutputNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, OutputNodeParameters, Node as WorkflowNode } from '../../types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
   private params: OutputNodeParameters;
 
-  constructor(parameters: any, nodeId: string) {
-    super(parameters, nodeId);
-    this.params = parameters as OutputNodeParameters;
+  constructor(node: WorkflowNode) {
+    super(node);
+    this.params = node.parameters as OutputNodeParameters;
   }
 
   async execute(context: ExecutionContext) {

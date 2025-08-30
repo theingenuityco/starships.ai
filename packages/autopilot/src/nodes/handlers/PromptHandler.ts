@@ -5,15 +5,15 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, UserPromptNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode } from '../../types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
   private params: UserPromptNodeParameters;
 
-  constructor(parameters: any, nodeId: string) {
-    super(parameters, nodeId);
-    this.params = parameters as UserPromptNodeParameters;
+  constructor(node: WorkflowNode) {
+    super(node);
+    this.params = node.parameters as UserPromptNodeParameters;
   }
 
   async execute(context: ExecutionContext) {

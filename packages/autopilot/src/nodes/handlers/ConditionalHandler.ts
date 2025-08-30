@@ -6,16 +6,16 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, ConditionalNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, ConditionalNodeParameters, Node as WorkflowNode } from '../../types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
   private params: ConditionalNodeParameters;
 
-  constructor(parameters: any, nodeId: string) {
-    super(parameters, nodeId);
-    this.params = parameters as ConditionalNodeParameters;
+  constructor(node: WorkflowNode) {
+    super(node);
+    this.params = node.parameters as ConditionalNodeParameters;
   }
 
   async execute(context: ExecutionContext) {

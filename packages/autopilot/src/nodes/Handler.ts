@@ -4,7 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { NodeResult, ExecutionContext, ValidationResult } from '../types';
+import { NodeResult, ExecutionContext, ValidationResult, Node as WorkflowNode } from '../types';
 
 /**
  * Base interface for workflow node handlers
@@ -25,9 +25,9 @@ export interface Handler {
 }
 
 /**
- * Constructor type for handlers that accept parameters and nodeId
+ * Constructor type for handlers that accept the full node object
  */
-export type HandlerConstructor = new (parameters: any, nodeId: string) => Handler;
+export type HandlerConstructor = new (node: WorkflowNode) => Handler;
 
 /**
  * Abstract base class for handlers with common functionality
@@ -35,10 +35,17 @@ export type HandlerConstructor = new (parameters: any, nodeId: string) => Handle
 export abstract class BaseHandler implements Handler {
   abstract readonly type: string;
 
-  constructor(
-    protected parameters: any,
-    protected nodeId: string
-  ) {}
+  constructor(protected node: WorkflowNode) {}
+
+  /** Convenience getter for nodeId */
+  protected get nodeId(): string {
+    return this.node.id;
+  }
+
+  /** Convenience getter for parameters */
+  protected get parameters(): any {
+    return this.node.parameters;
+  }
 
   abstract execute(context: ExecutionContext): Promise<NodeResult>;
   abstract validate(): ValidationResult;

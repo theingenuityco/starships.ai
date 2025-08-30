@@ -12,7 +12,7 @@ import { Workflow } from '../../Workflow';
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
-  async execute(initialExecution?: Execution) {
+  async execute(execution: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as AgentNodeParameters;
     
@@ -30,7 +30,7 @@ export class AgentHandler extends BaseHandler {
           .filter(result => result.success)
           .map(result => result.data);
 
-        return this.createSuccessResult({
+        return this.createSuccessResult(execution, {
           agentName: params.name,
           model: params.model,
           systemPrompt: params.systemPrompt,
@@ -42,14 +42,14 @@ export class AgentHandler extends BaseHandler {
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
-        return this.createErrorResult(
+        return this.createErrorResult(execution,
           `Agent ${params.name} workflow execution failed: ${errorMessage}`,
           Date.now() - startTime
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
+      return this.createErrorResult(execution,
         `Agent ${params.name} execution failed: ${errorMessage}`,
         Date.now() - startTime
       );

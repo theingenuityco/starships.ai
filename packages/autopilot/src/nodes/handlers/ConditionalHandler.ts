@@ -12,10 +12,10 @@ import jsonata from 'jsonata';
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
-  async execute(initialExecution?: Execution) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
-    const sourceResult = initialExecution?.executionResults.get(params.sourceNodeId);
+    const sourceResult = execution.executionResults.get(params.sourceNodeId);
     if (!sourceResult) {
       throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }
@@ -28,7 +28,7 @@ export class ConditionalHandler extends BaseHandler {
         
         // Check for explicit true result (not just truthy values)
         if (result === true) {
-          return {
+          const nodeResult = {
             nodeRef: this.node.ref,
             success: true,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
@@ -36,12 +36,14 @@ export class ConditionalHandler extends BaseHandler {
             executedAt: new Date().toISOString(),
             duration: 10
           };
+          execution.executionResults.set(this.node.ref, nodeResult);
+          return execution;
         }
       }
 
       // Use default condition if provided
       const defaultCondition = params.defaultCondition || 'default';
-      return {
+      const nodeResult = {
         nodeRef: this.node.ref,
         success: true,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
@@ -49,9 +51,11 @@ export class ConditionalHandler extends BaseHandler {
         executedAt: new Date().toISOString(),
         duration: 10
       };
+      execution.executionResults.set(this.node.ref, nodeResult);
+      return execution;
 
     } catch (error) {
-      return this.createErrorResult(
+      return this.createErrorResult(execution,
         `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         10
       );

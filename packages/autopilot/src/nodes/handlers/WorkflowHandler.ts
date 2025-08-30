@@ -12,7 +12,7 @@ import { Workflow } from '../../Workflow';
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
 
-  async execute(initialExecution?: Execution) {
+  async execute(execution: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as WorkflowNodeParameters;
     
@@ -30,7 +30,7 @@ export class WorkflowHandler extends BaseHandler {
           .filter(result => result.success)
           .map(result => result.data);
 
-        return this.createSuccessResult({
+        return this.createSuccessResult(execution, {
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
           output: 'Workflow completed successfully'
@@ -38,14 +38,14 @@ export class WorkflowHandler extends BaseHandler {
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
-        return this.createErrorResult(
+        return this.createErrorResult(execution,
           `Workflow execution failed: ${errorMessage}`,
           Date.now() - startTime
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
+      return this.createErrorResult(execution,
         `Workflow execution failed: ${errorMessage}`,
         Date.now() - startTime
       );

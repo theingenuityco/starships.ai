@@ -11,8 +11,8 @@ import { Execution, ValidationResult } from '../../types';
 export class EndHandler extends BaseHandler {
   readonly type = 'end';
 
-  async execute(initialExecution?: Execution) {
-    return this.createSuccessResult({
+  async execute(execution: Execution) {
+    return this.createSuccessResult(execution, {
       message: 'Workflow completed'
     });
   }

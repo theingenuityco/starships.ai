@@ -12,7 +12,7 @@ import { HttpRequestHandler } from './HttpRequestHandler';
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
 
-  async execute(initialExecution?: Execution) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as LlmNodeParameters;
     try {
       // Convert LLM parameters to HTTP request parameters
@@ -28,30 +28,32 @@ export class LlmHandler extends BaseHandler {
       };
       const httpHandler = new HttpRequestHandler(httpNode);
       
-      // Delegate to HttpRequestHandler
-      const result = await httpHandler.execute(initialExecution);
+      // Delegate to HttpRequestHandler - this will return the execution with HTTP result added
+      const updatedExecution = await httpHandler.execute(execution);
+      
+      // Get the result from the HTTP handler
+      const httpResult = updatedExecution.executionResults.get(`${this.node.ref}-http`);
       
       // Process the result to extract LLM-specific data
-      if (result.success && result.data && typeof result.data === 'object') {
-        const httpData = result.data as any;
+      if (httpResult && httpResult.success && httpResult.data && typeof httpResult.data === 'object') {
+        const httpData = httpResult.data as any;
         if (httpData.body) {
           const llmResponse = this.extractLlmResponse(httpData.body);
           
-          return this.createSuccessResult({
+          return this.createSuccessResult(updatedExecution, {
             ...httpData,
             llmResponse,
             model: params.model,
-          }, result.duration);
+          }, httpResult.duration);
         }
       }
       
-      return {
-        ...result,
-        nodeRef: this.node.ref
-      };
+      // If HTTP request failed or no data, create error result
+      const errorMessage = httpResult?.error || 'LLM request failed';
+      return this.createErrorResult(updatedExecution, errorMessage);
       
     } catch (error) {
-      return this.createErrorResult((error as Error).message);
+      return this.createErrorResult(execution, (error as Error).message);
     }
   }
 

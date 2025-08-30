@@ -167,17 +167,20 @@ export class Engine {
           timestamp: new Date().toISOString()
         });
 
-        // Execute the node
-        const result = await this.executeNode(currentNode, execution);
+        // Execute the node - this now returns updated execution with result stored
+        const updatedExecution = await this.executeNode(currentNode, execution);
         
-        // Store result
-        execution.executionResults.set(currentNode.ref, result);
+        // Get the result that was stored by the handler
+        const result = updatedExecution.executionResults.get(currentNode.ref);
+        if (!result) {
+          throw new Error(`Handler failed to store result for node ${currentNode.ref}`);
+        }
 
         if (result.success) {
           // Emit node completed event
           await this.emitEvent({
             type: 'node_completed',
-            execution: execution,
+            execution: updatedExecution,
             timestamp: new Date().toISOString()
           });
 
@@ -194,7 +197,7 @@ export class Engine {
           // Node execution failed
           await this.emitEvent({
             type: 'node_failed',
-            execution: execution,
+            execution: updatedExecution,
             timestamp: new Date().toISOString()
           });
 
@@ -228,21 +231,14 @@ export class Engine {
   private async executeNode(
     node: WorkflowNode,
     execution: Execution
-  ): Promise<NodeResult> {
+  ): Promise<Execution> {
     // Create handler instance with parameters (now async)
     const handler = await this.createHandler(node);
 
-    // Execute the node - pass execution as initialExecution
-    const startTime = Date.now();
-    const result = await handler.execute(execution);
-    const duration = Date.now() - startTime;
+    // Execute the node - this returns execution with result stored
+    const updatedExecution = await handler.execute(execution);
 
-    // Update duration if not set by handler
-    if (!result.duration) {
-      result.duration = duration;
-    }
-
-    return result;
+    return updatedExecution;
   }
 
   /**

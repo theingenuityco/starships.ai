@@ -12,7 +12,7 @@ import { Execution, ValidationResult, HttpRequestNodeParameters, ValidationError
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
 
-  async execute(initialExecution?: Execution) {
+  async execute(execution: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as HttpRequestNodeParameters;
     
@@ -53,7 +53,7 @@ export class HttpRequestHandler extends BaseHandler {
           lastError = error as AxiosError;
           
           // Don't retry on certain errors
-          if (axios.isCancel(error) || 
+          if (axios.isCancel(error) ||
               (error as AxiosError).code === 'ECONNABORTED') {
             break;
           }
@@ -68,7 +68,7 @@ export class HttpRequestHandler extends BaseHandler {
       const duration = Date.now() - startTime;
 
       if (response) {
-        return this.createSuccessResult({
+        return this.createSuccessResult(execution, {
           status: response.status,
           statusText: response.statusText,
           headers: response.headers,
@@ -77,7 +77,7 @@ export class HttpRequestHandler extends BaseHandler {
         }, duration);
       } else {
         // If we get here, all retries failed
-        return this.createErrorResult(
+        return this.createErrorResult(execution,
           lastError?.message || 'HTTP request failed',
           duration
         );
@@ -85,7 +85,7 @@ export class HttpRequestHandler extends BaseHandler {
 
     } catch (error) {
       const duration = Date.now() - startTime;
-      return this.createErrorResult((error as Error).message, duration);
+      return this.createErrorResult(execution, (error as Error).message, duration);
     }
   }
 

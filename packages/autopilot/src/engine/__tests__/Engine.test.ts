@@ -60,7 +60,7 @@ describe('Engine', () => {
       const result = await engine.execute(workflowWithoutStart, mockContext);
       
       expect(result.status).toBe('failed');
-      expect(result.error?.message).toContain('Blueprint must have a start node');
+      expect(result.error?.message).toContain('Workflow must have a start node');
     });
 
     it('should fail when node handler is missing', async () => {
@@ -90,11 +90,11 @@ describe('Engine', () => {
       
       const startResult = result.executionResults.get('start');
       expect(startResult?.success).toBe(true);
-      expect(startResult?.data).toEqual({ message: 'Blueprint started' });
+      expect(startResult?.data).toEqual({ message: 'Workflow started' });
       
       const endResult = result.executionResults.get('end');
       expect(endResult?.success).toBe(true);
-      expect(endResult?.data).toEqual({ message: 'Blueprint completed' });
+      expect(endResult?.data).toEqual({ message: 'Workflow completed' });
     });
 
     it('should handle node execution failures', async () => {

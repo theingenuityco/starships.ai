@@ -5,6 +5,17 @@
 import { AgentHandler } from '../AgentHandler';
 import { Node, ExecutionContext, AgentNodeParameters } from '../../../types';
 
+interface AgentExecutionResult {
+  agentName: string;
+  model: string;
+  systemPrompt?: string;
+  instructions?: string;
+  workflowId: string;
+  workflowResults: unknown[];
+  workflowStatus: string;
+  output: string;
+}
+
 describe('AgentHandler', () => {
   let handler: AgentHandler;
   let mockNode: Node;
@@ -51,9 +62,13 @@ describe('AgentHandler', () => {
         model: 'anthropic/claude-3.5-sonnet',
         systemPrompt: 'You are a helpful customer support agent.',
         instructions: 'Test instructions for the agent',
-        workflowId: 'test-workflow',
-        workflowStatus: 'completed'
+        workflowId: 'test-blueprint',
+        workflowStatus: 'completed',
+        output: 'Agent Customer Support Agent completed workflow execution successfully'
       }));
+      const agentResult = result.data as AgentExecutionResult;
+      expect(agentResult.workflowResults).toBeDefined();
+      expect(Array.isArray(agentResult.workflowResults)).toBe(true);
       expect(result.duration).toBeGreaterThan(0);
       expect(result.executedAt).toBeDefined();
       expect(result.error).toBeUndefined();
@@ -85,9 +100,13 @@ describe('AgentHandler', () => {
       expect(result.data).toEqual(expect.objectContaining({
         agentName: 'Basic Agent',
         model: 'openai/gpt-4',
-        workflowId: 'test-workflow',
-        workflowStatus: 'completed'
+        workflowId: 'test-blueprint',
+        workflowStatus: 'completed',
+        output: 'Agent Basic Agent completed workflow execution successfully'
       }));
+      const agentResult = result.data as AgentExecutionResult;
+      expect(agentResult.workflowResults).toBeDefined();
+      expect(Array.isArray(agentResult.workflowResults)).toBe(true);
       
       // Verify console.log was called correctly
       expect(consoleSpy).toHaveBeenCalledWith(

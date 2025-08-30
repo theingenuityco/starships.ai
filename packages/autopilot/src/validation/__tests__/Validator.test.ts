@@ -57,7 +57,7 @@ describe('Validator', () => {
         id: 'undefined-nodes',
         edges: [],
         metadata: {}
-      } as Blueprint;
+      } as unknown as Blueprint;
 
       const result = validator.validate(blueprintWithUndefinedNodes);
 

@@ -4,7 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { NodeResult, ExecutionContext, ValidationResult, Node as WorkflowNode } from '../types';
+import { NodeResult, ExecutionContext, ValidationResult, Node as WorkflowNode, ValidationErrorCode, ValidationWarningCode } from '../types';
 
 /**
  * Base interface for workflow node handlers
@@ -70,7 +70,7 @@ export abstract class BaseHandler implements Handler {
   /**
    * Helper to create validation error
    */
-  protected createValidationError(code: string, message: string) {
+  protected createValidationError(code: ValidationErrorCode, message: string) {
     return {
       code,
       message,
@@ -82,12 +82,11 @@ export abstract class BaseHandler implements Handler {
   /**
    * Helper to create validation warning
    */
-  protected createValidationWarning(code: string, message: string) {
+  protected createValidationWarning(code: ValidationWarningCode, message: string) {
     return {
       code,
       message,
       nodeId: this.node.id,
-      severity: 'warning' as const
     };
   }
 }

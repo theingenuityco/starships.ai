@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, ConditionalNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
@@ -59,7 +59,7 @@ export class ConditionalHandler extends BaseHandler {
   }
 
   validate(): ValidationResult {
-    const errors = [];
+    const errors: ValidationError[] = [];
     const params = this.node.parameters as ConditionalNodeParameters;
 
     if (!params.sourceNodeId) {

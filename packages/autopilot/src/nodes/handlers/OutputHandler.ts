@@ -5,7 +5,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, OutputNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
@@ -33,7 +33,7 @@ export class OutputHandler extends BaseHandler {
   }
 
   validate(): ValidationResult {
-    const errors = [];
+    const errors: ValidationError[] = [];
     const params = this.node.parameters as OutputNodeParameters;
 
     if (!params.template) {

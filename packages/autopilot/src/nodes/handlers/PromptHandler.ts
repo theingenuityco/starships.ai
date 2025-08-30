@@ -5,7 +5,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode } from '../../types';
+import { ExecutionContext, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '../../types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
@@ -25,7 +25,7 @@ export class PromptHandler extends BaseHandler {
   }
 
   validate(): ValidationResult {
-    const errors = [];
+    const errors: ValidationError[] = [];
     const params = this.node.parameters as UserPromptNodeParameters;
 
     if (!params.promptText) {

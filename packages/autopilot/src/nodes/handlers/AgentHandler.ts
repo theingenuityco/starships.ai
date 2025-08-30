@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, AgentNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {
@@ -73,8 +73,8 @@ export class AgentHandler extends BaseHandler {
   }
 
   validate(): ValidationResult {
-    const errors = [];
-    const warnings = [];
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
     const params = this.node.parameters as AgentNodeParameters;
 
     // Check for required fields
@@ -101,7 +101,7 @@ export class AgentHandler extends BaseHandler {
       // Validate workflow structure
       if (!params.blueprint.nodes || params.blueprint.nodes.length === 0) {
         errors.push(this.createValidationError(
-          'INVALID_WORKFLOW',
+          'VALIDATION_FAILED',
           'Agent workflow must contain at least one node'
         ));
       }
@@ -110,7 +110,7 @@ export class AgentHandler extends BaseHandler {
       const hasStartNode = params.blueprint.nodes.some(n => n.type === 'start');
       if (!hasStartNode) {
         errors.push(this.createValidationError(
-          'INVALID_WORKFLOW',
+          'MISSING_START_NODE',
           'Agent workflow must have a start node'
         ));
       }
@@ -121,7 +121,7 @@ export class AgentHandler extends BaseHandler {
         for (const edge of params.blueprint.edges) {
           if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
             errors.push(this.createValidationError(
-              'INVALID_WORKFLOW',
+              'INVALID_EDGE_CONNECTION',
               `Invalid edge reference in workflow: ${edge.from} -> ${edge.to}`
             ));
           }

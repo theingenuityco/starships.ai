@@ -180,14 +180,14 @@ describe('Engine', () => {
       
       // Mock the executeGraph method to capture running executions
       const originalExecuteGraph = (engine as any).executeGraph;
-      jest.spyOn(engine as any, 'executeGraph').mockImplementation(async function(...args) {
+      jest.spyOn(engine as any, 'executeGraph').mockImplementation(async (...args) => {
         // Capture the execution ID while it's running
         const running = engine.getRunningExecutions();
         if (running.length > 0) {
           executionId = running[0].id;
         }
         // Call original method
-        return originalExecuteGraph.apply(this, args);
+        return originalExecuteGraph.apply(engine, args);
       });
       
       const result = await engine.execute(mockBlueprint, mockContext);

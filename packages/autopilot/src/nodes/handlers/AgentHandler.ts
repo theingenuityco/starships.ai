@@ -6,16 +6,16 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, AgentNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, AgentNodeParameters, Node as WorkflowNode } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
   private params: AgentNodeParameters;
 
-  constructor(parameters: any, nodeId: string) {
-    super(parameters, nodeId);
-    this.params = parameters as AgentNodeParameters;
+  constructor(node: WorkflowNode) {
+    super(node);
+    this.params = node.parameters as AgentNodeParameters;
   }
 
   async execute(context: ExecutionContext) {

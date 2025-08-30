@@ -43,7 +43,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters
     };
 
-    handler = new OutputHandler(mockNode.parameters, mockNode.id);
+    handler = new OutputHandler(mockNode);
 
     mockContext = {
       ...global.createMockContext(),
@@ -87,7 +87,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const handlerWithoutTitle = new OutputHandler(paramsWithoutTitle, 'no-title-node');
+      const handlerWithoutTitle = new OutputHandler({
+        id: 'no-title-node',
+        type: 'output',
+        name: 'Output without title',
+        description: 'Output without title for testing',
+        parameters: paramsWithoutTitle
+      });
       
       const result = await handlerWithoutTitle.execute(mockContext);
       
@@ -104,7 +110,13 @@ describe('OutputHandler', () => {
         title: 'Single Source Report'
       } as OutputNodeParameters;
       
-      const singleSourceHandler = new OutputHandler(singleSourceParams, 'single-source-node');
+      const singleSourceHandler = new OutputHandler({
+        id: 'single-source-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: singleSourceParams
+      });
       
       const result = await singleSourceHandler.execute(mockContext);
       
@@ -124,7 +136,13 @@ describe('OutputHandler', () => {
         title: 'Mixed Sources Report'
       } as OutputNodeParameters;
       
-      const handlerWithMissingSources = new OutputHandler(paramsWithMissingSources, 'missing-sources-node');
+      const handlerWithMissingSources = new OutputHandler({
+        id: 'missing-sources-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithMissingSources
+      });
       
       const result = await handlerWithMissingSources.execute(mockContext);
       
@@ -150,7 +168,13 @@ describe('OutputHandler', () => {
           format
         } as OutputNodeParameters;
         
-        const handlerWithFormat = new OutputHandler(paramsWithFormat, `format-${format}-node`);
+        const handlerWithFormat = new OutputHandler({
+        id: 'format-${format}-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithFormat
+      });
         
         const result = await handlerWithFormat.execute(mockContext);
         
@@ -166,7 +190,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const handlerWithEmptySources = new OutputHandler(paramsWithEmptySources, 'empty-sources-node');
+      const handlerWithEmptySources = new OutputHandler({
+        id: 'empty-sources-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithEmptySources
+      });
       
       const result = await handlerWithEmptySources.execute(mockContext);
       
@@ -212,7 +242,13 @@ describe('OutputHandler', () => {
         title: 'Complex Data Report'
       } as OutputNodeParameters;
       
-      const handlerWithComplexData = new OutputHandler(paramsWithComplexData, 'complex-data-node');
+      const handlerWithComplexData = new OutputHandler({
+        id: 'complex-data-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithComplexData
+      });
       
       const result = await handlerWithComplexData.execute(contextWithComplexData);
       
@@ -263,7 +299,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const minimalHandler = new OutputHandler(minimalParams, 'minimal-output-node');
+      const minimalHandler = new OutputHandler({
+        id: 'minimal-output-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: minimalParams
+      });
       const result = minimalHandler.validate();
       
       expect(result.valid).toBe(true);
@@ -276,7 +318,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const handlerWithoutTemplate = new OutputHandler(paramsWithoutTemplate, 'no-template-node');
+      const handlerWithoutTemplate = new OutputHandler({
+        id: 'no-template-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithoutTemplate
+      });
       const result = handlerWithoutTemplate.validate();
       
       expect(result.valid).toBe(false);
@@ -296,7 +344,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const handlerWithEmptyTemplate = new OutputHandler(paramsWithEmptyTemplate, 'empty-template-node');
+      const handlerWithEmptyTemplate = new OutputHandler({
+        id: 'empty-template-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithEmptyTemplate
+      });
       const result = handlerWithEmptyTemplate.validate();
       
       expect(result.valid).toBe(false);
@@ -311,7 +365,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const handlerWithoutSources = new OutputHandler(paramsWithoutSources, 'no-sources-node');
+      const handlerWithoutSources = new OutputHandler({
+        id: 'no-sources-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithoutSources
+      });
       const result = handlerWithoutSources.validate();
       
       expect(result.valid).toBe(false);
@@ -331,7 +391,13 @@ describe('OutputHandler', () => {
         format: 'text'
       } as OutputNodeParameters;
       
-      const handlerWithEmptySources = new OutputHandler(paramsWithEmptySources, 'empty-sources-validation-node');
+      const handlerWithEmptySources = new OutputHandler({
+        id: 'empty-sources-validation-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithEmptySources
+      });
       const result = handlerWithEmptySources.validate();
       
       expect(result.valid).toBe(false);
@@ -346,7 +412,13 @@ describe('OutputHandler', () => {
         title: 'Some title'
       } as OutputNodeParameters;
       
-      const handlerWithMissingFields = new OutputHandler(paramsWithMissingFields, 'missing-fields-node');
+      const handlerWithMissingFields = new OutputHandler({
+        id: 'missing-fields-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithMissingFields
+      });
       const result = handlerWithMissingFields.validate();
       
       expect(result.valid).toBe(false);
@@ -371,7 +443,13 @@ describe('OutputHandler', () => {
           format
         } as OutputNodeParameters;
         
-        const handlerWithFormat = new OutputHandler(paramsWithFormat, `format-validation-${format}-node`);
+        const handlerWithFormat = new OutputHandler({
+        id: 'format-validation-${format}-node',
+        type: 'output',
+        name: 'Test Output Node',
+        description: 'Output node for testing',
+        parameters: paramsWithFormat
+      });
         const result = handlerWithFormat.validate();
         expect(result.valid).toBe(true);
       }

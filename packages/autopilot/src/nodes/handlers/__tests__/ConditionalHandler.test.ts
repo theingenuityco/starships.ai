@@ -41,7 +41,7 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters
     };
 
-    handler = new ConditionalHandler(mockNode.parameters, mockNode.id);
+    handler = new ConditionalHandler(mockNode);
 
     mockContext = {
       ...global.createMockContext(),
@@ -86,7 +86,13 @@ describe('ConditionalHandler', () => {
         defaultCondition: 'default'
       } as ConditionalNodeParameters;
       
-      const handlerWithNoMatches = new ConditionalHandler(paramsWithNoMatches, 'no-matches-node');
+      const handlerWithNoMatches = new ConditionalHandler({
+        id: 'no-matches-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithNoMatches
+      });
       
       const result = await handlerWithNoMatches.execute(mockContext);
       
@@ -108,7 +114,13 @@ describe('ConditionalHandler', () => {
         defaultCondition: undefined
       } as ConditionalNodeParameters;
       
-      const handlerWithoutDefault = new ConditionalHandler(paramsWithoutDefault, 'no-default-node');
+      const handlerWithoutDefault = new ConditionalHandler({
+        id: 'no-default-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithoutDefault
+      });
       
       const result = await handlerWithoutDefault.execute(mockContext);
       
@@ -127,7 +139,13 @@ describe('ConditionalHandler', () => {
         }
       } as ConditionalNodeParameters;
 
-      const complexHandler = new ConditionalHandler(complexParams, 'complex-node');
+      const complexHandler = new ConditionalHandler({
+        id: 'complex-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: complexParams
+      });
 
       const complexSourceResult: NodeResult = {
         ...mockSourceResult,
@@ -175,7 +193,13 @@ describe('ConditionalHandler', () => {
         }
       } as ConditionalNodeParameters;
       
-      const handlerWithInvalidExpression = new ConditionalHandler(paramsWithInvalidExpression, 'invalid-expression-node');
+      const handlerWithInvalidExpression = new ConditionalHandler({
+        id: 'invalid-expression-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithInvalidExpression
+      });
       
       const result = await handlerWithInvalidExpression.execute(mockContext);
       
@@ -197,7 +221,13 @@ describe('ConditionalHandler', () => {
         defaultCondition: 'fallback'
       } as ConditionalNodeParameters;
       
-      const handlerWithFalsyConditions = new ConditionalHandler(paramsWithFalsyConditions, 'falsy-conditions-node');
+      const handlerWithFalsyConditions = new ConditionalHandler({
+        id: 'falsy-conditions-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithFalsyConditions
+      });
       
       const result = await handlerWithFalsyConditions.execute(mockContext);
       
@@ -234,7 +264,13 @@ describe('ConditionalHandler', () => {
         conditions: { 'test': 'score > 50' }
       } as ConditionalNodeParameters;
       
-      const handlerWithoutSource = new ConditionalHandler(paramsWithoutSource, 'no-source-node');
+      const handlerWithoutSource = new ConditionalHandler({
+        id: 'no-source-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithoutSource
+      });
       const result = handlerWithoutSource.validate();
       
       expect(result.valid).toBe(false);
@@ -254,7 +290,13 @@ describe('ConditionalHandler', () => {
         conditions: { 'test': 'score > 50' }
       } as ConditionalNodeParameters;
       
-      const handlerWithEmptySource = new ConditionalHandler(paramsWithEmptySource, 'empty-source-node');
+      const handlerWithEmptySource = new ConditionalHandler({
+        id: 'empty-source-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithEmptySource
+      });
       const result = handlerWithEmptySource.validate();
       
       expect(result.valid).toBe(false);
@@ -270,7 +312,13 @@ describe('ConditionalHandler', () => {
         conditions: {}
       } as ConditionalNodeParameters;
       
-      const handlerWithoutConditions = new ConditionalHandler(paramsWithoutConditions, 'no-conditions-node');
+      const handlerWithoutConditions = new ConditionalHandler({
+        id: 'no-conditions-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithoutConditions
+      });
       const result = handlerWithoutConditions.validate();
       
       expect(result.valid).toBe(false);
@@ -290,7 +338,13 @@ describe('ConditionalHandler', () => {
         conditions: {}
       } as ConditionalNodeParameters;
       
-      const handlerWithEmptyConditions = new ConditionalHandler(paramsWithEmptyConditions, 'empty-conditions-node');
+      const handlerWithEmptyConditions = new ConditionalHandler({
+        id: 'empty-conditions-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithEmptyConditions
+      });
       const result = handlerWithEmptyConditions.validate();
       
       expect(result.valid).toBe(false);
@@ -310,7 +364,13 @@ describe('ConditionalHandler', () => {
         }
       } as ConditionalNodeParameters;
       
-      const handlerWithInvalidExpressions = new ConditionalHandler(paramsWithInvalidExpressions, 'invalid-expressions-node');
+      const handlerWithInvalidExpressions = new ConditionalHandler({
+        id: 'invalid-expressions-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithInvalidExpressions
+      });
       const result = handlerWithInvalidExpressions.validate();
       
       expect(result.valid).toBe(false);
@@ -336,7 +396,13 @@ describe('ConditionalHandler', () => {
         }
       } as ConditionalNodeParameters;
       
-      const handlerWithComplexExpressions = new ConditionalHandler(paramsWithComplexExpressions, 'complex-expressions-node');
+      const handlerWithComplexExpressions = new ConditionalHandler({
+        id: 'complex-expressions-node',
+        type: 'conditional',
+        name: 'Test Conditional Node',
+        description: 'Conditional node for testing',
+        parameters: paramsWithComplexExpressions
+      });
       const result = handlerWithComplexExpressions.validate();
       
       expect(result.valid).toBe(true);

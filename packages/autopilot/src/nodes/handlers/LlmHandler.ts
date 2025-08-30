@@ -6,16 +6,16 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters } from '../../types';
+import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node as WorkflowNode } from '../../types';
 import { HttpRequestHandler } from './HttpRequestHandler';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
   private params: LlmNodeParameters;
 
-  constructor(parameters: any, nodeId: string) {
-    super(parameters, nodeId);
-    this.params = parameters as LlmNodeParameters;
+  constructor(node: WorkflowNode) {
+    super(node);
+    this.params = node.parameters as LlmNodeParameters;
   }
 
   async execute(context: ExecutionContext) {
@@ -24,7 +24,14 @@ export class LlmHandler extends BaseHandler {
       const httpParams = this.convertToHttpRequest(this.params);
       
       // Create HttpRequestHandler instance for delegation
-      const httpHandler = new HttpRequestHandler(httpParams, `${this.nodeId}-http`);
+      const httpNode: WorkflowNode = {
+        id: `${this.nodeId}-http`,
+        type: 'http_request',
+        name: `HTTP Request for ${this.node.name}`,
+        description: `HTTP request delegated from LLM node ${this.node.name}`,
+        parameters: httpParams
+      };
+      const httpHandler = new HttpRequestHandler(httpNode);
       
       // Delegate to HttpRequestHandler
       const result = await httpHandler.execute(context);

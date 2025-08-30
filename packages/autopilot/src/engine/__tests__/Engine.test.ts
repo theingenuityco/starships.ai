@@ -3,47 +3,47 @@
  */
 
 import { Engine, ExecutionEvent } from '../Engine';
-import { Registry } from '../../nodes/Registry';
+import { Handler } from '../../nodes/Handler';
 import { StartHandler } from '../../nodes/handlers/StartHandler';
 import { EndHandler } from '../../nodes/handlers/EndHandler';
-import { Workflow, ExecutionContext, NodeResult } from '../../types';
+import { Blueprint, ExecutionContext, NodeResult } from '../../types';
 
 describe('Engine', () => {
   let engine: Engine;
-  let registry: Registry;
-  let mockWorkflow: Workflow;
+  let handlers: Map<string, Handler>;
+  let mockBlueprint: Blueprint;
   let mockContext: Partial<ExecutionContext>;
 
   beforeEach(() => {
-    registry = new Registry();
-    registry.register(new StartHandler());
-    registry.register(new EndHandler());
+    handlers = new Map();
+    handlers.set('start', new StartHandler());
+    handlers.set('end', new EndHandler());
     
-    engine = new Engine(registry);
+    engine = new Engine(handlers);
     
-    mockWorkflow = global.createMockWorkflow();
+    mockBlueprint = global.createMockBlueprint();
     mockContext = global.createMockContext();
   });
 
   describe('constructor', () => {
-    it('should create engine with provided registry', () => {
-      const customRegistry = new Registry();
-      const customEngine = new Engine(customRegistry);
+    it('should create engine with provided handlers', () => {
+      const customHandlers = new Map<string, Handler>();
+      const customEngine = new Engine(customHandlers);
       expect(customEngine).toBeInstanceOf(Engine);
     });
 
-    it('should create engine with new registry if none provided', () => {
-      const newEngine = new Engine();
-      expect(newEngine).toBeInstanceOf(Engine);
+    it('should require handlers map to be provided', () => {
+      // Engine now requires handlers map
+      expect(() => new Engine(new Map())).not.toThrow();
     });
   });
 
   describe('execute', () => {
     it('should execute a simple workflow successfully', async () => {
-      const result = await engine.execute(mockWorkflow, mockContext);
+      const result = await engine.execute(mockBlueprint, mockContext);
       
       expect(result.status).toBe('completed');
-      expect(result.workflowId).toBe(mockWorkflow.id);
+      expect(result.workflowId).toBe(mockBlueprint.id);
       expect(result.executionResults.size).toBe(2); // start and end nodes
       expect(result.startTime).toBeDefined();
       expect(result.endTime).toBeDefined();
@@ -51,7 +51,7 @@ describe('Engine', () => {
     });
 
     it('should fail when workflow has no start node', async () => {
-      const workflowWithoutStart = global.createMockWorkflow({
+      const workflowWithoutStart = global.createMockBlueprint({
         nodes: [
           { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ]
@@ -60,11 +60,11 @@ describe('Engine', () => {
       const result = await engine.execute(workflowWithoutStart, mockContext);
       
       expect(result.status).toBe('failed');
-      expect(result.error?.message).toContain('Workflow must have a start node');
+      expect(result.error?.message).toContain('Blueprint must have a start node');
     });
 
     it('should fail when node handler is missing', async () => {
-      const workflowWithUnsupportedNode = global.createMockWorkflow({
+      const workflowWithUnsupportedNode = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
           { id: 'unsupported', type: 'unsupported-type', name: 'Unsupported', description: 'Unsupported', parameters: {} },
@@ -83,18 +83,18 @@ describe('Engine', () => {
     });
 
     it('should store execution results for each node', async () => {
-      const result = await engine.execute(mockWorkflow, mockContext);
+      const result = await engine.execute(mockBlueprint, mockContext);
       
       expect(result.executionResults.has('start')).toBe(true);
       expect(result.executionResults.has('end')).toBe(true);
       
       const startResult = result.executionResults.get('start');
       expect(startResult?.success).toBe(true);
-      expect(startResult?.data).toEqual({ message: 'Workflow started' });
+      expect(startResult?.data).toEqual({ message: 'Blueprint started' });
       
       const endResult = result.executionResults.get('end');
       expect(endResult?.success).toBe(true);
-      expect(endResult?.data).toEqual({ message: 'Workflow completed' });
+      expect(endResult?.data).toEqual({ message: 'Blueprint completed' });
     });
 
     it('should handle node execution failures', async () => {
@@ -121,9 +121,9 @@ describe('Engine', () => {
         }
       }
       
-      registry.register(new FailingHandler());
+      handlers.set('failing', new FailingHandler());
       
-      const workflowWithFailingNode = global.createMockWorkflow({
+      const workflowWithFailingNode = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
           { id: 'failing-node', type: 'failing', name: 'Failing', description: 'Failing', parameters: {} },
@@ -152,7 +152,7 @@ describe('Engine', () => {
       
       engine.onEvent(eventCallback);
       
-      await engine.execute(mockWorkflow, mockContext);
+      await engine.execute(mockBlueprint, mockContext);
       
       // Check that events were emitted in correct order
       expect(events).toHaveLength(6); // workflow_started, node_started, node_completed, node_started, node_completed, workflow_completed
@@ -170,7 +170,7 @@ describe('Engine', () => {
       engine.onEvent(eventCallback);
       engine.offEvent(eventCallback);
       
-      await engine.execute(mockWorkflow, mockContext);
+      await engine.execute(mockBlueprint, mockContext);
       
       expect(events).toHaveLength(0);
     });
@@ -184,9 +184,9 @@ describe('Engine', () => {
       
       engine.onEvent(failingCallback);
       
-      const result = await engine.execute(mockWorkflow, mockContext);
+      const result = await engine.execute(mockBlueprint, mockContext);
       
-      // Workflow should still complete successfully despite callback error
+      // Blueprint should still complete successfully despite callback error
       expect(result.status).toBe('completed');
       expect(consoleSpy).toHaveBeenCalledWith(
         'Error in workflow event callback:',
@@ -215,7 +215,7 @@ describe('Engine', () => {
         return originalExecuteGraph.apply(this, args);
       });
       
-      const result = await engine.execute(mockWorkflow, mockContext);
+      const result = await engine.execute(mockBlueprint, mockContext);
       
       expect(result.status).toBe('completed');
       expect(executionId).toBeTruthy();
@@ -274,10 +274,10 @@ describe('Engine', () => {
         }
       }
       
-      registry.register(new ConditionalHandler());
-      registry.register(new PathHandler());
+      handlers.set('conditional', new ConditionalHandler());
+      handlers.set('path', new PathHandler());
       
-      const conditionalWorkflow = global.createMockWorkflow({
+      const conditionalBlueprint = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
           { id: 'conditional', type: 'conditional', name: 'Decision', description: 'Decision', parameters: {} },
@@ -294,7 +294,7 @@ describe('Engine', () => {
         ]
       });
       
-      const result = await engine.execute(conditionalWorkflow, mockContext);
+      const result = await engine.execute(conditionalBlueprint, mockContext);
       
       expect(result.status).toBe('completed');
       expect(result.executionResults.has('path-a')).toBe(true);

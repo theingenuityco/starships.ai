@@ -6,23 +6,13 @@
 
 import { Handler } from '../Handler';
 import { Node, NodeResult, ExecutionContext, ValidationResult, AgentNodeParameters } from '../../types';
-import { Engine } from '../../engine/Engine';
-import { Registry } from '../Registry';
-import { StartHandler } from './StartHandler';
-import { EndHandler } from './EndHandler';
+import { Workflow } from '../../Workflow';
 
 export class AgentHandler implements Handler {
   readonly type = 'agent';
-  private engine: Engine;
 
   constructor() {
-    const registry = new Registry();
-    
-    // Register basic handlers needed for workflow execution
-    registry.register(new StartHandler());
-    registry.register(new EndHandler());
-    
-    this.engine = new Engine(registry);
+    // No longer need to create engine instance - each agent creates its own Workflow
   }
 
   async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
@@ -47,8 +37,9 @@ export class AgentHandler implements Handler {
         }
       };
 
-      // Execute the embedded workflow
-      const workflowResult = await this.engine.execute(params.workflow, workflowContext);
+      // Create workflow instance from the agent's blueprint and execute
+      const workflow = new Workflow(params.blueprint);
+      const workflowResult = await workflow.execute(workflowContext);
       
       // Check if workflow execution was successful
       if (workflowResult.status === 'completed') {
@@ -65,7 +56,7 @@ export class AgentHandler implements Handler {
             model: params.model,
             systemPrompt: params.systemPrompt,
             instructions: params.instructions,
-            workflowId: params.workflow.id,
+            workflowId: params.blueprint.id,
             workflowResults: workflowOutputs,
             workflowStatus: workflowResult.status,
             output: `Agent ${params.name} completed workflow execution successfully`
@@ -82,7 +73,7 @@ export class AgentHandler implements Handler {
           error: `Agent ${params.name} workflow execution failed: ${errorMessage}`,
           data: {
             agentName: params.name,
-            workflowId: params.workflow.id,
+            workflowId: params.blueprint.id,
             workflowStatus: workflowResult.status,
             workflowError: workflowResult.error
           },
@@ -130,7 +121,7 @@ export class AgentHandler implements Handler {
       });
     }
 
-    if (!params.workflow) {
+    if (!params.blueprint) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Agent workflow is required',
@@ -139,7 +130,7 @@ export class AgentHandler implements Handler {
       });
     } else {
       // Validate workflow structure
-      if (!params.workflow.nodes || params.workflow.nodes.length === 0) {
+      if (!params.blueprint.nodes || params.blueprint.nodes.length === 0) {
         errors.push({
           code: 'INVALID_WORKFLOW',
           message: 'Agent workflow must contain at least one node',
@@ -149,7 +140,7 @@ export class AgentHandler implements Handler {
       }
 
       // Check for start node
-      const hasStartNode = params.workflow.nodes.some(n => n.type === 'start');
+      const hasStartNode = params.blueprint.nodes.some(n => n.type === 'start');
       if (!hasStartNode) {
         errors.push({
           code: 'INVALID_WORKFLOW',
@@ -160,9 +151,9 @@ export class AgentHandler implements Handler {
       }
 
       // Check for circular references in workflow
-      if (params.workflow.edges && params.workflow.edges.length > 0) {
-        const nodeIds = new Set(params.workflow.nodes.map(n => n.id));
-        for (const edge of params.workflow.edges) {
+      if (params.blueprint.edges && params.blueprint.edges.length > 0) {
+        const nodeIds = new Set(params.blueprint.nodes.map(n => n.id));
+        for (const edge of params.blueprint.edges) {
           if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
             errors.push({
               code: 'INVALID_WORKFLOW',

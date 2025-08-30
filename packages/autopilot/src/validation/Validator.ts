@@ -1,13 +1,13 @@
 /**
- * Workflow Validator
+ * Blueprint Validator
  * 
  * Validates workflow structure and configuration
  */
 
-import { Workflow, ValidationResult, ValidationError, Node } from '../types';
+import { Blueprint, ValidationResult, ValidationError, Node } from '../types';
 
 export class Validator {
-  validate(workflow: Workflow): ValidationResult {
+  validate(workflow: Blueprint): ValidationResult {
     const errors: ValidationError[] = [];
 
     try {
@@ -15,7 +15,7 @@ export class Validator {
       if (!workflow.nodes || workflow.nodes.length === 0) {
         errors.push({
           code: 'MISSING_REQUIRED_FIELD',
-          message: 'Workflow must have nodes',
+          message: 'Blueprint must have nodes',
           severity: 'error'
         });
       }
@@ -23,7 +23,7 @@ export class Validator {
       if (!workflow.edges || workflow.edges.length === 0) {
         errors.push({
           code: 'MISSING_REQUIRED_FIELD', 
-          message: 'Workflow must have edges',
+          message: 'Blueprint must have edges',
           severity: 'error'
         });
       }
@@ -39,7 +39,7 @@ export class Validator {
       if (!hasStart) {
         errors.push({
           code: 'MISSING_START_NODE',
-          message: 'Workflow must have a start node',
+          message: 'Blueprint must have a start node',
           severity: 'error'
         });
       }
@@ -47,7 +47,7 @@ export class Validator {
       if (!hasEnd) {
         errors.push({
           code: 'MISSING_END_NODE',
-          message: 'Workflow must have an end node', 
+          message: 'Blueprint must have an end node', 
           severity: 'error'
         });
       }
@@ -79,7 +79,7 @@ export class Validator {
     }
   }
 
-  private validateConnectivity(workflow: Workflow): ValidationError[] {
+  private validateConnectivity(workflow: Blueprint): ValidationError[] {
     const errors: ValidationError[] = [];
     
     // Check for unreachable nodes
@@ -113,7 +113,7 @@ export class Validator {
     return errors;
   }
 
-  private findReachableNodes(workflow: Workflow, startNodeId: string): Set<string> {
+  private findReachableNodes(workflow: Blueprint, startNodeId: string): Set<string> {
     const reachable = new Set<string>();
     const queue = [startNodeId];
 
@@ -131,7 +131,7 @@ export class Validator {
     return reachable;
   }
 
-  private detectCircularDependencies(workflow: Workflow): string[][] {
+  private detectCircularDependencies(workflow: Blueprint): string[][] {
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
     const cycles: string[][] = [];

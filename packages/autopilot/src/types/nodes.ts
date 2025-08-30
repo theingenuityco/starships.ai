@@ -4,8 +4,8 @@
  * Specific parameter types for different workflow node types
  */
 
-// Import Workflow type for agent workflow execution
-import type { Workflow } from './workflow';
+// Import Blueprint type for agent workflow execution
+import type { Blueprint } from './workflow';
 
 /**
  * Agent-specific node parameters
@@ -26,8 +26,8 @@ export interface AgentNodeParameters {
   instructions?: string;
   timeout?: number;
   
-  // Workflow execution
-  workflow: Workflow;
+  // Blueprint execution
+  blueprint: Blueprint;
   workflowContext?: Record<string, unknown>;
 }
 

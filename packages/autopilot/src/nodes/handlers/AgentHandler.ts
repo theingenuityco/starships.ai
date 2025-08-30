@@ -8,13 +8,21 @@ import { Handler } from '../Handler';
 import { Node, NodeResult, ExecutionContext, ValidationResult, AgentNodeParameters } from '../../types';
 import { Engine } from '../../engine/Engine';
 import { Registry } from '../Registry';
+import { StartHandler } from './StartHandler';
+import { EndHandler } from './EndHandler';
 
 export class AgentHandler implements Handler {
   readonly type = 'agent';
   private engine: Engine;
 
   constructor() {
-    this.engine = new Engine(new Registry());
+    const registry = new Registry();
+    
+    // Register basic handlers needed for workflow execution
+    registry.register(new StartHandler());
+    registry.register(new EndHandler());
+    
+    this.engine = new Engine(registry);
   }
 
   async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
@@ -63,7 +71,7 @@ export class AgentHandler implements Handler {
             output: `Agent ${params.name} completed workflow execution successfully`
           },
           executedAt: new Date().toISOString(),
-          duration: Date.now() - startTime
+          duration: Math.max(1, Date.now() - startTime)
         };
       } else {
         // Workflow execution failed
@@ -79,7 +87,7 @@ export class AgentHandler implements Handler {
             workflowError: workflowResult.error
           },
           executedAt: new Date().toISOString(),
-          duration: Date.now() - startTime
+          duration: Math.max(1, Date.now() - startTime)
         };
       }
     } catch (error) {
@@ -93,7 +101,7 @@ export class AgentHandler implements Handler {
           model: params.model
         },
         executedAt: new Date().toISOString(),
-        duration: Date.now() - startTime
+        duration: Math.max(1, Date.now() - startTime)
       };
     }
   }

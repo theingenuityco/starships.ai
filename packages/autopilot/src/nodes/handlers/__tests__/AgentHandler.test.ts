@@ -25,7 +25,8 @@ describe('AgentHandler', () => {
         temperature: 0.7,
         maxTokens: 500,
         instructions: 'Test instructions for the agent',
-        timeout: 5000
+        timeout: 5000,
+        workflow: global.createMockWorkflow()
       } as AgentNodeParameters
     };
     mockContext = global.createMockContext();
@@ -45,19 +46,21 @@ describe('AgentHandler', () => {
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('agent-node');
-      expect(result.data).toEqual({ 
-        output: 'Agent execution completed',
+      expect(result.data).toEqual(expect.objectContaining({
         agentName: 'Customer Support Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        systemPrompt: 'You are a helpful customer support agent.'
-      });
-      expect(result.duration).toBe(5000); // Uses timeout value
+        systemPrompt: 'You are a helpful customer support agent.',
+        instructions: 'Test instructions for the agent',
+        workflowId: 'test-workflow',
+        workflowStatus: 'completed'
+      }));
+      expect(result.duration).toBeGreaterThan(0);
       expect(result.executedAt).toBeDefined();
       expect(result.error).toBeUndefined();
       
       // Verify console.log was called with correct parameters
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Executing agent: Customer Support Agent (model: anthropic/claude-3.5-sonnet) with instructions: Test instructions for the agent'
+        'Executing agent: Customer Support Agent (model: anthropic/claude-3.5-sonnet) with workflow execution'
       );
       
       consoleSpy.mockRestore();
@@ -68,7 +71,8 @@ describe('AgentHandler', () => {
         ...mockNode,
         parameters: {
           name: 'Basic Agent',
-          model: 'openai/gpt-4'
+          model: 'openai/gpt-4',
+          workflow: global.createMockWorkflow()
         } as AgentNodeParameters
       };
       
@@ -78,16 +82,16 @@ describe('AgentHandler', () => {
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('agent-node');
-      expect(result.data).toEqual({ 
-        output: 'Agent execution completed',
+      expect(result.data).toEqual(expect.objectContaining({
         agentName: 'Basic Agent',
         model: 'openai/gpt-4',
-        systemPrompt: undefined
-      });
+        workflowId: 'test-workflow',
+        workflowStatus: 'completed'
+      }));
       
-      // Verify console.log handles undefined instructions
+      // Verify console.log was called correctly
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Executing agent: Basic Agent (model: openai/gpt-4) with instructions: undefined'
+        'Executing agent: Basic Agent (model: openai/gpt-4) with workflow execution'
       );
       
       consoleSpy.mockRestore();
@@ -128,7 +132,8 @@ describe('AgentHandler', () => {
         ...mockNode,
         parameters: {
           name: 'Test Agent',
-          model: 'openai/gpt-4'
+          model: 'openai/gpt-4',
+          workflow: global.createMockWorkflow()
         } as AgentNodeParameters
       };
       
@@ -144,7 +149,8 @@ describe('AgentHandler', () => {
         ...mockNode,
         parameters: {
           model: 'openai/gpt-4',
-          instructions: 'Some instructions'
+          instructions: 'Some instructions',
+          workflow: global.createMockWorkflow()
         } as AgentNodeParameters
       };
       
@@ -166,7 +172,8 @@ describe('AgentHandler', () => {
         ...mockNode,
         parameters: {
           name: 'Test Agent',
-          instructions: 'Some instructions'
+          instructions: 'Some instructions',
+          workflow: global.createMockWorkflow()
         } as AgentNodeParameters
       };
       
@@ -186,7 +193,8 @@ describe('AgentHandler', () => {
       const nodeWithoutRequiredParams = {
         ...mockNode,
         parameters: {
-          instructions: 'Some instructions'
+          instructions: 'Some instructions',
+          workflow: global.createMockWorkflow()
         } as AgentNodeParameters
       };
       
@@ -207,9 +215,10 @@ describe('AgentHandler', () => {
       const result = handler.validate(nodeWithoutParams);
       
       expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(2);
+      expect(result.errors).toHaveLength(3);
       expect(result.errors[0].code).toBe('MISSING_REQUIRED_FIELD');
       expect(result.errors[1].code).toBe('MISSING_REQUIRED_FIELD');
+      expect(result.errors[2].code).toBe('MISSING_REQUIRED_FIELD');
     });
 
     it('should handle empty string values as invalid', () => {
@@ -218,7 +227,8 @@ describe('AgentHandler', () => {
         parameters: {
           name: '',
           model: '',
-          instructions: 'Some instructions'
+          instructions: 'Some instructions',
+          workflow: global.createMockWorkflow()
         } as AgentNodeParameters
       };
       

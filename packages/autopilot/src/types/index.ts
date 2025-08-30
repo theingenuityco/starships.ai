@@ -26,8 +26,7 @@ export type {
   HttpRequestNodeParameters,
   HttpMethod,
   HttpAuthentication,
-  LlmNodeParameters,
-  LlmProvider
+  LlmNodeParameters
 } from './nodes';
 
 // ===== AGENT FRAMEWORK TYPES =====

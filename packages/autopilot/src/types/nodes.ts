@@ -108,7 +108,7 @@ export interface HttpAuthentication {
 }
 
 /**
- * LLM node parameters for AI model interactions
+ * LLM node parameters for AI model interactions via OpenRouter
  */
 export interface LlmNodeParameters {
   model: string;
@@ -116,20 +116,9 @@ export interface LlmNodeParameters {
   temperature?: number;
   maxTokens?: number;
   systemMessage?: string;
-  provider?: LlmProvider;
   timeout?: number;
   stream?: boolean;
   topP?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
 }
-
-/**
- * LLM providers supported by the LLM node
- */
-export type LlmProvider =
-  | 'openai'
-  | 'anthropic'
-  | 'google'
-  | 'local'
-  | 'custom';

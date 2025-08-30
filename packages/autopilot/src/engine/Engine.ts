@@ -27,9 +27,7 @@ const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
 export interface ExecutionEvent {
   type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' |
         'workflow_paused' | 'workflow_resumed' | 'workflow_completed' | 'workflow_failed';
-  contextId: string;
-  nodeId?: string;
-  data?: any;
+  execution: Execution;
   timestamp: string;
 }
 
@@ -104,7 +102,7 @@ export class Engine {
       // Emit start event
       await this.emitEvent({
         type: 'workflow_started',
-        contextId: 'workflow',
+        execution: this.execution,
         timestamp: new Date().toISOString()
       });
 
@@ -120,7 +118,7 @@ export class Engine {
 
         await this.emitEvent({
           type: 'workflow_completed',
-          contextId: 'workflow',
+          execution: this.execution,
           timestamp: new Date().toISOString()
         });
       }
@@ -138,8 +136,7 @@ export class Engine {
 
       await this.emitEvent({
         type: 'workflow_failed',
-        contextId: 'workflow',
-        data: { error: errorMessage },
+        execution: this.execution,
         timestamp: new Date().toISOString()
       });
     } finally {
@@ -166,9 +163,7 @@ export class Engine {
         // Emit node start event
         await this.emitEvent({
           type: 'node_started',
-          contextId: 'workflow',
-          nodeId: currentNode.ref,
-          data: { nodeName: currentNode.name, nodeType: currentNode.type },
+          execution: execution,
           timestamp: new Date().toISOString()
         });
 
@@ -182,9 +177,7 @@ export class Engine {
           // Emit node completed event
           await this.emitEvent({
             type: 'node_completed',
-            contextId: 'workflow',
-            nodeId: currentNode.ref,
-            data: { result: result.data },
+            execution: execution,
             timestamp: new Date().toISOString()
           });
 
@@ -201,9 +194,7 @@ export class Engine {
           // Node execution failed
           await this.emitEvent({
             type: 'node_failed',
-            contextId: 'workflow',
-            nodeId: currentNode.ref,
-            data: { error: result.error },
+            execution: execution,
             timestamp: new Date().toISOString()
           });
 
@@ -333,7 +324,7 @@ export class Engine {
 
     this.emitEvent({
       type: 'workflow_paused',
-      contextId: 'workflow',
+      execution: this.execution,
       timestamp: new Date().toISOString()
     });
 
@@ -352,7 +343,7 @@ export class Engine {
 
     this.emitEvent({
       type: 'workflow_resumed',
-      contextId: 'workflow',
+      execution: this.execution,
       timestamp: new Date().toISOString()
     });
 

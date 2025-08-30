@@ -435,9 +435,7 @@ Example execution result:
       { /* llm analysis result */ }
     ],
     output: 'Agent Support Agent completed workflow execution successfully'
-  },
-  executedAt: '2025-08-30T11:53:00.000Z',
-  duration: 2500
+  }
 }
 ```
 

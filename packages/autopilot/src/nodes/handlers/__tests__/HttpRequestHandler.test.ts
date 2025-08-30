@@ -63,7 +63,6 @@ describe('HttpRequestHandler', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Network Error');
       expect(result.nodeRef).toBe('http-request-node');
-      expect(result.duration).toBeGreaterThanOrEqual(0);
     });
   });
 

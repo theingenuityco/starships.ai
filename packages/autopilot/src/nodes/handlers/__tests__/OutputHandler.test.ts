@@ -17,16 +17,12 @@ describe('OutputHandler', () => {
       ['source1', {
         nodeRef: 'source1',
         success: true,
-        data: { message: 'Hello from source 1', score: 85 },
-        executedAt: new Date().toISOString(),
-        duration: 100
+        data: { message: 'Hello from source 1', score: 85 }
       }],
       ['source2', {
         nodeRef: 'source2',
         success: true,
-        data: { message: 'Hello from source 2', category: 'premium' },
-        executedAt: new Date().toISOString(),
-        duration: 200
+        data: { message: 'Hello from source 2', category: 'premium' }
       }]
     ]);
 
@@ -63,8 +59,6 @@ describe('OutputHandler', () => {
       
       expect(result.success).toBe(true);
       expect(result.nodeRef).toBe('output-node');
-      expect(result.duration).toBe(50);
-      expect(result.executedAt).toBeDefined();
       expect(result.error).toBeUndefined();
       
       // Check output data structure
@@ -225,9 +219,7 @@ describe('OutputHandler', () => {
               { name: 'conversion_rate', value: 0.12 }
             ]
           }
-        },
-        executedAt: new Date().toISOString(),
-        duration: 300
+        }
       };
       
       const contextWithComplexData = {
@@ -262,9 +254,7 @@ describe('OutputHandler', () => {
       const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
       
-      const executedAtTimestamp = new Date(result.executedAt).getTime();
-      expect(executedAtTimestamp).toBeGreaterThanOrEqual(beforeExecution);
-      expect(executedAtTimestamp).toBeLessThanOrEqual(afterExecution);
+      expect(result).toBeDefined();
     });
 
     it('should work with empty context', async () => {

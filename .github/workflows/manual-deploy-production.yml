@@ -1,0 +1,58 @@
+name: Manual Deploy to Production
+
+# IMPORTANT: This workflow ONLY runs on manual trigger
+# It will NEVER run automatically on push, pull_request, or any other event
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (e.g., 3.9.0 or latest)'
+        required: true
+        type: string
+        default: 'latest'
+      confirm_production:
+        description: 'Type "DEPLOY" to confirm production deployment'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    # Extra safety: Only run on workflow_dispatch
+    if: github.event_name == 'workflow_dispatch'
+    environment: 
+      name: prod
+      url: https://starships.ai
+    steps:
+      - name: Validate deployment confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY" ]; then
+            echo "❌ Production deployment not confirmed. Type DEPLOY to confirm."
+            exit 1
+          fi
+          echo "✅ Production deployment confirmed by ${{ github.actor }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production
+        run: |
+          echo "🚀 Deploying version ${{ github.event.inputs.version }} to production"
+          echo "Deployed by: ${{ github.actor }}"
+          echo "Deployment time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          # Add your actual deployment steps here
+          # For now, this is a safe placeholder that does nothing
+          
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 🚀 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- Version: ${{ github.event.inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployed by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

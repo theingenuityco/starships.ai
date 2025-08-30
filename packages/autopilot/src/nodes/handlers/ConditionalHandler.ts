@@ -31,11 +31,7 @@ export class ConditionalHandler extends BaseHandler {
           const nodeResult: NodeResult = {
             nodeRef: this.node.ref,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
-            nextEdgeCondition: conditionKey,
-            metadata: {
-              duration: 10,
-              executedAt: new Date().toISOString()
-            }
+            nextEdgeCondition: conditionKey
           };
           execution.executionResults.set(this.node.ref, nodeResult);
           return execution;
@@ -47,19 +43,14 @@ export class ConditionalHandler extends BaseHandler {
       const nodeResult: NodeResult = {
         nodeRef: this.node.ref,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
-        nextEdgeCondition: defaultCondition,
-        metadata: {
-          duration: 10,
-          executedAt: new Date().toISOString()
-        }
+        nextEdgeCondition: defaultCondition
       };
       execution.executionResults.set(this.node.ref, nodeResult);
       return execution;
 
     } catch (error) {
       return this.createErrorResult(execution,
-        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        10
+        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

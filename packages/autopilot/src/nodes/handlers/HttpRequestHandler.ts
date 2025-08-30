@@ -13,7 +13,6 @@ export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
 
   async execute(execution: Execution) {
-    const startTime = Date.now();
     const params = this.node.parameters as HttpRequestNodeParameters;
     
     try {
@@ -65,7 +64,6 @@ export class HttpRequestHandler extends BaseHandler {
         }
       }
 
-      const duration = Date.now() - startTime;
 
       if (response) {
         return this.createSuccessResult(execution, {
@@ -74,18 +72,16 @@ export class HttpRequestHandler extends BaseHandler {
           headers: response.headers,
           body: response.data,
           url: response.config.url
-        }, duration);
+        });
       } else {
         // If we get here, all retries failed
         return this.createErrorResult(execution,
-          lastError?.message || 'HTTP request failed',
-          duration
+          lastError?.message || 'HTTP request failed'
         );
       }
 
     } catch (error) {
-      const duration = Date.now() - startTime;
-      return this.createErrorResult(execution, (error as Error).message, duration);
+      return this.createErrorResult(execution, (error as Error).message);
     }
   }
 

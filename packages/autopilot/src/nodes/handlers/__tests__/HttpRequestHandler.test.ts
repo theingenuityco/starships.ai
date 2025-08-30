@@ -30,7 +30,7 @@ describe('HttpRequestHandler', () => {
 
   beforeEach(() => {
     mockNode = {
-      id: 'http-request-node',
+      ref: 'http-request-node',
       type: 'http_request',
       name: 'Test HTTP Request',
       description: 'HTTP request for testing',
@@ -62,7 +62,7 @@ describe('HttpRequestHandler', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Network Error');
-      expect(result.nodeId).toBe('http-request-node');
+      expect(result.nodeRef).toBe('http-request-node');
       expect(result.duration).toBeGreaterThanOrEqual(0);
     });
   });

@@ -16,11 +16,11 @@ describe('Validator', () => {
     it('should validate successfully with valid workflow', () => {
       const validBlueprint: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'end' }
         ],
         metadata: {}
       };
@@ -69,7 +69,7 @@ describe('Validator', () => {
     it('should fail validation when edges are missing', () => {
       const blueprintWithoutEdges: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
         edges: [],
         metadata: {}
@@ -88,7 +88,7 @@ describe('Validator', () => {
     it('should fail validation when edges array is undefined', () => {
       const blueprintWithUndefinedEdges = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
         metadata: {}
       } as Blueprint;
@@ -106,10 +106,10 @@ describe('Validator', () => {
     it('should fail validation when start node is missing', () => {
       const blueprintWithoutStart: Blueprint = {
         nodes: [
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'end' }
         ],
         metadata: {}
       };
@@ -127,10 +127,10 @@ describe('Validator', () => {
     it('should fail validation when end node is missing', () => {
       const blueprintWithoutEnd: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'end' }
         ],
         metadata: {}
       };
@@ -148,12 +148,12 @@ describe('Validator', () => {
     it('should detect unreachable nodes', () => {
       const blueprintWithUnreachableNode: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
-          { id: 'isolated', type: 'conditional', name: 'Isolated', description: 'Isolated node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
+          { ref: 'isolated', type: 'conditional', name: 'Isolated', description: 'Isolated node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'end' }
           // No edge connecting to 'isolated' node
         ],
         metadata: {}
@@ -173,16 +173,16 @@ describe('Validator', () => {
     it('should detect circular dependencies', () => {
       const blueprintWithCircularDep: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'node1', type: 'conditional', name: 'Node 1', description: 'Node 1', parameters: {} },
-          { id: 'node2', type: 'conditional', name: 'Node 2', description: 'Node 2', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'node1', type: 'conditional', name: 'Node 1', description: 'Node 1', parameters: {} },
+          { ref: 'node2', type: 'conditional', name: 'Node 2', description: 'Node 2', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'node1' },
-          { id: 'edge-2', from: 'node1', to: 'node2' },
-          { id: 'edge-3', from: 'node2', to: 'node1' }, // Creates cycle
-          { id: 'edge-4', from: 'node2', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'node1' },
+          { ref: 'edge-2', from: 'node1', to: 'node2' },
+          { ref: 'edge-3', from: 'node2', to: 'node1' }, // Creates cycle
+          { ref: 'edge-4', from: 'node2', to: 'end' }
         ],
         metadata: {}
       };
@@ -199,18 +199,18 @@ describe('Validator', () => {
     it('should handle complex circular dependencies', () => {
       const blueprintWithComplexCycle: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'a', type: 'conditional', name: 'A', description: 'Node A', parameters: {} },
-          { id: 'b', type: 'conditional', name: 'B', description: 'Node B', parameters: {} },
-          { id: 'c', type: 'conditional', name: 'C', description: 'Node C', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'a', type: 'conditional', name: 'A', description: 'Node A', parameters: {} },
+          { ref: 'b', type: 'conditional', name: 'B', description: 'Node B', parameters: {} },
+          { ref: 'c', type: 'conditional', name: 'C', description: 'Node C', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'a' },
-          { id: 'edge-2', from: 'a', to: 'b' },
-          { id: 'edge-3', from: 'b', to: 'c' },
-          { id: 'edge-4', from: 'c', to: 'a' }, // Creates cycle: a -> b -> c -> a
-          { id: 'edge-5', from: 'c', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'a' },
+          { ref: 'edge-2', from: 'a', to: 'b' },
+          { ref: 'edge-3', from: 'b', to: 'c' },
+          { ref: 'edge-4', from: 'c', to: 'a' }, // Creates cycle: a -> b -> c -> a
+          { ref: 'edge-5', from: 'c', to: 'end' }
         ],
         metadata: {}
       };
@@ -224,13 +224,13 @@ describe('Validator', () => {
     it('should handle workflows without start node for connectivity validation', () => {
       const blueprintWithoutStartForConnectivity: Blueprint = {
         nodes: [
-          { id: 'node1', type: 'conditional', name: 'Node 1', description: 'Node 1', parameters: {} },
-          { id: 'node2', type: 'conditional', name: 'Node 2', description: 'Node 2', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'node1', type: 'conditional', name: 'Node 1', description: 'Node 1', parameters: {} },
+          { ref: 'node2', type: 'conditional', name: 'Node 2', description: 'Node 2', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'node1', to: 'node2' },
-          { id: 'edge-2', from: 'node2', to: 'end' }
+          { ref: 'edge-1', from: 'node1', to: 'node2' },
+          { ref: 'edge-2', from: 'node2', to: 'end' }
         ],
         metadata: {}
       };
@@ -245,14 +245,14 @@ describe('Validator', () => {
     it('should handle self-referencing nodes', () => {
       const blueprintWithSelfReference: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'self-ref', type: 'conditional', name: 'Self Ref', description: 'Self referencing node', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'self-ref', type: 'conditional', name: 'Self Ref', description: 'Self referencing node', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'self-ref' },
-          { id: 'edge-2', from: 'self-ref', to: 'self-ref' }, // Self reference
-          { id: 'edge-3', from: 'self-ref', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'self-ref' },
+          { ref: 'edge-2', from: 'self-ref', to: 'self-ref' }, // Self reference
+          { ref: 'edge-3', from: 'self-ref', to: 'end' }
         ],
         metadata: {}
       };
@@ -299,18 +299,18 @@ describe('Validator', () => {
     it('should pass validation for workflow with multiple paths', () => {
       const multiPathBlueprint: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'decision', type: 'conditional', name: 'Decision', description: 'Decision node', parameters: {} },
-          { id: 'path1', type: 'conditional', name: 'Path 1', description: 'Path 1', parameters: {} },
-          { id: 'path2', type: 'conditional', name: 'Path 2', description: 'Path 2', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'decision', type: 'conditional', name: 'Decision', description: 'Decision node', parameters: {} },
+          { ref: 'path1', type: 'conditional', name: 'Path 1', description: 'Path 1', parameters: {} },
+          { ref: 'path2', type: 'conditional', name: 'Path 2', description: 'Path 2', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'decision' },
-          { id: 'edge-2', from: 'decision', to: 'path1', condition: 'condition1' },
-          { id: 'edge-3', from: 'decision', to: 'path2', condition: 'condition2' },
-          { id: 'edge-4', from: 'path1', to: 'end' },
-          { id: 'edge-5', from: 'path2', to: 'end' }
+          { ref: 'edge-1', from: 'start', to: 'decision' },
+          { ref: 'edge-2', from: 'decision', to: 'path1', condition: 'condition1' },
+          { ref: 'edge-3', from: 'decision', to: 'path2', condition: 'condition2' },
+          { ref: 'edge-4', from: 'path1', to: 'end' },
+          { ref: 'edge-5', from: 'path2', to: 'end' }
         ],
         metadata: {}
       };
@@ -324,13 +324,13 @@ describe('Validator', () => {
     it('should detect nodes that only connect to themselves', () => {
       const blueprintWithIsolatedSelfLoop: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'self-loop', type: 'conditional', name: 'Self Loop', description: 'Self loop node', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'self-loop', type: 'conditional', name: 'Self Loop', description: 'Self loop node', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'end' },
-          { id: 'edge-2', from: 'self-loop', to: 'self-loop' } // Isolated self loop
+          { ref: 'edge-1', from: 'start', to: 'end' },
+          { ref: 'edge-2', from: 'self-loop', to: 'self-loop' } // Isolated self loop
         ],
         metadata: {}
       };
@@ -346,8 +346,8 @@ describe('Validator', () => {
     it('should handle workflow with no edges correctly', () => {
       const blueprintWithNoEdgesButNodes: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [],
         metadata: {}
@@ -381,17 +381,17 @@ describe('Validator', () => {
     it('should properly track visited nodes in cycle detection', () => {
       const blueprintWithMultipleComponents: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-          { id: 'a', type: 'conditional', name: 'A', description: 'Node A', parameters: {} },
-          { id: 'b', type: 'conditional', name: 'B', description: 'Node B', parameters: {} },
-          { id: 'c', type: 'conditional', name: 'C', description: 'Node C', parameters: {} },
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'a', type: 'conditional', name: 'A', description: 'Node A', parameters: {} },
+          { ref: 'b', type: 'conditional', name: 'B', description: 'Node B', parameters: {} },
+          { ref: 'c', type: 'conditional', name: 'C', description: 'Node C', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [
-          { id: 'edge-1', from: 'start', to: 'a' },
-          { id: 'edge-2', from: 'a', to: 'b' },
-          { id: 'edge-3', from: 'b', to: 'end' },
-          { id: 'edge-4', from: 'c', to: 'c' } // Isolated self loop
+          { ref: 'edge-1', from: 'start', to: 'a' },
+          { ref: 'edge-2', from: 'a', to: 'b' },
+          { ref: 'edge-3', from: 'b', to: 'end' },
+          { ref: 'edge-4', from: 'c', to: 'c' } // Isolated self loop
         ],
         metadata: {}
       };
@@ -423,7 +423,7 @@ describe('Validator', () => {
     it('should handle workflow with only start node', () => {
       const startOnlyBlueprint: Blueprint = {
         nodes: [
-          { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
         edges: [],
         metadata: {}
@@ -439,7 +439,7 @@ describe('Validator', () => {
     it('should handle workflow with only end node', () => {
       const endOnlyBlueprint: Blueprint = {
         nodes: [
-          { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],
         edges: [],
         metadata: {}

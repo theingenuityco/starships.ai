@@ -20,11 +20,11 @@ global.console = {
 // Global test utilities with type assertions
 (global as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
   nodes: [
-    { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-    { id: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+    { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+    { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
   ],
   edges: [
-    { id: 'edge-1', from: 'start', to: 'end' }
+    { ref: 'edge-1', from: 'start', to: 'end' }
   ],
   metadata: {},
   ...overrides

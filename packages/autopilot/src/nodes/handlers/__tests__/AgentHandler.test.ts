@@ -23,7 +23,7 @@ describe('AgentHandler', () => {
 
   beforeEach(() => {
     mockNode = {
-      id: 'agent-node',
+      ref: 'agent-node',
       type: 'agent',
       name: 'Test Agent Node',
       description: 'Agent node for testing',
@@ -56,7 +56,7 @@ describe('AgentHandler', () => {
       const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('agent-node');
+      expect(result.nodeRef).toBe('agent-node');
       expect(result.data).toEqual(expect.objectContaining({
         agentName: 'Customer Support Agent',
         model: 'anthropic/claude-3.5-sonnet',
@@ -89,7 +89,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters;
       
       const minimalNode: Node = {
-        id: 'minimal-agent-node',
+        ref: 'minimal-agent-node',
         type: 'agent',
         name: 'Minimal Agent',
         description: 'Minimal agent for testing',
@@ -101,7 +101,7 @@ describe('AgentHandler', () => {
       const result = await minimalHandler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('minimal-agent-node');
+      expect(result.nodeRef).toBe('minimal-agent-node');
       expect(result.data).toEqual(expect.objectContaining({
         agentName: 'Basic Agent',
         model: 'openai/gpt-4',
@@ -137,7 +137,7 @@ describe('AgentHandler', () => {
       const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('agent-node');
+      expect(result.nodeRef).toBe('agent-node');
     });
   });
 
@@ -159,7 +159,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters;
       
       const minimalNode: Node = {
-        id: 'minimal-agent-node',
+        ref: 'minimal-agent-node',
         type: 'agent',
         name: 'Minimal Agent',
         description: 'Minimal agent for testing',
@@ -181,7 +181,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters;
       
       const nodeWithoutName: Node = {
-        id: 'no-name-agent-node',
+        ref: 'no-name-agent-node',
         type: 'agent',
         name: 'Agent without name',
         description: 'Agent without name for testing',
@@ -195,7 +195,7 @@ describe('AgentHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Agent name is required',
-        nodeId: 'no-name-agent-node',
+        nodeRef: 'no-name-agent-node',
         severity: 'error'
       });
       expect(result.warnings).toHaveLength(0);
@@ -209,7 +209,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters;
       
       const nodeWithoutModel: Node = {
-        id: 'no-model-agent-node',
+        ref: 'no-model-agent-node',
         type: 'agent',
         name: 'Agent without model',
         description: 'Agent without model for testing',
@@ -223,7 +223,7 @@ describe('AgentHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Agent model is required',
-        nodeId: 'no-model-agent-node',
+        nodeRef: 'no-model-agent-node',
         severity: 'error'
       });
     });
@@ -235,7 +235,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters;
       
       const nodeWithoutRequiredParams: Node = {
-        id: 'no-required-agent-node',
+        ref: 'no-required-agent-node',
         type: 'agent',
         name: 'Agent without required params',
         description: 'Agent without required params for testing',
@@ -254,7 +254,7 @@ describe('AgentHandler', () => {
       const emptyParams = {} as AgentNodeParameters;
       
       const nodeWithoutParams: Node = {
-        id: 'empty-params-agent-node',
+        ref: 'empty-params-agent-node',
         type: 'agent',
         name: 'Agent with empty params',
         description: 'Agent with empty params for testing',
@@ -279,7 +279,7 @@ describe('AgentHandler', () => {
       } as AgentNodeParameters;
       
       const nodeWithEmptyValues: Node = {
-        id: 'empty-values-agent-node',
+        ref: 'empty-values-agent-node',
         type: 'agent',
         name: 'Agent with empty values',
         description: 'Agent with empty values for testing',

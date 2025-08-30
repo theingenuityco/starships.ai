@@ -12,7 +12,7 @@ describe('StartHandler', () => {
 
   beforeEach(() => {
     mockNode = {
-      id: 'start-node',
+      ref: 'start-node',
       type: 'start',
       name: 'Start Node',
       description: 'Start node for workflow',
@@ -33,7 +33,7 @@ describe('StartHandler', () => {
       const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('start-node');
+      expect(result.nodeRef).toBe('start-node');
       expect(result.data).toEqual({ message: 'Workflow started' });
       expect(result.duration).toBe(0);
       expect(result.executedAt).toBeDefined();
@@ -46,7 +46,7 @@ describe('StartHandler', () => {
       const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('start-node');
+      expect(result.nodeRef).toBe('start-node');
     });
 
     it('should set execution timestamp', async () => {
@@ -72,7 +72,7 @@ describe('StartHandler', () => {
 
     it('should validate even with empty parameters', () => {
       const nodeWithEmptyParams: Node = {
-        id: 'start-node-2',
+        ref: 'start-node-2',
         type: 'start',
         name: 'Start Node 2',
         description: 'Start node with empty params',

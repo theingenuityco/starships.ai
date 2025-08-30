@@ -12,7 +12,7 @@ describe('EndHandler', () => {
 
   beforeEach(() => {
     mockNode = {
-      id: 'end-node',
+      ref: 'end-node',
       type: 'end',
       name: 'End Node',
       description: 'End node for workflow',
@@ -33,7 +33,7 @@ describe('EndHandler', () => {
       const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('end-node');
+      expect(result.nodeRef).toBe('end-node');
       expect(result.data).toEqual({ message: 'Workflow completed' });
       expect(result.duration).toBe(0);
       expect(result.executedAt).toBeDefined();
@@ -46,7 +46,7 @@ describe('EndHandler', () => {
       const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('end-node');
+      expect(result.nodeRef).toBe('end-node');
     });
 
     it('should set execution timestamp', async () => {
@@ -72,7 +72,7 @@ describe('EndHandler', () => {
 
     it('should validate even with empty parameters', () => {
       const nodeWithEmptyParams: Node = {
-        id: 'end-node-2',
+        ref: 'end-node-2',
         type: 'end',
         name: 'End Node 2',
         description: 'End node with empty params',

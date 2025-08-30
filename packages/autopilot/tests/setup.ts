@@ -2,6 +2,13 @@
  * Jest setup file for autopilot package tests
  */
 
+import type { Blueprint } from '../src/types/workflow';
+import type { ExecutionContext } from '../src/types/execution';
+// import './global.d.ts';
+
+// Import Jest types for global availability
+// import '@types/jest';
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,
@@ -10,8 +17,8 @@ global.console = {
   error: jest.fn()
 };
 
-// Global test utilities
-global.createMockBlueprint = (overrides = {}) => ({
+// Global test utilities with type assertions
+(global as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
   id: 'test-blueprint',
   nodes: [
     { id: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
@@ -25,9 +32,9 @@ global.createMockBlueprint = (overrides = {}) => ({
 });
 
 // Legacy support for tests that haven't been updated yet
-global.createMockWorkflow = global.createMockBlueprint;
+(global as any).createMockWorkflow = (global as any).createMockBlueprint;
 
-global.createMockContext = (overrides = {}) => ({
+(global as any).createMockContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
   workflowId: 'test-blueprint',
   userId: 'test-user',
   previousResults: new Map(),

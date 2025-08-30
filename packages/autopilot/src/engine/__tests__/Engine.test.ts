@@ -67,7 +67,7 @@ describe('Engine', () => {
       const workflowWithUnsupportedNode = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
-          { id: 'unsupported', type: 'unsupported-type', name: 'Unsupported', description: 'Unsupported', parameters: {} },
+          { id: 'unsupported', type: 'unsupported-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
         ],
         edges: [
@@ -126,7 +126,7 @@ describe('Engine', () => {
       const workflowWithFailingNode = global.createMockBlueprint({
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
-          { id: 'failing-node', type: 'failing', name: 'Failing', description: 'Failing', parameters: {} },
+          { id: 'failing-node', type: 'failing' as any, name: 'Failing', description: 'Failing', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
         ],
         edges: [
@@ -281,8 +281,8 @@ describe('Engine', () => {
         nodes: [
           { id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
           { id: 'conditional', type: 'conditional', name: 'Decision', description: 'Decision', parameters: {} },
-          { id: 'path-a', type: 'path', name: 'Path A', description: 'Path A', parameters: {} },
-          { id: 'path-b', type: 'path', name: 'Path B', description: 'Path B', parameters: {} },
+          { id: 'path-a', type: 'path' as any, name: 'Path A', description: 'Path A', parameters: {} },
+          { id: 'path-b', type: 'path' as any, name: 'Path B', description: 'Path B', parameters: {} },
           { id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} }
         ],
         edges: [

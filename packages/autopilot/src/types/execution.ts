@@ -19,11 +19,8 @@ export interface Execution {
  */
 export interface NodeResult {
   nodeRef: string;
-  success: boolean;
   data?: unknown;
   error?: string;
-  executedAt: string;
-  duration?: number;
   nextEdgeCondition?: string;
   metadata?: Record<string, unknown>;
 }

@@ -27,7 +27,7 @@ export class AgentHandler extends BaseHandler {
       if (workflowResult.status === 'completed') {
         // Collect all successful workflow results
         const workflowOutputs = Array.from(workflowResult.executionResults.values())
-          .filter(result => result.success)
+          .filter(result => !result.error)
           .map(result => result.data);
 
         return this.createSuccessResult(execution, {
@@ -38,20 +38,18 @@ export class AgentHandler extends BaseHandler {
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
           output: `Agent ${params.name} completed workflow execution successfully`
-        }, Date.now() - startTime);
+        });
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
         return this.createErrorResult(execution,
-          `Agent ${params.name} workflow execution failed: ${errorMessage}`,
-          Date.now() - startTime
+          `Agent ${params.name} workflow execution failed: ${errorMessage}`
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResult(execution,
-        `Agent ${params.name} execution failed: ${errorMessage}`,
-        Date.now() - startTime
+        `Agent ${params.name} execution failed: ${errorMessage}`
       );
     }
   }

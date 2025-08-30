@@ -1,26 +1,16 @@
 /**
  * Workflow Class
- * 
- * Executable workflow that combines Blueprint data with handler management and execution capabilities.
- * Replaces the Registry pattern with integrated handler management.
+ *
+ * Executable workflow that combines Blueprint data with workflow building and execution capabilities.
+ * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
 import { Blueprint, Node, Edge, ExecutionContext, RuntimeState, NodeType } from './types';
-import { Handler } from './nodes/Handler';
 import { Engine } from './engine/Engine';
-import { 
-  StartHandler, 
-  EndHandler, 
-  AgentHandler, 
-  ConditionalHandler, 
-  PromptHandler, 
-  OutputHandler 
-} from './nodes/handlers';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Workflow {
   private blueprint: Blueprint;
-  private handlers: Map<string, Handler> = new Map();
   private engine: Engine;
 
   constructor(blueprintOrId: Blueprint | string) {
@@ -36,56 +26,8 @@ export class Workflow {
       this.blueprint = { ...blueprintOrId };
     }
 
-    // Initialize default handlers (replaces Registry functionality)
-    this.initializeDefaultHandlers();
-
-    // Create engine with handler lookup function
-    this.engine = new Engine(this.handlers);
-  }
-
-  /**
-   * Initialize default handlers for all supported node types
-   */
-  private initializeDefaultHandlers(): void {
-    this.registerHandler(new StartHandler());
-    this.registerHandler(new EndHandler());
-    this.registerHandler(new AgentHandler());
-    this.registerHandler(new ConditionalHandler());
-    this.registerHandler(new PromptHandler());
-    this.registerHandler(new OutputHandler());
-  }
-
-  /**
-   * Register a node handler (replaces Registry.register)
-   */
-  registerHandler(handler: Handler): void {
-    if (this.handlers.has(handler.type)) {
-      console.warn(`Overriding existing handler for node type: ${handler.type}`);
-    }
-    
-    this.handlers.set(handler.type, handler);
-    console.log(`Registered node handler: ${handler.type}`);
-  }
-
-  /**
-   * Get handler for a node type (replaces Registry.getHandler)
-   */
-  getHandler(type: string): Handler | null {
-    return this.handlers.get(type) || null;
-  }
-
-  /**
-   * Get all registered handler types (replaces Registry.getSupportedTypes)
-   */
-  getSupportedTypes(): string[] {
-    return Array.from(this.handlers.keys());
-  }
-
-  /**
-   * Check if a node type is supported (replaces Registry.hasHandler)
-   */
-  hasHandler(type: string): boolean {
-    return this.handlers.has(type);
+    // Create engine - handles all node types internally
+    this.engine = new Engine();
   }
 
   /**
@@ -192,8 +134,8 @@ export class Workflow {
       errors.push('Workflow must have a start node');
     }
 
-    // Check that all node types have handlers
-    const unsupportedNodes = this.blueprint.nodes.filter(node => !this.hasHandler(node.type));
+    // Check that all node types have handlers (delegate to engine)
+    const unsupportedNodes = this.blueprint.nodes.filter(node => !this.engine.hasHandler(node.type));
     if (unsupportedNodes.length > 0) {
       errors.push(`Unsupported node types: ${unsupportedNodes.map(n => n.type).join(', ')}`);
     }

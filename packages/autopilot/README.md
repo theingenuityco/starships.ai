@@ -22,37 +22,24 @@ Autopilot provides a powerful workflow execution system:
 ### Quick Start - Workflows
 
 ```typescript
-import { Engine, Registry, Validator, type Workflow } from '@starships/autopilot';
+import { Workflow, Validator } from '@starships/autopilot';
 
-// Create workflow
-const workflow: Workflow = {
-  id: 'example-workflow',
-  expeditionId: 'exp-1',
-  nodes: [
-    { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-    { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
-  ],
-  edges: [
-    { id: 'edge-1', from: 'start', to: 'end' }
-  ],
-  approvalStatus: 'approved',
-  visualization: '',
-  createdAt: new Date().toISOString()
-};
+// Create workflow using the builder pattern
+const workflow = new Workflow('example-workflow')
+  .addNode({ type: 'start', name: 'Start', description: 'Begin', parameters: {} })
+  .addNode({ type: 'end', name: 'End', description: 'Complete', parameters: {} })
+  .addEdge('start', 'end');
 
 // Validate workflow
-const validator = new Validator();
-const validation = validator.validate(workflow);
+const validation = workflow.validate();
 
 if (!validation.valid) {
   console.error('Validation errors:', validation.errors);
   process.exit(1);
 }
 
-// Execute workflow
-const registry = new Registry();
-const engine = new Engine(registry);
-const result = await engine.execute(workflow, {
+// Execute workflow - engine with all handlers is created internally
+const result = await workflow.execute({
   userId: 'user-1'
 });
 
@@ -83,104 +70,81 @@ Autopilot supports various node types for building complex workflows:
 
 ## Integration Example
 
-### Using Both Systems Together
+### Complete Workflow Example
 
 ```typescript
-import { 
-  // Workflow system
-  Engine, Registry, StartHandler, EndHandler, AgentHandler,
-  // Agent framework  
-  AgentBuilder, type ExecutionHandler 
-} from '@starships/autopilot';
+import { Workflow } from '@starships/autopilot';
 
-// 1. Create agents using the framework
-class ServerExecutionHandler implements ExecutionHandler {
-  async handle(request: AgentRequest, agent: Agent): Promise<AgentResponse> {
-    // Server implements actual agent logic
-    return {
-      content: `${agent.name} processed: ${request.message}`,
-      timestamp: new Date().toISOString(),
-      sessionId: request.sessionId
-    };
-  }
-}
-
-const supportAgent = new AgentBuilder()
-  .setId('support-001')
-  .setName('Support Agent')
-  .setDescription('Customer support specialist')
-  .setHandler(new ServerExecutionHandler())
-  .build();
-
-await supportAgent.onInitialize({ userId: 'user-123' });
-
-// 2. Create workflow that uses the agent
-const workflow = {
-  id: 'support-workflow',
-  expeditionId: 'exp-1',
-  nodes: [
-    { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-    {
-      id: 'http-call',
-      type: 'http_request',
-      name: 'Fetch User Data',
-      description: 'Get user information from API',
-      parameters: {
-        url: 'https://api.example.com/users/123',
-        method: 'GET',
-        headers: { 'Authorization': 'Bearer ${API_TOKEN}' },
-        timeout: 10000,
-        retries: 2
+// Create workflow with multiple node types - all handlers are automatically available
+const workflow = new Workflow('support-workflow')
+  .addNode({
+    id: 'start',
+    type: 'start',
+    name: 'Start',
+    description: 'Begin',
+    parameters: {}
+  })
+  .addNode({
+    id: 'http-call',
+    type: 'http_request',
+    name: 'Fetch User Data',
+    description: 'Get user information from API',
+    parameters: {
+      url: 'https://api.example.com/users/123',
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ${API_TOKEN}' },
+      timeout: 10000,
+      retries: 2
+    }
+  })
+  .addNode({
+    id: 'llm-task',
+    type: 'llm',
+    name: 'Generate Response',
+    description: 'Create personalized response using AI',
+    parameters: {
+      model: 'anthropic/claude-3.5-sonnet',
+      prompt: 'Generate a helpful response for the user based on their data',
+      temperature: 0.7,
+      maxTokens: 500,
+      systemMessage: 'You are a helpful customer support assistant.'
+    }
+  })
+  .addNode({
+    id: 'agent-task',
+    type: 'agent',
+    name: 'Process Request',
+    description: 'Handle user request',
+    parameters: {
+      name: 'Support Agent',
+      model: 'anthropic/claude-3.5-sonnet',
+      instructions: 'Help the user',
+      systemPrompt: 'You are a helpful customer support agent.',
+      blueprint: {
+        id: 'agent-workflow',
+        nodes: [
+          { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+          { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+        ],
+        edges: [{ id: 'edge-1', from: 'start', to: 'end' }],
+        metadata: {}
       }
-    },
-    {
-      id: 'llm-task',
-      type: 'llm',
-      name: 'Generate Response',
-      description: 'Create personalized response using AI',
-      parameters: {
-        model: 'anthropic/claude-3.5-sonnet',
-        prompt: 'Generate a helpful response for the user based on their data',
-        temperature: 0.7,
-        maxTokens: 500,
-        systemMessage: 'You are a helpful customer support assistant.'
-      }
-    },
-    {
-      id: 'agent-task',
-      type: 'agent',
-      name: 'Process Request',
-      description: 'Handle user request',
-      parameters: {
-        name: 'Support Agent',
-        model: 'anthropic/claude-3.5-sonnet',
-        instructions: 'Help the user',
-        systemPrompt: 'You are a helpful customer support agent.'
-      }
-    },
-    { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
-  ],
-  edges: [
-    { id: 'edge-1', from: 'start', to: 'http-call' },
-    { id: 'edge-2', from: 'http-call', to: 'llm-task' },
-    { id: 'edge-3', from: 'llm-task', to: 'agent-task' },
-    { id: 'edge-4', from: 'agent-task', to: 'end' }
-  ],
-  approvalStatus: 'approved',
-  visualization: '',
-  createdAt: new Date().toISOString()
-};
+    }
+  })
+  .addNode({
+    id: 'end',
+    type: 'end',
+    name: 'End',
+    description: 'Complete',
+    parameters: {}
+  })
+  .addEdge('start', 'http-call')
+  .addEdge('http-call', 'llm-task')
+  .addEdge('llm-task', 'agent-task')
+  .addEdge('agent-task', 'end');
 
-// Execute workflow with all node types
-const registry = new Registry();
-registry.register(new StartHandler());
-registry.register(new EndHandler());
-registry.register(new HttpRequestHandler());
-registry.register(new LlmHandler());
-registry.register(new AgentHandler()); // Handles embedded agent configuration
-
-const engine = new Engine(registry);
-const result = await engine.execute(workflow, { userId: 'user-123' });
+// Execute workflow - engine with all node handlers is managed internally
+const result = await workflow.execute({ userId: 'user-123' });
 ```
 
 ## New Node Types
@@ -260,22 +224,27 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
 
 ### Workflow System
 
-#### Engine
+#### Workflow
 ```typescript
-const engine = new Engine(registry);
-const result = await engine.execute(workflow, context);
+const workflow = new Workflow('my-workflow');
+const result = await workflow.execute(context);
 ```
 
-#### Registry
-```typescript
-const registry = new Registry();
-registry.register(new CustomHandler());
-```
+#### Engine (Internal)
+The engine is created and managed internally by the Workflow class. All supported node handlers are automatically registered:
+- start/end - Flow control nodes
+- agent - AI agent with embedded workflow execution
+- conditional - Smart routing with JSONata expressions
+- user_prompt - Interactive user input
+- output - Result formatting and delivery
+- http_request - HTTP API calls
+- llm - Large Language Model interactions
 
 #### Validator
 ```typescript
 const validator = new Validator();
-const result = validator.validate(workflow);
+// or use the workflow's built-in validation
+const result = workflow.validate();
 ```
 
 ### Agent Node Configuration
@@ -319,9 +288,8 @@ Example agent node with embedded workflow:
     maxTokens: 500,
     instructions: 'Help the customer with their inquiry',
     // Embedded workflow that the agent will execute
-    workflow: {
+    blueprint: {
       id: 'support-workflow',
-      expeditionId: 'exp-1',
       nodes: [
         { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
         {
@@ -353,9 +321,7 @@ Example agent node with embedded workflow:
         { id: 'edge-2', from: 'fetch-data', to: 'analyze' },
         { id: 'edge-3', from: 'analyze', to: 'end' }
       ],
-      approvalStatus: 'approved',
-      visualization: '',
-      createdAt: new Date().toISOString()
+      metadata: {}
     },
     // Context passed to the embedded workflow
     workflowContext: {

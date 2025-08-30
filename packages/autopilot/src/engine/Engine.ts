@@ -7,7 +7,6 @@
 
 import { Blueprint, RuntimeState, ExecutionContext, Node as WorkflowNode, NodeResult } from '../types';
 import { Handler, HandlerConstructor } from '../nodes/Handler';
-import { v4 as uuidv4 } from 'uuid';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
@@ -89,9 +88,7 @@ export class Engine {
     this.runtimeState = {
       currentNodeRef: undefined,
       status: 'not_started',
-      executionResults: new Map(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      executionResults: new Map()
     };
 
     try {
@@ -113,8 +110,6 @@ export class Engine {
 
       // Update runtime state
       this.runtimeState.status = 'running';
-      this.runtimeState.startTime = new Date().toISOString();
-      this.runtimeState.updatedAt = new Date().toISOString();
 
       // Execute workflow graph
       await this.executeGraph(blueprint, this.runtimeState, context);
@@ -122,8 +117,6 @@ export class Engine {
       // Mark as completed if no errors
       if (this.runtimeState.status === 'running') {
         this.runtimeState.status = 'completed';
-        this.runtimeState.endTime = new Date().toISOString();
-        this.runtimeState.updatedAt = new Date().toISOString();
 
         await this.emitEvent({
           type: 'workflow_completed',
@@ -136,8 +129,6 @@ export class Engine {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
       this.runtimeState.status = 'failed';
-      this.runtimeState.endTime = new Date().toISOString();
-      this.runtimeState.updatedAt = new Date().toISOString();
       this.runtimeState.error = {
         code: 'SYSTEM_ERROR',
         message: errorMessage,
@@ -181,7 +172,6 @@ export class Engine {
       try {
         // Update current node
         runtimeState.currentNodeRef = currentNode.ref;
-        runtimeState.updatedAt = new Date().toISOString();
 
         // Emit node start event
         await this.emitEvent({
@@ -249,7 +239,6 @@ export class Engine {
 
     // Clear current node when done
     runtimeState.currentNodeRef = undefined;
-    runtimeState.updatedAt = new Date().toISOString();
   }
 
   /**
@@ -351,8 +340,6 @@ export class Engine {
     }
 
     this.runtimeState.status = 'paused';
-    this.runtimeState.pausedAt = new Date().toISOString();
-    this.runtimeState.updatedAt = new Date().toISOString();
 
     this.emitEvent({
       type: 'workflow_paused',
@@ -372,8 +359,6 @@ export class Engine {
     }
 
     this.runtimeState.status = 'running';
-    this.runtimeState.pausedAt = undefined;
-    this.runtimeState.updatedAt = new Date().toISOString();
 
     this.emitEvent({
       type: 'workflow_resumed',
@@ -393,8 +378,6 @@ export class Engine {
     }
 
     this.runtimeState.status = 'cancelled';
-    this.runtimeState.endTime = new Date().toISOString();
-    this.runtimeState.updatedAt = new Date().toISOString();
 
     return true;
   }

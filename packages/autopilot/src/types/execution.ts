@@ -11,12 +11,7 @@ export interface RuntimeState {
   currentNodeRef?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;
-  startTime?: string;
-  endTime?: string;
-  pausedAt?: string;
   error?: ExecutionError;
-  createdAt: string;
-  updatedAt: string;
 }
 
 /**

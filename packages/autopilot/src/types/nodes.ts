@@ -137,3 +137,12 @@ export interface LlmNodeParameters {
   frequencyPenalty?: number;
   presencePenalty?: number;
 }
+
+/**
+ * Workflow node parameters for executing embedded blueprints
+ */
+export interface WorkflowNodeParameters {
+  blueprint: Blueprint;
+  workflowContext?: Record<string, unknown>;
+  timeout?: number;
+}

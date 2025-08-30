@@ -11,7 +11,8 @@ import type {
   UserPromptNodeParameters,
   OutputNodeParameters,
   HttpRequestNodeParameters,
-  LlmNodeParameters
+  LlmNodeParameters,
+  WorkflowNodeParameters
 } from './nodes';
 
 /**
@@ -59,7 +60,8 @@ export type NodeType =
   | 'start'
   | 'end'
   | 'http_request'
-  | 'llm';
+  | 'llm'
+  | 'workflow';
 
 /**
  * Base interface for all workflow node parameters
@@ -78,6 +80,7 @@ export type NodeParameters =
   | OutputNodeParameters
   | HttpRequestNodeParameters
   | LlmNodeParameters
+  | WorkflowNodeParameters
   | StartEndNodeParameters;
 
 export type StartEndNodeParameters = BaseNodeParameters;

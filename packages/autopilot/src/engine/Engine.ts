@@ -19,6 +19,7 @@ const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
   'output': () => import('../nodes/handlers/OutputHandler').then(m => m.OutputHandler),
   'http_request': () => import('../nodes/handlers/HttpRequestHandler').then(m => m.HttpRequestHandler),
   'llm': () => import('../nodes/handlers/LlmHandler').then(m => m.LlmHandler),
+  'workflow': () => import('../nodes/handlers/WorkflowHandler').then(m => m.WorkflowHandler),
 };
 
 /**

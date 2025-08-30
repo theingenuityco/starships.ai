@@ -2,16 +2,16 @@
  * Node Parameter Types
  *
  * Specific parameter types for different workflow node types
+ * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-// Import Blueprint type for agent workflow execution
-import type { Blueprint } from './workflow';
+import type { BaseNodeParameters, BaseBlueprint } from './base';
 
 /**
  * Agent-specific node parameters
  * Contains full agent configuration for workflow execution
  */
-export interface AgentNodeParameters {
+export interface AgentNodeParameters extends BaseNodeParameters {
   // Core agent identity
   name: string;
   description?: string;
@@ -27,14 +27,14 @@ export interface AgentNodeParameters {
   timeout?: number;
   
   // Blueprint execution
-  blueprint: Blueprint;
+  blueprint: BaseBlueprint;
   workflowContext?: Record<string, unknown>;
 }
 
 /**
  * Conditional node parameters for data-driven routing
  */
-export interface ConditionalNodeParameters {
+export interface ConditionalNodeParameters extends BaseNodeParameters {
   sourceNodeId: string;
   expression: string;
   conditions: Record<string, string>;
@@ -44,7 +44,7 @@ export interface ConditionalNodeParameters {
 /**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptNodeParameters {
+export interface UserPromptNodeParameters extends BaseNodeParameters {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
@@ -55,7 +55,7 @@ export interface UserPromptNodeParameters {
 /**
  * Output node parameters for final result generation
  */
-export interface OutputNodeParameters {
+export interface OutputNodeParameters extends BaseNodeParameters {
   template: string;
   sources: string[];
   format: OutputFormat;
@@ -87,7 +87,7 @@ export type OutputFormat =
 /**
  * HTTP request node parameters for making HTTP calls
  */
-export interface HttpRequestNodeParameters {
+export interface HttpRequestNodeParameters extends BaseNodeParameters {
   url: string;
   method: HttpMethod;
   headers?: Record<string, string>;
@@ -125,7 +125,7 @@ export interface HttpAuthentication {
 /**
  * LLM node parameters for AI model interactions via OpenRouter
  */
-export interface LlmNodeParameters {
+export interface LlmNodeParameters extends BaseNodeParameters {
   model: string;
   prompt: string;
   temperature?: number;
@@ -141,8 +141,26 @@ export interface LlmNodeParameters {
 /**
  * Workflow node parameters for executing embedded blueprints
  */
-export interface WorkflowNodeParameters {
-  blueprint: Blueprint;
+export interface WorkflowNodeParameters extends BaseNodeParameters {
+  blueprint: BaseBlueprint;
   workflowContext?: Record<string, unknown>;
   timeout?: number;
 }
+
+/**
+ * Start and End node parameters (empty but extends base)
+ */
+export type StartEndNodeParameters = BaseNodeParameters;
+
+/**
+ * Union type for all workflow node parameters
+ */
+export type NodeParameters =
+  | AgentNodeParameters
+  | ConditionalNodeParameters
+  | UserPromptNodeParameters
+  | OutputNodeParameters
+  | HttpRequestNodeParameters
+  | LlmNodeParameters
+  | WorkflowNodeParameters
+  | StartEndNodeParameters;

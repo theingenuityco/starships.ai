@@ -7,7 +7,7 @@
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, HttpRequestNodeParameters, Node as WorkflowNode } from '../../types';
+import { ExecutionContext, ValidationResult, HttpRequestNodeParameters } from '../../types';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';

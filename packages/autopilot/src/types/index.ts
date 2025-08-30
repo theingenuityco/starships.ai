@@ -4,30 +4,26 @@
  * Re-exports all types for the autopilot package
  */
 
-// ===== WORKFLOW SYSTEM TYPES =====
-// Core workflow types (includes node parameter types)
-export * from './workflow';
+// ===== MAIN API TYPES =====
+// Primary types for external usage (Node, Blueprint)
+export type { Node, Blueprint } from './blueprint';
 
-// Execution types
+// ===== BASE TYPES =====
+// Shared base types (Edge, NodeType, BaseNodeParameters)
+export type { Edge, NodeType, BaseNodeParameters } from './base';
+
+// ===== NODE PARAMETER TYPES =====
+// Node-specific parameter definitions
+export * from './node-parameters';
+
+// ===== EXECUTION TYPES =====
+// Runtime execution state and context
 export * from './execution';
 
-// Validation types
+// ===== VALIDATION TYPES =====
+// Validation and error reporting
 export * from './validation';
 
-// Node parameter types are available through workflow exports
-// but can be imported directly if needed
-export type {
-  AgentNodeParameters,
-  ConditionalNodeParameters,
-  UserPromptNodeParameters,
-  OutputNodeParameters,
-  UserPromptChoice,
-  OutputFormat,
-  HttpRequestNodeParameters,
-  HttpMethod,
-  HttpAuthentication,
-  LlmNodeParameters,
-  WorkflowNodeParameters
-} from './nodes';
-
-// Agent framework types were removed - autopilot now focuses on workflow execution only
+// ===== INTERNAL TYPES =====
+// Internal base types (for internal package use only)
+export type { BaseNode, BaseBlueprint } from './base';

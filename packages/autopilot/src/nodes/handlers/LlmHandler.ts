@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node as WorkflowNode } from '../../types';
+import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node } from '../../types';
 import { HttpRequestHandler } from './HttpRequestHandler';
 
 export class LlmHandler extends BaseHandler {
@@ -19,7 +19,7 @@ export class LlmHandler extends BaseHandler {
       const httpParams = this.convertToHttpRequest(params);
       
       // Create HttpRequestHandler instance for delegation
-      const httpNode: WorkflowNode = {
+      const httpNode: Node = {
         id: `${this.node.id}-http`,
         type: 'http_request',
         name: `HTTP Request for ${this.node.name}`,

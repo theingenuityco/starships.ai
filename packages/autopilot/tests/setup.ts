@@ -2,8 +2,8 @@
  * Jest setup file for autopilot package tests
  */
 
-import type { Blueprint } from '../src/types/workflow';
-import type { ExecutionContext } from '../src/types/execution';
+import type { Blueprint } from '../src/types';
+import type { ExecutionContext } from '../src/types';
 // import './global.d.ts';
 
 // Import Jest types for global availability

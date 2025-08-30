@@ -11,8 +11,8 @@ import { Execution, ValidationResult } from '../../types';
 export class StartHandler extends BaseHandler {
   readonly type = 'start';
 
-  async execute(initialExecution?: Execution) {
-    return this.createSuccessResult({
+  async execute(execution: Execution) {
+    return this.createSuccessResult(execution, {
       message: 'Workflow started'
     });
   }

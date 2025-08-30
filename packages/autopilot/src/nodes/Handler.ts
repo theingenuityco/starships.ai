@@ -15,7 +15,7 @@ export interface Handler {
   readonly type: string;
   
   /** Execute with parameters already injected via constructor */
-  execute(initialExecution?: Execution): Promise<NodeResult>;
+  execute(execution: Execution): Promise<Execution>;
   
   /** Validate the handler's configuration */
   validate(): ValidationResult;
@@ -37,34 +37,40 @@ export abstract class BaseHandler implements Handler {
 
   constructor(protected node: WorkflowNode) {}
 
-  abstract execute(initialExecution?: Execution): Promise<NodeResult>;
+  abstract execute(execution: Execution): Promise<Execution>;
   abstract validate(): ValidationResult;
   abstract getIcon(): string;
 
   /**
-   * Helper to create successful result
+   * Helper to create successful result and push to execution results
    */
-  protected createSuccessResult(data: any, duration?: number): NodeResult {
-    return {
+  protected createSuccessResult(execution: Execution, data: any, duration?: number): Execution {
+    const result: NodeResult = {
       nodeRef: this.node.ref,
       success: true,
       data,
       executedAt: new Date().toISOString(),
       duration: duration || 0
     };
+    
+    execution.executionResults.set(this.node.ref, result);
+    return execution;
   }
 
   /**
-   * Helper to create error result
+   * Helper to create error result and push to execution results
    */
-  protected createErrorResult(error: string, duration?: number): NodeResult {
-    return {
+  protected createErrorResult(execution: Execution, error: string, duration?: number): Execution {
+    const result: NodeResult = {
       nodeRef: this.node.ref,
       success: false,
       error,
       executedAt: new Date().toISOString(),
       duration: duration || 0
     };
+    
+    execution.executionResults.set(this.node.ref, result);
+    return execution;
   }
 
   /**

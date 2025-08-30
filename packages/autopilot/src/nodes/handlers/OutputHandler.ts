@@ -10,12 +10,12 @@ import { Execution, ValidationResult, OutputNodeParameters, ValidationError } fr
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
 
-  async execute(initialExecution?: Execution) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as OutputNodeParameters;
     // Gather data from source nodes
     const sourceData: Record<string, any> = {};
     for (const sourceNodeId of params.sources) {
-      const sourceResult = initialExecution?.executionResults.get(sourceNodeId);
+      const sourceResult = execution.executionResults.get(sourceNodeId);
       if (sourceResult) {
         sourceData[sourceNodeId] = sourceResult.data;
       }
@@ -25,7 +25,7 @@ export class OutputHandler extends BaseHandler {
     // For now, return simple formatted output
     const output = `# ${params.title || 'Workflow Output'}\n\n${JSON.stringify(sourceData, null, 2)}`;
     
-    return this.createSuccessResult({
+    return this.createSuccessResult(execution, {
       output,
       format: params.format,
       sourceData

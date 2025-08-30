@@ -182,8 +182,7 @@ const workflow = {
       name: 'Generate Response',
       description: 'Create personalized response using AI',
       parameters: {
-        model: 'gpt-4',
-        provider: 'openai',
+        model: 'anthropic/claude-3.5-sonnet',
         prompt: 'Generate a helpful response for the user based on their data',
         temperature: 0.7,
         maxTokens: 500,
@@ -260,17 +259,16 @@ Makes HTTP API calls with comprehensive support for authentication, retries, and
 
 ### LLM Node
 
-Integrates with various Large Language Model providers by converting parameters to HTTP requests.
+Integrates with AI models using OpenRouter's unified API, providing access to 200+ models from various providers including OpenAI, Anthropic, Google, Meta, and more.
 
 ```typescript
 {
   id: 'ai-response',
   type: 'llm',
   name: 'Generate AI Response',
-  description: 'Create intelligent response using LLM',
+  description: 'Create intelligent response using LLM via OpenRouter',
   parameters: {
-    model: 'gpt-4',
-    provider: 'openai',
+    model: 'anthropic/claude-3.5-sonnet',
     prompt: 'Analyze this data and provide insights',
     systemMessage: 'You are an expert data analyst',
     temperature: 0.7,
@@ -281,12 +279,20 @@ Integrates with various Large Language Model providers by converting parameters 
 }
 ```
 
-**Supported Providers:**
-- `openai` - OpenAI GPT models
-- `anthropic` - Anthropic Claude models
-- `google` - Google Gemini models
-- `local` - Local models (Ollama)
-- `custom` - Custom provider endpoints
+**Available Models (via OpenRouter):**
+- `openai/gpt-4-turbo` - OpenAI GPT-4 Turbo
+- `anthropic/claude-3.5-sonnet` - Anthropic Claude 3.5 Sonnet
+- `google/gemini-pro-1.5` - Google Gemini Pro 1.5
+- `meta-llama/llama-3.1-405b-instruct` - Meta Llama 3.1 405B
+- `mistralai/mixtral-8x7b-instruct` - Mistral Mixtral 8x7B
+- And 200+ more models...
+
+**Key Features:**
+- Unified API for all major LLM providers
+- Automatic fallback routing
+- Cost optimization
+- Rate limit handling
+- Model performance analytics
 
 ## API Reference
 

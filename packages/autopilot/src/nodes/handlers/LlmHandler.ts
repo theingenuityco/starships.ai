@@ -1,8 +1,7 @@
 /**
  * LLM Node Handler
  * 
- * Handles LLM (Large Language Model) nodes by converting them to HTTP requests
- * and delegating to the HttpRequestHandler
+ * Handles LLM (Large Language Model) nodes using OpenRouter unified API
  */
 
 import { Handler } from '../Handler';
@@ -34,7 +33,7 @@ export class LlmHandler implements Handler {
       if (result.success && result.data && typeof result.data === 'object') {
         const httpData = result.data as any;
         if (httpData.body) {
-          const llmResponse = this.extractLlmResponse(httpData.body, params.provider);
+          const llmResponse = this.extractLlmResponse(httpData.body);
           
           return {
             ...result,
@@ -42,8 +41,7 @@ export class LlmHandler implements Handler {
             data: {
               ...httpData,
               llmResponse,
-              model: params.model,
-              provider: params.provider
+              model: params.model,            
             }
           };
         }
@@ -66,8 +64,13 @@ export class LlmHandler implements Handler {
   }
 
   private convertToHttpRequest(params: LlmNodeParameters): HttpRequestNodeParameters {
-    const endpoint = this.getProviderEndpoint(params.provider || 'openai');
-    const headers = this.getProviderHeaders(params.provider || 'openai');
+    const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${OPENROUTER_API_KEY}',
+      'HTTP-Referer': '${OPENROUTER_HTTP_REFERER}', // Optional: for analytics
+      'X-Title': '${OPENROUTER_APP_NAME}' // Optional: for analytics
+    };
     const body = this.buildRequestBody(params);
 
     return {
@@ -79,56 +82,6 @@ export class LlmHandler implements Handler {
       retries: 1,
       followRedirects: true
     };
-  }
-
-  private getProviderEndpoint(provider: LlmNodeParameters['provider']): string {
-    switch (provider) {
-      case 'openai':
-        return 'https://api.openai.com/v1/chat/completions';
-      case 'anthropic':
-        return 'https://api.anthropic.com/v1/messages';
-      case 'google':
-        return 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
-      case 'local':
-        return 'http://localhost:11434/api/chat'; // Ollama default
-      case 'custom':
-        return 'https://api.custom-provider.com/v1/chat'; // Placeholder
-      default:
-        return 'https://api.openai.com/v1/chat/completions';
-    }
-  }
-
-  private getProviderHeaders(provider: LlmNodeParameters['provider']): Record<string, string> {
-    const baseHeaders = {
-      'Content-Type': 'application/json'
-    };
-
-    switch (provider) {
-      case 'openai':
-        return {
-          ...baseHeaders,
-          'Authorization': 'Bearer ${OPENAI_API_KEY}' // Will be replaced at runtime
-        };
-      case 'anthropic':
-        return {
-          ...baseHeaders,
-          'x-api-key': '${ANTHROPIC_API_KEY}', // Will be replaced at runtime
-          'anthropic-version': '2023-06-01'
-        };
-      case 'google':
-        return {
-          ...baseHeaders,
-          'x-goog-api-key': '${GOOGLE_API_KEY}' // Will be replaced at runtime
-        };
-      case 'local':
-      case 'custom':
-        return baseHeaders;
-      default:
-        return {
-          ...baseHeaders,
-          'Authorization': 'Bearer ${OPENAI_API_KEY}'
-        };
-    }
   }
 
   private buildRequestBody(params: LlmNodeParameters): object {
@@ -148,66 +101,26 @@ export class LlmHandler implements Handler {
       content: params.prompt
     });
 
-    // Build request body based on provider format
-    switch (params.provider) {
-      case 'anthropic':
-        return {
-          model: params.model,
-          max_tokens: params.maxTokens || 1024,
-          temperature: params.temperature || 0.7,
-          messages,
-          stream: params.stream || false
-        };
-      case 'google':
-        return {
-          contents: messages.map(msg => ({
-            role: msg.role === 'system' ? 'user' : msg.role,
-            parts: [{ text: msg.content }]
-          })),
-          generationConfig: {
-            temperature: params.temperature || 0.7,
-            maxOutputTokens: params.maxTokens || 1024,
-            topP: params.topP || 1.0
-          }
-        };
-      case 'local':
-        return {
-          model: params.model,
-          messages,
-          stream: params.stream || false,
-          options: {
-            temperature: params.temperature || 0.7,
-            num_predict: params.maxTokens || 1024
-          }
-        };
-      case 'openai':
-      default:
-        return {
-          model: params.model,
-          messages,
-          temperature: params.temperature || 0.7,
-          max_tokens: params.maxTokens || 1024,
-          top_p: params.topP || 1.0,
-          frequency_penalty: params.frequencyPenalty || 0,
-          presence_penalty: params.presencePenalty || 0,
-          stream: params.stream || false
-        };
-    }
+    // Build OpenRouter-compatible request body
+    return {
+      model: params.model,
+      messages,
+      temperature: params.temperature || 0.7,
+      max_tokens: params.maxTokens || 1024,
+      top_p: params.topP || 1.0,
+      frequency_penalty: params.frequencyPenalty || 0,
+      presence_penalty: params.presencePenalty || 0,
+      stream: params.stream || false,
+      // OpenRouter specific optional parameters
+      transforms: [], // Can be used for prompt transforms
+      route: 'fallback' // Can be 'fallback' or specific routing
+    };
   }
 
-  private extractLlmResponse(responseBody: any, provider: LlmNodeParameters['provider']): string {
+  private extractLlmResponse(responseBody: any): string {
     try {
-      switch (provider) {
-        case 'anthropic':
-          return responseBody.content?.[0]?.text || responseBody.completion || '';
-        case 'google':
-          return responseBody.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        case 'local':
-          return responseBody.message?.content || responseBody.response || '';
-        case 'openai':
-        default:
-          return responseBody.choices?.[0]?.message?.content || '';
-      }
+      // OpenRouter uses OpenAI-compatible format
+      return responseBody.choices?.[0]?.message?.content || '';
     } catch {
       // Fallback: try to extract any text content
       if (typeof responseBody === 'string') return responseBody;
@@ -236,17 +149,6 @@ export class LlmHandler implements Handler {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Prompt is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
-    }
-
-    // Provider validation
-    const validProviders = ['openai', 'anthropic', 'google', 'local', 'custom'];
-    if (params.provider && !validProviders.includes(params.provider)) {
-      errors.push({
-        code: 'INVALID_PROVIDER',
-        message: `Invalid provider. Must be one of: ${validProviders.join(', ')}`,
         nodeId: node.id,
         severity: 'error' as const
       });

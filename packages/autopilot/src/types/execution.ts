@@ -9,7 +9,7 @@
  */
 export interface RuntimeState {
   id: string;
-  currentNodeId?: string;
+  currentNodeRef?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;
   startTime?: string;
@@ -24,7 +24,7 @@ export interface RuntimeState {
  * Result of executing a workflow node
  */
 export interface NodeResult {
-  nodeId: string;
+  nodeRef: string;
   success: boolean;
   data?: unknown;
   error?: string;
@@ -61,7 +61,7 @@ export type ExecutionStatus =
 export interface ExecutionError {
   code: WorkflowErrorCode;
   message: string;
-  nodeId?: string;
+  nodeRef?: string;
   details?: unknown;
   timestamp: string;
   recoverable: boolean;

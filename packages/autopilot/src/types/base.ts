@@ -29,7 +29,7 @@ export type NodeType =
  * Base node interface (untyped parameters)
  */
 export interface BaseNode {
-  id: string;
+  ref: string;
   type: NodeType;
   name: string;
   description: string;
@@ -41,7 +41,7 @@ export interface BaseNode {
  * Edges connecting workflow nodes
  */
 export interface Edge {
-  id: string;
+  ref: string;
   from: string;
   to: string;
   condition?: string;

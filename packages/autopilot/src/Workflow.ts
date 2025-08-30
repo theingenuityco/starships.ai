@@ -38,9 +38,9 @@ export class Workflow {
   /**
    * Builder method: Add a node to the workflow
    */
-  addNode(nodeConfig: Omit<Node, 'id'> & { id?: string }): Workflow {
+  addNode(nodeConfig: Omit<Node, 'ref'> & { ref?: string }): Workflow {
     const node: Node = {
-      id: nodeConfig.id || uuidv4(),
+      ref: nodeConfig.ref || uuidv4(),
       type: nodeConfig.type,
       name: nodeConfig.name,
       description: nodeConfig.description,
@@ -57,7 +57,7 @@ export class Workflow {
    */
   addEdge(from: string, to: string, condition?: string, label?: string): Workflow {
     const edge: Edge = {
-      id: uuidv4(),
+      ref: uuidv4(),
       from,
       to,
       condition,
@@ -72,13 +72,13 @@ export class Workflow {
   /**
    * Builder method: Remove a node and its associated edges
    */
-  removeNode(nodeId: string): Workflow {
+  removeNode(nodeRef: string): Workflow {
     // Remove the node
-    this.blueprint.nodes = this.blueprint.nodes.filter(node => node.id !== nodeId);
+    this.blueprint.nodes = this.blueprint.nodes.filter(node => node.ref !== nodeRef);
     
     // Remove associated edges
     this.blueprint.edges = this.blueprint.edges.filter(
-      edge => edge.from !== nodeId && edge.to !== nodeId
+      edge => edge.from !== nodeRef && edge.to !== nodeRef
     );
     
     return this;
@@ -87,8 +87,8 @@ export class Workflow {
   /**
    * Builder method: Remove an edge
    */
-  removeEdge(edgeId: string): Workflow {
-    this.blueprint.edges = this.blueprint.edges.filter(edge => edge.id !== edgeId);
+  removeEdge(edgeRef: string): Workflow {
+    this.blueprint.edges = this.blueprint.edges.filter(edge => edge.ref !== edgeRef);
     return this;
   }
 
@@ -140,9 +140,9 @@ export class Workflow {
     }
 
     // Check edge references
-    const nodeIds = new Set(this.blueprint.nodes.map(n => n.id));
+    const nodeRefs = new Set(this.blueprint.nodes.map(n => n.ref));
     const invalidEdges = this.blueprint.edges.filter(
-      edge => !nodeIds.has(edge.from) || !nodeIds.has(edge.to)
+      edge => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
     );
     if (invalidEdges.length > 0) {
       errors.push(`Invalid edge references found: ${invalidEdges.length} edges`);

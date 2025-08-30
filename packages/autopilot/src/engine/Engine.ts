@@ -309,7 +309,7 @@ export class Engine {
    * Pause workflow execution
    */
   pause(): boolean {
-    if (this.execution.status !== 'running') {
+    if (!this.execution || this.execution.status !== 'running') {
       return false;
     }
 
@@ -328,7 +328,7 @@ export class Engine {
    * Resume workflow execution
    */
   resume(): boolean {
-    if (this.execution.status !== 'paused') {
+    if (!this.execution || this.execution.status !== 'paused') {
       return false;
     }
 
@@ -347,7 +347,7 @@ export class Engine {
    * Cancel workflow execution
    */
   cancel(): boolean {
-    if (this.execution.status === 'completed' || this.execution.status === 'failed') {
+    if (!this.execution || this.execution.status === 'completed' || this.execution.status === 'failed') {
       return false;
     }
 

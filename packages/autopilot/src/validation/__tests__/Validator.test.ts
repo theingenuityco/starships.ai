@@ -165,7 +165,7 @@ describe('Validator', () => {
       expect(result.errors).toContainEqual({
         code: 'UNREACHABLE_NODE',
         message: "Node 'Isolated' is not reachable from start node",
-        nodeId: 'isolated',
+        nodeRef: 'isolated',
         severity: 'error'
       });
     });

@@ -3,13 +3,13 @@
  */
 
 import { Workflow } from '../Workflow';
-import { Blueprint, Node, Edge, ExecutionContext } from '../types';
+import { Blueprint, Node, Edge, Execution } from '../types';
 
 describe('Workflow', () => {
-  let mockContext: Partial<ExecutionContext>;
+  let mockExecution: Execution;
 
   beforeEach(() => {
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
   });
 
   describe('constructor', () => {
@@ -324,13 +324,13 @@ describe('Workflow', () => {
         .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'end');
 
-      const result = await workflow.execute(mockContext);
+      const result = await workflow.execute(mockExecution);
 
       expect(result.status).toBe('completed');
       expect(result.executionResults.size).toBe(2);
     });
 
-    it('should handle execution context', async () => {
+    it('should handle execution with initial execution state', async () => {
       const workflow = new Workflow();
       
       workflow
@@ -338,12 +338,9 @@ describe('Workflow', () => {
         .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'end');
 
-      const customContext = {
-        userId: 'custom-user',
-        expeditionState: { customData: 'test' }
-      };
+      const initialExecution = global.createMockExecution();
 
-      const result = await workflow.execute(customContext);
+      const result = await workflow.execute(initialExecution);
 
       expect(result.status).toBe('completed');
     });
@@ -354,7 +351,7 @@ describe('Workflow', () => {
       // Create workflow without start node to trigger failure
       workflow.addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} });
 
-      const result = await workflow.execute(mockContext);
+      const result = await workflow.execute(mockExecution);
 
       expect(result.status).toBe('failed');
       expect(result.error?.message).toContain('Workflow must have a start node');

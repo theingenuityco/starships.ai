@@ -2,11 +2,7 @@
  * Jest setup file for autopilot package tests
  */
 
-import type { Blueprint, Execution } from '../src/types';
-// import './global.d.ts';
-
-// Import Jest types for global availability
-// import '@types/jest';
+import type { Blueprint, Execution, Node } from '../src/types';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -38,6 +34,15 @@ global.console = {
   ...overrides
 });
 
+// Create mock node helper
+(global as any).createMockNode = (overrides: Partial<Node> = {}): Node => ({
+  ref: 'test-node',
+  type: 'start',
+  name: 'Test Node',
+  description: 'Test node description',
+  parameters: {},
+  ...overrides
+});
 
 // Setup common test timeouts
 jest.setTimeout(10000);

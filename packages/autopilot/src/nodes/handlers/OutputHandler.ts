@@ -29,7 +29,7 @@ export class OutputHandler extends BaseHandler {
       output,
       format: params.format,
       sourceData
-    }, 50);
+    });
   }
 
   validate(): ValidationResult {

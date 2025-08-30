@@ -3,12 +3,12 @@
  */
 
 import { EndHandler } from '../EndHandler';
-import { Node, ExecutionContext } from '../../../types';
+import { Node, Execution } from '../../../types';
 
 describe('EndHandler', () => {
   let handler: EndHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
+  let mockExecution: Execution;
 
   beforeEach(() => {
     mockNode = {
@@ -19,7 +19,7 @@ describe('EndHandler', () => {
       parameters: {}
     };
     handler = new EndHandler(mockNode);
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
   });
 
   describe('type', () => {
@@ -30,33 +30,35 @@ describe('EndHandler', () => {
 
   describe('execute', () => {
     it('should execute successfully', async () => {
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('end-node');
-      expect(result.data).toEqual({ message: 'Workflow completed' });
-      expect(result.duration).toBe(0);
-      expect(result.executedAt).toBeDefined();
-      expect(result.error).toBeUndefined();
+      expect(result.executionResults.has('end-node')).toBe(true);
+      const nodeResult = result.executionResults.get('end-node');
+      expect(nodeResult?.nodeRef).toBe('end-node');
+      expect(nodeResult?.data).toEqual({ message: 'Workflow completed' });
+      expect(nodeResult?.error).toBeUndefined();
     });
 
-    it('should always succeed regardless of context', async () => {
-      const emptyContext = {} as ExecutionContext;
+    it('should always succeed regardless of execution state', async () => {
+      const emptyExecution = global.createMockExecution();
       
-      const result = await handler.execute(emptyContext);
+      const result = await handler.execute(emptyExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeRef).toBe('end-node');
+      expect(result.executionResults.has('end-node')).toBe(true);
+      const nodeResult = result.executionResults.get('end-node');
+      expect(nodeResult?.nodeRef).toBe('end-node');
+      expect(nodeResult?.error).toBeUndefined();
     });
 
-    it('should set execution timestamp', async () => {
-      const beforeExecution = Date.now();
-      const result = await handler.execute(mockContext);
-      const afterExecution = Date.now();
+    it('should store result in execution results', async () => {
+      const result = await handler.execute(mockExecution);
       
-      const executedAtTimestamp = new Date(result.executedAt).getTime();
-      expect(executedAtTimestamp).toBeGreaterThanOrEqual(beforeExecution);
-      expect(executedAtTimestamp).toBeLessThanOrEqual(afterExecution);
+      expect(result.executionResults.size).toBeGreaterThan(0);
+      expect(result.executionResults.has('end-node')).toBe(true);
+      
+      const nodeResult = result.executionResults.get('end-node');
+      expect(nodeResult?.nodeRef).toBe('end-node');
+      expect(nodeResult?.data).toEqual({ message: 'Workflow completed' });
     });
   });
 

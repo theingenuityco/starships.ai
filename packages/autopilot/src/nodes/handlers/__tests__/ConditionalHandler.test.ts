@@ -12,15 +12,13 @@ describe('ConditionalHandler', () => {
   let mockSourceResult: NodeResult;
 
   beforeEach(() => {
-    handler = new ConditionalHandler();
-    
     mockSourceResult = {
       nodeId: 'source-node',
       success: true,
-      data: { 
-        score: 85, 
-        category: 'premium', 
-        user: { age: 30, name: 'John' } 
+      data: {
+        score: 85,
+        category: 'premium',
+        user: { age: 30, name: 'John' }
       },
       executedAt: new Date().toISOString(),
       duration: 100
@@ -43,6 +41,8 @@ describe('ConditionalHandler', () => {
       } as ConditionalNodeParameters
     };
 
+    handler = new ConditionalHandler(mockNode.parameters, mockNode.id);
+
     mockContext = {
       ...global.createMockContext(),
       previousResults: new Map([
@@ -59,7 +59,7 @@ describe('ConditionalHandler', () => {
 
   describe('execute', () => {
     it('should execute successfully and return first matching condition', async () => {
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('conditional-node');
@@ -74,22 +74,21 @@ describe('ConditionalHandler', () => {
     });
 
     it('should return default condition when no conditions match', async () => {
-      // Create node with conditions that definitely won't match the data
-      const nodeWithNoMatches = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'score > 1000',
-          conditions: {
-            'impossible-high': 'score > 1000',  // 85 > 1000 = false
-            'wrong-category': 'category = "nonexistent"',  // "premium" = "nonexistent" = false
-            'too-old': 'user.age > 100'  // 30 > 100 = false
-          },
-          defaultCondition: 'default'
-        } as ConditionalNodeParameters
-      };
+      // Create handler with conditions that definitely won't match the data
+      const paramsWithNoMatches = {
+        sourceNodeId: 'source-node',
+        expression: 'score > 1000',
+        conditions: {
+          'impossible-high': 'score > 1000',  // 85 > 1000 = false
+          'wrong-category': 'category = "nonexistent"',  // "premium" = "nonexistent" = false
+          'too-old': 'user.age > 100'  // 30 > 100 = false
+        },
+        defaultCondition: 'default'
+      } as ConditionalNodeParameters;
       
-      const result = await handler.execute(nodeWithNoMatches, mockContext);
+      const handlerWithNoMatches = new ConditionalHandler(paramsWithNoMatches, 'no-matches-node');
+      
+      const result = await handlerWithNoMatches.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.data).toEqual({
@@ -100,19 +99,18 @@ describe('ConditionalHandler', () => {
     });
 
     it('should use "default" as fallback when no defaultCondition specified', async () => {
-      const nodeWithoutDefault = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'score > 1000',
-          conditions: {
-            'never-true': 'score > 1000'  // 85 > 1000 = false
-          },
-          defaultCondition: undefined
-        } as ConditionalNodeParameters
-      };
+      const paramsWithoutDefault = {
+        sourceNodeId: 'source-node',
+        expression: 'score > 1000',
+        conditions: {
+          'never-true': 'score > 1000'  // 85 > 1000 = false
+        },
+        defaultCondition: undefined
+      } as ConditionalNodeParameters;
       
-      const result = await handler.execute(nodeWithoutDefault, mockContext);
+      const handlerWithoutDefault = new ConditionalHandler(paramsWithoutDefault, 'no-default-node');
+      
+      const result = await handlerWithoutDefault.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect((result.data as any).conditionMet).toBe('default');
@@ -120,17 +118,16 @@ describe('ConditionalHandler', () => {
     });
 
     it('should handle complex JSONata expressions', async () => {
-      const complexNode = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: '$sum(scores) > 100',
-          conditions: {
-            'complex': '$sum(scores) > 100 and category in ["premium", "gold"]',
-            'nested': 'user.profile.settings.notifications = true'
-          }
-        } as ConditionalNodeParameters
-      };
+      const complexParams = {
+        sourceNodeId: 'source-node',
+        expression: '$sum(scores) > 100',
+        conditions: {
+          'complex': '$sum(scores) > 100 and category in ["premium", "gold"]',
+          'nested': 'user.profile.settings.notifications = true'
+        }
+      } as ConditionalNodeParameters;
+
+      const complexHandler = new ConditionalHandler(complexParams, 'complex-node');
 
       const complexSourceResult: NodeResult = {
         ...mockSourceResult,
@@ -147,58 +144,62 @@ describe('ConditionalHandler', () => {
         }
       };
       
-      mockContext.previousResults.set('source-node', complexSourceResult);
+      const complexContext = {
+        ...mockContext,
+        previousResults: new Map([['source-node', complexSourceResult]])
+      };
       
-      const result = await handler.execute(complexNode, mockContext);
+      const result = await complexHandler.execute(complexContext);
       
       expect(result.success).toBe(true);
       expect((result.data as any).conditionMet).toBe('complex');
     });
 
     it('should fail when source node is not found', async () => {
-      mockContext.previousResults = new Map(); // Empty results
+      const emptyContext = {
+        ...mockContext,
+        previousResults: new Map() // Empty results
+      };
       
-      await expect(handler.execute(mockNode, mockContext))
+      await expect(handler.execute(emptyContext))
         .rejects
         .toThrow('Source node source-node not found in execution results');
     });
 
     it('should handle JSONata evaluation errors gracefully', async () => {
-      const nodeWithInvalidExpression = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'score ++ invalid',
-          conditions: {
-            'invalid': 'score ++ invalid' // Invalid JSONata operator syntax
-          }
-        } as ConditionalNodeParameters
-      };
+      const paramsWithInvalidExpression = {
+        sourceNodeId: 'source-node',
+        expression: 'score ++ invalid',
+        conditions: {
+          'invalid': 'score ++ invalid' // Invalid JSONata operator syntax
+        }
+      } as ConditionalNodeParameters;
       
-      const result = await handler.execute(nodeWithInvalidExpression, mockContext);
+      const handlerWithInvalidExpression = new ConditionalHandler(paramsWithInvalidExpression, 'invalid-expression-node');
+      
+      const result = await handlerWithInvalidExpression.execute(mockContext);
       
       expect(result.success).toBe(false);
       expect(result.error).toContain('JSONata evaluation failed');
-      expect(result.nodeId).toBe('conditional-node');
+      expect(result.nodeId).toBe('invalid-expression-node');
       expect(result.duration).toBe(10);
     });
 
     it('should handle conditions that evaluate to falsy values', async () => {
-      const nodeWithFalsyConditions = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'score > 1000',
-          conditions: {
-            'too-high': 'score > 1000',        // false
-            'missing-field': 'missingField',   // undefined
-            'zero-result': 'score * 0'         // 0 (falsy)
-          },
-          defaultCondition: 'fallback'
-        } as ConditionalNodeParameters
-      };
+      const paramsWithFalsyConditions = {
+        sourceNodeId: 'source-node',
+        expression: 'score > 1000',
+        conditions: {
+          'too-high': 'score > 1000',        // false
+          'missing-field': 'missingField',   // undefined
+          'zero-result': 'score * 0'         // 0 (falsy)
+        },
+        defaultCondition: 'fallback'
+      } as ConditionalNodeParameters;
       
-      const result = await handler.execute(nodeWithFalsyConditions, mockContext);
+      const handlerWithFalsyConditions = new ConditionalHandler(paramsWithFalsyConditions, 'falsy-conditions-node');
+      
+      const result = await handlerWithFalsyConditions.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect((result.data as any).conditionMet).toBe('fallback');
@@ -207,7 +208,7 @@ describe('ConditionalHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
       
       const executedAtTimestamp = new Date(result.executedAt).getTime();
@@ -218,7 +219,7 @@ describe('ConditionalHandler', () => {
 
   describe('validate', () => {
     it('should validate successfully with valid parameters', () => {
-      const result = handler.validate(mockNode);
+      const result = handler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -227,38 +228,34 @@ describe('ConditionalHandler', () => {
     });
 
     it('should fail validation when sourceNodeId is missing', () => {
-      const nodeWithoutSource = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: '',
-          expression: 'score > 50',
-          conditions: { 'test': 'score > 50' }
-        } as ConditionalNodeParameters
-      };
+      const paramsWithoutSource = {
+        sourceNodeId: '',
+        expression: 'score > 50',
+        conditions: { 'test': 'score > 50' }
+      } as ConditionalNodeParameters;
       
-      const result = handler.validate(nodeWithoutSource);
+      const handlerWithoutSource = new ConditionalHandler(paramsWithoutSource, 'no-source-node');
+      const result = handlerWithoutSource.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Source node ID is required',
-        nodeId: 'conditional-node',
+        nodeId: 'no-source-node',
         severity: 'error'
       });
     });
 
     it('should fail validation when sourceNodeId is empty string', () => {
-      const nodeWithEmptySource = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: '',
-          expression: 'score > 50',
-          conditions: { 'test': 'score > 50' }
-        } as ConditionalNodeParameters
-      };
+      const paramsWithEmptySource = {
+        sourceNodeId: '',
+        expression: 'score > 50',
+        conditions: { 'test': 'score > 50' }
+      } as ConditionalNodeParameters;
       
-      const result = handler.validate(nodeWithEmptySource);
+      const handlerWithEmptySource = new ConditionalHandler(paramsWithEmptySource, 'empty-source-node');
+      const result = handlerWithEmptySource.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -267,38 +264,34 @@ describe('ConditionalHandler', () => {
     });
 
     it('should fail validation when conditions are missing', () => {
-      const nodeWithoutConditions = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'true',
-          conditions: {}
-        } as ConditionalNodeParameters
-      };
+      const paramsWithoutConditions = {
+        sourceNodeId: 'source-node',
+        expression: 'true',
+        conditions: {}
+      } as ConditionalNodeParameters;
       
-      const result = handler.validate(nodeWithoutConditions);
+      const handlerWithoutConditions = new ConditionalHandler(paramsWithoutConditions, 'no-conditions-node');
+      const result = handlerWithoutConditions.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'At least one condition is required',
-        nodeId: 'conditional-node',
+        nodeId: 'no-conditions-node',
         severity: 'error'
       });
     });
 
     it('should fail validation when conditions object is empty', () => {
-      const nodeWithEmptyConditions = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'true',
-          conditions: {}
-        } as ConditionalNodeParameters
-      };
+      const paramsWithEmptyConditions = {
+        sourceNodeId: 'source-node',
+        expression: 'true',
+        conditions: {}
+      } as ConditionalNodeParameters;
       
-      const result = handler.validate(nodeWithEmptyConditions);
+      const handlerWithEmptyConditions = new ConditionalHandler(paramsWithEmptyConditions, 'empty-conditions-node');
+      const result = handlerWithEmptyConditions.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
@@ -307,25 +300,23 @@ describe('ConditionalHandler', () => {
     });
 
     it('should fail validation for invalid JSONata expressions', () => {
-      const nodeWithInvalidExpressions = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: 'score >= 80',
-          conditions: {
-            'valid': 'score >= 80',
-            'invalid1': 'score >=<= 80', // Invalid syntax
-            'invalid2': 'score + + 10'   // Invalid syntax
-          }
-        } as ConditionalNodeParameters
-      };
+      const paramsWithInvalidExpressions = {
+        sourceNodeId: 'source-node',
+        expression: 'score >= 80',
+        conditions: {
+          'valid': 'score >= 80',
+          'invalid1': 'score >=<= 80', // Invalid syntax
+          'invalid2': 'score + + 10'   // Invalid syntax
+        }
+      } as ConditionalNodeParameters;
       
-      const result = handler.validate(nodeWithInvalidExpressions);
+      const handlerWithInvalidExpressions = new ConditionalHandler(paramsWithInvalidExpressions, 'invalid-expressions-node');
+      const result = handlerWithInvalidExpressions.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(0);
       
-      const invalidErrors = result.errors.filter(err => 
+      const invalidErrors = result.errors.filter(err =>
         err.code === 'INVALID_JSONATA_EXPRESSION'
       );
       expect(invalidErrors.length).toBe(2);
@@ -335,20 +326,18 @@ describe('ConditionalHandler', () => {
     });
 
     it('should validate complex JSONata expressions', () => {
-      const nodeWithComplexExpressions = {
-        ...mockNode,
-        parameters: {
-          sourceNodeId: 'source-node',
-          expression: '$sum(scores) > $average(scores) * 2',
-          conditions: {
-            'complex1': '$sum(scores) > $average(scores) * 2',
-            'complex2': '($filter(items, function($v) { $v.active = true }) ~> $count()) > 0',
-            'complex3': 'user.profile.settings.theme in ["dark", "light"]'
-          }
-        } as ConditionalNodeParameters
-      };
+      const paramsWithComplexExpressions = {
+        sourceNodeId: 'source-node',
+        expression: '$sum(scores) > $average(scores) * 2',
+        conditions: {
+          'complex1': '$sum(scores) > $average(scores) * 2',
+          'complex2': '($filter(items, function($v) { $v.active = true }) ~> $count()) > 0',
+          'complex3': 'user.profile.settings.theme in ["dark", "light"]'
+        }
+      } as ConditionalNodeParameters;
       
-      const result = handler.validate(nodeWithComplexExpressions);
+      const handlerWithComplexExpressions = new ConditionalHandler(paramsWithComplexExpressions, 'complex-expressions-node');
+      const result = handlerWithComplexExpressions.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);

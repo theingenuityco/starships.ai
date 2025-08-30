@@ -11,7 +11,6 @@ describe('EndHandler', () => {
   let mockContext: ExecutionContext;
 
   beforeEach(() => {
-    handler = new EndHandler();
     mockNode = {
       id: 'end-node',
       type: 'end',
@@ -19,6 +18,7 @@ describe('EndHandler', () => {
       description: 'End node for workflow',
       parameters: {}
     };
+    handler = new EndHandler(mockNode.parameters, mockNode.id);
     mockContext = global.createMockContext();
   });
 
@@ -30,7 +30,7 @@ describe('EndHandler', () => {
 
   describe('execute', () => {
     it('should execute successfully', async () => {
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('end-node');
@@ -43,7 +43,7 @@ describe('EndHandler', () => {
     it('should always succeed regardless of context', async () => {
       const emptyContext = {} as ExecutionContext;
       
-      const result = await handler.execute(mockNode, emptyContext);
+      const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('end-node');
@@ -51,7 +51,7 @@ describe('EndHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
       
       const executedAtTimestamp = new Date(result.executedAt).getTime();
@@ -62,7 +62,7 @@ describe('EndHandler', () => {
 
   describe('validate', () => {
     it('should validate successfully for any node', () => {
-      const result = handler.validate(mockNode);
+      const result = handler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -71,12 +71,9 @@ describe('EndHandler', () => {
     });
 
     it('should validate even with empty parameters', () => {
-      const nodeWithoutParams = {
-        ...mockNode,
-        parameters: {}
-      };
+      const handlerWithEmptyParams = new EndHandler({}, 'end-node-2');
       
-      const result = handler.validate(nodeWithoutParams);
+      const result = handlerWithEmptyParams.validate();
       
       expect(result.valid).toBe(true);
     });

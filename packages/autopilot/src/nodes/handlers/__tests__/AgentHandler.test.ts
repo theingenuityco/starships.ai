@@ -22,7 +22,6 @@ describe('AgentHandler', () => {
   let mockContext: ExecutionContext;
 
   beforeEach(() => {
-    handler = new AgentHandler();
     mockNode = {
       id: 'agent-node',
       type: 'agent',
@@ -40,6 +39,7 @@ describe('AgentHandler', () => {
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters
     };
+    handler = new AgentHandler(mockNode.parameters, mockNode.id);
     mockContext = global.createMockContext();
   });
 
@@ -53,7 +53,7 @@ describe('AgentHandler', () => {
     it('should execute successfully with valid parameters', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('agent-node');
@@ -82,21 +82,19 @@ describe('AgentHandler', () => {
     });
 
     it('should execute successfully with minimal parameters', async () => {
-      const minimalNode = {
-        ...mockNode,
-        parameters: {
-          name: 'Basic Agent',
-          model: 'openai/gpt-4',
-          blueprint: global.createMockBlueprint()
-        } as AgentNodeParameters
-      };
+      const minimalParams = {
+        name: 'Basic Agent',
+        model: 'openai/gpt-4',
+        blueprint: global.createMockBlueprint()
+      } as AgentNodeParameters;
       
+      const minimalHandler = new AgentHandler(minimalParams, 'minimal-agent-node');
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       
-      const result = await handler.execute(minimalNode, mockContext);
+      const result = await minimalHandler.execute(mockContext);
       
       expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('agent-node');
+      expect(result.nodeId).toBe('minimal-agent-node');
       expect(result.data).toEqual(expect.objectContaining({
         agentName: 'Basic Agent',
         model: 'openai/gpt-4',
@@ -118,7 +116,7 @@ describe('AgentHandler', () => {
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockNode, mockContext);
+      const result = await handler.execute(mockContext);
       const afterExecution = Date.now();
       
       const executedAtTimestamp = new Date(result.executedAt).getTime();
@@ -129,7 +127,7 @@ describe('AgentHandler', () => {
     it('should work with empty context', async () => {
       const emptyContext = {} as ExecutionContext;
       
-      const result = await handler.execute(mockNode, emptyContext);
+      const result = await handler.execute(emptyContext);
       
       expect(result.success).toBe(true);
       expect(result.nodeId).toBe('agent-node');
@@ -138,7 +136,7 @@ describe('AgentHandler', () => {
 
   describe('validate', () => {
     it('should validate successfully with valid parameters', () => {
-      const result = handler.validate(mockNode);
+      const result = handler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -147,16 +145,14 @@ describe('AgentHandler', () => {
     });
 
     it('should validate successfully with minimal valid parameters', () => {
-      const minimalNode = {
-        ...mockNode,
-        parameters: {
-          name: 'Test Agent',
-          model: 'openai/gpt-4',
-          blueprint: global.createMockBlueprint()
-        } as AgentNodeParameters
-      };
+      const minimalParams = {
+        name: 'Test Agent',
+        model: 'openai/gpt-4',
+        blueprint: global.createMockBlueprint()
+      } as AgentNodeParameters;
       
-      const result = handler.validate(minimalNode);
+      const minimalHandler = new AgentHandler(minimalParams, 'minimal-agent-node');
+      const result = minimalHandler.validate();
       
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -164,60 +160,54 @@ describe('AgentHandler', () => {
     });
 
     it('should fail validation when name is missing', () => {
-      const nodeWithoutName = {
-        ...mockNode,
-        parameters: {
-          model: 'openai/gpt-4',
-          instructions: 'Some instructions',
-          blueprint: global.createMockBlueprint()
-        } as AgentNodeParameters
-      };
+      const paramsWithoutName = {
+        model: 'openai/gpt-4',
+        instructions: 'Some instructions',
+        blueprint: global.createMockBlueprint()
+      } as AgentNodeParameters;
       
-      const result = handler.validate(nodeWithoutName);
+      const handlerWithoutName = new AgentHandler(paramsWithoutName, 'no-name-agent-node');
+      const result = handlerWithoutName.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Agent name is required',
-        nodeId: 'agent-node',
+        nodeId: 'no-name-agent-node',
         severity: 'error'
       });
       expect(result.warnings).toHaveLength(0);
     });
 
     it('should fail validation when model is missing', () => {
-      const nodeWithoutModel = {
-        ...mockNode,
-        parameters: {
-          name: 'Test Agent',
-          instructions: 'Some instructions',
-          blueprint: global.createMockBlueprint()
-        } as AgentNodeParameters
-      };
+      const paramsWithoutModel = {
+        name: 'Test Agent',
+        instructions: 'Some instructions',
+        blueprint: global.createMockBlueprint()
+      } as AgentNodeParameters;
       
-      const result = handler.validate(nodeWithoutModel);
+      const handlerWithoutModel = new AgentHandler(paramsWithoutModel, 'no-model-agent-node');
+      const result = handlerWithoutModel.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(1);
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Agent model is required',
-        nodeId: 'agent-node',
+        nodeId: 'no-model-agent-node',
         severity: 'error'
       });
     });
 
     it('should fail validation when both name and model are missing', () => {
-      const nodeWithoutRequiredParams = {
-        ...mockNode,
-        parameters: {
-          instructions: 'Some instructions',
-          blueprint: global.createMockBlueprint()
-        } as AgentNodeParameters
-      };
+      const paramsWithoutRequiredParams = {
+        instructions: 'Some instructions',
+        blueprint: global.createMockBlueprint()
+      } as AgentNodeParameters;
       
-      const result = handler.validate(nodeWithoutRequiredParams);
+      const handlerWithoutRequiredParams = new AgentHandler(paramsWithoutRequiredParams, 'no-required-agent-node');
+      const result = handlerWithoutRequiredParams.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(2);
@@ -226,12 +216,10 @@ describe('AgentHandler', () => {
     });
 
     it('should fail validation when parameters are completely missing', () => {
-      const nodeWithoutParams = {
-        ...mockNode,
-        parameters: {} as AgentNodeParameters
-      };
+      const emptyParams = {} as AgentNodeParameters;
       
-      const result = handler.validate(nodeWithoutParams);
+      const handlerWithoutParams = new AgentHandler(emptyParams, 'empty-params-agent-node');
+      const result = handlerWithoutParams.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(3);
@@ -241,17 +229,15 @@ describe('AgentHandler', () => {
     });
 
     it('should handle empty string values as invalid', () => {
-      const nodeWithEmptyValues = {
-        ...mockNode,
-        parameters: {
-          name: '',
-          model: '',
-          instructions: 'Some instructions',
-          blueprint: global.createMockBlueprint()
-        } as AgentNodeParameters
-      };
+      const paramsWithEmptyValues = {
+        name: '',
+        model: '',
+        instructions: 'Some instructions',
+        blueprint: global.createMockBlueprint()
+      } as AgentNodeParameters;
       
-      const result = handler.validate(nodeWithEmptyValues);
+      const handlerWithEmptyValues = new AgentHandler(paramsWithEmptyValues, 'empty-values-agent-node');
+      const result = handlerWithEmptyValues.validate();
       
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(2);

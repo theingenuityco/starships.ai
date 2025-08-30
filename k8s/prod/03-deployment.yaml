@@ -39,7 +39,7 @@ spec:
       
       containers:
       - name: starships
-        image: ghcr.io/theingenuityco/starships.ai:latest  # Updated by CI/CD
+        image: [DOCKER-REGISTRY-URL]:latest
         imagePullPolicy: Always
         
         ports:
@@ -87,7 +87,7 @@ spec:
         
         # Neo4j Configuration (with auth enabled)
         - name: NEO4J_URI
-          value: "bolt://localhost:7687"
+          value: "[NEO4J-LOCAL-URL]"
         - name: NEO4J_USERNAME
           value: "neo4j"
         - name: NEO4J_PASSWORD

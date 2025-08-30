@@ -19,15 +19,9 @@ import type {
  */
 export interface Workflow {
   id: string;
-  expeditionId: string;
   nodes: Node[];
   edges: Edge[];
-  visualization: string;
-  approvalStatus: WorkflowApprovalStatus;
-  createdAt: string;
-  approvedAt?: string;
-  rejectedAt?: string;
-  metadata?: WorkflowMetadata;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -38,10 +32,8 @@ export interface Node {
   type: NodeType;
   name: string;
   description: string;
-  estimatedTime?: number;
   parameters: NodeParameters;
   metadata?: Record<string, unknown>;
-  position?: NodePosition;
 }
 
 /**
@@ -54,27 +46,6 @@ export interface Edge {
   condition?: string;
   label?: string;
   metadata?: Record<string, unknown>;
-}
-
-/**
- * Node position for visualization
- */
-export interface NodePosition {
-  x: number;
-  y: number;
-  layer?: number;
-}
-
-/**
- * Workflow metadata for additional information
- */
-export interface WorkflowMetadata {
-  complexity: WorkflowComplexity;
-  estimatedDuration: number;
-  createdBy: string;
-  version: string;
-  tags?: string[];
-  description?: string;
 }
 
 /**
@@ -110,21 +81,3 @@ export type NodeParameters =
   | StartEndNodeParameters;
 
 export type StartEndNodeParameters = BaseNodeParameters;
-
-/**
- * Workflow approval status
- */
-export type WorkflowApprovalStatus = 
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'modified';
-
-/**
- * Workflow complexity levels
- */
-export type WorkflowComplexity = 
-  | 'simple'
-  | 'moderate'
-  | 'complex'
-  | 'advanced';

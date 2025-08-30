@@ -280,7 +280,7 @@ const result = validator.validate(workflow);
 
 ### Agent Node Configuration
 
-Agents are now embedded directly in workflow nodes with full configuration:
+Agents now execute embedded workflows, providing powerful multi-step execution capabilities:
 
 ```typescript
 interface AgentNodeParameters {
@@ -297,24 +297,111 @@ interface AgentNodeParameters {
   // Execution parameters
   instructions?: string;
   timeout?: number;
+  
+  // Embedded workflow execution (required)
+  workflow: Workflow;
+  workflowContext?: Record<string, unknown>;
 }
 ```
 
-Example agent node:
+Example agent node with embedded workflow:
 ```typescript
 {
   id: 'support-agent',
   type: 'agent',
   name: 'Customer Support',
-  description: 'Handles customer inquiries',
+  description: 'Handles customer inquiries with multi-step workflow',
   parameters: {
     name: 'Support Agent',
     model: 'anthropic/claude-3.5-sonnet',
     systemPrompt: 'You are a helpful customer support agent.',
     temperature: 0.7,
     maxTokens: 500,
-    instructions: 'Help the customer with their inquiry'
+    instructions: 'Help the customer with their inquiry',
+    // Embedded workflow that the agent will execute
+    workflow: {
+      id: 'support-workflow',
+      expeditionId: 'exp-1',
+      nodes: [
+        { id: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
+        {
+          id: 'fetch-data',
+          type: 'http_request',
+          name: 'Get Customer Data',
+          description: 'Fetch customer information',
+          parameters: {
+            url: 'https://api.example.com/customers/{{customerId}}',
+            method: 'GET',
+            headers: { 'Authorization': 'Bearer {{apiToken}}' }
+          }
+        },
+        {
+          id: 'analyze',
+          type: 'llm',
+          name: 'Analyze Issue',
+          description: 'Understand customer problem',
+          parameters: {
+            model: 'anthropic/claude-3.5-sonnet',
+            prompt: 'Analyze customer data and issue: {{customerIssue}}',
+            systemMessage: 'You are a customer support analyst.'
+          }
+        },
+        { id: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+      ],
+      edges: [
+        { id: 'edge-1', from: 'start', to: 'fetch-data' },
+        { id: 'edge-2', from: 'fetch-data', to: 'analyze' },
+        { id: 'edge-3', from: 'analyze', to: 'end' }
+      ],
+      approvalStatus: 'approved',
+      visualization: '',
+      createdAt: new Date().toISOString()
+    },
+    // Context passed to the embedded workflow
+    workflowContext: {
+      customerId: '12345',
+      apiToken: 'your-api-token',
+      customerIssue: 'Login problems'
+    }
   }
+}
+```
+
+#### Agent Workflow Execution Features
+
+- **Embedded Workflows**: Each agent node contains a complete workflow definition
+- **Context Merging**: Agent parameters and context are automatically merged with workflow execution context
+- **Result Aggregation**: Workflow results are collected and returned as part of agent output
+- **Comprehensive Validation**: Embedded workflows are validated for structure, nodes, and dependencies
+- **Error Handling**: Robust error handling with detailed feedback on workflow execution failures
+
+#### Agent Execution Flow
+
+1. Agent receives parameters with embedded workflow
+2. Agent context is merged with workflow context
+3. Embedded workflow is executed using the workflow engine
+4. Results from all workflow nodes are collected
+5. Final output includes both agent information and workflow results
+
+Example execution result:
+```typescript
+{
+  nodeId: 'support-agent',
+  success: true,
+  data: {
+    agentName: 'Support Agent',
+    model: 'anthropic/claude-3.5-sonnet',
+    workflowId: 'support-workflow',
+    workflowStatus: 'completed',
+    workflowResults: [
+      { /* start node result */ },
+      { /* http_request result with customer data */ },
+      { /* llm analysis result */ }
+    ],
+    output: 'Agent Support Agent completed workflow execution successfully'
+  },
+  executedAt: '2025-08-30T11:53:00.000Z',
+  duration: 2500
 }
 ```
 

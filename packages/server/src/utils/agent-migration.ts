@@ -5,8 +5,8 @@
  * Handles backward compatibility and default value assignment.
  */
 
-import { RepositoryFactory, AgentMemoryConfig } from '@starships/models';
-import { Blueprint } from '@starships/autopilot';
+import { RepositoryFactory } from '@starships/models';
+import { Blueprint, AgentMemoryConfig } from '@starships/autopilot';
 
 export interface MigrationStats {
   totalAgents: number;
@@ -124,8 +124,8 @@ export class AgentMigration {
     }
 
     // Create default memory config if missing
-    if (!agent.agentMemoryConfig) {
-      migrationData.agentMemoryConfig = this.createDefaultMemoryConfig(agent);
+    if (!agent.memory) {
+      migrationData.memory = this.createDefaultMemoryConfig(agent);
       console.log(`  🧠 Creating default memory configuration`);
     }
 
@@ -383,7 +383,7 @@ export class AgentMigration {
         // Remove autopilot-specific fields
         const updates = {
           blueprint: undefined,
-          agentMemoryConfig: undefined,
+          memory: undefined,
           executionMode: 'simple' as const, // Keep simple mode as fallback
           timeout: undefined
         };

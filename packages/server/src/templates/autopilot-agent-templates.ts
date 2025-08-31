@@ -5,8 +5,7 @@
  * These templates can be used to create new agents or as examples.
  */
 
-import { Blueprint } from '@starships/autopilot';
-import { AgentMemoryConfig } from '@starships/models';
+import { Blueprint, AgentMemoryConfig } from '@starships/autopilot';
 
 export interface AgentTemplate {
   id: string;
@@ -17,7 +16,7 @@ export interface AgentTemplate {
   model: string;
   systemPrompt: string;
   blueprint: Blueprint;
-  agentMemoryConfig: AgentMemoryConfig;
+  memory: AgentMemoryConfig;
   executionMode: 'simple' | 'workflow';
   timeout: number;
   examples: string[];
@@ -76,7 +75,7 @@ export const SIMPLE_CHAT_AGENT: AgentTemplate = {
       complexity: 'basic'
     }
   },
-  agentMemoryConfig: {
+  memory: {
     identity: {
       name: 'Chat Assistant',
       role: 'General Assistant',
@@ -183,7 +182,7 @@ export const RESEARCH_AGENT: AgentTemplate = {
       requiresAPIKeys: ['SEARCH_API_KEY']
     }
   },
-  agentMemoryConfig: {
+  memory: {
     identity: {
       name: 'Research Assistant',
       role: 'Research Specialist',
@@ -299,7 +298,7 @@ export const CREATIVE_WRITING_AGENT: AgentTemplate = {
       stages: ['ideation', 'planning', 'creation', 'refinement']
     }
   },
-  agentMemoryConfig: {
+  memory: {
     identity: {
       name: 'Creative Writer',
       role: 'Creative Writing Specialist',
@@ -415,7 +414,7 @@ export const CODE_REVIEW_AGENT: AgentTemplate = {
       focus: ['structure', 'best-practices', 'security', 'recommendations']
     }
   },
-  agentMemoryConfig: {
+  memory: {
     identity: {
       name: 'Code Reviewer',
       role: 'Senior Software Engineer',
@@ -552,7 +551,7 @@ export const CUSTOMER_SUPPORT_AGENT: AgentTemplate = {
       features: ['escalation', 'knowledge-base', 'conditional-routing']
     }
   },
-  agentMemoryConfig: {
+  memory: {
     identity: {
       name: 'Support Specialist',
       role: 'Customer Support Representative',
@@ -622,8 +621,8 @@ export function createAgentFromTemplate(
   return {
     ...template,
     ...overrides,
-    // Deep merge blueprint and agentMemoryConfig if provided
+    // Deep merge blueprint and memory if provided
     blueprint: overrides.blueprint ? { ...template.blueprint, ...overrides.blueprint } : template.blueprint,
-    agentMemoryConfig: overrides.agentMemoryConfig ? { ...template.agentMemoryConfig, ...overrides.agentMemoryConfig } : template.agentMemoryConfig
+    memory: overrides.memory ? { ...template.memory, ...overrides.memory } : template.memory
   };
 }

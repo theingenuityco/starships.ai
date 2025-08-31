@@ -86,6 +86,24 @@ export type {
 
 
 
+// Export agent types
+export type {
+  AgentModel,
+  AgentConfig,
+  CreateAgentRequest,
+  UpdateAgentRequest,
+  AgentListResponse,
+  AgentResponse,
+  SearchAgentsRequest,
+  SearchAgentsResponse,
+  AgentFilters,
+  DeployAgentRequest,
+  DeployAgentResponse,
+  AgentUsageStats,
+  AgentAnalytics,
+  AgentTemplate
+} from './types/agent';
+
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';
 export { seedWaitlist } from './scripts/seed-waitlist';

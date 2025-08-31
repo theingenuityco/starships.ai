@@ -134,7 +134,7 @@ export class AgentService {
    */
   static async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     const repository = new AgentRepository();
-    return await repository.update(agentId, updates);
+    return await repository.update(agentId, updates as Partial<AgentModel>);
   }
 
   /**
@@ -283,7 +283,7 @@ export class AgentService {
       }
     }
 
-    const dbAgent = await this.agentRepository.update(agentId, updates);
+    const dbAgent = await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
     if (!dbAgent) {
       return null;
     }
@@ -440,33 +440,36 @@ export class AgentService {
     dbAgent: AgentModel,
     options: AgentOptions
   ): Promise<Agent> {
-    const {
-      includeMemory = true,
-      userId,
-      loadConversationHistory = true
-    } = options;
-
-    // Create agent memory
-    const memory = await this.createAgentMemory(dbAgent, {
-      includeMemory,
-      userId,
-      loadConversationHistory
-    });
-
     // Get or create blueprint
     const blueprint = dbAgent.blueprint || this.createDefaultBlueprint(dbAgent);
 
+    // Create default memory config if missing
+    const memoryConfig = dbAgent.memory || {
+      identity: {
+        name: dbAgent.name as string,
+        role: this.getRoleFromCategory(dbAgent.category as string),
+        expertise: dbAgent.tags as string[]
+      },
+      purpose: {
+        primary: (dbAgent.description as string) || `Assist users as a ${dbAgent.category} agent`,
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines']
+      },
+      space: {
+        description: `Professional ${dbAgent.category} assistance environment. Focused on providing accurate and helpful responses.`
+      }
+    };
+
     // Create autopilot agent parameters
     const agentParams = {
-      name: dbAgent.name,
-      description: dbAgent.description,
-      model: dbAgent.model,
-      memory: memory,
+      name: dbAgent.name as string,
+      description: dbAgent.description as string,
+      model: dbAgent.model as string,
+      memory: memoryConfig, // Pass the AgentMemoryConfig
       blueprint: blueprint,
-      instructions: dbAgent.customInstructions,
-      temperature: dbAgent.temperature,
-      maxTokens: dbAgent.maxTokens,
-      timeout: dbAgent.timeout || 30000
+      instructions: dbAgent.customInstructions as string,
+      temperature: dbAgent.temperature as number,
+      maxTokens: dbAgent.maxTokens as number,
+      timeout: (dbAgent.timeout as number) || 30000
     };
 
     return new Agent(agentParams);
@@ -489,26 +492,26 @@ export class AgentService {
     );
 
     // Set structured context from database configuration
-    if (dbAgent.agentMemoryConfig) {
-      if (dbAgent.agentMemoryConfig.identity) {
-        memory.setIdentity(dbAgent.agentMemoryConfig.identity);
+    if (dbAgent.memory) {
+      if (dbAgent.memory.identity) {
+        memory.setIdentity(dbAgent.memory.identity);
       }
-      if (dbAgent.agentMemoryConfig.purpose) {
-        memory.setPurpose(dbAgent.agentMemoryConfig.purpose);
+      if (dbAgent.memory.purpose) {
+        memory.setPurpose(dbAgent.memory.purpose);
       }
-      if (dbAgent.agentMemoryConfig.space) {
-        memory.setSpace(dbAgent.agentMemoryConfig.space);
+      if (dbAgent.memory.space) {
+        memory.setSpace(dbAgent.memory.space);
       }
     } else {
       // Set default identity and purpose based on agent metadata
       memory.setIdentity({
-        name: dbAgent.name,
-        role: this.getRoleFromCategory(dbAgent.category),
-        expertise: dbAgent.tags
+        name: dbAgent.name as string,
+        role: this.getRoleFromCategory(dbAgent.category as string),
+        expertise: dbAgent.tags as string[]
       });
 
       memory.setPurpose({
-        primary: dbAgent.description || `Assist users as a ${dbAgent.category} agent`,
+        primary: (dbAgent.description as string) || `Assist users as a ${dbAgent.category} agent`,
         constraints: ['Be helpful and accurate', 'Follow ethical guidelines']
       });
     }

@@ -9,15 +9,15 @@
 import { RepositoryFactory } from '@starships/models';
 import { MissionService } from './MissionService';
 import { Logger } from '../utils/logger';
-import { AgentExecutionService } from './AgentExecutionService';
+import { AgentService } from './AgentService';
 import type {
-  MissionWorkflow, 
-  WorkflowNode, 
-  MissionExecutionResult, 
+  MissionWorkflow,
+  WorkflowNode,
+  MissionExecutionResult,
   MissionNodeResult,
   MissionExecutionState,
   ChatRequest,
-  ChatResponse 
+  ChatResponse
 } from '@starships/protocol';
 import getStore from '../store';
 
@@ -186,7 +186,7 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
 
         // Execute using real agent engine with shared memory store
         const startTime = Date.now();
-        const response: ChatResponse = await AgentExecutionService.executeChat(chatRequest);
+        const response: ChatResponse = await AgentService.executeChat(chatRequest);
         const executionTime = Date.now() - startTime;
 
         this.logger.info('Real agent execution completed successfully', {

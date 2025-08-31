@@ -6,11 +6,11 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { AgentRepository } from '@starships/models';
+import { AgentRepository, RepositoryFactory } from '@starships/models';
 import { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
 import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
-import type { MemoryEntry } from '@starships/protocol';
+import type { MemoryEntry, ChatRequest, ChatResponse } from '@starships/protocol';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -321,6 +321,153 @@ export class AgentService {
   // ============================================================================
   // AGENT EXECUTION APIs
   // ============================================================================
+
+  /**
+   * Execute agent chat using ChatRequest format (replaces AgentExecutionService.executeChat)
+   */
+  static async executeChat(request: ChatRequest): Promise<ChatResponse> {
+    const { agent_id, user_id, message, session_id } = request;
+
+    if (!agent_id) {
+      throw new Error('agent_id is required for agent chat');
+    }
+
+    console.log('🚀 [AGENT-SERVICE] Starting agent chat:', {
+      agent_id,
+      user_id,
+      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+      session_id,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Get agent from database
+    const agentRepo = RepositoryFactory.getAgentRepository();
+    const dbAgent = await agentRepo.findById(agent_id);
+
+    if (!dbAgent) {
+      console.error('❌ [AGENT-SERVICE] Agent not found:', agent_id);
+      throw new Error(`Agent ${agent_id} not found`);
+    }
+
+    console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
+      id: dbAgent.id,
+      name: dbAgent.name,
+      model: dbAgent.model,
+      executionMode: dbAgent.executionMode || 'simple',
+      hasBlueprint: !!dbAgent.blueprint,
+      starshipId: dbAgent.starshipId,
+    });
+
+    try {
+      // Execute agent using AgentService instance
+      const agentService = new AgentService();
+      const executionResult = await agentService.executeAgent(
+        {
+          agentId: agent_id,
+          userId: user_id,
+          sessionId: session_id,
+          userMessage: message
+        },
+        {
+          includeMemory: true,
+          userId: user_id,
+          sessionId: session_id,
+          loadConversationHistory: true
+        }
+      );
+
+      console.log('✅ [AGENT-SERVICE] Chat execution completed successfully:', {
+        responseLength: executionResult.response.length,
+        executionTime: executionResult.executionTime,
+        usageStats: executionResult.usage
+      });
+
+      return {
+        source: 'agent',
+        content: executionResult.response,
+        agent_id: agent_id,
+        usage: {
+          prompt_tokens: Math.floor(executionResult.usage.total_tokens * 0.7), // Estimate prompt tokens
+          completion_tokens: Math.floor(executionResult.usage.total_tokens * 0.3) // Estimate completion tokens
+        }
+      };
+
+    } catch (error) {
+      console.error('❌ [AGENT-SERVICE] Agent execution failed:', {
+        agent_id,
+        user_id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+
+      // Just throw the error instead of providing fallback response
+      throw error;
+    }
+  }
+
+  /**
+   * Get memory store instance for backward compatibility
+   */
+  static getMemoryStore(): DatabaseMemoryStore {
+    const agentService = new AgentService();
+    return agentService.getMemoryStore();
+  }
+
+  /**
+   * Test agent configuration without executing
+   */
+  static async validateAgent(agentId: string): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    try {
+      const agentRepo = RepositoryFactory.getAgentRepository();
+      const dbAgent = await agentRepo.findById(agentId);
+
+      if (!dbAgent) {
+        return {
+          valid: false,
+          errors: [`Agent ${agentId} not found`],
+          warnings: []
+        };
+      }
+
+      // Basic validation - AgentService handles detailed validation internally
+      if (!dbAgent.name || !dbAgent.model) {
+        return {
+          valid: false,
+          errors: ['Agent name and model are required'],
+          warnings: []
+        };
+      }
+      
+      const warnings: string[] = [];
+      
+      // Add warnings for potential issues
+      if (!dbAgent.blueprint && dbAgent.executionMode === 'workflow') {
+        warnings.push('Agent is set to workflow mode but has no blueprint defined');
+      }
+      
+
+      if (!dbAgent.starshipId) {
+        warnings.push('Agent is not assigned to any starship');
+      }
+
+      return {
+        valid: true,
+        errors: [],
+        warnings
+      };
+
+    } catch (error) {
+      return {
+        valid: false,
+        errors: [error instanceof Error ? error.message : 'Unknown validation error'],
+        warnings: []
+      };
+    }
+  }
 
   /**
    * Execute an agent with user input

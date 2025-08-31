@@ -370,4 +370,52 @@ export class MissionService {
     // Get clarity assessment (can be null if not yet assessed)
     return await clarityRepo.getByMissionId(missionId);
   }
+
+  /**
+   * Get workflow for a mission - temporary implementation using WorkflowService until MissionWorkflow is fully implemented
+   */
+  static async getWorkflowByMissionId(missionId: string): Promise<any | null> {
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    
+    // Verify mission exists first
+    try {
+      await missionRepo.getMissionById(missionId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError('Mission not found', 'Mission', missionId);
+      }
+      throw error;
+    }
+
+    // TODO: This is a temporary implementation. In the future, this should query MissionWorkflow table
+    // For now, we'll return null since there's no direct mission-workflow relationship in current schema
+    return null;
+  }
+
+  /**
+   * Update workflow approval status for a mission - temporary implementation
+   */
+  static async updateWorkflowApproval(missionId: string, approvalData: {
+    approvalStatus: 'pending' | 'approved' | 'rejected';
+    rejectionReason?: string;
+  }): Promise<any | null> {
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    
+    // Verify mission exists first
+    try {
+      const mission = await missionRepo.getMissionById(missionId);
+      
+      // Update mission's approval status
+      const updatedMission = await missionRepo.updateMission(missionId, {
+        approvalStatus: approvalData.approvalStatus as any
+      });
+      
+      return updatedMission;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError('Mission not found', 'Mission', missionId);
+      }
+      throw error;
+    }
+  }
 }

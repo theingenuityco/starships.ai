@@ -206,7 +206,7 @@ export class MissionOrchestratorAgent {
     
     // Load existing workflow and clarity
     const [workflow, clarity] = await Promise.all([
-      WorkflowService.getWorkflowByMissionId(missionId),
+      MissionService.getWorkflowByMissionId(missionId),
       this.getClarityFromDB(missionId)
     ]);
 
@@ -323,7 +323,7 @@ export class MissionOrchestratorAgent {
           const approvalResult = await this.processWorkflowApprovalIntent(intent, recentMessage.content, taskCount);
           
           if (approvalResult.shouldUpdate && approvalResult.newStatus) {
-            await WorkflowService.updateWorkflowApproval(metadata.mission.id, {
+            await MissionService.updateWorkflowApproval(metadata.mission.id, {
               approvalStatus: approvalResult.newStatus,
               ...(approvalResult.rejectionReason && { rejectionReason: approvalResult.rejectionReason })
             });
@@ -502,7 +502,29 @@ export class MissionOrchestratorAgent {
     console.log('[Workflow Generation] LLM Response:', aiResponse);
     
     const createRequest = WorkflowParsingService.parseAIResponse(aiResponse, missionId, agents);
-    return await WorkflowService.createWorkflow(createRequest);
+    
+    // TODO: Replace with proper MissionWorkflow creation once MissionWorkflowRepository is implemented
+    // For now, return a mock MissionWorkflow structure
+    const mockWorkflow: MissionWorkflow = {
+      id: `workflow-${missionId}`,
+      missionId: missionId,
+      nodes: createRequest.nodes.map((node, index) => ({
+        id: node.aiId || `node-${index}`,
+        type: node.type as any,
+        name: node.name,
+        description: node.description,
+        parameters: node.parameters
+      })),
+      edges: createRequest.edges.map((edge, index) => ({
+        id: `edge-${index}`,
+        from: edge.from,
+        to: edge.to
+      })),
+      approvalStatus: 'pending' as const,
+      createdAt: new Date().toISOString()
+    };
+    
+    return mockWorkflow;
   }
 
   /**

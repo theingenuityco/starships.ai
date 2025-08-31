@@ -361,4 +361,5 @@ export class WorkflowRepository extends BaseRepository {
     const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
     return convertNeo4jIntsInArray(result.map((record) => record.w));
   }
+
 }

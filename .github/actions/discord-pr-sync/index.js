@@ -4,6 +4,8 @@ const DiscordThreadManager = require('../../scripts/discord-client');
 const ThreadStateManager = require('../../scripts/state-manager');
 
 async function run() {
+  let discord = null;
+  
   try {
     // Get inputs
     const discordToken = core.getInput('discord-token', { required: true });
@@ -28,8 +30,13 @@ async function run() {
     console.log(`Processing ${eventName} event for PR #${prNumber} (action: ${action})`);
 
     // Initialize Discord client
-    const discord = new DiscordThreadManager(discordToken, guildId, channelId);
-    await discord.initialize();
+    discord = new DiscordThreadManager(discordToken, guildId, channelId);
+    try {
+      await discord.initialize();
+    } catch (error) {
+      core.setFailed(`Failed to initialize Discord client: ${error.message}`);
+      return;
+    }
 
     // Initialize state manager
     const stateManager = new ThreadStateManager();
@@ -63,12 +70,25 @@ async function run() {
       }
     }
 
-    // Disconnect client
-    await discord.disconnect();
+    // Always disconnect client
+    try {
+      await discord.disconnect();
+    } catch (disconnectError) {
+      console.error('Error disconnecting Discord client:', disconnectError);
+    }
     
   } catch (error) {
     core.setFailed(`Action failed: ${error.message}`);
     console.error(error);
+    
+    // Try to disconnect if discord client exists
+    if (typeof discord !== 'undefined' && discord) {
+      try {
+        await discord.disconnect();
+      } catch (disconnectError) {
+        console.error('Error disconnecting Discord client:', disconnectError);
+      }
+    }
   }
 }
 

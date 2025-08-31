@@ -6,7 +6,8 @@ const artifact = require('@actions/artifact');
 class ThreadStateManager {
   constructor() {
     this.stateFile = 'thread-state.json';
-    this.artifactClient = artifact.create();
+    // Use the new artifact client API
+    this.artifactClient = new artifact.DefaultArtifactClient();
     this.artifactName = 'discord-thread-state';
   }
 

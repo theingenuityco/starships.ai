@@ -18,7 +18,7 @@ class DiscordThreadManager {
       ]
     });
 
-    // Set up ready listener BEFORE login
+    // Set up ready listener BEFORE login (using new clientReady event)
     const readyPromise = new Promise((resolve) => {
       this.client.once('ready', () => {
         console.log('Discord client ready');

@@ -126,16 +126,6 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: KINDE_POST_LOGOUT_REDIRECT_URL
-        - name: KINDE_REDIRECT_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_REDIRECT_URL
-        - name: KINDE_COOKIE_DOMAIN
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_COOKIE_DOMAIN
         
         # Security: Disable testing backdoor, enable debug for dev
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR

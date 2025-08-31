@@ -121,11 +121,6 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: KINDE_POST_LOGOUT_REDIRECT_URL
-        - name: KINDE_REDIRECT_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_REDIRECT_URL
         
         # Security: Disable debug modes
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR

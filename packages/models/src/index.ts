@@ -19,9 +19,9 @@ export { StarshipRepository } from './repositories/StarshipRepository';
 export { VisionRepository } from './repositories/VisionRepository';
 export { MissionRepository } from './repositories/MissionRepository';
 export { MissionMessageRepository } from './repositories/MissionMessageRepository';
-export { WorkflowRepository } from './repositories/WorkflowRepository';
-export { WorkflowNodeRepository } from './repositories/WorkflowNodeRepository';
-export { WorkflowEdgeRepository } from './repositories/WorkflowEdgeRepository';
+export { BlueprintRepository } from './repositories/BlueprintRepository';
+export { NodeRepository } from './repositories/NodeRepository';
+export { EdgeRepository } from './repositories/EdgeRepository';
 export { WorkflowRuntimeStateRepository } from './repositories/WorkflowRuntimeStateRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
@@ -115,6 +115,41 @@ export type {
   AgentTemplateUsage,
   IncrementTemplateUsageRequest
 } from './types/agent-template';
+
+// Export autopilot-based types
+export type {
+  NodeModel,
+  CreateNodeRequest,
+  UpdateNodeRequest,
+  NodeListResponse,
+  NodeResponse,
+  SearchNodesRequest,
+  SearchNodesResponse,
+  NodeFilters
+} from './types/node';
+
+export type {
+  EdgeModel,
+  CreateEdgeRequest,
+  UpdateEdgeRequest,
+  EdgeListResponse,
+  EdgeResponse,
+  SearchEdgesRequest,
+  SearchEdgesResponse,
+  EdgeFilters
+} from './types/edge';
+
+export type {
+  BlueprintModel,
+  CreateBlueprintRequest,
+  UpdateBlueprintRequest,
+  BlueprintListResponse,
+  BlueprintResponse,
+  SearchBlueprintsRequest,
+  SearchBlueprintsResponse,
+  BlueprintFilters,
+  BlueprintUsageStats
+} from './types/blueprint';
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';

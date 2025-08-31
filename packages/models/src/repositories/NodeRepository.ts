@@ -1,34 +1,33 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  WorkflowNode
-} from '@starships/protocol';
+import type { Node } from '@starships/autopilot';
+import type { NodeModel } from '../types/node';
 
-export class WorkflowNodeRepository extends BaseRepository {
+export class NodeRepository extends BaseRepository {
   constructor() {
-    super('WorkflowNodeRepository');
+    super('NodeRepository');
   }
 
-  async createNode(workflowId: string, nodeData: Omit<WorkflowNode, 'id'>): Promise<WorkflowNode> {
+  async createNode(blueprintId: string, nodeData: Omit<NodeModel, 'id'>): Promise<NodeModel> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ workflowId }, ['workflowId'], 'createNode');
+      this.validateRequired({ blueprintId }, ['blueprintId'], 'createNode');
       this.validateRequired(nodeData, ['type', 'name'], 'createNode');
 
       const connection = getConnection();
       const nodeId = uuidv4();
 
-      // Check if workflow exists
-      const workflowCheck = await connection.executeQuery<{ id: string }>(
-        'MATCH (w:Workflow {id: $workflowId}) RETURN w.id as id',
-        { workflowId }
+      // Check if blueprint exists
+      const blueprintCheck = await connection.executeQuery<{ id: string }>(
+        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
+        { blueprintId }
       );
 
-      if (!workflowCheck || workflowCheck.length === 0) {
-        this.handleNotFound('Workflow', workflowId, 'createNode');
+      if (!blueprintCheck || blueprintCheck.length === 0) {
+        this.handleNotFound('Blueprint', blueprintId, 'createNode');
       }
 
-      const node: WorkflowNode = {
+      const node: NodeModel = {
         id: nodeId,
         ...nodeData
       };
@@ -36,24 +35,25 @@ export class WorkflowNodeRepository extends BaseRepository {
       // Serialize parameters as JSON string for Neo4j storage
       const nodeProps = {
         ...node,
-        parameters: JSON.stringify(node.parameters || {})
+        parameters: JSON.stringify(node.parameters || {}),
+        ref: node.ref || nodeId
       };
 
       await connection.executeWrite(`
-        MATCH (w:Workflow {id: $workflowId})
-        CREATE (w)-[:CONTAINS]->(n:WorkflowNode $nodeProps)
+        MATCH (b:Blueprint {id: $blueprintId})
+        CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)
       `, {
-        workflowId,
+        blueprintId,
         nodeProps
       });
 
       return node;
-    }, 'createNode', 'WorkflowNode');
+    }, 'createNode', 'Node');
   }
 
-  async createNodes(workflowId: string, nodesData: Array<Omit<WorkflowNode, 'id'> & { aiId?: string }>): Promise<{ nodes: WorkflowNode[]; idMapping: Map<string, string> }> {
+  async createNodes(blueprintId: string, nodesData: Array<Omit<NodeModel, 'id'> & { aiId?: string }>): Promise<{ nodes: NodeModel[]; idMapping: Map<string, string> }> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ workflowId }, ['workflowId'], 'createNodes');
+      this.validateRequired({ blueprintId }, ['blueprintId'], 'createNodes');
       
       if (!Array.isArray(nodesData) || nodesData.length === 0) {
         this.handleValidationError([{
@@ -65,24 +65,24 @@ export class WorkflowNodeRepository extends BaseRepository {
 
       const connection = getConnection();
       
-      // Check if workflow exists
-      const workflowCheck = await connection.executeQuery<{ id: string }>(
-        'MATCH (w:Workflow {id: $workflowId}) RETURN w.id as id',
-        { workflowId }
+      // Check if blueprint exists
+      const blueprintCheck = await connection.executeQuery<{ id: string }>(
+        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
+        { blueprintId }
       );
 
-      if (!workflowCheck || workflowCheck.length === 0) {
-        this.handleNotFound('Workflow', workflowId, 'createNodes');
+      if (!blueprintCheck || blueprintCheck.length === 0) {
+        this.handleNotFound('Blueprint', blueprintId, 'createNodes');
       }
 
-      const nodes: WorkflowNode[] = [];
+      const nodes: NodeModel[] = [];
       const idMapping = new Map<string, string>();
 
       for (const nodeData of nodesData) {
         const nodeId = uuidv4();
         const { aiId, ...nodeWithoutAiId } = nodeData as any;
         
-        const node: WorkflowNode = {
+        const node: NodeModel = {
           id: nodeId,
           ...nodeWithoutAiId
         };
@@ -90,14 +90,15 @@ export class WorkflowNodeRepository extends BaseRepository {
         // Serialize parameters as JSON string for Neo4j storage
         const nodeProps = {
           ...node,
-          parameters: JSON.stringify(node.parameters || {})
+          parameters: JSON.stringify(node.parameters || {}),
+          ref: node.ref || nodeId
         };
 
         await connection.executeWrite(`
-          MATCH (w:Workflow {id: $workflowId})
-          CREATE (w)-[:CONTAINS]->(n:WorkflowNode $nodeProps)
+          MATCH (b:Blueprint {id: $blueprintId})
+          CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)
         `, {
-          workflowId,
+          blueprintId,
           nodeProps
         });
 
@@ -110,19 +111,19 @@ export class WorkflowNodeRepository extends BaseRepository {
       }
 
       return { nodes, idMapping };
-    }, 'createNodes', 'WorkflowNode');
+    }, 'createNodes', 'Node');
   }
 
-  async getNodesByWorkflowId(workflowId: string): Promise<WorkflowNode[]> {
+  async getNodesByBlueprintId(blueprintId: string): Promise<NodeModel[]> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ workflowId }, ['workflowId'], 'getNodesByWorkflowId');
+      this.validateRequired({ blueprintId }, ['blueprintId'], 'getNodesByBlueprintId');
 
       const connection = getConnection();
 
-      const result = await connection.executeQuery<{ n: WorkflowNode }>(
-        `MATCH (w:Workflow {id: $workflowId})-[:CONTAINS]->(n:WorkflowNode)
+      const result = await connection.executeQuery<{ n: NodeModel }>(
+        `MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(n:Node)
          RETURN n`,
-        { workflowId }
+        { blueprintId }
       );
 
       return result?.map(record => {
@@ -138,17 +139,17 @@ export class WorkflowNodeRepository extends BaseRepository {
         }
         return nodeProps;
       }) || [];
-    }, 'getNodesByWorkflowId', 'WorkflowNode');
+    }, 'getNodesByBlueprintId', 'Node');
   }
 
-  async getNodeById(nodeId: string): Promise<WorkflowNode | null> {
+  async getNodeById(nodeId: string): Promise<NodeModel | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ nodeId }, ['nodeId'], 'getNodeById');
 
       const connection = getConnection();
 
-      const result = await connection.executeQuery<{ n: WorkflowNode }>(
-        'MATCH (n:WorkflowNode {id: $nodeId}) RETURN n',
+      const result = await connection.executeQuery<{ n: NodeModel }>(
+        'MATCH (n:Node {id: $nodeId}) RETURN n',
         { nodeId }
       );
 
@@ -168,10 +169,10 @@ export class WorkflowNodeRepository extends BaseRepository {
       }
       
       return nodeProps;
-    }, 'getNodeById', 'WorkflowNode', nodeId);
+    }, 'getNodeById', 'Node', nodeId);
   }
 
-  async updateNode(nodeId: string, updates: Partial<WorkflowNode>): Promise<WorkflowNode | null> {
+  async updateNode(nodeId: string, updates: Partial<NodeModel>): Promise<NodeModel | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ nodeId }, ['nodeId'], 'updateNode');
       
@@ -185,13 +186,13 @@ export class WorkflowNodeRepository extends BaseRepository {
       const connection = getConnection();
 
       // Check if node exists
-      const existingResult = await connection.executeQuery<{ n: WorkflowNode }>(
-        'MATCH (n:WorkflowNode {id: $nodeId}) RETURN n',
+      const existingResult = await connection.executeQuery<{ n: NodeModel }>(
+        'MATCH (n:Node {id: $nodeId}) RETURN n',
         { nodeId }
       );
 
       if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('WorkflowNode', nodeId, 'updateNode');
+        this.handleNotFound('Node', nodeId, 'updateNode');
       }
 
       // Build SET clause dynamically
@@ -218,20 +219,25 @@ export class WorkflowNodeRepository extends BaseRepository {
         params.description = updates.description;
       }
 
+      if (updates.ref !== undefined) {
+        setClause.push('n.ref = $ref');
+        params.ref = updates.ref;
+      }
+
       if (setClause.length === 0) {
         return this.getNodeById(nodeId);
       }
 
       const query = `
-        MATCH (n:WorkflowNode {id: $nodeId})
+        MATCH (n:Node {id: $nodeId})
         SET ${setClause.join(', ')}
         RETURN n
       `;
 
-      const result = await connection.executeWrite<{ n: WorkflowNode }>(query, params);
+      const result = await connection.executeWrite<{ n: NodeModel }>(query, params);
 
       if (!result || result.length === 0) {
-        throw new Error('Failed to update workflow node');
+        throw new Error('Failed to update node');
       }
 
       const nodeProps = result[0].n;
@@ -246,7 +252,7 @@ export class WorkflowNodeRepository extends BaseRepository {
       }
 
       return nodeProps;
-    }, 'updateNode', 'WorkflowNode', nodeId);
+    }, 'updateNode', 'Node', nodeId);
   }
 
   async deleteNode(nodeId: string): Promise<boolean> {
@@ -256,46 +262,46 @@ export class WorkflowNodeRepository extends BaseRepository {
       const connection = getConnection();
 
       // Check if node exists
-      const existingResult = await connection.executeQuery<{ n: WorkflowNode }>(
-        'MATCH (n:WorkflowNode {id: $nodeId}) RETURN n',
+      const existingResult = await connection.executeQuery<{ n: NodeModel }>(
+        'MATCH (n:Node {id: $nodeId}) RETURN n',
         { nodeId }
       );
 
       if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('WorkflowNode', nodeId, 'deleteNode');
+        this.handleNotFound('Node', nodeId, 'deleteNode');
       }
 
       // Delete the node and all its relationships
       await connection.executeWrite(
-        'MATCH (n:WorkflowNode {id: $nodeId}) DETACH DELETE n',
+        'MATCH (n:Node {id: $nodeId}) DETACH DELETE n',
         { nodeId }
       );
 
       return true;
-    }, 'deleteNode', 'WorkflowNode', nodeId);
+    }, 'deleteNode', 'Node', nodeId);
   }
 
-  async deleteNodesByWorkflowId(workflowId: string): Promise<void> {
+  async deleteNodesByBlueprintId(blueprintId: string): Promise<void> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ workflowId }, ['workflowId'], 'deleteNodesByWorkflowId');
+      this.validateRequired({ blueprintId }, ['blueprintId'], 'deleteNodesByBlueprintId');
 
       const connection = getConnection();
 
-      // Check if workflow exists
-      const workflowCheck = await connection.executeQuery<{ id: string }>(
-        'MATCH (w:Workflow {id: $workflowId}) RETURN w.id as id',
-        { workflowId }
+      // Check if blueprint exists
+      const blueprintCheck = await connection.executeQuery<{ id: string }>(
+        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
+        { blueprintId }
       );
 
-      if (!workflowCheck || workflowCheck.length === 0) {
-        this.handleNotFound('Workflow', workflowId, 'deleteNodesByWorkflowId');
+      if (!blueprintCheck || blueprintCheck.length === 0) {
+        this.handleNotFound('Blueprint', blueprintId, 'deleteNodesByBlueprintId');
       }
 
-      // Delete all nodes belonging to the workflow
+      // Delete all nodes belonging to the blueprint
       await connection.executeWrite(`
-        MATCH (w:Workflow {id: $workflowId})-[:CONTAINS]->(n:WorkflowNode)
+        MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(n:Node)
         DETACH DELETE n
-      `, { workflowId });
-    }, 'deleteNodesByWorkflowId', 'WorkflowNode');
+      `, { blueprintId });
+    }, 'deleteNodesByBlueprintId', 'Node');
   }
 }

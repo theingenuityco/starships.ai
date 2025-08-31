@@ -67,7 +67,6 @@ export class AgentMemory extends Memory {
    */
   setIdentity(identity: AgentIdentity): void {
     this.identity = identity;
-    this.rebuildSystemContext();
   }
 
   /**
@@ -75,7 +74,6 @@ export class AgentMemory extends Memory {
    */
   setPurpose(purpose: AgentPurpose): void {
     this.purpose = purpose;
-    this.rebuildSystemContext();
   }
 
   /**
@@ -83,7 +81,6 @@ export class AgentMemory extends Memory {
    */
   setSpace(space: AgentSpace): void {
     this.space = space;
-    this.rebuildSystemContext();
   }
 
   /**
@@ -186,7 +183,7 @@ export class AgentMemory extends Memory {
       }
       
       if (identityParts.length > 0) {
-        parts.push(`IDENTITY:\n${identityParts.join('\n')}`);
+        parts.push(`<identity>\n${identityParts.join('\n')}\n</identity>`);
       }
     }
 
@@ -201,25 +198,17 @@ export class AgentMemory extends Memory {
         purposeParts.push(`Constraints: ${this.purpose.constraints.join(', ')}`);
       }
       
-      parts.push(`PURPOSE:\n${purposeParts.join('\n')}`);
+      parts.push(`<purpose>\n${purposeParts.join('\n')}\n</purpose>`);
     }
 
     // Space section
     if (this.space) {
-      parts.push(`SPACE:\n${this.space.description}`);
+      parts.push(`<space>\n${this.space.description}\n</space>`);
     }
 
     return parts.length > 0 ? parts.join('\n\n') : '';
   }
 
-  /**
-   * Rebuild system context when identity/purpose/space changes
-   */
-  private rebuildSystemContext(): void {
-    // Remove existing structured system messages and rebuild
-    // This is called when identity, purpose, or space changes
-    // For now, we'll just let toMessages() handle the formatting
-  }
 
   /**
    * Clear conversation history only

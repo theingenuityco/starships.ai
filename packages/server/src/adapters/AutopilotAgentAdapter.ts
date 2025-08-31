@@ -14,14 +14,14 @@
  * Handles conversion, memory management, and blueprint creation.
  */
 
-import { AgentModel as DBAgent, AgentMemoryConfig } from '@starships/models';
-import { Blueprint, NodeType, Agent as AutopilotAgent, AgentMemory, createAgentMemory, Execution, ConversationEntry } from '@starships/autopilot';
+import { AgentModel, AgentMemoryConfig } from '@starships/models';
+import { Blueprint, NodeType, Agent, AgentMemory, createAgentMemory, Execution, ConversationEntry } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { MemoryEntry } from '@starships/protocol';
 
 // Now using real autopilot imports
 
-export interface AutopilotAgentOptions {
+export interface AgentOptions {
   includeMemory?: boolean;
   sessionId?: string;
   userId?: string;
@@ -29,7 +29,7 @@ export interface AutopilotAgentOptions {
 }
 
 /**
- * Adapter class for converting database agents to autopilot agents
+ * Adapter class for converting database agents to agent instances
  */
 export class AutopilotAgentAdapter {
   private static memoryStore = new DatabaseMemoryStore();
@@ -42,12 +42,12 @@ export class AutopilotAgentAdapter {
   }
 
   /**
-   * Convert database agent to autopilot agent instance
+   * Convert database agent to agent instance
    */
   static async fromDatabaseAgent(
-    dbAgent: DBAgent, 
-    options: AutopilotAgentOptions = {}
-  ): Promise<AutopilotAgent> {
+    dbAgent: AgentModel,
+    options: AgentOptions = {}
+  ): Promise<Agent> {
     const {
       includeMemory = true,
       sessionId,
@@ -65,7 +65,7 @@ export class AutopilotAgentAdapter {
     // Get or create blueprint
     const blueprint = dbAgent.blueprint || this.createDefaultBlueprint(dbAgent);
 
-    // Create autopilot agent parameters
+    // Create agent parameters
     const agentParams = {
       name: dbAgent.name,
       description: dbAgent.description,
@@ -78,14 +78,14 @@ export class AutopilotAgentAdapter {
       timeout: dbAgent.timeout || 30000
     };
 
-    return new AutopilotAgent(agentParams);
+    return new Agent(agentParams);
   }
 
   /**
    * Create agent memory from database agent configuration
    */
   private static async createAgentMemory(
-    dbAgent: DBAgent,
+    dbAgent: AgentModel,
     options: {
       includeMemory?: boolean;
       userId?: string;
@@ -195,7 +195,7 @@ export class AutopilotAgentAdapter {
   /**
    * Create default blueprint for simple chat agents
    */
-  private static createDefaultBlueprint(dbAgent: DBAgent): Blueprint {
+  private static createDefaultBlueprint(dbAgent: AgentModel): Blueprint {
     return {
       nodes: [
         {
@@ -252,7 +252,7 @@ export class AutopilotAgentAdapter {
    * Create workflow blueprint for complex agents with tools
    */
   static createWorkflowBlueprint(
-    dbAgent: DBAgent,
+    dbAgent: AgentModel,
     includeTools: boolean = false
   ): Blueprint {
     const nodes = [
@@ -341,7 +341,7 @@ export class AutopilotAgentAdapter {
   }
 
   /**
-   * Extract response from autopilot agent execution result
+   * Extract response from agent execution result
    */
   static extractResponse(executionResult: any): string {
     if (executionResult.status !== 'completed') {
@@ -427,9 +427,9 @@ export class AutopilotAgentAdapter {
   }
 
   /**
-   * Validate autopilot agent configuration
+   * Validate agent configuration
    */
-  static validateAgentConfig(dbAgent: DBAgent): { valid: boolean; errors: string[] } {
+  static validateAgentConfig(dbAgent: AgentModel): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     // Basic validation

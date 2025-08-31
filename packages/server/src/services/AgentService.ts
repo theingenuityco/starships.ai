@@ -7,12 +7,12 @@
  */
 
 import { AgentRepository } from '@starships/models';
-import { AgentModel as DatabaseAgent, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
-import { Agent as AutopilotAgent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
+import { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
+import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { MemoryEntry } from '@starships/protocol';
 
-export interface AutopilotAgentOptions {
+export interface AgentOptions {
   includeMemory?: boolean;
   sessionId?: string;
   userId?: string;
@@ -57,7 +57,7 @@ export class AgentService {
   /**
    * Get agents by category - Static method
    */
-  static async getAgentsByCategory(category: string): Promise<DatabaseAgent[]> {
+  static async getAgentsByCategory(category: string): Promise<AgentModel[]> {
     const repository = new AgentRepository();
     return await repository.findByCategory(category);
   }
@@ -65,7 +65,7 @@ export class AgentService {
   /**
    * Get agents by author - Static method
    */
-  static async getAgentsByAuthor(authorId: string): Promise<DatabaseAgent[]> {
+  static async getAgentsByAuthor(authorId: string): Promise<AgentModel[]> {
     const repository = new AgentRepository();
     return await repository.findByAuthor(authorId);
   }
@@ -73,7 +73,7 @@ export class AgentService {
   /**
    * Get agents by tags - Static method
    */
-  static async getAgentsByTags(tags: string[]): Promise<DatabaseAgent[]> {
+  static async getAgentsByTags(tags: string[]): Promise<AgentModel[]> {
     const repository = new AgentRepository();
     return await repository.findByTags(tags);
   }
@@ -81,7 +81,7 @@ export class AgentService {
   /**
    * Get public agents - Static method
    */
-  static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<DatabaseAgent[]> {
+  static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
     const repository = new AgentRepository();
     return await repository.findPublic(limit, offset);
   }
@@ -89,23 +89,23 @@ export class AgentService {
   /**
    * Search agents - Static method
    */
-  static async searchAgents(query: string): Promise<DatabaseAgent[]> {
+  static async searchAgents(query: string): Promise<AgentModel[]> {
     const repository = new AgentRepository();
     return await repository.searchAgents(query);
   }
 
   /**
-   * Get agent by ID - Static method (returns DatabaseAgent, not AutopilotAgent)
+   * Get agent by ID - Static method (returns AgentModel, not Agent)
    */
-  static async getAgent(agentId: string): Promise<DatabaseAgent | null> {
+  static async getAgent(agentId: string): Promise<AgentModel | null> {
     const repository = new AgentRepository();
     return await repository.findById(agentId);
   }
 
   /**
-   * Create agent - Static method (returns DatabaseAgent, not AutopilotAgent)
+   * Create agent - Static method (returns AgentModel, not Agent)
    */
-  static async createAgent(request: CreateAgentRequest): Promise<DatabaseAgent> {
+  static async createAgent(request: CreateAgentRequest): Promise<AgentModel> {
     const repository = new AgentRepository();
     
     // Provide defaults for required fields that might be missing from CreateAgentRequest
@@ -123,9 +123,9 @@ export class AgentService {
   }
 
   /**
-   * Update agent - Static method (returns DatabaseAgent, not AutopilotAgent)
+   * Update agent - Static method (returns AgentModel, not Agent)
    */
-  static async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<DatabaseAgent | null> {
+  static async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     const repository = new AgentRepository();
     return await repository.update(agentId, updates);
   }
@@ -141,7 +141,7 @@ export class AgentService {
   /**
    * Get agents by starship ID - Static method
    */
-  static async getAgentsByStarshipId(starshipId: string): Promise<DatabaseAgent[]> {
+  static async getAgentsByStarshipId(starshipId: string): Promise<AgentModel[]> {
     const repository = new AgentRepository();
     return await repository.findByStarshipId(starshipId);
   }
@@ -202,9 +202,9 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Create a new agent and return as AutopilotAgent instance
+   * Create a new agent and return as Agent instance
    */
-  async createAgent(request: CreateAgentRequest, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent> {
+  async createAgent(request: CreateAgentRequest, options: AgentOptions = {}): Promise<Agent> {
     // Validate blueprint if provided
     if (request.blueprint) {
       const validation = this.validateBlueprint(request.blueprint);
@@ -226,48 +226,48 @@ export class AgentService {
     };
 
     const dbAgent = await this.agentRepository.create(agentData);
-    return await this.createAutopilotAgent(dbAgent, options);
+    return await this.createAgentInstance(dbAgent, options);
   }
 
   /**
-   * Get agent by ID as AutopilotAgent instance
+   * Get agent by ID as Agent instance
    */
-  async getAgent(agentId: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent | null> {
+  async getAgent(agentId: string, options: AgentOptions = {}): Promise<Agent | null> {
     const dbAgent = await this.agentRepository.findById(agentId);
     if (!dbAgent) {
       return null;
     }
-    return await this.createAutopilotAgent(dbAgent, options);
+    return await this.createAgentInstance(dbAgent, options);
   }
 
   /**
-   * Get all agents as AutopilotAgent instances
+   * Get all agents as Agent instances
    */
-  async getAllAgents(options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+  async getAllAgents(options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findAll();
-    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
-   * Get agents by starship as AutopilotAgent instances
+   * Get agents by starship as Agent instances
    */
-  async getAgentsByStarship(starshipId: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+  async getAgentsByStarship(starshipId: string, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findByStarshipId(starshipId);
-    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
-   * Get agents by user as AutopilotAgent instances
+   * Get agents by user as Agent instances
    */
-  async getAgentsByUser(userId: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+  async getAgentsByUser(userId: string, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findByAuthor(userId);
-    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
-   * Update agent and return as AutopilotAgent instance
+   * Update agent and return as Agent instance
    */
-  async updateAgent(agentId: string, updates: UpdateAgentRequest, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent | null> {
+  async updateAgent(agentId: string, updates: UpdateAgentRequest, options: AgentOptions = {}): Promise<Agent | null> {
     // Validate blueprint if being updated
     if (updates.blueprint) {
       const validation = this.validateBlueprint(updates.blueprint);
@@ -280,7 +280,7 @@ export class AgentService {
     if (!dbAgent) {
       return null;
     }
-    return await this.createAutopilotAgent(dbAgent, options);
+    return await this.createAgentInstance(dbAgent, options);
   }
 
   /**
@@ -298,15 +298,15 @@ export class AgentService {
   }
 
   /**
-   * Search agents and return as AutopilotAgent instances
+   * Search agents and return as Agent instances
    */
-  async searchAgents(query: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+  async searchAgents(query: string, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.searchAgents(query);
-    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
-   * Get agents with filters as AutopilotAgent instances
+   * Get agents with filters as Agent instances
    */
   async getAgentsWithFilters(filters: {
     category?: string;
@@ -314,9 +314,9 @@ export class AgentService {
     isPublic?: boolean;
     authorId?: string;
     starshipClass?: 'scout' | 'cruiser';
-  }, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+  }, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findWithFilters(filters);
-    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
   }
 
   // ============================================================================
@@ -328,7 +328,7 @@ export class AgentService {
    */
   async executeAgent(
     context: AgentExecutionContext,
-    options: AutopilotAgentOptions = {}
+    options: AgentOptions = {}
   ): Promise<ExecuteAgentResponse> {
     const startTime = Date.now();
     
@@ -339,14 +339,14 @@ export class AgentService {
         throw new Error(`Agent ${context.agentId} not found`);
       }
 
-      // Create autopilot agent instance
-      const autopilotAgent = await this.createAutopilotAgent(dbAgent, options);
+      // Create agent instance
+      const agent = await this.createAgentInstance(dbAgent, options);
 
       // Add user message to memory
-      autopilotAgent.addToMemory('user', context.userMessage);
+      agent.addToMemory('user', context.userMessage);
 
       // Execute the agent
-      const execution = await autopilotAgent.execute();
+      const execution = await agent.execute();
 
       // Extract response from execution result
       const response = this.extractResponse(execution);
@@ -357,7 +357,7 @@ export class AgentService {
       // Save conversation history back to database
       if (options.includeMemory && options.userId) {
         await this.saveConversationHistory(
-          autopilotAgent.getMemory(),
+          agent.getMemory(),
           context.agentId,
           options.userId
         );
@@ -427,12 +427,12 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Convert database agent to autopilot agent instance
+   * Convert database agent to agent instance
    */
-  private async createAutopilotAgent(
-    dbAgent: DatabaseAgent,
-    options: AutopilotAgentOptions
-  ): Promise<AutopilotAgent> {
+  private async createAgentInstance(
+    dbAgent: AgentModel,
+    options: AgentOptions
+  ): Promise<Agent> {
     const {
       includeMemory = true,
       userId,
@@ -462,14 +462,14 @@ export class AgentService {
       timeout: dbAgent.timeout || 30000
     };
 
-    return new AutopilotAgent(agentParams);
+    return new Agent(agentParams);
   }
 
   /**
    * Create agent memory from database agent configuration
    */
   private async createAgentMemory(
-    dbAgent: DatabaseAgent,
+    dbAgent: AgentModel,
     options: {
       includeMemory?: boolean;
       userId?: string;
@@ -637,7 +637,7 @@ export class AgentService {
   /**
    * Create default blueprint for simple chat agents
    */
-  private createDefaultBlueprint(dbAgent: DatabaseAgent | CreateAgentRequest): Blueprint {
+  private createDefaultBlueprint(dbAgent: AgentModel | CreateAgentRequest): Blueprint {
     return {
       nodes: [
         {

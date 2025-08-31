@@ -20,32 +20,22 @@ import type {
  * Database Agent interface - core API contract type
  * Extends AgentNodeParameters to be a superset with additional database/marketplace fields
  */
-export interface AgentModel extends Omit<AgentNodeParameters, 'memory' | 'blueprint'> {
+export interface AgentModel extends AgentNodeParameters {
   // Core database fields
   id: string;
-  systemPrompt?: string;
   createdAt: string;
-
-  // Enhanced marketplace fields
-  tags: string[];
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  authorId: string;
-  isPublic: boolean;
-  version: string;
   updatedAt: string;
+  version: string;
+
+  // Marketplace fields
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
   usageCount: number;
-  rating?: number;
+
+  // Template relationship
+  templateId?: string;
 
   // Deployment settings
   starshipId: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-  requiredPermissions?: string[];
-
-  // Autopilot integration fields (optional for database persistence)
-  blueprint?: Blueprint;
-  memory?: AgentMemoryConfig;
-  agentMemoryConfig?: AgentMemoryConfig; // Backward compatibility alias for memory
-  executionMode: 'simple' | 'workflow';
 }
 
 /**
@@ -67,21 +57,16 @@ export interface CreateAgentRequest {
   name: string;
   description?: string;
   category: AgentModel['category'];
-  systemPrompt?: string;
   model: string;
-  tags?: string[];
-  isPublic?: boolean;
   temperature?: number;
   maxTokens?: number;
   instructions?: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-  authorId?: string;
+  templateId?: string; // Reference to template if agent is created from template
   starshipId: string; // REQUIRED for new agents
 
   // Autopilot-specific fields (optional for backward compatibility)
   blueprint?: Blueprint;
   memory?: AgentMemoryConfig;
-  executionMode?: 'simple' | 'workflow';
   timeout?: number;
 }
 
@@ -121,10 +106,6 @@ export interface AgentResponse {
 export interface SearchAgentsRequest {
   query: string;
   category?: string;
-  tags?: string[];
-  isPublic?: boolean;
-  authorId?: string;
-  starshipClass?: 'scout' | 'cruiser';
   limit?: number;
   offset?: number;
 }
@@ -143,10 +124,6 @@ export interface SearchAgentsResponse {
  */
 export interface AgentFilters {
   category?: string;
-  tags?: string[];
-  isPublic?: boolean;
-  authorId?: string;
-  starshipClass?: 'scout' | 'cruiser';
   starshipId?: string;
 }
 

@@ -29,16 +29,7 @@ export class Agent {
     };
 
     // Create AgentMemory instance from config
-    this.memory = new AgentMemory();
-    if (params.memory.identity) {
-      this.memory.setIdentity(params.memory.identity);
-    }
-    if (params.memory.purpose) {
-      this.memory.setPurpose(params.memory.purpose);
-    }
-    if (params.memory.space) {
-      this.memory.setSpace(params.memory.space);
-    }
+    this.memory = new AgentMemory(undefined, params.memory);
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -219,7 +210,8 @@ export class Agent {
     const memoryConfig: AgentMemoryConfig = {
       identity: this.memory.getIdentity(),
       purpose: this.memory.getPurpose(),
-      space: this.memory.getSpace()
+      space: this.memory.getSpace(),
+      messages: this.memory.getMessageHistory()
     };
 
     const clonedParams: AgentNodeParameters = {
@@ -243,7 +235,8 @@ export class Agent {
     const currentMemoryConfig: AgentMemoryConfig = {
       identity: this.memory.getIdentity(),
       purpose: this.memory.getPurpose(),
-      space: this.memory.getSpace()
+      space: this.memory.getSpace(),
+      messages: this.memory.getMessageHistory()
     };
 
     const updatedParams = {

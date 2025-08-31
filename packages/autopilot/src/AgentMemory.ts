@@ -40,12 +40,13 @@ export interface AgentMemoryConfig {
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
+  messages?: Message[];
 }
 
 /**
- * Conversation entry with metadata
+ * Message entry with metadata
  */
-export interface ConversationEntry {
+export interface Message {
   id: string;
   timestamp: string;
   role: 'user' | 'assistant' | 'system';
@@ -62,10 +63,24 @@ export class AgentMemory extends Memory {
   private identity?: AgentIdentity;
   private purpose?: AgentPurpose;
   private space?: AgentSpace;
-  private conversations: ConversationEntry[] = [];
+  private messageEntries: Message[] = [];
 
-  constructor(initialSystemPrompt?: string) {
+  constructor(initialSystemPrompt?: string, config?: AgentMemoryConfig) {
     super(); // Don't pass initialSystemPrompt to base - we'll handle it ourselves
+    
+    // Initialize from config if provided
+    if (config) {
+      if (config.identity) this.setIdentity(config.identity);
+      if (config.purpose) this.setPurpose(config.purpose);
+      if (config.space) this.setSpace(config.space);
+      if (config.messages) {
+        config.messages.forEach(msgEntry => {
+          this.addMessage(msgEntry.role, msgEntry.content, msgEntry.metadata);
+        });
+      }
+    }
+    
+    // Handle legacy initialSystemPrompt (for backward compatibility)
     if (initialSystemPrompt) {
       this.addMessage('system', initialSystemPrompt);
     }
@@ -93,39 +108,59 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Add conversation entry with metadata
+   * Add message entry with metadata
    */
-  addConversation(
+  addMessage(
     role: 'user' | 'assistant' | 'system',
     content: string,
     metadata?: Record<string, unknown>
   ): void {
     if (content && content.trim()) {
-      const entry: ConversationEntry = {
-        id: `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      const entry: Message = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         role,
         content: content.trim(),
         metadata
       };
       
-      this.conversations.push(entry);
-      this.addMessage(role, content);
+      this.messageEntries.push(entry);
+      super.addMessage(role, content);
     }
+  }
+
+  /**
+   * Add conversation entry with metadata (legacy compatibility)
+   * @deprecated Use addMessage instead
+   */
+  addConversation(
+    role: 'user' | 'assistant' | 'system',
+    content: string,
+    metadata?: Record<string, unknown>
+  ): void {
+    this.addMessage(role, content, metadata);
   }
 
   /**
    * Add system prompt (legacy compatibility)
    */
   addSystemPrompt(prompt: string): void {
-    this.addMessage('system', prompt);
+    super.addMessage('system', prompt);
   }
 
   /**
-   * Get conversation history
+   * Get message history
    */
-  getConversationHistory(): ConversationEntry[] {
-    return [...this.conversations];
+  getMessageHistory(): Message[] {
+    return [...this.messageEntries];
+  }
+
+  /**
+   * Get conversation history (legacy compatibility)
+   * @deprecated Use getMessageHistory instead
+   */
+  getConversationHistory(): Message[] {
+    return this.getMessageHistory();
   }
 
   /**
@@ -220,13 +255,22 @@ export class AgentMemory extends Memory {
 
 
   /**
-   * Clear conversation history only
+   * Clear message history only
+   */
+  clearMessages(): void {
+    this.messageEntries = [];
+    // Remove conversation messages but keep system messages
+    const systemMessages = super.getMessages().filter(msg => msg.role === 'system');
+    super.clear();
+    systemMessages.forEach(msg => super.addMessage(msg.role, msg.content));
+  }
+
+  /**
+   * Clear conversation history only (legacy compatibility)
+   * @deprecated Use clearMessages instead
    */
   clearConversations(): void {
-    this.conversations = [];
-    // Remove conversation messages but keep system messages
-    const systemMessages = this.messages.filter(msg => msg.role === 'system');
-    this.messages = systemMessages;
+    this.clearMessages();
   }
 
   /**
@@ -234,7 +278,7 @@ export class AgentMemory extends Memory {
    */
   clear(): void {
     super.clear();
-    this.conversations = [];
+    this.messageEntries = [];
     this.identity = undefined;
     this.purpose = undefined;
     this.space = undefined;
@@ -245,8 +289,11 @@ export class AgentMemory extends Memory {
    */
   clone(): AgentMemory {
     const cloned = new AgentMemory();
-    cloned.messages = this.messages.map(msg => ({ ...msg }));
-    cloned.conversations = this.conversations.map(conv => ({ ...conv }));
+    // Copy base messages
+    super.getMessages().forEach(msg => cloned.addMessage(msg.role, msg.content));
+    // Copy message entries
+    cloned.messageEntries = this.messageEntries.map(msg => ({ ...msg }));
+    // Copy agent-specific data
     cloned.identity = this.identity ? { ...this.identity } : undefined;
     cloned.purpose = this.purpose ? { ...this.purpose } : undefined;
     cloned.space = this.space ? { ...this.space } : undefined;
@@ -265,7 +312,7 @@ export class AgentMemory extends Memory {
    */
   getAgentStats(): {
     messages: { total: number; system: number; user: number; assistant: number };
-    conversations: number;
+    messageEntries: number;
     hasIdentity: boolean;
     hasPurpose: boolean;
     hasSpace: boolean;
@@ -273,7 +320,7 @@ export class AgentMemory extends Memory {
     const messageStats = super.getStats();
     return {
       messages: messageStats,
-      conversations: this.conversations.length,
+      messageEntries: this.messageEntries.length,
       hasIdentity: !!this.identity,
       hasPurpose: !!this.purpose,
       hasSpace: !!this.space

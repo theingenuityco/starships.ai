@@ -19,7 +19,7 @@ export type { LLMMessage } from './Memory';
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
 export type {
-  ConversationEntry,
+  Message,
   AgentIdentity,
   AgentPurpose,
   AgentSpace,

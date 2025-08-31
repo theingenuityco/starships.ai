@@ -30,7 +30,7 @@ export type { LLMMessage } from '../Memory';
 
 // Agent memory types only (no classes)
 export type {
-  ConversationEntry,
+  Message,
   AgentIdentity,
   AgentPurpose,
   AgentSpace,

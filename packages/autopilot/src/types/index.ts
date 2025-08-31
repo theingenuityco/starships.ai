@@ -35,7 +35,7 @@ export type {
   ConversationEntry,
   AgentIdentity,
   AgentPurpose,
-  Scene
+  AgentContext
 } from '../AgentMemory';
 
 // ===== INTERNAL TYPES =====

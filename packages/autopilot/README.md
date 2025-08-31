@@ -67,7 +67,7 @@ console.log('Execution result:', result);
 
 ## Memory System
 
-Autopilot includes a sophisticated memory system built on two layers: base **Memory** for core LLM message management, and **AgentMemory** for advanced structured context with identity, purpose, scene, and conversation history.
+Autopilot includes a sophisticated memory system built on two layers: base **Memory** for core LLM message management, and **AgentMemory** for advanced structured context with identity, purpose, context, and conversation history.
 
 ### Base Memory Class
 
@@ -119,8 +119,8 @@ memory.setPurpose({
   constraints: ['Never promise what cannot be delivered', 'Escalate complex technical issues']
 });
 
-// Set scene context (like screenplay background)
-memory.setScene({
+// Set context (like screenplay background)
+memory.setContext({
   setting: 'Customer support chat during business hours',
   participants: ['customer', 'support agent'],
   mood: 'professional but friendly',
@@ -160,7 +160,7 @@ Primary Purpose: Resolve customer issues efficiently and professionally
 Secondary Goals: Build customer satisfaction, Identify upsell opportunities
 Constraints: Never promise what cannot be delivered, Escalate complex technical issues
 
-SCENE:
+CONTEXT:
 Setting: Customer support chat during business hours
 Participants: customer, support agent
 Mood: professional but friendly
@@ -182,7 +182,7 @@ Background: High-volume support period, need efficient resolution
 **AgentMemory Additional:**
 - `setIdentity(identity)` - Set agent identity
 - `setPurpose(purpose)` - Set agent purpose
-- `setScene(scene)` - Set scene context
+- `setContext(context)` - Set agent context
 - `addConversation(role, content, metadata?)` - Add conversation with metadata
 - `addSystemPrompt(prompt)` - Legacy compatibility
 - `clearConversations()` - Clear conversations only
@@ -237,7 +237,7 @@ agentMemory.setPurpose({
   primary: 'Provide comprehensive customer support through multi-step workflow',
   secondary: ['Gather user data', 'Generate personalized responses', 'Process requests efficiently']
 });
-agentMemory.setScene({
+agentMemory.setContext({
   setting: 'Customer support automation system',
   context: 'Multi-step workflow processing customer requests',
   mood: 'professional and efficient'

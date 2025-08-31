@@ -27,9 +27,9 @@ export interface AgentPurpose {
 }
 
 /**
- * Scene/context information (like screenplay background)
+ * Agent context information (like screenplay background)
  */
-export interface Scene {
+export interface AgentContext {
   setting?: string;
   participants?: string[];
   mood?: string;
@@ -56,7 +56,7 @@ export interface ConversationEntry {
 export class AgentMemory extends Memory {
   private identity?: AgentIdentity;
   private purpose?: AgentPurpose;
-  private scene?: Scene;
+  private context?: AgentContext;
   private conversations: ConversationEntry[] = [];
 
   constructor(initialSystemPrompt?: string) {
@@ -83,10 +83,10 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Set scene context
+   * Set agent context
    */
-  setScene(scene: Scene): void {
-    this.scene = scene;
+  setContext(context: AgentContext): void {
+    this.context = context;
     this.rebuildSystemContext();
   }
 
@@ -141,10 +141,10 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Get scene context
+   * Get agent context
    */
-  getScene(): Scene | undefined {
-    return this.scene ? { ...this.scene } : undefined;
+  getContext(): AgentContext | undefined {
+    return this.context ? { ...this.context } : undefined;
   }
 
   /**
@@ -208,19 +208,19 @@ export class AgentMemory extends Memory {
       parts.push(`PURPOSE:\n${purposeParts.join('\n')}`);
     }
 
-    // Scene section
-    if (this.scene) {
-      const sceneParts: string[] = [];
-      if (this.scene.setting) sceneParts.push(`Setting: ${this.scene.setting}`);
-      if (this.scene.participants && this.scene.participants.length > 0) {
-        sceneParts.push(`Participants: ${this.scene.participants.join(', ')}`);
+    // Context section
+    if (this.context) {
+      const contextParts: string[] = [];
+      if (this.context.setting) contextParts.push(`Setting: ${this.context.setting}`);
+      if (this.context.participants && this.context.participants.length > 0) {
+        contextParts.push(`Participants: ${this.context.participants.join(', ')}`);
       }
-      if (this.scene.mood) sceneParts.push(`Mood: ${this.scene.mood}`);
-      if (this.scene.context) sceneParts.push(`Context: ${this.scene.context}`);
-      if (this.scene.background) sceneParts.push(`Background: ${this.scene.background}`);
+      if (this.context.mood) contextParts.push(`Mood: ${this.context.mood}`);
+      if (this.context.context) contextParts.push(`Context: ${this.context.context}`);
+      if (this.context.background) contextParts.push(`Background: ${this.context.background}`);
       
-      if (sceneParts.length > 0) {
-        parts.push(`SCENE:\n${sceneParts.join('\n')}`);
+      if (contextParts.length > 0) {
+        parts.push(`CONTEXT:\n${contextParts.join('\n')}`);
       }
     }
 
@@ -228,11 +228,11 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Rebuild system context when identity/purpose/scene changes
+   * Rebuild system context when identity/purpose/context changes
    */
   private rebuildSystemContext(): void {
     // Remove existing structured system messages and rebuild
-    // This is called when identity, purpose, or scene changes
+    // This is called when identity, purpose, or context changes
     // For now, we'll just let toMessages() handle the formatting
   }
 
@@ -254,7 +254,7 @@ export class AgentMemory extends Memory {
     this.conversations = [];
     this.identity = undefined;
     this.purpose = undefined;
-    this.scene = undefined;
+    this.context = undefined;
   }
 
   /**
@@ -266,7 +266,7 @@ export class AgentMemory extends Memory {
     cloned.conversations = this.conversations.map(conv => ({ ...conv }));
     cloned.identity = this.identity ? { ...this.identity } : undefined;
     cloned.purpose = this.purpose ? { ...this.purpose } : undefined;
-    cloned.scene = this.scene ? { ...this.scene } : undefined;
+    cloned.context = this.context ? { ...this.context } : undefined;
     return cloned;
   }
 
@@ -285,7 +285,7 @@ export class AgentMemory extends Memory {
     conversations: number;
     hasIdentity: boolean;
     hasPurpose: boolean;
-    hasScene: boolean;
+    hasContext: boolean;
   } {
     const messageStats = super.getStats();
     return {
@@ -293,7 +293,7 @@ export class AgentMemory extends Memory {
       conversations: this.conversations.length,
       hasIdentity: !!this.identity,
       hasPurpose: !!this.purpose,
-      hasScene: !!this.scene
+      hasContext: !!this.context
     };
   }
 }

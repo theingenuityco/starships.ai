@@ -53,6 +53,8 @@ async function run() {
     const shouldCreate = eventName === 'pull_request' && 
                         (action === 'opened' || action === 'reopened');
 
+    console.log(`Event type: ${eventName}, Action: ${action}, Should create: ${shouldCreate}`);
+
     if (shouldCreate) {
       // Create or reactivate thread
       const result = await createOrReactivateThread(

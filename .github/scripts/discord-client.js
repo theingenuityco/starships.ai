@@ -331,12 +331,16 @@ class DiscordThreadManager {
       const activeThreads = await channel.threads.fetchActive();
       
       // Search for thread with PR number in name
+      // Account for status emojis at the beginning
       const searchPattern = `PR #${prNumber}:`;
-      const thread = activeThreads.threads.find(t => 
-        t.name.includes(searchPattern)
-      );
+      const thread = activeThreads.threads.find(t => {
+        // Remove any emoji prefix and check
+        const cleanName = t.name.replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '');
+        return cleanName.startsWith(searchPattern) || t.name.includes(searchPattern);
+      });
 
       if (thread) {
+        console.log(`Found existing active thread: ${thread.name} (${thread.id})`);
         return {
           threadId: thread.id,
           threadUrl: `https://discord.com/channels/${this.guildId}/${thread.id}`
@@ -345,9 +349,11 @@ class DiscordThreadManager {
 
       // Check archived threads
       const archivedThreads = await channel.threads.fetchArchived();
-      const archivedThread = archivedThreads.threads.find(t => 
-        t.name.includes(searchPattern)
-      );
+      const archivedThread = archivedThreads.threads.find(t => {
+        // Remove any emoji prefix and check
+        const cleanName = t.name.replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '');
+        return cleanName.startsWith(searchPattern) || t.name.includes(searchPattern);
+      });
 
       if (archivedThread) {
         // Unarchive if found

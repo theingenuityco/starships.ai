@@ -29,19 +29,6 @@ export type {
   LLMSort
 } from './domains/llm';
 
-export type {
-  AgentTemplate,
-  AgentTemplateCategory,
-  CreateAgentTemplateRequest,
-  UpdateAgentTemplateRequest,
-  AgentTemplateResponse,
-  AgentTemplateListResponse,
-  AgentTemplateFilters,
-  AgentTemplateSort,
-  AgentTemplateUsage,
-  IncrementTemplateUsageRequest,
-  RateTemplateRequest,
-} from './domains/agent-template';
 
 
 // Export Vision Socket Events

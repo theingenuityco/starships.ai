@@ -1,10 +1,11 @@
-import { AgentTemplate } from '@starships/protocol';
+import { AgentTemplateModel } from '../types/agent-template';
 import { AgentModel } from '../types/agent';
 import { Neo4jConnection, getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
+import { AgentMemoryConfig } from '@starships/autopilot';
 
 export class AgentTemplateRepository extends BaseRepository {
   private connection: Neo4jConnection;
@@ -24,42 +25,42 @@ export class AgentTemplateRepository extends BaseRepository {
     return value as T;
   }
 
-  async findAll(): Promise<AgentTemplate[]> {
+  async findAll(): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       const query = `
-        MATCH (t:AgentTemplate)
+        MATCH (t:AgentTemplateModel)
         RETURN t
         ORDER BY t.createdAt DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query);
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query);
       return convertNeo4jIntsInArray(results.map((result) => result.t));
-    }, 'findAll', 'AgentTemplate');
+    }, 'findAll', 'AgentTemplateModel');
   }
 
-  async findById(id: string): Promise<AgentTemplate | null> {
+  async findById(id: string): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ id }, ['id'], 'findById');
       
       const query = `
-        MATCH (t:AgentTemplate {id: $id})
+        MATCH (t:AgentTemplateModel {id: $id})
         RETURN t
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { id });
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
       const template = results.length > 0 ? results[0].t : null;
       return template ? convertNeo4jIntsInObject(template) : null;
-    }, 'findById', 'AgentTemplate', id);
+    }, 'findById', 'AgentTemplateModel', id);
   }
 
-  async create(entity: Omit<AgentTemplate, 'id' | 'createdAt'>): Promise<AgentTemplate> {
+  async create(entity: Omit<AgentTemplateModel, 'id' | 'createdAt'>): Promise<AgentTemplateModel> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(entity, ['name', 'description', 'authorId'], 'create');
       
       const id = uuidv4();
       const now = new Date().toISOString();
 
-      const template: AgentTemplate = {
+      const template: AgentTemplateModel = {
         ...entity,
         id,
         createdAt: now,
@@ -68,18 +69,18 @@ export class AgentTemplateRepository extends BaseRepository {
       };
 
       const query = `
-        CREATE (t:AgentTemplate $template)
+        CREATE (t:AgentTemplateModel $template)
         RETURN t
       `;
       
-      const results = await this.connection.executeWrite<{ t: AgentTemplate }>(query, { template });
+      const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(query, { template });
       const created = convertNeo4jIntsInObject(results[0].t);
 
       // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
       try {
         if (template.authorId && template.authorId !== 'system') {
           await this.connection.executeWrite(
-            `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
+            `MATCH (u:User {id: $authorId}), (t:AgentTemplateModel {id: $templateId})
              MERGE (u)-[r:CREATES]->(t)
              ON CREATE SET r.createdAt = $now`,
             {
@@ -95,10 +96,10 @@ export class AgentTemplateRepository extends BaseRepository {
       }
 
       return created;
-    }, 'create', 'AgentTemplate');
+    }, 'create', 'AgentTemplateModel');
   }
 
-  async update(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | null> {
+  async update(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ id }, ['id'], 'update');
       
@@ -112,12 +113,12 @@ export class AgentTemplateRepository extends BaseRepository {
       }
 
       const query = `
-        MATCH (t:AgentTemplate {id: $id})
+        MATCH (t:AgentTemplateModel {id: $id})
         SET ${updateFields}, t.updatedAt = $now
         RETURN t
       `;
 
-      const results = await this.connection.executeWrite<{ t: AgentTemplate }>(query, {
+      const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(query, {
         id,
         updates,
         now: new Date().toISOString(),
@@ -125,7 +126,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
       const template = results.length > 0 ? results[0].t : null;
       return template ? convertNeo4jIntsInObject(template) : null;
-    }, 'update', 'AgentTemplate', id);
+    }, 'update', 'AgentTemplateModel', id);
   }
 
   async delete(id: string): Promise<boolean> {
@@ -133,48 +134,48 @@ export class AgentTemplateRepository extends BaseRepository {
       this.validateRequired({ id }, ['id'], 'delete');
       
       const query = `
-        MATCH (t:AgentTemplate {id: $id})
+        MATCH (t:AgentTemplateModel {id: $id})
         DETACH DELETE t
         RETURN count(t) as deletedCount
       `;
 
       const results = await this.connection.executeWrite<{ deletedCount: number }>(query, { id });
       return results[0]?.deletedCount > 0;
-    }, 'delete', 'AgentTemplate', id);
+    }, 'delete', 'AgentTemplateModel', id);
   }
 
-  async findByAuthor(authorId: string): Promise<AgentTemplate[]> {
+  async findByAuthor(authorId: string): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ authorId }, ['authorId'], 'findByAuthor');
       
       const query = `
-        MATCH (t:AgentTemplate {authorId: $authorId})
+        MATCH (t:AgentTemplateModel {authorId: $authorId})
         RETURN t
         ORDER BY t.createdAt DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { authorId });
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { authorId });
       return convertNeo4jIntsInArray(results.map((result) => result.t));
-    }, 'findByAuthor', 'AgentTemplate');
+    }, 'findByAuthor', 'AgentTemplateModel');
   }
 
-  async findByCategory(category: string): Promise<AgentTemplate[]> {
+  async findByCategory(category: string): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ category }, ['category'], 'findByCategory');
       
       const query = `
-        MATCH (t:AgentTemplate {category: $category})
+        MATCH (t:AgentTemplateModel {category: $category})
         WHERE t.isPublic = true
         RETURN t
         ORDER BY t.usageCount DESC, t.rating DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { category });
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { category });
       return convertNeo4jIntsInArray(results.map((result) => result.t));
-    }, 'findByCategory', 'AgentTemplate');
+    }, 'findByCategory', 'AgentTemplateModel');
   }
 
-  async findByTags(tags: string[]): Promise<AgentTemplate[]> {
+  async findByTags(tags: string[]): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ tags }, ['tags'], 'findByTags');
       
@@ -187,18 +188,18 @@ export class AgentTemplateRepository extends BaseRepository {
       }
       
       const query = `
-        MATCH (t:AgentTemplate)
+        MATCH (t:AgentTemplateModel)
         WHERE t.isPublic = true AND ANY(tag IN $tags WHERE tag IN t.tags)
         RETURN t, size([tag IN $tags WHERE tag IN t.tags]) as matchCount
         ORDER BY matchCount DESC, t.usageCount DESC, t.rating DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, { tags });
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { tags });
       return convertNeo4jIntsInArray(results.map((result) => result.t));
-    }, 'findByTags', 'AgentTemplate');
+    }, 'findByTags', 'AgentTemplateModel');
   }
 
-  async findPublic(limit: number = 50, offset: number = 0): Promise<AgentTemplate[]> {
+  async findPublic(limit: number = 50, offset: number = 0): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       if (limit < 1 || limit > 100) {
         this.handleValidationError([{
@@ -217,28 +218,28 @@ export class AgentTemplateRepository extends BaseRepository {
       }
       
       const query = `
-        MATCH (t:AgentTemplate {isPublic: true})
+        MATCH (t:AgentTemplateModel {isPublic: true})
         RETURN t
         ORDER BY t.usageCount DESC, t.rating DESC, t.createdAt DESC
         SKIP $offset
         LIMIT $limit
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(query, {
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, {
         limit: int(limit),
         offset: int(offset),
       });
       return convertNeo4jIntsInArray(results.map((result) => result.t));
-    }, 'findPublic', 'AgentTemplate');
+    }, 'findPublic', 'AgentTemplateModel');
   }
 
-  async searchTemplates(query: string): Promise<AgentTemplate[]> {
+  async searchTemplates(query: string): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ query }, ['query'], 'searchTemplates');
       this.validateStringLengths({ query }, { query: { min: 1, max: 200 } }, 'searchTemplates');
       
       const searchQuery = `
-        MATCH (t:AgentTemplate)
+        MATCH (t:AgentTemplateModel)
         WHERE t.isPublic = true AND (
           toLower(t.name) CONTAINS toLower($query) OR
           toLower(t.description) CONTAINS toLower($query) OR
@@ -253,11 +254,11 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY relevance DESC, t.usageCount DESC, t.rating DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplate }>(searchQuery, {
+      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(searchQuery, {
         query,
       });
       return convertNeo4jIntsInArray(results.map((result) => result.t));
-    }, 'searchTemplates', 'AgentTemplate');
+    }, 'searchTemplates', 'AgentTemplateModel');
   }
 
   async incrementUsageCount(id: string): Promise<void> {
@@ -265,12 +266,12 @@ export class AgentTemplateRepository extends BaseRepository {
       this.validateRequired({ id }, ['id'], 'incrementUsageCount');
       
       const query = `
-        MATCH (t:AgentTemplate {id: $id})
+        MATCH (t:AgentTemplateModel {id: $id})
         SET t.usageCount = t.usageCount + 1, t.updatedAt = $now
       `;
 
       await this.connection.executeWrite(query, { id, now: new Date().toISOString() });
-    }, 'incrementUsageCount', 'AgentTemplate', id);
+    }, 'incrementUsageCount', 'AgentTemplateModel', id);
   }
 
   async updateRating(id: string, rating: number): Promise<void> {
@@ -286,12 +287,12 @@ export class AgentTemplateRepository extends BaseRepository {
       }
       
       const query = `
-        MATCH (t:AgentTemplate {id: $id})
+        MATCH (t:AgentTemplateModel {id: $id})
         SET t.rating = $rating, t.updatedAt = $now
       `;
 
       await this.connection.executeWrite(query, { id, rating, now: new Date().toISOString() });
-    }, 'updateRating', 'AgentTemplate', id);
+    }, 'updateRating', 'AgentTemplateModel', id);
   }
 
   async createAgentFromTemplate(
@@ -369,7 +370,7 @@ export class AgentTemplateRepository extends BaseRepository {
     return createdAgent;
   }
 
-  async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {
+  async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ agentId }, ['agentId'], 'createTemplateFromAgent');
 
@@ -434,14 +435,14 @@ export class AgentTemplateRepository extends BaseRepository {
       };
 
       // Create default memory config
-      const defaultMemory = {
+      const defaultMemory: AgentMemoryConfig = {
         identity: {
-          name: agent.name,
+          name: String(agent.name || 'AI Assistant'),
           role: 'AI Assistant',
           personality: 'Professional and helpful'
         },
         purpose: {
-          primary: this.getSafeValue(agent.description, 'Assist users with their requests') as string,
+          primary: String(this.getSafeValue(agent.description, 'Assist users with their requests')),
           constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy']
         },
         space: {
@@ -449,7 +450,7 @@ export class AgentTemplateRepository extends BaseRepository {
         }
       };
 
-      const template: AgentTemplate = {
+      const template: AgentTemplateModel = {
         id: templateId,
         name: `${agent.name} Template`,
         description: this.getSafeValue(agent.description, '') as string,
@@ -474,11 +475,11 @@ export class AgentTemplateRepository extends BaseRepository {
       };
 
       const createQuery = `
-        CREATE (t:AgentTemplate $template)
+        CREATE (t:AgentTemplateModel $template)
         RETURN t
       `;
       
-      const results = await this.connection.executeWrite<{ t: AgentTemplate }>(createQuery, {
+      const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(createQuery, {
         template,
       });
       const created = convertNeo4jIntsInObject(results[0].t);
@@ -487,7 +488,7 @@ export class AgentTemplateRepository extends BaseRepository {
       try {
         if (template.authorId && template.authorId !== 'system') {
           await this.connection.executeWrite(
-            `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
+            `MATCH (u:User {id: $authorId}), (t:AgentTemplateModel {id: $templateId})
              MERGE (u)-[r:CREATES]->(t)
              ON CREATE SET r.createdAt = $now`,
             {
@@ -502,6 +503,6 @@ export class AgentTemplateRepository extends BaseRepository {
       }
 
       return created;
-    }, 'createTemplateFromAgent', 'AgentTemplate', agentId);
+    }, 'createTemplateFromAgent', 'AgentTemplateModel', agentId);
   }
 }

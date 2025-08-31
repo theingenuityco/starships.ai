@@ -1,8 +1,10 @@
 /**
  * Agent Template Collection Types
  *
- * Clean agent template type definitions for protocol contract.
+ * Clean agent template type definitions for model types.
  */
+
+import type { Blueprint, AgentMemoryConfig } from '@starships/autopilot';
 
 // ============================================================================
 // AGENT TEMPLATE TYPES
@@ -16,7 +18,7 @@ export type AgentTemplateCategory = 'general' | 'coding' | 'creative' | 'analysi
 /**
  * Core agent template entity
  */
-export interface AgentTemplate {
+export interface AgentTemplateModel {
   id: string;
   name: string;
   description: string;
@@ -100,14 +102,14 @@ export interface UpdateAgentTemplateRequest {
  * Agent template response structure
  */
 export interface AgentTemplateResponse {
-  template: AgentTemplate;
+  template: AgentTemplateModel;
 }
 
 /**
  * Agent template list response
  */
 export interface AgentTemplateListResponse {
-  templates: AgentTemplate[];
+  templates: AgentTemplateModel[];
   total: number;
 }
 

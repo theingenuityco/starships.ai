@@ -100,9 +100,23 @@ export type {
   DeployAgentRequest,
   DeployAgentResponse,
   AgentUsageStats,
-  AgentAnalytics,
-  AgentTemplate
+  AgentAnalytics
 } from './types/agent';
+
+// Export agent template types
+export type {
+  AgentTemplateModel,
+  AgentTemplateCategory,
+  CreateAgentTemplateRequest,
+  UpdateAgentTemplateRequest,
+  AgentTemplateResponse,
+  AgentTemplateListResponse,
+  AgentTemplateFilters,
+  AgentTemplateSort,
+  AgentTemplateUsage,
+  IncrementTemplateUsageRequest,
+  RateTemplateRequest
+} from './types/agent-template';
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';

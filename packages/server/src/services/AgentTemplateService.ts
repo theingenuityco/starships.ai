@@ -1,4 +1,4 @@
-import { AgentTemplate } from '@starships/protocol';
+import { AgentTemplateModel } from '@starships/models';
 import { AgentModel } from '@starships/models';
 import { AgentTemplateRepository } from '@starships/models';
 import { Neo4jConnection } from '@starships/models';
@@ -11,33 +11,33 @@ export class AgentTemplateService {
     this.templateRepository = new AgentTemplateRepository(connection);
   }
 
-  async getAllTemplates(): Promise<AgentTemplate[]> {
+  async getAllTemplates(): Promise<AgentTemplateModel[]> {
     return this.templateRepository.findAll();
   }
 
-  async getTemplateById(id: string): Promise<AgentTemplate | null> {
+  async getTemplateById(id: string): Promise<AgentTemplateModel | null> {
     return this.templateRepository.findById(id);
   }
 
-  async getPublicTemplates(limit?: number, offset?: number): Promise<AgentTemplate[]> {
+  async getPublicTemplates(limit?: number, offset?: number): Promise<AgentTemplateModel[]> {
     return this.templateRepository.findPublic(limit, offset);
   }
 
-  async getTemplatesByCategory(category: string): Promise<AgentTemplate[]> {
+  async getTemplatesByCategory(category: string): Promise<AgentTemplateModel[]> {
     return this.templateRepository.findByCategory(category);
   }
 
-  async getTemplatesByAuthor(authorId: string): Promise<AgentTemplate[]> {
+  async getTemplatesByAuthor(authorId: string): Promise<AgentTemplateModel[]> {
     return this.templateRepository.findByAuthor(authorId);
   }
 
-  async searchTemplates(query: string): Promise<AgentTemplate[]> {
+  async searchTemplates(query: string): Promise<AgentTemplateModel[]> {
     return this.templateRepository.searchTemplates(query);
   }
 
   async createTemplate(
-    templateData: Omit<AgentTemplate, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
-  ): Promise<AgentTemplate> {
+    templateData: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
+  ): Promise<AgentTemplateModel> {
     // Validate required fields
     if (!templateData.name || !templateData.systemPrompt || !templateData.model) {
       throw new Error('Template name, systemPrompt, and model are required');
@@ -55,7 +55,7 @@ export class AgentTemplateService {
     });
   }
 
-  async updateTemplate(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | null> {
+  async updateTemplate(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
     // Don't allow updating certain fields
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, createdAt: _createdAt, ...allowedUpdates } = updates;
@@ -83,7 +83,7 @@ export class AgentTemplateService {
     return this.templateRepository.createAgentFromTemplate(templateId, agentName.trim(), authorId, starshipId);
   }
 
-  async createTemplateFromAgent(agentId: string): Promise<AgentTemplate | null> {
+  async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
     if (!agentId) {
       throw new Error('Agent ID is required');
     }
@@ -351,7 +351,7 @@ export class AgentTemplateService {
   async seedDefaultTemplates(): Promise<void> {
     console.log('🌱 Seeding default autopilot-enabled agent templates...');
 
-    const defaultTemplates: Array<Omit<AgentTemplate, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
+    const defaultTemplates: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
       blueprint?: Blueprint;
       memory?: AgentMemoryConfig;
       executionMode?: 'simple' | 'workflow';

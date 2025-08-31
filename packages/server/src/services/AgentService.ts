@@ -458,7 +458,6 @@ export class AgentService {
       model: dbAgent.model as string,
       memory: memoryConfig, // Pass the AgentMemoryConfig
       blueprint: blueprint,
-      instructions: dbAgent.customInstructions as string,
       temperature: dbAgent.temperature as number,
       maxTokens: dbAgent.maxTokens as number,
       timeout: (dbAgent.timeout as number) || 30000

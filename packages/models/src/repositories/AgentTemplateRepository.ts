@@ -67,7 +67,6 @@ export class AgentTemplateRepository extends BaseRepository {
         model: entity.model as string,
         temperature: entity.temperature as number | undefined,
         maxTokens: entity.maxTokens as number | undefined,
-        instructions: entity.instructions as string | undefined,
         timeout: this.getSafeValue(entity.timeout, 30000) as number,
         memory: entity.memory as any, // AgentMemoryConfig
         blueprint: entity.blueprint as any, // BaseBlueprint

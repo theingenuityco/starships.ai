@@ -53,7 +53,6 @@ export interface CreateAgentRequest {
   model: string;
   temperature?: number;
   maxTokens?: number;
-  instructions?: string;
   templateId?: string; // Reference to template if agent is created from template
   starshipId: string; // REQUIRED for new agents
 

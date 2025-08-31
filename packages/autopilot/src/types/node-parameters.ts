@@ -23,7 +23,6 @@ export interface AgentNodeParameters extends BaseNodeParameters {
   maxTokens?: number;
   
   // Execution parameters
-  instructions?: string;
   timeout?: number;
   
   // Memory system (required)

@@ -105,7 +105,6 @@ export interface StarshipAgentsResponse {
     model: string;
     temperature?: number;
     maxTokens?: number;
-    instructions?: string;
     timeout?: number;
     memory?: any; // AgentMemoryConfig
     blueprint?: any; // BaseBlueprint

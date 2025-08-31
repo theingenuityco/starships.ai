@@ -9,6 +9,12 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # WebSocket support for Socket.IO
+    nginx.ingress.kubernetes.io/websocket-services: "starships-app-internal"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-set-headers: |
+      Upgrade $http_upgrade
+      Connection "upgrade"
 spec:
   ingressClassName: nginx
   tls:
@@ -28,6 +34,14 @@ spec:
             name: starships-app-internal
             port:
               number: 3000
+      # Socket.IO WebSocket route
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3001
       # Other API routes go to backend
       - path: /api
         pathType: Prefix

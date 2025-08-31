@@ -84,11 +84,7 @@ export type {
   HealthStatus
 } from './helpers/logging';
 
-// Agent types (moved from protocol)
-export * from './types/agent';
 
-// Also export AgentModel explicitly for clarity
-export { AgentModel } from './types/agent';
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';

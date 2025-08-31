@@ -20,8 +20,18 @@ export class AgentRepository extends BaseRepository {
     return {
       ...agent,
       blueprint: agent.blueprint ? JSON.stringify(agent.blueprint) : null,
-      agentMemoryConfig: agent.agentMemoryConfig ? JSON.stringify(agent.agentMemoryConfig) : null,
+      memory: agent.memory ? JSON.stringify(agent.memory) : null,
     };
+  }
+
+  /**
+   * Helper to safely get value or default, handling empty objects from Neo4j
+   */
+  private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
+    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
+      return defaultValue;
+    }
+    return value as T;
   }
 
   /**
@@ -32,14 +42,14 @@ export class AgentRepository extends BaseRepository {
       return {
         ...agent,
         blueprint: agent.blueprint ? JSON.parse(agent.blueprint) : undefined,
-        agentMemoryConfig: agent.agentMemoryConfig ? JSON.parse(agent.agentMemoryConfig) : undefined,
+        memory: agent.memory ? JSON.parse(agent.memory) : undefined,
       };
     } catch (error) {
       console.warn(`Failed to deserialize agent ${agent.id} complex fields:`, error);
       return {
         ...agent,
         blueprint: undefined,
-        agentMemoryConfig: undefined,
+        memory: undefined,
       };
     }
   }
@@ -176,13 +186,14 @@ export class AgentRepository extends BaseRepository {
         createdAt: now,
         updatedAt: now,
         usageCount: 0,
-        tags: entity.tags || [],
-        category: entity.category || 'general',
-        isPublic: entity.isPublic || false,
-        version: entity.version || '1.0.0',
-        starshipId: entity.starshipId, // Ensure starshipId is included
-        executionMode: entity.executionMode || 'simple', // Default execution mode
-        timeout: entity.timeout || 30000, // Default timeout
+        tags: this.getSafeValue(entity.tags, []) as string[],
+        category: this.getSafeValue(entity.category, 'general') as AgentModel['category'],
+        isPublic: this.getSafeValue(entity.isPublic, false) as boolean,
+        version: this.getSafeValue(entity.version, '1.0.0') as string,
+        authorId: this.getSafeValue(entity.authorId, 'system') as string,
+        starshipId: entity.starshipId as string, // Ensure starshipId is included
+        executionMode: this.getSafeValue(entity.executionMode, 'simple') as AgentModel['executionMode'], // Default execution mode
+        timeout: this.getSafeValue(entity.timeout, 30000) as number, // Default timeout
       };
 
       // Serialize complex objects for Neo4j storage

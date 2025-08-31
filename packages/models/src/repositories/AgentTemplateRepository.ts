@@ -14,6 +14,16 @@ export class AgentTemplateRepository extends BaseRepository {
     this.connection = connection || getConnection();
   }
 
+  /**
+   * Helper to safely get value or default, handling empty objects from Neo4j
+   */
+  private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
+    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
+      return defaultValue;
+    }
+    return value as T;
+  }
+
   async findAll(): Promise<AgentTemplate[]> {
     return this.executeWithErrorHandling(async () => {
       const query = `
@@ -385,13 +395,13 @@ export class AgentTemplateRepository extends BaseRepository {
       const template: AgentTemplate = {
         id: templateId,
         name: `${agent.name} Template`,
-        description: agent.description || '',
+        description: this.getSafeValue(agent.description, '') as string,
         category: agent.category,
         tags: [...(agent.tags || [])],
-        systemPrompt: agent.systemPrompt || '',
-        model: agent.model,
-        temperature: agent.temperature,
-        maxTokens: agent.maxTokens,
+        systemPrompt: this.getSafeValue(agent.systemPrompt, '') as string,
+        model: agent.model as string,
+        temperature: agent.temperature as number | undefined,
+        maxTokens: agent.maxTokens as number | undefined,
         authorId: agent.authorId,
         isPublic: true,
         usageCount: 0,

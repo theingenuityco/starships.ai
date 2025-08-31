@@ -8,7 +8,8 @@
 // Import autopilot types at the top level
 import type {
   AgentMemoryConfig,
-  Blueprint
+  Blueprint,
+  AgentNodeParameters
 } from '@starships/autopilot';
 
 // ============================================================================
@@ -17,17 +18,15 @@ import type {
 
 /**
  * Database Agent interface - core API contract type
+ * Extends AgentNodeParameters to be a superset with additional database/marketplace fields
  */
-export interface AgentModel {
-  // Core fields
+export interface AgentModel extends Omit<AgentNodeParameters, 'memory' | 'blueprint'> {
+  // Core database fields
   id: string;
-  name: string;
-  model: string;
   systemPrompt?: string;
   createdAt: string;
 
   // Enhanced marketplace fields
-  description?: string;
   tags: string[];
   category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
   authorId: string;
@@ -37,25 +36,21 @@ export interface AgentModel {
   usageCount: number;
   rating?: number;
 
-  // Advanced configuration
-  temperature?: number;
-  maxTokens?: number;
-  customInstructions?: string;
-
   // Deployment settings
   starshipId: string;
   allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   requiredPermissions?: string[];
 
-  // Autopilot integration fields
+  // Autopilot integration fields (optional for database persistence)
   blueprint?: Blueprint;
-  agentMemoryConfig?: AgentMemoryConfig;
+  memory?: AgentMemoryConfig;
+  agentMemoryConfig?: AgentMemoryConfig; // Backward compatibility alias for memory
   executionMode: 'simple' | 'workflow';
-  timeout?: number;
 }
 
 /**
  * Agent configuration interface
+ * Extends AgentModel with runtime configuration options
  */
 export interface AgentConfig extends AgentModel {
   provider?: 'openai' | 'anthropic';
@@ -78,14 +73,14 @@ export interface CreateAgentRequest {
   isPublic?: boolean;
   temperature?: number;
   maxTokens?: number;
-  customInstructions?: string;
+  instructions?: string;
   allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   authorId?: string;
   starshipId: string; // REQUIRED for new agents
 
   // Autopilot-specific fields (optional for backward compatibility)
   blueprint?: Blueprint;
-  agentMemoryConfig?: AgentMemoryConfig;
+  memory?: AgentMemoryConfig;
   executionMode?: 'simple' | 'workflow';
   timeout?: number;
 }

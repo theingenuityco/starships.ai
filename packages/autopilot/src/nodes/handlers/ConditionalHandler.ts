@@ -6,16 +6,16 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
-  async execute(context: ExecutionContext) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
-    const sourceResult = context.previousResults.get(params.sourceNodeId);
+    const sourceResult = execution.executionResults.get(params.sourceNodeId);
     if (!sourceResult) {
       throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }
@@ -28,32 +28,29 @@ export class ConditionalHandler extends BaseHandler {
         
         // Check for explicit true result (not just truthy values)
         if (result === true) {
-          return {
-            nodeId: this.node.id,
-            success: true,
+          const nodeResult: NodeResult = {
+            nodeRef: this.node.ref,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
-            nextEdgeCondition: conditionKey,
-            executedAt: new Date().toISOString(),
-            duration: 10
+            nextEdgeCondition: conditionKey
           };
+          execution.executionResults.set(this.node.ref, nodeResult);
+          return execution;
         }
       }
 
       // Use default condition if provided
       const defaultCondition = params.defaultCondition || 'default';
-      return {
-        nodeId: this.node.id,
-        success: true,
+      const nodeResult: NodeResult = {
+        nodeRef: this.node.ref,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
-        nextEdgeCondition: defaultCondition,
-        executedAt: new Date().toISOString(),
-        duration: 10
+        nextEdgeCondition: defaultCondition
       };
+      execution.executionResults.set(this.node.ref, nodeResult);
+      return execution;
 
     } catch (error) {
-      return this.createErrorResult(
-        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        10
+      return this.createErrorResult(execution,
+        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

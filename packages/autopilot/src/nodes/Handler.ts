@@ -4,7 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { NodeResult, ExecutionContext, ValidationResult, Node as WorkflowNode, ValidationErrorCode, ValidationWarningCode } from '../types';
+import { NodeResult, Execution, ValidationResult, Node as WorkflowNode, ValidationErrorCode, ValidationWarningCode } from '../types';
 
 /**
  * Base interface for workflow node handlers
@@ -15,7 +15,7 @@ export interface Handler {
   readonly type: string;
   
   /** Execute with parameters already injected via constructor */
-  execute(context: ExecutionContext): Promise<NodeResult>;
+  execute(execution: Execution): Promise<Execution>;
   
   /** Validate the handler's configuration */
   validate(): ValidationResult;
@@ -37,34 +37,34 @@ export abstract class BaseHandler implements Handler {
 
   constructor(protected node: WorkflowNode) {}
 
-  abstract execute(context: ExecutionContext): Promise<NodeResult>;
+  abstract execute(execution: Execution): Promise<Execution>;
   abstract validate(): ValidationResult;
   abstract getIcon(): string;
 
   /**
-   * Helper to create successful result
+   * Helper to create successful result and push to execution results
    */
-  protected createSuccessResult(data: any, duration?: number): NodeResult {
-    return {
-      nodeId: this.node.id,
-      success: true,
-      data,
-      executedAt: new Date().toISOString(),
-      duration: duration || 0
+  protected createSuccessResult(execution: Execution, data: any): Execution {
+    const result: NodeResult = {
+      nodeRef: this.node.ref,
+      data
     };
+    
+    execution.executionResults.set(this.node.ref, result);
+    return execution;
   }
 
   /**
-   * Helper to create error result
+   * Helper to create error result and push to execution results
    */
-  protected createErrorResult(error: string, duration?: number): NodeResult {
-    return {
-      nodeId: this.node.id,
-      success: false,
-      error,
-      executedAt: new Date().toISOString(),
-      duration: duration || 0
+  protected createErrorResult(execution: Execution, error: string): Execution {
+    const result: NodeResult = {
+      nodeRef: this.node.ref,
+      error
     };
+    
+    execution.executionResults.set(this.node.ref, result);
+    return execution;
   }
 
   /**
@@ -74,7 +74,7 @@ export abstract class BaseHandler implements Handler {
     return {
       code,
       message,
-      nodeId: this.node.id,
+      nodeRef: this.node.ref,
       severity: 'error' as const
     };
   }
@@ -86,7 +86,7 @@ export abstract class BaseHandler implements Handler {
     return {
       code,
       message,
-      nodeId: this.node.id,
+      nodeRef: this.node.ref,
     };
   }
 }

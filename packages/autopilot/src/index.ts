@@ -37,8 +37,7 @@ export type {
   NodeParameters,
   
   // Execution types
-  RuntimeState,
-  ExecutionContext,
+  Execution,
   NodeResult,
   ExecutionStatus,
   
@@ -72,6 +71,6 @@ const _defaultValidator = new Validator();
 export const defaultValidator = _defaultValidator;
 
 // Helper function to create a new workflow with default handlers
-export const createWorkflow = (id: string): Workflow => {
-  return new Workflow(id);
+export const createWorkflow = (): Workflow => {
+  return new Workflow();
 };

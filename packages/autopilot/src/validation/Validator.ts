@@ -86,16 +86,16 @@ export class Validator {
     const startNode = workflow.nodes.find(node => node.type === 'start');
     if (!startNode) return errors;
 
-    const reachableNodes = this.findReachableNodes(workflow, startNode.id);
-    const unreachableNodes = workflow.nodes.filter(node => 
-      !reachableNodes.has(node.id) && node.type !== 'start'
+    const reachableNodes = this.findReachableNodes(workflow, startNode.ref);
+    const unreachableNodes = workflow.nodes.filter(node =>
+      !reachableNodes.has(node.ref) && node.type !== 'start'
     );
 
     unreachableNodes.forEach(node => {
       errors.push({
         code: 'UNREACHABLE_NODE',
         message: `Node '${node.name}' is not reachable from start node`,
-        nodeId: node.id,
+        nodeRef: node.ref,
         severity: 'error'
       });
     });
@@ -160,8 +160,8 @@ export class Validator {
     };
 
     workflow.nodes.forEach(node => {
-      if (!visited.has(node.id)) {
-        dfs(node.id, []);
+      if (!visited.has(node.ref)) {
+        dfs(node.ref, []);
       }
     });
 

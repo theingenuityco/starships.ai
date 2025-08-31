@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node, ValidationError, ValidationWarning } from '../../types';
 import { HttpRequestHandler } from './HttpRequestHandler';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
 
-  async execute(context: ExecutionContext) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as LlmNodeParameters;
     try {
       // Convert LLM parameters to HTTP request parameters
@@ -20,7 +20,7 @@ export class LlmHandler extends BaseHandler {
       
       // Create HttpRequestHandler instance for delegation
       const httpNode: Node = {
-        id: `${this.node.id}-http`,
+        ref: `${this.node.ref}-http`,
         type: 'http_request',
         name: `HTTP Request for ${this.node.name}`,
         description: `HTTP request delegated from LLM node ${this.node.name}`,
@@ -28,30 +28,32 @@ export class LlmHandler extends BaseHandler {
       };
       const httpHandler = new HttpRequestHandler(httpNode);
       
-      // Delegate to HttpRequestHandler
-      const result = await httpHandler.execute(context);
+      // Delegate to HttpRequestHandler - this will return the execution with HTTP result added
+      const updatedExecution = await httpHandler.execute(execution);
+      
+      // Get the result from the HTTP handler
+      const httpResult = updatedExecution.executionResults.get(`${this.node.ref}-http`);
       
       // Process the result to extract LLM-specific data
-      if (result.success && result.data && typeof result.data === 'object') {
-        const httpData = result.data as any;
+      if (httpResult && !httpResult.error && httpResult.data && typeof httpResult.data === 'object') {
+        const httpData = httpResult.data as any;
         if (httpData.body) {
           const llmResponse = this.extractLlmResponse(httpData.body);
           
-          return this.createSuccessResult({
+          return this.createSuccessResult(updatedExecution, {
             ...httpData,
             llmResponse,
             model: params.model,
-          }, result.duration);
+          });
         }
       }
       
-      return {
-        ...result,
-        nodeId: this.node.id
-      };
+      // If HTTP request failed or no data, create error result
+      const errorMessage = httpResult?.error || 'LLM request failed';
+      return this.createErrorResult(updatedExecution, errorMessage);
       
     } catch (error) {
-      return this.createErrorResult((error as Error).message);
+      return this.createErrorResult(execution, (error as Error).message);
     }
   }
 

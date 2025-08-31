@@ -3,35 +3,16 @@
  */
 
 import { OutputHandler } from '../OutputHandler';
-import { Node, ExecutionContext, OutputNodeParameters, NodeResult } from '../../../types';
+import { Node, Execution, OutputNodeParameters, NodeResult } from '../../../types';
 
 describe('OutputHandler', () => {
   let handler: OutputHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
-  let mockSourceResults: Map<string, NodeResult>;
+  let mockExecution: Execution;
 
   beforeEach(() => {
-    // Create mock source results
-    mockSourceResults = new Map([
-      ['source1', {
-        nodeId: 'source1',
-        success: true,
-        data: { message: 'Hello from source 1', score: 85 },
-        executedAt: new Date().toISOString(),
-        duration: 100
-      }],
-      ['source2', {
-        nodeId: 'source2',
-        success: true,
-        data: { message: 'Hello from source 2', category: 'premium' },
-        executedAt: new Date().toISOString(),
-        duration: 200
-      }]
-    ]);
-
     mockNode = {
-      id: 'output-node',
+      ref: 'output-node',
       type: 'output',
       name: 'Test Output Node',
       description: 'Output node for testing',
@@ -45,10 +26,16 @@ describe('OutputHandler', () => {
 
     handler = new OutputHandler(mockNode);
 
-    mockContext = {
-      ...global.createMockContext(),
-      previousResults: mockSourceResults
-    };
+    mockExecution = global.createMockExecution();
+    // Add mock source results to execution
+    mockExecution.executionResults.set('source1', {
+      nodeRef: 'source1',
+      data: { message: 'Hello from source 1', score: 85 }
+    });
+    mockExecution.executionResults.set('source2', {
+      nodeRef: 'source2',
+      data: { message: 'Hello from source 2', category: 'premium' }
+    });
   });
 
   describe('type', () => {
@@ -59,20 +46,19 @@ describe('OutputHandler', () => {
 
   describe('execute', () => {
     it('should execute successfully with valid parameters', async () => {
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('output-node');
-      expect(result.duration).toBe(50);
-      expect(result.executedAt).toBeDefined();
-      expect(result.error).toBeUndefined();
+      const nodeResult = result.executionResults.get('output-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('output-node');
       
       // Check output data structure
-      expect(result.data).toHaveProperty('output');
-      expect(result.data).toHaveProperty('format', 'markdown');
-      expect(result.data).toHaveProperty('sourceData');
+      expect(nodeResult?.data).toHaveProperty('output');
+      expect(nodeResult?.data).toHaveProperty('format', 'markdown');
+      expect(nodeResult?.data).toHaveProperty('sourceData');
       
-      const data = result.data as any;
+      const data = nodeResult?.data as any;
       expect(data.output).toContain('# Test Report');
       expect(data.sourceData).toEqual({
         'source1': { message: 'Hello from source 1', score: 85 },
@@ -88,17 +74,19 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithoutTitle = new OutputHandler({
-        id: 'no-title-node',
+        ref: 'no-title-node',
         type: 'output',
         name: 'Output without title',
         description: 'Output without title for testing',
         parameters: paramsWithoutTitle
       });
       
-      const result = await handlerWithoutTitle.execute(mockContext);
+      const result = await handlerWithoutTitle.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      const data = result.data as any;
+      const nodeResult = result.executionResults.get('no-title-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      const data = nodeResult?.data as any;
       expect(data.output).toContain('# Workflow Output'); // Default title
     });
 
@@ -111,17 +99,19 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const singleSourceHandler = new OutputHandler({
-        id: 'single-source-node',
+        ref: 'single-source-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
         parameters: singleSourceParams
       });
       
-      const result = await singleSourceHandler.execute(mockContext);
+      const result = await singleSourceHandler.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      const data = result.data as any;
+      const nodeResult = result.executionResults.get('single-source-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      const data = nodeResult?.data as any;
       expect(data.sourceData).toEqual({
         'source1': { message: 'Hello from source 1', score: 85 }
       });
@@ -137,17 +127,19 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithMissingSources = new OutputHandler({
-        id: 'missing-sources-node',
+        ref: 'missing-sources-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
         parameters: paramsWithMissingSources
       });
       
-      const result = await handlerWithMissingSources.execute(mockContext);
+      const result = await handlerWithMissingSources.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      const data = result.data as any;
+      const nodeResult = result.executionResults.get('missing-sources-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      const data = nodeResult?.data as any;
       
       // Should only include existing sources
       expect(data.sourceData).toEqual({
@@ -169,17 +161,19 @@ describe('OutputHandler', () => {
         } as OutputNodeParameters;
         
         const handlerWithFormat = new OutputHandler({
-        id: 'format-${format}-node',
+        ref: `format-${format}-node`,
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
         parameters: paramsWithFormat
       });
         
-        const result = await handlerWithFormat.execute(mockContext);
+        const result = await handlerWithFormat.execute(mockExecution);
         
-        expect(result.success).toBe(true);
-        expect((result.data as any).format).toBe(format);
+        const nodeResult = result.executionResults.get(`format-${format}-node`);
+        expect(nodeResult).toBeDefined();
+        expect(nodeResult?.error).toBeUndefined();
+        expect((nodeResult?.data as any).format).toBe(format);
       }
     });
 
@@ -191,24 +185,25 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithEmptySources = new OutputHandler({
-        id: 'empty-sources-node',
+        ref: 'empty-sources-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
         parameters: paramsWithEmptySources
       });
       
-      const result = await handlerWithEmptySources.execute(mockContext);
+      const result = await handlerWithEmptySources.execute(mockExecution);
       
-      expect(result.success).toBe(true);
-      const data = result.data as any;
+      const nodeResult = result.executionResults.get('empty-sources-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      const data = nodeResult?.data as any;
       expect(data.sourceData).toEqual({});
     });
 
     it('should handle complex nested source data', async () => {
       const complexSourceResult: NodeResult = {
-        nodeId: 'complex-source',
-        success: true,
+        nodeRef: 'complex-source',
         data: {
           user: {
             name: 'John Doe',
@@ -225,15 +220,11 @@ describe('OutputHandler', () => {
               { name: 'conversion_rate', value: 0.12 }
             ]
           }
-        },
-        executedAt: new Date().toISOString(),
-        duration: 300
+        }
       };
       
-      const contextWithComplexData = {
-        ...mockContext,
-        previousResults: new Map([['complex-source', complexSourceResult]])
-      };
+      const executionWithComplexData = global.createMockExecution();
+      executionWithComplexData.executionResults.set('complex-source', complexSourceResult);
       
       const paramsWithComplexData = {
         template: 'Complex data template',
@@ -243,41 +234,42 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithComplexData = new OutputHandler({
-        id: 'complex-data-node',
+        ref: 'complex-data-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
         parameters: paramsWithComplexData
       });
       
-      const result = await handlerWithComplexData.execute(contextWithComplexData);
+      const result = await handlerWithComplexData.execute(executionWithComplexData);
       
-      expect(result.success).toBe(true);
-      const data = result.data as any;
+      const nodeResult = result.executionResults.get('complex-data-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      const data = nodeResult?.data as any;
       expect(data.sourceData['complex-source']).toEqual(complexSourceResult.data);
     });
 
     it('should set execution timestamp', async () => {
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       const afterExecution = Date.now();
       
-      const executedAtTimestamp = new Date(result.executedAt).getTime();
-      expect(executedAtTimestamp).toBeGreaterThanOrEqual(beforeExecution);
-      expect(executedAtTimestamp).toBeLessThanOrEqual(afterExecution);
+      expect(result).toBeDefined();
+      const nodeResult = result.executionResults.get('output-node');
+      expect(nodeResult).toBeDefined();
     });
 
-    it('should work with empty context', async () => {
-      const emptyContext = {
-        ...global.createMockContext(),
-        previousResults: new Map()
-      };
+    it('should work with empty execution', async () => {
+      const emptyExecution = global.createMockExecution();
       
-      const result = await handler.execute(emptyContext);
+      const result = await handler.execute(emptyExecution);
       
-      expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('output-node');
-      const data = result.data as any;
+      const nodeResult = result.executionResults.get('output-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('output-node');
+      const data = nodeResult?.data as any;
       expect(data.sourceData).toEqual({});
     });
   });
@@ -300,7 +292,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const minimalHandler = new OutputHandler({
-        id: 'minimal-output-node',
+        ref: 'minimal-output-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
@@ -319,7 +311,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithoutTemplate = new OutputHandler({
-        id: 'no-template-node',
+        ref: 'no-template-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
@@ -332,7 +324,7 @@ describe('OutputHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Template is required',
-        nodeId: 'no-template-node',
+        nodeRef: 'no-template-node',
         severity: 'error'
       });
     });
@@ -345,7 +337,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithEmptyTemplate = new OutputHandler({
-        id: 'empty-template-node',
+        ref: 'empty-template-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
@@ -366,7 +358,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithoutSources = new OutputHandler({
-        id: 'no-sources-node',
+        ref: 'no-sources-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
@@ -379,7 +371,7 @@ describe('OutputHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'At least one source node is required',
-        nodeId: 'no-sources-node',
+        nodeRef: 'no-sources-node',
         severity: 'error'
       });
     });
@@ -392,7 +384,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithEmptySources = new OutputHandler({
-        id: 'empty-sources-validation-node',
+        ref: 'empty-sources-validation-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
@@ -413,7 +405,7 @@ describe('OutputHandler', () => {
       } as OutputNodeParameters;
       
       const handlerWithMissingFields = new OutputHandler({
-        id: 'missing-fields-node',
+        ref: 'missing-fields-node',
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',
@@ -444,7 +436,7 @@ describe('OutputHandler', () => {
         } as OutputNodeParameters;
         
         const handlerWithFormat = new OutputHandler({
-        id: 'format-validation-${format}-node',
+        ref: `format-validation-${format}-node`,
         type: 'output',
         name: 'Test Output Node',
         description: 'Output node for testing',

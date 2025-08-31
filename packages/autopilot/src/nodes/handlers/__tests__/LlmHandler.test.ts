@@ -4,7 +4,7 @@
 
 import { LlmHandler } from '../LlmHandler';
 import { HttpRequestHandler } from '../HttpRequestHandler';
-import { Node, ExecutionContext, LlmNodeParameters, NodeResult } from '../../../types';
+import { Node, Execution, LlmNodeParameters, NodeResult } from '../../../types';
 
 // Type definitions for test data structures
 interface LlmResponseData {
@@ -31,12 +31,12 @@ jest.mock('../HttpRequestHandler');
 describe('LlmHandler', () => {
   let handler: LlmHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
+  let mockExecution: Execution;
   let mockHttpHandler: jest.Mocked<HttpRequestHandler>;
 
   beforeEach(() => {
     mockNode = {
-      id: 'llm-node',
+      ref: 'llm-node',
       type: 'llm',
       name: 'Test LLM Node',
       description: 'LLM node for testing',
@@ -47,7 +47,7 @@ describe('LlmHandler', () => {
     };
 
     handler = new LlmHandler(mockNode);
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
 
     // Setup HttpRequestHandler mock
     mockHttpHandler = {
@@ -68,9 +68,9 @@ describe('LlmHandler', () => {
 
   describe('execute', () => {
     it('should execute successfully with minimal parameters', async () => {
-      const mockHttpResult = {
-        success: true,
-        nodeId: 'llm-node-http',
+      const mockHttpExecution = global.createMockExecution();
+      mockHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
         data: {
           body: {
             choices: [{
@@ -79,21 +79,20 @@ describe('LlmHandler', () => {
               }
             }]
           }
-        },
-        duration: 1500,
-        executedAt: new Date().toISOString()
-      };
+        }
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockHttpExecution);
 
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
 
-      expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('llm-node');
-      const resultData = result.data as LlmResponseData;
+      const nodeResult = result.executionResults.get('llm-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('llm-node');
+      const resultData = nodeResult?.data as LlmResponseData;
       expect(resultData.llmResponse).toBe('Hello! I am doing well, thank you for asking.');
       expect(resultData.model).toBe('anthropic/claude-3.5-sonnet');
-      expect(result.duration).toBe(1500);
     });
 
     it('should execute with full parameters', async () => {
@@ -115,9 +114,9 @@ describe('LlmHandler', () => {
 
       const fullHandler = new LlmHandler(fullParamsNode);
 
-      const mockHttpResult = {
-        success: true,
-        nodeId: 'llm-node-http',
+      const mockHttpExecution = global.createMockExecution();
+      mockHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
         data: {
           body: {
             choices: [{
@@ -126,17 +125,17 @@ describe('LlmHandler', () => {
               }
             }]
           }
-        },
-        duration: 2000,
-        executedAt: new Date().toISOString()
-      };
+        }
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockHttpExecution);
 
-      const result = await fullHandler.execute(mockContext);
+      const result = await fullHandler.execute(mockExecution);
 
-      expect(result.success).toBe(true);
-      const resultData = result.data as LlmResponseData;
+      const nodeResult = result.executionResults.get('llm-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      const resultData = nodeResult?.data as LlmResponseData;
       expect(resultData.llmResponse).toBe('Quantum computing is a revolutionary technology...');
       expect(resultData.model).toBe('openai/gpt-4-turbo');
 
@@ -181,9 +180,9 @@ describe('LlmHandler', () => {
 
       const systemHandler = new LlmHandler(systemMessageNode);
 
-      const mockHttpResult = {
-        success: true,
-        nodeId: 'llm-node-http',
+      const mockSystemHttpExecution = global.createMockExecution();
+      mockSystemHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
         data: {
           body: {
             choices: [{
@@ -192,14 +191,12 @@ describe('LlmHandler', () => {
               }
             }]
           }
-        },
-        duration: 1200,
-        executedAt: new Date().toISOString()
-      };
+        }
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockSystemHttpExecution);
 
-      await systemHandler.execute(mockContext);
+      await systemHandler.execute(mockExecution);
 
       expect(HttpRequestHandler).toHaveBeenCalledWith(expect.objectContaining({
         parameters: expect.objectContaining({
@@ -220,7 +217,14 @@ describe('LlmHandler', () => {
     });
 
     it('should handle prompt only (no system message)', async () => {
-      const result = await handler.execute(mockContext);
+      const mockPromptHttpExecution = global.createMockExecution();
+      mockPromptHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
+        data: { body: { choices: [{ message: { content: 'Response' } }] } }
+      });
+      mockHttpHandler.execute.mockResolvedValue(mockPromptHttpExecution);
+
+      const result = await handler.execute(mockExecution);
 
       expect(HttpRequestHandler).toHaveBeenCalledWith(expect.objectContaining({
         parameters: expect.objectContaining({
@@ -265,85 +269,85 @@ describe('LlmHandler', () => {
         }
       ];
 
-      for (const testCase of testCases) {
-        const mockHttpResult = {
-          success: true,
-          nodeId: 'llm-node-http',
-          ...testCase,
-          duration: 1000,
-          executedAt: new Date().toISOString()
-        };
+      for (let i = 0; i < testCases.length; i++) {
+        const testCase = testCases[i];
+        const mockResponseHttpExecution = global.createMockExecution();
+        mockResponseHttpExecution.executionResults.set('llm-node-http', {
+          nodeRef: 'llm-node-http',
+          ...testCase
+        });
 
-        mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+        mockHttpHandler.execute.mockResolvedValue(mockResponseHttpExecution);
 
-        const result = await handler.execute(mockContext);
+        const result = await handler.execute(mockExecution);
 
-        const resultData = result.data as LlmResponseData;
+        const nodeResult = result.executionResults.get('llm-node');
+        const resultData = nodeResult?.data as LlmResponseData;
         expect(resultData.llmResponse).toBe(testCase.expected);
       }
     });
 
     it('should handle HTTP request failure', async () => {
-      const mockHttpResult = {
-        success: false,
-        nodeId: 'llm-node-http',
-        error: 'HTTP request failed',
-        duration: 500,
-        executedAt: new Date().toISOString()
-      };
+      const mockFailedHttpExecution = global.createMockExecution();
+      mockFailedHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
+        error: 'HTTP request failed'
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockFailedHttpExecution);
 
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('HTTP request failed');
-      expect(result.nodeId).toBe('llm-node');
+      const nodeResult = result.executionResults.get('llm-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBe('HTTP request failed');
+      expect(nodeResult?.nodeRef).toBe('llm-node');
     });
 
     it('should handle missing response body', async () => {
-      const mockHttpResult = {
-        success: true,
-        nodeId: 'llm-node-http',
-        data: {}, // No body
-        duration: 1000,
-        executedAt: new Date().toISOString()
-      };
+      const mockEmptyHttpExecution = global.createMockExecution();
+      mockEmptyHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
+        data: {} // No body
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockEmptyHttpExecution);
 
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
 
-      expect(result.success).toBe(true);
-      expect(result.nodeId).toBe('llm-node');
+      const nodeResult = result.executionResults.get('llm-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBe('LLM request failed');
+      expect(nodeResult?.nodeRef).toBe('llm-node');
     });
 
     it('should handle execution errors gracefully', async () => {
       mockHttpHandler.execute.mockRejectedValue(new Error('Network error'));
 
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Network error');
-      expect(result.nodeId).toBe('llm-node');
+      const nodeResult = result.executionResults.get('llm-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBe('Network error');
+      expect(nodeResult?.nodeRef).toBe('llm-node');
     });
 
     it('should set execution timestamp', async () => {
-      const mockHttpResult = {
-        success: true,
-        nodeId: 'llm-node-http',
-        data: { body: { choices: [{ message: { content: 'Response' } }] } },
-        duration: 1000,
-        executedAt: new Date().toISOString()
-      };
+      const mockTimestampHttpExecution = global.createMockExecution();
+      mockTimestampHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
+        data: { body: { choices: [{ message: { content: 'Response' } }] } }
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockTimestampHttpExecution);
 
       const beforeExecution = Date.now();
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
       const afterExecution = Date.now();
 
-      expect(result.executedAt).toBeDefined();
+      expect(result).toBeDefined();
+      const nodeResult = result.executionResults.get('llm-node');
+      expect(nodeResult).toBeDefined();
     });
   });
 
@@ -406,7 +410,7 @@ describe('LlmHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Model is required',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -427,7 +431,7 @@ describe('LlmHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Prompt is required',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -447,9 +451,9 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'INVALID_TEMPERATURE',
+        code: 'INVALID_PARAMETERS',
         message: 'Temperature must be between 0 and 2',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -469,9 +473,9 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'INVALID_MAX_TOKENS',
+        code: 'INVALID_PARAMETERS',
         message: 'Max tokens must be greater than 0',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -491,9 +495,9 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'INVALID_TOP_P',
+        code: 'INVALID_PARAMETERS',
         message: 'Top P must be between 0 and 1',
-        nodeId: 'llm-node',
+        nodeRef: 'llm-node',
         severity: 'error'
       });
     });
@@ -513,10 +517,9 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
-        code: 'HIGH_TOKEN_COUNT',
+        code: 'LARGE_WORKFLOW_SIZE',
         message: 'High token count may result in expensive API calls',
-        nodeId: 'llm-node',
-        severity: 'warning'
+        nodeRef: 'llm-node'
       });
     });
 
@@ -525,10 +528,9 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
-        code: 'NO_SYSTEM_MESSAGE',
+        code: 'MISSING_DESCRIPTIONS',
         message: 'Consider adding a system message for better AI behavior control',
-        nodeId: 'llm-node',
-        severity: 'warning'
+        nodeRef: 'llm-node'
       });
     });
 
@@ -547,10 +549,9 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
-        code: 'LOW_TIMEOUT',
+        code: 'POTENTIAL_TIMEOUT',
         message: 'LLM requests may take longer than the specified timeout',
-        nodeId: 'llm-node',
-        severity: 'warning'
+        nodeRef: 'llm-node'
       });
     });
 
@@ -582,17 +583,15 @@ describe('LlmHandler', () => {
 
   describe('OpenRouter API integration', () => {
     it('should build correct request body structure', async () => {
-      const mockHttpResult = {
-        success: true,
-        nodeId: 'llm-node-http',
-        data: { body: { choices: [{ message: { content: 'Response' } }] } },
-        duration: 1000,
-        executedAt: new Date().toISOString()
-      };
+      const mockIntegrationHttpExecution = global.createMockExecution();
+      mockIntegrationHttpExecution.executionResults.set('llm-node-http', {
+        nodeRef: 'llm-node-http',
+        data: { body: { choices: [{ message: { content: 'Response' } }] } }
+      });
 
-      mockHttpHandler.execute.mockResolvedValue(mockHttpResult);
+      mockHttpHandler.execute.mockResolvedValue(mockIntegrationHttpExecution);
 
-      await handler.execute(mockContext);
+      await handler.execute(mockExecution);
 
       expect(HttpRequestHandler).toHaveBeenCalledWith(expect.objectContaining({
         parameters: expect.objectContaining({

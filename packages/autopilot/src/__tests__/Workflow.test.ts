@@ -3,25 +3,28 @@
  */
 
 import { Workflow } from '../Workflow';
-import { Blueprint, Node, Edge, ExecutionContext } from '../types';
+import { Blueprint, Node, Edge, Execution } from '../types';
 
 describe('Workflow', () => {
-  let mockContext: Partial<ExecutionContext>;
+  let mockExecution: Execution;
 
   beforeEach(() => {
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
   });
 
   describe('constructor', () => {
-    it('should create workflow from string id', () => {
-      const workflow = new Workflow('test-workflow');
+    it('should create workflow from blueprint', () => {
+      const testBlueprint = {
+        nodes: [],
+        edges: [],
+        metadata: {}
+      };
+      const workflow = new Workflow(testBlueprint);
       
-      expect(workflow.getId()).toBe('test-workflow');
       expect(workflow.getNodes()).toHaveLength(0);
       expect(workflow.getEdges()).toHaveLength(0);
       
       const blueprint = workflow.getBlueprint();
-      expect(blueprint.id).toBe('test-workflow');
       expect(blueprint.nodes).toEqual([]);
       expect(blueprint.edges).toEqual([]);
       expect(blueprint.metadata).toEqual({});
@@ -29,19 +32,17 @@ describe('Workflow', () => {
 
     it('should create workflow from blueprint object', () => {
       const mockBlueprint: Blueprint = {
-        id: 'blueprint-workflow',
         nodes: [
-          { id: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
+          { ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
         edges: [
-          { id: 'edge1', from: 'node1', to: 'node2' }
+          { ref: 'edge1', from: 'node1', to: 'node2' }
         ],
         metadata: { version: '1.0' }
       };
 
       const workflow = new Workflow(mockBlueprint);
       
-      expect(workflow.getId()).toBe('blueprint-workflow');
       expect(workflow.getNodes()).toHaveLength(1);
       expect(workflow.getEdges()).toHaveLength(1);
       
@@ -51,9 +52,8 @@ describe('Workflow', () => {
 
     it('should create a copy of the blueprint to avoid mutations', () => {
       const originalBlueprint: Blueprint = {
-        id: 'original',
         nodes: [
-          { id: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
+          { ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
         ],
         edges: [],
         metadata: {}
@@ -63,23 +63,20 @@ describe('Workflow', () => {
       
       // Get initial state
       const initialNodeCount = workflow.getNodes().length;
-      const initialId = workflow.getId();
       
       // Modify original blueprint
-      originalBlueprint.id = 'modified';
       originalBlueprint.nodes.push({
-        id: 'node2', type: 'end', name: 'End', description: 'End node', parameters: {}
+        ref: 'node2', type: 'end', name: 'End', description: 'End node', parameters: {}
       });
 
       // Workflow should have original values (not affected by mutations to original blueprint)
-      expect(workflow.getId()).toBe(initialId);
       expect(workflow.getNodes()).toHaveLength(initialNodeCount);
     });
   });
 
   describe('addNode', () => {
     it('should add node with generated id', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addNode({
         type: 'start',
@@ -90,17 +87,17 @@ describe('Workflow', () => {
 
       const nodes = workflow.getNodes();
       expect(nodes).toHaveLength(1);
-      expect(nodes[0].id).toBeDefined();
+      expect(nodes[0].ref).toBeDefined();
       expect(nodes[0].type).toBe('start');
       expect(nodes[0].name).toBe('Start Node');
       expect(nodes[0].description).toBe('Starting point');
     });
 
-    it('should add node with provided id', () => {
-      const workflow = new Workflow('test');
+    it('should add node with provided ref', () => {
+      const workflow = new Workflow();
       
       workflow.addNode({
-        id: 'custom-id',
+        ref: 'custom-ref',
         type: 'end',
         name: 'End Node',
         description: 'Ending point',
@@ -109,11 +106,11 @@ describe('Workflow', () => {
 
       const nodes = workflow.getNodes();
       expect(nodes).toHaveLength(1);
-      expect(nodes[0].id).toBe('custom-id');
+      expect(nodes[0].ref).toBe('custom-ref');
     });
 
     it('should add node with metadata', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addNode({
         type: 'conditional',
@@ -128,7 +125,7 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       const result = workflow
         .addNode({ type: 'start', name: 'Start', description: 'Start', parameters: {} })
@@ -141,13 +138,13 @@ describe('Workflow', () => {
 
   describe('addEdge', () => {
     it('should add basic edge', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addEdge('node1', 'node2');
 
       const edges = workflow.getEdges();
       expect(edges).toHaveLength(1);
-      expect(edges[0].id).toBeDefined();
+      expect(edges[0].ref).toBeDefined();
       expect(edges[0].from).toBe('node1');
       expect(edges[0].to).toBe('node2');
       expect(edges[0].condition).toBeUndefined();
@@ -155,7 +152,7 @@ describe('Workflow', () => {
     });
 
     it('should add edge with condition', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addEdge('node1', 'node2', 'success');
 
@@ -164,7 +161,7 @@ describe('Workflow', () => {
     });
 
     it('should add edge with condition and label', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addEdge('node1', 'node2', 'success', 'Success Path');
 
@@ -174,7 +171,7 @@ describe('Workflow', () => {
     });
 
     it('should add edge with metadata', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addEdge('node1', 'node2');
 
@@ -183,7 +180,7 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       const result = workflow
         .addEdge('start', 'middle')
@@ -196,12 +193,12 @@ describe('Workflow', () => {
 
   describe('removeNode', () => {
     it('should remove node and associated edges', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ id: 'node2', type: 'end', name: 'End', description: 'End', parameters: {} })
-        .addNode({ id: 'node3', type: 'conditional', name: 'Decision', description: 'Decision', parameters: {} })
+        .addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'node2', type: 'end', name: 'End', description: 'End', parameters: {} })
+        .addNode({ ref: 'node3', type: 'conditional', name: 'Decision', description: 'Decision', parameters: {} })
         .addEdge('node1', 'node2')
         .addEdge('node2', 'node3')
         .addEdge('node3', 'node1');
@@ -212,7 +209,7 @@ describe('Workflow', () => {
       const edges = workflow.getEdges();
       
       expect(nodes).toHaveLength(2);
-      expect(nodes.find(n => n.id === 'node2')).toBeUndefined();
+      expect(nodes.find(n => n.ref === 'node2')).toBeUndefined();
       
       // Edges involving node2 should be removed
       expect(edges).toHaveLength(1);
@@ -221,20 +218,20 @@ describe('Workflow', () => {
     });
 
     it('should handle removing non-existent node', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
-      workflow.addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} });
+      workflow.addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} });
 
       expect(() => workflow.removeNode('nonexistent')).not.toThrow();
       expect(workflow.getNodes()).toHaveLength(1);
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ id: 'node2', type: 'end', name: 'End', description: 'End', parameters: {} });
+        .addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'node2', type: 'end', name: 'End', description: 'End', parameters: {} });
 
       const result = workflow.removeNode('node1');
       expect(result).toBe(workflow);
@@ -242,15 +239,15 @@ describe('Workflow', () => {
   });
 
   describe('removeEdge', () => {
-    it('should remove edge by id', () => {
-      const workflow = new Workflow('test');
+    it('should remove edge by ref', () => {
+      const workflow = new Workflow();
       
       workflow
         .addEdge('node1', 'node2')
         .addEdge('node2', 'node3');
 
       const edges = workflow.getEdges();
-      const edgeToRemove = edges[0].id;
+      const edgeToRemove = edges[0].ref;
 
       workflow.removeEdge(edgeToRemove);
 
@@ -261,7 +258,7 @@ describe('Workflow', () => {
     });
 
     it('should handle removing non-existent edge', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addEdge('node1', 'node2');
 
@@ -270,22 +267,22 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow.addEdge('node1', 'node2');
-      const edgeId = workflow.getEdges()[0].id;
+      const edgeRef = workflow.getEdges()[0].ref;
 
-      const result = workflow.removeEdge(edgeId);
+      const result = workflow.removeEdge(edgeRef);
       expect(result).toBe(workflow);
     });
   });
 
   describe('getBlueprint', () => {
     it('should return deep copy of blueprint', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
         .addEdge('node1', 'node2');
 
       const blueprint1 = workflow.getBlueprint();
@@ -300,10 +297,10 @@ describe('Workflow', () => {
 
   describe('getter methods', () => {
     it('should return copies of nodes and edges', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
         .addEdge('node1', 'node2');
 
       const nodes1 = workflow.getNodes();
@@ -320,45 +317,41 @@ describe('Workflow', () => {
 
   describe('execute', () => {
     it('should execute simple workflow successfully', async () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'end');
 
-      const result = await workflow.execute(mockContext);
+      const result = await workflow.execute(mockExecution);
 
       expect(result.status).toBe('completed');
-      expect(result.workflowId).toBe('test');
       expect(result.executionResults.size).toBe(2);
     });
 
-    it('should handle execution context', async () => {
-      const workflow = new Workflow('test');
+    it('should handle execution with initial execution state', async () => {
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'end');
 
-      const customContext = {
-        userId: 'custom-user',
-        expeditionState: { customData: 'test' }
-      };
+      const initialExecution = global.createMockExecution();
 
-      const result = await workflow.execute(customContext);
+      const result = await workflow.execute(initialExecution);
 
       expect(result.status).toBe('completed');
     });
 
     it('should handle workflow execution failure', async () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       // Create workflow without start node to trigger failure
-      workflow.addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} });
+      workflow.addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} });
 
-      const result = await workflow.execute(mockContext);
+      const result = await workflow.execute(mockExecution);
 
       expect(result.status).toBe('failed');
       expect(result.error?.message).toContain('Workflow must have a start node');
@@ -367,11 +360,11 @@ describe('Workflow', () => {
 
   describe('validate', () => {
     it('should validate successful workflow', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'end');
 
       const validation = workflow.validate();
@@ -381,9 +374,9 @@ describe('Workflow', () => {
     });
 
     it('should fail validation without start node', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
-      workflow.addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} });
+      workflow.addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} });
 
       const validation = workflow.validate();
 
@@ -392,11 +385,11 @@ describe('Workflow', () => {
     });
 
     it('should fail validation with unsupported node types', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ id: 'unsupported', type: 'unsupported-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} });
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'unsupported', type: 'unsupported-type' as any, name: 'Unsupported', description: 'Unsupported', parameters: {} });
 
       const validation = workflow.validate();
 
@@ -405,10 +398,10 @@ describe('Workflow', () => {
     });
 
     it('should fail validation with invalid edge references', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
         .addEdge('start', 'nonexistent');
 
       const validation = workflow.validate();
@@ -418,7 +411,7 @@ describe('Workflow', () => {
     });
 
     it('should handle empty workflow', () => {
-      const workflow = new Workflow('test');
+      const workflow = new Workflow();
 
       const validation = workflow.validate();
 
@@ -428,16 +421,15 @@ describe('Workflow', () => {
   });
 
   describe('clone', () => {
-    it('should clone workflow with default name', () => {
-      const workflow = new Workflow('original');
+    it('should clone workflow', () => {
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} })
         .addEdge('node1', 'node2');
 
       const cloned = workflow.clone();
 
-      expect(cloned.getId()).toBe('original-copy');
       expect(cloned.getNodes()).toEqual(workflow.getNodes());
       expect(cloned.getEdges()).toEqual(workflow.getEdges());
       
@@ -446,26 +438,15 @@ describe('Workflow', () => {
       expect(cloned.getNodes()).not.toBe(workflow.getNodes());
     });
 
-    it('should clone workflow with custom name', () => {
-      const workflow = new Workflow('original');
-      
-      workflow.addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} });
-
-      const cloned = workflow.clone('custom-name');
-
-      expect(cloned.getId()).toBe('custom-name');
-      expect(cloned.getNodes()).toEqual(workflow.getNodes());
-    });
-
     it('should create independent clone', () => {
-      const workflow = new Workflow('original');
+      const workflow = new Workflow();
       
-      workflow.addNode({ id: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} });
+      workflow.addNode({ ref: 'node1', type: 'start', name: 'Start', description: 'Start', parameters: {} });
 
       const cloned = workflow.clone();
       
       // Modify original
-      workflow.addNode({ id: 'node2', type: 'end', name: 'End', description: 'End', parameters: {} });
+      workflow.addNode({ ref: 'node2', type: 'end', name: 'End', description: 'End', parameters: {} });
 
       expect(workflow.getNodes()).toHaveLength(2);
       expect(cloned.getNodes()).toHaveLength(1);
@@ -474,22 +455,22 @@ describe('Workflow', () => {
 
   describe('complex workflows', () => {
     it('should handle workflow with conditional routing', () => {
-      const workflow = new Workflow('conditional-test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ 
-          id: 'condition', 
-          type: 'conditional', 
-          name: 'Decision', 
-          description: 'Decision', 
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({
+          ref: 'condition',
+          type: 'conditional',
+          name: 'Decision',
+          description: 'Decision',
           parameters: {
             sourceNodeId: 'start',
             conditions: { 'success': 'true' },
             defaultCondition: 'success'
           }
         })
-        .addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
+        .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'condition')
         .addEdge('condition', 'end', 'success');
 
@@ -498,24 +479,24 @@ describe('Workflow', () => {
     });
 
     it('should handle workflow with user prompts', () => {
-      const workflow = new Workflow('prompt-test');
+      const workflow = new Workflow();
       
       workflow
-        .addNode({ id: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
-        .addNode({ 
-          id: 'prompt', 
-          type: 'user_prompt', 
-          name: 'User Input', 
-          description: 'Get user input', 
+        .addNode({ ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} })
+        .addNode({
+          ref: 'prompt',
+          type: 'user_prompt',
+          name: 'User Input',
+          description: 'Get user input',
           parameters: {
             promptText: 'Please choose:',
             choices: [
-              { id: 'yes', text: 'Yes', value: true },
-              { id: 'no', text: 'No', value: false }
+              { ref: 'yes', text: 'Yes', value: true },
+              { ref: 'no', text: 'No', value: false }
             ]
           }
         })
-        .addNode({ id: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
+        .addNode({ ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} })
         .addEdge('start', 'prompt')
         .addEdge('prompt', 'end');
 

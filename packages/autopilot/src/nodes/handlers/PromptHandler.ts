@@ -5,12 +5,12 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '../../types';
+import { Execution, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '../../types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
 
-  async execute(context: ExecutionContext) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as UserPromptNodeParameters;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input
@@ -18,10 +18,10 @@ export class PromptHandler extends BaseHandler {
     console.log('Choices:', params.choices);
     
     // For now, return a placeholder result
-    return this.createSuccessResult({
+    return this.createSuccessResult(execution, {
       choice: params.choices[0],
       userInput: 'placeholder'
-    }, 100);
+    });
   }
 
   validate(): ValidationResult {

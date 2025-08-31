@@ -5,7 +5,7 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, ExecutionContext, RuntimeState } from './types';
+import { Blueprint, Node, Edge, Execution } from './types';
 import { Engine } from './engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,11 +13,10 @@ export class Workflow {
   private blueprint: Blueprint;
   private engine: Engine;
 
-  constructor(blueprintOrId: Blueprint | string) {
+  constructor(blueprint?: Blueprint) {
     // Initialize blueprint
-    if (typeof blueprintOrId === 'string') {
+    if (!blueprint) {
       this.blueprint = {
-        id: blueprintOrId,
         nodes: [],
         edges: [],
         metadata: {}
@@ -25,10 +24,10 @@ export class Workflow {
     } else {
       // Create a deep copy to avoid mutations to the original blueprint
       this.blueprint = {
-        ...blueprintOrId,
-        nodes: blueprintOrId.nodes.map(node => ({ ...node })),
-        edges: blueprintOrId.edges.map(edge => ({ ...edge })),
-        metadata: { ...blueprintOrId.metadata }
+        ...blueprint,
+        nodes: blueprint.nodes.map(node => ({ ...node })),
+        edges: blueprint.edges.map(edge => ({ ...edge })),
+        metadata: { ...blueprint.metadata }
       };
     }
 
@@ -39,9 +38,9 @@ export class Workflow {
   /**
    * Builder method: Add a node to the workflow
    */
-  addNode(nodeConfig: Omit<Node, 'id'> & { id?: string }): Workflow {
+  addNode(nodeConfig: Omit<Node, 'ref'> & { ref?: string }): Workflow {
     const node: Node = {
-      id: nodeConfig.id || uuidv4(),
+      ref: nodeConfig.ref || uuidv4(),
       type: nodeConfig.type,
       name: nodeConfig.name,
       description: nodeConfig.description,
@@ -58,7 +57,7 @@ export class Workflow {
    */
   addEdge(from: string, to: string, condition?: string, label?: string): Workflow {
     const edge: Edge = {
-      id: uuidv4(),
+      ref: uuidv4(),
       from,
       to,
       condition,
@@ -73,13 +72,13 @@ export class Workflow {
   /**
    * Builder method: Remove a node and its associated edges
    */
-  removeNode(nodeId: string): Workflow {
+  removeNode(nodeRef: string): Workflow {
     // Remove the node
-    this.blueprint.nodes = this.blueprint.nodes.filter(node => node.id !== nodeId);
+    this.blueprint.nodes = this.blueprint.nodes.filter(node => node.ref !== nodeRef);
     
     // Remove associated edges
     this.blueprint.edges = this.blueprint.edges.filter(
-      edge => edge.from !== nodeId && edge.to !== nodeId
+      edge => edge.from !== nodeRef && edge.to !== nodeRef
     );
     
     return this;
@@ -88,8 +87,8 @@ export class Workflow {
   /**
    * Builder method: Remove an edge
    */
-  removeEdge(edgeId: string): Workflow {
-    this.blueprint.edges = this.blueprint.edges.filter(edge => edge.id !== edgeId);
+  removeEdge(edgeRef: string): Workflow {
+    this.blueprint.edges = this.blueprint.edges.filter(edge => edge.ref !== edgeRef);
     return this;
   }
 
@@ -100,12 +99,6 @@ export class Workflow {
     return JSON.parse(JSON.stringify(this.blueprint));
   }
 
-  /**
-   * Get workflow ID
-   */
-  getId(): string {
-    return this.blueprint.id;
-  }
 
   /**
    * Get workflow nodes
@@ -124,8 +117,8 @@ export class Workflow {
   /**
    * Execute the workflow (delegates to internal Engine)
    */
-  async execute(context: Partial<ExecutionContext>): Promise<RuntimeState> {
-    return this.engine.execute(this.blueprint, context);
+  async execute(initialExecution?: Execution): Promise<Execution> {
+    return this.engine.execute(this.blueprint, initialExecution);
   }
 
   /**
@@ -147,9 +140,9 @@ export class Workflow {
     }
 
     // Check edge references
-    const nodeIds = new Set(this.blueprint.nodes.map(n => n.id));
+    const nodeRefs = new Set(this.blueprint.nodes.map(n => n.ref));
     const invalidEdges = this.blueprint.edges.filter(
-      edge => !nodeIds.has(edge.from) || !nodeIds.has(edge.to)
+      edge => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
     );
     if (invalidEdges.length > 0) {
       errors.push(`Invalid edge references found: ${invalidEdges.length} edges`);
@@ -162,12 +155,11 @@ export class Workflow {
   }
 
   /**
-   * Clone workflow with a new ID
+   * Clone workflow
    */
-  clone(newId?: string): Workflow {
+  clone(): Workflow {
     const clonedBlueprint: Blueprint = {
       ...this.blueprint,
-      id: newId || `${this.blueprint.id}-copy`,
       nodes: this.blueprint.nodes.map(node => ({ ...node })),
       edges: this.blueprint.edges.map(edge => ({ ...edge }))
     };

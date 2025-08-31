@@ -6,13 +6,13 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult } from '../../types';
+import { Execution, ValidationResult } from '../../types';
 
 export class StartHandler extends BaseHandler {
   readonly type = 'start';
 
-  async execute(context: ExecutionContext) {
-    return this.createSuccessResult({
+  async execute(execution: Execution) {
+    return this.createSuccessResult(execution, {
       message: 'Workflow started'
     });
   }
@@ -27,6 +27,6 @@ export class StartHandler extends BaseHandler {
   }
 
   getIcon(): string {
-    return 'play-circle';
+    return 'play';
   }
 }

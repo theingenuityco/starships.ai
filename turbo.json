@@ -72,6 +72,10 @@
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
+    "test": {
+      "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],
+      "outputs": []
+    },
     "clean": {
       "cache": false,
       "outputs": []

@@ -20,8 +20,8 @@ export interface ValidationResult {
 export interface ValidationError {
   code: ValidationErrorCode;
   message: string;
-  nodeId?: string;
-  edgeId?: string;
+  nodeRef?: string;
+  edgeRef?: string;
   severity: 'error' | 'warning';
   details?: unknown;
 }
@@ -32,8 +32,8 @@ export interface ValidationError {
 export interface ValidationWarning {
   code: ValidationWarningCode;
   message: string;
-  nodeId?: string;
-  edgeId?: string;
+  nodeRef?: string;
+  edgeRef?: string;
   suggestion?: string;
 }
 
@@ -44,7 +44,7 @@ export interface ValidationSuggestion {
   type: 'optimization' | 'improvement' | 'best_practice';
   message: string;
   impact: 'low' | 'medium' | 'high';
-  nodeId?: string;
+  nodeRef?: string;
 }
 
 /**

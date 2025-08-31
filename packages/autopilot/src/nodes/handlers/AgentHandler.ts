@@ -6,68 +6,50 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
-  async execute(context: ExecutionContext) {
+  async execute(execution: Execution) {
     const startTime = Date.now();
     const params = this.node.parameters as AgentNodeParameters;
     
     try {
       console.log(`Executing agent: ${params.name} (model: ${params.model}) with workflow execution`);
-      
-      // Prepare workflow execution context
-      const existingState = (context.expeditionState as Record<string, unknown>) || {};
-      const workflowContext: Partial<ExecutionContext> = {
-        ...context,
-        // Merge agent context with workflow context
-        expeditionState: {
-          ...existingState,
-          agentName: params.name,
-          agentModel: params.model,
-          agentSystemPrompt: params.systemPrompt,
-          agentInstructions: params.instructions,
-          ...params.workflowContext
-        }
-      };
 
       // Create workflow instance from the agent's blueprint and execute
       const workflow = new Workflow(params.blueprint);
-      const workflowResult = await workflow.execute(workflowContext);
+      const workflowResult = await workflow.execute();
       
       // Check if workflow execution was successful
       if (workflowResult.status === 'completed') {
         // Collect all successful workflow results
         const workflowOutputs = Array.from(workflowResult.executionResults.values())
-          .filter(result => result.success)
+          .filter(result => !result.error)
           .map(result => result.data);
 
-        return this.createSuccessResult({
+        return this.createSuccessResult(execution, {
           agentName: params.name,
           model: params.model,
           systemPrompt: params.systemPrompt,
           instructions: params.instructions,
-          workflowId: params.blueprint.id,
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
           output: `Agent ${params.name} completed workflow execution successfully`
-        }, Date.now() - startTime);
+        });
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
-        return this.createErrorResult(
-          `Agent ${params.name} workflow execution failed: ${errorMessage}`,
-          Date.now() - startTime
+        return this.createErrorResult(execution,
+          `Agent ${params.name} workflow execution failed: ${errorMessage}`
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
-        `Agent ${params.name} execution failed: ${errorMessage}`,
-        Date.now() - startTime
+      return this.createErrorResult(execution,
+        `Agent ${params.name} execution failed: ${errorMessage}`
       );
     }
   }
@@ -117,9 +99,9 @@ export class AgentHandler extends BaseHandler {
 
       // Check for circular references in workflow
       if (params.blueprint.edges && params.blueprint.edges.length > 0) {
-        const nodeIds = new Set(params.blueprint.nodes.map(n => n.id));
+        const nodeRefs = new Set(params.blueprint.nodes.map(n => n.ref));
         for (const edge of params.blueprint.edges) {
-          if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+          if (!nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)) {
             errors.push(this.createValidationError(
               'INVALID_EDGE_CONNECTION',
               `Invalid edge reference in workflow: ${edge.from} -> ${edge.to}`

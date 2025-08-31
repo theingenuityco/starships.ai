@@ -3,7 +3,7 @@
  */
 
 import { HttpRequestHandler } from '../HttpRequestHandler';
-import { Node, ExecutionContext, HttpRequestNodeParameters } from '../../../types';
+import { Node, Execution, HttpRequestNodeParameters } from '../../../types';
 
 // Mock axios
 jest.mock('axios', () => {
@@ -26,11 +26,11 @@ const mockedAxios = axios as jest.MockedFunction<typeof axios>;
 describe('HttpRequestHandler', () => {
   let handler: HttpRequestHandler;
   let mockNode: Node;
-  let mockContext: ExecutionContext;
+  let mockExecution: Execution;
 
   beforeEach(() => {
     mockNode = {
-      id: 'http-request-node',
+      ref: 'http-request-node',
       type: 'http_request',
       name: 'Test HTTP Request',
       description: 'HTTP request for testing',
@@ -41,7 +41,7 @@ describe('HttpRequestHandler', () => {
     };
 
     handler = new HttpRequestHandler(mockNode);
-    mockContext = global.createMockContext();
+    mockExecution = global.createMockExecution();
 
     // Reset mocks
     jest.clearAllMocks();
@@ -58,12 +58,37 @@ describe('HttpRequestHandler', () => {
       const mockError = new Error('Network Error');
       mockedAxios.mockRejectedValue(mockError);
 
-      const result = await handler.execute(mockContext);
+      const result = await handler.execute(mockExecution);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Network Error');
-      expect(result.nodeId).toBe('http-request-node');
-      expect(result.duration).toBeGreaterThanOrEqual(0);
+      const nodeResult = result.executionResults.get('http-request-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBe('Network Error');
+      expect(nodeResult?.nodeRef).toBe('http-request-node');
+    });
+
+    it('should execute successfully with valid request', async () => {
+      const mockResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        data: { message: 'success' },
+        config: { url: 'https://api.example.com/data' }
+      };
+      mockedAxios.mockResolvedValue(mockResponse);
+
+      const result = await handler.execute(mockExecution);
+
+      const nodeResult = result.executionResults.get('http-request-node');
+      expect(nodeResult).toBeDefined();
+      expect(nodeResult?.error).toBeUndefined();
+      expect(nodeResult?.nodeRef).toBe('http-request-node');
+      expect(nodeResult?.data).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: { message: 'success' },
+        url: 'https://api.example.com/data'
+      });
     });
   });
 
@@ -92,7 +117,7 @@ describe('HttpRequestHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'URL is required',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -113,7 +138,7 @@ describe('HttpRequestHandler', () => {
       expect(result.errors[0]).toEqual({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'HTTP method is required',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -132,9 +157,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'INVALID_URL',
+        code: 'INVALID_PARAMETERS',
         message: 'URL format is invalid',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -153,9 +178,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'INVALID_HTTP_METHOD',
+        code: 'INVALID_PARAMETERS',
         message: 'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -177,9 +202,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'MISSING_AUTH_TOKEN',
+        code: 'MISSING_REQUIRED_FIELD',
         message: 'Bearer token is required for bearer authentication',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -203,9 +228,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'MISSING_AUTH_CREDENTIALS',
+        code: 'MISSING_REQUIRED_FIELD',
         message: 'Username and password are required for basic authentication',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -229,9 +254,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
-        code: 'MISSING_API_KEY',
+        code: 'MISSING_REQUIRED_FIELD',
         message: 'API key and header name are required for API key authentication',
-        nodeId: 'http-request-node',
+        nodeRef: 'http-request-node',
         severity: 'error'
       });
     });
@@ -251,10 +276,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
-        code: 'LOW_TIMEOUT',
+        code: 'POTENTIAL_TIMEOUT',
         message: 'Timeout is very low, this may cause frequent failures',
-        nodeId: 'http-request-node',
-        severity: 'warning'
+        nodeRef: 'http-request-node'
       });
     });
 
@@ -273,10 +297,9 @@ describe('HttpRequestHandler', () => {
 
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
-        code: 'HIGH_RETRY_COUNT',
+        code: 'POTENTIAL_TIMEOUT',
         message: 'High retry count may cause long execution times',
-        nodeId: 'http-request-node',
-        severity: 'warning'
+        nodeRef: 'http-request-node'
       });
     });
   });

@@ -2,15 +2,15 @@
  * Global test utilities type declarations
  */
 
-import type { Blueprint } from '../src/types';
-import type { ExecutionContext } from '../src/types';
+import type { Blueprint, Execution, Node } from '../src/types';
 
 declare global {
   namespace NodeJS {
     interface Global {
       createMockBlueprint: (overrides?: Partial<Blueprint>) => Blueprint;
       createMockWorkflow: (overrides?: Partial<Blueprint>) => Blueprint;
-      createMockContext: (overrides?: Partial<ExecutionContext>) => ExecutionContext;
+      createMockExecution: (overrides?: Partial<Execution>) => Execution;
+      createMockNode: (overrides?: Partial<Node>) => Node;
     }
   }
 
@@ -18,13 +18,15 @@ declare global {
   interface GlobalThis {
     createMockBlueprint: (overrides?: Partial<Blueprint>) => Blueprint;
     createMockWorkflow: (overrides?: Partial<Blueprint>) => Blueprint;
-    createMockContext: (overrides?: Partial<ExecutionContext>) => ExecutionContext;
+    createMockExecution: (overrides?: Partial<Execution>) => Execution;
+    createMockNode: (overrides?: Partial<Node>) => Node;
   }
 
   // Also declare for regular global access
   var createMockBlueprint: (overrides?: Partial<Blueprint>) => Blueprint;
   var createMockWorkflow: (overrides?: Partial<Blueprint>) => Blueprint;
-  var createMockContext: (overrides?: Partial<ExecutionContext>) => ExecutionContext;
+  var createMockExecution: (overrides?: Partial<Execution>) => Execution;
+  var createMockNode: (overrides?: Partial<Node>) => Node;
 }
 
 export {};

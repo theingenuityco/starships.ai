@@ -5,17 +5,17 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
+import { Execution, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
 
-  async execute(context: ExecutionContext) {
+  async execute(execution: Execution) {
     const params = this.node.parameters as OutputNodeParameters;
     // Gather data from source nodes
     const sourceData: Record<string, any> = {};
     for (const sourceNodeId of params.sources) {
-      const sourceResult = context.previousResults.get(sourceNodeId);
+      const sourceResult = execution.executionResults.get(sourceNodeId);
       if (sourceResult) {
         sourceData[sourceNodeId] = sourceResult.data;
       }
@@ -25,11 +25,11 @@ export class OutputHandler extends BaseHandler {
     // For now, return simple formatted output
     const output = `# ${params.title || 'Workflow Output'}\n\n${JSON.stringify(sourceData, null, 2)}`;
     
-    return this.createSuccessResult({
+    return this.createSuccessResult(execution, {
       output,
       format: params.format,
       sourceData
-    }, 50);
+    });
   }
 
   validate(): ValidationResult {

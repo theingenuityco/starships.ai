@@ -6,62 +6,45 @@
  */
 
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '../../types';
 import { Workflow } from '../../Workflow';
 
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
 
-  async execute(context: ExecutionContext) {
-    const startTime = Date.now();
+  async execute(execution: Execution) {
     const params = this.node.parameters as WorkflowNodeParameters;
     
     try {
-      console.log(`Executing workflow: ${params.blueprint.id}`);
-      
-      // Prepare workflow execution context
-      const existingState = (context.expeditionState as Record<string, unknown>) || {};
-      const workflowContext: Partial<ExecutionContext> = {
-        ...context,
-        // Merge existing context with workflow-specific context
-        expeditionState: {
-          ...existingState,
-          workflowNodeId: this.node.id,
-          ...params.workflowContext
-        }
-      };
+      console.log('Executing embedded workflow');
 
       // Create workflow instance from the blueprint and execute
       const workflow = new Workflow(params.blueprint);
-      const workflowResult = await workflow.execute(workflowContext);
+      const workflowResult = await workflow.execute();
       
       // Check if workflow execution was successful
       if (workflowResult.status === 'completed') {
         // Collect all successful workflow results
         const workflowOutputs = Array.from(workflowResult.executionResults.values())
-          .filter(result => result.success)
+          .filter(result => !result.error)
           .map(result => result.data);
 
-        return this.createSuccessResult({
-          workflowId: params.blueprint.id,
+        return this.createSuccessResult(execution, {
           workflowResults: workflowOutputs,
           workflowStatus: workflowResult.status,
-          executionId: workflowResult.id,
-          output: `Workflow ${params.blueprint.id} completed successfully`
-        }, Date.now() - startTime);
+          output: 'Workflow completed successfully'
+        });
       } else {
         // Workflow execution failed
         const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
-        return this.createErrorResult(
-          `Workflow ${params.blueprint.id} execution failed: ${errorMessage}`,
-          Date.now() - startTime
+        return this.createErrorResult(execution,
+          `Workflow execution failed: ${errorMessage}`
         );
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
-        `Workflow ${params.blueprint.id} execution failed: ${errorMessage}`,
-        Date.now() - startTime
+      return this.createErrorResult(execution,
+        `Workflow execution failed: ${errorMessage}`
       );
     }
   }
@@ -79,13 +62,6 @@ export class WorkflowHandler extends BaseHandler {
       ));
     } else {
       // Validate blueprint structure
-      if (!params.blueprint.id) {
-        errors.push(this.createValidationError(
-          'VALIDATION_FAILED',
-          'Blueprint must have an id'
-        ));
-      }
-
       if (!params.blueprint.nodes || params.blueprint.nodes.length === 0) {
         errors.push(this.createValidationError(
           'VALIDATION_FAILED',
@@ -106,9 +82,9 @@ export class WorkflowHandler extends BaseHandler {
 
       // Check for valid edge references
       if (params.blueprint.edges && params.blueprint.nodes) {
-        const nodeIds = new Set(params.blueprint.nodes.map(n => n.id));
+        const nodeRefs = new Set(params.blueprint.nodes.map(n => n.ref));
         for (const edge of params.blueprint.edges) {
-          if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
+          if (!nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)) {
             errors.push(this.createValidationError(
               'INVALID_EDGE_CONNECTION',
               `Invalid edge reference in blueprint: ${edge.from} -> ${edge.to}`

@@ -7,13 +7,12 @@
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { BaseHandler } from '../Handler';
-import { ExecutionContext, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { Execution, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '../../types';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
 
-  async execute(context: ExecutionContext) {
-    const startTime = Date.now();
+  async execute(execution: Execution) {
     const params = this.node.parameters as HttpRequestNodeParameters;
     
     try {
@@ -53,7 +52,7 @@ export class HttpRequestHandler extends BaseHandler {
           lastError = error as AxiosError;
           
           // Don't retry on certain errors
-          if (axios.isCancel(error) || 
+          if (axios.isCancel(error) ||
               (error as AxiosError).code === 'ECONNABORTED') {
             break;
           }
@@ -65,27 +64,24 @@ export class HttpRequestHandler extends BaseHandler {
         }
       }
 
-      const duration = Date.now() - startTime;
 
       if (response) {
-        return this.createSuccessResult({
+        return this.createSuccessResult(execution, {
           status: response.status,
           statusText: response.statusText,
           headers: response.headers,
           body: response.data,
           url: response.config.url
-        }, duration);
+        });
       } else {
         // If we get here, all retries failed
-        return this.createErrorResult(
-          lastError?.message || 'HTTP request failed',
-          duration
+        return this.createErrorResult(execution,
+          lastError?.message || 'HTTP request failed'
         );
       }
 
     } catch (error) {
-      const duration = Date.now() - startTime;
-      return this.createErrorResult((error as Error).message, duration);
+      return this.createErrorResult(execution, (error as Error).message);
     }
   }
 

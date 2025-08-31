@@ -7,20 +7,9 @@
 
 // Import autopilot types at the top level
 import type {
-  AgentIdentity,
-  AgentPurpose,
-  AgentSpace,
+  AgentMemoryConfig,
   Blueprint
 } from '@starships/autopilot';
-
-/**
- * Agent memory configuration for autopilot
- */
-export interface AgentMemoryConfig {
-  identity?: AgentIdentity;
-  purpose?: AgentPurpose;
-  space?: AgentSpace;
-}
 
 // ============================================================================
 // DATABASE AGENT INTERFACE

@@ -22,7 +22,8 @@ export type {
   ConversationEntry,
   AgentIdentity,
   AgentPurpose,
-  AgentSpace
+  AgentSpace,
+  AgentMemoryConfig
 } from './AgentMemory';
 
 // Node system

@@ -34,6 +34,15 @@ export interface AgentSpace {
 }
 
 /**
+ * Agent memory configuration for autopilot
+ */
+export interface AgentMemoryConfig {
+  identity?: AgentIdentity;
+  purpose?: AgentPurpose;
+  space?: AgentSpace;
+}
+
+/**
  * Conversation entry with metadata
  */
 export interface ConversationEntry {

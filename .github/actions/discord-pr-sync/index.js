@@ -298,6 +298,16 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
 
     // Update state timestamp
     await stateManager.updateThreadActivity(prNumber, `${eventName}/${action}`);
+    
+    // Archive thread if PR is closed
+    if (eventName === 'pull_request' && action === 'closed') {
+      try {
+        await discord.archiveThread(threadData.threadId, context.payload.pull_request.merged ? 'PR merged' : 'PR closed');
+        console.log(`Archived thread for closed PR #${prNumber}`);
+      } catch (error) {
+        console.error(`Failed to archive thread: ${error.message}`);
+      }
+    }
   }
 
   return threadData;
@@ -409,6 +419,12 @@ function createPullRequestEmbed(action, payload) {
         { name: 'Closed By', value: payload.sender?.login || 'Unknown', inline: true }
       );
     }
+    
+    // Add note about thread archival
+    embed.footer = {
+      text: 'This thread will be archived',
+      icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
+    };
   }
 
   return embed;

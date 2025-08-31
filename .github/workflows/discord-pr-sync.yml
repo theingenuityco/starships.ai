@@ -40,8 +40,13 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Install dependencies for the action
           cd .github/actions/discord-pr-sync
-          npm install
+          npm ci || npm install
+          
+          # Install dependencies for shared scripts
+          cd ../../scripts
+          npm ci || npm install
 
       - name: Sync PR to Discord
         id: discord-sync

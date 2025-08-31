@@ -180,7 +180,7 @@ class DiscordThreadManager {
             { name: '📊 Status', value: 'Open', inline: true }
           ],
           footer: {
-            text: 'GitHub PR Bot',
+            text: 'GitHub Bot',
             icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
           },
           timestamp: new Date().toISOString()

@@ -1,15 +1,18 @@
 /**
  * @starships/autopilot
- * 
- * Generic workflow DSL execution engine
+ *
+ * Workflow execution engine and agent development framework for starships.ai
  */
 
-// Core engine
-export { Engine } from './engine/Engine';
-export type { EventCallback, ExecutionEvent } from './engine/Engine';
+// ===== WORKFLOW SYSTEM =====
+// Core workflow class (replaces Registry + Engine pattern)
+export { Workflow } from './Workflow';
+
+// ===== AGENT SYSTEM =====
+// Core agent class for agent execution
+export { Agent } from './Agent';
 
 // Node system
-export { Registry } from './nodes/Registry';
 export { Handler } from './nodes/Handler';
 
 // Individual handlers
@@ -19,24 +22,26 @@ export {
   AgentHandler,
   ConditionalHandler,
   PromptHandler,
-  OutputHandler
+  OutputHandler,
+  HttpRequestHandler,
+  LlmHandler,
+  WorkflowHandler
 } from './nodes/handlers';
 
 // Validation
 export { Validator } from './validation/Validator';
 
-// Types - clean exports
+// Workflow Types - clean exports
 export type {
   // Core workflow types
-  Workflow,
+  Blueprint,
   Node,
   Edge,
   NodeType,
   NodeParameters,
   
   // Execution types
-  RuntimeState,
-  ExecutionContext,
+  Execution,
   NodeResult,
   ExecutionStatus,
   
@@ -45,6 +50,9 @@ export type {
   ConditionalNodeParameters,
   UserPromptNodeParameters,
   OutputNodeParameters,
+  HttpRequestNodeParameters,
+  LlmNodeParameters,
+  WorkflowNodeParameters,
   
   // Validation types
   ValidationResult,
@@ -56,33 +64,24 @@ export type {
 // Configuration
 export { config } from './constants';
 
-// Import for creating default instances
-import { Engine } from './engine/Engine';
-import { Registry } from './nodes/Registry';
+// Import classes for convenience functions
+import { Workflow } from './Workflow';
+import { Agent } from './Agent';
 import { Validator } from './validation/Validator';
-import { 
-  StartHandler, 
-  EndHandler, 
-  AgentHandler, 
-  ConditionalHandler, 
-  PromptHandler, 
-  OutputHandler 
-} from './nodes/handlers';
+import { AgentNodeParameters } from './types';
 
 // Create default instances for convenience
-const _defaultRegistry = new Registry();
-const _defaultEngine = new Engine(_defaultRegistry);
 const _defaultValidator = new Validator();
 
-// Register default handlers
-_defaultRegistry.register(new StartHandler());
-_defaultRegistry.register(new EndHandler()); 
-_defaultRegistry.register(new AgentHandler());
-_defaultRegistry.register(new ConditionalHandler());
-_defaultRegistry.register(new PromptHandler());
-_defaultRegistry.register(new OutputHandler());
-
 // Export configured instances
-export const defaultRegistry = _defaultRegistry;
-export const defaultEngine = _defaultEngine;
 export const defaultValidator = _defaultValidator;
+
+// Helper function to create a new workflow with default handlers
+export const createWorkflow = (): Workflow => {
+  return new Workflow();
+};
+
+// Helper function to create a new agent
+export const createAgent = (config: AgentNodeParameters): Agent => {
+  return new Agent(config);
+};

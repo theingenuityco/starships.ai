@@ -5,47 +5,26 @@
  */
 
 /**
- * Runtime state of workflow execution
+ * Workflow execution state
  */
-export interface RuntimeState {
-  id: string;
-  workflowId: string;
-  currentNodeId?: string;
+export interface Execution {
+  currentNodeRef?: string;
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;
-  startTime?: string;
-  endTime?: string;
-  pausedAt?: string;
   error?: ExecutionError;
-  createdAt: string;
-  updatedAt: string;
 }
 
 /**
  * Result of executing a workflow node
  */
 export interface NodeResult {
-  nodeId: string;
-  success: boolean;
+  nodeRef: string;
   data?: unknown;
   error?: string;
-  executedAt: string;
-  duration?: number;
   nextEdgeCondition?: string;
   metadata?: Record<string, unknown>;
 }
 
-/**
- * Context passed to node handlers during execution
- */
-export interface ExecutionContext {
-  expeditionId: string;
-  workflowId: string;
-  userId: string;
-  previousResults: Map<string, NodeResult>;
-  expeditionState: unknown;
-  services: unknown;
-}
 
 /**
  * Workflow execution status
@@ -64,7 +43,7 @@ export type ExecutionStatus =
 export interface ExecutionError {
   code: WorkflowErrorCode;
   message: string;
-  nodeId?: string;
+  nodeRef?: string;
   details?: unknown;
   timestamp: string;
   recoverable: boolean;
@@ -74,7 +53,7 @@ export interface ExecutionError {
 /**
  * Workflow error codes
  */
-export type WorkflowErrorCode = 
+export type WorkflowErrorCode =
   | 'NODE_EXECUTION_FAILED'
   | 'TIMEOUT_EXCEEDED'
   | 'USER_INPUT_TIMEOUT'
@@ -86,3 +65,4 @@ export type WorkflowErrorCode =
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
   | 'JSONATA_ERROR';
+  

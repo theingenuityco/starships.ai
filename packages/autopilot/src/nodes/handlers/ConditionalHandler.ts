@@ -2,20 +2,20 @@
  * Conditional Node Handler
  * 
  * Conditional logic handler with JSONata
+ * Uses BaseHandler pattern
  */
 
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, ConditionalNodeParameters } from '../../types';
-import * as jsonata from 'jsonata';
+import { BaseHandler } from '../Handler';
+import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import jsonata from 'jsonata';
 
-export class ConditionalHandler implements Handler {
+export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as ConditionalNodeParameters;
-    
+  async execute(execution: Execution) {
+    const params = this.node.parameters as ConditionalNodeParameters;
     // Get data from source node
-    const sourceResult = context.previousResults.get(params.sourceNodeId);
+    const sourceResult = execution.executionResults.get(params.sourceNodeId);
     if (!sourceResult) {
       throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }
@@ -24,62 +24,53 @@ export class ConditionalHandler implements Handler {
       // Evaluate conditions using JSONata
       for (const [conditionKey, expression] of Object.entries(params.conditions)) {
         const evaluator = jsonata(expression);
-        const result = evaluator.evaluate(sourceResult.data);
+        const result = await evaluator.evaluate(sourceResult.data);
         
-        if (result) {
-          return {
-            nodeId: node.id,
-            success: true,
+        // Check for explicit true result (not just truthy values)
+        if (result === true) {
+          const nodeResult: NodeResult = {
+            nodeRef: this.node.ref,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
-            nextEdgeCondition: conditionKey,
-            executedAt: new Date().toISOString(),
-            duration: 10
+            nextEdgeCondition: conditionKey
           };
+          execution.executionResults.set(this.node.ref, nodeResult);
+          return execution;
         }
       }
 
       // Use default condition if provided
       const defaultCondition = params.defaultCondition || 'default';
-      return {
-        nodeId: node.id,
-        success: true,
+      const nodeResult: NodeResult = {
+        nodeRef: this.node.ref,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
-        nextEdgeCondition: defaultCondition,
-        executedAt: new Date().toISOString(),
-        duration: 10
+        nextEdgeCondition: defaultCondition
       };
+      execution.executionResults.set(this.node.ref, nodeResult);
+      return execution;
 
     } catch (error) {
-      return {
-        nodeId: node.id,
-        success: false,
-        error: `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        executedAt: new Date().toISOString(),
-        duration: 10
-      };
+      return this.createErrorResult(execution,
+        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as ConditionalNodeParameters;
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: ValidationError[] = [];
+    const params = this.node.parameters as ConditionalNodeParameters;
 
     if (!params.sourceNodeId) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Source node ID is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Source node ID is required'
+      ));
     }
 
     if (!params.conditions || Object.keys(params.conditions).length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'At least one condition is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'At least one condition is required'
+      ));
     }
 
     // Validate JSONata expressions
@@ -88,12 +79,10 @@ export class ConditionalHandler implements Handler {
         try {
           jsonata(expression);
         } catch (error) {
-          errors.push({
-            code: 'INVALID_JSONATA_EXPRESSION',
-            message: `Invalid JSONata expression for condition '${key}': ${error instanceof Error ? error.message : 'Syntax error'}`,
-            nodeId: node.id,
-            severity: 'error' as const
-          });
+          errors.push(this.createValidationError(
+            'INVALID_JSONATA_EXPRESSION',
+            `Invalid JSONata expression for condition '${key}': ${error instanceof Error ? error.message : 'Syntax error'}`
+          ));
         }
       }
     }

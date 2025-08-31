@@ -1,53 +1,45 @@
 /**
  * User Prompt Handler
  * 
- * User prompt handler - will need UI integration
+ * User prompt handler using BaseHandler pattern - will need UI integration
  */
 
-import { Handler } from '../Handler';
-import { Node, NodeResult, ExecutionContext, ValidationResult, UserPromptNodeParameters } from '../../types';
+import { BaseHandler } from '../Handler';
+import { Execution, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '../../types';
 
-export class PromptHandler implements Handler {
+export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
 
-  async execute(node: Node, context: ExecutionContext): Promise<NodeResult> {
-    const params = node.parameters as UserPromptNodeParameters;
-    
+  async execute(execution: Execution) {
+    const params = this.node.parameters as UserPromptNodeParameters;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input
     console.log(`User prompt: ${params.promptText}`);
     console.log('Choices:', params.choices);
     
     // For now, return a placeholder result
-    return {
-      nodeId: node.id,
-      success: true,
-      data: { choice: params.choices[0], userInput: 'placeholder' },
-      executedAt: new Date().toISOString(),
-      duration: 100
-    };
+    return this.createSuccessResult(execution, {
+      choice: params.choices[0],
+      userInput: 'placeholder'
+    });
   }
 
-  validate(node: Node): ValidationResult {
-    const params = node.parameters as UserPromptNodeParameters;
-    const errors = [];
+  validate(): ValidationResult {
+    const errors: ValidationError[] = [];
+    const params = this.node.parameters as UserPromptNodeParameters;
 
     if (!params.promptText) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Prompt text is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Prompt text is required'
+      ));
     }
 
     if (!params.choices || params.choices.length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'At least one choice is required',
-        nodeId: node.id,
-        severity: 'error' as const
-      });
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'At least one choice is required'
+      ));
     }
 
     return {

@@ -5,20 +5,29 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { Workflow, RuntimeState, ExecutionContext, Node, NodeResult } from '../types';
-import { Registry } from '../nodes/Registry';
-import { v4 as uuidv4 } from 'uuid';
+import { Blueprint, Execution, Node as WorkflowNode, NodeResult } from '../types';
+import { Handler, HandlerConstructor } from '../nodes/Handler';
+
+// Dynamic imports for handlers - pure lazy loading
+const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
+  'start': () => import('../nodes/handlers/StartHandler').then(m => m.StartHandler),
+  'end': () => import('../nodes/handlers/EndHandler').then(m => m.EndHandler),
+  'agent': () => import('../nodes/handlers/AgentHandler').then(m => m.AgentHandler),
+  'conditional': () => import('../nodes/handlers/ConditionalHandler').then(m => m.ConditionalHandler),
+  'user_prompt': () => import('../nodes/handlers/PromptHandler').then(m => m.PromptHandler),
+  'output': () => import('../nodes/handlers/OutputHandler').then(m => m.OutputHandler),
+  'http_request': () => import('../nodes/handlers/HttpRequestHandler').then(m => m.HttpRequestHandler),
+  'llm': () => import('../nodes/handlers/LlmHandler').then(m => m.LlmHandler),
+  'workflow': () => import('../nodes/handlers/WorkflowHandler').then(m => m.WorkflowHandler),
+};
 
 /**
  * Events that can be emitted during workflow execution
  */
 export interface ExecutionEvent {
-  type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' | 
+  type: 'workflow_started' | 'node_started' | 'node_completed' | 'node_failed' |
         'workflow_paused' | 'workflow_resumed' | 'workflow_completed' | 'workflow_failed';
-  workflowId: string;
-  contextId: string;
-  nodeId?: string;
-  data?: any;
+  execution: Execution;
   timestamp: string;
 }
 
@@ -31,43 +40,61 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
  * Main workflow execution engine
  */
 export class Engine {
-  private registry: Registry;
   private eventCallbacks: EventCallback[] = [];
-  private runningExecutions: Map<string, RuntimeState> = new Map();
+  private execution!: Execution;
 
-  constructor(registry?: Registry) {
-    this.registry = registry || new Registry();
+  constructor() {
+    // Engine is completely stateless for handlers - pure dynamic loading
+  }
+
+  /**
+   * Create handler instance for a node with pure dynamic loading
+   */
+  async createHandler(node: WorkflowNode): Promise<Handler> {
+    const loader = HANDLER_MAP[node.type];
+    if (!loader) {
+      throw new Error(`No handler available for node type: ${node.type}`);
+    }
+    
+    // Load handler constructor dynamically each time
+    const handlerConstructor = await loader();
+    return new handlerConstructor(node);
+  }
+
+  /**
+   * Get all available handler types
+   */
+  getSupportedTypes(): string[] {
+    return Object.keys(HANDLER_MAP);
+  }
+
+  /**
+   * Check if a node type is supported
+   */
+  hasHandler(type: string): boolean {
+    return type in HANDLER_MAP;
   }
 
   /**
    * Execute a workflow from start to completion
    */
   async execute(
-    workflow: Workflow,
-    context: Partial<ExecutionContext>
-  ): Promise<RuntimeState> {
-    const executionId = uuidv4();
-    
-    // Initialize runtime state
-    const runtimeState: RuntimeState = {
-      id: executionId,
-      workflowId: workflow.id,
-      currentNodeId: undefined,
+    blueprint: Blueprint,
+    initialExecution?: Execution
+  ): Promise<Execution> {
+    // Set the provided initial execution or create a default one
+    this.execution = initialExecution || {
+      currentNodeRef: undefined,
       status: 'not_started',
-      executionResults: new Map(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      executionResults: new Map()
     };
-
-    // Store in running executions
-    this.runningExecutions.set(executionId, runtimeState);
 
     try {
       // Validate workflow before execution
-      await this.validateForExecution(workflow);
+      await this.validateForExecution(blueprint);
 
       // Find start node
-      const startNode = this.getStartNode(workflow);
+      const startNode = this.getStartNode(blueprint);
       if (!startNode) {
         throw new Error('No start node found in workflow');
       }
@@ -75,29 +102,23 @@ export class Engine {
       // Emit start event
       await this.emitEvent({
         type: 'workflow_started',
-        workflowId: workflow.id,
-        contextId: workflow.expeditionId,
+        execution: this.execution,
         timestamp: new Date().toISOString()
       });
 
-      // Update runtime state
-      runtimeState.status = 'running';
-      runtimeState.startTime = new Date().toISOString();
-      runtimeState.updatedAt = new Date().toISOString();
+      // Update execution state
+      this.execution.status = 'running';
 
       // Execute workflow graph
-      await this.executeGraph(workflow, runtimeState, context);
+      await this.executeGraph(blueprint, this.execution);
 
       // Mark as completed if no errors
-      if (runtimeState.status === 'running') {
-        runtimeState.status = 'completed';
-        runtimeState.endTime = new Date().toISOString();
-        runtimeState.updatedAt = new Date().toISOString();
+      if (this.execution.status === 'running') {
+        this.execution.status = 'completed';
 
         await this.emitEvent({
           type: 'workflow_completed',
-          workflowId: workflow.id,
-          contextId: workflow.expeditionId,
+          execution: this.execution,
           timestamp: new Date().toISOString()
         });
       }
@@ -105,10 +126,8 @@ export class Engine {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      runtimeState.status = 'failed';
-      runtimeState.endTime = new Date().toISOString();
-      runtimeState.updatedAt = new Date().toISOString();
-      runtimeState.error = {
+      this.execution.status = 'failed';
+      this.execution.error = {
         code: 'SYSTEM_ERROR',
         message: errorMessage,
         timestamp: new Date().toISOString(),
@@ -117,74 +136,56 @@ export class Engine {
 
       await this.emitEvent({
         type: 'workflow_failed',
-        workflowId: workflow.id,
-        contextId: workflow.expeditionId,
-        data: { error: errorMessage },
+        execution: this.execution,
         timestamp: new Date().toISOString()
       });
     } finally {
-      // Clean up running execution
-      this.runningExecutions.delete(executionId);
+      // Execution cleanup completed
     }
 
-    return runtimeState;
+    return this.execution;
   }
 
   /**
    * Execute the workflow graph node by node
    */
   private async executeGraph(
-    workflow: Workflow,
-    runtimeState: RuntimeState,
-    contextData: Partial<ExecutionContext>
+    blueprint: Blueprint,
+    execution: Execution
   ): Promise<void> {
-    let currentNode = this.getStartNode(workflow);
-    
-    // Build execution context
-    const context: ExecutionContext = {
-      expeditionId: workflow.expeditionId,
-      workflowId: workflow.id,
-      userId: contextData.userId || 'system',
-      previousResults: runtimeState.executionResults,
-      expeditionState: contextData.expeditionState || {},
-      services: contextData.services || {}
-    };
+    let currentNode = this.getStartNode(blueprint);
 
-    while (currentNode && runtimeState.status === 'running') {
+    while (currentNode && execution.status === 'running') {
       try {
         // Update current node
-        runtimeState.currentNodeId = currentNode.id;
-        runtimeState.updatedAt = new Date().toISOString();
+        execution.currentNodeRef = currentNode.ref;
 
         // Emit node start event
         await this.emitEvent({
           type: 'node_started',
-          workflowId: workflow.id,
-          contextId: workflow.expeditionId,
-          nodeId: currentNode.id,
-          data: { nodeName: currentNode.name, nodeType: currentNode.type },
+          execution: execution,
           timestamp: new Date().toISOString()
         });
 
-        // Execute the node
-        const result = await this.executeNode(currentNode, context);
+        // Execute the node - this now returns updated execution with result stored
+        const updatedExecution = await this.executeNode(currentNode, execution);
         
-        // Store result
-        runtimeState.executionResults.set(currentNode.id, result);
+        // Get the result that was stored by the handler
+        const result = updatedExecution.executionResults.get(currentNode.ref);
+        if (!result) {
+          throw new Error(`Handler failed to store result for node ${currentNode.ref}`);
+        }
 
-        if (result.success) {
+        if (!result.error) {
           // Emit node completed event
           await this.emitEvent({
             type: 'node_completed',
-            workflowId: workflow.id,
-            contextId: workflow.expeditionId,
-            nodeId: currentNode.id,
-            data: { result: result.data },
+            execution: updatedExecution,
             timestamp: new Date().toISOString()
           });
 
           // Find next node
-          const nextNode = this.getNextNode(workflow, currentNode, result.nextEdgeCondition);
+          const nextNode = this.getNextNode(blueprint, currentNode, result.nextEdgeCondition);
           
           if (!nextNode) {
             break; // No next node, workflow complete
@@ -196,10 +197,7 @@ export class Engine {
           // Node execution failed
           await this.emitEvent({
             type: 'node_failed',
-            workflowId: workflow.id,
-            contextId: workflow.expeditionId,
-            nodeId: currentNode.id,
-            data: { error: result.error },
+            execution: updatedExecution,
             timestamp: new Date().toISOString()
           });
 
@@ -211,66 +209,52 @@ export class Engine {
         
         // Store failed result
         const failedResult: NodeResult = {
-          nodeId: currentNode.id,
-          success: false,
-          error: errorMessage,
-          executedAt: new Date().toISOString(),
-          duration: 0
+          nodeRef: currentNode.ref,
+          error: errorMessage
         };
-        runtimeState.executionResults.set(currentNode.id, failedResult);
+        execution.executionResults.set(currentNode.ref, failedResult);
 
         throw error;
       }
     }
 
     // Clear current node when done
-    runtimeState.currentNodeId = undefined;
-    runtimeState.updatedAt = new Date().toISOString();
+    execution.currentNodeRef = undefined;
   }
 
   /**
-   * Execute a single node
+   * Execute a single node with lazy loading
    */
   private async executeNode(
-    node: Node,
-    context: ExecutionContext
-  ): Promise<NodeResult> {
-    // Get handler for node type
-    const handler = this.registry.getHandler(node.type);
-    if (!handler) {
-      throw new Error(`No handler found for node type: ${node.type}`);
-    }
+    node: WorkflowNode,
+    execution: Execution
+  ): Promise<Execution> {
+    // Create handler instance with parameters (now async)
+    const handler = await this.createHandler(node);
 
-    // Execute the node
-    const startTime = Date.now();
-    const result = await handler.execute(node, context);
-    const duration = Date.now() - startTime;
+    // Execute the node - this returns execution with result stored
+    const updatedExecution = await handler.execute(execution);
 
-    // Update duration if not set by handler
-    if (!result.duration) {
-      result.duration = duration;
-    }
-
-    return result;
+    return updatedExecution;
   }
 
   /**
    * Find the start node in the workflow
    */
-  private getStartNode(workflow: Workflow): Node | null {
-    return workflow.nodes.find(node => node.type === 'start') || null;
+  private getStartNode(blueprint: Blueprint): WorkflowNode | null {
+    return blueprint.nodes.find(node => node.type === 'start') || null;
   }
 
   /**
    * Find the next node based on current node and edge condition
    */
   private getNextNode(
-    workflow: Workflow,
-    currentNode: Node,
+    blueprint: Blueprint,
+    currentNode: WorkflowNode,
     edgeCondition?: string
-  ): Node | null {
+  ): WorkflowNode | null {
     // Find edges from current node
-    const outgoingEdges = workflow.edges.filter(edge => edge.from === currentNode.id);
+    const outgoingEdges = blueprint.edges.filter(edge => edge.from === currentNode.ref);
 
     if (outgoingEdges.length === 0) {
       return null; // No outgoing edges, workflow complete
@@ -280,19 +264,19 @@ export class Engine {
     if (edgeCondition) {
       const matchingEdge = outgoingEdges.find(edge => edge.condition === edgeCondition);
       if (matchingEdge) {
-        return workflow.nodes.find(node => node.id === matchingEdge.to) || null;
+        return blueprint.nodes.find(node => node.ref === matchingEdge.to) || null;
       }
     }
 
     // Look for default edge (no condition)
     const defaultEdge = outgoingEdges.find(edge => !edge.condition);
     if (defaultEdge) {
-      return workflow.nodes.find(node => node.id === defaultEdge.to) || null;
+      return blueprint.nodes.find(node => node.ref === defaultEdge.to) || null;
     }
 
     // If no matching edge found and we have edges, take the first one
     if (outgoingEdges.length > 0) {
-      return workflow.nodes.find(node => node.id === outgoingEdges[0].to) || null;
+      return blueprint.nodes.find(node => node.ref === outgoingEdges[0].to) || null;
     }
 
     return null;
@@ -301,19 +285,18 @@ export class Engine {
   /**
    * Validate workflow before execution
    */
-  private async validateForExecution(workflow: Workflow): Promise<void> {
+  private async validateForExecution(blueprint: Blueprint): Promise<void> {
     // Check for start node
-    const startNode = this.getStartNode(workflow);
+    const startNode = this.getStartNode(blueprint);
     if (!startNode) {
       throw new Error('Workflow must have a start node');
     }
 
-    // Check that all node types have handlers
+    // Check that all node types have available handlers
     const unsupportedNodes = [];
-    for (const node of workflow.nodes) {
-      const handler = this.registry.getHandler(node.type);
-      if (!handler) {
-        unsupportedNodes.push({ id: node.id, type: node.type });
+    for (const node of blueprint.nodes) {
+      if (!(node.type in HANDLER_MAP)) {
+        unsupportedNodes.push({ ref: node.ref, type: node.type });
       }
     }
 
@@ -325,20 +308,16 @@ export class Engine {
   /**
    * Pause workflow execution
    */
-  pause(executionId: string): boolean {
-    const runtimeState = this.runningExecutions.get(executionId);
-    if (!runtimeState || runtimeState.status !== 'running') {
+  pause(): boolean {
+    if (!this.execution || this.execution.status !== 'running') {
       return false;
     }
 
-    runtimeState.status = 'paused';
-    runtimeState.pausedAt = new Date().toISOString();
-    runtimeState.updatedAt = new Date().toISOString();
+    this.execution.status = 'paused';
 
     this.emitEvent({
       type: 'workflow_paused',
-      workflowId: runtimeState.workflowId,
-      contextId: '',
+      execution: this.execution,
       timestamp: new Date().toISOString()
     });
 
@@ -348,20 +327,16 @@ export class Engine {
   /**
    * Resume workflow execution
    */
-  resume(executionId: string): boolean {
-    const runtimeState = this.runningExecutions.get(executionId);
-    if (!runtimeState || runtimeState.status !== 'paused') {
+  resume(): boolean {
+    if (!this.execution || this.execution.status !== 'paused') {
       return false;
     }
 
-    runtimeState.status = 'running';
-    runtimeState.pausedAt = undefined;
-    runtimeState.updatedAt = new Date().toISOString();
+    this.execution.status = 'running';
 
     this.emitEvent({
       type: 'workflow_resumed',
-      workflowId: runtimeState.workflowId,
-      contextId: '',
+      execution: this.execution,
       timestamp: new Date().toISOString()
     });
 
@@ -371,32 +346,28 @@ export class Engine {
   /**
    * Cancel workflow execution
    */
-  cancel(executionId: string): boolean {
-    const runtimeState = this.runningExecutions.get(executionId);
-    if (!runtimeState || runtimeState.status === 'completed' || runtimeState.status === 'failed') {
+  cancel(): boolean {
+    if (!this.execution || this.execution.status === 'completed' || this.execution.status === 'failed') {
       return false;
     }
 
-    runtimeState.status = 'cancelled';
-    runtimeState.endTime = new Date().toISOString();
-    runtimeState.updatedAt = new Date().toISOString();
+    this.execution.status = 'cancelled';
 
-    this.runningExecutions.delete(executionId);
     return true;
   }
 
   /**
    * Get execution status
    */
-  getExecutionStatus(executionId: string): RuntimeState | null {
-    return this.runningExecutions.get(executionId) || null;
+  getExecutionStatus(): Execution {
+    return this.execution;
   }
 
   /**
-   * Get all running executions
+   * Get current execution state
    */
-  getRunningExecutions(): RuntimeState[] {
-    return Array.from(this.runningExecutions.values());
+  getCurrentExecution(): Execution {
+    return this.execution;
   }
 
   /**

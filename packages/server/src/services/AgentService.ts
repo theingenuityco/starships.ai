@@ -7,7 +7,7 @@
  */
 
 import { AgentRepository } from '@starships/models';
-import { Agent as DatabaseAgent, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
+import { AgentModel as DatabaseAgent, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
 import { Agent as AutopilotAgent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { MemoryEntry } from '@starships/protocol';
@@ -48,6 +48,153 @@ export class AgentService {
   constructor() {
     this.agentRepository = new AgentRepository();
     this.memoryStore = new DatabaseMemoryStore();
+  }
+
+  // ============================================================================
+  // STATIC APIs FOR BACKWARD COMPATIBILITY
+  // ============================================================================
+
+  /**
+   * Get agents by category - Static method
+   */
+  static async getAgentsByCategory(category: string): Promise<DatabaseAgent[]> {
+    const repository = new AgentRepository();
+    return await repository.findByCategory(category);
+  }
+
+  /**
+   * Get agents by author - Static method
+   */
+  static async getAgentsByAuthor(authorId: string): Promise<DatabaseAgent[]> {
+    const repository = new AgentRepository();
+    return await repository.findByAuthor(authorId);
+  }
+
+  /**
+   * Get agents by tags - Static method
+   */
+  static async getAgentsByTags(tags: string[]): Promise<DatabaseAgent[]> {
+    const repository = new AgentRepository();
+    return await repository.findByTags(tags);
+  }
+
+  /**
+   * Get public agents - Static method
+   */
+  static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<DatabaseAgent[]> {
+    const repository = new AgentRepository();
+    return await repository.findPublic(limit, offset);
+  }
+
+  /**
+   * Search agents - Static method
+   */
+  static async searchAgents(query: string): Promise<DatabaseAgent[]> {
+    const repository = new AgentRepository();
+    return await repository.searchAgents(query);
+  }
+
+  /**
+   * Get agent by ID - Static method (returns DatabaseAgent, not AutopilotAgent)
+   */
+  static async getAgent(agentId: string): Promise<DatabaseAgent | null> {
+    const repository = new AgentRepository();
+    return await repository.findById(agentId);
+  }
+
+  /**
+   * Create agent - Static method (returns DatabaseAgent, not AutopilotAgent)
+   */
+  static async createAgent(request: CreateAgentRequest): Promise<DatabaseAgent> {
+    const repository = new AgentRepository();
+    
+    // Provide defaults for required fields that might be missing from CreateAgentRequest
+    const agentData = {
+      ...request,
+      version: '1.0.0',
+      tags: request.tags || [],
+      isPublic: request.isPublic || false,
+      authorId: request.authorId || 'system',
+      executionMode: request.executionMode || 'simple' as const,
+      timeout: request.timeout || 30000,
+    };
+    
+    return await repository.create(agentData);
+  }
+
+  /**
+   * Update agent - Static method (returns DatabaseAgent, not AutopilotAgent)
+   */
+  static async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<DatabaseAgent | null> {
+    const repository = new AgentRepository();
+    return await repository.update(agentId, updates);
+  }
+
+  /**
+   * Delete agent - Static method
+   */
+  static async deleteAgent(agentId: string): Promise<boolean> {
+    const repository = new AgentRepository();
+    return await repository.delete(agentId);
+  }
+
+  /**
+   * Get agents by starship ID - Static method
+   */
+  static async getAgentsByStarshipId(starshipId: string): Promise<DatabaseAgent[]> {
+    const repository = new AgentRepository();
+    return await repository.findByStarshipId(starshipId);
+  }
+
+  /**
+   * Track usage - Static method
+   */
+  static async trackUsage(agentId: string): Promise<boolean> {
+    const repository = new AgentRepository();
+    try {
+      await repository.incrementUsageCount(agentId);
+      return true;
+    } catch (error) {
+      console.error(`Failed to track usage for agent ${agentId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Rate agent - Static method
+   */
+  static async rateAgent(agentId: string, userId: string, rating: number): Promise<boolean> {
+    const repository = new AgentRepository();
+    try {
+      await repository.updateRating(agentId, rating);
+      return true;
+    } catch (error) {
+      console.error(`Failed to rate agent ${agentId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get agent analytics - Static method
+   */
+  static async getAgentAnalytics(agentId: string): Promise<any> {
+    const repository = new AgentRepository();
+    const agent = await repository.findById(agentId);
+    if (!agent) {
+      return null;
+    }
+    
+    // Return basic analytics from the agent model
+    return {
+      id: agent.id,
+      name: agent.name,
+      usageCount: agent.usageCount || 0,
+      rating: agent.rating || 0,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      category: agent.category,
+      isPublic: agent.isPublic
+    };
   }
 
   // ============================================================================

@@ -6,7 +6,7 @@
  */
 
 import { CreateWorkflowRequest } from '@starships/protocol';
-import { Agent } from '@starships/models';
+import { AgentModel } from '@starships/models';
 import { Logger } from '../utils/logger';
 
 export class WorkflowParsingService {
@@ -16,7 +16,7 @@ export class WorkflowParsingService {
    * Parse AI response and convert to WorkflowDSL
    * Moved from MissionOrchestratorAgent to follow separation of concerns
    */
-  static parseAIResponse(aiResponse: string, missionId: string, agents: Agent[]): CreateWorkflowRequest {
+  static parseAIResponse(aiResponse: string, missionId: string, agents: AgentModel[]): CreateWorkflowRequest {
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {

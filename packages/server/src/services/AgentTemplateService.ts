@@ -1,5 +1,5 @@
 import { AgentTemplate } from '@starships/protocol';
-import { Agent } from '@starships/models';
+import { AgentModel } from '@starships/models';
 import { AgentTemplateRepository } from '@starships/models';
 import { Neo4jConnection } from '@starships/models';
 
@@ -74,7 +74,7 @@ export class AgentTemplateService {
     agentName: string,
     authorId: string,
     starshipId: string
-  ): Promise<Agent> {
+  ): Promise<AgentModel> {
     if (!agentName.trim()) {
       throw new Error('Agent name is required');
     }

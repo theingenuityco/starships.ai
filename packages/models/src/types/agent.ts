@@ -29,7 +29,7 @@ export interface AgentMemoryConfig {
 /**
  * Database Agent interface - core API contract type
  */
-export interface Agent {
+export interface AgentModel {
   // Core fields
   id: string;
   name: string;
@@ -68,7 +68,7 @@ export interface Agent {
 /**
  * Agent configuration interface
  */
-export interface AgentConfig extends Agent {
+export interface AgentConfig extends AgentModel {
   provider?: 'openai' | 'anthropic';
 }
 
@@ -82,7 +82,7 @@ export interface AgentConfig extends Agent {
 export interface CreateAgentRequest {
   name: string;
   description?: string;
-  category: Agent['category'];
+  category: AgentModel['category'];
   systemPrompt?: string;
   model: string;
   tags?: string[];
@@ -117,7 +117,7 @@ export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
  * Agent database response with pagination
  */
 export interface AgentListResponse {
-  agents: Agent[];
+  agents: AgentModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -128,7 +128,7 @@ export interface AgentListResponse {
  * Agent response with single agent
  */
 export interface AgentResponse {
-  agent: Agent;
+  agent: AgentModel;
 }
 
 /**
@@ -149,7 +149,7 @@ export interface SearchAgentsRequest {
  * Response for search agents
  */
 export interface SearchAgentsResponse {
-  agents: Agent[];
+  agents: AgentModel[];
   total: number;
   searchQuery: string;
 }

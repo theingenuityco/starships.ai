@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { Agent } from '../types/agent';
+import { AgentModel } from '../types/agent';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
@@ -16,7 +16,7 @@ export class AgentRepository extends BaseRepository {
   /**
    * Serialize complex objects for Neo4j storage
    */
-  private serializeComplexFields(agent: Agent): any {
+  private serializeComplexFields(agent: AgentModel): any {
     return {
       ...agent,
       blueprint: agent.blueprint ? JSON.stringify(agent.blueprint) : null,
@@ -27,7 +27,7 @@ export class AgentRepository extends BaseRepository {
   /**
    * Deserialize complex objects from Neo4j storage
    */
-  private deserializeComplexFields(agent: any): Agent {
+  private deserializeComplexFields(agent: any): AgentModel {
     try {
       return {
         ...agent,
@@ -43,20 +43,20 @@ export class AgentRepository extends BaseRepository {
       };
     }
   }
-  async findAll(): Promise<Agent[]> {
+  async findAll(): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ a: Agent }>(
+      const result = await connection.executeQuery<{ a: AgentModel }>(
         'MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC'
       );
       return convertNeo4jIntsInArray(result.map((record) => record.a));
     }, 'findAll', 'Agent');
   }
 
-  async findById(id: string): Promise<Agent | null> {
+  async findById(id: string): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ a: Agent }>(
+      const result = await connection.executeQuery<{ a: AgentModel }>(
         'MATCH (a:Agent) WHERE a.id = $id RETURN a',
         { id }
       );
@@ -66,18 +66,18 @@ export class AgentRepository extends BaseRepository {
   }
 
 
-  async findByUser(userId: string): Promise<Agent[]> {
+  async findByUser(userId: string): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent)<-[:INTERACTS_WITH]-(u:User) WHERE u.id = $userId RETURN a',
       { userId }
     );
     return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.a)));
   }
 
-  async findByStarship(starshipId: string): Promise<Agent[]> {
+  async findByStarship(starshipId: string): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a ORDER BY a.name',
       { starshipId }
     );
@@ -85,9 +85,9 @@ export class AgentRepository extends BaseRepository {
   }
 
   // NEW: FK-based query methods for starshipId relationship
-  async findByStarshipId(starshipId: string): Promise<Agent[]> {
+  async findByStarshipId(starshipId: string): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',
       { starshipId }
     );
@@ -150,9 +150,9 @@ export class AgentRepository extends BaseRepository {
     }
   }
 
-  async findUndeployedAgents(): Promise<Agent[]> {
+  async findUndeployedAgents(): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent) WHERE a.starshipId IS NULL OR a.starshipId = "" RETURN a ORDER BY a.createdAt DESC',
       {}
     );
@@ -160,8 +160,8 @@ export class AgentRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<Agent, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
-  ): Promise<Agent> {
+    entity: Omit<AgentModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
+  ): Promise<AgentModel> {
     return this.executeWithErrorHandling(async () => {
       // Validate required starshipId field
       if (!entity.starshipId) {
@@ -170,7 +170,7 @@ export class AgentRepository extends BaseRepository {
 
       const connection = getConnection();
       const now = new Date().toISOString();
-      const agent: Agent = {
+      const agent: AgentModel = {
         ...entity,
         id: uuidv4(),
         createdAt: now,
@@ -232,7 +232,7 @@ export class AgentRepository extends BaseRepository {
     }, 'create', 'Agent');
   }
 
-  async update(id: string, updates: Partial<Agent>): Promise<Agent | null> {
+  async update(id: string, updates: Partial<AgentModel>): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const updateProps = {
@@ -240,7 +240,7 @@ export class AgentRepository extends BaseRepository {
         updatedAt: new Date().toISOString(),
       };
 
-      const result = await connection.executeWrite<{ a: Agent }>(
+      const result = await connection.executeWrite<{ a: AgentModel }>(
         'MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a',
         { id, updates: updateProps }
       );
@@ -263,36 +263,36 @@ export class AgentRepository extends BaseRepository {
   }
 
   // ADD: New enhanced query methods
-  async findByAuthor(authorId: string): Promise<Agent[]> {
+  async findByAuthor(authorId: string): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent) WHERE a.authorId = $authorId RETURN a ORDER BY a.updatedAt DESC',
       { authorId }
     );
     return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
-  async findByCategory(category: string): Promise<Agent[]> {
+  async findByCategory(category: string): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent) WHERE a.category = $category RETURN a ORDER BY a.name',
       { category }
     );
     return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
-  async findByTags(tags: string[]): Promise<Agent[]> {
+  async findByTags(tags: string[]): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent) WHERE ANY(tag IN $tags WHERE tag IN a.tags) RETURN a ORDER BY a.name',
       { tags }
     );
     return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
-  async findPublic(limit: number = 50, offset: number = 0): Promise<Agent[]> {
+  async findPublic(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       'MATCH (a:Agent) WHERE a.isPublic = true RETURN a ORDER BY a.usageCount DESC, a.rating DESC SKIP $offset LIMIT $limit',
       {
         limit: int(limit),
@@ -302,9 +302,9 @@ export class AgentRepository extends BaseRepository {
     return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 
-  async searchAgents(query: string): Promise<Agent[]> {
+  async searchAgents(query: string): Promise<AgentModel[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent; score: number }>(
+    const result = await connection.executeQuery<{ a: AgentModel; score: number }>(
       'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
       { query }
     );
@@ -333,7 +333,7 @@ export class AgentRepository extends BaseRepository {
     isPublic?: boolean;
     authorId?: string;
     starshipClass?: 'scout' | 'cruiser';
-  }): Promise<Agent[]> {
+  }): Promise<AgentModel[]> {
     const connection = getConnection();
     let query = 'MATCH (a:Agent) WHERE 1=1';
     const params: any = {};
@@ -365,7 +365,7 @@ export class AgentRepository extends BaseRepository {
 
     query += ' RETURN a ORDER BY a.updatedAt DESC';
 
-    const result = await connection.executeQuery<{ a: Agent }>(query, params);
+    const result = await connection.executeQuery<{ a: AgentModel }>(query, params);
     return convertNeo4jIntsInArray(result.map((record) => record.a));
   }
 }

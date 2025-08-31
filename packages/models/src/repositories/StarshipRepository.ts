@@ -1,6 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { Starship } from '@starships/protocol';
-import { Agent } from '../types/agent';
+import { AgentModel } from '../types/agent';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -199,13 +199,13 @@ export class StarshipRepository extends BaseRepository {
     }, 'delete', 'Starship', id);
   }
 
-  async getDeployedAgents(starshipId: string): Promise<Agent[]> {
+  async getDeployedAgents(starshipId: string): Promise<AgentModel[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = getConnection();
-    const result = await connection.executeQuery<{ a: Agent }>(
+    const result = await connection.executeQuery<{ a: AgentModel }>(
       `MATCH (s:Starship {id: $starshipId})<-[:DEPLOYED_ON]-(a:Agent)
        RETURN a ORDER BY a.name`,
       { starshipId }
@@ -287,7 +287,7 @@ export class StarshipRepository extends BaseRepository {
       deployedCount: number;
     }>(
       `MATCH (s:Starship {id: $starshipId})
-       OPTIONAL MATCH (s)<-[:DEPLOYED_ON]-(a:Agent)
+       OPTIONAL MATCH (s)<-[:DEPLOYED_ON]-(a:AgentModel)
        RETURN s.maxAgents as maxAgents, count(a) as deployedCount`,
       { starshipId }
     );

@@ -27,7 +27,7 @@ import type {
 } from '@starships/protocol';
 import type { LLM } from '@starships/models';
 import type { Starship, Vision } from '@starships/protocol';
-import type { Agent } from '@starships/models';
+import type { AgentModel } from '@starships/models';
 
 /**
  * Configuration for MissionOrchestratorAgent
@@ -462,7 +462,7 @@ export class MissionOrchestratorAgent {
   /**
    * Get agents assigned to mission
    */
-  private async getAssignedAgents(missionId: string): Promise<Agent[]> {
+  private async getAssignedAgents(missionId: string): Promise<AgentModel[]> {
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
       const mission = await missionRepo.getMissionById(missionId);
@@ -472,7 +472,7 @@ export class MissionOrchestratorAgent {
       }
 
       const agentRepo = RepositoryFactory.getAgentRepository();
-      const agents: Agent[] = [];
+      const agents: AgentModel[] = [];
       
       for (const agentId of mission.agentIds) {
         const agent = await agentRepo.findById(agentId);

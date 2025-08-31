@@ -9,7 +9,7 @@ import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
 import { MISSION_PHASES } from '@starships/protocol';
-import type { Agent } from '@starships/models';
+import type { AgentModel } from '@starships/models';
 
 /**
  * System instruction constants - direct instruction strings for different operations
@@ -227,7 +227,7 @@ export class MissionPromptBuilder {
   /**
    * Build workflow generation prompt
    */
-  buildWorkflowGenerationPrompt(agents: Agent[]): LLMChatPrompt {
+  buildWorkflowGenerationPrompt(agents: AgentModel[]): LLMChatPrompt {
     const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION
       .replace('{agentList}', this.buildAgentListSection(agents))
       .replace('{missionContext}', this.buildMissionSection())
@@ -560,7 +560,7 @@ ${taskResults}
   /**
    * Build agent list section for plan generation
    */
-  private buildAgentListSection(agents: Agent[]): string {
+  private buildAgentListSection(agents: AgentModel[]): string {
     return agents.map(agent => {
       const capabilities = agent.category || 'general';
       return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;

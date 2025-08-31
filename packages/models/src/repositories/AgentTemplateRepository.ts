@@ -1,5 +1,5 @@
 import { AgentTemplate } from '@starships/protocol';
-import { Agent } from '../types/agent';
+import { AgentModel } from '../types/agent';
 import { Neo4jConnection, getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
@@ -289,7 +289,7 @@ export class AgentTemplateRepository extends BaseRepository {
     agentName: string,
     authorId: string,
     starshipId: string
-  ): Promise<Agent> {
+  ): Promise<AgentModel> {
     // First get the template
     const template = await this.findById(templateId);
     if (!template) {
@@ -303,7 +303,7 @@ export class AgentTemplateRepository extends BaseRepository {
     const agentId = uuidv4();
     const now = new Date().toISOString();
 
-    const agent: Agent = {
+    const agent: AgentModel = {
       id: agentId,
       name: agentName,
       model: template.model,
@@ -335,7 +335,7 @@ export class AgentTemplateRepository extends BaseRepository {
       RETURN a
     `;
     
-    const results = await this.connection.executeWrite<{ a: Agent }>(query, { agent, starshipId });
+    const results = await this.connection.executeWrite<{ a: AgentModel }>(query, { agent, starshipId });
     const createdAgent = convertNeo4jIntsInObject(results[0].a);
 
     // Create USER-[:CREATES]->AGENT relationship if author user exists
@@ -370,7 +370,7 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN a
       `;
 
-      const agentResults = await this.connection.executeQuery<{ a: Agent }>(query, { agentId });
+      const agentResults = await this.connection.executeQuery<{ a: AgentModel }>(query, { agentId });
 
       if (agentResults.length === 0) {
         return null; // Agent not found or not public

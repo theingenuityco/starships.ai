@@ -53,6 +53,8 @@ async function run() {
     const shouldCreate = eventName === 'pull_request' && 
                         (action === 'opened' || action === 'reopened');
 
+    console.log(`Event type: ${eventName}, Action: ${action}, Should create: ${shouldCreate}`);
+
     if (shouldCreate) {
       // Create or reactivate thread
       const result = await createOrReactivateThread(
@@ -247,6 +249,12 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
       // Don't create new threads for closed PRs
       if (context.payload.pull_request && context.payload.pull_request.state === 'closed') {
         console.log(`PR #${prNumber} is closed, not creating new thread`);
+        return null;
+      }
+      
+      // Don't create threads for workflow/check events - they should only update existing threads
+      if (eventName === 'workflow_run' || eventName === 'check_run' || eventName === 'check_suite') {
+        console.log(`Skipping ${eventName} for PR #${prNumber} - no existing thread to update`);
         return null;
       }
       

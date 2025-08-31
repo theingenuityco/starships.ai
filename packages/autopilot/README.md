@@ -38,8 +38,10 @@ if (!validation.valid) {
   process.exit(1);
 }
 
-// Create memory for execution context
+// Create structured memory for execution context
 const agentMemory = createAgentMemory('System context for workflow execution');
+agentMemory.setIdentity({ role: 'Workflow Executor' });
+agentMemory.setPurpose({ primary: 'Execute workflow efficiently' });
 
 // Execute workflow with memory - engine with all handlers is created internally
 const execution = {
@@ -63,65 +65,136 @@ console.log('Execution result:', result);
 - **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
 - **workflow** - Execute embedded workflow blueprints
 
-## AgentMemory System
+## Memory System
 
-Autopilot includes a powerful AgentMemory system that provides structured memory management for agents with system prompts and conversation history. This system formats data for direct consumption by LLM APIs.
+Autopilot includes a sophisticated memory system built on two layers: base **Memory** for core LLM message management, and **AgentMemory** for advanced structured context with identity, purpose, scene, and conversation history.
 
-### Creating and Using AgentMemory
+### Base Memory Class
+
+The core memory system handles LLM-compatible messages:
+
+```typescript
+import { Memory, createMemory } from '@starships/autopilot';
+
+// Create basic memory
+const memory = new Memory('You are a helpful assistant.');
+
+// Add messages
+memory.addMessage('system', 'Focus on being concise.');
+memory.addMessage('user', 'Hello!');
+memory.addMessage('assistant', 'Hi! How can I help?');
+
+// Get LLM-formatted messages
+const messages = memory.toMessages();
+// Result: [
+//   { role: 'system', content: 'You are a helpful assistant.' },
+//   { role: 'system', content: 'Focus on being concise.' },
+//   { role: 'user', content: 'Hello!' },
+//   { role: 'assistant', content: 'Hi! How can I help?' }
+// ]
+```
+
+### AgentMemory - Advanced Structured Memory
+
+AgentMemory extends Memory with structured context management:
 
 ```typescript
 import { AgentMemory, createAgentMemory } from '@starships/autopilot';
 
-// Create memory with initial system prompt
-const memory = new AgentMemory('You are a helpful assistant.');
+// Create agent memory
+const memory = new AgentMemory('You are a customer support agent.');
 
-// Or use the convenience function
-const memory = createAgentMemory('You are a helpful assistant.');
-
-// Add additional system prompts (accumulative)
-memory.addSystemPrompt('Focus on being concise.');
-memory.addSystemPrompt('Always be professional.');
-
-// Add conversation history
-memory.addConversation('user', 'Hello, can you help me?');
-memory.addConversation('assistant', 'Of course! How can I assist you?');
-memory.addConversation('user', 'I need help with my account.');
-
-// Add conversation with metadata
-memory.addConversation('assistant', 'Let me check your account details.', {
-  confidence: 0.95,
-  source: 'account_service'
+// Set structured identity
+memory.setIdentity({
+  name: 'Sarah',
+  role: 'Senior Support Agent',
+  personality: 'Professional, empathetic, solution-focused',
+  expertise: ['billing', 'technical support', 'account management']
 });
 
-// Format for LLM consumption (returns array of messages)
+// Set purpose and goals
+memory.setPurpose({
+  primary: 'Resolve customer issues efficiently and professionally',
+  secondary: ['Build customer satisfaction', 'Identify upsell opportunities'],
+  constraints: ['Never promise what cannot be delivered', 'Escalate complex technical issues']
+});
+
+// Set scene context (like screenplay background)
+memory.setScene({
+  setting: 'Customer support chat during business hours',
+  participants: ['customer', 'support agent'],
+  mood: 'professional but friendly',
+  context: 'Customer experiencing billing issue',
+  background: 'High-volume support period, need efficient resolution'
+});
+
+// Add conversation history with metadata
+memory.addConversation('user', 'I was charged twice this month!', {
+  sentiment: 'frustrated',
+  priority: 'high'
+});
+
+memory.addConversation('assistant', 'I understand your frustration. Let me check your account right away.', {
+  action: 'investigating',
+  empathy_level: 'high'
+});
+
+// LLM-formatted output includes structured context
 const messages = memory.toMessages();
-// Result:
-// [
-//   { role: 'system', content: 'You are a helpful assistant.\n\nFocus on being concise.\n\nAlways be professional.' },
-//   { role: 'user', content: 'Hello, can you help me?' },
-//   { role: 'assistant', content: 'Of course! How can I assist you?' },
-//   { role: 'user', content: 'I need help with my account.' },
-//   { role: 'assistant', content: 'Let me check your account details.' }
-// ]
+// Result: Structured system message + conversation history
 ```
 
-### AgentMemory Methods
+### AgentMemory Structured Output
 
-- **`addSystemPrompt(prompt: string)`** - Add system prompt (accumulative)
-- **`addConversation(role, content, metadata?)`** - Add conversation entry
-- **`toMessages()`** - Format memory for LLM consumption
-- **`clear()`** - Clear all memory
-- **`clearConversations()`** - Clear only conversation history
-- **`getConversationHistory()`** - Get conversation entries
-- **`getSystemPrompts()`** - Get system prompts
-- **`getStats()`** - Get memory statistics
-- **`clone()`** - Clone memory instance
+When `toMessages()` is called, AgentMemory creates a structured system context:
+
+```
+IDENTITY:
+Name: Sarah
+Role: Senior Support Agent
+Personality: Professional, empathetic, solution-focused
+Expertise: billing, technical support, account management
+
+PURPOSE:
+Primary Purpose: Resolve customer issues efficiently and professionally
+Secondary Goals: Build customer satisfaction, Identify upsell opportunities
+Constraints: Never promise what cannot be delivered, Escalate complex technical issues
+
+SCENE:
+Setting: Customer support chat during business hours
+Participants: customer, support agent
+Mood: professional but friendly
+Context: Customer experiencing billing issue
+Background: High-volume support period, need efficient resolution
+```
+
+### Memory Methods
+
+**Base Memory:**
+- `addMessage(role, content)` - Add LLM message
+- `toMessages()` - Get LLM-formatted messages
+- `clear()` - Clear all messages
+- `getMessageCount()` - Get message count
+- `getMessagesByRole(role)` - Filter by role
+- `getLastMessages(count)` - Get recent messages
+- `clone()` - Clone memory instance
+
+**AgentMemory Additional:**
+- `setIdentity(identity)` - Set agent identity
+- `setPurpose(purpose)` - Set agent purpose
+- `setScene(scene)` - Set scene context
+- `addConversation(role, content, metadata?)` - Add conversation with metadata
+- `addSystemPrompt(prompt)` - Legacy compatibility
+- `clearConversations()` - Clear conversations only
+- `getConversationHistory()` - Get conversation entries
+- `getAgentStats()` - Get comprehensive statistics
 
 ### Memory in Agents
 
 ```typescript
 const memory = new AgentMemory('You are a customer support agent.');
-memory.addSystemPrompt('Be helpful and professional.');
+memory.setIdentity({ name: 'Alex', role: 'Support Agent' });
+memory.setPurpose({ primary: 'Help customers effectively' });
 
 const agent = new Agent({
   name: 'Support Agent',
@@ -130,11 +203,7 @@ const agent = new Agent({
   blueprint: myBlueprint
 });
 
-// Add to memory during execution
-agent.addToMemory('user', 'I have a problem with my order.');
-agent.addSystemPrompt('Focus on order-related issues.');
-
-// Memory automatically flows to LLM nodes in the workflow
+// Memory automatically flows to LLM nodes with full context
 ```
 
 ## Node Types
@@ -157,9 +226,22 @@ Autopilot supports various node types for building complex workflows:
 ```typescript
 import { Workflow, AgentMemory } from '@starships/autopilot';
 
-// Create agent memory for the workflow
+// Create structured agent memory for the workflow
 const agentMemory = new AgentMemory('You are a helpful customer support assistant.');
-agentMemory.addSystemPrompt('Be professional and concise in responses.');
+agentMemory.setIdentity({
+  name: 'AI Assistant',
+  role: 'Customer Support Coordinator',
+  personality: 'Professional, helpful, solution-oriented'
+});
+agentMemory.setPurpose({
+  primary: 'Provide comprehensive customer support through multi-step workflow',
+  secondary: ['Gather user data', 'Generate personalized responses', 'Process requests efficiently']
+});
+agentMemory.setScene({
+  setting: 'Customer support automation system',
+  context: 'Multi-step workflow processing customer requests',
+  mood: 'professional and efficient'
+});
 
 // Create workflow with multiple node types - all handlers are automatically available
 const workflow = new Workflow()
@@ -203,7 +285,12 @@ const workflow = new Workflow()
     parameters: {
       name: 'Support Agent',
       model: 'anthropic/claude-3.5-sonnet',
-      memory: new AgentMemory('You are a helpful customer support agent.'),
+      memory: (() => {
+        const agentTaskMemory = new AgentMemory('You are a helpful customer support agent.');
+        agentTaskMemory.setIdentity({ name: 'Support Agent', role: 'Customer Service Representative' });
+        agentTaskMemory.setPurpose({ primary: 'Help customers with their specific requests' });
+        return agentTaskMemory;
+      })(),
       instructions: 'Help the user',
       blueprint: {
         nodes: [
@@ -227,7 +314,7 @@ const workflow = new Workflow()
   .addEdge('llm-task', 'agent-task')
   .addEdge('agent-task', 'end');
 
-// Execute workflow with agent memory - engine with all node handlers is managed internally
+// Execute workflow with structured agent memory - engine with all node handlers is managed internally
 const execution = {
   status: 'not_started' as const,
   executionResults: new Map(),

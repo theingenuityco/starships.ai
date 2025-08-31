@@ -25,9 +25,18 @@ export * from './execution';
 export * from './validation';
 
 // ===== MEMORY SYSTEM =====
+// Base memory class and interfaces
+export { Memory } from '../Memory';
+export type { LLMMessage } from '../Memory';
+
 // Agent memory classes and interfaces
 export { AgentMemory } from '../AgentMemory';
-export type { ConversationEntry, LLMMessage } from '../AgentMemory';
+export type {
+  ConversationEntry,
+  AgentIdentity,
+  AgentPurpose,
+  Scene
+} from '../AgentMemory';
 
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)

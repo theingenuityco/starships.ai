@@ -15,24 +15,22 @@ services:
       NODE_ENV: production
       
       # Frontend URLs
-      NEXT_PUBLIC_API_URL: http://localhost:4000
-      NEXT_PUBLIC_WS_URL: ws://localhost:4000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       
       # Neo4j Configuration - Choose ONE of the following options:
       
       # Option 1: Use INTERNAL Neo4j (default - runs Neo4j inside container)
       # Leave NEO4J_EXTERNAL_URI unset or empty
-      NEO4J_URI: [NEO4J-LOCAL-URL]  # Will be auto-set if using internal
-      
+      NEO4J_URI: ${NEO4J_URI}  # Will be auto-set if using internal
       # Option 2: Use EXTERNAL Neo4j (e.g., Neo4j Aura)
       # Uncomment and set the following to use external Neo4j:
       # NEO4J_EXTERNAL_URI: neo4j+s://xxxxxxxx.databases.neo4j.io
       # NEO4J_EXTERNAL_URI: bolt://your-neo4j-host:7687
       
       # Neo4j Credentials (for both internal and external)
-      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-password}
-      NEO4J_DATABASE: ${NEO4J_DATABASE:-neo4j}
+      NEO4J_USERNAME: ${NEO4J_USERNAME}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      NEO4J_DATABASE: ${NEO4J_DATABASE}
       
       # API Keys
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}

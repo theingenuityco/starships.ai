@@ -25,88 +25,60 @@ fi
 export STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
 export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-}"
 
-# Check if we should use external Neo4j (e.g., Neo4j Aura)
-if [ -n "$NEO4J_EXTERNAL_URI" ]; then
-    echo "Using external Neo4j database at: $NEO4J_EXTERNAL_URI"
-    echo "Skipping internal Neo4j startup..."
+# Check if NEO4J_URI is already set (from K8s secrets, docker-compose, or environment)
+if [ -n "$NEO4J_URI" ]; then
+    echo "Using Neo4j URI from environment: $NEO4J_URI"
     
-    # Test connection to external Neo4j
-    echo "Testing connection to external Neo4j..."
-    max_attempts=30
-    attempt=0
-    
-    # Extract host and port from URI (e.g., neo4j+s://xxx.databases.neo4j.io)
-    # For Aura, we just check if the URI is valid, as it uses neo4j+s:// protocol
-    if echo "$NEO4J_EXTERNAL_URI" | grep -q "neo4j+s://"; then
-        echo "Neo4j Aura connection detected. Proceeding with secure connection..."
-        # For Aura, we assume it's ready as it's a managed service
-        NEO4J_URI="$NEO4J_EXTERNAL_URI"
-        export NEO4J_URI
-    else
-        # For standard bolt connections, extract host and port
-        NEO4J_HOST=$(echo "$NEO4J_EXTERNAL_URI" | sed 's|bolt://||' | cut -d: -f1)
-        NEO4J_PORT=$(echo "$NEO4J_EXTERNAL_URI" | sed 's|bolt://||' | cut -d: -f2 | cut -d/ -f1)
+    # Check if it's localhost - then we need to start internal Neo4j
+    if echo "$NEO4J_URI" | grep -q "localhost\|127.0.0.1"; then
+        echo "Neo4j URI points to localhost, starting internal Neo4j..."
         
+        # Check if supervisor is managing Neo4j (when running with supervisor)
+        if [ -f /var/run/supervisord.pid ]; then
+            echo "Neo4j is managed by supervisor"
+        else
+            echo "Starting Neo4j manually..."
+            # Start Neo4j in background if not using supervisor
+            /opt/neo4j/bin/neo4j start
+        fi
+        
+        # Extract port from NEO4J_URI for health check
+        NEO4J_CHECK_PORT=$(echo "$NEO4J_URI" | sed 's/.*://' | sed 's/\/.*//')
+        
+        # Wait for internal Neo4j to be ready
+        echo "Waiting for internal Neo4j to start on port $NEO4J_CHECK_PORT..."
+        max_attempts=60
+        attempt=0
         while [ $attempt -lt $max_attempts ]; do
-            if nc -z "$NEO4J_HOST" "$NEO4J_PORT" 2>/dev/null; then
-                echo "External Neo4j is reachable!"
+            if nc -z localhost "$NEO4J_CHECK_PORT" 2>/dev/null; then
+                echo "Internal Neo4j is ready!"
                 break
             fi
             attempt=$((attempt + 1))
-            echo "Waiting for external Neo4j... (attempt $attempt/$max_attempts)"
+            echo "Waiting for Neo4j... (attempt $attempt/$max_attempts)"
             sleep 2
         done
         
         if [ $attempt -eq $max_attempts ]; then
-            echo "WARNING: Could not reach external Neo4j at $NEO4J_EXTERNAL_URI"
-            echo "Continuing anyway as it might be accessible from the application..."
+            echo "Internal Neo4j failed to start after $max_attempts attempts"
+            exit 1
         fi
-        
-        NEO4J_URI="$NEO4J_EXTERNAL_URI"
-        export NEO4J_URI
+    else
+        echo "Neo4j URI points to external service: $NEO4J_URI"
+        echo "Skipping internal Neo4j startup..."
     fi
 else
-    echo "Using internal Neo4j database..."
-    
-    # Check if supervisor is managing Neo4j (when running with supervisor)
-    if [ -f /var/run/supervisord.pid ]; then
-        echo "Neo4j is managed by supervisor"
-    else
-        echo "Starting Neo4j manually..."
-        # Start Neo4j in background if not using supervisor
-        /opt/neo4j/bin/neo4j start
-    fi
-    
-    # Wait for internal Neo4j to be ready
-    echo "Waiting for internal Neo4j to start on localhost:7687..."
-    max_attempts=60
-    attempt=0
-    while [ $attempt -lt $max_attempts ]; do
-        if nc -z localhost 7687 2>/dev/null; then
-            echo "Internal Neo4j is ready!"
-            break
-        fi
-        attempt=$((attempt + 1))
-        echo "Waiting for Neo4j... (attempt $attempt/$max_attempts)"
-        sleep 2
-    done
-    
-    if [ $attempt -eq $max_attempts ]; then
-        echo "Internal Neo4j failed to start after $max_attempts attempts"
-        exit 1
-    fi
-    
-    # Use internal Neo4j
-    NEO4J_URI="[NEO4J-LOCAL-URL]"
-    export NEO4J_URI
+    echo "ERROR: NEO4J_URI environment variable is not set!"
+    echo "Please set NEO4J_URI in your environment or deployment configuration."
+    exit 1
 fi
 
 # Display Neo4j connection info
 echo "========================================="
 echo "Neo4j Configuration:"
 echo "  URI: $NEO4J_URI"
-echo "  Username: ${NEO4J_USERNAME:-neo4j}"
-echo "  Database: ${NEO4J_DATABASE:-neo4j}"
+echo "  Username: ${NEO4J_USERNAME}"
+echo "  Database: ${NEO4J_DATABASE}"
 echo "========================================="
 
 # Skip installation and building in production since it's done in Dockerfile
@@ -133,10 +105,34 @@ fi
 
 # Start both frontend and backend services concurrently
 echo "Starting all application services..."
-echo "  - Frontend on http://localhost:3000"
-echo "  - Backend on http://localhost:4000"
-if [ -z "$NEO4J_EXTERNAL_URI" ]; then
-    echo "  - Neo4j Browser on http://localhost:7474"
+
+# Extract ports from existing environment variables if available
+if [ -n "$CLIENT_URL" ]; then
+    echo "  - Frontend: $CLIENT_URL"
+else
+    # Extract port from CLIENT_URL if possible, otherwise use PORT env var
+    if [ -n "$PORT" ]; then
+        echo "  - Frontend on port $PORT"
+    else
+        echo "  - Frontend service starting..."
+    fi
+fi
+
+if [ -n "$NEXT_PUBLIC_API_URL" ]; then
+    echo "  - Backend API: $NEXT_PUBLIC_API_URL"
+elif [ -n "$SERVER_URL" ]; then
+    echo "  - Backend: $SERVER_URL"
+else
+    # No hardcoded fallback - must be configured
+    echo "  - Backend service starting..."
+fi
+
+# Check if Neo4j is running locally and extract port from URI
+if echo "$NEO4J_URI" | grep -q "localhost\|127.0.0.1"; then
+    # Extract port from NEO4J_URI (e.g., bolt://localhost:7687 -> 7687)
+    NEO4J_PORT=$(echo "$NEO4J_URI" | sed 's/.*://' | sed 's/\/.*//')
+    # Neo4j Browser is typically on port-100 (7687->7587) or could be on 7474
+    echo "  - Neo4j at: $NEO4J_URI"
 fi
 
 exec npx concurrently \

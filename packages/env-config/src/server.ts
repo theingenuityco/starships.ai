@@ -24,10 +24,10 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     REDEPLOY_SECRET: process.env.REDEPLOY_SECRET || '',
     DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
     OPEN_WEBUI_BASE_URL: process.env.OPEN_WEBUI_BASE_URL,
-    NEO4J_URI: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
-    NEO4J_USERNAME: process.env.NEO4J_USERNAME || 'neo4j',
-    NEO4J_PASSWORD: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
-    NEO4J_DATABASE: process.env.NEO4J_DATABASE || 'neo4j',
+    NEO4J_URI: process.env.NEO4J_URI!,
+    NEO4J_USERNAME: process.env.NEO4J_USERNAME!,
+    NEO4J_PASSWORD: process.env.NEO4J_PASSWORD!,
+    NEO4J_DATABASE: process.env.NEO4J_DATABASE!,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || ('' as const),
@@ -61,6 +61,19 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
   const isLinting = process.env.NODE_ENV === undefined || process.env.npm_lifecycle_event === 'lint';
   
   if (!isLinting) {
+    // Validate required Neo4j configuration
+    const missingNeo4j = [];
+    if (!env.NEO4J_URI) missingNeo4j.push('NEO4J_URI');
+    if (!env.NEO4J_USERNAME) missingNeo4j.push('NEO4J_USERNAME');
+    if (!env.NEO4J_PASSWORD) missingNeo4j.push('NEO4J_PASSWORD');
+    
+    if (missingNeo4j.length > 0) {
+      throw new EnvironmentValidationError(
+        `Missing required Neo4j environment variables: ${missingNeo4j.join(', ')}`,
+        missingNeo4j
+      );
+    }
+
     // Validate based on provider choice
     if (env.DEFAULT_LLM_PROVIDER === 'openai' && !env.OPENAI_API_KEY) {
       throw new EnvironmentValidationError(

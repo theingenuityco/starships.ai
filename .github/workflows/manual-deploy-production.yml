@@ -180,22 +180,25 @@ jobs:
             --from-literal=STRIPE_SECRET_KEY="${{ secrets.STRIPE_SECRET_KEY }}" \
             --from-literal=STRIPE_WEBHOOK_SECRET="${{ secrets.STRIPE_WEBHOOK_SECRET }}" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="${{ secrets.STRIPE_PUBLISHABLE_KEY }}" \
+            --from-literal=NEO4J_URI="${{ secrets.NEO4J_URI }}" \
+            --from-literal=NEO4J_USERNAME="${{ secrets.NEO4J_USERNAME }}" \
             --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
-            --from-literal=KINDE_SITE_URL="${{ secrets.KINDE_SITE_URL }}" \
-            --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${{ secrets.KINDE_POST_LOGIN_REDIRECT_URL }}" \
-            --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${{ secrets.KINDE_POST_LOGOUT_REDIRECT_URL }}" \
-            --from-literal=KINDE_REDIRECT_URL="${{ secrets.KINDE_REDIRECT_URL }}" \
-            --from-literal=KINDE_COOKIE_DOMAIN="${{ secrets.KINDE_COOKIE_DOMAIN }}" \
-            --from-literal=CLIENT_URL="${{ secrets.CLIENT_URL }}" \
-            --from-literal=NEXT_PUBLIC_API_URL="${{ secrets.NEXT_PUBLIC_API_URL }}" \
-            --from-literal=NEXT_PUBLIC_SERVER_URL="${{ secrets.NEXT_PUBLIC_SERVER_URL }}" \
+            --from-literal=SERVER_URL="${{ secrets.SERVER_URL }}" \
+            --from-literal=KINDE_SITE_URL="${{ vars.KINDE_SITE_URL }}" \
+            --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}" \
+            --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}" \
+            --from-literal=KINDE_DEBUG_MODE="${{ vars.KINDE_DEBUG_MODE }}" \
+            --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \
+            --from-literal=NEXT_PUBLIC_API_URL="${{ vars.NEXT_PUBLIC_API_URL }}" \
+            --from-literal=NEXT_PUBLIC_SERVER_URL="${{ vars.NEXT_PUBLIC_SERVER_URL }}" \
+            --from-literal=NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR="${{ vars.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR }}" \
             -n starships-prod
           
           # Create Kinde secrets
           kubectl create secret generic kinde-auth-secret \
             --from-literal=KINDE_CLIENT_ID="${{ secrets.KINDE_CLIENT_ID }}" \
             --from-literal=KINDE_CLIENT_SECRET="${{ secrets.KINDE_CLIENT_SECRET }}" \
-            --from-literal=KINDE_ISSUER_URL="${{ secrets.KINDE_ISSUER_URL }}" \
+            --from-literal=KINDE_ISSUER_URL="${{ vars.KINDE_ISSUER_URL }}" \
             -n starships-prod
           
           # Create GHCR pull secret using persistent PAT

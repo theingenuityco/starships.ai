@@ -8,6 +8,7 @@ import { SocketProvider } from '@/providers/socket-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClientLayout } from './client-layout'
 import { UI_TEXT } from '@/constants/text'
+import { GoogleAnalytics } from '@/components/analytics/google-analytics'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </QueryProvider>
           </AuthProvider>
         </ThemeProvider>
+        <GoogleAnalytics />
       </body>
     </html>
   )

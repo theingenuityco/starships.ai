@@ -378,12 +378,21 @@ class DiscordThreadManager {
 
       // Update thread name with new status emoji
       const currentName = thread.name;
-      const baseName = currentName.replace(/^[🔒🚧🔵✅🔴⚠️🟣❌]\s*/, '').replace(/^PR #\d+:\s*/, '');
+      
+      // Remove all status emojis and "PR #XXX:" patterns (including duplicates)
+      let baseName = currentName
+        .replace(/^[🔒🚧🔵✅🔴⚠️🟣❌]\s*/, '')  // Remove emoji
+        .replace(/PR #\d+:\s*/g, '');  // Remove ALL "PR #XXX:" occurrences (note the 'g' flag)
+      
+      // Clean up any extra whitespace
+      baseName = baseName.trim();
+      
+      // Build the new name with single PR prefix
       const newName = `${emoji} PR #${prNumber}: ${baseName}`.substring(0, 100);
       
       if (newName !== currentName) {
         await thread.setName(newName);
-        console.log(`Updated thread name to: ${newName}`);
+        console.log(`Updated thread name from "${currentName}" to "${newName}"`);
       }
 
       return true;

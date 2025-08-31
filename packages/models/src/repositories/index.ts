@@ -18,7 +18,6 @@ export { MissionMessageRepository } from './MissionMessageRepository';
 export { BlueprintRepository } from './BlueprintRepository';
 export { NodeRepository } from './NodeRepository';
 export { EdgeRepository } from './EdgeRepository';
-export { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
 // Export mission clarity repository
 export { MissionClarityRepository } from './MissionClarityRepository';
@@ -47,7 +46,6 @@ import { WaitlistRepository } from './WaitlistRepository';
 import { BlueprintRepository } from './BlueprintRepository';
 import { NodeRepository } from './NodeRepository';
 import { EdgeRepository } from './EdgeRepository';
-import { WorkflowRuntimeStateRepository } from './WorkflowRuntimeStateRepository';
 
 // Import mission clarity repository
 import { MissionClarityRepository } from './MissionClarityRepository';
@@ -88,7 +86,6 @@ export class RepositoryFactory {
   private static blueprintRepo: BlueprintRepository | null = null;
   private static nodeRepo: NodeRepository | null = null;
   private static edgeRepo: EdgeRepository | null = null;
-  private static workflowRuntimeStateRepo: WorkflowRuntimeStateRepository | null = null;
 
   // Mission clarity repository instance
   private static missionClarityRepo: MissionClarityRepository | null = null;
@@ -165,7 +162,6 @@ export class RepositoryFactory {
       this.blueprintRepo = new BlueprintRepository();
       this.nodeRepo = new NodeRepository();
       this.edgeRepo = new EdgeRepository();
-      this.workflowRuntimeStateRepo = new WorkflowRuntimeStateRepository();
 
       // Initialize mission clarity repository (no dependencies)
       this.missionClarityRepo = new MissionClarityRepository();
@@ -237,7 +233,6 @@ export class RepositoryFactory {
         blueprintRepo: this.blueprintRepo !== null,
         nodeRepo: this.nodeRepo !== null,
         edgeRepo: this.edgeRepo !== null,
-        workflowRuntimeStateRepo: this.workflowRuntimeStateRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
         waitlistRepo: this.waitlistRepo !== null,
@@ -321,16 +316,6 @@ export class RepositoryFactory {
     return this.blueprintRepo;
   }
 
-  /**
-   * Get WorkflowRuntimeStateRepository instance (synchronous)
-   */
-  static getWorkflowRuntimeStateRepository(): WorkflowRuntimeStateRepository {
-    this.ensureInitialized();
-    if (!this.workflowRuntimeStateRepo) {
-      throw new Error('WorkflowRuntimeStateRepository not initialized');
-    }
-    return this.workflowRuntimeStateRepo;
-  }
 
   /**
    * Get MissionRepository instance (synchronous)
@@ -463,7 +448,6 @@ export class RepositoryFactory {
     this.blueprintRepo = null;
     this.nodeRepo = null;
     this.edgeRepo = null;
-    this.workflowRuntimeStateRepo = null;
     this.missionClarityRepo = null;
     this.nativeToolApiKeyRepo = null;
     this.waitlistRepo = null;

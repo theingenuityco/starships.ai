@@ -22,8 +22,10 @@ export { MissionMessageRepository } from './repositories/MissionMessageRepositor
 export { BlueprintRepository } from './repositories/BlueprintRepository';
 export { NodeRepository } from './repositories/NodeRepository';
 export { EdgeRepository } from './repositories/EdgeRepository';
-export { WorkflowRuntimeStateRepository } from './repositories/WorkflowRuntimeStateRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';
+
+// Export workflow types
+export type { CreateWorkflowRequest, MissionWorkflow } from './types/workflow';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 
 // NEW: Agent Templates

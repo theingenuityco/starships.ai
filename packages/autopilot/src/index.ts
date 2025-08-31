@@ -8,6 +8,10 @@
 // Core workflow class (replaces Registry + Engine pattern)
 export { Workflow } from './Workflow';
 
+// ===== AGENT SYSTEM =====
+// Core agent class for agent execution
+export { Agent } from './Agent';
+
 // Node system
 export { Handler } from './nodes/Handler';
 
@@ -60,9 +64,11 @@ export type {
 // Configuration
 export { config } from './constants';
 
-// Agent framework was removed - autopilot now focuses on workflow execution only
+// Import classes for convenience functions
 import { Workflow } from './Workflow';
+import { Agent } from './Agent';
 import { Validator } from './validation/Validator';
+import { AgentNodeParameters } from './types';
 
 // Create default instances for convenience
 const _defaultValidator = new Validator();
@@ -73,4 +79,9 @@ export const defaultValidator = _defaultValidator;
 // Helper function to create a new workflow with default handlers
 export const createWorkflow = (): Workflow => {
   return new Workflow();
+};
+
+// Helper function to create a new agent
+export const createAgent = (config: AgentNodeParameters): Agent => {
+  return new Agent(config);
 };

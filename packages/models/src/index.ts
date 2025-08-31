@@ -25,7 +25,7 @@ export { EdgeRepository } from './repositories/EdgeRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';
 
 // Export workflow types
-export type { CreateWorkflowRequest, MissionWorkflow } from './types/workflow';
+export type { CreateWorkflowRequest } from './types/workflow';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 
 // NEW: Agent Templates

@@ -21,6 +21,7 @@ import type {
   MissionPhase,
   MissionClarity,
   MissionWorkflow,
+  CreateWorkflowRequest,
   CreateMissionClarityRequest,
   LLMChatPrompt,
   LLMProvider

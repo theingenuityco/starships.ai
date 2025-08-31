@@ -8,8 +8,8 @@
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { LLMChatPrompt } from '@starships/protocol';
-import { MISSION_PHASES } from '@starships/protocol';
-import type { AgentModel, MissionWorkflow } from '@starships/models';
+import { MISSION_PHASES, type MissionWorkflow } from '@starships/protocol';
+import type { AgentModel } from '@starships/models';
 
 /**
  * System instruction constants - direct instruction strings for different operations

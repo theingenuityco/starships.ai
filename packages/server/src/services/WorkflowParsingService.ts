@@ -5,7 +5,7 @@
  * Separated from orchestrator agent to follow separation of concerns pattern.
  */
 
-import { CreateWorkflowRequest } from '@starships/models';
+import { CreateWorkflowRequest } from '@starships/protocol';
 import { AgentModel } from '@starships/models';
 import { Logger } from '../utils/logger';
 

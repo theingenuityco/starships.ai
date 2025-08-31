@@ -87,6 +87,7 @@ export class MissionRepository extends BaseRepository {
         status: 'draft',
         phase: 'welcome',
         agentIds: request.agentIds,
+        approvalStatus: 'pending',
         createdAt: now,
         updatedAt: now,
         createdBy: userId,
@@ -299,6 +300,11 @@ export class MissionRepository extends BaseRepository {
         params.agentIds = updates.agentIds;
       }
 
+      if (updates.approvalStatus !== undefined) {
+        setClause.push('m.approvalStatus = $approvalStatus');
+        params.approvalStatus = updates.approvalStatus;
+      }
+
       if (updates.executionState !== undefined) {
         setClause.push('m.executionState = $executionState');
         params.executionState = updates.executionState ? JSON.stringify(updates.executionState) : null;
@@ -361,6 +367,7 @@ export class MissionRepository extends BaseRepository {
       status: record.status,
       phase: record.phase,
       agentIds: record.agentIds || [],
+      approvalStatus: record.approvalStatus || 'pending',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       createdBy: record.createdBy,

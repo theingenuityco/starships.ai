@@ -67,6 +67,7 @@ export interface Mission {
   status: MissionStatus;
   phase: MissionPhase;
   agentIds: string[]; // Assigned agent IDs from starship's crew
+  approvalStatus: 'pending' | 'approved' | 'rejected' | 'modified';
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
@@ -136,6 +137,7 @@ export interface UpdateMissionRequest {
   status?: MissionStatus;
   phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
+  approvalStatus?: 'pending' | 'approved' | 'rejected' | 'modified';
   executionState?: MissionExecutionState; // Update execution progress
   executionResult?: MissionExecutionResult; // Update final execution results
 }

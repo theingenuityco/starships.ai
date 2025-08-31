@@ -140,14 +140,3 @@ export interface ExecutionAnalytics {
   }>;
   last30DaysUsage: number;
 }
-
-// ============================================================================
-// RE-EXPORT AUTOPILOT TYPES
-// ============================================================================
-
-// Re-export autopilot types for convenience
-export type {
-  Execution,
-  NodeResult,
-  ExecutionStatus
-} from '@starships/autopilot';

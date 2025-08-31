@@ -24,8 +24,9 @@ export class WorkflowService {
    */
   static async getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null> {
     try {
-      const workflowRepository = RepositoryFactory.getWorkflowRepository();
-      return await workflowRepository.getWorkflowByMissionId(missionId);
+      // TODO: Implement workflow storage - for now return null as workflows are ephemeral
+      this.logger.warn('Workflow storage not implemented, returning null', { missionId });
+      return null;
     } catch (error) {
       this.logger.error('Error getting workflow by mission ID', { error });
       throw error;
@@ -37,8 +38,25 @@ export class WorkflowService {
    */
   static async createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow> {
     try {
-      const workflowRepository = RepositoryFactory.getWorkflowRepository();
-      return await workflowRepository.createWorkflow(request);
+      // TODO: Implement workflow storage - for now create ephemeral workflow
+      this.logger.warn('Workflow storage not implemented, creating ephemeral workflow', { missionId: request.missionId });
+      
+      const workflow: MissionWorkflow = {
+        id: `workflow-${request.missionId}-${Date.now()}`,
+        missionId: request.missionId,
+        nodes: request.nodes.map((node, index) => ({
+          ...node,
+          id: `node-${index}`
+        })),
+        edges: request.edges.map((edge, index) => ({
+          ...edge,
+          id: `edge-${index}`
+        })),
+        approvalStatus: 'pending',
+        createdAt: new Date().toISOString()
+      };
+      
+      return workflow;
     } catch (error) {
       this.logger.error('Error creating workflow', { error });
       throw error;
@@ -56,8 +74,16 @@ export class WorkflowService {
         throw new Error(`Workflow not found for mission ${missionId}`);
       }
 
-      const workflowRepository = RepositoryFactory.getWorkflowRepository();
-      return await workflowRepository.updateApprovalStatus(workflow.id, updates);
+      // TODO: Implement workflow storage - for now update ephemeral workflow
+      this.logger.warn('Workflow storage not implemented, updating ephemeral workflow', { missionId });
+      
+      const updatedWorkflow: MissionWorkflow = {
+        ...workflow,
+        approvalStatus: updates.approvalStatus,
+        ...(updates.approvalStatus === 'approved' && { approvedAt: new Date().toISOString() })
+      };
+      
+      return updatedWorkflow;
     } catch (error) {
       this.logger.error('Error updating workflow approval', { error });
       throw error;
@@ -76,8 +102,8 @@ export class WorkflowService {
         return;
       }
 
-      const workflowRepository = RepositoryFactory.getWorkflowRepository();
-      await workflowRepository.deleteWorkflow(workflow.id);
+      // TODO: Implement workflow storage - for now just log deletion
+      this.logger.warn('Workflow storage not implemented, skipping deletion', { missionId });
     } catch (error) {
       this.logger.error('Error deleting workflow', { error });
       throw error;

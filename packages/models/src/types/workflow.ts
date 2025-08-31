@@ -36,39 +36,3 @@ export interface CreateWorkflowRequest {
   }>;
 }
 
-/**
- * Legacy MissionWorkflow interface for MissionPromptBuilder
- * TODO: Migrate to autopilot Blueprint pattern
- */
-export interface MissionWorkflow {
-  nodes: Array<{
-    id: string; // Legacy field for backward compatibility
-    ref?: string; // Autopilot field
-    type: string;
-    name: string;
-    description?: string;
-    parameters: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-  }>;
-  edges: Array<{
-    ref?: string; // Autopilot field
-    from: string;
-    to: string;
-    condition?: string;
-    label?: string;
-    metadata?: Record<string, unknown>;
-  }>;
-  approvalStatus: 'pending' | 'approved' | 'rejected' | 'modified';
-  createdAt: string;
-}
-
-// ============================================================================
-// RE-EXPORT AUTOPILOT TYPES
-// ============================================================================
-
-// Re-export autopilot types for convenience
-export type {
-  Blueprint,
-  Node,
-  Edge
-} from '@starships/autopilot';

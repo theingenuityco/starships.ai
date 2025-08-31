@@ -2,10 +2,16 @@ const { Client, GatewayIntentBits, ChannelType, ThreadAutoArchiveDuration } = re
 
 class DiscordThreadManager {
   constructor(token, guildId, channelId) {
+    // Store token but never log it
     this.token = token;
     this.guildId = guildId;
     this.channelId = channelId;
     this.client = null;
+    
+    // Validate inputs without exposing sensitive data
+    if (!token) throw new Error('Discord token is required');
+    if (!guildId) throw new Error('Guild ID is required');
+    if (!channelId) throw new Error('Channel ID is required');
   }
 
   async initialize() {
@@ -29,8 +35,14 @@ class DiscordThreadManager {
     });
 
     // Login to Discord
-    await this.client.login(this.token);
-    console.log(`Bot logged in as ${this.client.user.tag}`);
+    try {
+      await this.client.login(this.token);
+      console.log(`Bot logged in as ${this.client.user.tag}`);
+    } catch (error) {
+      // Don't log the token in error messages
+      console.error('Failed to login to Discord. Please check if the bot token is valid.');
+      throw new Error('Discord authentication failed');
+    }
     
     // Wait for ready event or timeout after 5 seconds
     const timeoutPromise = new Promise((resolve) => {
@@ -127,15 +139,14 @@ class DiscordThreadManager {
         throw new Error('Channel not found or not a text channel');
       }
 
-      // Create thread name with emoji indicators
-      const threadName = `🔒 PR #${prNumber}: ${prTitle}`.substring(0, 100);
+      // Create thread name without lock icon
+      const threadName = `PR #${prNumber}: ${prTitle}`.substring(0, 100);
 
       // Create initial message in channel
       const starterMessage = await channel.send({
-        content: `Creating private thread for PR #${prNumber}`,
         embeds: [{
-          title: `🚀 New PR: ${prTitle}`,
-          description: `A private thread is being created for this pull request.`,
+          title: `🚀 PR: ${prTitle}`,
+          description: `Thread for pull request #${prNumber}`,
           color: 0x0366d6,
           fields: [
             { name: 'PR Number', value: `#${prNumber}`, inline: true },
@@ -265,7 +276,7 @@ class DiscordThreadManager {
       // Get all members with this role
       const membersWithRole = role.members;
       
-      for (const [memberId, member] of membersWithRole) {
+      for (const [, member] of membersWithRole) {
         try {
           await thread.members.add(member);
           console.log(`Added ${member.user.tag} from role ${role.name}`);
@@ -367,7 +378,7 @@ class DiscordThreadManager {
     return statusMap[status] || '';
   }
 
-  async updateThreadStatus(threadId, prNumber, status, emoji) {
+  async updateThreadStatus(threadId, prNumber, _, emoji) {
     try {
       const guild = await this.client.guilds.fetch(this.guildId);
       const thread = await guild.channels.fetch(threadId);
@@ -381,7 +392,7 @@ class DiscordThreadManager {
       
       // Remove all status emojis and "PR #XXX:" patterns (including duplicates)
       let baseName = currentName
-        .replace(/^[🔒🚧🔵✅🔴⚠️🟣❌]\s*/, '')  // Remove emoji
+        .replace(/^[🚧🔵✅🔴⚠️🟣❌]\s*/, '')  // Remove emoji (no lock icon)
         .replace(/PR #\d+:\s*/g, '');  // Remove ALL "PR #XXX:" occurrences (note the 'g' flag)
       
       // Clean up any extra whitespace

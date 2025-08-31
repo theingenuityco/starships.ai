@@ -38,13 +38,6 @@ export interface AgentModel extends AgentNodeParameters {
   starshipId: string;
 }
 
-/**
- * Agent configuration interface
- * Extends AgentModel with runtime configuration options
- */
-export interface AgentConfig extends AgentModel {
-  provider?: 'openai' | 'anthropic';
-}
 
 // ============================================================================
 // AGENT REQUEST/RESPONSE TYPES

@@ -204,8 +204,48 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
     threadData = await discord.findThreadByName(prNumber);
     
     if (!threadData) {
-      console.log(`No Discord thread found for PR #${prNumber}, skipping update`);
-      return null;
+      console.log(`No Discord thread found for PR #${prNumber}, creating new thread`);
+      
+      // Fetch PR details to create thread
+      const octokit = github.getOctokit(process.env.GITHUB_TOKEN || '');
+      try {
+        const { data: pr } = await octokit.rest.pulls.get({
+          owner: context.repo.owner,
+          repo: context.repo.repo,
+          pull_number: prNumber
+        });
+        
+        // Create the thread
+        const result = await discord.createPrivateThread(
+          prNumber,
+          pr.title,
+          pr.user.login,
+          pr.html_url
+        );
+        
+        // Save thread ID to state
+        await stateManager.saveThreadId(prNumber, result.threadId, result.threadUrl);
+        
+        threadData = result;
+        console.log(`Created new thread: ${result.threadId} for PR #${prNumber}`);
+        
+        // Send initial creation message
+        await discord.updateThread(threadData.threadId, {
+          embeds: [{
+            title: '🔄 Thread Created',
+            description: 'This thread was created for an existing PR due to activity',
+            color: 0x0366d6,
+            fields: [
+              { name: 'PR', value: `#${prNumber}`, inline: true },
+              { name: 'Triggered By', value: `${eventName}/${action}`, inline: true }
+            ],
+            timestamp: new Date().toISOString()
+          }]
+        });
+      } catch (error) {
+        console.error(`Failed to fetch PR details or create thread: ${error.message}`);
+        return null;
+      }
     }
   }
 

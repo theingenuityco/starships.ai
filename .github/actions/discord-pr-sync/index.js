@@ -21,8 +21,9 @@ async function run() {
     // Determine PR number and details
     const prDetails = extractPRDetails(context);
     if (!prDetails) {
-      console.log('No PR context found for this event');
-      core.setOutput('action-taken', 'skipped');
+      // This is expected for events not related to PRs (e.g., pushes to main, standalone workflows)
+      console.log(`Event ${eventName}/${payload.action || 'unknown'} is not related to a pull request - skipping`);
+      core.setOutput('action-taken', 'skipped - not a PR event');
       return;
     }
 
@@ -127,21 +128,31 @@ function extractPRDetails(context) {
     prUrl = payload.pull_request.html_url;
   }
   // Workflow run events
-  else if (payload.workflow_run && payload.workflow_run.pull_requests?.length > 0) {
-    const pr = payload.workflow_run.pull_requests[0];
-    prNumber = pr.number;
-    // We'll need to fetch full PR details for workflow runs
-    return { prNumber, needsFetch: true, action };
+  else if (payload.workflow_run) {
+    // Only process if associated with PRs
+    if (payload.workflow_run.pull_requests?.length > 0) {
+      const pr = payload.workflow_run.pull_requests[0];
+      prNumber = pr.number;
+      // We'll need to fetch full PR details for workflow runs
+      return { prNumber, needsFetch: true, action };
+    }
+    // Skip workflow runs not associated with PRs (e.g., runs on main branch)
+    return null;
   }
   // Check run/suite events
-  else if ((payload.check_run || payload.check_suite) && 
-           (payload.check_run?.pull_requests?.length > 0 || 
-            payload.check_suite?.pull_requests?.length > 0)) {
-    const prs = payload.check_run?.pull_requests || payload.check_suite?.pull_requests;
-    prNumber = prs[0].number;
-    return { prNumber, needsFetch: true, action };
+  else if (payload.check_run || payload.check_suite) {
+    const check = payload.check_run || payload.check_suite;
+    const prs = check.pull_requests || [];
+    
+    if (prs.length > 0) {
+      prNumber = prs[0].number;
+      return { prNumber, needsFetch: true, action };
+    }
+    // Skip checks not associated with PRs
+    return null;
   }
   else {
+    // Other events without PR context
     return null;
   }
 

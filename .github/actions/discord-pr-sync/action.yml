@@ -1,0 +1,31 @@
+name: 'Discord PR Sync'
+description: 'Unified action to sync GitHub PR events to Discord threads'
+inputs:
+  discord-token:
+    description: 'Discord bot token'
+    required: true
+  guild-id:
+    description: 'Discord server (guild) ID'
+    required: true
+  channel-id:
+    description: 'Discord channel ID where threads will be created'
+    required: true
+  auto-invite-role-id:
+    description: 'Role ID to auto-invite to thread (optional)'
+    required: false
+  github-discord-map:
+    description: 'JSON mapping of GitHub users to Discord IDs (optional)'
+    required: false
+    default: '{}'
+
+outputs:
+  thread-id:
+    description: 'Discord thread ID'
+  thread-url:
+    description: 'Discord thread URL'
+  action-taken:
+    description: 'What action was taken (created, updated, skipped)'
+
+runs:
+  using: 'node16'
+  main: 'index.js'

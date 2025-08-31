@@ -1,0 +1,72 @@
+name: Discord PR Sync
+
+on:
+  pull_request:
+    types: [opened, closed, reopened, edited, assigned, unassigned, labeled, unlabeled, synchronize, converted_to_draft, ready_for_review, locked, unlocked, review_requested, review_request_removed, auto_merge_enabled, auto_merge_disabled]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  pull_request_review_comment:
+    types: [created, edited, deleted]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_run:
+    workflows: ["*"]
+    types: [requested, in_progress, completed]
+  check_run:
+    types: [created, rerequested, completed]
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  checks: read
+  actions: read
+  statuses: read
+
+jobs:
+  discord-sync:
+    name: Sync to Discord
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd .github/actions/discord-pr-sync
+          npm install
+
+      - name: Sync PR to Discord
+        id: discord-sync
+        uses: ./.github/actions/discord-pr-sync
+        with:
+          discord-token: ${{ secrets.DISCORD_BOT_TOKEN }}
+          guild-id: ${{ secrets.DISCORD_GUILD_ID }}
+          channel-id: ${{ secrets.DISCORD_CHANNEL_ID }}
+          auto-invite-role-id: ${{ secrets.AUTO_INVITE_ROLE_ID }}
+          github-discord-map: ${{ secrets.DISCORD_USER_MAP }}
+
+      - name: Log Results
+        if: always()
+        run: |
+          echo "Event: ${{ github.event_name }} / ${{ github.event.action }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Action Taken: ${{ steps.discord-sync.outputs.action-taken }}"
+          
+          if [ "${{ steps.discord-sync.outputs.thread-id }}" != "" ]; then
+            echo "Thread ID: ${{ steps.discord-sync.outputs.thread-id }}"
+            echo "Thread URL: ${{ steps.discord-sync.outputs.thread-url }}"
+          fi
+          
+          # Debug mode - log full payload if enabled
+          if [ "${ACTIONS_STEP_DEBUG:-false}" == "true" ]; then
+            echo "Full Event Payload:"
+            echo '${{ toJSON(github.event) }}'
+          fi

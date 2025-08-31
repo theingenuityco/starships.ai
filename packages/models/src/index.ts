@@ -24,12 +24,13 @@ export { NodeRepository } from './repositories/NodeRepository';
 export { EdgeRepository } from './repositories/EdgeRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';
 
-// Export workflow types
-export type { CreateWorkflowRequest } from './types/workflow';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 
 // NEW: Agent Templates
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
+
+// NEW: Workflows
+export { WorkflowRepository } from './repositories/WorkflowRepository';
 
 // Factory for creating repositories
 export { RepositoryFactory } from './repositories';
@@ -152,6 +153,24 @@ export type {
   BlueprintFilters,
   BlueprintUsageStats
 } from './types/blueprint';
+
+// Export workflow types
+export type {
+  WorkflowModel,
+  CreateWorkflowRequest,
+  UpdateWorkflowRequest,
+  WorkflowListResponse,
+  WorkflowResponse,
+  SearchWorkflowsRequest,
+  SearchWorkflowsResponse,
+  WorkflowFilters,
+  DeployWorkflowRequest,
+  DeployWorkflowResponse,
+  ExecuteWorkflowRequest,
+  WorkflowUsageStats,
+  WorkflowAnalytics,
+  LegacyCreateWorkflowRequest
+} from './types/workflow';
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';

@@ -1,211 +1,530 @@
 /**
- * WorkflowService - Business logic for mission workflow DSL
- * 
- * Handles business operations for mission workflows including creation, updates,
- * and data transformations. Follows service layer pattern for separation of concerns.
+ * Workflow Service
+ *
+ * Provides business logic APIs for workflow management and execution.
+ * Orchestrates between database persistence (WorkflowRepository) and
+ * stateless execution engine (autopilot Workflow).
  */
 
-import { RepositoryFactory } from '@starships/models';
-import {
-  MissionWorkflow,
-  WorkflowNode,
-  WorkflowEdge,
-  CreateWorkflowRequest,
-  UpdateWorkflowApprovalRequest
-} from '@starships/protocol';
-import { Logger } from '../utils/logger';
-// import { v4 as uuidv4 } from 'uuid';
+import { WorkflowRepository, RepositoryFactory } from '@starships/models';
+import { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/models';
+import { Workflow, Blueprint, Execution, createAgentMemory } from '@starships/autopilot';
+import { DatabaseMemoryStore } from '../utils/database-memory';
 
+export interface WorkflowOptions {
+  includeMemory?: boolean;
+}
+
+export interface ExecuteWorkflowResponse {
+  response: any;
+  executionId: string;
+  status: 'completed' | 'failed' | 'timeout';
+  error?: {
+    message: string;
+    code?: string;
+  };
+}
+
+export interface WorkflowExecutionContext {
+  workflowId: string;
+  initialData?: Record<string, unknown>;
+  timeout?: number;
+}
+
+/**
+ * WorkflowService - Business logic for workflow management and execution
+ */
 export class WorkflowService {
-  private static logger = Logger.getInstance();
+  private workflowRepository: WorkflowRepository;
+  private memoryStore: DatabaseMemoryStore;
+
+  constructor() {
+    this.workflowRepository = new WorkflowRepository();
+    this.memoryStore = new DatabaseMemoryStore();
+  }
+
+  // ============================================================================
+  // STATIC METHODS - Database operations (returns WorkflowModel)
+  // ============================================================================
 
   /**
-   * Get workflow by mission ID
+   * Get workflows by category - Static method
    */
-  static async getWorkflowByMissionId(missionId: string): Promise<MissionWorkflow | null> {
+  static async getWorkflowsByCategory(category: string): Promise<WorkflowModel[]> {
+    const repository = new WorkflowRepository();
+    return await repository.findByCategory(category);
+  }
+
+  /**
+   * Get workflows by author - Static method
+   */
+  static async getWorkflowsByAuthor(authorId: string): Promise<WorkflowModel[]> {
+    const repository = new WorkflowRepository();
+    return await repository.findByAuthor(authorId);
+  }
+
+  /**
+   * Get workflows by tags - Static method
+   */
+  static async getWorkflowsByTags(tags: string[]): Promise<WorkflowModel[]> {
+    const repository = new WorkflowRepository();
+    return await repository.findByTags(tags);
+  }
+
+  /**
+   * Get public workflows - Static method
+   */
+  static async getPublicWorkflows(limit: number = 50, offset: number = 0): Promise<WorkflowModel[]> {
+    const repository = new WorkflowRepository();
+    return await repository.findPublic(limit, offset);
+  }
+
+  /**
+   * Search workflows - Static method
+   */
+  static async searchWorkflows(query: string): Promise<WorkflowModel[]> {
+    const repository = new WorkflowRepository();
+    return await repository.searchWorkflows(query);
+  }
+
+  /**
+   * Get workflow by ID - Static method (returns WorkflowModel, not Workflow)
+   */
+  static async getWorkflow(workflowId: string): Promise<WorkflowModel | null> {
+    const repository = new WorkflowRepository();
+    return await repository.findById(workflowId);
+  }
+
+  /**
+   * Create workflow - Static method (returns WorkflowModel, not Workflow)
+   */
+  static async createWorkflow(request: CreateWorkflowRequest): Promise<WorkflowModel> {
+    const repository = new WorkflowRepository();
+
+    // Provide defaults for core WorkflowNodeParameters fields
+    const workflowData = {
+      ...request,
+      blueprint: request.blueprint || { nodes: [], edges: [], metadata: {} },
+      timeout: request.timeout || 30000
+    };
+
+    return await repository.create(workflowData as Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>);
+  }
+
+  /**
+   * Update workflow - Static method (returns WorkflowModel, not Workflow)
+   */
+  static async updateWorkflow(workflowId: string, updates: UpdateWorkflowRequest): Promise<WorkflowModel | null> {
+    const repository = new WorkflowRepository();
+    return await repository.update(workflowId, updates as Partial<WorkflowModel>);
+  }
+
+  /**
+   * Delete workflow - Static method
+   */
+  static async deleteWorkflow(workflowId: string): Promise<boolean> {
+    const repository = new WorkflowRepository();
+    return await repository.delete(workflowId);
+  }
+
+  /**
+   * Get workflows by starship ID - Static method
+   */
+  static async getWorkflowsByStarshipId(starshipId: string): Promise<WorkflowModel[]> {
+    const repository = new WorkflowRepository();
+    return await repository.findByStarshipId(starshipId);
+  }
+
+  /**
+   * Track workflow usage - Static method
+   */
+  static async trackUsage(workflowId: string): Promise<boolean> {
+    const repository = new WorkflowRepository();
     try {
-      // TODO: Implement workflow storage - for now return null as workflows are ephemeral
-      this.logger.warn('Workflow storage not implemented, returning null', { missionId });
-      return null;
+      await repository.incrementUsageCount(workflowId);
+      return true;
     } catch (error) {
-      this.logger.error('Error getting workflow by mission ID', { error });
-      throw error;
+      console.error('Failed to track workflow usage:', error);
+      return false;
     }
   }
 
   /**
-   * Create new workflow from request
+   * Rate workflow - Static method
    */
-  static async createWorkflow(request: CreateWorkflowRequest): Promise<MissionWorkflow> {
+  static async rateWorkflow(workflowId: string, userId: string, rating: number): Promise<boolean> {
+    const repository = new WorkflowRepository();
     try {
-      // TODO: Implement workflow storage - for now create ephemeral workflow
-      this.logger.warn('Workflow storage not implemented, creating ephemeral workflow', { missionId: request.missionId });
-      
-      const workflow: MissionWorkflow = {
-        id: `workflow-${request.missionId}-${Date.now()}`,
-        missionId: request.missionId,
-        nodes: request.nodes.map((node, index) => ({
-          ...node,
-          id: `node-${index}`
-        })),
-        edges: request.edges.map((edge, index) => ({
-          ...edge,
-          id: `edge-${index}`
-        })),
-        approvalStatus: 'pending',
-        createdAt: new Date().toISOString()
-      };
-      
-      return workflow;
+      await repository.updateRating(workflowId, rating);
+      return true;
     } catch (error) {
-      this.logger.error('Error creating workflow', { error });
-      throw error;
+      console.error('Failed to rate workflow:', error);
+      return false;
     }
   }
 
   /**
-   * Update workflow approval status
+   * Get workflow analytics - Static method
    */
-  static async updateWorkflowApproval(missionId: string, updates: UpdateWorkflowApprovalRequest): Promise<MissionWorkflow> {
-    try {
-      // First get the workflow to find its ID
-      const workflow = await this.getWorkflowByMissionId(missionId);
-      if (!workflow) {
-        throw new Error(`Workflow not found for mission ${missionId}`);
-      }
+  static async getWorkflowAnalytics(workflowId: string): Promise<any> {
+    const repository = new WorkflowRepository();
+    const workflow = await repository.findById(workflowId);
 
-      // TODO: Implement workflow storage - for now update ephemeral workflow
-      this.logger.warn('Workflow storage not implemented, updating ephemeral workflow', { missionId });
-      
-      const updatedWorkflow: MissionWorkflow = {
-        ...workflow,
-        approvalStatus: updates.approvalStatus,
-        ...(updates.approvalStatus === 'approved' && { approvedAt: new Date().toISOString() })
-      };
-      
-      return updatedWorkflow;
-    } catch (error) {
-      this.logger.error('Error updating workflow approval', { error });
-      throw error;
-    }
-  }
-
-  /**
-   * Delete workflow by mission ID
-   */
-  static async deleteWorkflow(missionId: string): Promise<void> {
-    try {
-      // First get the workflow to find its ID
-      const workflow = await this.getWorkflowByMissionId(missionId);
-      if (!workflow) {
-        this.logger.warn(`No workflow found for mission ${missionId} to delete`);
-        return;
-      }
-
-      // TODO: Implement workflow storage - for now just log deletion
-      this.logger.warn('Workflow storage not implemented, skipping deletion', { missionId });
-    } catch (error) {
-      this.logger.error('Error deleting workflow', { error });
-      throw error;
-    }
-  }
-
-  /**
-   * Convert AI-generated task array to WorkflowDSL nodes and edges
-   * Transforms from task-based format to workflow DSL format
-   */
-  static convertTasksToWorkflowDSL(tasks: any[], missionId: string): CreateWorkflowRequest {
-    const nodes: Omit<WorkflowNode, 'id'>[] = [];
-    const edges: Omit<WorkflowEdge, 'id'>[] = [];
-
-    // Create start node
-    const startNodeRef = 'start-node';
-    nodes.push({
-      type: 'start',
-      name: 'Start Mission',
-      description: 'Initialize mission execution',
-      parameters: {}
-    });
-
-    // Create agent nodes for each task
-    const taskNodeRefs: string[] = [];
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      const nodeRef = `agent-${i}`;
-      taskNodeRefs.push(nodeRef);
-
-      nodes.push({
-        type: 'agent',
-        name: task.title || `Task ${i + 1}`,
-        description: task.description || '',
-        parameters: {
-          agentId: task.assignedAgentId,
-          instructions: task.description || task.title,
-          expectedOutput: task.deliverable || 'Task completion',
-          priority: task.priority || 'medium'
-        }
-      });
-    }
-
-    // Create end node
-    const endNodeRef = 'end-node';
-    nodes.push({
-      type: 'end',
-      name: 'Complete Mission',
-      description: 'Mission execution completed',
-      parameters: {}
-    });
-
-    // Create edges for sequential flow (for now)
-    // Start -> first task
-    if (taskNodeRefs.length > 0) {
-      edges.push({
-        from: startNodeRef,
-        to: taskNodeRefs[0]
-      });
-
-      // Task -> Task (sequential)
-      for (let i = 0; i < taskNodeRefs.length - 1; i++) {
-        edges.push({
-          from: taskNodeRefs[i],
-          to: taskNodeRefs[i + 1]
-        });
-      }
-
-      // Last task -> end
-      edges.push({
-        from: taskNodeRefs[taskNodeRefs.length - 1],
-        to: endNodeRef
-      });
-    } else {
-      // No tasks, just start -> end
-      edges.push({
-        from: startNodeRef,
-        to: endNodeRef
-      });
+    if (!workflow) {
+      throw new Error(`Workflow ${workflowId} not found`);
     }
 
     return {
-      missionId,
-      nodes,
-      edges
+      workflowId,
+      name: workflow.name,
+      category: workflow.category,
+      usageCount: workflow.usageCount || 0,
+      rating: workflow.rating || 0,
+      isPublic: workflow.isPublic,
+      createdAt: workflow.createdAt,
+      lastUpdated: workflow.updatedAt
+    };
+  }
+
+  // ============================================================================
+  // INSTANCE METHODS - Execution operations (returns Workflow instances)
+  // ============================================================================
+
+  /**
+   * Create a new workflow and return as Workflow instance
+   */
+  async createWorkflow(request: CreateWorkflowRequest, options: WorkflowOptions = {}): Promise<Workflow> {
+    // Validate blueprint if provided
+    if (request.blueprint) {
+      const validation = this.validateBlueprint(request.blueprint);
+      if (!validation.valid) {
+        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    const workflowData = {
+      ...request,
+      blueprint: request.blueprint || this.createDefaultBlueprint(),
+      timeout: request.timeout || 30000
+    };
+
+    const dbWorkflow = await this.workflowRepository.create(workflowData as Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>);
+    return await this.createWorkflowInstance(dbWorkflow, options);
+  }
+
+  /**
+   * Get workflow by ID as Workflow instance
+   */
+  async getWorkflow(workflowId: string, options: WorkflowOptions = {}): Promise<Workflow | null> {
+    const dbWorkflow = await this.workflowRepository.findById(workflowId);
+    if (!dbWorkflow) {
+      return null;
+    }
+    return await this.createWorkflowInstance(dbWorkflow, options);
+  }
+
+  /**
+   * Get all workflows as Workflow instances
+   */
+  async getAllWorkflows(options: WorkflowOptions = {}): Promise<Workflow[]> {
+    const dbWorkflows = await this.workflowRepository.findAll();
+    return Promise.all(dbWorkflows.map((dbWorkflow: WorkflowModel) => this.createWorkflowInstance(dbWorkflow, options)));
+  }
+
+  /**
+   * Get workflows by starship as Workflow instances
+   */
+  async getWorkflowsByStarship(starshipId: string, options: WorkflowOptions = {}): Promise<Workflow[]> {
+    const dbWorkflows = await this.workflowRepository.findByStarshipId(starshipId);
+    return Promise.all(dbWorkflows.map((dbWorkflow: WorkflowModel) => this.createWorkflowInstance(dbWorkflow, options)));
+  }
+
+  /**
+   * Get workflows by user as Workflow instances
+   */
+  async getWorkflowsByUser(userId: string, options: WorkflowOptions = {}): Promise<Workflow[]> {
+    const dbWorkflows = await this.workflowRepository.findByAuthor(userId);
+    return Promise.all(dbWorkflows.map((dbWorkflow: WorkflowModel) => this.createWorkflowInstance(dbWorkflow, options)));
+  }
+
+  /**
+   * Update workflow and return as Workflow instance
+   */
+  async updateWorkflow(workflowId: string, updates: UpdateWorkflowRequest, options: WorkflowOptions = {}): Promise<Workflow | null> {
+    // Validate blueprint if being updated
+    if (updates.blueprint) {
+      const validation = this.validateBlueprint(updates.blueprint);
+      if (!validation.valid) {
+        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    const dbWorkflow = await this.workflowRepository.update(workflowId, updates as Partial<WorkflowModel>);
+    if (!dbWorkflow) {
+      return null;
+    }
+    return await this.createWorkflowInstance(dbWorkflow, options);
+  }
+
+  /**
+   * Delete workflow
+   */
+  async deleteWorkflow(workflowId: string): Promise<boolean> {
+    return await this.workflowRepository.delete(workflowId);
+  }
+
+  /**
+   * Deploy workflow to starship
+   */
+  async deployWorkflow(workflowId: string, starshipId: string): Promise<void> {
+    await this.workflowRepository.updateStarshipId(workflowId, starshipId);
+  }
+
+  /**
+   * Search workflows and return as Workflow instances
+   */
+  async searchWorkflows(query: string, options: WorkflowOptions = {}): Promise<Workflow[]> {
+    const dbWorkflows = await this.workflowRepository.searchWorkflows(query);
+    return Promise.all(dbWorkflows.map((dbWorkflow: WorkflowModel) => this.createWorkflowInstance(dbWorkflow, options)));
+  }
+
+  /**
+   * Get workflows with filters as Workflow instances
+   */
+  async getWorkflowsWithFilters(filters: {
+    category?: string;
+    authorId?: string;
+    isPublic?: boolean;
+    tags?: string[];
+    starshipClass?: 'scout' | 'cruiser';
+  }, options: WorkflowOptions = {}): Promise<Workflow[]> {
+    const dbWorkflows = await this.workflowRepository.findWithFilters(filters);
+    return Promise.all(dbWorkflows.map((dbWorkflow: WorkflowModel) => this.createWorkflowInstance(dbWorkflow, options)));
+  }
+
+  // ============================================================================
+  // EXECUTION METHODS
+  // ============================================================================
+
+  /**
+   * Execute workflow using WorkflowExecutionContext
+   */
+  async executeWorkflow(
+    context: WorkflowExecutionContext,
+    options: WorkflowOptions = {}
+  ): Promise<ExecuteWorkflowResponse> {
+    const startTime = Date.now();
+
+    try {
+      // Get database workflow
+      const dbWorkflow = await this.workflowRepository.findById(context.workflowId);
+      if (!dbWorkflow) {
+        throw new Error(`Workflow ${context.workflowId} not found`);
+      }
+
+      // Create workflow instance
+      const workflow = await this.createWorkflowInstance(dbWorkflow, options);
+
+      console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
+
+      // Create agent memory for execution context
+      const agentMemory = createAgentMemory('Workflow execution context');
+
+      // Create initial execution context
+      const initialExecution: Execution = {
+        currentNodeRef: undefined,
+        status: 'running',
+        executionResults: new Map(),
+        agentMemory: agentMemory,
+        error: undefined
+      };
+
+      // Execute workflow
+      const result = await workflow.execute(initialExecution);
+
+      // Track usage
+      await this.workflowRepository.incrementUsageCount(context.workflowId);
+
+      const executionTime = Date.now() - startTime;
+      console.log(`✅ [WORKFLOW-SERVICE] Workflow executed successfully in ${executionTime}ms`);
+
+      return {
+        response: result,
+        executionId: `exec-${Date.now()}`,
+        status: result.status === 'completed' ? 'completed' : 'failed'
+      };
+
+    } catch (error: any) {
+      const executionTime = Date.now() - startTime;
+
+      console.error(`[WORKFLOW-SERVICE] Workflow execution failed for ${context.workflowId}:`, error);
+
+      return {
+        response: null,
+        executionId: `failed-${Date.now()}`,
+        status: 'failed',
+        error: {
+          message: error.message || 'Unknown error occurred',
+          code: error.code || 'EXECUTION_ERROR'
+        }
+      };
+    }
+  }
+
+  /**
+   * Test workflow execution
+   */
+  async testWorkflow(workflowId: string, testData: Record<string, unknown> = {}): Promise<ExecuteWorkflowResponse> {
+    return this.executeWorkflow(
+      { workflowId, initialData: testData },
+      { includeMemory: false }
+    );
+  }
+
+  /**
+   * Get memory store for workflow execution
+   */
+  getMemoryStore(): DatabaseMemoryStore {
+    return this.memoryStore;
+  }
+
+  /**
+   * Validate workflow
+   */
+  static async validateWorkflow(workflowId: string): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    try {
+      const workflowRepo = RepositoryFactory.getWorkflowRepository();
+      const dbWorkflow = await workflowRepo.findById(workflowId);
+
+      if (!dbWorkflow) {
+        return {
+          valid: false,
+          errors: [`Workflow ${workflowId} not found`],
+          warnings: []
+        };
+      }
+
+      // Basic validation - WorkflowService handles detailed validation internally
+      if (!dbWorkflow.name || !dbWorkflow.blueprint) {
+        return {
+          valid: false,
+          errors: ['Workflow name and blueprint are required'],
+          warnings: []
+        };
+      }
+
+      // Add warnings for potential issues
+      if (!dbWorkflow.blueprint.nodes || dbWorkflow.blueprint.nodes.length === 0) {
+        warnings.push('Workflow blueprint has no nodes defined');
+      }
+
+      if (!dbWorkflow.starshipId) {
+        warnings.push('Workflow is not assigned to any starship');
+      }
+
+      return {
+        valid: errors.length === 0,
+        errors,
+        warnings
+      };
+    } catch (error: any) {
+      return {
+        valid: false,
+        errors: [`Validation failed: ${error.message}`],
+        warnings: []
+      };
+    }
+  }
+
+  // ============================================================================
+  // PRIVATE HELPER METHODS
+  // ============================================================================
+
+  /**
+   * Create Workflow instance from database model
+   */
+  private async createWorkflowInstance(
+    dbWorkflow: WorkflowModel,
+    options: WorkflowOptions
+  ): Promise<Workflow> {
+    // Get blueprint
+    const blueprint = dbWorkflow.blueprint || this.createDefaultBlueprint();
+
+    const workflowParams = {
+      blueprint: blueprint,
+      timeout: dbWorkflow.timeout || 30000
+    };
+
+    return new Workflow(workflowParams);
+  }
+
+  /**
+   * Validate blueprint structure
+   */
+  private validateBlueprint(blueprint: Blueprint): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!blueprint.nodes || !Array.isArray(blueprint.nodes)) {
+      errors.push('Blueprint must have a nodes array');
+    }
+
+    if (!blueprint.edges || !Array.isArray(blueprint.edges)) {
+      errors.push('Blueprint must have an edges array');
+    }
+
+    // Check for start node
+    if (blueprint.nodes && !blueprint.nodes.some(node => node.type === 'start')) {
+      errors.push('Blueprint must have a start node');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
     };
   }
 
   /**
-   * Extract task-like information from workflow for backward compatibility
+   * Create default blueprint for simple workflows
    */
-  static extractTasksFromWorkflow(workflow: MissionWorkflow): any[] {
-    return workflow.nodes
-      .filter(node => node.type === 'agent')
-      .map((node) => ({
-        id: node.id,
-        title: node.name,
-        description: node.description,
-        assignedAgentId: node.parameters.agentId,
-        dependencies: [], // TODO: Extract from edges if needed
-        deliverable: node.parameters.expectedOutput || '',
-        priority: node.parameters.priority || 'medium'
-      }));
+  private createDefaultBlueprint(): Blueprint {
+    return {
+      nodes: [
+        {
+          ref: 'start',
+          type: 'start',
+          name: 'Start',
+          description: 'Workflow start point',
+          parameters: {},
+          metadata: {}
+        },
+        {
+          ref: 'end',
+          type: 'end',
+          name: 'End',
+          description: 'Workflow end point',
+          parameters: {},
+          metadata: {}
+        }
+      ],
+      edges: [
+        {
+          ref: 'start-to-end',
+          from: 'start',
+          to: 'end',
+          metadata: {}
+        }
+      ],
+      metadata: {
+        generated: true,
+        createdAt: new Date().toISOString()
+      }
+    };
   }
 }

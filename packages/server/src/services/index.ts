@@ -23,6 +23,9 @@ export { VisionRefinementSessionManager } from './VisionRefinementSessionManager
 // Mission services
 export { MissionOrchestratorService } from './MissionOrchestratorService';
 
+// Workflow services
+export { WorkflowService } from './WorkflowService';
+
 // Agent execution services (replacing agents/ directory)
 export { LLMService } from './LLMService';
 export { ToolService } from './ToolService';

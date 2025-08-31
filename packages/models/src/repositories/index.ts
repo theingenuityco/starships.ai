@@ -34,6 +34,9 @@ export { ChatSessionRepository } from './ChatSessionRepository';
 // Export chat message repository
 export { ChatMessageRepository } from './ChatMessageRepository';
 
+// Export workflow repository
+export { WorkflowRepository } from './WorkflowRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -58,6 +61,9 @@ import { ChatSessionRepository } from './ChatSessionRepository';
 
 // Import chat message repository
 import { ChatMessageRepository } from './ChatMessageRepository';
+
+// Import workflow repository
+import { WorkflowRepository } from './WorkflowRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -101,6 +107,9 @@ export class RepositoryFactory {
 
   // Chat message repository instance
   private static chatMessageRepo: ChatMessageRepository | null = null;
+
+  // Workflow repository instance
+  private static workflowRepo: WorkflowRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -175,6 +184,9 @@ export class RepositoryFactory {
       // Initialize chat message repository (no dependencies)
       this.chatMessageRepo = new ChatMessageRepository();
 
+      // Initialize workflow repository (no dependencies)
+      this.workflowRepo = new WorkflowRepository();
+
       // Initialize repositories with dependencies
       this.starshipRepo = new StarshipRepository();
 
@@ -238,6 +250,7 @@ export class RepositoryFactory {
         waitlistRepo: this.waitlistRepo !== null,
         chatSessionRepo: this.chatSessionRepo !== null,
         chatMessageRepo: this.chatMessageRepo !== null,
+        workflowRepo: this.workflowRepo !== null,
       }
     };
   }
@@ -427,6 +440,17 @@ export class RepositoryFactory {
     return this.chatMessageRepo;
   }
 
+  /**
+   * Get WorkflowRepository instance (synchronous)
+   */
+  static getWorkflowRepository(): WorkflowRepository {
+    this.ensureInitialized();
+    if (!this.workflowRepo) {
+      throw new Error('WorkflowRepository not initialized');
+    }
+    return this.workflowRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -453,6 +477,7 @@ export class RepositoryFactory {
     this.waitlistRepo = null;
     this.chatSessionRepo = null;
     this.chatMessageRepo = null;
+    this.workflowRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

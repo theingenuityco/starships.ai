@@ -35,7 +35,7 @@ spec:
           service:
             name: starships-app-internal
             port:
-              number: 4000
+              number: 3001
       # Everything else goes to frontend
       - path: /
         pathType: Prefix

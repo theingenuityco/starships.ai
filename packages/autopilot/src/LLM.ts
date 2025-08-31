@@ -2,12 +2,12 @@
  * LLM Class
  *
  * Executable LLM (Large Language Model) that handles AI model interactions via OpenRouter.
+ * Uses HttpRequest under the hood for HTTP communication, similar to how Agent uses Workflow.
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
-import { LlmNodeParameters, Execution } from './types';
-import { AgentMemory } from './AgentMemory';
+import { LlmNodeParameters, HttpRequestNodeParameters, Execution } from './types';
+import { HttpRequest } from './HttpRequest';
 
 export class LLM {
   private params: LlmNodeParameters;
@@ -48,42 +48,21 @@ export class LLM {
   }
 
   /**
-   * Execute the LLM request
+   * Execute the LLM request (delegates to HttpRequest)
    */
   async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
     try {
       console.log(`Executing LLM: ${this.params.model}`);
 
-      // Build the HTTP request for OpenRouter
-      const requestConfig = this.buildOpenRouterRequest(execution);
+      // Create HttpRequest instance with current execution context (for memory integration)
+      const httpRequest = new HttpRequest(this.buildHttpRequestParams(execution));
       
-      // Execute request with retries
-      const maxRetries = 1; // Default retry for LLM requests
-      let lastError: Error | null = null;
-      let response: AxiosResponse | null = null;
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          response = await axios(requestConfig);
-          break; // Success, exit retry loop
-        } catch (error) {
-          lastError = error as AxiosError;
-          
-          // Don't retry on certain errors
-          if (axios.isCancel(error) ||
-              (error as AxiosError).code === 'ECONNABORTED') {
-            break;
-          }
-          
-          // Wait before retry (exponential backoff)
-          if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-          }
-        }
-      }
-
-      if (response && response.status >= 200 && response.status < 300) {
-        const llmResponse = this.extractLlmResponse(response.data);
+      // Delegate to HttpRequest for execution
+      const httpResult = await httpRequest.execute();
+      
+      // Check if HTTP request execution was successful
+      if (httpResult.status === 'completed' && httpResult.data) {
+        const llmResponse = this.extractLlmResponse(httpResult.data.body);
         
         // Add LLM response to agent memory if execution context is provided
         if (execution?.agentMemory) {
@@ -95,18 +74,14 @@ export class LLM {
         return {
           status: 'completed',
           data: {
+            ...httpResult.data,
             llmResponse,
-            model: this.params.model,
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            body: response.data,
-            url: response.config.url
+            model: this.params.model
           }
         };
       } else {
-        // LLM request failed
-        const errorMessage = lastError?.message || response?.data?.error?.message || 'LLM request failed';
+        // HTTP request execution failed
+        const errorMessage = httpResult.error?.message || 'LLM request failed';
         return {
           status: 'failed',
           error: new Error(`LLM request failed: ${errorMessage}`)
@@ -122,9 +97,9 @@ export class LLM {
   }
 
   /**
-   * Build OpenRouter-compatible HTTP request configuration
+   * Build HttpRequest parameters for OpenRouter API
    */
-  private buildOpenRouterRequest(execution?: Execution): AxiosRequestConfig {
+  private buildHttpRequestParams(execution?: Execution): HttpRequestNodeParameters {
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
     
     // Build messages array
@@ -161,17 +136,18 @@ export class LLM {
     };
 
     return {
-      method: 'POST',
       url: endpoint,
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ${OPENROUTER_API_KEY}',
         'HTTP-Referer': '${OPENROUTER_HTTP_REFERER}', // Optional: for analytics
         'X-Title': '${OPENROUTER_APP_NAME}' // Optional: for analytics
       },
-      data: body,
+      body,
       timeout: this.params.timeout || 60000,
-      validateStatus: () => true, // Don't throw on any status code
+      retries: 1,
+      followRedirects: true
     };
   }
 
@@ -196,12 +172,12 @@ export class LLM {
   }
 
   /**
-   * Validate LLM configuration
+   * Validate LLM configuration (delegates to HttpRequest validation)
    */
   validate(): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    // Check required fields
+    // Check LLM-specific required fields
     if (!this.params.model) {
       errors.push('Model is required');
     }
@@ -210,7 +186,7 @@ export class LLM {
       errors.push('Prompt is required');
     }
 
-    // Parameter range validation
+    // LLM-specific parameter range validation
     if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
       errors.push('Temperature must be between 0 and 2');
     }
@@ -234,6 +210,15 @@ export class LLM {
     // Timeout validation
     if (this.params.timeout !== undefined && this.params.timeout < 1000) {
       errors.push('Timeout should be at least 1000ms');
+    }
+
+    // Delegate to HttpRequest validation for HTTP-specific validation
+    if (errors.length === 0) {
+      const httpRequest = new HttpRequest(this.buildHttpRequestParams());
+      const httpValidation = httpRequest.validate();
+      if (!httpValidation.valid) {
+        errors.push(...httpValidation.errors);
+      }
     }
 
     return {

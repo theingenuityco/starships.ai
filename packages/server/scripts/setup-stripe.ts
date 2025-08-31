@@ -69,19 +69,19 @@ const PRICES: Record<string, PriceConfig> = {
 
 async function setupStripe() {
   console.log('🚀 Starting Stripe setup...\n');
-  
+
   const priceIds: Record<string, string> = {};
-  
+
   try {
     // First, check if products already exist
     console.log('📦 Checking existing products...');
     const existingProducts = await stripe.products.list({ limit: 100, active: true });
-    
+
     for (const [key, config] of Object.entries(PRODUCTS)) {
       let product = existingProducts.data.find(
-        p => p.metadata.plan_type === config.metadata.plan_type
+        (p) => p.metadata.plan_type === config.metadata.plan_type
       );
-      
+
       if (product) {
         console.log(`✅ Product already exists: ${product.name} (${product.id})`);
       } else {
@@ -89,22 +89,22 @@ async function setupStripe() {
         product = await stripe.products.create(config);
         console.log(`✅ Created product: ${product.name} (${product.id})`);
       }
-      
+
       // Check/Create prices for this product
       const existingPrices = await stripe.prices.list({
         product: product.id,
         limit: 100,
       });
-      
+
       // Monthly price
       const monthlyKey = `${key}_monthly`;
       const monthlyConfig = PRICES[monthlyKey];
-      let monthlyPrice = existingPrices.data.find(
-        p => p.recurring?.interval === 'month'
-      );
-      
+      let monthlyPrice = existingPrices.data.find((p) => p.recurring?.interval === 'month');
+
       if (monthlyPrice) {
-        console.log(`  💵 Monthly price exists: $${monthlyPrice.unit_amount! / 100}/month (${monthlyPrice.id})`);
+        console.log(
+          `  💵 Monthly price exists: $${monthlyPrice.unit_amount! / 100}/month (${monthlyPrice.id})`
+        );
       } else {
         console.log(`  📝 Creating monthly price: $${monthlyConfig.amount / 100}/month`);
         monthlyPrice = await stripe.prices.create({
@@ -117,16 +117,16 @@ async function setupStripe() {
         console.log(`  ✅ Created monthly price: ${monthlyPrice.id}`);
       }
       priceIds[`STRIPE_PRICE_${key.toUpperCase()}_MONTHLY`] = monthlyPrice.id;
-      
+
       // Yearly price
       const yearlyKey = `${key}_yearly`;
       const yearlyConfig = PRICES[yearlyKey];
-      let yearlyPrice = existingPrices.data.find(
-        p => p.recurring?.interval === 'year'
-      );
-      
+      let yearlyPrice = existingPrices.data.find((p) => p.recurring?.interval === 'year');
+
       if (yearlyPrice) {
-        console.log(`  💵 Yearly price exists: $${yearlyPrice.unit_amount! / 100}/year (${yearlyPrice.id})`);
+        console.log(
+          `  💵 Yearly price exists: $${yearlyPrice.unit_amount! / 100}/year (${yearlyPrice.id})`
+        );
       } else {
         console.log(`  📝 Creating yearly price: $${yearlyConfig.amount / 100}/year`);
         yearlyPrice = await stripe.prices.create({
@@ -139,15 +139,15 @@ async function setupStripe() {
         console.log(`  ✅ Created yearly price: ${yearlyPrice.id}`);
       }
       priceIds[`STRIPE_PRICE_${key.toUpperCase()}_YEARLY`] = yearlyPrice.id;
-      
+
       console.log('');
     }
-    
+
     // Update .env file with price IDs
     console.log('\n📄 Updating .env file with price IDs...');
     const envPath = path.resolve(__dirname, '../../../.env');
     let envContent = fs.readFileSync(envPath, 'utf-8');
-    
+
     for (const [key, value] of Object.entries(priceIds)) {
       const regex = new RegExp(`^${key}=.*$`, 'm');
       if (regex.test(envContent)) {
@@ -156,10 +156,10 @@ async function setupStripe() {
         envContent += `\n${key}=${value}`;
       }
     }
-    
+
     fs.writeFileSync(envPath, envContent);
     console.log('✅ Updated .env file with price IDs');
-    
+
     // Display summary
     console.log('\n' + '='.repeat(60));
     console.log('✨ Stripe setup completed successfully!');
@@ -176,7 +176,6 @@ async function setupStripe() {
     for (const [key, value] of Object.entries(priceIds)) {
       console.log(`  ${key}=${value}`);
     }
-    
   } catch (error) {
     console.error('\n❌ Error during setup:', error);
     process.exit(1);

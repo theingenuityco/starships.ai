@@ -266,6 +266,7 @@ jobs:
             --from-literal=NEO4J_URI="${{ secrets.NEO4J_URI }}" \
             --from-literal=NEO4J_USERNAME="${{ secrets.NEO4J_USERNAME }}" \
             --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
+            --from-literal=NEO4J_DATABASE="${{ secrets.NEO4J_DATABASE }}" \
             --from-literal=SERVER_URL="${{ secrets.SERVER_URL }}" \
             --from-literal=KINDE_SITE_URL="${{ vars.KINDE_SITE_URL }}" \
             --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}" \

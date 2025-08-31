@@ -404,9 +404,33 @@ function createPullRequestEmbed(action, payload) {
   };
 
   // Add relevant fields based on action
-  if (action === 'synchronize' && payload.before && payload.after) {
+  if (action === 'synchronize') {
+    // Get the latest commit info
+    const headCommit = pr.head;
+    const latestCommitSha = headCommit?.sha || payload.after;
+    const commitMessage = payload.pull_request?.head?.repo?.pushed_at ? 
+      `Latest: ${headCommit?.ref || 'unknown'}` : 'New commits pushed';
+    
+    embed.description = commitMessage;
+    embed.url = pr.html_url; // Link to PR
+    
+    if (payload.before && payload.after) {
+      // Make the commit range clickable
+      const compareUrl = `${pr.html_url}/files/${payload.before.substring(0, 7)}..${payload.after.substring(0, 7)}`;
+      embed.fields.push(
+        { name: 'Commits', value: `[\`${payload.before.substring(0, 7)}...${payload.after.substring(0, 7)}\`](${compareUrl})`, inline: true }
+      );
+    }
+    
+    // Add author info
     embed.fields.push(
-      { name: 'Commits', value: `${payload.before.substring(0, 7)}...${payload.after.substring(0, 7)}`, inline: true }
+      { name: 'Author', value: payload.sender?.login || pr.user?.login || 'Unknown', inline: true },
+      { name: 'Branch', value: headCommit?.ref || 'Unknown', inline: true }
+    );
+    
+    // Add PR link
+    embed.fields.push(
+      { name: 'Pull Request', value: `[View PR #${pr.number}](${pr.html_url})`, inline: false }
     );
   }
   
@@ -453,19 +477,26 @@ function createPullRequestEmbed(action, payload) {
 
 function createReviewEmbed(payload) {
   const review = payload.review;
+  const pr = payload.pull_request;
   const reviewStates = {
-    'approved': { emoji: '✅', color: 0x28a745 },
-    'changes_requested': { emoji: '🔄', color: 0xffd33d },
-    'commented': { emoji: '💭', color: 0x586069 },
-    'dismissed': { emoji: '❌', color: 0xd73a49 }
+    'approved': { emoji: '✅', color: 0x28a745, text: 'Approved' },
+    'changes_requested': { emoji: '🔄', color: 0xffd33d, text: 'Changes Requested' },
+    'commented': { emoji: '💭', color: 0x586069, text: 'Commented' },
+    'dismissed': { emoji: '❌', color: 0xd73a49, text: 'Dismissed' }
   };
   
   const reviewState = review.state?.toLowerCase() || 'commented';
   const reviewInfo = reviewStates[reviewState] || reviewStates.commented;
   
-  return {
-    title: `${reviewInfo.emoji} PR Review: ${reviewState.replace('_', ' ').toUpperCase()}`,
-    description: review.body || 'Review submitted',
+  // Truncate review body if too long
+  let reviewBody = review.body || 'Review submitted';
+  if (reviewBody.length > 500) {
+    reviewBody = reviewBody.substring(0, 497) + '...';
+  }
+  
+  const embed = {
+    title: `${reviewInfo.emoji} PR Review: ${reviewInfo.text}`,
+    description: reviewBody,
     color: reviewInfo.color,
     author: {
       name: review.user?.login || 'Unknown',
@@ -473,11 +504,26 @@ function createReviewEmbed(payload) {
     },
     fields: [
       { name: 'Reviewer', value: review.user?.login || 'Unknown', inline: true },
-      { name: 'State', value: reviewState.replace('_', ' '), inline: true }
+      { name: 'Status', value: reviewInfo.text, inline: true }
     ],
     url: review.html_url,
     timestamp: new Date().toISOString()
   };
+  
+  // Add links
+  if (review.html_url) {
+    embed.fields.push(
+      { name: 'Review Link', value: `[View Review](${review.html_url})`, inline: true }
+    );
+  }
+  
+  if (pr?.html_url) {
+    embed.fields.push(
+      { name: 'Pull Request', value: `[PR #${pr.number}](${pr.html_url})`, inline: true }
+    );
+  }
+  
+  return embed;
 }
 
 function createCommentEmbed(action, payload) {
@@ -488,9 +534,15 @@ function createCommentEmbed(action, payload) {
     'deleted': '🗑️'
   };
   
-  return {
-    title: `${actionEmojis[action] || '💬'} Comment ${action}`,
-    description: comment?.body || 'Comment activity',
+  // Truncate comment body if too long
+  let commentBody = comment?.body || 'Comment activity';
+  if (commentBody.length > 500) {
+    commentBody = commentBody.substring(0, 497) + '...';
+  }
+  
+  const embed = {
+    title: `${actionEmojis[action] || '💬'} New Comment`,
+    description: commentBody,
     color: 0x586069,
     author: {
       name: comment?.user?.login || payload.sender?.login || 'Unknown',
@@ -498,11 +550,20 @@ function createCommentEmbed(action, payload) {
     },
     fields: [
       { name: 'Author', value: comment?.user?.login || payload.sender?.login || 'Unknown', inline: true },
-      { name: 'Action', value: action, inline: true }
+      { name: 'Action', value: action.charAt(0).toUpperCase() + action.slice(1), inline: true }
     ],
     url: comment?.html_url,
     timestamp: new Date().toISOString()
   };
+  
+  // Add link to comment
+  if (comment?.html_url) {
+    embed.fields.push(
+      { name: 'Link', value: `[View Comment](${comment.html_url})`, inline: false }
+    );
+  }
+  
+  return embed;
 }
 
 function createWorkflowEmbed(payload) {
@@ -551,6 +612,16 @@ function createWorkflowEmbed(payload) {
     const seconds = duration % 60;
     embed.fields.push({ name: 'Duration', value: `${minutes}m ${seconds}s`, inline: true });
   }
+  
+  // Add actor who triggered the workflow
+  if (workflow.actor) {
+    embed.fields.push({ name: 'Triggered By', value: workflow.actor.login || 'Unknown', inline: true });
+  }
+  
+  // Add link to workflow run
+  if (workflow.html_url) {
+    embed.fields.push({ name: 'View Run', value: `[Open in GitHub](${workflow.html_url})`, inline: false });
+  }
 
   return embed;
 }
@@ -578,7 +649,7 @@ function createCheckEmbed(eventName, payload) {
     statusInfo = statusMap[check.status] || { emoji: '📊', color: 0x0366d6 };
   }
 
-  return {
+  const embed = {
     title: `${statusInfo.emoji} ${eventName === 'check_suite' ? 'Check Suite' : 'Check'}: ${checkName}`,
     description: `Status: ${check.status}${check.conclusion ? ` (${check.conclusion})` : ''}`,
     color: statusInfo.color,
@@ -590,6 +661,18 @@ function createCheckEmbed(eventName, payload) {
     url: check.html_url || check.url,
     timestamp: new Date().toISOString()
   };
+  
+  // Add link to check run
+  if (check.html_url || check.url) {
+    embed.fields.push({ name: 'View Check', value: `[Open in GitHub](${check.html_url || check.url})`, inline: false });
+  }
+  
+  // Add PR link if available
+  if (payload.pull_request?.html_url) {
+    embed.fields.push({ name: 'Pull Request', value: `[PR #${payload.pull_request.number}](${payload.pull_request.html_url})`, inline: true });
+  }
+  
+  return embed;
 }
 
 function determineStatus(eventName, action, context) {

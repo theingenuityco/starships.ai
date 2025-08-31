@@ -55,17 +55,33 @@ export class AgentTemplateRepository extends BaseRepository {
 
   async create(entity: Omit<AgentTemplateModel, 'id' | 'createdAt'>): Promise<AgentTemplateModel> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired(entity, ['name', 'description', 'authorId'], 'create');
+      this.validateRequired(entity, ['name', 'description'], 'create');
       
       const id = uuidv4();
       const now = new Date().toISOString();
 
       const template: AgentTemplateModel = {
-        ...entity,
+        // Core AgentNodeParameters fields
+        name: entity.name as string,
+        description: entity.description as string | undefined,
+        model: entity.model as string,
+        temperature: entity.temperature as number | undefined,
+        maxTokens: entity.maxTokens as number | undefined,
+        instructions: entity.instructions as string | undefined,
+        timeout: this.getSafeValue(entity.timeout, 30000) as number,
+        memory: entity.memory as any, // AgentMemoryConfig
+        blueprint: entity.blueprint as any, // BaseBlueprint
+        
+        // Database-specific fields
         id,
         createdAt: now,
         updatedAt: now,
+        category: entity.category as AgentTemplateModel['category'],
         usageCount: 0,
+        
+        // Template-specific fields
+        icon: entity.icon as string | undefined,
+        previewPrompts: entity.previewPrompts as string[] | undefined,
       };
 
       const query = `
@@ -75,25 +91,6 @@ export class AgentTemplateRepository extends BaseRepository {
       
       const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(query, { template });
       const created = convertNeo4jIntsInObject(results[0].t);
-
-      // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
-      try {
-        if (template.authorId && template.authorId !== 'system') {
-          await this.connection.executeWrite(
-            `MATCH (u:User {id: $authorId}), (t:AgentTemplateModel {id: $templateId})
-             MERGE (u)-[r:CREATES]->(t)
-             ON CREATE SET r.createdAt = $now`,
-            {
-              authorId: template.authorId,
-              templateId: created.id,
-              now
-            }
-          );
-        }
-      } catch (error) {
-        // Log but don't fail - relationship is optional if user doesn't exist
-        console.warn('Failed to create USER-[:CREATES]->AGENT_TEMPLATE relationship:', error);
-      }
 
       return created;
     }, 'create', 'AgentTemplateModel');
@@ -315,28 +312,26 @@ export class AgentTemplateRepository extends BaseRepository {
     const now = new Date().toISOString();
 
     const agent: AgentModel = {
-      id: agentId,
+      // Core AgentNodeParameters fields from template
       name: agentName,
-      model: template.model,
-      systemPrompt: template.systemPrompt,
       description: template.description,
-      tags: [...template.tags], // Copy tags from template
-      category: template.category,
-      version: '1.0.0',
-      isPublic: false, // New agents from templates are private by default
-      authorId,
-      starshipId,
-      rating: undefined,
-      usageCount: 0,
+      model: template.model,
       temperature: template.temperature,
       maxTokens: template.maxTokens,
+      instructions: template.instructions,
+      timeout: template.timeout || 30000,
+      memory: template.memory,
+      blueprint: template.blueprint,
+      
+      // Database-specific fields
+      id: agentId,
       createdAt: now,
       updatedAt: now,
-      // Required autopilot fields
-      executionMode: 'simple', // Default to simple mode for template-created agents
-      timeout: 30000, // Default timeout
-      allowedStarshipClasses: undefined,
-      requiredPermissions: undefined,
+      version: '1.0.0',
+      category: template.category,
+      usageCount: 0,
+      templateId: templateId,
+      starshipId: starshipId,
     };
 
     const query = `
@@ -348,24 +343,6 @@ export class AgentTemplateRepository extends BaseRepository {
     
     const results = await this.connection.executeWrite<{ a: AgentModel }>(query, { agent, starshipId });
     const createdAgent = convertNeo4jIntsInObject(results[0].a);
-
-    // Create USER-[:CREATES]->AGENT relationship if author user exists
-    try {
-      if (authorId && authorId !== 'system') {
-        await this.connection.executeWrite(
-          `MATCH (u:User {id: $authorId}), (a:Agent {id: $agentId})
-           MERGE (u)-[r:CREATES]->(a)
-           ON CREATE SET r.createdAt = $now`,
-          {
-            authorId,
-            agentId: createdAgent.id,
-            now
-          }
-        );
-      }
-    } catch (error) {
-      console.warn('Failed to create USER-[:CREATES]->AGENT relationship:', error);
-    }
 
     return createdAgent;
   }
@@ -451,27 +428,27 @@ export class AgentTemplateRepository extends BaseRepository {
       };
 
       const template: AgentTemplateModel = {
-        id: templateId,
+        // Core AgentNodeParameters fields
         name: `${agent.name} Template`,
         description: this.getSafeValue(agent.description, '') as string,
-        category: agent.category,
-        tags: [...(agent.tags || [])],
-        systemPrompt: this.getSafeValue(agent.systemPrompt, '') as string,
         model: agent.model as string,
         temperature: agent.temperature as number | undefined,
         maxTokens: agent.maxTokens as number | undefined,
-        blueprint: defaultBlueprint,
-        memory: defaultMemory,
-        executionMode: 'simple',
+        instructions: agent.instructions as string | undefined,
         timeout: 30000,
-        authorId: agent.authorId,
-        isPublic: true,
-        usageCount: 0,
-        rating: agent.rating,
-        icon: '🤖', // Default icon
-        previewPrompts: [],
+        memory: defaultMemory,
+        blueprint: defaultBlueprint,
+        
+        // Database-specific fields
+        id: templateId,
         createdAt: now,
         updatedAt: now,
+        category: agent.category,
+        usageCount: 0,
+        
+        // Template-specific fields
+        icon: '🤖', // Default icon
+        previewPrompts: [],
       };
 
       const createQuery = `

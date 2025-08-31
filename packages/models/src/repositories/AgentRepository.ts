@@ -180,20 +180,29 @@ export class AgentRepository extends BaseRepository {
 
       const connection = getConnection();
       const now = new Date().toISOString();
+      
+      // Create agent with only essential fields from AgentNodeParameters + database fields
       const agent: AgentModel = {
-        ...entity,
+        // Core AgentNodeParameters fields
+        name: entity.name as string,
+        description: entity.description as string | undefined,
+        model: entity.model as string,
+        temperature: entity.temperature as number | undefined,
+        maxTokens: entity.maxTokens as number | undefined,
+        instructions: entity.instructions as string | undefined,
+        timeout: this.getSafeValue(entity.timeout, 30000) as number,
+        memory: entity.memory as any, // AgentMemoryConfig
+        blueprint: entity.blueprint as any, // BaseBlueprint
+        
+        // Database-specific fields
         id: uuidv4(),
         createdAt: now,
         updatedAt: now,
-        usageCount: 0,
-        tags: this.getSafeValue(entity.tags, []) as string[],
-        category: this.getSafeValue(entity.category, 'general') as AgentModel['category'],
-        isPublic: this.getSafeValue(entity.isPublic, false) as boolean,
         version: this.getSafeValue(entity.version, '1.0.0') as string,
-        authorId: this.getSafeValue(entity.authorId, 'system') as string,
-        starshipId: entity.starshipId as string, // Ensure starshipId is included
-        executionMode: this.getSafeValue(entity.executionMode, 'simple') as AgentModel['executionMode'], // Default execution mode
-        timeout: this.getSafeValue(entity.timeout, 30000) as number, // Default timeout
+        category: entity.category as AgentModel['category'],
+        usageCount: 0,
+        templateId: entity.templateId as string | undefined,
+        starshipId: entity.starshipId as string,
       };
 
       // Serialize complex objects for Neo4j storage
@@ -218,25 +227,6 @@ export class AgentRepository extends BaseRepository {
       } catch (error) {
         // Log but don't fail - Neo4j relationship is optional during transition
         console.warn('Failed to create Neo4j relationship for agent deployment:', error);
-      }
-
-      // Create USER-[:CREATES]->AGENT relationship if author user exists
-      try {
-        if (agent.authorId && agent.authorId !== 'system') {
-          await connection.executeWrite(
-            `MATCH (u:User {id: $authorId}), (a:Agent {id: $agentId})
-             MERGE (u)-[r:CREATES]->(a)
-             ON CREATE SET r.createdAt = $timestamp`,
-            {
-              authorId: agent.authorId,
-              agentId: agent.id,
-              timestamp: now
-            }
-          );
-        }
-      } catch (error) {
-        // Log but don't fail - relationship is optional if user doesn't exist
-        console.warn('Failed to create USER-[:CREATES]->AGENT relationship:', error);
       }
       
       return convertNeo4jIntsInObject(agent);

@@ -115,15 +115,11 @@ export class AgentService {
   static async createAgent(request: CreateAgentRequest): Promise<AgentModel> {
     const repository = new AgentRepository();
     
-    // Provide defaults for required fields that might be missing from CreateAgentRequest
+    // Provide defaults for core AgentNodeParameters fields
     const agentData = {
       ...request,
-      version: '1.0.0',
-      tags: request.tags || [],
-      isPublic: request.isPublic || false,
-      authorId: request.authorId || 'system',
-      executionMode: request.executionMode || 'simple' as const,
       timeout: request.timeout || 30000,
+      version: '1.0.0', // Default version for all new agents
     };
     
     return await repository.create(agentData);
@@ -224,12 +220,8 @@ export class AgentService {
     const agentData = {
       ...request,
       blueprint: request.blueprint || this.createDefaultBlueprint(request),
-      executionMode: request.executionMode || 'simple',
       timeout: request.timeout || 30000,
-      version: '1.0.0',
-      tags: request.tags || [],
-      isPublic: request.isPublic || false,
-      authorId: request.authorId || 'system',
+      version: '1.0.0', // Default version for all new agents
     };
 
     const dbAgent = await this.agentRepository.create(agentData);
@@ -486,9 +478,9 @@ export class AgentService {
       loadConversationHistory?: boolean;
     }
   ): Promise<AgentMemory> {
-    // Initialize memory with system prompt
+    // Initialize memory with instructions (replaced systemPrompt)
     const memory = createAgentMemory(
-      dbAgent.systemPrompt || 'You are a helpful AI assistant.'
+      (dbAgent.instructions as string) || 'You are a helpful AI assistant.'
     );
 
     // Set structured context from database configuration

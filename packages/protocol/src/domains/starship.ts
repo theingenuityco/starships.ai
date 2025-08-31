@@ -99,25 +99,26 @@ export interface StarshipAgentsResponse {
   starshipClass: StarshipClass;
   maxAgents: number;
   deployedAgents: Array<{
-    id: string;
+    // Core AgentNodeParameters fields
     name: string;
-    model: string;
-    systemPrompt?: string;
-    createdAt: string;
     description?: string;
-    tags: string[];
-    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-    authorId: string;
-    isPublic: boolean;
-    version: string;
-    updatedAt: string;
-    usageCount: number;
-    rating?: number;
+    model: string;
     temperature?: number;
     maxTokens?: number;
-    customInstructions?: string;
-    allowedStarshipClasses?: StarshipClass[];
-    requiredPermissions?: string[];
+    instructions?: string;
+    timeout?: number;
+    memory?: any; // AgentMemoryConfig
+    blueprint?: any; // BaseBlueprint
+    
+    // Database-specific fields
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+    version: string;
+    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+    usageCount: number;
+    templateId?: string;
+    starshipId: string;
   }>;
   availableSlots: number;
   deployedCount: number;

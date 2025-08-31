@@ -3,6 +3,7 @@ import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/error-utils';
+import type { StarshipAgentsResponse } from '@starships/protocol';
 
 // Define types locally based on protocol package
 interface UpdateStarshipRequest {
@@ -13,36 +14,6 @@ interface UpdateStarshipRequest {
 
 interface UpdateStarshipStatusRequest {
   status: 'active' | 'inactive';
-}
-
-interface StarshipAgentsResponse {
-  starshipId: string;
-  starshipName: string;
-  starshipClass: 'scout' | 'cruiser' | 'draught';
-  maxAgents: number;
-  deployedAgents: Array<{
-    id: string;
-    name: string;
-    model: string;
-    systemPrompt?: string;
-    createdAt: string;
-    description?: string;
-    tags: string[];
-    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-    authorId: string;
-    isPublic: boolean;
-    version: string;
-    updatedAt: string;
-    usageCount: number;
-    rating?: number;
-    temperature?: number;
-    maxTokens?: number;
-    customInstructions?: string;
-    allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-    requiredPermissions?: string[];
-  }>;
-  availableSlots: number;
-  deployedCount: number;
 }
 
 interface CommandDeckState {

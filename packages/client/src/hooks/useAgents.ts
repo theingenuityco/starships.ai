@@ -35,20 +35,12 @@ export function useAgents(starshipId?: string): UseAgentsReturn {
         console.log('[AGENTS] Using mock data due to error')
         const mockAgents: Agent[] = [
           {
+            // Minimal Agent fields (from protocol/mission.ts)
             id: 'fallback-research-assistant',
             name: 'Research Assistant',
-            description: 'Helps with research and data analysis',
             model: 'gpt-4o',
-            systemPrompt: 'You are a research assistant specializing in data analysis and research.',
-            starshipId: starshipId || 'default',
-            tags: ['research', 'analysis'],
             category: 'analysis',
-            authorId: 'system',
-            isPublic: false,
-            version: '1',
-            usageCount: 0,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            description: 'Helps with research and data analysis'
           }
         ]
         setAgents(mockAgents)

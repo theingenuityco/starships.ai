@@ -74,7 +74,7 @@ export class Agent {
    * Get agent instructions
    */
   getInstructions(): string | undefined {
-    return this.params.instructions;
+    return this.params.instructions as string | undefined;
   }
 
   /**

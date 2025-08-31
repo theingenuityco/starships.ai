@@ -89,7 +89,6 @@ export type {
 // Export agent types
 export type {
   AgentModel,
-  AgentConfig,
   CreateAgentRequest,
   UpdateAgentRequest,
   AgentListResponse,
@@ -114,8 +113,7 @@ export type {
   AgentTemplateFilters,
   AgentTemplateSort,
   AgentTemplateUsage,
-  IncrementTemplateUsageRequest,
-  RateTemplateRequest
+  IncrementTemplateUsageRequest
 } from './types/agent-template';
 
 // Export scripts

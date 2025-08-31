@@ -191,8 +191,9 @@ describe('AgentHandler', () => {
       const paramsWithoutName = {
         model: 'openai/gpt-4',
         instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
-      } as AgentNodeParameters;
+      } as unknown as AgentNodeParameters;
       
       const nodeWithoutName: Node = {
         ref: 'no-name-agent-node',
@@ -219,8 +220,9 @@ describe('AgentHandler', () => {
       const paramsWithoutModel = {
         name: 'Test Agent',
         instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
-      } as AgentNodeParameters;
+      } as unknown as AgentNodeParameters;
       
       const nodeWithoutModel: Node = {
         ref: 'no-model-agent-node',
@@ -245,8 +247,9 @@ describe('AgentHandler', () => {
     it('should fail validation when both name and model are missing', () => {
       const paramsWithoutRequiredParams = {
         instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
-      } as AgentNodeParameters;
+      } as unknown as AgentNodeParameters;
       
       const nodeWithoutRequiredParams: Node = {
         ref: 'no-required-agent-node',

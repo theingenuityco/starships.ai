@@ -27,12 +27,13 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "3000"
     spec:
-      # Security Context - Run as non-root user for security
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        runAsNonRoot: true
+      # Security Context - Temporarily disabled due to supervisor permission issues
+      # TODO: Fix Docker image to work with non-root user
+      # securityContext:
+      #   runAsUser: 1000
+      #   runAsGroup: 1000
+      #   fsGroup: 1000
+      #   runAsNonRoot: true
       
       imagePullSecrets:
       - name: ghcr-pull-secret

@@ -1,7 +1,7 @@
 /**
  * Agent Memory System
  *
- * Extended memory system for agents with identity, purpose, scene, and conversation history
+ * Extended memory system for agents with identity, purpose, space, and conversation history
  * Built on top of the base Memory class for LLM message management
  */
 
@@ -27,14 +27,10 @@ export interface AgentPurpose {
 }
 
 /**
- * Agent context information (like screenplay background)
+ * Agent space information (like screenplay background)
  */
-export interface AgentContext {
-  setting?: string;
-  participants?: string[];
-  mood?: string;
-  context?: string;
-  background?: string;
+export interface AgentSpace {
+  description: string;
 }
 
 /**
@@ -56,7 +52,7 @@ export interface ConversationEntry {
 export class AgentMemory extends Memory {
   private identity?: AgentIdentity;
   private purpose?: AgentPurpose;
-  private context?: AgentContext;
+  private space?: AgentSpace;
   private conversations: ConversationEntry[] = [];
 
   constructor(initialSystemPrompt?: string) {
@@ -83,10 +79,10 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Set agent context
+   * Set agent space
    */
-  setContext(context: AgentContext): void {
-    this.context = context;
+  setSpace(space: AgentSpace): void {
+    this.space = space;
     this.rebuildSystemContext();
   }
 
@@ -141,10 +137,10 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Get agent context
+   * Get agent space
    */
-  getContext(): AgentContext | undefined {
-    return this.context ? { ...this.context } : undefined;
+  getSpace(): AgentSpace | undefined {
+    return this.space ? { ...this.space } : undefined;
   }
 
   /**
@@ -208,31 +204,20 @@ export class AgentMemory extends Memory {
       parts.push(`PURPOSE:\n${purposeParts.join('\n')}`);
     }
 
-    // Context section
-    if (this.context) {
-      const contextParts: string[] = [];
-      if (this.context.setting) contextParts.push(`Setting: ${this.context.setting}`);
-      if (this.context.participants && this.context.participants.length > 0) {
-        contextParts.push(`Participants: ${this.context.participants.join(', ')}`);
-      }
-      if (this.context.mood) contextParts.push(`Mood: ${this.context.mood}`);
-      if (this.context.context) contextParts.push(`Context: ${this.context.context}`);
-      if (this.context.background) contextParts.push(`Background: ${this.context.background}`);
-      
-      if (contextParts.length > 0) {
-        parts.push(`CONTEXT:\n${contextParts.join('\n')}`);
-      }
+    // Space section
+    if (this.space) {
+      parts.push(`SPACE:\n${this.space.description}`);
     }
 
     return parts.length > 0 ? parts.join('\n\n') : '';
   }
 
   /**
-   * Rebuild system context when identity/purpose/context changes
+   * Rebuild system context when identity/purpose/space changes
    */
   private rebuildSystemContext(): void {
     // Remove existing structured system messages and rebuild
-    // This is called when identity, purpose, or context changes
+    // This is called when identity, purpose, or space changes
     // For now, we'll just let toMessages() handle the formatting
   }
 
@@ -254,7 +239,7 @@ export class AgentMemory extends Memory {
     this.conversations = [];
     this.identity = undefined;
     this.purpose = undefined;
-    this.context = undefined;
+    this.space = undefined;
   }
 
   /**
@@ -266,7 +251,7 @@ export class AgentMemory extends Memory {
     cloned.conversations = this.conversations.map(conv => ({ ...conv }));
     cloned.identity = this.identity ? { ...this.identity } : undefined;
     cloned.purpose = this.purpose ? { ...this.purpose } : undefined;
-    cloned.context = this.context ? { ...this.context } : undefined;
+    cloned.space = this.space ? { ...this.space } : undefined;
     return cloned;
   }
 
@@ -285,7 +270,7 @@ export class AgentMemory extends Memory {
     conversations: number;
     hasIdentity: boolean;
     hasPurpose: boolean;
-    hasContext: boolean;
+    hasSpace: boolean;
   } {
     const messageStats = super.getStats();
     return {
@@ -293,7 +278,7 @@ export class AgentMemory extends Memory {
       conversations: this.conversations.length,
       hasIdentity: !!this.identity,
       hasPurpose: !!this.purpose,
-      hasContext: !!this.context
+      hasSpace: !!this.space
     };
   }
 }

@@ -67,7 +67,7 @@ console.log('Execution result:', result);
 
 ## Memory System
 
-Autopilot includes a sophisticated memory system built on two layers: base **Memory** for core LLM message management, and **AgentMemory** for advanced structured context with identity, purpose, context, and conversation history.
+Autopilot includes a sophisticated memory system built on two layers: base **Memory** for core LLM message management, and **AgentMemory** for advanced structured context with identity, purpose, space, and conversation history.
 
 ### Base Memory Class
 
@@ -119,13 +119,9 @@ memory.setPurpose({
   constraints: ['Never promise what cannot be delivered', 'Escalate complex technical issues']
 });
 
-// Set context (like screenplay background)
-memory.setContext({
-  setting: 'Customer support chat during business hours',
-  participants: ['customer', 'support agent'],
-  mood: 'professional but friendly',
-  context: 'Customer experiencing billing issue',
-  background: 'High-volume support period, need efficient resolution'
+// Set space (like screenplay background)
+memory.setSpace({
+  description: 'Customer support chat during business hours with customer experiencing billing issue. Mood is professional but friendly. High-volume support period requiring efficient resolution.'
 });
 
 // Add conversation history with metadata
@@ -160,12 +156,8 @@ Primary Purpose: Resolve customer issues efficiently and professionally
 Secondary Goals: Build customer satisfaction, Identify upsell opportunities
 Constraints: Never promise what cannot be delivered, Escalate complex technical issues
 
-CONTEXT:
-Setting: Customer support chat during business hours
-Participants: customer, support agent
-Mood: professional but friendly
-Context: Customer experiencing billing issue
-Background: High-volume support period, need efficient resolution
+SPACE:
+Customer support chat during business hours with customer experiencing billing issue. Mood is professional but friendly. High-volume support period requiring efficient resolution.
 ```
 
 ### Memory Methods
@@ -182,7 +174,7 @@ Background: High-volume support period, need efficient resolution
 **AgentMemory Additional:**
 - `setIdentity(identity)` - Set agent identity
 - `setPurpose(purpose)` - Set agent purpose
-- `setContext(context)` - Set agent context
+- `setSpace(space)` - Set agent space
 - `addConversation(role, content, metadata?)` - Add conversation with metadata
 - `addSystemPrompt(prompt)` - Legacy compatibility
 - `clearConversations()` - Clear conversations only
@@ -237,10 +229,8 @@ agentMemory.setPurpose({
   primary: 'Provide comprehensive customer support through multi-step workflow',
   secondary: ['Gather user data', 'Generate personalized responses', 'Process requests efficiently']
 });
-agentMemory.setContext({
-  setting: 'Customer support automation system',
-  context: 'Multi-step workflow processing customer requests',
-  mood: 'professional and efficient'
+agentMemory.setSpace({
+  description: 'Customer support automation system processing multi-step workflow for customer requests. Mood is professional and efficient.'
 });
 
 // Create workflow with multiple node types - all handlers are automatically available

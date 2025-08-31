@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AutopilotAgentExecutionService } from '../services/AutopilotAgentExecutionService';
+import { AgentExecutionService } from '../services/AgentExecutionService';
 import type { ChatRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
@@ -82,7 +82,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
     console.log(`[CHAT] Processing message for authenticated user: ${userId}`);
 
-    const result = await AutopilotAgentExecutionService.executeChat(chatRequest);
+    const result = await AgentExecutionService.executeChat(chatRequest);
 
     // Track agent usage after successful chat
     try {
@@ -149,7 +149,7 @@ router.delete('/:sessionKey/memory', authMiddleware, async (req: Request, res: R
       );
     }
 
-    const store = AutopilotAgentExecutionService.getMemoryStore();
+    const store = AgentExecutionService.getMemoryStore();
     await store.clear(sessionKey);
 
     res.json({

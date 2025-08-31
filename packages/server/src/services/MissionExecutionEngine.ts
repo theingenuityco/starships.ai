@@ -9,7 +9,7 @@
 import { RepositoryFactory } from '@starships/models';
 import { MissionService } from './MissionService';
 import { Logger } from '../utils/logger';
-import { AutopilotAgentExecutionService } from './AutopilotAgentExecutionService';
+import { AgentExecutionService } from './AgentExecutionService';
 import type {
   MissionWorkflow, 
   WorkflowNode, 
@@ -186,7 +186,7 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
 
         // Execute using real agent engine with shared memory store
         const startTime = Date.now();
-        const response: ChatResponse = await AutopilotAgentExecutionService.executeChat(chatRequest);
+        const response: ChatResponse = await AgentExecutionService.executeChat(chatRequest);
         const executionTime = Date.now() - startTime;
 
         this.logger.info('Real agent execution completed successfully', {

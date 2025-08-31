@@ -18,10 +18,12 @@ class DiscordThreadManager {
       ]
     });
 
-    // Set up ready listener BEFORE login (using new clientReady event)
+    // Set up ready listener BEFORE login
+    let isReady = false;
     const readyPromise = new Promise((resolve) => {
       this.client.once('ready', () => {
         console.log('Discord client ready');
+        isReady = true;
         resolve();
       });
     });
@@ -33,7 +35,9 @@ class DiscordThreadManager {
     // Wait for ready event or timeout after 5 seconds
     const timeoutPromise = new Promise((resolve) => {
       setTimeout(() => {
-        console.log('Ready event timeout - proceeding anyway');
+        if (!isReady) {
+          console.log('Ready event timeout - proceeding anyway');
+        }
         resolve();
       }, 5000);
     });
@@ -59,7 +63,17 @@ class DiscordThreadManager {
       console.log(`✓ Bot has access to channel: ${channel.name} (${channel.id})`);
       
       if (channel.type !== ChannelType.GuildText) {
-        throw new Error(`Channel ${channel.name} is not a text channel (type: ${channel.type})`);
+        const channelTypes = {
+          0: 'Text Channel',
+          2: 'Voice Channel', 
+          4: 'Category',
+          5: 'Announcement Channel',
+          13: 'Stage Channel',
+          15: 'Forum Channel',
+          16: 'Media Channel'
+        };
+        const channelTypeName = channelTypes[channel.type] || `Unknown (${channel.type})`;
+        throw new Error(`Channel "${channel.name}" is a ${channelTypeName}, but threads can only be created in Text Channels (type 0). Please use a regular text channel instead of a forum channel.`);
       }
       
       // Check permissions

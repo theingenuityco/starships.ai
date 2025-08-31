@@ -117,8 +117,8 @@ describe('WorkflowHandler', () => {
 
       await handler.execute(mockExecution);
 
-      // Verify Workflow was created with correct blueprint
-      expect(Workflow).toHaveBeenCalledWith(mockBlueprint);
+      // Verify Workflow was created with correct parameters
+      expect(Workflow).toHaveBeenCalledWith(mockNode.parameters);
 
       // Verify execute was called
       expect(mockWorkflow.execute).toHaveBeenCalled();
@@ -202,8 +202,8 @@ describe('WorkflowHandler', () => {
 
       await timeoutHandler.execute(mockExecution);
 
-      // Verify Workflow was created with correct blueprint
-      expect(Workflow).toHaveBeenCalledWith(mockBlueprint);
+      // Verify Workflow was created with correct parameters
+      expect(Workflow).toHaveBeenCalledWith(nodeWithTimeout.parameters);
       expect(mockWorkflow.execute).toHaveBeenCalled();
     });
 

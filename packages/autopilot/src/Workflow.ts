@@ -5,31 +5,33 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, Execution } from './types';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from './types';
 import { Engine } from './engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Workflow {
   private blueprint: Blueprint;
+  private parameters?: WorkflowNodeParameters;
   private engine: Engine;
 
-  constructor(blueprint?: Blueprint) {
-    // Initialize blueprint
-    if (!blueprint) {
-      this.blueprint = {
-        nodes: [],
-        edges: [],
-        metadata: {}
-      };
-    } else {
-      // Create a deep copy to avoid mutations to the original blueprint
-      this.blueprint = {
-        ...blueprint,
-        nodes: blueprint.nodes.map(node => ({ ...node })),
-        edges: blueprint.edges.map(edge => ({ ...edge })),
-        metadata: { ...blueprint.metadata }
-      };
-    }
+  constructor(params?: WorkflowNodeParameters) {
+    // Store parameters if provided
+    this.parameters = params;
+    
+    // Extract blueprint or create empty one
+    const blueprint: Blueprint = params?.blueprint || {
+      nodes: [],
+      edges: [],
+      metadata: {}
+    };
+
+    // Create a deep copy to avoid mutations to the original blueprint
+    this.blueprint = {
+      ...blueprint,
+      nodes: blueprint.nodes.map(node => ({ ...node })),
+      edges: blueprint.edges.map(edge => ({ ...edge })),
+      metadata: { ...blueprint.metadata }
+    };
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -99,6 +101,19 @@ export class Workflow {
     return JSON.parse(JSON.stringify(this.blueprint));
   }
 
+  /**
+   * Get workflow parameters (read-only copy)
+   */
+  getParameters(): WorkflowNodeParameters | undefined {
+    return this.parameters ? JSON.parse(JSON.stringify(this.parameters)) : undefined;
+  }
+
+  /**
+   * Get workflow timeout
+   */
+  getTimeout(): number | undefined {
+    return this.parameters?.timeout;
+  }
 
   /**
    * Get workflow nodes
@@ -164,6 +179,16 @@ export class Workflow {
       edges: this.blueprint.edges.map(edge => ({ ...edge }))
     };
 
-    return new Workflow(clonedBlueprint);
+    // If we have parameters, clone them with the new blueprint
+    if (this.parameters) {
+      const clonedParams: WorkflowNodeParameters = {
+        ...this.parameters,
+        blueprint: clonedBlueprint
+      };
+      return new Workflow(clonedParams);
+    } else {
+      // If no parameters, create minimal parameters with just blueprint
+      return new Workflow({ blueprint: clonedBlueprint });
+    }
   }
 }

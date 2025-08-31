@@ -281,7 +281,6 @@ const workflow = new Workflow()
         agentTaskMemory.setPurpose({ primary: 'Help customers with their specific requests' });
         return agentTaskMemory;
       })(),
-      instructions: 'Help the user',
       blueprint: {
         nodes: [
           { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
@@ -499,7 +498,6 @@ interface AgentNodeParameters {
   memory: AgentMemory;
   
   // Execution parameters
-  instructions?: string;
   timeout?: number;
   
   // Embedded workflow execution (required)
@@ -524,7 +522,6 @@ memory.addSystemPrompt('Be concise and professional in responses.');
     name: 'Support Agent',
     model: 'anthropic/claude-3.5-sonnet',
     memory: memory, // AgentMemory instance
-    instructions: 'Help the customer with their inquiry',
     temperature: 0.7,
     maxTokens: 500,
     timeout: 5000,
@@ -587,8 +584,6 @@ Example execution result:
   data: {
     agentName: 'Support Agent',
     model: 'anthropic/claude-3.5-sonnet',
-    systemPrompt: 'You are a helpful customer support agent.',
-    instructions: 'Help the customer with their inquiry',
     workflowStatus: 'completed',
     workflowResults: [
       { message: 'Workflow started' },

@@ -183,7 +183,6 @@ const templateRepo = RepositoryFactory.getAgentTemplateRepository();
 const template = await templateRepo.create({
   name: 'Data Analyst',
   category: 'analysis',
-  systemPrompt: 'You are a data analysis specialist...',
   isPublic: true
 });
 

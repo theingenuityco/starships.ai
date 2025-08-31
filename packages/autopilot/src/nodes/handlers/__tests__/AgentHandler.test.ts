@@ -44,7 +44,6 @@ describe('AgentHandler', () => {
         } as AgentMemoryConfig,
         temperature: 0.7,
         maxTokens: 500,
-        instructions: 'Test instructions for the agent',
         timeout: 5000,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters
@@ -72,7 +71,6 @@ describe('AgentHandler', () => {
       expect(nodeResult?.data).toEqual(expect.objectContaining({
         agentName: 'Customer Support Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        instructions: 'Test instructions for the agent',
         workflowResults: expect.any(Array),
         workflowStatus: 'completed',
         output: 'Agent Customer Support Agent completed workflow execution successfully'
@@ -190,7 +188,6 @@ describe('AgentHandler', () => {
     it('should fail validation when name is missing', () => {
       const paramsWithoutName = {
         model: 'openai/gpt-4',
-        instructions: 'Some instructions',
         memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as unknown as AgentNodeParameters;
@@ -219,7 +216,6 @@ describe('AgentHandler', () => {
     it('should fail validation when model is missing', () => {
       const paramsWithoutModel = {
         name: 'Test Agent',
-        instructions: 'Some instructions',
         memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as unknown as AgentNodeParameters;
@@ -246,7 +242,6 @@ describe('AgentHandler', () => {
 
     it('should fail validation when both name and model are missing', () => {
       const paramsWithoutRequiredParams = {
-        instructions: 'Some instructions',
         memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as unknown as AgentNodeParameters;
@@ -293,7 +288,6 @@ describe('AgentHandler', () => {
         name: '',
         model: '',
         memory: {} as AgentMemoryConfig,
-        instructions: 'Some instructions',
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       

@@ -63,19 +63,6 @@ export class Agent {
     this.memory.addConversation(role, content, metadata);
   }
 
-  /**
-   * Add system prompt to agent memory
-   */
-  addSystemPrompt(prompt: string): void {
-    this.memory.addMessage('system', prompt);
-  }
-
-  /**
-   * Get agent instructions
-   */
-  getInstructions(): string | undefined {
-    return this.params.instructions as string | undefined;
-  }
 
   /**
    * Get agent description

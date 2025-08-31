@@ -360,7 +360,6 @@ Content-Type: application/json
 {
   "name": "Code Assistant",
   "model": "gpt-4",
-  "systemPrompt": "You are a helpful coding assistant",
   "starshipId": "starship-123",
   "category": "coding",
   "tags": ["coding", "development"],
@@ -374,7 +373,6 @@ Content-Type: application/json
   "id": "agent-456",
   "name": "Code Assistant",
   "model": "gpt-4",
-  "systemPrompt": "You are a helpful coding assistant",
   "starshipId": "starship-123",
   "category": "coding",
   "tags": ["coding", "development"],

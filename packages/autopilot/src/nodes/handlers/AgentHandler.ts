@@ -32,8 +32,6 @@ export class AgentHandler extends BaseHandler {
         return this.createSuccessResult(execution, {
           agentName: params.name,
           model: params.model,
-          systemPrompt: params.systemPrompt,
-          instructions: params.instructions,
           workflowResults: agentOutputs,
           workflowStatus: agentResult.status,
           output: `Agent ${params.name} completed workflow execution successfully`

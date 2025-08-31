@@ -188,9 +188,6 @@ export class AutopilotAgentExecutionService {
         warnings.push('Agent is set to workflow mode but has no blueprint defined');
       }
       
-      if (!dbAgent.systemPrompt) {
-        warnings.push('Agent has no system prompt defined');
-      }
 
       if (!dbAgent.starshipId) {
         warnings.push('Agent is not assigned to any starship');

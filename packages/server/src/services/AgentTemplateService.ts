@@ -39,8 +39,8 @@ export class AgentTemplateService {
     templateData: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
   ): Promise<AgentTemplateModel> {
     // Validate required fields
-    if (!templateData.name || !templateData.systemPrompt || !templateData.model) {
-      throw new Error('Template name, systemPrompt, and model are required');
+    if (!templateData.name || !templateData.model) {
+      throw new Error('Template name and model are required');
     }
 
     // Ensure tags is an array
@@ -362,7 +362,6 @@ export class AgentTemplateService {
         description: 'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
         category: 'general',
         tags: ['general', 'helpful', 'assistant', 'versatile', 'autopilot'],
-        systemPrompt: 'You are a helpful, knowledgeable, and friendly assistant. You provide accurate information, help solve problems, and offer guidance across a wide range of topics. Always be polite, clear, and concise in your responses.',
         model: 'anthropic/claude-3.5-sonnet',
         temperature: 0.7,
         maxTokens: 2000,
@@ -390,7 +389,6 @@ export class AgentTemplateService {
         description: 'An expert code reviewer with advanced autopilot workflows for comprehensive code analysis and improvement suggestions.',
         category: 'coding',
         tags: ['programming', 'code-review', 'debugging', 'best-practices', 'autopilot'],
-        systemPrompt: 'You are an expert software engineer and code reviewer. Analyze code for quality, performance, security, and maintainability. Provide constructive feedback, suggest improvements, and identify potential bugs. Always explain your reasoning and provide examples when possible.',
         model: 'anthropic/claude-3.5-sonnet',
         temperature: 0.3,
         maxTokens: 3000,
@@ -418,7 +416,6 @@ export class AgentTemplateService {
         description: 'A creative writing assistant with structured autopilot workflows for ideation, planning, and content creation.',
         category: 'creative',
         tags: ['writing', 'storytelling', 'creative', 'content', 'fiction', 'autopilot'],
-        systemPrompt: 'You are a creative writing assistant with expertise in storytelling, character development, and various writing styles. Help users craft compelling narratives, develop interesting characters, and improve their creative writing. Be imaginative, supportive, and provide specific, actionable feedback.',
         model: 'anthropic/claude-3.5-sonnet',
         temperature: 0.8,
         maxTokens: 2500,
@@ -446,7 +443,6 @@ export class AgentTemplateService {
         description: 'An analytical assistant powered by autopilot for data interpretation, visualization, and insights.',
         category: 'analysis',
         tags: ['data', 'analysis', 'statistics', 'insights', 'visualization', 'autopilot'],
-        systemPrompt: 'You are a data analyst with expertise in statistics, data interpretation, and visualization. Help users understand their data, identify patterns and trends, suggest appropriate analysis methods, and explain complex statistical concepts in simple terms. Always provide actionable insights.',
         model: 'anthropic/claude-3.5-sonnet',
         temperature: 0.4,
         maxTokens: 2500,
@@ -474,7 +470,6 @@ export class AgentTemplateService {
         description: 'A friendly customer support assistant with autopilot-powered workflows for issue resolution.',
         category: 'support',
         tags: ['customer-service', 'support', 'help', 'professional', 'problem-solving', 'autopilot'],
-        systemPrompt: 'You are a professional customer support representative. Be helpful, patient, and empathetic. Listen to customer concerns, provide clear solutions, and escalate issues when necessary. Always maintain a positive and professional tone, even in difficult situations.',
         model: 'anthropic/claude-3.5-sonnet',
         temperature: 0.6,
         maxTokens: 2000,
@@ -502,7 +497,7 @@ export class AgentTemplateService {
     for (const template of defaultTemplates) {
       try {
         // Check if template already exists
-        const existing = await this.searchTemplates(template.name);
+        const existing = await this.searchTemplates(template.name as string);
         const alreadyExists = existing.some(
           (t) => t.name === template.name && t.authorId === 'system'
         );

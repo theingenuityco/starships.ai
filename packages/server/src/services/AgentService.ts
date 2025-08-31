@@ -477,9 +477,9 @@ export class AgentService {
       loadConversationHistory?: boolean;
     }
   ): Promise<AgentMemory> {
-    // Initialize memory with instructions (replaced systemPrompt)
+    // Initialize memory with default prompt
     const memory = createAgentMemory(
-      (dbAgent.instructions as string) || 'You are a helpful AI assistant.'
+      'You are a helpful AI assistant.'
     );
 
     // Set structured context from database configuration

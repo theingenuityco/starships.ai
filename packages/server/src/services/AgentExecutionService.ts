@@ -83,7 +83,7 @@ export class AgentExecutionService {
     const memoryArray = memories.slice(-10); // Last 10 messages
 
     // Build system prompt with tools context
-    let systemPrompt = agent.systemPrompt || "You are a helpful AI assistant.";
+    let systemPrompt = "You are a helpful AI assistant.";
     
     if (availableTools.length > 0) {
       systemPrompt += `\n\nYou have access to the following tools:

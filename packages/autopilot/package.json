@@ -2,15 +2,15 @@
   "name": "@starships/autopilot",
   "version": "1.0.0",
   "description": "Workflow execution engine and agent development framework for starships.ai",
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./dist/src/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./types": {
-      "types": "./dist/src/types/index.d.ts"
+      "types": "./dist/types/index.d.ts"
     }
   },
   "scripts": {

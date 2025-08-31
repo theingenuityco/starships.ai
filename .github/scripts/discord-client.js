@@ -18,16 +18,36 @@ class DiscordThreadManager {
       ]
     });
 
-    await this.client.login(this.token);
-    console.log(`Bot logged in as ${this.client.user.tag}`);
-    
-    // Wait for client to be ready
-    return new Promise((resolve) => {
+    // Set up ready listener BEFORE login
+    const readyPromise = new Promise((resolve) => {
       this.client.once('ready', () => {
         console.log('Discord client ready');
         resolve();
       });
     });
+
+    // Login to Discord
+    await this.client.login(this.token);
+    console.log(`Bot logged in as ${this.client.user.tag}`);
+    
+    // Wait for ready event or timeout after 5 seconds
+    const timeoutPromise = new Promise((resolve) => {
+      setTimeout(() => {
+        console.log('Ready event timeout - proceeding anyway');
+        resolve();
+      }, 5000);
+    });
+    
+    // Wait for either ready or timeout
+    await Promise.race([readyPromise, timeoutPromise]);
+    
+    // Double-check client is ready
+    if (!this.client.isReady()) {
+      console.log('Client not ready, waiting additional time...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    console.log('Discord client initialization complete');
   }
 
   async createPrivateThread(prNumber, prTitle, prAuthor, prUrl) {

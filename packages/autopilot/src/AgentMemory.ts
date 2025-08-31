@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, LLMMessage } from './Memory';
+import { Memory, Message } from './Memory';
 
 /**
  * Agent identity information
@@ -43,16 +43,6 @@ export interface AgentMemoryConfig {
   messages?: Message[];
 }
 
-/**
- * Message entry with metadata
- */
-export interface Message {
-  id: string;
-  timestamp: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  metadata?: Record<string, unknown>;
-}
 
 /**
  * Agent Memory Class
@@ -63,7 +53,6 @@ export class AgentMemory extends Memory {
   private identity?: AgentIdentity;
   private purpose?: AgentPurpose;
   private space?: AgentSpace;
-  private messageEntries: Message[] = [];
 
   constructor(config?: AgentMemoryConfig) {
     super();
@@ -102,27 +91,6 @@ export class AgentMemory extends Memory {
     this.space = space;
   }
 
-  /**
-   * Add message entry with metadata
-   */
-  addMessage(
-    role: 'user' | 'assistant' | 'system',
-    content: string,
-    metadata?: Record<string, unknown>
-  ): void {
-    if (content && content.trim()) {
-      const entry: Message = {
-        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString(),
-        role,
-        content: content.trim(),
-        metadata
-      };
-      
-      this.messageEntries.push(entry);
-      super.addMessage(role, content);
-    }
-  }
 
   /**
    * Add conversation entry with metadata (legacy compatibility)
@@ -136,18 +104,12 @@ export class AgentMemory extends Memory {
     this.addMessage(role, content, metadata);
   }
 
-  /**
-   * Add system prompt (legacy compatibility)
-   */
-  addSystemPrompt(prompt: string): void {
-    super.addMessage('system', prompt);
-  }
 
   /**
    * Get message history
    */
   getMessageHistory(): Message[] {
-    return [...this.messageEntries];
+    return super.getMessageEntries();
   }
 
   /**
@@ -182,24 +144,26 @@ export class AgentMemory extends Memory {
   /**
    * Format messages for LLM with structured context
    */
-  toMessages(): LLMMessage[] {
-    const messages: LLMMessage[] = [];
+  toMessages(): Message[] {
+    const messages: Message[] = [];
     
     // Add structured system context if available
     const systemContext = this.buildSystemContext();
     if (systemContext) {
       messages.push({
+        id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
         role: 'system',
         content: systemContext
       });
     }
 
     // Add all other messages (excluding system messages we'll replace)
-    const nonSystemMessages = this.messages.filter(msg => msg.role !== 'system');
+    const nonSystemMessages = super.getMessages().filter(msg => msg.role !== 'system');
     messages.push(...nonSystemMessages);
 
     // Add any remaining system messages that aren't part of structured context
-    const remainingSystemMessages = this.messages.filter(msg => msg.role === 'system');
+    const remainingSystemMessages = super.getMessages().filter(msg => msg.role === 'system');
     messages.push(...remainingSystemMessages);
 
     return messages;
@@ -253,11 +217,10 @@ export class AgentMemory extends Memory {
    * Clear message history only
    */
   clearMessages(): void {
-    this.messageEntries = [];
     // Remove conversation messages but keep system messages
-    const systemMessages = super.getMessages().filter(msg => msg.role === 'system');
+    const systemMessages = super.getMessageEntries().filter(msg => msg.role === 'system');
     super.clear();
-    systemMessages.forEach(msg => super.addMessage(msg.role, msg.content));
+    systemMessages.forEach(msg => super.addMessage(msg.role, msg.content, msg.metadata));
   }
 
   /**
@@ -273,7 +236,6 @@ export class AgentMemory extends Memory {
    */
   clear(): void {
     super.clear();
-    this.messageEntries = [];
     this.identity = undefined;
     this.purpose = undefined;
     this.space = undefined;
@@ -284,10 +246,10 @@ export class AgentMemory extends Memory {
    */
   clone(): AgentMemory {
     const cloned = new AgentMemory();
-    // Copy base messages
-    super.getMessages().forEach(msg => cloned.addMessage(msg.role, msg.content));
-    // Copy message entries
-    cloned.messageEntries = this.messageEntries.map(msg => ({ ...msg }));
+    // Copy message entries with metadata
+    super.getMessageEntries().forEach(msg =>
+      cloned.addMessage(msg.role, msg.content, msg.metadata)
+    );
     // Copy agent-specific data
     cloned.identity = this.identity ? { ...this.identity } : undefined;
     cloned.purpose = this.purpose ? { ...this.purpose } : undefined;
@@ -315,7 +277,7 @@ export class AgentMemory extends Memory {
     const messageStats = super.getStats();
     return {
       messages: messageStats,
-      messageEntries: this.messageEntries.length,
+      messageEntries: super.getMessageEntries().length,
       hasIdentity: !!this.identity,
       hasPurpose: !!this.purpose,
       hasSpace: !!this.space
@@ -324,4 +286,4 @@ export class AgentMemory extends Memory {
 }
 
 // Export types for external use
-export type { LLMMessage } from './Memory';
+export type { Message } from './Memory';

@@ -8,20 +8,24 @@
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * LLM-compatible message format
+ * Message entry with metadata
  */
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant';
+export interface Message {
+  id: string;
+  timestamp: string;
+  role: 'user' | 'assistant' | 'system';
   content: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
  * Base Memory Class
- * 
- * Core message management system that handles LLM-compatible messages
+ *
+ * Core message management system that stores rich Message objects internally
+ * but provides LLM-compatible format for external consumption
  */
 export class Memory {
-  protected messages: LLMMessage[] = [];
+  protected messages: Message[] = [];
 
   constructor(initialSystemMessage?: string) {
     if (initialSystemMessage) {
@@ -32,26 +36,37 @@ export class Memory {
   /**
    * Add message to memory
    */
-  addMessage(role: 'system' | 'user' | 'assistant', content: string): void {
+  addMessage(role: 'system' | 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
     if (content && content.trim()) {
-      this.messages.push({
+      const message: Message = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
         role,
-        content: content.trim()
-      });
+        content: content.trim(),
+        metadata
+      };
+      this.messages.push(message);
     }
   }
 
   /**
-   * Get all messages in LLM format
+   * Get all messages
    */
-  getMessages(): LLMMessage[] {
+  getMessages(): Message[] {
     return [...this.messages];
+  }
+
+  /**
+   * Get all message entries (alias for getMessages)
+   */
+  getMessageEntries(): Message[] {
+    return this.getMessages();
   }
 
   /**
    * Format messages for LLM consumption (alias for getMessages)
    */
-  toMessages(): LLMMessage[] {
+  toMessages(): Message[] {
     return this.getMessages();
   }
 
@@ -72,14 +87,14 @@ export class Memory {
   /**
    * Get messages by role
    */
-  getMessagesByRole(role: 'system' | 'user' | 'assistant'): LLMMessage[] {
+  getMessagesByRole(role: 'system' | 'user' | 'assistant'): Message[] {
     return this.messages.filter(msg => msg.role === role);
   }
 
   /**
    * Get last N messages
    */
-  getLastMessages(count: number): LLMMessage[] {
+  getLastMessages(count: number): Message[] {
     return this.messages.slice(-count);
   }
 

@@ -41,7 +41,7 @@ export class LlmHandler extends BaseHandler {
           const llmResponse = this.extractLlmResponse(httpData.body);
           
           // Add LLM response to agent memory for future reference
-          execution.agentMemory.addConversation('assistant', llmResponse, {
+          execution.agentMemory.addMessage('assistant', llmResponse, {
             model: params.model,
             nodeRef: this.node.ref
           });
@@ -86,10 +86,16 @@ export class LlmHandler extends BaseHandler {
 
   private buildRequestBody(params: LlmNodeParameters, execution: Execution): object {
     // Get messages from agent memory (includes system prompts and conversation history)
-    const messages = execution.agentMemory.toMessages();
+    const memoryMessages = execution.agentMemory.toMessages();
+    
+    // Convert to API format (simple objects with just role and content)
+    const apiMessages = memoryMessages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
     
     // Add current prompt as user message
-    messages.push({
+    apiMessages.push({
       role: 'user',
       content: params.prompt
     });
@@ -97,7 +103,7 @@ export class LlmHandler extends BaseHandler {
     // Build OpenRouter-compatible request body
     return {
       model: params.model,
-      messages,
+      messages: apiMessages,
       temperature: params.temperature || 0.7,
       max_tokens: params.maxTokens || 1024,
       top_p: params.topP || 1.0,

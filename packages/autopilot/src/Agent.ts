@@ -67,7 +67,7 @@ export class Agent {
    * Add system prompt to agent memory
    */
   addSystemPrompt(prompt: string): void {
-    this.memory.addSystemPrompt(prompt);
+    this.memory.addMessage('system', prompt);
   }
 
   /**

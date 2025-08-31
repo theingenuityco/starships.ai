@@ -26,11 +26,10 @@ export * from './validation';
 
 // ===== MEMORY SYSTEM =====
 // Base memory types only (no classes)
-export type { LLMMessage } from '../Memory';
+export type { Message } from '../Memory';
 
 // Agent memory types only (no classes)
 export type {
-  Message,
   AgentIdentity,
   AgentPurpose,
   AgentSpace,

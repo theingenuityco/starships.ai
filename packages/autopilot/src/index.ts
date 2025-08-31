@@ -14,12 +14,11 @@ export { Agent } from './Agent';
 
 // Memory system
 export { Memory } from './Memory';
-export type { LLMMessage } from './Memory';
+export type { Message } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
 export type {
-  Message,
   AgentIdentity,
   AgentPurpose,
   AgentSpace,

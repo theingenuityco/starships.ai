@@ -9,7 +9,7 @@ import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
 import { MISSION_PHASES } from '@starships/protocol';
-import type { Agent } from '@starships/protocol';
+import type { Agent } from '@starships/models';
 
 /**
  * System instruction constants - direct instruction strings for different operations

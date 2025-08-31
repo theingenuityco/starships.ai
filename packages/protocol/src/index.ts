@@ -7,7 +7,6 @@
 export * from './contracts/socket';
 
 // Export domain types (database domains)
-export * from './domains/agent';
 export * from './domains/chat';
 export * from './domains/llm';
 export * from './domains/mission';

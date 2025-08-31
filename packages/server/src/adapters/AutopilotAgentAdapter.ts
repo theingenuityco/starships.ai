@@ -5,9 +5,8 @@
  * Handles conversion, memory management, and blueprint creation.
  */
 
-import { Agent as DBAgent, AutopilotBlueprint, AgentMemoryConfig, AutopilotNodeType } from '@starships/protocol';
-// TODO: Import autopilot types after module setup
-// import { Agent as AutopilotAgent, AgentMemory, createAgentMemory, Execution, ConversationEntry } from '@starships/autopilot';
+import { Agent as DBAgent, AgentMemoryConfig } from '@starships/models';
+import { Blueprint, NodeType, Agent as AutopilotAgent, AgentMemory, createAgentMemory, Execution, ConversationEntry } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { MemoryEntry } from '@starships/protocol';
 

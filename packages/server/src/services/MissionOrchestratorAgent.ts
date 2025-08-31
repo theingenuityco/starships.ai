@@ -26,7 +26,8 @@ import type {
   LLMProvider
 } from '@starships/protocol';
 import type { LLM } from '@starships/models';
-import type { Starship, Vision, Agent } from '@starships/protocol';
+import type { Starship, Vision } from '@starships/protocol';
+import type { Agent } from '@starships/models';
 
 /**
  * Configuration for MissionOrchestratorAgent

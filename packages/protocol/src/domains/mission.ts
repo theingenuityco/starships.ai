@@ -5,7 +5,21 @@
  * Implementation details moved to appropriate packages.
  */
 
-import type { Agent } from './agent';
+// ============================================================================
+// MINIMAL AGENT INTERFACE (for mission context only)
+// ============================================================================
+
+/**
+ * Minimal Agent interface for mission workflow responses
+ * Full Agent type is in @starships/models
+ */
+export interface Agent {
+  id: string;
+  name: string;
+  model: string;
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  description?: string;
+}
 
 // ============================================================================
 // CORE MISSION TYPES

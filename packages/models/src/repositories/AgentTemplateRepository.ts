@@ -1,4 +1,5 @@
-import { AgentTemplate, Agent } from '@starships/protocol';
+import { AgentTemplate } from '@starships/protocol';
+import { Agent } from '../types/agent';
 import { Neo4jConnection, getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
@@ -320,6 +321,11 @@ export class AgentTemplateRepository extends BaseRepository {
       maxTokens: template.maxTokens,
       createdAt: now,
       updatedAt: now,
+      // Required autopilot fields
+      executionMode: 'simple', // Default to simple mode for template-created agents
+      timeout: 30000, // Default timeout
+      allowedStarshipClasses: undefined,
+      requiredPermissions: undefined,
     };
 
     const query = `

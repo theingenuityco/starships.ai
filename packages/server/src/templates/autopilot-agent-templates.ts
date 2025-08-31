@@ -5,7 +5,8 @@
  * These templates can be used to create new agents or as examples.
  */
 
-import { AutopilotBlueprint, AgentMemoryConfig } from '@starships/protocol';
+import { Blueprint } from '@starships/autopilot';
+import { AgentMemoryConfig } from '@starships/models';
 
 export interface AgentTemplate {
   id: string;
@@ -15,7 +16,7 @@ export interface AgentTemplate {
   tags: string[];
   model: string;
   systemPrompt: string;
-  blueprint: AutopilotBlueprint;
+  blueprint: Blueprint;
   agentMemoryConfig: AgentMemoryConfig;
   executionMode: 'simple' | 'workflow';
   timeout: number;

@@ -5,8 +5,8 @@
  * Handles backward compatibility and default value assignment.
  */
 
-import { RepositoryFactory } from '@starships/models';
-import { AutopilotBlueprint, AgentMemoryConfig } from '@starships/protocol';
+import { RepositoryFactory, AgentMemoryConfig } from '@starships/models';
+import { Blueprint } from '@starships/autopilot';
 
 export interface MigrationStats {
   totalAgents: number;
@@ -135,7 +135,7 @@ export class AgentMigration {
   /**
    * Create default blueprint for existing agents
    */
-  private static createDefaultBlueprint(agent: any): AutopilotBlueprint {
+  private static createDefaultBlueprint(agent: any): Blueprint {
     return {
       nodes: [
         {

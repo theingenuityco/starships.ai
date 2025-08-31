@@ -25,12 +25,10 @@ export * from './execution';
 export * from './validation';
 
 // ===== MEMORY SYSTEM =====
-// Base memory class and interfaces
-export { Memory } from '../Memory';
+// Base memory types only (no classes)
 export type { LLMMessage } from '../Memory';
 
-// Agent memory classes and interfaces
-export { AgentMemory } from '../AgentMemory';
+// Agent memory types only (no classes)
 export type {
   ConversationEntry,
   AgentIdentity,

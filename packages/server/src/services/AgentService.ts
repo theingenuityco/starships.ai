@@ -1,6 +1,4 @@
-import { RepositoryFactory } from '@starships/models';
-import { Agent } from '@starships/protocol';
-import { AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import { RepositoryFactory, Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
 
 /**
  * Service for managing AI agents with Neo4j persistence

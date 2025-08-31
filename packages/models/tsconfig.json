@@ -10,6 +10,7 @@
   "include": ["src/**/*"],
   "exclude": ["dist"],
   "references": [
-    { "path": "../protocol" }
+    { "path": "../protocol" },
+    { "path": "../autopilot" }
   ]
 }

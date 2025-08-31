@@ -274,6 +274,9 @@ importers:
 
   packages/models:
     dependencies:
+      '@starships/autopilot':
+        specifier: workspace:*
+        version: link:../autopilot
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -329,6 +332,9 @@ importers:
       '@notionhq/client':
         specifier: ^4.0.2
         version: 4.0.2
+      '@starships/autopilot':
+        specifier: workspace:*
+        version: link:../autopilot
       '@starships/env-config':
         specifier: workspace:*
         version: link:../env-config

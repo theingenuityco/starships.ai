@@ -803,9 +803,9 @@ router.get('/:id/execution-status', async (req: Request, res: Response): Promise
     
     res.json({
       success: true,
-      data: { 
-        executionState: mission.executionState || null,
-        phase: mission.phase 
+      data: {
+        executionState: null, // Execution state now managed by autopilot workflow system
+        phase: mission.phase
       }
     });
 

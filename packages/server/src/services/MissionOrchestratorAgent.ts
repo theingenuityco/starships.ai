@@ -222,7 +222,7 @@ export class MissionOrchestratorAgent {
       metadata,
       clarity: clarity || undefined,
       workflow: workflow || undefined,
-      executionResult: metadata.mission.executionResult,
+      executionResult: undefined, // Execution results now managed by autopilot workflow system
       messages: [messageObj]
     };
   }
@@ -413,14 +413,14 @@ export class MissionOrchestratorAgent {
       let completionMessage: string;
       
       if (result.success) {
-        const nodeResultsSummary = result.nodeResults?.map((nodeResult, index) => 
+        const nodeResultsSummary = result.nodeResults?.map((nodeResult: any, index: number) =>
           `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.success ? '✅ Completed' : '❌ Failed'}\n   ${nodeResult.output ? nodeResult.output.substring(0, 150) + (nodeResult.output.length > 150 ? '...' : '') : 'No output'}`
         ).join('\n') || 'No detailed results available.';
         
         completionMessage = `✅ **Mission execution completed successfully!**\n\n${result.summary}\n\n📋 **Execution Details:**\n${nodeResultsSummary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`;
       } else {
-        const failedNodes = result.nodeResults?.filter(nr => !nr.success) || [];
-        const failureDetails = failedNodes.map((nodeResult, index) => 
+        const failedNodes = result.nodeResults?.filter((nr: any) => !nr.success) || [];
+        const failureDetails = failedNodes.map((nodeResult: any, index: number) =>
           `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.error || 'Unknown error'}`
         ).join('\n') || 'No specific error details available.';
         

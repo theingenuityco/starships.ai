@@ -6,22 +6,6 @@
  */
 
 // ============================================================================
-// MINIMAL AGENT INTERFACE (for mission context only)
-// ============================================================================
-
-/**
- * Minimal Agent interface for mission workflow responses
- * Full Agent type is in @starships/models
- */
-export interface Agent {
-  id: string;
-  name: string;
-  model: string;
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  description?: string;
-}
-
-// ============================================================================
 // CORE MISSION TYPES
 // ============================================================================
 
@@ -71,47 +55,8 @@ export interface Mission {
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
-  executionState?: MissionExecutionState; // Workflow execution progress
-  executionResult?: MissionExecutionResult; // Final execution results for persistence
-}
-
-// ============================================================================
-// EXECUTION TYPES
-// ============================================================================
-
-/**
- * Mission execution state - tracks workflow execution progress
- */
-export interface MissionExecutionState {
-  status: 'running' | 'completed' | 'failed';
-  currentNodeIndex: number;
-  totalNodes: number;
-  nodeResults: MissionNodeResult[];
-  startedAt: string;
-  completedAt?: string;
-  error?: string;
-}
-
-/**
- * Result from executing a single workflow node
- */
-export interface MissionNodeResult {
-  nodeId: string;
-  nodeName: string;
-  success: boolean;
-  output: string;
-  timestamp: string;
-  error?: string;
-}
-
-/**
- * Overall result from workflow execution
- */
-export interface MissionExecutionResult {
-  success: boolean;
-  nodeResults: MissionNodeResult[];
-  summary: string;
-  executedAt: string;
+  // Workflow execution is now handled by the autopilot package
+  // Mission tracks workflow through MissionWorkflow relationship
 }
 
 // ============================================================================
@@ -138,8 +83,7 @@ export interface UpdateMissionRequest {
   phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
   approvalStatus?: 'pending' | 'approved' | 'rejected' | 'modified';
-  executionState?: MissionExecutionState; // Update execution progress
-  executionResult?: MissionExecutionResult; // Update final execution results
+  // Execution state is now managed by the autopilot workflow system
 }
 
 /**
@@ -333,11 +277,11 @@ export interface UpdateWorkflowApprovalRequest {
 }
 
 /**
- * Response containing workflow data with associated agent details
+ * Response containing workflow data
  */
 export interface WorkflowResponse {
   workflow: MissionWorkflow;
-  agents: Record<string, Agent>; // agentId -> Agent details
+  // Agent details are now managed by the models package
 }
 
 

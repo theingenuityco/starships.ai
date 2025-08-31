@@ -90,8 +90,7 @@ export class MissionRepository extends BaseRepository {
         approvalStatus: 'pending',
         createdAt: now,
         updatedAt: now,
-        createdBy: userId,
-        executionState: undefined
+        createdBy: userId
       };
 
       await connection.executeWrite(
@@ -305,16 +304,6 @@ export class MissionRepository extends BaseRepository {
         params.approvalStatus = updates.approvalStatus;
       }
 
-      if (updates.executionState !== undefined) {
-        setClause.push('m.executionState = $executionState');
-        params.executionState = updates.executionState ? JSON.stringify(updates.executionState) : null;
-      }
-
-      if (updates.executionResult !== undefined) {
-        setClause.push('m.executionResult = $executionResult');
-        params.executionResult = updates.executionResult ? JSON.stringify(updates.executionResult) : null;
-      }
-
       const query = `
         MATCH (m:Mission {id: $id})
         SET ${setClause.join(', ')}
@@ -370,9 +359,7 @@ export class MissionRepository extends BaseRepository {
       approvalStatus: record.approvalStatus || 'pending',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      createdBy: record.createdBy,
-      executionState: record.executionState ? JSON.parse(record.executionState) : undefined,
-      executionResult: record.executionResult ? JSON.parse(record.executionResult) : undefined
+      createdBy: record.createdBy
     };
   }
 }

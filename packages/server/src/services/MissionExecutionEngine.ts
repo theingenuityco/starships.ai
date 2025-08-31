@@ -13,12 +13,36 @@ import { AgentService } from './AgentService';
 import type {
   MissionWorkflow,
   WorkflowNode,
-  MissionExecutionResult,
-  MissionNodeResult,
-  MissionExecutionState,
   ChatRequest,
   ChatResponse
 } from '@starships/protocol';
+
+// Local execution types (execution state now managed internally)
+interface MissionExecutionResult {
+  success: boolean;
+  nodeResults: MissionNodeResult[];
+  summary: string;
+  executedAt: string;
+}
+
+interface MissionNodeResult {
+  nodeId: string;
+  nodeName: string;
+  success: boolean;
+  output: string;
+  error?: string;
+  timestamp: string;
+}
+
+interface MissionExecutionState {
+  status: 'running' | 'completed' | 'failed';
+  currentNodeIndex: number;
+  totalNodes: number;
+  nodeResults: MissionNodeResult[];
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+}
 import getStore from '../store';
 
 export class MissionExecutionEngine {
@@ -271,64 +295,67 @@ Please execute this task as part of mission ${missionId}. Provide a comprehensiv
    * Initialize execution state when starting
    */
   private async initializeExecutionState(missionId: string, totalNodes: number): Promise<void> {
-    const executionState: MissionExecutionState = {
-      status: 'running',
-      currentNodeIndex: 0,
+    // Execution state now managed by autopilot workflow system
+    // This is a local tracking method for the execution engine
+    this.logger.info('Initializing mission execution', {
+      missionId,
       totalNodes,
-      nodeResults: [],
-      startedAt: new Date().toISOString()
-    };
-    
-    await MissionService.updateMission(missionId, { executionState });
+      status: 'running'
+    });
   }
   
   /**
    * Update execution progress after each node
    */
   private async updateExecutionProgress(
-    missionId: string, 
-    currentIndex: number, 
+    missionId: string,
+    currentIndex: number,
     results: MissionNodeResult[]
   ): Promise<void> {
-    const mission = await MissionService.getMissionById(missionId);
-    if (mission.executionState) {
-      mission.executionState.currentNodeIndex = currentIndex;
-      mission.executionState.nodeResults = [...results];
-      await MissionService.updateMission(missionId, { executionState: mission.executionState });
-    }
+    // Execution state now managed by autopilot workflow system
+    // This is a local tracking method for the execution engine
+    this.logger.info('Mission execution progress updated', {
+      missionId,
+      currentIndex,
+      totalResults: results.length,
+      successCount: results.filter(r => r.success).length
+    });
   }
   
   /**
    * Mark execution as completed
    */
   private async markExecutionCompleted(missionId: string, results: MissionNodeResult[], executionResult: MissionExecutionResult): Promise<void> {
-    const mission = await MissionService.getMissionById(missionId);
-    if (mission.executionState) {
-      mission.executionState.status = 'completed';
-      mission.executionState.currentNodeIndex = mission.executionState.totalNodes;
-      mission.executionState.nodeResults = results;
-      mission.executionState.completedAt = new Date().toISOString();
-      await MissionService.updateMission(missionId, { 
-        executionState: mission.executionState,
-        executionResult: executionResult
-      });
-    }
+    // Execution state now managed by autopilot workflow system
+    // Update mission status to completed
+    await MissionService.updateMission(missionId, {
+      status: 'completed'
+    });
+    
+    this.logger.info('Mission execution completed', {
+      missionId,
+      success: executionResult.success,
+      totalTasks: results.length,
+      completedAt: new Date().toISOString()
+    });
   }
   
   /**
    * Mark execution as failed
    */
   private async markExecutionFailed(missionId: string, results: MissionNodeResult[], error?: string, executionResult?: MissionExecutionResult): Promise<void> {
-    const mission = await MissionService.getMissionById(missionId);
-    if (mission.executionState) {
-      mission.executionState.status = 'failed';
-      mission.executionState.nodeResults = results;
-      mission.executionState.error = error || 'Execution failed';
-      mission.executionState.completedAt = new Date().toISOString();
-      await MissionService.updateMission(missionId, { 
-        executionState: mission.executionState,
-        executionResult: executionResult
-      });
-    }
+    // Execution state now managed by autopilot workflow system
+    // Update mission status to failed
+    await MissionService.updateMission(missionId, {
+      status: 'failed'
+    });
+    
+    this.logger.error('Mission execution failed', {
+      missionId,
+      error: error || 'Execution failed',
+      totalTasks: results.length,
+      successfulTasks: results.filter(r => r.success).length,
+      failedAt: new Date().toISOString()
+    });
   }
 }

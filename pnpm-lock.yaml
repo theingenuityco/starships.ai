@@ -134,6 +134,9 @@ importers:
       '@starships/env-config':
         specifier: workspace:*
         version: link:../env-config
+      '@starships/models':
+        specifier: workspace:*
+        version: link:../models
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol

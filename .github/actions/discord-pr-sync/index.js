@@ -170,7 +170,7 @@ async function createOrReactivateThread(discord, stateManager, prNumber, prTitle
         color: 0x0366d6,
         fields: [
           { name: 'PR', value: `#${prNumber}`, inline: true },
-          { name: 'Status', value: '🔵 Open', inline: true }
+          { name: 'Status', value: '💬 Open', inline: true }
         ],
         timestamp: new Date().toISOString()
       }]
@@ -307,10 +307,10 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
     const status = determineStatus(eventName, action, context);
     if (status) {
       const statusEmojis = {
-        'open': '🔵',
-        'closed': '🔴',
-        'merged': '🟣',
-        'draft': '⚪'
+        'open': '💬',
+        'closed': '🔒',
+        'merged': '✨',
+        'draft': '📝'
       };
       
       const emoji = statusEmojis[status] || '🔵';

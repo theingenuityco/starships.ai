@@ -151,7 +151,7 @@ class DiscordThreadManager {
           fields: [
             { name: 'PR Number', value: `#${prNumber}`, inline: true },
             { name: 'Author', value: prAuthor, inline: true },
-            { name: 'Status', value: '🔵 Open', inline: true }
+            { name: 'Status', value: '💬 Open', inline: true }
           ],
           url: prUrl,
           timestamp: new Date().toISOString()
@@ -367,13 +367,13 @@ class DiscordThreadManager {
 
   getStatusEmoji(status) {
     const statusMap = {
-      'draft': '🚧',
-      'open': '🔵',
+      'draft': '📝',
+      'open': '💬',
       'approved': '✅',
-      'changes_requested': '🔴',
+      'changes_requested': '🔄',
       'ci_failing': '⚠️',
-      'merged': '🟣',
-      'closed': '❌'
+      'merged': '✨',
+      'closed': '🔒'
     };
     return statusMap[status] || '';
   }
@@ -392,7 +392,7 @@ class DiscordThreadManager {
       
       // Remove all status emojis and "PR #XXX:" patterns (including duplicates)
       let baseName = currentName
-        .replace(/^[🚧🔵✅🔴⚠️🟣❌]\s*/, '')  // Remove emoji (no lock icon)
+        .replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '')  // Remove emoji
         .replace(/PR #\d+:\s*/g, '');  // Remove ALL "PR #XXX:" occurrences (note the 'g' flag)
       
       // Clean up any extra whitespace

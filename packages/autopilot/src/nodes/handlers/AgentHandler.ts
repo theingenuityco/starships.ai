@@ -7,26 +7,25 @@
 
 import { BaseHandler } from '../Handler';
 import { Execution, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '../../types';
-import { Workflow } from '../../Workflow';
+import { Agent } from '../../Agent';
 
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
   async execute(execution: Execution) {
-    const startTime = Date.now();
     const params = this.node.parameters as AgentNodeParameters;
     
     try {
       console.log(`Executing agent: ${params.name} (model: ${params.model}) with workflow execution`);
 
-      // Create workflow instance from the agent's blueprint and execute
-      const workflow = new Workflow(params.blueprint);
-      const workflowResult = await workflow.execute();
+      // Create agent instance from the full parameters and execute
+      const agent = new Agent(params);
+      const agentResult = await agent.execute();
       
-      // Check if workflow execution was successful
-      if (workflowResult.status === 'completed') {
-        // Collect all successful workflow results
-        const workflowOutputs = Array.from(workflowResult.executionResults.values())
+      // Check if agent execution was successful
+      if (agentResult.status === 'completed') {
+        // Collect all successful agent results
+        const agentOutputs = Array.from(agentResult.executionResults.values())
           .filter(result => !result.error)
           .map(result => result.data);
 
@@ -35,13 +34,13 @@ export class AgentHandler extends BaseHandler {
           model: params.model,
           systemPrompt: params.systemPrompt,
           instructions: params.instructions,
-          workflowResults: workflowOutputs,
-          workflowStatus: workflowResult.status,
+          workflowResults: agentOutputs,
+          workflowStatus: agentResult.status,
           output: `Agent ${params.name} completed workflow execution successfully`
         });
       } else {
-        // Workflow execution failed
-        const errorMessage = workflowResult.error?.message || 'Workflow execution failed';
+        // Agent execution failed
+        const errorMessage = agentResult.error?.message || 'Agent execution failed';
         return this.createErrorResult(execution,
           `Agent ${params.name} workflow execution failed: ${errorMessage}`
         );
@@ -49,7 +48,7 @@ export class AgentHandler extends BaseHandler {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return this.createErrorResult(execution,
-        `Agent ${params.name} execution failed: ${errorMessage}`
+        `Agent ${params.name} workflow execution failed: ${errorMessage}`
       );
     }
   }
@@ -59,7 +58,7 @@ export class AgentHandler extends BaseHandler {
     const warnings: ValidationWarning[] = [];
     const params = this.node.parameters as AgentNodeParameters;
 
-    // Check for required fields
+    // Check for required fields first
     if (!params.name) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
@@ -80,33 +79,25 @@ export class AgentHandler extends BaseHandler {
         'Agent workflow is required'
       ));
     } else {
-      // Validate workflow structure
-      if (!params.blueprint.nodes || params.blueprint.nodes.length === 0) {
-        errors.push(this.createValidationError(
-          'VALIDATION_FAILED',
-          'Agent workflow must contain at least one node'
-        ));
-      }
-
-      // Check for start node
-      const hasStartNode = params.blueprint.nodes.some(n => n.type === 'start');
-      if (!hasStartNode) {
-        errors.push(this.createValidationError(
-          'MISSING_START_NODE',
-          'Agent workflow must have a start node'
-        ));
-      }
-
-      // Check for circular references in workflow
-      if (params.blueprint.edges && params.blueprint.edges.length > 0) {
-        const nodeRefs = new Set(params.blueprint.nodes.map(n => n.ref));
-        for (const edge of params.blueprint.edges) {
-          if (!nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)) {
-            errors.push(this.createValidationError(
-              'INVALID_EDGE_CONNECTION',
-              `Invalid edge reference in workflow: ${edge.from} -> ${edge.to}`
-            ));
-          }
+      // Only do comprehensive validation if basic fields are present
+      // to avoid duplicate error messages
+      if (params.name && params.model) {
+        // Use Agent class validation for comprehensive checking
+        const agent = new Agent(params);
+        const agentValidation = agent.validate();
+        
+        if (!agentValidation.valid) {
+          agentValidation.errors.forEach(error => {
+            // Skip errors we already caught above
+            if (!error.includes('Agent name is required') &&
+                !error.includes('Agent model is required') &&
+                !error.includes('Agent blueprint is required')) {
+              errors.push(this.createValidationError(
+                'VALIDATION_FAILED',
+                error
+              ));
+            }
+          });
         }
       }
     }

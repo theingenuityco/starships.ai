@@ -12,10 +12,10 @@ import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import { WorkflowService } from './WorkflowService';
-import { MissionExecutionEngine } from './MissionExecutionEngine';
 import { MissionService } from './MissionService';
 import { MISSION_PHASES } from '@starships/protocol';
 import { WorkflowParsingService } from './WorkflowParsingService';
+import { Workflow, createAgentMemory, AgentMemory } from '@starships/autopilot';
 import type {
   Mission,
   MissionPhase,
@@ -390,19 +390,42 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Start mission execution in background
+   * Start mission execution in background using autopilot workflow system
    */
-  private async startMissionExecution(missionId: string, workflow: MissionWorkflow): Promise<void> {
+  private async startMissionExecution(missionId: string, missionWorkflow: MissionWorkflow): Promise<void> {
     try {
-      const executionEngine = new MissionExecutionEngine();
+      // Convert MissionWorkflow to autopilot Workflow
+      const autopilotWorkflow = this.convertToAutopilotWorkflow(missionWorkflow);
       
-      this.logger.info('Starting mission execution', {
-        missionId,
-        workflowId: workflow.id,
-        agentNodesCount: workflow.nodes.filter(n => n.type === 'agent').length
+      // Create agent memory for workflow execution context
+      const agentMemory = createAgentMemory('Mission execution coordinator');
+      agentMemory.setIdentity({
+        name: 'Mission Executor',
+        role: 'Workflow Coordinator',
+        personality: 'Systematic, thorough, results-oriented'
+      });
+      agentMemory.setPurpose({
+        primary: 'Execute mission workflow tasks sequentially and efficiently',
+        secondary: ['Track task progress', 'Handle errors gracefully', 'Provide detailed results']
+      });
+      agentMemory.setSpace({
+        description: `Executing mission ${missionId} with ${missionWorkflow.nodes.filter(n => n.type === 'agent').length} tasks`
       });
       
-      const result = await executionEngine.executeWorkflow(missionId, workflow);
+      this.logger.info('Starting mission execution with autopilot workflow system', {
+        missionId,
+        workflowId: missionWorkflow.id,
+        agentNodesCount: missionWorkflow.nodes.filter(n => n.type === 'agent').length
+      });
+      
+      // Execute workflow using autopilot
+      const execution = {
+        status: 'not_started' as const,
+        executionResults: new Map(),
+        agentMemory: agentMemory
+      };
+      
+      const result = await autopilotWorkflow.execute(execution);
       
       // Update mission phase to converse after execution
       await MissionService.updateMission(missionId, {
@@ -412,19 +435,16 @@ export class MissionOrchestratorAgent {
       // Send completion message
       let completionMessage: string;
       
-      if (result.success) {
-        const nodeResultsSummary = result.nodeResults?.map((nodeResult: any, index: number) =>
-          `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.success ? '✅ Completed' : '❌ Failed'}\n   ${nodeResult.output ? nodeResult.output.substring(0, 150) + (nodeResult.output.length > 150 ? '...' : '') : 'No output'}`
+      if (result.status === 'completed') {
+        const executionResults = Array.from(result.executionResults.entries());
+        const nodeResultsSummary = executionResults.map(([nodeRef, nodeResult], index) =>
+          `${index + 1}. **${nodeRef}**: ✅ Completed\n   ${nodeResult.data ? JSON.stringify(nodeResult.data).substring(0, 150) + '...' : 'No output'}`
         ).join('\n') || 'No detailed results available.';
         
-        completionMessage = `✅ **Mission execution completed successfully!**\n\n${result.summary}\n\n📋 **Execution Details:**\n${nodeResultsSummary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`;
+        completionMessage = `✅ **Mission execution completed successfully!**\n\nExecuted ${executionResults.length} tasks successfully.\n\n📋 **Execution Details:**\n${nodeResultsSummary}\n\n🎯 **What's next?**\nYou can now ask me questions about the results, request additional analysis, or start a new mission. How can I help you make the most of these results?`;
       } else {
-        const failedNodes = result.nodeResults?.filter((nr: any) => !nr.success) || [];
-        const failureDetails = failedNodes.map((nodeResult: any, index: number) =>
-          `${index + 1}. **${nodeResult.nodeName}**: ${nodeResult.error || 'Unknown error'}`
-        ).join('\n') || 'No specific error details available.';
-        
-        completionMessage = `❌ **Mission execution encountered issues**\n\n${result.summary}\n\n🚨 **Failed Tasks:**\n${failureDetails}\n\n🔧 **Next steps:**\n- Review the failed tasks above\n- Consider modifying the plan to address the issues\n- Or ask me to regenerate the workflow\n\nWhat would you like to do?`;
+        const error = result.error || 'Unknown execution error';
+        completionMessage = `❌ **Mission execution encountered issues**\n\nExecution Status: ${result.status}\nError: ${error}\n\n🔧 **Next steps:**\n- Review the error details above\n- Consider modifying the plan to address the issues\n- Or ask me to regenerate the workflow\n\nWhat would you like to do?`;
       }
         
       // Send system message
@@ -433,7 +453,7 @@ export class MissionOrchestratorAgent {
       await orchestratorService.handleSystemMessage(missionId, completionMessage);
       
     } catch (error) {
-      this.logger.error('Background mission execution failed', { 
+      this.logger.error('Background mission execution failed', {
         missionId,
         error: error instanceof Error ? error.message : String(error)
       });
@@ -444,6 +464,31 @@ export class MissionOrchestratorAgent {
       const orchestratorService = MissionOrchestratorService.getInstance();
       await orchestratorService.handleSystemMessage(missionId, errorMessage);
     }
+  }
+
+  /**
+   * Convert MissionWorkflow to autopilot Workflow format
+   */
+  private convertToAutopilotWorkflow(missionWorkflow: MissionWorkflow): Workflow {
+    const workflow = new Workflow();
+    
+    // Add nodes
+    missionWorkflow.nodes.forEach(node => {
+      workflow.addNode({
+        ref: node.id,
+        type: node.type as any, // Convert to autopilot node types
+        name: node.name,
+        description: node.description || '',
+        parameters: node.parameters || {}
+      });
+    });
+    
+    // Add edges
+    missionWorkflow.edges.forEach(edge => {
+      workflow.addEdge(edge.from, edge.to);
+    });
+    
+    return workflow;
   }
 
   /**

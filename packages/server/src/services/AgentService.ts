@@ -68,6 +68,12 @@ export class AgentService {
       allowedStarshipClasses: createRequest.allowedStarshipClasses,
       starshipId: createRequest.starshipId, // Required starshipId from request
 
+      // Autopilot-specific fields
+      blueprint: createRequest.blueprint,
+      agentMemoryConfig: createRequest.agentMemoryConfig,
+      executionMode: createRequest.executionMode || 'simple', // Default to simple mode
+      timeout: createRequest.timeout || 30000, // Default 30 second timeout
+
       // Auto-generated fields
       authorId: createRequest.authorId || 'system', // Use provided authorId or default to system
       version: '1.0.0',
@@ -262,7 +268,7 @@ export class AgentService {
     };
   }
 
-  // UPDATE: Enhanced convertToAgentConfig to handle all fields
+  // UPDATE: Enhanced convertToAgentConfig to handle all fields including autopilot
   private static convertToAgentConfig(agent: Agent): AgentConfig {
     return {
       id: agent.id,
@@ -285,6 +291,12 @@ export class AgentService {
       allowedStarshipClasses: agent.allowedStarshipClasses,
       requiredPermissions: agent.requiredPermissions,
       starshipId: agent.starshipId,
+      
+      // Autopilot-specific fields
+      blueprint: agent.blueprint,
+      agentMemoryConfig: agent.agentMemoryConfig,
+      executionMode: agent.executionMode || 'simple', // Default to simple if not set
+      timeout: agent.timeout,
     };
   }
 

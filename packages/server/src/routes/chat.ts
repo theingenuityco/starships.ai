@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AgentExecutionService } from '../services/AgentExecutionService';
+import { AutopilotAgentExecutionService } from '../services/AutopilotAgentExecutionService';
 import type { ChatRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
@@ -82,7 +82,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
     console.log(`[CHAT] Processing message for authenticated user: ${userId}`);
 
-    const result = await AgentExecutionService.executeChat(chatRequest);
+    const result = await AutopilotAgentExecutionService.executeChat(chatRequest);
 
     // Track agent usage after successful chat
     try {

@@ -12,6 +12,37 @@ export class AgentRepository extends BaseRepository {
   constructor() {
     super('AgentRepository');
   }
+
+  /**
+   * Serialize complex objects for Neo4j storage
+   */
+  private serializeComplexFields(agent: Agent): any {
+    return {
+      ...agent,
+      blueprint: agent.blueprint ? JSON.stringify(agent.blueprint) : null,
+      agentMemoryConfig: agent.agentMemoryConfig ? JSON.stringify(agent.agentMemoryConfig) : null,
+    };
+  }
+
+  /**
+   * Deserialize complex objects from Neo4j storage
+   */
+  private deserializeComplexFields(agent: any): Agent {
+    try {
+      return {
+        ...agent,
+        blueprint: agent.blueprint ? JSON.parse(agent.blueprint) : undefined,
+        agentMemoryConfig: agent.agentMemoryConfig ? JSON.parse(agent.agentMemoryConfig) : undefined,
+      };
+    } catch (error) {
+      console.warn(`Failed to deserialize agent ${agent.id} complex fields:`, error);
+      return {
+        ...agent,
+        blueprint: undefined,
+        agentMemoryConfig: undefined,
+      };
+    }
+  }
   async findAll(): Promise<Agent[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
@@ -41,7 +72,7 @@ export class AgentRepository extends BaseRepository {
       'MATCH (a:Agent)<-[:INTERACTS_WITH]-(u:User) WHERE u.id = $userId RETURN a',
       { userId }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.a));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.a)));
   }
 
   async findByStarship(starshipId: string): Promise<Agent[]> {
@@ -50,7 +81,7 @@ export class AgentRepository extends BaseRepository {
       'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a ORDER BY a.name',
       { starshipId }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.a));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.a)));
   }
 
   // NEW: FK-based query methods for starshipId relationship
@@ -60,7 +91,7 @@ export class AgentRepository extends BaseRepository {
       'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',
       { starshipId }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.a));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.a)));
   }
 
   async updateStarshipId(agentId: string, starshipId: string): Promise<void> {
@@ -150,9 +181,14 @@ export class AgentRepository extends BaseRepository {
         isPublic: entity.isPublic || false,
         version: entity.version || '1.0.0',
         starshipId: entity.starshipId, // Ensure starshipId is included
+        executionMode: entity.executionMode || 'simple', // Default execution mode
+        timeout: entity.timeout || 30000, // Default timeout
       };
 
-      await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agent });
+      // Serialize complex objects for Neo4j storage
+      const agentForStorage = this.serializeComplexFields(agent);
+
+      await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agentForStorage });
       
       // For backward compatibility, also create Neo4j relationship during transition
       try {

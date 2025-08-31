@@ -1,9 +1,100 @@
 /**
  * Agent Domain Types
- * 
+ *
  * Consolidated agent interface definitions and domain-specific types.
  * Moved from contracts/agent.ts as agents are now domain concepts.
+ * Extended to support autopilot workflow execution system.
  */
+
+// ============================================================================
+// AUTOPILOT WORKFLOW TYPES
+// ============================================================================
+
+/**
+ * Workflow node types supported by autopilot
+ */
+export type AutopilotNodeType =
+  | 'agent'
+  | 'conditional'
+  | 'user_prompt'
+  | 'output'
+  | 'start'
+  | 'end'
+  | 'http_request'
+  | 'llm'
+  | 'workflow';
+
+/**
+ * Base workflow node interface
+ */
+export interface AutopilotNode {
+  ref: string;
+  type: AutopilotNodeType;
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Workflow edge connecting nodes
+ */
+export interface AutopilotEdge {
+  ref: string;
+  from: string;
+  to: string;
+  condition?: string;
+  label?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Workflow blueprint definition
+ */
+export interface AutopilotBlueprint {
+  nodes: AutopilotNode[];
+  edges: AutopilotEdge[];
+  metadata?: Record<string, unknown>;
+}
+
+// ============================================================================
+// AGENT MEMORY TYPES
+// ============================================================================
+
+/**
+ * Agent identity configuration
+ */
+export interface AgentIdentity {
+  name?: string;
+  role?: string;
+  personality?: string;
+  expertise?: string[];
+}
+
+/**
+ * Agent purpose and goals
+ */
+export interface AgentPurpose {
+  primary: string;
+  secondary?: string[];
+  constraints?: string[];
+}
+
+/**
+ * Agent space information (contextual background)
+ */
+export interface AgentSpace {
+  description: string;
+}
+
+/**
+ * Agent memory configuration for autopilot
+ */
+export interface AgentMemoryConfig {
+  identity?: AgentIdentity;
+  purpose?: AgentPurpose;
+  space?: AgentSpace;
+}
 
 // ============================================================================
 // CORE AGENT INTERFACE
@@ -11,6 +102,7 @@
 
 /**
  * Agent interface - core API contract type
+ * Extended to support autopilot workflow execution
  */
 export interface Agent {
   // Existing fields
@@ -40,6 +132,12 @@ export interface Agent {
   starshipId: string;
   allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   requiredPermissions?: string[];
+
+  // Autopilot integration fields
+  blueprint?: AutopilotBlueprint;           // Workflow definition for complex agents
+  agentMemoryConfig?: AgentMemoryConfig;    // Structured memory configuration
+  executionMode: 'simple' | 'workflow';    // Execution type (backward compatibility)
+  timeout?: number;                         // Execution timeout in milliseconds
 }
 
 /**
@@ -70,6 +168,12 @@ export interface CreateAgentRequest {
   allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
   authorId?: string;
   starshipId: string; // REQUIRED for new agents
+
+  // Autopilot-specific fields (optional for backward compatibility)
+  blueprint?: AutopilotBlueprint;           // Workflow definition
+  agentMemoryConfig?: AgentMemoryConfig;    // Memory configuration
+  executionMode?: 'simple' | 'workflow';   // Execution type (defaults to 'simple')
+  timeout?: number;                         // Execution timeout
 }
 
 /**

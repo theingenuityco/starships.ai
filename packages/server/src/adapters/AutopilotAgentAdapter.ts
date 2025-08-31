@@ -1,6 +1,15 @@
 /**
  * Autopilot Agent Adapter
- * 
+ *
+ * @deprecated This adapter is being replaced by AgentService for better architecture.
+ * The new architecture separates concerns:
+ * - AgentRepository (from @starships/models) handles database persistence
+ * - Agent (from @starships/autopilot) provides stateless execution engine
+ * - AgentService orchestrates between the two with clean business logic APIs
+ *
+ * Please migrate to:
+ * - packages/server/src/services/AgentService.ts for agent management and execution
+ *
  * Bridge between database agents and autopilot Agent class.
  * Handles conversion, memory management, and blueprint creation.
  */

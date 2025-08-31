@@ -1,357 +1,604 @@
-import { RepositoryFactory, Agent, AgentConfig, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
+/**
+ * Agent Service
+ * 
+ * Provides business logic APIs for agent management and execution.
+ * Orchestrates between database persistence (AgentRepository) and 
+ * stateless execution engine (autopilot Agent).
+ */
+
+import { AgentRepository } from '@starships/models';
+import { Agent as DatabaseAgent, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
+import { Agent as AutopilotAgent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
+import { DatabaseMemoryStore } from '../utils/database-memory';
+import type { MemoryEntry } from '@starships/protocol';
+
+export interface AutopilotAgentOptions {
+  includeMemory?: boolean;
+  sessionId?: string;
+  userId?: string;
+  loadConversationHistory?: boolean;
+}
+
+export interface ExecuteAgentResponse {
+  response: string;
+  usage: {
+    total_tokens: number;
+    cost: number;
+    model_calls: number;
+  };
+  executionTime: number;
+  status: 'success' | 'error';
+  error?: string;
+}
+
+export interface AgentExecutionContext {
+  agentId: string;
+  userId?: string;
+  sessionId?: string;
+  userMessage: string;
+}
 
 /**
- * Service for managing AI agents with Neo4j persistence
+ * Service class for managing agents and their execution
  */
 export class AgentService {
-  private static instance: AgentService;
-  private static isInitialized = false;
+  private agentRepository: AgentRepository;
+  private memoryStore: DatabaseMemoryStore;
 
-  static getInstance(): AgentService {
-    if (!AgentService.instance) {
-      AgentService.instance = new AgentService();
+  constructor() {
+    this.agentRepository = new AgentRepository();
+    this.memoryStore = new DatabaseMemoryStore();
+  }
+
+  // ============================================================================
+  // AGENT MANAGEMENT APIs
+  // ============================================================================
+
+  /**
+   * Create a new agent and return as AutopilotAgent instance
+   */
+  async createAgent(request: CreateAgentRequest, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent> {
+    // Validate blueprint if provided
+    if (request.blueprint) {
+      const validation = this.validateBlueprint(request.blueprint);
+      if (!validation.valid) {
+        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+      }
     }
-    return AgentService.instance;
-  }
 
-  static async initialize(): Promise<void> {
-    // No longer seeding default agents - agents are created per starship
-    // This method is kept for backward compatibility but does nothing
-    if (this.isInitialized) {
-      return;
-    }
-    this.isInitialized = true;
-  }
-
-  static async loadAgents(): Promise<AgentConfig[]> {
-    try {
-      await this.initialize();
-
-      const agentRepo = RepositoryFactory.getAgentRepository();
-      const agents = await agentRepo.findAll();
-
-      return agents.map(this.convertToAgentConfig);
-    } catch (error: any) {
-      console.error('[AGENT-SERVICE] Failed to load agents:', error);
-      throw new Error(`Failed to load agents: ${error?.message || 'Unknown error'}`);
-    }
-  }
-
-  static async getAgent(id: string): Promise<AgentConfig | undefined> {
-    await this.initialize();
-
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agent = await agentRepo.findById(id);
-
-    return agent ? this.convertToAgentConfig(agent) : undefined;
-  }
-
-  static async createAgent(createRequest: CreateAgentRequest): Promise<AgentConfig> {
-    await this.initialize();
-
-    // Convert CreateAgentRequest to full AgentConfig with auto-generated fields
-    const now = new Date().toISOString();
-    const agentData: Omit<AgentConfig, 'id'> = {
-      // Fields from CreateAgentRequest
-      name: createRequest.name,
-      description: createRequest.description,
-      category: createRequest.category,
-      systemPrompt: createRequest.systemPrompt,
-      model: createRequest.model,
-      tags: createRequest.tags || [],
-      isPublic: createRequest.isPublic || false,
-      temperature: createRequest.temperature,
-      maxTokens: createRequest.maxTokens,
-      customInstructions: createRequest.customInstructions,
-      allowedStarshipClasses: createRequest.allowedStarshipClasses,
-      starshipId: createRequest.starshipId, // Required starshipId from request
-
-      // Autopilot-specific fields
-      blueprint: createRequest.blueprint,
-      agentMemoryConfig: createRequest.agentMemoryConfig,
-      executionMode: createRequest.executionMode || 'simple', // Default to simple mode
-      timeout: createRequest.timeout || 30000, // Default 30 second timeout
-
-      // Auto-generated fields
-      authorId: createRequest.authorId || 'system', // Use provided authorId or default to system
+    // Create agent with default blueprint if none provided
+    const agentData = {
+      ...request,
+      blueprint: request.blueprint || this.createDefaultBlueprint(request),
+      executionMode: request.executionMode || 'simple',
+      timeout: request.timeout || 30000,
       version: '1.0.0',
-      createdAt: now,
-      updatedAt: now,
-      usageCount: 0,
-      rating: 0,
-      requiredPermissions: [],
+      tags: request.tags || [],
+      isPublic: request.isPublic || false,
+      authorId: request.authorId || 'system',
     };
 
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agent = await agentRepo.create(agentData);
-
-    return this.convertToAgentConfig(agent);
+    const dbAgent = await this.agentRepository.create(agentData);
+    return await this.createAutopilotAgent(dbAgent, options);
   }
 
-  static async updateAgent(
-    id: string,
-    updateRequest: UpdateAgentRequest
-  ): Promise<AgentConfig | null> {
-    await this.initialize();
-
-    // Add updatedAt timestamp
-    const updates = {
-      ...updateRequest,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const updated = await agentRepo.update(id, updates);
-
-    return updated ? this.convertToAgentConfig(updated) : null;
-  }
-
-  static async deleteAgent(id: string): Promise<boolean> {
-    await this.initialize();
-
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    return await agentRepo.delete(id);
-  }
-
-  // ADD: Enhanced query methods
-  static async getAgentsByCategory(category: string): Promise<AgentConfig[]> {
-    await this.initialize();
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await agentRepo.findByCategory(category);
-    return agents.map(this.convertToAgentConfig);
-  }
-
-  static async getAgentsByAuthor(authorId: string): Promise<AgentConfig[]> {
-    try {
-      await this.initialize();
-      console.log(`[AGENT-SERVICE] Finding agents for author: ${authorId}`);
-      const agentRepo = RepositoryFactory.getAgentRepository();
-      const agents = await agentRepo.findByAuthor(authorId);
-      console.log(`[AGENT-SERVICE] Found ${agents.length} agents for author: ${authorId}`);
-
-      // Log each agent's authorId to verify it matches
-      agents.forEach((agent: Agent) => {
-        console.log(`[AGENT-SERVICE] Agent ${agent.id} has authorId: ${agent.authorId}`);
-      });
-
-      return agents.map(this.convertToAgentConfig);
-    } catch (error: any) {
-      console.error('[AGENT-SERVICE] Failed to get agents by author:', authorId, error);
-      throw new Error(`Failed to get agents by author: ${error?.message || 'Unknown error'}`);
-    }
-  }
-
-  static async getAgentsByTags(tags: string[]): Promise<AgentConfig[]> {
-    await this.initialize();
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await agentRepo.findByTags(tags);
-    return agents.map(this.convertToAgentConfig);
-  }
-
-  static async getAgentsByStarshipId(starshipId: string): Promise<AgentConfig[]> {
-    await this.initialize();
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    // Use the property-based query method
-    const agents = await agentRepo.findByStarshipId(starshipId);
-    return agents.map(this.convertToAgentConfig);
-  }
-
-  static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentConfig[]> {
-    try {
-      await this.initialize();
-      const agentRepo = RepositoryFactory.getAgentRepository();
-      const agents = await agentRepo.findPublic(limit, offset);
-      return agents.map(this.convertToAgentConfig);
-    } catch (error: any) {
-      console.error('[AGENT-SERVICE] Failed to get public agents:', error);
-      throw new Error(`Failed to get public agents: ${error?.message || 'Unknown error'}`);
-    }
-  }
-
-  static async searchAgents(query: string): Promise<AgentConfig[]> {
-    await this.initialize();
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agents = await agentRepo.searchAgents(query);
-    return agents.map(this.convertToAgentConfig);
-  }
-
-  // ADD: Analytics methods
-  static async getAgentAnalytics(agentId: string): Promise<{
-    usageCount: number;
-    rating: number;
-    createdAt: string;
-    updatedAt: string;
-    category: string;
-    isPublic: boolean;
-  } | null> {
-    await this.initialize();
-
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const agent = await agentRepo.findById(agentId);
-
-    if (!agent) {
+  /**
+   * Get agent by ID as AutopilotAgent instance
+   */
+  async getAgent(agentId: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent | null> {
+    const dbAgent = await this.agentRepository.findById(agentId);
+    if (!dbAgent) {
       return null;
     }
-
-    return {
-      usageCount: agent.usageCount,
-      rating: agent.rating || 0,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      category: agent.category,
-      isPublic: agent.isPublic,
-    };
+    return await this.createAutopilotAgent(dbAgent, options);
   }
 
-  static async rateAgent(
-    agentId: string,
-    userId: string,
-    rating: number
-  ): Promise<{
-    success: boolean;
-    newRating: number;
-  }> {
-    await this.initialize();
-
-    // Validate rating range
-    if (rating < 1 || rating > 5) {
-      throw new Error('Rating must be between 1 and 5');
-    }
-
-    const agentRepo = RepositoryFactory.getAgentRepository();
-
-    // Check if agent exists
-    const agent = await agentRepo.findById(agentId);
-    if (!agent) {
-      throw new Error('Agent not found');
-    }
-
-    // For now, we'll use a simple average approach
-    // In a more sophisticated system, we'd store individual ratings
-    const currentRating = agent.rating || 0;
-    const usageCount = agent.usageCount || 1;
-
-    // Calculate new average rating
-    const newRating = (currentRating * usageCount + rating) / (usageCount + 1);
-
-    await agentRepo.updateRating(agentId, Math.round(newRating * 100) / 100);
-
-    return {
-      success: true,
-      newRating: Math.round(newRating * 100) / 100,
-    };
+  /**
+   * Get all agents as AutopilotAgent instances
+   */
+  async getAllAgents(options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+    const dbAgents = await this.agentRepository.findAll();
+    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
   }
 
-  static async trackUsage(
-    agentId: string
-  ): Promise<{
-    success: boolean;
-    newUsageCount: number;
-  }> {
-    await this.initialize();
-
-    const agentRepo = RepositoryFactory.getAgentRepository();
-
-    // Check if agent exists
-    const agent = await agentRepo.findById(agentId);
-    if (!agent) {
-      throw new Error('Agent not found');
-    }
-
-    await agentRepo.incrementUsageCount(agentId);
-
-    return {
-      success: true,
-      newUsageCount: (agent.usageCount || 0) + 1,
-    };
+  /**
+   * Get agents by starship as AutopilotAgent instances
+   */
+  async getAgentsByStarship(starshipId: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+    const dbAgents = await this.agentRepository.findByStarshipId(starshipId);
+    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
   }
 
-  // UPDATE: Enhanced convertToAgentConfig to handle all fields including autopilot
-  private static convertToAgentConfig(agent: Agent): AgentConfig {
-    return {
-      id: agent.id,
-      name: agent.name,
-      model: agent.model,
-      systemPrompt: agent.systemPrompt,
-      description: agent.description,
-      tags: agent.tags,
-      category: agent.category,
-      authorId: agent.authorId,
-      isPublic: agent.isPublic,
-      version: agent.version,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      usageCount: agent.usageCount,
-      rating: agent.rating,
-      temperature: agent.temperature,
-      maxTokens: agent.maxTokens,
-      customInstructions: agent.customInstructions,
-      allowedStarshipClasses: agent.allowedStarshipClasses,
-      requiredPermissions: agent.requiredPermissions,
-      starshipId: agent.starshipId,
+  /**
+   * Get agents by user as AutopilotAgent instances
+   */
+  async getAgentsByUser(userId: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+    const dbAgents = await this.agentRepository.findByAuthor(userId);
+    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+  }
+
+  /**
+   * Update agent and return as AutopilotAgent instance
+   */
+  async updateAgent(agentId: string, updates: UpdateAgentRequest, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent | null> {
+    // Validate blueprint if being updated
+    if (updates.blueprint) {
+      const validation = this.validateBlueprint(updates.blueprint);
+      if (!validation.valid) {
+        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    const dbAgent = await this.agentRepository.update(agentId, updates);
+    if (!dbAgent) {
+      return null;
+    }
+    return await this.createAutopilotAgent(dbAgent, options);
+  }
+
+  /**
+   * Delete agent
+   */
+  async deleteAgent(agentId: string): Promise<boolean> {
+    return await this.agentRepository.delete(agentId);
+  }
+
+  /**
+   * Deploy agent to starship
+   */
+  async deployAgent(agentId: string, starshipId: string): Promise<void> {
+    await this.agentRepository.updateStarshipId(agentId, starshipId);
+  }
+
+  /**
+   * Search agents and return as AutopilotAgent instances
+   */
+  async searchAgents(query: string, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+    const dbAgents = await this.agentRepository.searchAgents(query);
+    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+  }
+
+  /**
+   * Get agents with filters as AutopilotAgent instances
+   */
+  async getAgentsWithFilters(filters: {
+    category?: string;
+    tags?: string[];
+    isPublic?: boolean;
+    authorId?: string;
+    starshipClass?: 'scout' | 'cruiser';
+  }, options: AutopilotAgentOptions = {}): Promise<AutopilotAgent[]> {
+    const dbAgents = await this.agentRepository.findWithFilters(filters);
+    return Promise.all(dbAgents.map(dbAgent => this.createAutopilotAgent(dbAgent, options)));
+  }
+
+  // ============================================================================
+  // AGENT EXECUTION APIs
+  // ============================================================================
+
+  /**
+   * Execute an agent with user input
+   */
+  async executeAgent(
+    context: AgentExecutionContext,
+    options: AutopilotAgentOptions = {}
+  ): Promise<ExecuteAgentResponse> {
+    const startTime = Date.now();
+    
+    try {
+      // Get database agent
+      const dbAgent = await this.agentRepository.findById(context.agentId);
+      if (!dbAgent) {
+        throw new Error(`Agent ${context.agentId} not found`);
+      }
+
+      // Create autopilot agent instance
+      const autopilotAgent = await this.createAutopilotAgent(dbAgent, options);
+
+      // Add user message to memory
+      autopilotAgent.addToMemory('user', context.userMessage);
+
+      // Execute the agent
+      const execution = await autopilotAgent.execute();
+
+      // Extract response from execution result
+      const response = this.extractResponse(execution);
       
-      // Autopilot-specific fields
-      blueprint: agent.blueprint,
-      agentMemoryConfig: agent.agentMemoryConfig,
-      executionMode: agent.executionMode || 'simple', // Default to simple if not set
-      timeout: agent.timeout,
+      // Calculate usage statistics
+      const usage = this.calculateUsage(execution);
+
+      // Save conversation history back to database
+      if (options.includeMemory && options.userId) {
+        await this.saveConversationHistory(
+          autopilotAgent.getMemory(),
+          context.agentId,
+          options.userId
+        );
+      }
+
+      // Update agent usage count
+      await this.agentRepository.incrementUsageCount(context.agentId);
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        response,
+        usage,
+        executionTime,
+        status: 'success'
+      };
+
+    } catch (error) {
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      console.error(`[AGENT-SERVICE] Agent execution failed for ${context.agentId}:`, error);
+      
+      return {
+        response: "I apologize, but I encountered an error processing your request.",
+        usage: { total_tokens: 0, cost: 0, model_calls: 0 },
+        executionTime,
+        status: 'error',
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * Test agent execution (dry run without saving to memory)
+   */
+  async testAgent(agentId: string, testMessage: string): Promise<ExecuteAgentResponse> {
+    return this.executeAgent(
+      { agentId, userMessage: testMessage },
+      { includeMemory: false, loadConversationHistory: false }
+    );
+  }
+
+  /**
+   * Get agent conversation history
+   */
+  async getAgentConversationHistory(
+    agentId: string, 
+    userId: string, 
+    limit: number = 50
+  ): Promise<MemoryEntry[]> {
+    const memoryKey = this.memoryStore.makeKey(agentId, userId);
+    const history = await this.memoryStore.get(memoryKey);
+    return history.slice(-limit);
+  }
+
+  /**
+   * Clear agent conversation history
+   */
+  async clearAgentConversationHistory(agentId: string, userId: string): Promise<void> {
+    const memoryKey = this.memoryStore.makeKey(agentId, userId);
+    await this.memoryStore.clear(memoryKey);
+  }
+
+  // ============================================================================
+  // PRIVATE HELPER METHODS
+  // ============================================================================
+
+  /**
+   * Convert database agent to autopilot agent instance
+   */
+  private async createAutopilotAgent(
+    dbAgent: DatabaseAgent,
+    options: AutopilotAgentOptions
+  ): Promise<AutopilotAgent> {
+    const {
+      includeMemory = true,
+      userId,
+      loadConversationHistory = true
+    } = options;
+
+    // Create agent memory
+    const memory = await this.createAgentMemory(dbAgent, {
+      includeMemory,
+      userId,
+      loadConversationHistory
+    });
+
+    // Get or create blueprint
+    const blueprint = dbAgent.blueprint || this.createDefaultBlueprint(dbAgent);
+
+    // Create autopilot agent parameters
+    const agentParams = {
+      name: dbAgent.name,
+      description: dbAgent.description,
+      model: dbAgent.model,
+      memory: memory,
+      blueprint: blueprint,
+      instructions: dbAgent.customInstructions,
+      temperature: dbAgent.temperature,
+      maxTokens: dbAgent.maxTokens,
+      timeout: dbAgent.timeout || 30000
+    };
+
+    return new AutopilotAgent(agentParams);
+  }
+
+  /**
+   * Create agent memory from database agent configuration
+   */
+  private async createAgentMemory(
+    dbAgent: DatabaseAgent,
+    options: {
+      includeMemory?: boolean;
+      userId?: string;
+      loadConversationHistory?: boolean;
+    }
+  ): Promise<AgentMemory> {
+    // Initialize memory with system prompt
+    const memory = createAgentMemory(
+      dbAgent.systemPrompt || 'You are a helpful AI assistant.'
+    );
+
+    // Set structured context from database configuration
+    if (dbAgent.agentMemoryConfig) {
+      if (dbAgent.agentMemoryConfig.identity) {
+        memory.setIdentity(dbAgent.agentMemoryConfig.identity);
+      }
+      if (dbAgent.agentMemoryConfig.purpose) {
+        memory.setPurpose(dbAgent.agentMemoryConfig.purpose);
+      }
+      if (dbAgent.agentMemoryConfig.space) {
+        memory.setSpace(dbAgent.agentMemoryConfig.space);
+      }
+    } else {
+      // Set default identity and purpose based on agent metadata
+      memory.setIdentity({
+        name: dbAgent.name,
+        role: this.getRoleFromCategory(dbAgent.category),
+        expertise: dbAgent.tags
+      });
+
+      memory.setPurpose({
+        primary: dbAgent.description || `Assist users as a ${dbAgent.category} agent`,
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines']
+      });
+    }
+
+    // Load conversation history from database if requested
+    if (options.includeMemory && options.userId && options.loadConversationHistory) {
+      await this.loadConversationHistory(memory, dbAgent.id, options.userId);
+    }
+
+    return memory;
+  }
+
+  /**
+   * Load conversation history from database into agent memory
+   */
+  private async loadConversationHistory(
+    memory: AgentMemory,
+    agentId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      const memoryKey = this.memoryStore.makeKey(agentId, userId);
+      const history = await this.memoryStore.get(memoryKey);
+
+      // Load last 10 conversation entries to maintain context window
+      const recentHistory = history.slice(-10);
+
+      for (const entry of recentHistory) {
+        if (entry.role === 'user' || entry.role === 'assistant') {
+          memory.addConversation(entry.role, entry.content, {
+            timestamp: entry.timestamp,
+            fromDatabase: true
+          });
+        }
+      }
+
+      console.log(`[AGENT-SERVICE] Loaded ${recentHistory.length} conversation entries for agent ${agentId}`);
+    } catch (error) {
+      console.warn(`[AGENT-SERVICE] Failed to load conversation history for agent ${agentId}:`, error);
+      // Continue without history - not a critical failure
+    }
+  }
+
+  /**
+   * Save agent memory conversation back to database
+   */
+  private async saveConversationHistory(
+    memory: AgentMemory,
+    agentId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      const memoryKey = this.memoryStore.makeKey(agentId, userId);
+      const conversations = memory.getConversationHistory();
+
+      // Save only recent conversations that haven't been saved yet
+      const newConversations = conversations.filter(
+        conv => !conv.metadata?.fromDatabase
+      ).slice(-2); // Last user/assistant pair
+
+      for (const conv of newConversations) {
+        await this.memoryStore.append(memoryKey, {
+          role: conv.role,
+          content: conv.content,
+          timestamp: parseInt(conv.timestamp) || Date.now()
+        } as MemoryEntry);
+      }
+
+      console.log(`[AGENT-SERVICE] Saved ${newConversations.length} new conversations for agent ${agentId}`);
+    } catch (error) {
+      console.error(`[AGENT-SERVICE] Failed to save conversation history for agent ${agentId}:`, error);
+    }
+  }
+
+  /**
+   * Extract response from autopilot agent execution result
+   */
+  private extractResponse(executionResult: any): string {
+    if (executionResult.status !== 'completed') {
+      throw new Error(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`);
+    }
+
+    // Look for LLM response in execution results
+    const results = Array.from(executionResult.executionResults.values()) as any[];
+    
+    // Find the last successful LLM response
+    for (let i = results.length - 1; i >= 0; i--) {
+      const result = results[i] as any;
+      if (!result.error && result.data) {
+        // Check for different response formats
+        if (typeof result.data === 'string') {
+          return result.data;
+        }
+        if (result.data.content) {
+          return result.data.content;
+        }
+        if (result.data.response) {
+          return result.data.response;
+        }
+        if (result.data.output) {
+          return result.data.output;
+        }
+      }
+    }
+
+    // Fallback: return a generic response
+    return "I've processed your request successfully, but couldn't generate a specific response.";
+  }
+
+  /**
+   * Calculate usage statistics from execution result
+   */
+  private calculateUsage(executionResult: any): any {
+    // Extract usage information from execution results
+    const results = Array.from(executionResult.executionResults.values()) as any[];
+    let totalTokens = 0;
+    let totalCost = 0;
+
+    for (const result of results) {
+      if (result.data?.usage) {
+        totalTokens += result.data.usage.total_tokens || 0;
+        totalCost += result.data.usage.cost || 0;
+      }
+    }
+
+    return {
+      total_tokens: totalTokens,
+      cost: totalCost,
+      model_calls: results.filter((r: any) => !r.error).length
     };
   }
 
-  // No longer used - agents are created per starship
-  /*
-  private static async seedDefaultAgents(): Promise<void> {
-    const agentRepo = RepositoryFactory.getAgentRepository();
-    const existingAgents = await agentRepo.findAll();
-
-    if (existingAgents.length > 0) {
-      return;
-    }
-
-    const defaultAgents = [
-      {
-        name: 'Assistant',
-        description: 'A helpful AI assistant for general tasks and questions',
-        model: env.DEFAULT_CHAT_MODEL,
-        systemPrompt: 'You are a helpful AI assistant.',
-        category: 'general' as const,
-        tags: ['general', 'helpful', 'assistant'],
-        authorId: 'system',
-        isPublic: true,
-        version: '1.0.0',
-        starshipId: 'system-starship', // Default starship for system agents
-      },
-      {
-        name: 'Code Helper',
-        description: 'Expert software developer for coding questions and solutions',
-        model: env.DEFAULT_CHAT_MODEL,
-        systemPrompt:
-          'You are an expert software developer who helps with coding questions and provides clean, efficient solutions.',
-        category: 'coding' as const,
-        tags: ['programming', 'debugging', 'code-review', 'development'],
-        authorId: 'system',
-        isPublic: true,
-        version: '1.0.0',
-        starshipId: 'system-starship', // Default starship for system agents
-      },
-      {
-        name: 'Creative Writer',
-        description: 'Creative writing assistant for storytelling and content creation',
-        model: env.DEFAULT_CHAT_MODEL,
-        systemPrompt:
-          'You are a creative writing assistant who helps with storytelling, character development, and creative content.',
-        category: 'creative' as const,
-        tags: ['writing', 'storytelling', 'creative', 'content'],
-        authorId: 'system',
-        isPublic: true,
-        version: '1.0.0',
-        starshipId: 'system-starship', // Default starship for system agents
-      },
-    ];
-
-    for (const agentData of defaultAgents) {
-      await agentRepo.create(agentData);
-    }
+  /**
+   * Create default blueprint for simple chat agents
+   */
+  private createDefaultBlueprint(dbAgent: DatabaseAgent | CreateAgentRequest): Blueprint {
+    return {
+      nodes: [
+        {
+          ref: 'start',
+          type: 'start',
+          name: 'Start',
+          description: 'Begin conversation',
+          parameters: {}
+        },
+        {
+          ref: 'llm-response',
+          type: 'llm',
+          name: 'Generate Response',
+          description: 'Process user input and generate response',
+          parameters: {
+            model: dbAgent.model,
+            prompt: 'Respond to the user based on the conversation context and your system instructions.',
+            temperature: dbAgent.temperature || 0.7,
+            maxTokens: dbAgent.maxTokens || 2000,
+            timeout: 30000
+          }
+        },
+        {
+          ref: 'end',
+          type: 'end',
+          name: 'End',
+          description: 'Complete conversation',
+          parameters: {}
+        }
+      ],
+      edges: [
+        {
+          ref: 'edge-1',
+          from: 'start',
+          to: 'llm-response'
+        },
+        {
+          ref: 'edge-2',
+          from: 'llm-response',
+          to: 'end'
+        }
+      ],
+      metadata: {
+        version: '1.0',
+        type: 'simple-chat',
+        generated: true,
+        agentId: 'id' in dbAgent ? dbAgent.id : 'new-agent',
+        createdAt: new Date().toISOString()
+      }
+    };
   }
-  */
+
+  /**
+   * Validate blueprint structure
+   */
+  private validateBlueprint(blueprint: Blueprint): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (!blueprint.nodes || !Array.isArray(blueprint.nodes)) {
+      errors.push('Blueprint must have a nodes array');
+      return { valid: false, errors };
+    }
+
+    if (!blueprint.edges || !Array.isArray(blueprint.edges)) {
+      errors.push('Blueprint must have an edges array');
+      return { valid: false, errors };
+    }
+
+    // Check for start node
+    const hasStartNode = blueprint.nodes.some(node => node.type === 'start');
+    if (!hasStartNode) {
+      errors.push('Blueprint must have a start node');
+    }
+
+    // Check for end node
+    const hasEndNode = blueprint.nodes.some(node => node.type === 'end');
+    if (!hasEndNode) {
+      errors.push('Blueprint must have an end node');
+    }
+
+    // Validate edge references
+    const nodeRefs = new Set(blueprint.nodes.map(n => n.ref));
+    for (const edge of blueprint.edges) {
+      if (!nodeRefs.has(edge.from)) {
+        errors.push(`Edge references non-existent node: ${edge.from}`);
+      }
+      if (!nodeRefs.has(edge.to)) {
+        errors.push(`Edge references non-existent node: ${edge.to}`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Helper: Get role from agent category
+   */
+  private getRoleFromCategory(category: string): string {
+    const roles = {
+      general: 'General Assistant',
+      coding: 'Software Developer',
+      creative: 'Creative Assistant',
+      analysis: 'Data Analyst',
+      support: 'Support Specialist'
+    };
+    return roles[category as keyof typeof roles] || 'AI Assistant';
+  }
 }

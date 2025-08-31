@@ -29,6 +29,12 @@ export interface AgentTemplate {
   temperature?: number;
   maxTokens?: number;
 
+  // Autopilot-specific fields
+  blueprint: Blueprint;
+  memory: AgentMemoryConfig;
+  executionMode: 'simple' | 'workflow';
+  timeout: number;
+
   // Template metadata
   authorId: string;
   isPublic: boolean;
@@ -59,6 +65,10 @@ export interface CreateAgentTemplateRequest {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  blueprint: Blueprint;
+  memory: AgentMemoryConfig;
+  executionMode: 'simple' | 'workflow';
+  timeout: number;
   isPublic: boolean;
   icon?: string;
   previewPrompts?: string[];
@@ -76,6 +86,10 @@ export interface UpdateAgentTemplateRequest {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  blueprint?: Blueprint;
+  memory?: AgentMemoryConfig;
+  executionMode?: 'simple' | 'workflow';
+  timeout?: number;
   isPublic?: boolean;
   rating?: number;
   icon?: string;

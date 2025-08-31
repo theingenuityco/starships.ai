@@ -40,7 +40,7 @@ export type {
   AgentTemplateSort,
   AgentTemplateUsage,
   IncrementTemplateUsageRequest,
-  RateTemplateRequest
+  RateTemplateRequest,
 } from './domains/agent-template';
 
 

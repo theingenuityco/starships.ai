@@ -4,20 +4,6 @@ import { AgentTemplateRepository } from '@starships/models';
 import { Neo4jConnection } from '@starships/models';
 import { Blueprint, AgentMemoryConfig } from '@starships/autopilot';
 
-/**
- * Extended AgentTemplate interface with autopilot capabilities
- */
-export interface AutopilotAgentTemplate extends AgentTemplate {
-  // Autopilot-specific fields
-  blueprint: Blueprint;
-  memory: AgentMemoryConfig;
-  executionMode: 'simple' | 'workflow';
-  timeout: number;
-  
-  // Optional examples for preview
-  examples?: string[];
-}
-
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
 

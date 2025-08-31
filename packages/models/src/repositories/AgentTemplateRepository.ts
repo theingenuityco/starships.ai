@@ -392,6 +392,63 @@ export class AgentTemplateRepository extends BaseRepository {
       const templateId = uuidv4();
       const now = new Date().toISOString();
 
+      // Create default blueprint for simple chat
+      const defaultBlueprint = {
+        nodes: [
+          {
+            ref: 'start',
+            type: 'start' as const,
+            name: 'Start',
+            description: 'Begin conversation',
+            parameters: {}
+          },
+          {
+            ref: 'chat-response',
+            type: 'llm' as const,
+            name: 'Generate Response',
+            description: 'Process user input and respond',
+            parameters: {
+              model: agent.model,
+              prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
+              temperature: agent.temperature || 0.7,
+              maxTokens: agent.maxTokens || 2000
+            }
+          },
+          {
+            ref: 'end',
+            type: 'end' as const,
+            name: 'End',
+            description: 'Complete conversation',
+            parameters: {}
+          }
+        ],
+        edges: [
+          { ref: 'edge-1', from: 'start', to: 'chat-response' },
+          { ref: 'edge-2', from: 'chat-response', to: 'end' }
+        ],
+        metadata: {
+          version: '1.0',
+          type: 'simple-chat',
+          complexity: 'basic'
+        }
+      };
+
+      // Create default memory config
+      const defaultMemory = {
+        identity: {
+          name: agent.name,
+          role: 'AI Assistant',
+          personality: 'Professional and helpful'
+        },
+        purpose: {
+          primary: this.getSafeValue(agent.description, 'Assist users with their requests') as string,
+          constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy']
+        },
+        space: {
+          description: 'Professional assistance environment focused on providing accurate and helpful responses.'
+        }
+      };
+
       const template: AgentTemplate = {
         id: templateId,
         name: `${agent.name} Template`,
@@ -402,6 +459,10 @@ export class AgentTemplateRepository extends BaseRepository {
         model: agent.model as string,
         temperature: agent.temperature as number | undefined,
         maxTokens: agent.maxTokens as number | undefined,
+        blueprint: defaultBlueprint,
+        memory: defaultMemory,
+        executionMode: 'simple',
+        timeout: 30000,
         authorId: agent.authorId,
         isPublic: true,
         usageCount: 0,

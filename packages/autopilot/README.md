@@ -22,7 +22,7 @@ Autopilot provides a powerful workflow execution system:
 ### Quick Start - Workflows
 
 ```typescript
-import { Workflow, Validator } from '@starships/autopilot';
+import { Workflow, AgentMemory, createAgentMemory } from '@starships/autopilot';
 
 // Create workflow using the builder pattern
 const workflow = new Workflow()
@@ -38,10 +38,14 @@ if (!validation.valid) {
   process.exit(1);
 }
 
-// Execute workflow - engine with all handlers is created internally
+// Create memory for execution context
+const agentMemory = createAgentMemory('System context for workflow execution');
+
+// Execute workflow with memory - engine with all handlers is created internally
 const execution = {
   status: 'not_started' as const,
-  executionResults: new Map()
+  executionResults: new Map(),
+  agentMemory: agentMemory
 };
 const result = await workflow.execute(execution);
 
@@ -59,17 +63,91 @@ console.log('Execution result:', result);
 - **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
 - **workflow** - Execute embedded workflow blueprints
 
+## AgentMemory System
+
+Autopilot includes a powerful AgentMemory system that provides structured memory management for agents with system prompts and conversation history. This system formats data for direct consumption by LLM APIs.
+
+### Creating and Using AgentMemory
+
+```typescript
+import { AgentMemory, createAgentMemory } from '@starships/autopilot';
+
+// Create memory with initial system prompt
+const memory = new AgentMemory('You are a helpful assistant.');
+
+// Or use the convenience function
+const memory = createAgentMemory('You are a helpful assistant.');
+
+// Add additional system prompts (accumulative)
+memory.addSystemPrompt('Focus on being concise.');
+memory.addSystemPrompt('Always be professional.');
+
+// Add conversation history
+memory.addConversation('user', 'Hello, can you help me?');
+memory.addConversation('assistant', 'Of course! How can I assist you?');
+memory.addConversation('user', 'I need help with my account.');
+
+// Add conversation with metadata
+memory.addConversation('assistant', 'Let me check your account details.', {
+  confidence: 0.95,
+  source: 'account_service'
+});
+
+// Format for LLM consumption (returns array of messages)
+const messages = memory.toMessages();
+// Result:
+// [
+//   { role: 'system', content: 'You are a helpful assistant.\n\nFocus on being concise.\n\nAlways be professional.' },
+//   { role: 'user', content: 'Hello, can you help me?' },
+//   { role: 'assistant', content: 'Of course! How can I assist you?' },
+//   { role: 'user', content: 'I need help with my account.' },
+//   { role: 'assistant', content: 'Let me check your account details.' }
+// ]
+```
+
+### AgentMemory Methods
+
+- **`addSystemPrompt(prompt: string)`** - Add system prompt (accumulative)
+- **`addConversation(role, content, metadata?)`** - Add conversation entry
+- **`toMessages()`** - Format memory for LLM consumption
+- **`clear()`** - Clear all memory
+- **`clearConversations()`** - Clear only conversation history
+- **`getConversationHistory()`** - Get conversation entries
+- **`getSystemPrompts()`** - Get system prompts
+- **`getStats()`** - Get memory statistics
+- **`clone()`** - Clone memory instance
+
+### Memory in Agents
+
+```typescript
+const memory = new AgentMemory('You are a customer support agent.');
+memory.addSystemPrompt('Be helpful and professional.');
+
+const agent = new Agent({
+  name: 'Support Agent',
+  model: 'anthropic/claude-3.5-sonnet',
+  memory: memory, // Required
+  blueprint: myBlueprint
+});
+
+// Add to memory during execution
+agent.addToMemory('user', 'I have a problem with my order.');
+agent.addSystemPrompt('Focus on order-related issues.');
+
+// Memory automatically flows to LLM nodes in the workflow
+```
+
 ## Node Types
 
 Autopilot supports various node types for building complex workflows:
 
 - **start/end** - Flow control nodes
-- **agent** - AI agent task execution with embedded configuration
+- **agent** - AI agent task execution with embedded configuration and memory
 - **conditional** - Smart routing with JSONata expressions
 - **user_prompt** - Interactive user input
 - **output** - Result formatting and delivery
 - **http_request** - HTTP API calls with authentication and retry support
-- **llm** - Large Language Model interactions (OpenAI, Anthropic, Google, etc.)
+- **llm** - Large Language Model interactions (uses agent memory for context)
 - **workflow** - Execute embedded workflow blueprints
 
 ## Integration Example
@@ -77,7 +155,11 @@ Autopilot supports various node types for building complex workflows:
 ### Complete Workflow Example
 
 ```typescript
-import { Workflow } from '@starships/autopilot';
+import { Workflow, AgentMemory } from '@starships/autopilot';
+
+// Create agent memory for the workflow
+const agentMemory = new AgentMemory('You are a helpful customer support assistant.');
+agentMemory.addSystemPrompt('Be professional and concise in responses.');
 
 // Create workflow with multiple node types - all handlers are automatically available
 const workflow = new Workflow()
@@ -110,8 +192,7 @@ const workflow = new Workflow()
       model: 'anthropic/claude-3.5-sonnet',
       prompt: 'Generate a helpful response for the user based on their data',
       temperature: 0.7,
-      maxTokens: 500,
-      systemMessage: 'You are a helpful customer support assistant.'
+      maxTokens: 500
     }
   })
   .addNode({
@@ -122,8 +203,8 @@ const workflow = new Workflow()
     parameters: {
       name: 'Support Agent',
       model: 'anthropic/claude-3.5-sonnet',
+      memory: new AgentMemory('You are a helpful customer support agent.'),
       instructions: 'Help the user',
-      systemPrompt: 'You are a helpful customer support agent.',
       blueprint: {
         nodes: [
           { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
@@ -146,10 +227,11 @@ const workflow = new Workflow()
   .addEdge('llm-task', 'agent-task')
   .addEdge('agent-task', 'end');
 
-// Execute workflow - engine with all node handlers is managed internally
+// Execute workflow with agent memory - engine with all node handlers is managed internally
 const execution = {
   status: 'not_started' as const,
-  executionResults: new Map()
+  executionResults: new Map(),
+  agentMemory: agentMemory
 };
 const result = await workflow.execute(execution);
 ```
@@ -192,7 +274,7 @@ Makes HTTP API calls with comprehensive support for authentication, retries, and
 
 ### LLM Node
 
-Integrates with AI models using OpenRouter's unified API, providing access to 200+ models from various providers including OpenAI, Anthropic, Google, Meta, and more.
+Integrates with AI models using OpenRouter's unified API, providing access to 200+ models from various providers including OpenAI, Anthropic, Google, Meta, and more. LLM nodes automatically receive context from the agent's memory system.
 
 ```typescript
 {
@@ -203,7 +285,6 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
   parameters: {
     model: 'anthropic/claude-3.5-sonnet',
     prompt: 'Analyze this data and provide insights',
-    systemMessage: 'You are an expert data analyst',
     temperature: 0.7,
     maxTokens: 1000,
     topP: 0.9,
@@ -211,6 +292,8 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
   }
 }
 ```
+
+**Note**: LLM nodes automatically include system prompts and conversation history from the agent's memory. The `prompt` parameter is added as the final user message.
 
 **Available Models (via OpenRouter):**
 - `openai/gpt-4-turbo` - OpenAI GPT-4 Turbo
@@ -322,7 +405,7 @@ const result = workflow.validate();
 
 ### Agent Node Configuration
 
-Agents now execute embedded workflows, providing powerful multi-step execution capabilities:
+Agents use the new AgentMemory system for structured context management and execute embedded workflows:
 
 ```typescript
 interface AgentNodeParameters {
@@ -332,21 +415,29 @@ interface AgentNodeParameters {
   
   // LLM configuration
   model: string;
-  systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
+  
+  // Memory system (required)
+  memory: AgentMemory;
   
   // Execution parameters
   instructions?: string;
   timeout?: number;
   
   // Embedded workflow execution (required)
-  workflow: Workflow;
+  blueprint: Blueprint;
 }
 ```
 
-Example agent node with embedded workflow:
+Example agent node with AgentMemory and embedded workflow:
 ```typescript
+import { AgentMemory } from '@starships/autopilot';
+
+// Create agent memory with initial system prompt
+const memory = new AgentMemory('You are a helpful customer support agent.');
+memory.addSystemPrompt('Be concise and professional in responses.');
+
 {
   ref: 'support-agent',
   type: 'agent',
@@ -355,8 +446,8 @@ Example agent node with embedded workflow:
   parameters: {
     name: 'Support Agent',
     model: 'anthropic/claude-3.5-sonnet',
+    memory: memory, // AgentMemory instance
     instructions: 'Help the customer with their inquiry',
-    systemPrompt: 'You are a helpful customer support agent.',
     temperature: 0.7,
     maxTokens: 500,
     timeout: 5000,
@@ -382,8 +473,7 @@ Example agent node with embedded workflow:
           description: 'Understand customer problem',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt: 'Analyze customer data and issue: {{customerIssue}}',
-            systemMessage: 'You are a customer support analyst.'
+            prompt: 'Analyze customer data and issue: {{customerIssue}}'
           }
         },
         { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }

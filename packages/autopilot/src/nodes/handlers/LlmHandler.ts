@@ -15,8 +15,8 @@ export class LlmHandler extends BaseHandler {
   async execute(execution: Execution) {
     const params = this.node.parameters as LlmNodeParameters;
     try {
-      // Convert LLM parameters to HTTP request parameters
-      const httpParams = this.convertToHttpRequest(params);
+      // Convert LLM parameters to HTTP request parameters (now with memory support)
+      const httpParams = this.convertToHttpRequest(params, execution);
       
       // Create HttpRequestHandler instance for delegation
       const httpNode: Node = {
@@ -40,6 +40,12 @@ export class LlmHandler extends BaseHandler {
         if (httpData.body) {
           const llmResponse = this.extractLlmResponse(httpData.body);
           
+          // Add LLM response to agent memory for future reference
+          execution.agentMemory.addConversation('assistant', llmResponse, {
+            model: params.model,
+            nodeRef: this.node.ref
+          });
+          
           return this.createSuccessResult(updatedExecution, {
             ...httpData,
             llmResponse,
@@ -57,7 +63,7 @@ export class LlmHandler extends BaseHandler {
     }
   }
 
-  private convertToHttpRequest(params: LlmNodeParameters): HttpRequestNodeParameters {
+  private convertToHttpRequest(params: LlmNodeParameters, execution: Execution): HttpRequestNodeParameters {
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
     const headers = {
       'Content-Type': 'application/json',
@@ -65,7 +71,7 @@ export class LlmHandler extends BaseHandler {
       'HTTP-Referer': '${OPENROUTER_HTTP_REFERER}', // Optional: for analytics
       'X-Title': '${OPENROUTER_APP_NAME}' // Optional: for analytics
     };
-    const body = this.buildRequestBody(params);
+    const body = this.buildRequestBody(params, execution);
 
     return {
       url: endpoint,
@@ -78,18 +84,11 @@ export class LlmHandler extends BaseHandler {
     };
   }
 
-  private buildRequestBody(params: LlmNodeParameters): object {
-    const messages = [];
+  private buildRequestBody(params: LlmNodeParameters, execution: Execution): object {
+    // Get messages from agent memory (includes system prompts and conversation history)
+    const messages = execution.agentMemory.toMessages();
     
-    // Add system message if provided
-    if (params.systemMessage) {
-      messages.push({
-        role: 'system',
-        content: params.systemMessage
-      });
-    }
-    
-    // Add user prompt
+    // Add current prompt as user message
     messages.push({
       role: 'user',
       content: params.prompt
@@ -175,13 +174,6 @@ export class LlmHandler extends BaseHandler {
       warnings.push(this.createValidationWarning(
         'LARGE_WORKFLOW_SIZE',
         'High token count may result in expensive API calls'
-      ));
-    }
-
-    if (!params.systemMessage) {
-      warnings.push(this.createValidationWarning(
-        'MISSING_DESCRIPTIONS',
-        'Consider adding a system message for better AI behavior control'
       ));
     }
 

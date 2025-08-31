@@ -12,6 +12,10 @@ export { Workflow } from './Workflow';
 // Core agent class for agent execution
 export { Agent } from './Agent';
 
+// Agent memory system
+export { AgentMemory } from './AgentMemory';
+export type { ConversationEntry, LLMMessage } from './AgentMemory';
+
 // Node system
 export { Handler } from './nodes/Handler';
 
@@ -67,6 +71,7 @@ export { config } from './constants';
 // Import classes for convenience functions
 import { Workflow } from './Workflow';
 import { Agent } from './Agent';
+import { AgentMemory } from './AgentMemory';
 import { Validator } from './validation/Validator';
 import { AgentNodeParameters } from './types';
 
@@ -84,4 +89,9 @@ export const createWorkflow = (): Workflow => {
 // Helper function to create a new agent
 export const createAgent = (config: AgentNodeParameters): Agent => {
   return new Agent(config);
+};
+
+// Helper function to create agent memory
+export const createAgentMemory = (initialSystemPrompt?: string): AgentMemory => {
+  return new AgentMemory(initialSystemPrompt);
 };

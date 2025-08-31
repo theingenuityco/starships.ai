@@ -1,8 +1,10 @@
 /**
  * Execution Types
- * 
+ *
  * Types related to workflow execution runtime state and context
  */
+
+import type { AgentMemory } from '../AgentMemory';
 
 /**
  * Workflow execution state
@@ -12,6 +14,7 @@ export interface Execution {
   status: ExecutionStatus;
   executionResults: Map<string, NodeResult>;
   error?: ExecutionError;
+  agentMemory: AgentMemory;
 }
 
 /**

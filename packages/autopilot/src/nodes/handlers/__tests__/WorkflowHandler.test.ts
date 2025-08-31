@@ -84,13 +84,13 @@ describe('WorkflowHandler', () => {
         data: { message: 'Completed' }
       };
 
-      const mockRuntimeState: Execution = {
+      const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
         executionResults: new Map([
           ['start', mockNodeResult1],
           ['end', mockNodeResult2]
         ])
-      };
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -108,10 +108,9 @@ describe('WorkflowHandler', () => {
     });
 
     it('should execute workflow successfully', async () => {
-      const mockRuntimeState: Execution = {
-        status: 'completed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'completed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -125,16 +124,15 @@ describe('WorkflowHandler', () => {
     });
 
     it('should handle workflow execution failure', async () => {
-      const mockRuntimeState: Execution = {
+      const mockRuntimeState: Execution = global.createMockExecution({
         status: 'failed',
-        executionResults: new Map(),
         error: {
           code: 'NODE_EXECUTION_FAILED',
           message: 'Something went wrong',
           timestamp: new Date().toISOString(),
           recoverable: false
         }
-      };
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -147,10 +145,9 @@ describe('WorkflowHandler', () => {
     });
 
     it('should handle workflow execution failure without error message', async () => {
-      const mockRuntimeState: Execution = {
-        status: 'failed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'failed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -193,10 +190,9 @@ describe('WorkflowHandler', () => {
 
       const timeoutHandler = new WorkflowHandler(nodeWithTimeout);
 
-      const mockRuntimeState: Execution = {
-        status: 'completed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'completed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -218,13 +214,13 @@ describe('WorkflowHandler', () => {
         error: 'Failed to execute'
       };
 
-      const mockRuntimeState: Execution = {
+      const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
         executionResults: new Map([
           ['success-node', successfulResult],
           ['failed-node', failedResult]
         ])
-      };
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -238,10 +234,9 @@ describe('WorkflowHandler', () => {
     });
 
     it('should set execution timestamp', async () => {
-      const mockRuntimeState: Execution = {
-        status: 'completed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'completed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 

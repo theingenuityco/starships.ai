@@ -3,6 +3,7 @@
  */
 
 import type { Blueprint, Execution, Node } from '../src/types';
+import { AgentMemory } from '../src/AgentMemory';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -28,9 +29,15 @@ global.console = {
 // Legacy support for tests that haven't been updated yet
 (global as any).createMockWorkflow = (global as any).createMockBlueprint;
 
+// Create AgentMemory helper
+(global as any).createAgentMemory = (initialSystemPrompt?: string): AgentMemory => {
+  return new AgentMemory(initialSystemPrompt || 'Test system prompt');
+};
+
 (global as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
   status: 'not_started',
   executionResults: new Map(),
+  agentMemory: (global as any).createAgentMemory(),
   ...overrides
 });
 

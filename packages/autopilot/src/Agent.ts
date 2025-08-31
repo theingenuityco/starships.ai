@@ -3,13 +3,16 @@
  *
  * Executable agent that combines agent configuration with execution capabilities.
  * Uses an internal Engine for execution that manages all node handlers automatically.
+ * Memory-first architecture with AgentMemory system.
  */
 
 import { Blueprint, Node, Edge, Execution, AgentNodeParameters } from './types';
 import { Engine } from './engine/Engine';
+import { AgentMemory } from './AgentMemory';
 
 export class Agent {
   private params: AgentNodeParameters;
+  private memory: AgentMemory;
   private engine: Engine;
 
   constructor(params: AgentNodeParameters) {
@@ -24,6 +27,9 @@ export class Agent {
         metadata: { ...params.blueprint.metadata }
       }
     };
+
+    // Memory is required
+    this.memory = params.memory;
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -44,10 +50,24 @@ export class Agent {
   }
 
   /**
-   * Get agent system prompt
+   * Get agent memory
    */
-  getSystemPrompt(): string | undefined {
-    return this.params.systemPrompt;
+  getMemory(): AgentMemory {
+    return this.memory;
+  }
+
+  /**
+   * Add content to agent memory
+   */
+  addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
+    this.memory.addConversation(role, content, metadata);
+  }
+
+  /**
+   * Add system prompt to agent memory
+   */
+  addSystemPrompt(prompt: string): void {
+    this.memory.addSystemPrompt(prompt);
   }
 
   /**
@@ -103,7 +123,14 @@ export class Agent {
    * Execute the agent (delegates to internal Engine using the blueprint)
    */
   async execute(initialExecution?: Execution): Promise<Execution> {
-    return this.engine.execute(this.params.blueprint, initialExecution);
+    const executionWithMemory: Execution = {
+      currentNodeRef: undefined,
+      status: 'not_started',
+      executionResults: new Map(),
+      agentMemory: this.memory,
+      ...initialExecution
+    };
+    return this.engine.execute(this.params.blueprint, executionWithMemory);
   }
 
   /**
@@ -119,6 +146,13 @@ export class Agent {
 
     if (!this.params.model) {
       errors.push('Agent model is required');
+    }
+
+    // Check memory is present and valid
+    if (!this.params.memory) {
+      errors.push('Agent memory is required');
+    } else if (!this.memory || typeof this.memory.toMessages !== 'function') {
+      errors.push('Invalid agent memory instance');
     }
 
     // Check blueprint structure
@@ -169,11 +203,12 @@ export class Agent {
   }
 
   /**
-   * Clone agent with the same parameters
+   * Clone agent with the same parameters and memory
    */
   clone(): Agent {
     const clonedParams: AgentNodeParameters = {
       ...this.params,
+      memory: this.memory.clone(), // Clone memory instance
       blueprint: {
         ...this.params.blueprint,
         nodes: this.params.blueprint.nodes.map(node => ({ ...node })),
@@ -191,6 +226,8 @@ export class Agent {
     const updatedParams = {
       ...this.params,
       ...updates,
+      // Preserve memory if not being updated
+      memory: updates.memory || this.memory,
       // Preserve blueprint if not being updated
       blueprint: updates.blueprint || this.params.blueprint
     };

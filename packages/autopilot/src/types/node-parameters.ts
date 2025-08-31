@@ -6,6 +6,7 @@
  */
 
 import type { BaseNodeParameters, BaseBlueprint } from './base';
+import type { AgentMemory } from '../AgentMemory';
 
 /**
  * Agent-specific node parameters
@@ -18,13 +19,15 @@ export interface AgentNodeParameters extends BaseNodeParameters {
   
   // LLM configuration
   model: string;
-  systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
   
   // Execution parameters
   instructions?: string;
   timeout?: number;
+  
+  // Memory system (required)
+  memory: AgentMemory;
   
   // Blueprint execution
   blueprint: BaseBlueprint;
@@ -129,7 +132,6 @@ export interface LlmNodeParameters extends BaseNodeParameters {
   prompt: string;
   temperature?: number;
   maxTokens?: number;
-  systemMessage?: string;
   timeout?: number;
   stream?: boolean;
   topP?: number;

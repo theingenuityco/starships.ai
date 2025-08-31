@@ -38,10 +38,9 @@ describe('StartHandler', () => {
     });
 
     it('should work with any execution state', async () => {
-      const customExecution: Execution = {
-        status: 'running',
-        executionResults: new Map()
-      };
+      const customExecution: Execution = global.createMockExecution({
+        status: 'running'
+      });
       
       const result = await handler.execute(customExecution);
       

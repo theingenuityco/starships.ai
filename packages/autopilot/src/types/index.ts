@@ -24,6 +24,11 @@ export * from './execution';
 // Validation and error reporting
 export * from './validation';
 
+// ===== MEMORY SYSTEM =====
+// Agent memory classes and interfaces
+export { AgentMemory } from '../AgentMemory';
+export type { ConversationEntry, LLMMessage } from '../AgentMemory';
+
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)
 export type { BaseNode, BaseBlueprint } from './base';

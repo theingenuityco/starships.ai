@@ -252,6 +252,12 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
         return null;
       }
       
+      // Don't create threads for workflow/check events - they should only update existing threads
+      if (eventName === 'workflow_run' || eventName === 'check_run' || eventName === 'check_suite') {
+        console.log(`Skipping ${eventName} for PR #${prNumber} - no existing thread to update`);
+        return null;
+      }
+      
       console.log(`Creating new thread for PR #${prNumber}`);
       
       // Fetch PR details to create thread

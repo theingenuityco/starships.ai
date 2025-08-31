@@ -109,5 +109,9 @@ export const createMemory = (initialSystemMessage?: string): Memory => {
 
 // Helper function to create agent memory
 export const createAgentMemory = (initialSystemPrompt?: string): AgentMemory => {
-  return new AgentMemory(initialSystemPrompt);
+  const memory = new AgentMemory();
+  if (initialSystemPrompt) {
+    memory.addMessage('system', initialSystemPrompt);
+  }
+  return memory;
 };

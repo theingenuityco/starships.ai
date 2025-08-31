@@ -65,8 +65,8 @@ export class AgentMemory extends Memory {
   private space?: AgentSpace;
   private messageEntries: Message[] = [];
 
-  constructor(initialSystemPrompt?: string, config?: AgentMemoryConfig) {
-    super(); // Don't pass initialSystemPrompt to base - we'll handle it ourselves
+  constructor(config?: AgentMemoryConfig) {
+    super();
     
     // Initialize from config if provided
     if (config) {
@@ -78,11 +78,6 @@ export class AgentMemory extends Memory {
           this.addMessage(msgEntry.role, msgEntry.content, msgEntry.metadata);
         });
       }
-    }
-    
-    // Handle legacy initialSystemPrompt (for backward compatibility)
-    if (initialSystemPrompt) {
-      this.addMessage('system', initialSystemPrompt);
     }
   }
 

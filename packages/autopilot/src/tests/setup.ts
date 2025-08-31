@@ -30,8 +30,10 @@ global.console = {
 (global as any).createMockWorkflow = (global as any).createMockBlueprint;
 
 // Create AgentMemory helper
-(global as any).createAgentMemory = (initialSystemPrompt?: string): AgentMemory => {
-  return new AgentMemory(initialSystemPrompt || 'Test system prompt');
+(global as any).createAgentMemory = (): AgentMemory => {
+  const memory = new AgentMemory();
+  memory.addMessage('system', 'Test system prompt');
+  return memory;
 };
 
 (global as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({

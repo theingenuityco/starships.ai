@@ -7,7 +7,7 @@
 
 import { RepositoryFactory } from '@starships/models';
 import type { ChatRequest, ChatResponse } from '@starships/protocol';
-import { AutopilotAgentAdapter } from '../adapters/AutopilotAgentAdapter';
+import { AgentService } from './AgentService';
 
 export class AutopilotAgentExecutionService {
   /**
@@ -47,58 +47,37 @@ export class AutopilotAgentExecutionService {
     });
 
     try {
-      // Validate agent configuration
-      const validation = AutopilotAgentAdapter.validateAgentConfig(dbAgent);
-      if (!validation.valid) {
-        throw new Error(`Invalid agent configuration: ${validation.errors.join(', ')}`);
-      }
-
-      // Create autopilot agent through adapter
-      const autopilotAgent = await AutopilotAgentAdapter.fromDatabaseAgent(dbAgent, {
-        includeMemory: true,
-        userId: user_id,
-        sessionId: session_id,
-        loadConversationHistory: true
-      });
-
-      console.log('✅ [AUTOPILOT-EXECUTION] Autopilot agent created successfully');
-
-      // Add current user message to agent memory
-      autopilotAgent.addToMemory('user', message);
-
-      // Execute agent workflow
-      console.log('⚙️ [AUTOPILOT-EXECUTION] Executing agent workflow...');
-      const executionStart = Date.now();
-      
-      const executionResult = await autopilotAgent.execute();
-      
-      const executionTime = Date.now() - executionStart;
-      console.log(`⏱️ [AUTOPILOT-EXECUTION] Workflow completed in ${executionTime}ms`);
-
-      // Extract response from execution result
-      const responseContent = AutopilotAgentAdapter.extractResponse(executionResult);
-      
-      // Calculate usage statistics
-      const usageStats = AutopilotAgentAdapter.calculateUsage(executionResult);
-
-      // Save conversation history back to database
-      await AutopilotAgentAdapter.saveConversationHistory(
-        autopilotAgent.getMemory(),
-        agent_id,
-        user_id
+      // Execute agent using AgentService
+      const agentService = new AgentService();
+      const executionResult = await agentService.executeAgent(
+        {
+          agentId: agent_id,
+          userId: user_id,
+          sessionId: session_id,
+          userMessage: message
+        },
+        {
+          includeMemory: true,
+          userId: user_id,
+          sessionId: session_id,
+          loadConversationHistory: true
+        }
       );
 
       console.log('✅ [AUTOPILOT-EXECUTION] Chat execution completed successfully:', {
-        responseLength: responseContent.length,
-        executionTime,
-        usageStats
+        responseLength: executionResult.response.length,
+        executionTime: executionResult.executionTime,
+        usageStats: executionResult.usage
       });
 
       return {
         source: 'agent',
-        content: responseContent,
+        content: executionResult.response,
         agent_id: agent_id,
-        usage: usageStats
+        usage: {
+          prompt_tokens: Math.floor(executionResult.usage.total_tokens * 0.7), // Estimate prompt tokens
+          completion_tokens: Math.floor(executionResult.usage.total_tokens * 0.3) // Estimate completion tokens
+        }
       };
 
     } catch (error) {
@@ -169,7 +148,8 @@ export class AutopilotAgentExecutionService {
    * Get memory store instance for backward compatibility
    */
   static getMemoryStore() {
-    return AutopilotAgentAdapter.getMemoryStore();
+    const agentService = new AgentService();
+    return agentService.getMemoryStore();
   }
 
   /**
@@ -192,7 +172,14 @@ export class AutopilotAgentExecutionService {
         };
       }
 
-      const validation = AutopilotAgentAdapter.validateAgentConfig(dbAgent);
+      // Basic validation - AgentService handles detailed validation internally
+      if (!dbAgent.name || !dbAgent.model) {
+        return {
+          valid: false,
+          errors: ['Agent name and model are required'],
+          warnings: []
+        };
+      }
       
       const warnings: string[] = [];
       
@@ -210,8 +197,8 @@ export class AutopilotAgentExecutionService {
       }
 
       return {
-        valid: validation.valid,
-        errors: validation.errors,
+        valid: true,
+        errors: [],
         warnings
       };
 

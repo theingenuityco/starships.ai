@@ -50,6 +50,13 @@ export class AgentService {
     this.memoryStore = new DatabaseMemoryStore();
   }
 
+  /**
+   * Get memory store instance
+   */
+  getMemoryStore(): DatabaseMemoryStore {
+    return this.memoryStore;
+  }
+
   // ============================================================================
   // STATIC APIs FOR BACKWARD COMPATIBILITY
   // ============================================================================

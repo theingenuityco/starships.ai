@@ -28,6 +28,13 @@ async function run() {
 
     const { prNumber, prTitle, prAuthor, prUrl, action } = prDetails;
     console.log(`Processing ${eventName} event for PR #${prNumber} (action: ${action})`);
+    
+    // Skip updates for closed PRs unless it's the closing event itself
+    if (payload.pull_request && payload.pull_request.state === 'closed' && action !== 'closed' && action !== 'reopened') {
+      console.log(`Skipping update for closed PR #${prNumber} (action: ${action})`);
+      core.setOutput('action-taken', 'skipped - PR is closed');
+      return;
+    }
 
     // Initialize Discord client
     discord = new DiscordThreadManager(discordToken, guildId, channelId);
@@ -224,7 +231,15 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
     threadData = await discord.findThreadByName(prNumber);
     
     if (!threadData) {
-      console.log(`No Discord thread found for PR #${prNumber}, creating new thread`);
+      console.log(`No Discord thread found for PR #${prNumber}`);
+      
+      // Don't create new threads for closed PRs
+      if (context.payload.pull_request && context.payload.pull_request.state === 'closed') {
+        console.log(`PR #${prNumber} is closed, not creating new thread`);
+        return null;
+      }
+      
+      console.log(`Creating new thread for PR #${prNumber}`);
       
       // Fetch PR details to create thread
       const octokit = github.getOctokit(process.env.GITHUB_TOKEN || '');
@@ -234,6 +249,12 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
           repo: context.repo.repo,
           pull_number: prNumber
         });
+        
+        // Don't create thread if PR is closed (double-check from API)
+        if (pr.state === 'closed') {
+          console.log(`PR #${prNumber} is closed (verified via API), not creating new thread`);
+          return null;
+        }
         
         // Create the thread
         const result = await discord.createPrivateThread(

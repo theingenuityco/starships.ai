@@ -107,20 +107,7 @@ describe('WorkflowHandler', () => {
       expect(resultData.output).toBe('Workflow completed successfully');
     });
 
-    it('should execute workflow with custom context', async () => {
-      const nodeWithContext: Node = {
-        ...mockNode,
-        parameters: {
-          blueprint: mockBlueprint,
-          workflowContext: {
-            customKey: 'customValue',
-            userId: 'custom-user'
-          }
-        } as WorkflowNodeParameters
-      };
-
-      const contextHandler = new WorkflowHandler(nodeWithContext);
-
+    it('should execute workflow successfully', async () => {
       const mockRuntimeState: Execution = {
         status: 'completed',
         executionResults: new Map()
@@ -128,7 +115,7 @@ describe('WorkflowHandler', () => {
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
-      await contextHandler.execute(mockExecution);
+      await handler.execute(mockExecution);
 
       // Verify Workflow was created with correct blueprint
       expect(Workflow).toHaveBeenCalledWith(mockBlueprint);
@@ -195,19 +182,16 @@ describe('WorkflowHandler', () => {
       expect(nodeResult?.error).toContain('Unknown error');
     });
 
-    it('should merge existing workflow context', async () => {
-      const nodeWithContext: Node = {
+    it('should execute workflow with timeout parameter', async () => {
+      const nodeWithTimeout: Node = {
         ...mockNode,
         parameters: {
           blueprint: mockBlueprint,
-          workflowContext: {
-            newKey: 'newValue',
-            sharedKey: 'overriddenValue'
-          }
+          timeout: 30000
         } as WorkflowNodeParameters
       };
 
-      const contextHandler = new WorkflowHandler(nodeWithContext);
+      const timeoutHandler = new WorkflowHandler(nodeWithTimeout);
 
       const mockRuntimeState: Execution = {
         status: 'completed',
@@ -216,7 +200,7 @@ describe('WorkflowHandler', () => {
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
-      await contextHandler.execute(mockExecution);
+      await timeoutHandler.execute(mockExecution);
 
       // Verify Workflow was created with correct blueprint
       expect(Workflow).toHaveBeenCalledWith(mockBlueprint);

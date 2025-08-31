@@ -271,10 +271,6 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
       ],
       metadata: {}
     },
-    workflowContext: {
-      token: 'your-api-token',
-      data: 'input-data'
-    },
     timeout: 120000
   }
 }
@@ -282,7 +278,6 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
 
 **Key Features:**
 - **Blueprint Storage**: Store and execute complete workflow definitions
-- **Context Passing**: Pass custom context to embedded workflows
 - **Modular Composition**: Build workflows from reusable sub-workflows
 - **Clean Separation**: Focus on blueprint execution without agent overhead
 - **Validation**: Comprehensive validation of embedded blueprints
@@ -347,7 +342,6 @@ interface AgentNodeParameters {
   
   // Embedded workflow execution (required)
   workflow: Workflow;
-  workflowContext?: Record<string, unknown>;
 }
 ```
 
@@ -408,7 +402,6 @@ Example agent node with embedded workflow:
 #### Agent Workflow Execution Features
 
 - **Embedded Workflows**: Each agent node contains a complete workflow definition
-- **Context Merging**: Agent parameters and context are automatically merged with workflow execution context
 - **Result Aggregation**: Workflow results are collected and returned as part of agent output
 - **Comprehensive Validation**: Embedded workflows are validated for structure, nodes, and dependencies
 - **Error Handling**: Robust error handling with detailed feedback on workflow execution failures
@@ -416,10 +409,9 @@ Example agent node with embedded workflow:
 #### Agent Execution Flow
 
 1. Agent receives parameters with embedded workflow
-2. Agent context is merged with workflow context
-3. Embedded workflow is executed using the workflow engine
-4. Results from all workflow nodes are collected
-5. Final output includes both agent information and workflow results
+2. Embedded workflow is executed using the workflow engine
+3. Results from all workflow nodes are collected
+4. Final output includes both agent information and workflow results
 
 Example execution result:
 ```typescript

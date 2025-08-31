@@ -28,7 +28,6 @@ export interface AgentNodeParameters extends BaseNodeParameters {
   
   // Blueprint execution
   blueprint: BaseBlueprint;
-  workflowContext?: Record<string, unknown>;
 }
 
 /**
@@ -143,7 +142,6 @@ export interface LlmNodeParameters extends BaseNodeParameters {
  */
 export interface WorkflowNodeParameters extends BaseNodeParameters {
   blueprint: BaseBlueprint;
-  workflowContext?: Record<string, unknown>;
   timeout?: number;
 }
 

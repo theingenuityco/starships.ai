@@ -27,7 +27,6 @@ export { MissionOrchestratorService } from './MissionOrchestratorService';
 export { WorkflowService } from './WorkflowService';
 
 // Agent execution services (replacing agents/ directory)
-export { LLMService } from './LLMService';
 export { ToolService } from './ToolService';
 
 // Note: Workflow execution engine has been moved to @starships/autopilot package

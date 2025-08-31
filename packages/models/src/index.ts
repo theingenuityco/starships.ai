@@ -9,7 +9,6 @@ export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 // Repository implementations
 export { AgentRepository } from './repositories/AgentRepository';
 export { UserRepository } from './repositories/UserRepository';
-export { LLMRepository } from './repositories/LLMRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
 export { ChatSessionRepository } from './repositories/ChatSessionRepository';
 export { ChatMessageRepository } from './repositories/ChatMessageRepository';
@@ -59,17 +58,6 @@ export {
 export { ErrorSeverity } from './helpers/logging/error-monitor';
 export { ErrorCategory } from './helpers/errors';
 
-// Export LLM collection types from protocol
-export type {
-  LLM,
-  LLMProviderType,
-  CreateLLMRequest,
-  UpdateLLMRequest,
-  LLMResponse,
-  LLMListResponse,
-  LLMFilters,
-  LLMSort
-} from '@starships/protocol';
 
 // NEW: Export structured logging and monitoring system
 export {

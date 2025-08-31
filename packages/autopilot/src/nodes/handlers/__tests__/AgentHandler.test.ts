@@ -4,7 +4,7 @@
 
 import { AgentHandler } from '../AgentHandler';
 import { Node, Execution, AgentNodeParameters } from '../../../types';
-import { AgentMemory } from '../../../AgentMemory';
+import { AgentMemoryConfig } from '../../../AgentMemory';
 
 interface AgentExecutionResult {
   agentName: string;
@@ -32,7 +32,16 @@ describe('AgentHandler', () => {
         name: 'Customer Support Agent',
         description: 'Helps customers with inquiries',
         model: 'anthropic/claude-3.5-sonnet',
-        memory: new AgentMemory('You are a helpful customer support agent.'),
+        memory: {
+          identity: {
+            name: 'Customer Support Agent',
+            role: 'customer support representative',
+            personality: 'helpful and friendly'
+          },
+          purpose: {
+            primary: 'Help customers with their inquiries'
+          }
+        } as AgentMemoryConfig,
         temperature: 0.7,
         maxTokens: 500,
         instructions: 'Test instructions for the agent',
@@ -84,7 +93,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Basic Agent',
         model: 'openai/gpt-4',
-        memory: new AgentMemory(),
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -159,7 +168,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Test Agent',
         model: 'openai/gpt-4',
-        memory: new AgentMemory(),
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -280,7 +289,7 @@ describe('AgentHandler', () => {
       const paramsWithEmptyValues = {
         name: '',
         model: '',
-        memory: new AgentMemory(),
+        memory: {} as AgentMemoryConfig,
         instructions: 'Some instructions',
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;

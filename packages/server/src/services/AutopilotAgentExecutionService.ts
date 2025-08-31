@@ -116,7 +116,10 @@ export class AutopilotAgentExecutionService {
         source: 'agent',
         content: fallbackResponse,
         agent_id: agent_id,
-        usage: { total_tokens: 0, prompt_tokens: 0, completion_tokens: 0 }
+        usage: {
+          prompt_tokens: 0,
+          completion_tokens: 0
+        }
       };
     }
   }

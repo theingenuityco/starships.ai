@@ -10,56 +10,7 @@ import { Blueprint, NodeType, Agent as AutopilotAgent, AgentMemory, createAgentM
 import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { MemoryEntry } from '@starships/protocol';
 
-// Temporary type definitions until autopilot module is properly linked
-interface ConversationEntry {
-  id: string;
-  timestamp: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface AgentMemory {
-  setIdentity(identity: any): void;
-  setPurpose(purpose: any): void;
-  setSpace(space: any): void;
-  addConversation(role: string, content: string, metadata?: any): void;
-  getConversationHistory(): ConversationEntry[];
-}
-
-interface AutopilotAgent {
-  execute(): Promise<any>;
-  addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void;
-  getMemory(): AgentMemory;
-}
-
-interface ExecutionResult {
-  error?: any;
-  data?: any;
-}
-
-// Temporary factory function
-const createAgentMemory = (prompt?: string): AgentMemory => {
-  // This will be replaced with actual autopilot import
-  return {} as AgentMemory;
-};
-
-// Temporary constructor function
-const createAutopilotAgent = (params: any): AutopilotAgent => {
-  // This will be replaced with actual autopilot Agent constructor
-  const memory = params.memory as AgentMemory;
-  return {
-    execute: async () => ({
-      status: 'completed',
-      executionResults: new Map(),
-      error: null
-    }),
-    addToMemory: (role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>) => {
-      memory.addConversation(role, content, metadata);
-    },
-    getMemory: () => memory
-  };
-};
+// Now using real autopilot imports
 
 export interface AutopilotAgentOptions {
   includeMemory?: boolean;
@@ -118,7 +69,7 @@ export class AutopilotAgentAdapter {
       timeout: dbAgent.timeout || 30000
     };
 
-    return createAutopilotAgent(agentParams);
+    return new AutopilotAgent(agentParams);
   }
 
   /**
@@ -235,7 +186,7 @@ export class AutopilotAgentAdapter {
   /**
    * Create default blueprint for simple chat agents
    */
-  private static createDefaultBlueprint(dbAgent: DBAgent): AutopilotBlueprint {
+  private static createDefaultBlueprint(dbAgent: DBAgent): Blueprint {
     return {
       nodes: [
         {
@@ -294,7 +245,7 @@ export class AutopilotAgentAdapter {
   static createWorkflowBlueprint(
     dbAgent: DBAgent,
     includeTools: boolean = false
-  ): AutopilotBlueprint {
+  ): Blueprint {
     const nodes = [
       {
         ref: 'start',
@@ -389,11 +340,11 @@ export class AutopilotAgentAdapter {
     }
 
     // Look for LLM response in execution results
-    const results = Array.from(executionResult.executionResults.values());
+    const results = Array.from(executionResult.executionResults.values()) as any[];
     
     // Find the last successful LLM response
     for (let i = results.length - 1; i >= 0; i--) {
-      const result = results[i];
+      const result = results[i] as any;
       if (!result.error && result.data) {
         // Check for different response formats
         if (typeof result.data === 'string') {
@@ -420,7 +371,7 @@ export class AutopilotAgentAdapter {
    */
   static calculateUsage(executionResult: any): any {
     // Extract usage information from execution results
-    const results = Array.from(executionResult.executionResults.values());
+    const results = Array.from(executionResult.executionResults.values()) as any[];
     let totalTokens = 0;
     let totalCost = 0;
 
@@ -434,7 +385,7 @@ export class AutopilotAgentAdapter {
     return {
       total_tokens: totalTokens,
       cost: totalCost,
-      model_calls: results.filter(r => !r.error).length
+      model_calls: results.filter((r: any) => !r.error).length
     };
   }
 
@@ -503,7 +454,7 @@ export class AutopilotAgentAdapter {
   /**
    * Validate blueprint structure
    */
-  private static validateBlueprint(blueprint: AutopilotBlueprint): { valid: boolean; errors: string[] } {
+  private static validateBlueprint(blueprint: Blueprint): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!blueprint.nodes || !Array.isArray(blueprint.nodes)) {

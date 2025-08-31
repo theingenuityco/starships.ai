@@ -149,7 +149,7 @@ router.delete('/:sessionKey/memory', authMiddleware, async (req: Request, res: R
       );
     }
 
-    const store = AgentExecutionService.getMemoryStore();
+    const store = AutopilotAgentExecutionService.getMemoryStore();
     await store.clear(sessionKey);
 
     res.json({

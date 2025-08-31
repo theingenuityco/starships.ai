@@ -25,6 +25,14 @@ export type {
   AgentMemoryConfig
 } from './AgentMemory';
 
+// ===== LLM SYSTEM =====
+// Core LLM class for AI model interactions
+export { LLM } from './LLM';
+
+// ===== HTTP REQUEST SYSTEM =====
+// Core HttpRequest class for external API calls
+export { HttpRequest } from './HttpRequest';
+
 // Node system
 export { Handler } from './nodes/Handler';
 
@@ -80,10 +88,12 @@ export { config } from './constants';
 // Import classes for convenience functions
 import { Workflow } from './Workflow';
 import { Agent } from './Agent';
+import { LLM } from './LLM';
+import { HttpRequest } from './HttpRequest';
 import { Memory } from './Memory';
 import { AgentMemory } from './AgentMemory';
 import { Validator } from './validation/Validator';
-import { AgentNodeParameters } from './types';
+import { AgentNodeParameters, LlmNodeParameters, HttpRequestNodeParameters } from './types';
 
 // Create default instances for convenience
 const _defaultValidator = new Validator();
@@ -113,4 +123,14 @@ export const createAgentMemory = (initialSystemPrompt?: string): AgentMemory => 
     memory.addMessage('system', initialSystemPrompt);
   }
   return memory;
+};
+
+// Helper function to create a new LLM
+export const createLLM = (config: LlmNodeParameters): LLM => {
+  return new LLM(config);
+};
+
+// Helper function to create a new HttpRequest
+export const createHttpRequest = (config: HttpRequestNodeParameters): HttpRequest => {
+  return new HttpRequest(config);
 };

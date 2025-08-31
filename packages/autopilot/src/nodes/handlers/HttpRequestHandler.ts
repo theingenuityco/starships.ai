@@ -1,13 +1,13 @@
 /**
  * HTTP Request Node Handler
- * 
- * Handles HTTP request nodes for making external API calls using axios
+ *
+ * Executes HTTP request with direct HttpRequest class instantiation
  * Uses BaseHandler pattern
  */
 
-import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { BaseHandler } from '../Handler';
 import { Execution, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { HttpRequest } from '../../HttpRequest';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
@@ -16,97 +16,30 @@ export class HttpRequestHandler extends BaseHandler {
     const params = this.node.parameters as HttpRequestNodeParameters;
     
     try {
-      // Build axios request configuration
-      const requestConfig: AxiosRequestConfig = {
-        method: params.method,
-        url: params.url,
-        headers: {
-          'Content-Type': 'application/json',
-          ...params.headers
-        },
-        timeout: params.timeout || 30000,
-        maxRedirects: params.followRedirects !== false ? 5 : 0,
-        validateStatus: () => true, // Don't throw on any status code
-      };
+      console.log(`Executing HTTP ${params.method} request to: ${params.url}`);
 
-      // Add authentication if provided
-      if (params.authentication) {
-        this.addAuthentication(requestConfig, params.authentication);
-      }
-
-      // Add body for non-GET requests
-      if (params.method !== 'GET' && params.method !== 'HEAD' && params.body) {
-        requestConfig.data = params.body;
-      }
-
-      // Execute request with retries
-      const maxRetries = params.retries || 0;
-      let lastError: Error | null = null;
-      let response: AxiosResponse | null = null;
-
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          response = await axios(requestConfig);
-          break; // Success, exit retry loop
-        } catch (error) {
-          lastError = error as AxiosError;
-          
-          // Don't retry on certain errors
-          if (axios.isCancel(error) ||
-              (error as AxiosError).code === 'ECONNABORTED') {
-            break;
-          }
-          
-          // Wait before retry (exponential backoff)
-          if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-          }
-        }
-      }
-
-
-      if (response) {
+      // Create HttpRequest instance from the full parameters and execute
+      const httpRequest = new HttpRequest(params);
+      const httpResult = await httpRequest.execute();
+      
+      // Check if HTTP request execution was successful
+      if (httpResult.status === 'completed') {
         return this.createSuccessResult(execution, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-          body: response.data,
-          url: response.config.url
+          ...httpResult.data,
+          output: `HTTP ${params.method} request to ${params.url} completed successfully`
         });
       } else {
-        // If we get here, all retries failed
+        // HTTP request execution failed
+        const errorMessage = httpResult.error?.message || 'HTTP request failed';
         return this.createErrorResult(execution,
-          lastError?.message || 'HTTP request failed'
+          `HTTP ${params.method} request to ${params.url} failed: ${errorMessage}`
         );
       }
-
     } catch (error) {
-      return this.createErrorResult(execution, (error as Error).message);
-    }
-  }
-
-  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestNodeParameters['authentication']) {
-    if (!auth || !config.headers) return;
-
-    switch (auth.type) {
-      case 'bearer':
-        if (auth.token) {
-          config.headers['Authorization'] = `Bearer ${auth.token}`;
-        }
-        break;
-      case 'basic':
-        if (auth.username && auth.password) {
-          config.auth = {
-            username: auth.username,
-            password: auth.password
-          };
-        }
-        break;
-      case 'api-key':
-        if (auth.apiKey && auth.headerName) {
-          config.headers[auth.headerName] = auth.apiKey;
-        }
-        break;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return this.createErrorResult(execution,
+        `HTTP ${params.method} request to ${params.url} execution failed: ${errorMessage}`
+      );
     }
   }
 
@@ -115,7 +48,7 @@ export class HttpRequestHandler extends BaseHandler {
     const warnings: ValidationWarning[] = [];
     const params = this.node.parameters as HttpRequestNodeParameters;
 
-    // Required fields validation
+    // Check for required fields first
     if (!params.url) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
@@ -130,55 +63,24 @@ export class HttpRequestHandler extends BaseHandler {
       ));
     }
 
-    // URL format validation
-    if (params.url) {
-      try {
-        new URL(params.url);
-      } catch {
-        errors.push(this.createValidationError(
-          'INVALID_PARAMETERS',
-          'URL format is invalid'
-        ));
-      }
-    }
-
-    // Method validation
-    const validMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
-    if (params.method && !validMethods.includes(params.method)) {
-      errors.push(this.createValidationError(
-        'INVALID_PARAMETERS',
-        `Invalid HTTP method. Must be one of: ${validMethods.join(', ')}`
-      ));
-    }
-
-    // Authentication validation
-    if (params.authentication) {
-      const auth = params.authentication;
-      switch (auth.type) {
-        case 'bearer':
-          if (!auth.token) {
+    // Only do comprehensive validation if basic fields are present
+    // to avoid duplicate error messages
+    if (params.url && params.method) {
+      // Use HttpRequest class validation for comprehensive checking
+      const httpRequest = new HttpRequest(params);
+      const httpValidation = httpRequest.validate();
+      
+      if (!httpValidation.valid) {
+        httpValidation.errors.forEach(error => {
+          // Skip errors we already caught above
+          if (!error.includes('URL is required') &&
+              !error.includes('HTTP method is required')) {
             errors.push(this.createValidationError(
-              'MISSING_REQUIRED_FIELD',
-              'Bearer token is required for bearer authentication'
+              'VALIDATION_FAILED',
+              error
             ));
           }
-          break;
-        case 'basic':
-          if (!auth.username || !auth.password) {
-            errors.push(this.createValidationError(
-              'MISSING_REQUIRED_FIELD',
-              'Username and password are required for basic authentication'
-            ));
-          }
-          break;
-        case 'api-key':
-          if (!auth.apiKey || !auth.headerName) {
-            errors.push(this.createValidationError(
-              'MISSING_REQUIRED_FIELD',
-              'API key and header name are required for API key authentication'
-            ));
-          }
-          break;
+        });
       }
     }
 

@@ -1,135 +1,45 @@
 /**
  * LLM Node Handler
- * 
- * Handles LLM (Large Language Model) nodes using OpenRouter unified API
- * Uses BaseHandler pattern and delegates to HttpRequestHandler
+ *
+ * Executes LLM with direct LLM class instantiation
+ * Uses BaseHandler pattern
  */
 
 import { BaseHandler } from '../Handler';
-import { Execution, ValidationResult, LlmNodeParameters, HttpRequestNodeParameters, Node, ValidationError, ValidationWarning } from '../../types';
-import { HttpRequestHandler } from './HttpRequestHandler';
+import { Execution, ValidationResult, LlmNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { LLM } from '../../LLM';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
 
   async execute(execution: Execution) {
     const params = this.node.parameters as LlmNodeParameters;
+    
     try {
-      // Convert LLM parameters to HTTP request parameters (now with memory support)
-      const httpParams = this.convertToHttpRequest(params, execution);
+      console.log(`Executing LLM: ${params.model}`);
+
+      // Create LLM instance from the full parameters and execute
+      const llm = new LLM(params);
+      const llmResult = await llm.execute(execution);
       
-      // Create HttpRequestHandler instance for delegation
-      const httpNode: Node = {
-        ref: `${this.node.ref}-http`,
-        type: 'http_request',
-        name: `HTTP Request for ${this.node.name}`,
-        description: `HTTP request delegated from LLM node ${this.node.name}`,
-        parameters: httpParams
-      };
-      const httpHandler = new HttpRequestHandler(httpNode);
-      
-      // Delegate to HttpRequestHandler - this will return the execution with HTTP result added
-      const updatedExecution = await httpHandler.execute(execution);
-      
-      // Get the result from the HTTP handler
-      const httpResult = updatedExecution.executionResults.get(`${this.node.ref}-http`);
-      
-      // Process the result to extract LLM-specific data
-      if (httpResult && !httpResult.error && httpResult.data && typeof httpResult.data === 'object') {
-        const httpData = httpResult.data as any;
-        if (httpData.body) {
-          const llmResponse = this.extractLlmResponse(httpData.body);
-          
-          // Add LLM response to agent memory for future reference
-          execution.agentMemory.addMessage('assistant', llmResponse, {
-            model: params.model,
-            nodeRef: this.node.ref
-          });
-          
-          return this.createSuccessResult(updatedExecution, {
-            ...httpData,
-            llmResponse,
-            model: params.model,
-          });
-        }
+      // Check if LLM execution was successful
+      if (llmResult.status === 'completed') {
+        return this.createSuccessResult(execution, {
+          ...llmResult.data,
+          output: `LLM ${params.model} completed successfully`
+        });
+      } else {
+        // LLM execution failed
+        const errorMessage = llmResult.error?.message || 'LLM execution failed';
+        return this.createErrorResult(execution,
+          `LLM ${params.model} execution failed: ${errorMessage}`
+        );
       }
-      
-      // If HTTP request failed or no data, create error result
-      const errorMessage = httpResult?.error || 'LLM request failed';
-      return this.createErrorResult(updatedExecution, errorMessage);
-      
     } catch (error) {
-      return this.createErrorResult(execution, (error as Error).message);
-    }
-  }
-
-  private convertToHttpRequest(params: LlmNodeParameters, execution: Execution): HttpRequestNodeParameters {
-    const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${OPENROUTER_API_KEY}',
-      'HTTP-Referer': '${OPENROUTER_HTTP_REFERER}', // Optional: for analytics
-      'X-Title': '${OPENROUTER_APP_NAME}' // Optional: for analytics
-    };
-    const body = this.buildRequestBody(params, execution);
-
-    return {
-      url: endpoint,
-      method: 'POST',
-      headers,
-      body,
-      timeout: params.timeout || 60000,
-      retries: 1,
-      followRedirects: true
-    };
-  }
-
-  private buildRequestBody(params: LlmNodeParameters, execution: Execution): object {
-    // Get messages from agent memory (includes system prompts and conversation history)
-    const memoryMessages = execution.agentMemory.toMessages();
-    
-    // Convert to API format (simple objects with just role and content)
-    const apiMessages = memoryMessages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-    
-    // Add current prompt as user message
-    apiMessages.push({
-      role: 'user',
-      content: params.prompt
-    });
-
-    // Build OpenRouter-compatible request body
-    return {
-      model: params.model,
-      messages: apiMessages,
-      temperature: params.temperature || 0.7,
-      max_tokens: params.maxTokens || 1024,
-      top_p: params.topP || 1.0,
-      frequency_penalty: params.frequencyPenalty || 0,
-      presence_penalty: params.presencePenalty || 0,
-      stream: params.stream || false,
-      // OpenRouter specific optional parameters
-      transforms: [], // Can be used for prompt transforms
-      route: 'fallback' // Can be 'fallback' or specific routing
-    };
-  }
-
-  private extractLlmResponse(responseBody: any): string {
-    try {
-      // OpenRouter uses OpenAI-compatible format
-      const openAIContent = responseBody.choices?.[0]?.message?.content;
-      if (openAIContent) return openAIContent;
-      
-      // Fallback: try to extract any text content
-      if (typeof responseBody === 'string') return responseBody;
-      if (responseBody?.content) return responseBody.content;
-      if (responseBody?.text) return responseBody.text;
-      return JSON.stringify(responseBody);
-    } catch {
-      // If parsing fails completely, return empty string
-      return '';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return this.createErrorResult(execution,
+        `LLM ${params.model} execution failed: ${errorMessage}`
+      );
     }
   }
 
@@ -138,7 +48,7 @@ export class LlmHandler extends BaseHandler {
     const warnings: ValidationWarning[] = [];
     const params = this.node.parameters as LlmNodeParameters;
 
-    // Required fields validation
+    // Check for required fields first
     if (!params.model) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
@@ -153,26 +63,25 @@ export class LlmHandler extends BaseHandler {
       ));
     }
 
-    // Parameter range validation
-    if (params.temperature !== undefined && (params.temperature < 0 || params.temperature > 2)) {
-      errors.push(this.createValidationError(
-        'INVALID_PARAMETERS',
-        'Temperature must be between 0 and 2'
-      ));
-    }
-
-    if (params.maxTokens !== undefined && params.maxTokens < 1) {
-      errors.push(this.createValidationError(
-        'INVALID_PARAMETERS',
-        'Max tokens must be greater than 0'
-      ));
-    }
-
-    if (params.topP !== undefined && (params.topP < 0 || params.topP > 1)) {
-      errors.push(this.createValidationError(
-        'INVALID_PARAMETERS',
-        'Top P must be between 0 and 1'
-      ));
+    // Only do comprehensive validation if basic fields are present
+    // to avoid duplicate error messages
+    if (params.model && params.prompt) {
+      // Use LLM class validation for comprehensive checking
+      const llm = new LLM(params);
+      const llmValidation = llm.validate();
+      
+      if (!llmValidation.valid) {
+        llmValidation.errors.forEach(error => {
+          // Skip errors we already caught above
+          if (!error.includes('Model is required') &&
+              !error.includes('Prompt is required')) {
+            errors.push(this.createValidationError(
+              'VALIDATION_FAILED',
+              error
+            ));
+          }
+        });
+      }
     }
 
     // Warnings for common issues

@@ -239,8 +239,9 @@ describe('Neo4jConnection', () => {
       };
 
       mockSession.executeRead.mockImplementation((fn: any) => {
-        return fn(mockTransaction).then(() => mockResult);
+        return Promise.resolve(fn(mockTransaction)).then(() => mockResult);
       });
+      mockTransaction.run.mockResolvedValue(mockResult);
 
       const result = await connection.executeQuery('MATCH (n) RETURN count(n) as count');
 
@@ -360,33 +361,38 @@ describe('Neo4jConnection', () => {
 
     it('should convert Map objects to plain objects', () => {
       const map = new Map([['key1', 'value1'], ['key2', 'value2']]);
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(map);
 
-      expect(result).toEqual({ key1: 'value1', key2: 'value2' });
+      expect(result).toEqual({ key1: 'value1', key2: 'value2' }); // Maps are converted to plain objects
     });
 
     it('should handle nested Map objects', () => {
       const nestedMap = new Map([
         ['outer', new Map([['inner', 'value']])]
       ]);
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(nestedMap);
 
       expect(result).toEqual({
         outer: { inner: 'value' }
-      });
+      }); // Nested Maps are recursively converted
     });
 
     it('should sanitize arrays', () => {
       const array = [new Map([['key', 'value']]), 'string', 123];
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(array);
 
-      expect(result).toEqual([{ key: 'value' }, 'string', expect.any(Object)]); // Number becomes Neo4j Integer
+      expect(result).toEqual([{ key: 'value' }, 'string', expect.any(Object)]); // Map converted, number becomes Neo4j Integer
     });
 
     it('should convert integers to Neo4j integers', () => {
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
+      
       const result = sanitizeMethod(42);
 
       expect(neo4j.int).toHaveBeenCalledWith(42);
@@ -395,6 +401,7 @@ describe('Neo4jConnection', () => {
 
     it('should handle limit parameter specially', () => {
       const params = { limit: 10, other: 'value' };
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(params);
 
@@ -435,6 +442,7 @@ describe('Neo4jConnection', () => {
         limit: 50,
         string: 'text'
       };
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(complex);
 
@@ -485,6 +493,9 @@ describe('Connection Factory Functions', () => {
     });
 
     it('should throw error when no connection exists', () => {
+      // Reset the global instance to simulate no connection
+      delete (global as any).__connectionInstance;
+      
       expect(() => getConnection()).toThrow(
         'Neo4j connection not initialized. Call createConnection() first.'
       );

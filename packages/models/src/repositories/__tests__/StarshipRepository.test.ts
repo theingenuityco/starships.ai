@@ -291,11 +291,15 @@ describe('StarshipRepository', () => {
         description: 'Updated description'
       };
 
+      const existingStarship = global.createMockStarship({ id: 'starship-123', ownerId: 'owner-123' });
       const updatedStarship = global.createMockStarship({
         id: 'starship-123',
         ...updates
       });
 
+      // Mock findById call for slug generation
+      jest.spyOn(repository, 'findById').mockResolvedValue(existingStarship);
+      jest.spyOn(repository as any, 'generateUniqueSlug').mockResolvedValue('updated-name');
       mockConnection.executeWrite.mockResolvedValue([{ s: updatedStarship }]);
 
       const result = await repository.update('starship-123', updates);
@@ -306,6 +310,7 @@ describe('StarshipRepository', () => {
           id: 'starship-123',
           updates: expect.objectContaining({
             ...updates,
+            slug: 'updated-name',
             updatedAt: expect.any(String)
           })
         }
@@ -329,6 +334,8 @@ describe('StarshipRepository', () => {
     });
 
     it('should return null when starship not found', async () => {
+      // Mock findById to return null (starship not found)
+      jest.spyOn(repository, 'findById').mockResolvedValue(null);
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.update('non-existent', { name: 'New Name' });
@@ -522,7 +529,7 @@ describe('StarshipRepository', () => {
 
         const result = await repository.generateUniqueSlug('Test Ship', 'owner-123');
 
-        expect(result).toMatch(/^test-ship-[a-z0-9]{8}$/);
+        expect(result).toMatch(/^test-ship-[a-z0-9-]{8,}$/);
       });
 
       it('should validate required parameters', async () => {

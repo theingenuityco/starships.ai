@@ -184,7 +184,7 @@ import {
   StarshipListResponse,
   StarshipDetailsResponse,
   CreateStarshipRequest,
-  ChatSession,
+  Session,
 } from '@starships/protocol'
 
 // Re-export types for use in other client components
@@ -198,7 +198,7 @@ export type {
   StarshipListResponse,
   StarshipDetailsResponse,
   CreateStarshipRequest,
-  ChatSession
+  Session
 }
 
 // For compatibility, alias the types
@@ -568,10 +568,10 @@ export const chatAPI = {
   },
 
   // Get chat sessions by starship ID
-  getSessionsByStarship: (starshipId: string): Promise<{ sessions: ChatSession[] }> =>
+  getSessionsByStarship: (starshipId: string): Promise<{ sessions: Session[] }> =>
     api
       .get(`/api/chat/sessions/starship/${starshipId}`)
-      .then((res: AxiosResponse<{ sessions: ChatSession[] }>) => res.data),
+      .then((res: AxiosResponse<{ sessions: Session[] }>) => res.data),
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>

@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { MessageSquare, Bot, Sparkles, Clock, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { chatAPI } from '@/lib/api'
-import type { ChatSession, ChatSourceType } from '@starships/protocol'
+import type { Session, SessionSourceType } from '@starships/protocol'
 
 interface ChatSessionsSidebarProps {
   starshipId: string
@@ -22,7 +22,7 @@ export function ChatSessionsSidebar({
   className = "" 
 }: ChatSessionsSidebarProps) {
   const { isAuthenticated, userId } = useAuth()
-  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,7 +62,7 @@ export function ChatSessionsSidebar({
     return date.toLocaleDateString()
   }
 
-  const getSessionIcon = (source: ChatSourceType) => {
+  const getSessionIcon = (source: SessionSourceType) => {
     switch (source) {
       case 'agent':
         return <Bot className="w-4 h-4" />
@@ -71,7 +71,7 @@ export function ChatSessionsSidebar({
     }
   }
 
-  const getSessionTitle = (session: ChatSession) => {
+  const getSessionTitle = (session: Session) => {
     if (session.source === 'agent') {
       return session.agent_id ? `Agent Chat` : 'Agent Session'
     }

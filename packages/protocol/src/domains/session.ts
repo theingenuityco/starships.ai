@@ -8,11 +8,20 @@
 // SESSION REQUEST/RESPONSE TYPES
 // ============================================================================
 
+// ============================================================================
+// SESSION SOURCE TYPE
+// ============================================================================
+
+/**
+ * Session source type
+ */
+export type SessionSourceType = 'agent' | 'sibil' | 'user';
+
 /**
  * Base session request interface
  */
 export interface SessionRequest {
-  source: 'agent' | 'sibil' | 'user';
+  source: SessionSourceType;
   agent_id?: string;
   user_id?: string;
   message: string;
@@ -28,7 +37,7 @@ export interface SessionRequest {
  * Base session response interface
  */
 export interface SessionResponse {
-  source: 'agent' | 'sibil' | 'user';
+  source: SessionSourceType;
   content: string;
   agent_id?: string;
   session_id?: string;
@@ -46,7 +55,7 @@ export interface SessionResponse {
  * Session stream chunk for real-time streaming
  */
 export interface SessionStreamChunk {
-  source: 'agent' | 'sibil' | 'user';
+  source: SessionSourceType;
   stream_id: string;
   agent_id?: string;
   type: 'content' | 'status' | 'error' | 'complete';
@@ -73,7 +82,7 @@ export interface SessionStreamChunk {
  */
 export interface Session {
   id: string;
-  source: 'agent' | 'sibil' | 'user';
+  source: SessionSourceType;
   agent_id?: string;
   user_id?: string;
   starship_id?: string;
@@ -81,6 +90,7 @@ export interface Session {
   updated_at: string;
   last_activity_at: string;
   message_count: number;
+  total_tokens?: number;
   status: 'active' | 'paused' | 'completed' | 'archived';
   metadata?: Record<string, unknown>;
 }

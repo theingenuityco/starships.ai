@@ -330,10 +330,10 @@ export class MigrationRunner {
         errors.push(`Expected at least 15 indexes, found ${indexes.length}`);
       }
 
-      // Check seed data was created
-      const mcpCount = await this.getConnection().executeQuery('MATCH (m:MCPServerOption) RETURN count(m) as count');
-      if (mcpCount[0]?.count < 8) {
-        errors.push(`Expected at least 8 MCP server options, found ${mcpCount[0]?.count || 0}`);
+      // Check that migration completed successfully
+      const migrationCheck = await this.getConnection().executeQuery('MATCH (m:Migration {id: "000_complete_schema"}) RETURN m');
+      if (!migrationCheck || migrationCheck.length === 0) {
+        errors.push('Migration record was not created properly');
       }
 
     } catch (error) {

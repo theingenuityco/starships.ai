@@ -90,12 +90,6 @@ CREATE CONSTRAINT execution_required_props IF NOT EXISTS FOR (ex:Execution) REQU
 CREATE CONSTRAINT execution_status_values IF NOT EXISTS FOR (ex:Execution) REQUIRE ex.status IN ['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'];
 
 
-// MCP Server Option constraints
-CREATE CONSTRAINT mcp_server_option_id_unique IF NOT EXISTS FOR (m:MCPServerOption) REQUIRE m.id IS UNIQUE;
-CREATE CONSTRAINT mcp_server_option_name_unique IF NOT EXISTS FOR (m:MCPServerOption) REQUIRE m.name IS UNIQUE;
-
-// MCP Connector constraints
-CREATE CONSTRAINT mcp_connector_id_unique IF NOT EXISTS FOR (mc:MCPConnector) REQUIRE mc.id IS UNIQUE;
 
 // Native Tool API Key constraints
 CREATE CONSTRAINT native_tool_api_key_unique IF NOT EXISTS FOR (k:NativeToolApiKey) REQUIRE (k.starshipId, k.toolName) IS UNIQUE;
@@ -234,14 +228,6 @@ CREATE RANGE INDEX execution_created_at_range IF NOT EXISTS FOR (ex:Execution) O
 CREATE RANGE INDEX execution_start_time_range IF NOT EXISTS FOR (ex:Execution) ON (ex.startTime);
 CREATE RANGE INDEX execution_end_time_range IF NOT EXISTS FOR (ex:Execution) ON (ex.endTime);
 
-// MCP Server Option indexes
-CREATE INDEX mcp_server_name_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.name);
-CREATE INDEX mcp_server_command_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.command);
-CREATE INDEX mcp_server_slug_index IF NOT EXISTS FOR (m:MCPServerOption) ON (m.slug);
-
-// MCP Connector indexes
-CREATE INDEX mcp_connector_starship_id_index IF NOT EXISTS FOR (mc:MCPConnector) ON (mc.starshipId);
-CREATE INDEX mcp_connector_server_option_id_index IF NOT EXISTS FOR (mc:MCPConnector) ON (mc.serverOptionId);
 
 // Native Tool API Key indexes
 CREATE INDEX native_tool_api_key_starship IF NOT EXISTS FOR (n:NativeToolApiKey) ON (n.starshipId);
@@ -271,141 +257,6 @@ RETURN "Created full-text search index: " + name as result;
 CALL db.index.fulltext.createNodeIndex('messageSearch', ['Message'], ['content']) YIELD name
 RETURN "Created full-text search index: " + name as result;
 
-// ============================================================================
-// SEED DATA - MCP SERVER OPTIONS
-// ============================================================================
-
-// GitHub MCP Server
-MERGE (m:MCPServerOption {name: 'GitHub'})
-SET m.id = COALESCE(m.id, 'github-' + randomUUID()),
-    m.command = 'docker',
-    m.args = ['run', '-i', '--rm', 'mcp/github'],
-    m.env = '{"GITHUB_PERSONAL_ACCESS_TOKEN":"Your GitHub Personal Access Token"}',
-    m.slug = 'github',
-    m.description = 'GitHub integration for repository management',
-    m.category = 'development',
-    m.isActive = true,
-    m.dockerImage = 'mcp/github',
-    m.dockerTag = 'latest',
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
-
-// Puppeteer MCP Server
-MERGE (m:MCPServerOption {name: 'Puppeteer'})
-SET m.id = COALESCE(m.id, 'puppeteer-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-puppeteer'],
-    m.env = '{}',
-    m.slug = 'puppeteer',
-    m.description = 'Web automation and scraping capabilities',
-    m.category = 'automation',
-    m.isActive = true,
-    m.httpBridgePort = 3001,
-    m.httpBridgeEnabled = true;
-
-// SQLite MCP Server
-MERGE (m:MCPServerOption {name: 'SQLite'})
-SET m.id = COALESCE(m.id, 'sqlite-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-sqlite', '/path/to/database.db'],
-    m.env = '{}',
-    m.slug = 'sqlite',
-    m.description = 'SQLite database operations',
-    m.category = 'database',
-    m.isActive = true,
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
-
-// PostgreSQL MCP Server
-MERGE (m:MCPServerOption {name: 'PostgreSQL'})
-SET m.id = COALESCE(m.id, 'postgresql-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-postgres'],
-    m.env = '{"POSTGRES_CONNECTION_STRING":"[POSTGRES-CONNECTION]"}',
-    m.slug = 'postgresql',
-    m.description = 'PostgreSQL database operations',
-    m.category = 'database',
-    m.isActive = true,
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
-
-// Brave Search MCP Server
-MERGE (m:MCPServerOption {name: 'Brave Search'})
-SET m.id = COALESCE(m.id, 'brave-search-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-brave-search'],
-    m.env = '{"BRAVE_API_KEY":"Your Brave Search API Key"}',
-    m.slug = 'brave-search',
-    m.description = 'Web search capabilities using Brave Search',
-    m.category = 'search',
-    m.isActive = true,
-    m.httpBridgePort = 3002,
-    m.httpBridgeEnabled = true;
-
-// Google Drive MCP Server
-MERGE (m:MCPServerOption {name: 'Google Drive'})
-SET m.id = COALESCE(m.id, 'gdrive-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-gdrive'],
-    m.env = '{"GOOGLE_CLIENT_ID":"Your Google Client ID","GOOGLE_CLIENT_SECRET":"Your Google Client Secret"}',
-    m.slug = 'google-drive',
-    m.description = 'Google Drive file management',
-    m.category = 'storage',
-    m.isActive = true,
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
-
-// Slack MCP Server
-MERGE (m:MCPServerOption {name: 'Slack'})
-SET m.id = COALESCE(m.id, 'slack-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-slack'],
-    m.env = '{"SLACK_BOT_TOKEN":"Your Slack Bot Token"}',
-    m.slug = 'slack',
-    m.description = 'Slack messaging and workspace integration',
-    m.category = 'communication',
-    m.isActive = true,
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
-
-// Everything MCP Server
-MERGE (m:MCPServerOption {name: 'Everything'})
-SET m.id = COALESCE(m.id, 'everything-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-everything'],
-    m.env = '{}',
-    m.slug = 'everything',
-    m.description = 'File system search on Windows',
-    m.category = 'search',
-    m.isActive = true,
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
-
-// Fetch MCP Server
-MERGE (m:MCPServerOption {name: 'Fetch'})
-SET m.id = COALESCE(m.id, 'fetch-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-fetch'],
-    m.env = '{}',
-    m.slug = 'fetch',
-    m.description = 'HTTP request capabilities',
-    m.category = 'networking',
-    m.isActive = true,
-    m.httpBridgePort = 3003,
-    m.httpBridgeEnabled = true;
-
-// Time MCP Server
-MERGE (m:MCPServerOption {name: 'Time'})
-SET m.id = COALESCE(m.id, 'time-' + randomUUID()),
-    m.command = 'npx',
-    m.args = ['-y', '@modelcontextprotocol/server-time'],
-    m.env = '{}',
-    m.slug = 'time',
-    m.description = 'Time and date operations',
-    m.category = 'utility',
-    m.isActive = true,
-    m.httpBridgePort = null,
-    m.httpBridgeEnabled = false;
 
 // ============================================================================
 // PERFORMANCE MONITORING SETUP
@@ -448,7 +299,6 @@ CREATE (m:Migration {
     'session_models',
     'execution_tracking',
     'stripe_integration',
-    'mcp_servers',
     'native_tool_api_keys',
     'waitlist_management',
     'performance_optimizations'

@@ -89,10 +89,6 @@ CREATE CONSTRAINT session_model_id_unique IF NOT EXISTS FOR (cs:SessionModel) RE
 CREATE CONSTRAINT session_model_required_props IF NOT EXISTS FOR (cs:SessionModel) REQUIRE (cs.id, cs.source, cs.created_by, cs.created_at, cs.last_activity_at, cs.total_tokens) IS NOT NULL;
 CREATE CONSTRAINT session_model_source_values IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.source IN ['sibil', 'agent'];
 
-// Chat Message constraints
-CREATE CONSTRAINT chat_message_id_unique IF NOT EXISTS FOR (cm:ChatMessage) REQUIRE cm.id IS UNIQUE;
-CREATE CONSTRAINT chat_message_required_props IF NOT EXISTS FOR (cm:ChatMessage) REQUIRE (cm.id, cm.session_id, cm.role, cm.content, cm.timestamp) IS NOT NULL;
-CREATE CONSTRAINT chat_message_role_values IF NOT EXISTS FOR (cm:ChatMessage) REQUIRE cm.role IN ['user', 'assistant', 'system'];
 
 // Execution constraints
 CREATE CONSTRAINT execution_id_unique IF NOT EXISTS FOR (ex:Execution) REQUIRE ex.id IS UNIQUE;
@@ -253,13 +249,6 @@ CREATE INDEX session_model_total_tokens_index IF NOT EXISTS FOR (cs:SessionModel
 CREATE INDEX session_model_user_activity_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by, cs.last_activity_at);
 CREATE INDEX session_model_user_source_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by, cs.source);
 
-// Chat Message indexes
-CREATE INDEX chat_message_session_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.session_id);
-CREATE INDEX chat_message_role_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.role);
-CREATE INDEX chat_message_stream_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.stream_id);
-CREATE RANGE INDEX chat_message_timestamp_range IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.timestamp);
-CREATE INDEX chat_message_session_role_composite IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.session_id, cm.role);
-CREATE INDEX chat_message_session_timestamp_composite IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.session_id, cm.timestamp);
 
 // Execution indexes
 CREATE INDEX execution_workflow_id_index IF NOT EXISTS FOR (ex:Execution) ON (ex.workflowId);
@@ -483,7 +472,6 @@ CREATE (m:Migration {
     'agent_memory',
     'message_system',
     'session_models',
-    'chat_messages',
     'execution_tracking',
     'stripe_integration',
     'mcp_servers',

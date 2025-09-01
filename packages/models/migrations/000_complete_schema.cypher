@@ -13,35 +13,26 @@ CREATE CONSTRAINT user_email_unique IF NOT EXISTS FOR (u:User) REQUIRE u.email I
 
 // Starship constraints
 CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE;
-CREATE CONSTRAINT starship_owner_slug_key IF NOT EXISTS FOR (s:Starship) REQUIRE (s.ownerId, s.slug) IS NODE KEY;
+CREATE CONSTRAINT starship_owner_slug_key IF NOT EXISTS FOR (s:Starship) REQUIRE (s.ownerId, s.slug) IS UNIQUE;
 CREATE CONSTRAINT starship_subscription_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.subscriptionId IS UNIQUE;
-CREATE CONSTRAINT starship_class_values IF NOT EXISTS FOR (s:Starship) REQUIRE s.class IN ['scout', 'cruiser', 'draught'];
-CREATE CONSTRAINT starship_status_values IF NOT EXISTS FOR (s:Starship) REQUIRE s.status IN ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
 
 // Agent constraints
 CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE;
-CREATE CONSTRAINT agent_category_values IF NOT EXISTS FOR (a:Agent) REQUIRE a.category IN ['general', 'coding', 'creative', 'analysis', 'support'];
 
 // Agent Template constraints
 CREATE CONSTRAINT agent_template_id_unique IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
-CREATE CONSTRAINT agent_template_category_values IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.category IN ['general', 'coding', 'creative', 'analysis', 'support'];
 
 // Mission constraints
 CREATE CONSTRAINT mission_id_unique IF NOT EXISTS FOR (m:MissionModel) REQUIRE m.id IS UNIQUE;
-CREATE CONSTRAINT mission_status_values IF NOT EXISTS FOR (m:MissionModel) REQUIRE m.status IN ['draft', 'active', 'completed', 'failed', 'cancelled'];
-CREATE CONSTRAINT mission_phase_values IF NOT EXISTS FOR (m:MissionModel) REQUIRE m.phase IN ['welcome', 'analysis', 'plan', 'execute', 'converse'];
-CREATE CONSTRAINT mission_approval_values IF NOT EXISTS FOR (m:MissionModel) REQUIRE m.approvalStatus IN ['pending', 'approved', 'rejected', 'modified'];
 
 // Mission Message constraints
 CREATE CONSTRAINT mission_message_id_unique IF NOT EXISTS FOR (mm:MissionMessageModel) REQUIRE mm.id IS UNIQUE;
-CREATE CONSTRAINT mission_message_role_values IF NOT EXISTS FOR (mm:MissionMessageModel) REQUIRE mm.role IN ['user', 'orchestrator', 'system'];
 
 // Mission Clarity constraints
 CREATE CONSTRAINT mission_clarity_id_unique IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE mc.id IS UNIQUE;
 
 // Workflow constraints
 CREATE CONSTRAINT workflow_id_unique IF NOT EXISTS FOR (w:Workflow) REQUIRE w.id IS UNIQUE;
-CREATE CONSTRAINT workflow_execution_mode_values IF NOT EXISTS FOR (w:Workflow) REQUIRE w.executionMode IN ['simple', 'workflow'];
 
 // Blueprint constraints
 CREATE CONSTRAINT blueprint_id_unique IF NOT EXISTS FOR (b:Blueprint) REQUIRE b.id IS UNIQUE;
@@ -57,18 +48,12 @@ CREATE CONSTRAINT memory_id_unique IF NOT EXISTS FOR (mem:Memory) REQUIRE mem.id
 
 // Message constraints
 CREATE CONSTRAINT message_id_unique IF NOT EXISTS FOR (msg:Message) REQUIRE msg.id IS UNIQUE;
-CREATE CONSTRAINT message_role_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.role IN ['system', 'user', 'assistant'];
-CREATE CONSTRAINT message_type_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.messageType IN ['user_input', 'agent_response', 'system_message', 'workflow_output'];
-CREATE CONSTRAINT message_importance_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.importance IN ['low', 'medium', 'high', 'critical'];
-CREATE CONSTRAINT message_processing_status_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.processingStatus IN ['pending', 'processing', 'completed', 'failed'];
 
 // Session Model constraints
 CREATE CONSTRAINT session_model_id_unique IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.id IS UNIQUE;
-CREATE CONSTRAINT session_model_source_values IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.source IN ['sibil', 'agent'];
 
 // Execution constraints
 CREATE CONSTRAINT execution_id_unique IF NOT EXISTS FOR (ex:Execution) REQUIRE ex.id IS UNIQUE;
-CREATE CONSTRAINT execution_status_values IF NOT EXISTS FOR (ex:Execution) REQUIRE ex.status IN ['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'];
 
 // Native Tool API Key constraints
 CREATE CONSTRAINT native_tool_api_key_unique IF NOT EXISTS FOR (k:NativeToolApiKey) REQUIRE (k.starshipId, k.toolName) IS UNIQUE;
@@ -81,7 +66,6 @@ CREATE CONSTRAINT stripe_event_id_unique IF NOT EXISTS FOR (se:StripeEvent) REQU
 
 // Waitlist constraints
 CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS FOR (w:Waitlist) REQUIRE w.email IS UNIQUE;
-CREATE CONSTRAINT waitlist_status_values IF NOT EXISTS FOR (w:Waitlist) REQUIRE w.status IN ['approved', 'pending', 'rejected'];
 
 // ============================================================================
 // CRITICAL INDEXES

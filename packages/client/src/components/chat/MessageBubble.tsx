@@ -3,7 +3,6 @@
 import type { Message } from '@/lib/agent-socket-api'
 import { formatTime } from '@/lib/utils'
 import { Bot, User } from 'lucide-react'
-import { IntelligentContentRenderer } from '@/components/sibil/renderers/IntelligentContentRenderer'
 
 interface MessageBubbleProps {
   message: Message
@@ -45,10 +44,9 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
           {/* Content Rendering with stabilized layout */}
           <div className="text-sm overflow-hidden">
             <div className="w-full overflow-hidden">
-              <IntelligentContentRenderer
-                content={message.content}
-                isStreaming={streaming}
-              />
+              <div className="whitespace-pre-wrap">
+                {message.content}
+              </div>
             </div>
           </div>
           

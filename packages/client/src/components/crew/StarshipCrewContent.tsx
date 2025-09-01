@@ -12,7 +12,6 @@ import {
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { ChatInterface } from '@/components/chat/ChatInterface'
-import { CrewConsoleFloatingMessage } from '@/components/sibil/CrewConsoleFloatingMessage'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -459,13 +458,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         </div>
       </div>
 
-      {/* Crew Console Floating Message */}
-      <CrewConsoleFloatingMessage 
-        show={showFloatingMessage} 
-        onDismiss={handleDismissMessage}
-        isManualOpen={isManualOpen}
-        onTabChange={handleTabChange}
-      />
     </div>
   )
 }

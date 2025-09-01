@@ -1,4 +1,4 @@
-// Framer Motion animation variants for Sibil components
+// Framer Motion animation variants for chat components
 import { Variants } from 'motion/react'
 
 // Message Animation Variants
@@ -56,12 +56,12 @@ export const providerSwitchVariants: Variants = {
     backgroundColor: 'hsl(var(--muted))',
     borderColor: 'hsl(var(--border))'
   },
-  active: { 
-    scale: 1.05, 
+  active: {
+    scale: 1.05,
     opacity: 1,
-    backgroundColor: 'var(--sibil-accent)',
-    borderColor: 'var(--sibil-accent)',
-    boxShadow: 'var(--sibil-shadow-glow)',
+    backgroundColor: 'hsl(var(--primary))',
+    borderColor: 'hsl(var(--primary))',
+    boxShadow: '0 0 20px hsl(var(--primary) / 0.3)',
     transition: {
       duration: 0.2,
       ease: "easeOut"

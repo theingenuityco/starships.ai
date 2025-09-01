@@ -223,8 +223,8 @@ export function UnifiedMessageInput({
     return minimal ? 'Ask anything...' : 'Ask anything...'
   }
 
-  const canSend = message.trim() && !disabled && !sending && 
-    (mode === 'sibil' || (mode === 'agent' && selectedAgent))
+  const canSend = message.trim() && !disabled && !sending &&
+    (mode === 'agent' && selectedAgent)
 
   // Expose handleSuggestionSubmit for parent component
   const inputRef = useRef({ handleSuggestionSubmit })

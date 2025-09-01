@@ -1,0 +1,103 @@
+name: Test Discord Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Which environment channel to test'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - dev
+
+jobs:
+  test-bot:
+    name: Test Discord Bot Alert
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install Discord.js
+        run: |
+          cd .github/scripts
+          npm install discord.js
+      
+      - name: Send Test Alert via Bot
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          CHANNEL_NAME: ${{ github.event.inputs.environment == 'prod' && 'incidents' || 'dev-alerts' }}
+          ENV_NAME: ${{ github.event.inputs.environment == 'prod' && 'Production' || 'Development' }}
+        run: |
+          cat << 'EOF' > test-bot.js
+          const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+          
+          async function sendTestAlert() {
+            const client = new Client({
+              intents: [
+                GatewayIntentBits.Guilds,
+                GatewayIntentBits.GuildMessages
+              ]
+            });
+            
+            try {
+              await client.login(process.env.DISCORD_BOT_TOKEN);
+              console.log('Bot logged in successfully');
+              
+              // Get the guild
+              const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
+              console.log(`Found guild: ${guild.name}`);
+              
+              // Find the channel by name
+              const channel = guild.channels.cache.find(
+                ch => ch.name === process.env.CHANNEL_NAME && ch.type === 0 // 0 = text channel
+              );
+              
+              if (!channel) {
+                console.error(`Channel #${process.env.CHANNEL_NAME} not found in guild`);
+                console.log('Available channels:', guild.channels.cache.map(ch => ch.name).join(', '));
+                process.exit(1);
+              }
+              
+              console.log(`Found channel: #${channel.name}`);
+              
+              // Create test embed
+              const embed = new EmbedBuilder()
+                .setTitle('🧪 Bot Test Successful!')
+                .setDescription(`Your ${process.env.ENV_NAME} Discord bot integration is properly configured and ready for uptime monitoring.`)
+                .setColor(0x5865F2) // Discord blurple
+                .addFields(
+                  { name: '📍 Environment', value: process.env.ENV_NAME, inline: true },
+                  { name: '📢 Channel', value: `#${process.env.CHANNEL_NAME}`, inline: true },
+                  { name: '🤖 Bot Status', value: 'Connected', inline: true },
+                  { name: '✅ Test Type', value: 'Manual bot verification', inline: true },
+                  { name: '⏰ Time', value: new Date().toUTCString(), inline: true }
+                )
+                .setFooter({ text: 'Starships Uptime Monitor - Bot Test' })
+                .setTimestamp();
+              
+              // Send the message
+              await channel.send({ embeds: [embed] });
+              console.log(`Test message sent to #${process.env.CHANNEL_NAME}`);
+              
+              // Cleanup
+              client.destroy();
+              console.log('Bot disconnected successfully');
+            } catch (error) {
+              console.error('Error:', error.message);
+              process.exit(1);
+            }
+          }
+          
+          sendTestAlert();
+          EOF
+          
+          node test-bot.js

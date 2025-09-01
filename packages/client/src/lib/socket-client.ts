@@ -1,9 +1,9 @@
 import { io, Socket } from 'socket.io-client';
-import type { SocketEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
+import type { SessionSocketEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
 
 class SocketClient {
   private static instance: SocketClient;
-  private socket: Socket<SocketEvents> | null = null;
+  private socket: Socket<SessionSocketEvents> | null = null;
   private connectionState: SocketConnectionState = {
     connected: false,
     authenticated: false,
@@ -125,7 +125,7 @@ class SocketClient {
     }
   }
 
-  getSocket(): Socket<SocketEvents> | null {
+  getSocket(): Socket<SessionSocketEvents> | null {
     return this.socket;
   }
 

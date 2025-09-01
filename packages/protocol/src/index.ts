@@ -3,9 +3,6 @@
 // ============================================================================
 
 
-// Export contract types (API boundaries)
-export * from './contracts/socket';
-
 // Export domain types (database domains)
 export * from './domains/agent';
 export * from './domains/agent-template';

@@ -1,12 +1,90 @@
 /**
  * Session Domain Types
  *
- * Types for session functionality including requests, responses, and streaming
+ * Types for session functionality including requests, responses, streaming, and socket events
  */
 
 // ============================================================================
-// SESSION REQUEST/RESPONSE TYPES
+// SOCKET CONNECTION STATE
 // ============================================================================
+
+/**
+ * Socket.IO client connection state
+ */
+export interface SocketConnectionState {
+  connected: boolean;
+  authenticated: boolean;
+  room_joined: boolean;
+  user_id?: string;
+  connection_id?: string;
+  last_ping?: number;
+}
+
+/**
+ * Connection status event data
+ */
+export interface ConnectionStatusEvent {
+  status: 'connected' | 'disconnected' | 'reconnecting' | 'error';
+  user_id: string;
+  connection_id: string;
+  timestamp: string;
+}
+
+/**
+ * Connection status type
+ */
+export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'error';
+
+// ============================================================================
+// CHAT EVENT DATA TYPES
+// ============================================================================
+
+/**
+ * Chat room event data
+ */
+export interface ChatRoomData {
+  room_id: string;
+  user_id: string;
+  session_id?: string;
+}
+
+/**
+ * Chat typing event data
+ */
+export interface ChatTypingData {
+  user_id: string;
+  session_id?: string;
+  room_id?: string;
+  is_typing: boolean;
+}
+
+// ============================================================================
+// EVENT EMISSION UTILITIES
+// ============================================================================
+
+/**
+ * Event emission options
+ */
+export interface EventEmissionOptions {
+  exclude_user?: string;
+  include_users?: string[];
+  retry_count?: number;
+  timeout?: number;
+}
+
+/**
+ * Event emission result
+ */
+export interface EventEmissionResult {
+  success: boolean;
+  event_type: string;
+  recipient_count: number;
+  errors?: Array<{
+    user_id: string;
+    error: string;
+  }>;
+  timestamp: string;
+}
 
 // ============================================================================
 // SESSION SOURCE TYPE
@@ -111,3 +189,33 @@ export interface SessionError {
   recoverable: boolean;
   metadata?: Record<string, unknown>;
 }
+
+// ============================================================================
+// SOCKET EVENT INTERFACES
+// ============================================================================
+
+/**
+ * Base socket events for session management
+ */
+export interface SessionSocketEvents {
+  connect: () => void;
+  disconnect: () => void;
+  error: (error: Error) => void;
+  ping: () => void;
+  pong: () => void;
+  'connection-status': (data: ConnectionStatusEvent) => void;
+  'session:stream-start': (data: SessionStreamChunk) => void;
+  'session:stream-chunk': (data: SessionStreamChunk) => void;
+  'session:stream-complete': (data: SessionStreamChunk) => void;
+  'session:stream-error': (data: SessionError) => void;
+  'session:typing-start': (data: ChatTypingData) => void;
+  'session:typing-stop': (data: ChatTypingData) => void;
+  'session:join-room': (data: ChatRoomData) => void;
+  'session:leave-room': (data: ChatRoomData) => void;
+  'session:stop-stream': (stream_id: string) => void;
+}
+
+/**
+ * Generic type helper for socket event data
+ */
+export type SocketEventData<T extends (...args: unknown[]) => unknown> = Parameters<T>[0];

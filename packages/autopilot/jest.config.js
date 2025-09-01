@@ -51,7 +51,7 @@ module.exports = {
   coverageDirectory: 'coverage',
   
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
   
   // Clear mocks between tests
   clearMocks: true,

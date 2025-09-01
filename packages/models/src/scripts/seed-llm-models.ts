@@ -136,12 +136,19 @@ if (require.main === module) {
       console.log('📋 Loaded environment variables from', envPath);
     }
     
+    // Validate required environment variables
+    if (!process.env.NEO4J_URI || !process.env.NEO4J_USERNAME || !process.env.NEO4J_PASSWORD) {
+      console.error('❌ Missing required Neo4j environment variables');
+      console.error('Please set NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD');
+      process.exit(1);
+    }
+
     // Load configuration from environment
     const config: Neo4jConfig = {
-      uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
-      username: process.env.NEO4J_USERNAME || 'neo4j',
-      password: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
-      database: process.env.NEO4J_DATABASE || 'neo4j'
+      uri: process.env.NEO4J_URI,
+      username: process.env.NEO4J_USERNAME,
+      password: process.env.NEO4J_PASSWORD,
+      database: process.env.NEO4J_DATABASE
     };
     
     console.log('🔧 Using Neo4j config:', {

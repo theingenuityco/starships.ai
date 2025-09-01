@@ -40,16 +40,13 @@ import healthRoutes from './routes/health';
  * Validate required environment variables
  */
 function validateEnvironmentVariables() {
-  const requiredVars = [
-    'CLIENT_URL',
-    'NEXT_PUBLIC_API_URL',
-  ];
-  
-  const missingVars = requiredVars.filter(varName => !process.env[varName]);
-  
+  const requiredVars = ['CLIENT_URL', 'NEXT_PUBLIC_API_URL', 'NEO4J_URI', 'NEO4J_USERNAME', 'NEO4J_PASSWORD'];
+
+  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+
   if (missingVars.length > 0) {
     console.error('❌ Missing required environment variables:');
-    missingVars.forEach(varName => {
+    missingVars.forEach((varName) => {
       console.error(`   - ${varName}`);
     });
     console.error('');
@@ -57,7 +54,7 @@ function validateEnvironmentVariables() {
     console.error('You can copy .env.example to .env and fill in the values.');
     process.exit(1);
   }
-  
+
   // Validate CLIENT_URL format
   const clientUrl = process.env.CLIENT_URL;
   if (clientUrl && !clientUrl.match(/^https?:\/\/.+/)) {
@@ -65,7 +62,7 @@ function validateEnvironmentVariables() {
     console.error(`   Current value: ${clientUrl}`);
     process.exit(1);
   }
-  
+
   // Validate NEXT_PUBLIC_API_URL format
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   if (apiUrl && !apiUrl.match(/^https?:\/\/.+/)) {
@@ -73,10 +70,12 @@ function validateEnvironmentVariables() {
     console.error(`   Current value: ${apiUrl}`);
     process.exit(1);
   }
-  
+
   console.log('✅ Environment variables validated successfully');
   console.log(`   CLIENT_URL: ${clientUrl}`);
   console.log(`   NEXT_PUBLIC_API_URL: ${apiUrl}`);
+  console.log(`   NEO4J_URI: ${process.env.NEO4J_URI}`);
+  console.log(`   NEO4J_USERNAME: ${process.env.NEO4J_USERNAME}`);
 }
 
 const app: express.Application = express();
@@ -87,10 +86,10 @@ validateEnvironmentVariables();
 
 // Initialize Neo4j database connection
 const dbConnection = createConnection({
-  uri: process.env.NEO4J_URI || '[NEO4J-LOCAL-URL]',
-  username: process.env.NEO4J_USERNAME || 'neo4j',
-  password: process.env.NEO4J_PASSWORD || '[NEO4J-PASSWORD]',
-  database: process.env.NEO4J_DATABASE || 'neo4j',
+  uri: process.env.NEO4J_URI!,
+  username: process.env.NEO4J_USERNAME!,
+  password: process.env.NEO4J_PASSWORD!,
+  database: process.env.NEO4J_DATABASE,
 });
 
 // Core repositories
@@ -123,7 +122,6 @@ initializeStarshipRoutes({
 initializeWebhookRoutes({
   starshipRepository,
 });
-
 
 
 // Public pricing endpoint - must be before auth-protected routes
@@ -169,20 +167,20 @@ const socketService = initializeSocketIO(httpServer);
 httpServer.listen(PORT, async () => {
   try {
     console.log('🚀 Starting Aether Core Server...');
-    
+
     // Initialize database connection FIRST
     await dbConnection.connect();
     console.log('✅ Neo4j database connected');
-    
+
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
-    
+
     // Initialize RepositoryFactory AFTER database connection is established
     console.log('🔧 Initializing RepositoryFactory...');
     await RepositoryFactory.initialize();
     console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
-    
+
     // Ensure WaitlistRepository is properly initialized
     try {
       RepositoryFactory.getWaitlistRepository();
@@ -191,16 +189,19 @@ httpServer.listen(PORT, async () => {
       console.error('❌ Failed to initialize WaitlistRepository:', error);
       // Continue startup - waitlist is not critical for the application
     }
-    
+
     // Initialize AgentTemplateService (seeds default templates)
     try {
       const templateService = new AgentTemplateService(dbConnection);
       await templateService.seedDefaultTemplates();
       console.log('✅ AgentTemplateService initialized with default templates');
     } catch (error) {
-      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
+      console.warn(
+        '⚠️ AgentTemplateService not available - database connection may be unavailable:',
+        error
+      );
     }
-    
+
     // LLM Models are now initialized automatically with schema
     console.log('✅ LLM Models ready (seeded during schema initialization)');
 
@@ -212,7 +213,6 @@ httpServer.listen(PORT, async () => {
       console.error('⚠️ Failed to seed waitlist:', error);
       // Continue - seeding is not critical for startup
     }
-
 
     // Log Socket.IO status
     console.log('✅ Socket.IO server initialized');

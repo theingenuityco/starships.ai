@@ -551,8 +551,6 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: NEO4J_PASSWORD
-        - name: NEO4J_AUTH
-          value: "neo4j/$(NEO4J_PASSWORD)"
         
         # Kinde OAuth
         - name: KINDE_SITE_URL

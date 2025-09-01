@@ -27,19 +27,20 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "3000"
     spec:
-      # Security Context - Run as non-root user for security
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        runAsNonRoot: true
+      # Security Context - Temporarily disabled due to supervisor permission issues
+      # TODO: Fix Docker image to work with non-root user
+      # securityContext:
+      #   runAsUser: 1000
+      #   runAsGroup: 1000
+      #   fsGroup: 1000
+      #   runAsNonRoot: true
       
       imagePullSecrets:
       - name: ghcr-pull-secret
       
       containers:
       - name: starships
-        image: [DOCKER-REGISTRY-URL]:latest
+        image: "PLACEHOLDER_IMAGE:latest"  # Updated by CI/CD via kubectl set image
         imagePullPolicy: Always
         
         ports:
@@ -83,20 +84,32 @@ spec:
               name: starships-secrets
               key: NEXT_PUBLIC_SERVER_URL
         - name: SERVER_URL
-          value: "http://localhost:4000"  # Internal service URL, always the same
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: SERVER_URL
         
         # Neo4j Configuration (with auth enabled)
         - name: NEO4J_URI
-          value: "[NEO4J-LOCAL-URL]"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEO4J_URI
         - name: NEO4J_USERNAME
-          value: "neo4j"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEO4J_USERNAME
         - name: NEO4J_PASSWORD
           valueFrom:
             secretKeyRef:
               name: starships-secrets
               key: NEO4J_PASSWORD
-        - name: NEO4J_AUTH
-          value: "neo4j/$(NEO4J_PASSWORD)"
+        - name: NEO4J_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEO4J_DATABASE
         
         # Kinde OAuth URLs (from secrets for flexibility across environments)
         - name: KINDE_SITE_URL
@@ -114,17 +127,18 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: KINDE_POST_LOGOUT_REDIRECT_URL
-        - name: KINDE_REDIRECT_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_REDIRECT_URL
         
         # Security: Disable debug modes
         - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
-          value: "false"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
         - name: KINDE_DEBUG_MODE
-          value: "false"
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: KINDE_DEBUG_MODE
         
         # API Keys from Secrets
         - name: OPENAI_API_KEY

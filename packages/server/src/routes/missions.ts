@@ -577,16 +577,16 @@ router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> =
     const { id } = req.params;
     validateUUID(id, 'id');
 
-    const workflow = await WorkflowService.getWorkflowByMissionId(id);
+    const workflow = await MissionService.getWorkflowByMissionId(id);
 
     // Extract agent IDs from workflow nodes and fetch agent details
     const agents: Record<string, any> = {};
     if (workflow && workflow.nodes) {
       const agentIds = workflow.nodes
-        .filter(node => node.type === 'agent' && node.parameters?.agentId)
-        .map(node => node.parameters.agentId)
-        .filter((id): id is string => typeof id === 'string') // Type guard to ensure string
-        .filter((id, index, array) => array.indexOf(id) === index); // Remove duplicates
+        .filter((node: any) => node.type === 'agent' && node.parameters?.agentId)
+        .map((node: any) => node.parameters.agentId)
+        .filter((id: any): id is string => typeof id === 'string') // Type guard to ensure string
+        .filter((id: string, index: number, array: string[]) => array.indexOf(id) === index); // Remove duplicates
 
       // Fetch agent details for all unique agent IDs
       for (const agentId of agentIds) {
@@ -669,7 +669,7 @@ router.put('/:id/workflow/approval', async (req: Request, res: Response): Promis
     }
 
     // Update workflow approval using service
-    await WorkflowService.updateWorkflowApproval(id, { approvalStatus, rejectionReason });
+    await MissionService.updateWorkflowApproval(id, { approvalStatus, rejectionReason });
 
     // Let orchestrator handle state transition (not manual database update)
     const orchestrator = MissionOrchestratorService.getInstance();
@@ -803,9 +803,9 @@ router.get('/:id/execution-status', async (req: Request, res: Response): Promise
     
     res.json({
       success: true,
-      data: { 
-        executionState: mission.executionState || null,
-        phase: mission.phase 
+      data: {
+        executionState: null, // Execution state now managed by autopilot workflow system
+        phase: mission.phase
       }
     });
 

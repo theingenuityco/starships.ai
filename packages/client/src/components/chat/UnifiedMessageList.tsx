@@ -4,9 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { MessageList } from './MessageList'
 import { MessageBubble } from './MessageBubble'
-import { SibilMessageBubble } from '@/components/sibil/SibilMessageBubble'
 import type { Message } from '@/lib/agent-socket-api'
-import type { SibilMessage } from '@/lib/sibil-api'
 import type { ChatMode } from './ChatModeSelector'
 import { chatAPI } from '@/lib/api'
 
@@ -18,7 +16,7 @@ interface UnifiedMessageListProps {
 }
 
 // Union type for unified messages
-type UnifiedMessage = Message | SibilMessage
+type UnifiedMessage = Message
 
 export function UnifiedMessageList({
   mode,
@@ -55,8 +53,7 @@ export function UnifiedMessageList({
         timestamp: msg.timestamp,
         sessionId: msg.sessionId,
         // Add mode-specific fields based on message structure
-        ...(mode === 'agent' ? { agentId: sessionId.split(':')[0]?.replace('agent-', '') } : {}),
-        ...(mode === 'sibil' ? { provider: 'openai', model: 'gpt-4' } : {})
+        agentId: sessionId.split(':')[0]?.replace('agent-', '')
       } as UnifiedMessage))
       
       setMessages(unifiedMessages)
@@ -99,7 +96,7 @@ export function UnifiedMessageList({
 
   // Get appropriate message component based on mode
   const getMessageComponent = () => {
-    return mode === 'agent' ? MessageBubble : SibilMessageBubble
+    return MessageBubble
   }
 
   if (!sessionId) {
@@ -131,27 +128,16 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ mode }: EmptyStateProps) {
-  const content = mode === 'agent' 
-    ? {
-        title: "Connect with your Agent",
-        subtitle: "Select an agent and start a conversation to boost your productivity",
-        suggestions: [
-          "Help me plan my project timeline",
-          "Analyze this data for insights", 
-          "Write code for my application",
-          "Research industry trends"
-        ]
-      }
-    : {
-        title: "Ask anything",
-        subtitle: "Get detailed answers and creative help from AI",
-        suggestions: [
-          "Help me pack for my trip to Jaipur next week",
-          "Compare leather sofas vs fabric sofas",
-          "How to identify genuine pashmina shawls?",
-          "What are the best productivity apps for 2024?"
-        ]
-      }
+  const content = {
+    title: "Connect with your Agent",
+    subtitle: "Select an agent and start a conversation to boost your productivity",
+    suggestions: [
+      "Help me plan my project timeline",
+      "Analyze this data for insights",
+      "Write code for my application",
+      "Research industry trends"
+    ]
+  }
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">

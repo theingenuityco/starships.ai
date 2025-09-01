@@ -7,9 +7,19 @@
 
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import type { MissionWorkflow, LLMChatPrompt } from '@starships/protocol';
+// Note: LLMChatPrompt type needs to be defined based on the actual interface needed
+// For now, creating a local interface until the proper type is available
+interface LLMChatPrompt {
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  temperature?: number;
+  maxTokens?: number;
+}
 import { MISSION_PHASES } from '@starships/protocol';
-import type { Agent } from '@starships/protocol';
+import type { BlueprintModel } from '@starships/protocol';
+import type { AgentModel } from '@starships/protocol';
 
 /**
  * System instruction constants - direct instruction strings for different operations
@@ -227,7 +237,7 @@ export class MissionPromptBuilder {
   /**
    * Build workflow generation prompt
    */
-  buildWorkflowGenerationPrompt(agents: Agent[]): LLMChatPrompt {
+  buildWorkflowGenerationPrompt(agents: AgentModel[]): LLMChatPrompt {
     const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION
       .replace('{agentList}', this.buildAgentListSection(agents))
       .replace('{missionContext}', this.buildMissionSection())
@@ -244,9 +254,9 @@ export class MissionPromptBuilder {
   /**
    * Build workflow presentation prompt
    */
-  buildWorkflowPresentationPrompt(workflow: MissionWorkflow): LLMChatPrompt {
+  buildWorkflowPresentationPrompt(blueprint: BlueprintModel): LLMChatPrompt {
     const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION
-      .replace('{planData}', this.buildWorkflowDataSection(workflow));
+      .replace('{planData}', this.buildWorkflowDataSection(blueprint));
 
     return {
       messages: [{
@@ -386,12 +396,11 @@ You coordinate starship missions by:
     const { metadata } = this.state;
     if (!metadata) return '';
     
-    const { mission, starship, vision } = metadata;
+    const { mission, starship } = metadata;
     
     return `MISSION: "${mission.name}"
 ├─ OBJECTIVE: ${mission.description}
 ├─ STARSHIP: ${starship.name} (${starship.class}-class)
-├─ VISION: ${vision.statement}
 └─ STATUS: ${mission.status}`;
   }
 
@@ -429,24 +438,27 @@ MISSION CLARITY ASSESSMENT:
   }
 
   private buildWorkflowSection(): string {
-    const { workflow } = this.state;
-    if (!workflow) return '';
+    const { blueprint, metadata } = this.state;
+    if (!blueprint) return '';
     
-    const agentNodes = workflow.nodes.filter(n => n.type === 'agent');
-    const workflowStatus = workflow.approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' : 
-                          workflow.approvalStatus === 'rejected' ? '❌ REJECTED' : 
+    const agentNodes = blueprint.nodes?.filter((n: any) => n.type === 'agent') || [];
+    const approvalStatus = metadata?.mission.approvalStatus || 'pending';
+    const workflowStatus = approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' :
+                          approvalStatus === 'rejected' ? '❌ REJECTED' :
                           '⏳ PENDING APPROVAL';
     
-    const taskList = agentNodes.map((node, index) => 
+    const taskList = agentNodes.map((node: any, index: number) =>
       `├─ Task ${index + 1}: ${node.name}`
     ).join('\n');
+    
+    const createdDate = blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : 'Unknown';
     
     return `
 MISSION WORKFLOW:
 ├─ Status: ${workflowStatus}
 ├─ Total Tasks: ${agentNodes.length}
 ${taskList}
-└─ Created: ${new Date(workflow.createdAt).toLocaleDateString()}`;
+└─ Created: ${createdDate}`;
   }
 
   private buildExecutionResultsSection(): string {
@@ -560,7 +572,7 @@ ${taskResults}
   /**
    * Build agent list section for plan generation
    */
-  private buildAgentListSection(agents: Agent[]): string {
+  private buildAgentListSection(agents: AgentModel[]): string {
     return agents.map(agent => {
       const capabilities = agent.category || 'general';
       return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;
@@ -570,10 +582,10 @@ ${taskResults}
   /**
    * Build workflow data section for presentation
    */
-  private buildWorkflowDataSection(workflow: MissionWorkflow): string {
-    const agentNodes = workflow.nodes.filter(node => node.type === 'agent');
-    const agentAssignments = agentNodes.reduce((assignments, node) => {
-      const agentId = node.parameters.agentId;
+  private buildWorkflowDataSection(blueprint: BlueprintModel): string {
+    const agentNodes = blueprint.nodes?.filter((node: any) => node.type === 'agent') || [];
+    const agentAssignments = agentNodes.reduce((assignments: Record<string, string[]>, node: any) => {
+      const agentId = node.parameters?.agentId;
       if (agentId && typeof agentId === 'string') {
         if (!assignments[agentId]) {
           assignments[agentId] = [];
@@ -584,23 +596,23 @@ ${taskResults}
     }, {} as Record<string, string[]>);
 
     let workflowText = `EXECUTION WORKFLOW OVERVIEW:
-├─ Total Nodes: ${workflow.nodes.length}
+├─ Total Nodes: ${blueprint.nodes?.length || 0}
 ├─ Agent Tasks: ${agentNodes.length}
-├─ Workflow Edges: ${workflow.edges.length}
+├─ Workflow Edges: ${blueprint.edges?.length || 0}
 └─ Agents Involved: ${Object.keys(agentAssignments).length}
 
 WORKFLOW STRUCTURE:`;
 
-    workflow.nodes.forEach((node, index) => {
+    blueprint.nodes?.forEach((node: any, index: number) => {
       if (node.type === 'start') {
         workflowText += `\n${index + 1}. [START] ${node.name}
    └─ ${node.description}`;
       } else if (node.type === 'agent') {
         workflowText += `\n${index + 1}. [AGENT] ${node.name}
-   ├─ Agent: ${node.parameters.agentId}
-   ├─ Priority: ${node.parameters.priority || 'medium'}
-   ├─ Expected Output: ${node.parameters.expectedOutput}
-   └─ Instructions: ${node.parameters.instructions}`;
+   ├─ Agent: ${node.parameters?.agentId}
+   ├─ Priority: ${node.parameters?.priority || 'medium'}
+   ├─ Expected Output: ${node.parameters?.expectedOutput}
+   └─ Instructions: ${node.parameters?.instructions}`;
       } else if (node.type === 'end') {
         workflowText += `\n${index + 1}. [END] ${node.name}
    └─ ${node.description}`;
@@ -608,14 +620,14 @@ WORKFLOW STRUCTURE:`;
     });
 
     workflowText += '\n\nEXECUTION FLOW:';
-    workflow.edges.forEach((edge) => {
-      const fromNode = workflow.nodes.find(n => n.id === edge.from);
-      const toNode = workflow.nodes.find(n => n.id === edge.to);
+    blueprint.edges?.forEach((edge: any) => {
+      const fromNode = blueprint.nodes?.find((n: any) => n.id === edge.from);
+      const toNode = blueprint.nodes?.find((n: any) => n.id === edge.to);
       workflowText += `\n├─ ${fromNode?.name || edge.from} → ${toNode?.name || edge.to}`;
     });
 
     workflowText += '\n\nAGENT ASSIGNMENTS:';
-    Object.entries(agentAssignments).forEach(([agentId, nodeIds]) => {
+    Object.entries(agentAssignments).forEach(([agentId, nodeIds]: [string, string[]]) => {
       workflowText += `\n├─ ${agentId}: ${nodeIds.length} task(s)`;
     });
 

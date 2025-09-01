@@ -6,7 +6,7 @@ interface SystemQuickModuleProps {
 }
 
 export function SystemQuickModule({ data, onAction }: SystemQuickModuleProps) {
-  const { powerLevel, sibilInsights } = data;
+  const { powerLevel, insights } = data;
   const systemHealth = 92;
 
   return (
@@ -29,7 +29,7 @@ export function SystemQuickModule({ data, onAction }: SystemQuickModuleProps) {
           <div className="text-muted-foreground">Missions</div>
         </div>
         <div className="p-1 bg-purple-500/10 rounded text-xs">
-          <div className="text-purple-600 dark:text-purple-400 font-mono">{sibilInsights}</div>
+          <div className="text-purple-600 dark:text-purple-400 font-mono">{insights || 0}</div>
           <div className="text-muted-foreground">Insights</div>
         </div>
       </div>

@@ -166,7 +166,6 @@ File: packages/autopilot/src/types/nodes.ts
 export interface AgentNodeParameters {
   agentId: string;
   taskIds?: string[];
-  instructions?: string;
   expectedOutput?: string;
   timeout?: number;
   estimatedTime?: number;
@@ -689,7 +688,7 @@ export class AgentHandler implements Handler {
     
     // TODO: Integrate with agent service
     // This will need to be connected to the actual agent execution system
-    console.log(`Executing agent: ${params.agentId} with instructions: ${params.instructions}`);
+    console.log(`Executing agent: ${params.agentId}`);
     
     return {
       nodeId: node.id,

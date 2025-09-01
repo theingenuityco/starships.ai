@@ -10,11 +10,44 @@ import { missionApi } from '@/lib/missionApi';
 import { agentAPI } from '@/lib/api';
 import { useSocket } from '@/providers/socket-provider';
 import SocketClient from '@/lib/socket-client';
-import type { Mission, MissionStatus, MissionMessage, Agent, MissionClarity, MissionPhase } from '@starships/protocol';
+import type { MissionModel, MissionStatus, MissionMessageModel, AgentModel, MissionClarityModel, MissionPhase } from '@starships/protocol';
 import { MISSION_PHASES } from '@starships/protocol';
 import { getMissionPhaseConfig } from '@/types';
 import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
 import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent';
+
+// Extended mission type for client-side usage (includes execution properties)
+interface ClientMissionModel extends MissionModel {
+  executionResult?: {
+    success: boolean;
+    summary: string;
+    executedAt: string;
+    nodeResults: Array<{
+      nodeId: string;
+      nodeName: string;
+      success: boolean;
+      output?: string;
+      error?: string;
+      timestamp: string;
+    }>;
+  };
+  executionState?: {
+    status: string;
+    totalNodes: number;
+    currentNodeIndex: number;
+    startedAt: string;
+    completedAt?: string;
+    error?: string;
+    nodeResults?: Array<{
+      nodeId: string;
+      nodeName: string;
+      success: boolean;
+      output?: string;
+      error?: string;
+      timestamp: string;
+    }>;
+  };
+}
 
 interface MissionDetailPageProps {
   params: Promise<{
@@ -42,18 +75,18 @@ const statusIcons: Record<MissionStatus, React.ReactNode> = {
 export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const { missionId } = use(params);
   const router = useRouter();
-  const [mission, setMission] = useState<Mission | null>(null);
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [mission, setMission] = useState<ClientMissionModel | null>(null);
+  const [agents, setAgents] = useState<AgentModel[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Clarity state
-  const [clarity, setClarity] = useState<MissionClarity | null>(null);
+  const [clarity, setClarity] = useState<MissionClarityModel | null>(null);
   const [clarityUpdated, setClarityUpdated] = useState(false);
   
   // Chat state
-  const [messages, setMessages] = useState<MissionMessage[]>([]);
+  const [messages, setMessages] = useState<MissionMessageModel[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -98,7 +131,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   };
 
   // Function to get agent emoji based on name and category (same logic as AgentCard)
-  const getAgentEmoji = (agent: Agent) => {
+  const getAgentEmoji = (agent: AgentModel) => {
     if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
       return '🎧'; // Headphones emoji
     } else if (
@@ -144,7 +177,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   };
 
   // Central message handler - single source of truth
-  const addMessageToUI = (message: MissionMessage) => {
+  const addMessageToUI = (message: MissionMessageModel) => {
     setMessages(prev => [...prev, message]);
   };
 
@@ -153,14 +186,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     if (approved) {
       // Workflow was approved, mission should transition to execute phase
       // This will be handled by the WebSocket event or we can optimistically update
-      setMission(prev => prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null);
+      setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null);
     }
     // If rejected, stay in plan phase for regeneration
   };
 
   const handleExecutionComplete = () => {
     // Execution completed, mission should transition to converse phase
-    setMission(prev => prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null);
+    setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null);
   };
 
   // WebSocket setup for mission messages and real-time updates
@@ -195,12 +228,12 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
             setMission(response.data.mission);
           } else {
             // Fallback to just updating the phase if refetch fails
-            setMission(prev => prev ? { ...prev, phase: data.newPhase } : null);
+            setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: data.newPhase } : null);
           }
         } catch (error) {
           console.error('Failed to refetch mission after phase change:', error);
           // Fallback to just updating the phase if refetch fails
-          setMission(prev => prev ? { ...prev, phase: data.newPhase } : null);
+          setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: data.newPhase } : null);
         }
       }
     };
@@ -208,7 +241,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     const handleStatusChange = (data: any) => {
       console.log('[MISSION] Received status change:', data);
       if (data.missionId === missionId) {
-        setMission(prev => prev ? { ...prev, status: data.newStatus } : null);
+        setMission((prev: ClientMissionModel | null) => prev ? { ...prev, status: data.newStatus } : null);
       }
     };
 
@@ -338,7 +371,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         console.log('[MISSION] WebSocket disconnected, using HTTP fallback for messages');
         
         // Add user message
-        const userMessage: MissionMessage = {
+        const userMessage: MissionMessageModel = {
           id: `user-${Date.now()}`,
           missionId,
           role: 'user',
@@ -349,7 +382,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         addMessageToUI(userMessage);
         
         // Add orchestrator response
-        const orchestratorMessage: MissionMessage = {
+        const orchestratorMessage: MissionMessageModel = {
           id: `orchestrator-${Date.now()}`,
           missionId,
           role: 'orchestrator',
@@ -363,7 +396,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
       console.error('Failed to send message:', error);
       
       // On error, always show user message (they typed it)
-      const userMessage: MissionMessage = {
+      const userMessage: MissionMessageModel = {
         id: `user-error-${Date.now()}`,
         missionId,
         role: 'user',
@@ -417,9 +450,9 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
             Back
           </Button>
           <div className="flex items-center gap-3">
-            {statusIcons[mission.status]}
+            {statusIcons[mission.status as MissionStatus]}
             <h1 className="text-2xl font-bold">{mission.name}</h1>
-            <Badge className={statusColors[mission.status]}>
+            <Badge className={statusColors[mission.status as MissionStatus]}>
               {mission.status}
             </Badge>
           </div>
@@ -614,14 +647,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                     <div className="ml-auto">
                       <Badge className={
                         mission.executionResult?.success || 
-                        (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every(r => r.success))
+                        (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
                           ? "bg-green-100 text-green-800" 
                           : mission.phase === MISSION_PHASES.CONVERSE
                             ? "bg-green-100 text-green-800"
                             : "bg-red-100 text-red-800"
                       }>
                         {mission.executionResult?.success || 
-                         (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every(r => r.success))
+                         (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
                           ? "✅ Completed" 
                           : mission.phase === MISSION_PHASES.CONVERSE
                             ? "✅ Completed"
@@ -639,7 +672,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           <div className="text-xs font-medium text-muted-foreground mb-2">
                             Agent Task Outputs:
                           </div>
-                          {nodeResults.map((result) => (
+                          {nodeResults.map((result: any) => (
                             <div key={result.nodeId} className="p-3 rounded-lg bg-muted/10 border border-muted/30">
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
@@ -762,7 +795,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                               {/* Task Results */}
                               <div className="space-y-2">
                                 <div className="text-xs font-medium text-muted-foreground">Task Results:</div>
-                                {mission.executionResult.nodeResults.map((result) => (
+                                {mission.executionResult.nodeResults.map((result: any) => (
                                   <div key={result.nodeId} className="flex items-start gap-2 p-2 rounded bg-background/50">
                                     <span className="text-xs mt-0.5">
                                       {result.success ? '✅' : '❌'}

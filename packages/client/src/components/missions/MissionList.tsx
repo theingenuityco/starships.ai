@@ -60,7 +60,7 @@ type DeployedAgent = {
   requiredPermissions?: string[];
 };
 import type { 
-  Mission, 
+  MissionModel,
   MissionStatus, 
   CreateMissionRequest, 
   UpdateMissionRequest,
@@ -91,11 +91,11 @@ const statusColors: Record<MissionStatus, string> = {
 };
 
 export function MissionList({ starshipId, starshipSlug, showCreateButton = true }: MissionListProps) {
-  const [missions, setMissions] = useState<Mission[]>([]);
+  const [missions, setMissions] = useState<MissionModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editingMission, setEditingMission] = useState<Mission | null>(null);
+  const [editingMission, setEditingMission] = useState<MissionModel | null>(null);
   const [filters, setFilters] = useState<MissionFilters>({});
   const [sort, setSort] = useState<MissionSort>({ field: 'createdAt', direction: 'desc' });
   const [searchTerm, setSearchTerm] = useState('');
@@ -203,12 +203,12 @@ export function MissionList({ starshipId, starshipSlug, showCreateButton = true 
   };
 
   // Status transition actions
-  const handleStatusChange = async (mission: Mission, newStatus: MissionStatus) => {
+  const handleStatusChange = async (mission: MissionModel, newStatus: MissionStatus) => {
     await handleUpdateMission(mission.id, { status: newStatus });
   };
 
   // Navigate to mission detail
-  const handleMissionClick = (mission: Mission) => {
+  const handleMissionClick = (mission: MissionModel) => {
     if (starshipSlug) {
       router.push(`/ship/${starshipSlug}/missions/${mission.id}`);
     }
@@ -378,11 +378,11 @@ function MissionCard({
   onStatusChange,
   onClick 
 }: {
-  mission: Mission;
-  onEdit: (mission: Mission) => void;
+  mission: MissionModel;
+  onEdit: (mission: MissionModel) => void;
   onDelete: (id: string) => void;
-  onStatusChange: (mission: Mission, status: MissionStatus) => void;
-  onClick: (mission: Mission) => void;
+  onStatusChange: (mission: MissionModel, status: MissionStatus) => void;
+  onClick: (mission: MissionModel) => void;
 }) {
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onClick(mission)}>
@@ -390,11 +390,11 @@ function MissionCard({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <CardTitle className="text-lg flex items-center gap-2">
-              {statusIcons[mission.status]}
+              {statusIcons[mission.status as MissionStatus]}
               {mission.name}
             </CardTitle>
             <div className="flex items-center gap-2 mt-2">
-              <Badge className={statusColors[mission.status]}>
+              <Badge className={statusColors[mission.status as MissionStatus]}>
                 {mission.status}
               </Badge>
               <span className="text-sm text-muted-foreground">
@@ -528,7 +528,12 @@ function CreateMissionForm({
         setLoadingAgents(true);
         setAgentsError(null);
         const response = await starshipAPI.getStarshipAgents(starshipId);
-        setAgents(response.deployedAgents || []);
+        setAgents(response.deployedAgents?.map((agent: any) => ({
+          ...agent,
+          tags: agent.tags || [],
+          authorId: agent.authorId || '',
+          isPublic: agent.isPublic || false
+        })) || []);
       } catch (error) {
         setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
       } finally {
@@ -667,7 +672,7 @@ function EditMissionForm({
   onSubmit, 
   onCancel 
 }: {
-  mission: Mission;
+  mission: MissionModel;
   onSubmit: (updates: UpdateMissionRequest) => void;
   onCancel: () => void;
 }) {
@@ -688,7 +693,12 @@ function EditMissionForm({
         setLoadingAgents(true);
         setAgentsError(null);
         const response = await starshipAPI.getStarshipAgents(mission.starshipId);
-        setAgents(response.deployedAgents || []);
+        setAgents(response.deployedAgents?.map((agent: any) => ({
+          ...agent,
+          tags: agent.tags || [],
+          authorId: agent.authorId || '',
+          isPublic: agent.isPublic || false
+        })) || []);
       } catch (error) {
         setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
       } finally {

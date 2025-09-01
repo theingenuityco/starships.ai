@@ -7,7 +7,7 @@ import { RepositoryFactory } from '@starships/models';
 import { MissionOrchestratorService } from './MissionOrchestratorService';
 import { MissionEventService } from './MissionEventService';
 import type {
-  Mission,
+  MissionModel,
   CreateMissionRequest,
   UpdateMissionRequest,
   MissionFilters,
@@ -15,7 +15,7 @@ import type {
   MissionListResponse,
   MissionStatus,
   MissionPhase,
-  MissionClarity
+  MissionClarityModel
 } from '@starships/protocol';
 import {
   ValidationError,
@@ -27,7 +27,7 @@ export class MissionService {
   /**
    * Create a new mission
    */
-  static async createMission(request: CreateMissionRequest, userId: string): Promise<Mission> {
+  static async createMission(request: CreateMissionRequest, userId: string): Promise<MissionModel> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const starshipRepo = RepositoryFactory.getStarshipRepository();
     const agentRepo = RepositoryFactory.getAgentRepository();
@@ -66,13 +66,13 @@ export class MissionService {
     }
 
     // Validate mission name is unique for this starship (optional business rule)
-    const existingMissions = await missionRepo.getMissionsByStarshipId(
+    const existingMissions = await missionRepo.getMissionModelsByStarshipId(
       request.starshipId,
       { status: ['draft', 'active'] } // Only check active missions
     );
 
     const duplicateName = existingMissions.missions.find(
-      (mission: Mission) => mission.name.toLowerCase() === request.name.toLowerCase()
+      (mission: MissionModel) => mission.name.toLowerCase() === request.name.toLowerCase()
     );
 
     if (duplicateName) {
@@ -110,7 +110,7 @@ export class MissionService {
   /**
    * Get mission by ID
    */
-  static async getMissionById(id: string): Promise<Mission> {
+  static async getMissionById(id: string): Promise<MissionModel> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     return await missionRepo.getMissionById(id);
   }
@@ -147,7 +147,7 @@ export class MissionService {
       throw error;
     }
 
-    return await missionRepo.getMissionsByStarshipId(starshipId, filters, sort);
+    return await missionRepo.getMissionModelsByStarshipId(starshipId, filters, sort);
   }
 
   /**
@@ -156,7 +156,7 @@ export class MissionService {
   static async updateMission(
     id: string,
     updates: UpdateMissionRequest
-  ): Promise<Mission> {
+  ): Promise<MissionModel> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const agentRepo = RepositoryFactory.getAgentRepository();
     const missionEventService = MissionEventService.getInstance();
@@ -194,13 +194,13 @@ export class MissionService {
 
     // If updating name, check for duplicates
     if (updates.name && updates.name !== existingMission.name) {
-      const existingMissions = await missionRepo.getMissionsByStarshipId(
+      const existingMissions = await missionRepo.getMissionModelsByStarshipId(
         existingMission.starshipId,
         { status: ['draft', 'active'] }
       );
 
       const duplicateName = existingMissions.missions.find(
-        (mission: Mission) =>
+        (mission: MissionModel) =>
           mission.id !== id &&
           mission.name.toLowerCase() === updates.name!.toLowerCase()
       );
@@ -249,41 +249,41 @@ export class MissionService {
     //   throw new UnauthorizedError('You can only delete missions you created');
     // }
 
-    await missionRepo.deleteMission(id);
+    await missionRepo.deleteMissionModel(id);
   }
 
   /**
    * Start a mission (transition from draft to active)
    */
-  static async startMission(id: string): Promise<Mission> {
+  static async startMission(id: string): Promise<MissionModel> {
     return await this.updateMission(id, { status: 'active' });
   }
 
   /**
    * Complete a mission (transition from active to completed)
    */
-  static async completeMission(id: string): Promise<Mission> {
+  static async completeMission(id: string): Promise<MissionModel> {
     return await this.updateMission(id, { status: 'completed' });
   }
 
   /**
    * Fail a mission (transition from active to failed)
    */
-  static async failMission(id: string): Promise<Mission> {
+  static async failMission(id: string): Promise<MissionModel> {
     return await this.updateMission(id, { status: 'failed' });
   }
 
   /**
    * Cancel a mission (transition to cancelled from any status except completed)
    */
-  static async cancelMission(id: string): Promise<Mission> {
+  static async cancelMission(id: string): Promise<MissionModel> {
     return await this.updateMission(id, { status: 'cancelled' });
   }
 
   /**
    * Update mission phase
    */
-  static async updateMissionPhase(id: string, phase: MissionPhase): Promise<Mission> {
+  static async updateMissionPhase(id: string, phase: MissionPhase): Promise<MissionModel> {
     return await this.updateMission(id, { phase });
   }
 
@@ -293,11 +293,11 @@ export class MissionService {
   static async getMissionStats(starshipId: string): Promise<{
     total: number;
     byStatus: Record<MissionStatus, number>;
-    recentMissions: Mission[];
+    recentMissions: MissionModel[];
   }> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     
-    const allMissions = await missionRepo.getMissionsByStarshipId(starshipId);
+    const allMissions = await missionRepo.getMissionModelsByStarshipId(starshipId);
     const missions = allMissions.missions;
 
     // Count by status
@@ -309,13 +309,13 @@ export class MissionService {
       cancelled: 0
     };
 
-    missions.forEach((mission: Mission) => {
+    missions.forEach((mission: MissionModel) => {
       byStatus[mission.status as MissionStatus]++;
     });
 
     // Get recent missions (last 5)
     const recentMissions = missions
-      .sort((a: Mission, b: Mission) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort((a: MissionModel, b: MissionModel) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 5);
 
     return {
@@ -353,7 +353,7 @@ export class MissionService {
   /**
    * Get mission clarity assessment
    */
-  static async getMissionClarity(missionId: string): Promise<MissionClarity | null> {
+  static async getMissionClarity(missionId: string): Promise<MissionClarityModel | null> {
     const missionRepo = RepositoryFactory.getMissionRepository();
     const clarityRepo = RepositoryFactory.getMissionClarityRepository();
 
@@ -369,5 +369,53 @@ export class MissionService {
 
     // Get clarity assessment (can be null if not yet assessed)
     return await clarityRepo.getByMissionId(missionId);
+  }
+
+  /**
+   * Get workflow for a mission - temporary implementation using WorkflowService until MissionWorkflow is fully implemented
+   */
+  static async getWorkflowByMissionId(missionId: string): Promise<any | null> {
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    
+    // Verify mission exists first
+    try {
+      await missionRepo.getMissionById(missionId);
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError('Mission not found', 'Mission', missionId);
+      }
+      throw error;
+    }
+
+    // TODO: This is a temporary implementation. In the future, this should query MissionWorkflow table
+    // For now, we'll return null since there's no direct mission-workflow relationship in current schema
+    return null;
+  }
+
+  /**
+   * Update workflow approval status for a mission - temporary implementation
+   */
+  static async updateWorkflowApproval(missionId: string, approvalData: {
+    approvalStatus: 'pending' | 'approved' | 'rejected';
+    rejectionReason?: string;
+  }): Promise<any | null> {
+    const missionRepo = RepositoryFactory.getMissionRepository();
+    
+    // Verify mission exists first
+    try {
+      const mission = await missionRepo.getMissionById(missionId);
+      
+      // Update mission's approval status
+      const updatedMission = await missionRepo.updateMission(missionId, {
+        approvalStatus: approvalData.approvalStatus as any
+      });
+      
+      return updatedMission;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw new NotFoundError('Mission not found', 'Mission', missionId);
+      }
+      throw error;
+    }
   }
 }

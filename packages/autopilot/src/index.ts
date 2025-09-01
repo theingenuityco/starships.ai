@@ -12,6 +12,27 @@ export { Workflow } from './Workflow';
 // Core agent class for agent execution
 export { Agent } from './Agent';
 
+// Memory system
+export { Memory } from './Memory';
+export type { Message } from './Memory';
+
+// Agent memory system
+export { AgentMemory } from './AgentMemory';
+export type {
+  AgentIdentity,
+  AgentPurpose,
+  AgentSpace,
+  AgentMemoryConfig
+} from './AgentMemory';
+
+// ===== LLM SYSTEM =====
+// Core LLM class for AI model interactions
+export { LLM } from './LLM';
+
+// ===== HTTP REQUEST SYSTEM =====
+// Core HttpRequest class for external API calls
+export { HttpRequest } from './HttpRequest';
+
 // Node system
 export { Handler } from './nodes/Handler';
 
@@ -67,8 +88,12 @@ export { config } from './constants';
 // Import classes for convenience functions
 import { Workflow } from './Workflow';
 import { Agent } from './Agent';
+import { LLM } from './LLM';
+import { HttpRequest } from './HttpRequest';
+import { Memory } from './Memory';
+import { AgentMemory } from './AgentMemory';
 import { Validator } from './validation/Validator';
-import { AgentNodeParameters } from './types';
+import { AgentNodeParameters, LlmNodeParameters, HttpRequestNodeParameters } from './types';
 
 // Create default instances for convenience
 const _defaultValidator = new Validator();
@@ -84,4 +109,28 @@ export const createWorkflow = (): Workflow => {
 // Helper function to create a new agent
 export const createAgent = (config: AgentNodeParameters): Agent => {
   return new Agent(config);
+};
+
+// Helper function to create basic memory
+export const createMemory = (initialSystemMessage?: string): Memory => {
+  return new Memory(initialSystemMessage);
+};
+
+// Helper function to create agent memory
+export const createAgentMemory = (initialSystemPrompt?: string): AgentMemory => {
+  const memory = new AgentMemory();
+  if (initialSystemPrompt) {
+    memory.addMessage('system', initialSystemPrompt);
+  }
+  return memory;
+};
+
+// Helper function to create a new LLM
+export const createLLM = (config: LlmNodeParameters): LLM => {
+  return new LLM(config);
+};
+
+// Helper function to create a new HttpRequest
+export const createHttpRequest = (config: HttpRequestNodeParameters): HttpRequest => {
+  return new HttpRequest(config);
 };

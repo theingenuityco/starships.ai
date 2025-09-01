@@ -1,5 +1,5 @@
 import { RepositoryFactory } from '@starships/models';
-import { User } from '@starships/protocol';
+import { UserModel } from '@starships/protocol';
 
 interface KindeUserData {
   kindeId: string;
@@ -16,7 +16,7 @@ export class UserService {
    * Sync a Kinde user to our local database
    * Creates new user or updates existing user
    */
-  static async syncUser(kindeData: KindeUserData): Promise<User> {
+  static async syncUser(kindeData: KindeUserData): Promise<UserModel> {
     const userRepo = RepositoryFactory.getUserRepository();
 
     try {
@@ -73,7 +73,7 @@ export class UserService {
   /**
    * Get user by internal ID
    */
-  static async getUserById(id: string): Promise<User | null> {
+  static async getUserById(id: string): Promise<UserModel | null> {
     const userRepo = RepositoryFactory.getUserRepository();
     return await userRepo.findById(id);
   }
@@ -81,7 +81,7 @@ export class UserService {
   /**
    * Get user by Kinde ID
    */
-  static async getUserByKindeId(kindeId: string): Promise<User | null> {
+  static async getUserByKindeId(kindeId: string): Promise<UserModel | null> {
     try {
       console.log(`[USER-SERVICE] Getting user repository for Kinde ID: ${kindeId}`);
       const userRepo = RepositoryFactory.getUserRepository();
@@ -100,7 +100,7 @@ export class UserService {
   /**
    * Get user by email
    */
-  static async getUserByEmail(email: string): Promise<User | null> {
+  static async getUserByEmail(email: string): Promise<UserModel | null> {
     const userRepo = RepositoryFactory.getUserRepository();
     return await userRepo.findByEmail(email);
   }

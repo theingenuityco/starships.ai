@@ -19,6 +19,7 @@
     "@anthropic-ai/sdk": "^0.56.0",
     "@langchain/core": "^0.2.0",
     "@notionhq/client": "^4.0.2",
+    "@starships/autopilot": "workspace:*",
     "@starships/env-config": "workspace:*",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",

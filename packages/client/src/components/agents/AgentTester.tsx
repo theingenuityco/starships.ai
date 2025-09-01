@@ -431,14 +431,6 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             {messages.length === 0 ? (
               <div className="text-center text-zinc-500 py-8">
                 <p className="mb-4">Start a conversation to test this agent</p>
-                {agent.systemPrompt && (
-                  <div className="p-4 bg-zinc-800 rounded-lg text-left max-w-2xl mx-auto">
-                    <p className="text-sm font-medium mb-2 text-zinc-300">System Prompt:</p>
-                    <p className="text-xs text-zinc-400 whitespace-pre-wrap">
-                      {agent.systemPrompt}
-                    </p>
-                  </div>
-                )}
               </div>
             ) : (
               messages.map(message => (

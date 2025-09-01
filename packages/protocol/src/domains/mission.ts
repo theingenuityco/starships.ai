@@ -5,8 +5,6 @@
  * Implementation details moved to appropriate packages.
  */
 
-import type { Agent } from './agent';
-
 // ============================================================================
 // CORE MISSION TYPES
 // ============================================================================
@@ -45,7 +43,7 @@ export const MISSION_PHASES = {
 /**
  * Main mission entity - simplified and clean
  */
-export interface Mission {
+export interface MissionModel {
   id: string;
   starshipId: string;
   name: string;
@@ -53,50 +51,14 @@ export interface Mission {
   status: MissionStatus;
   phase: MissionPhase;
   agentIds: string[]; // Assigned agent IDs from starship's crew
+  blueprintId?: string; // Reference to BlueprintModel for execution plan
+  approvalStatus: 'pending' | 'approved' | 'rejected' | 'modified';
+  approvedAt?: string; // When blueprint was approved for execution
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
-  executionState?: MissionExecutionState; // Workflow execution progress
-  executionResult?: MissionExecutionResult; // Final execution results for persistence
-}
-
-// ============================================================================
-// EXECUTION TYPES
-// ============================================================================
-
-/**
- * Mission execution state - tracks workflow execution progress
- */
-export interface MissionExecutionState {
-  status: 'running' | 'completed' | 'failed';
-  currentNodeIndex: number;
-  totalNodes: number;
-  nodeResults: MissionNodeResult[];
-  startedAt: string;
-  completedAt?: string;
-  error?: string;
-}
-
-/**
- * Result from executing a single workflow node
- */
-export interface MissionNodeResult {
-  nodeId: string;
-  nodeName: string;
-  success: boolean;
-  output: string;
-  timestamp: string;
-  error?: string;
-}
-
-/**
- * Overall result from workflow execution
- */
-export interface MissionExecutionResult {
-  success: boolean;
-  nodeResults: MissionNodeResult[];
-  summary: string;
-  executedAt: string;
+  // Workflow execution is now handled by the autopilot package
+  // Mission tracks blueprint through blueprintId reference
 }
 
 // ============================================================================
@@ -122,22 +84,24 @@ export interface UpdateMissionRequest {
   status?: MissionStatus;
   phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
-  executionState?: MissionExecutionState; // Update execution progress
-  executionResult?: MissionExecutionResult; // Update final execution results
+  blueprintId?: string; // Update blueprint reference
+  approvalStatus?: 'pending' | 'approved' | 'rejected' | 'modified';
+  approvedAt?: string; // When blueprint was approved
+  // Execution state is now managed by the autopilot workflow system
 }
 
 /**
  * Response containing mission data
  */
 export interface MissionResponse {
-  mission: Mission;
+  mission: MissionModel;
 }
 
 /**
  * Response for mission list
  */
 export interface MissionListResponse {
-  missions: Mission[];
+  missions: MissionModel[];
   total: number;
 }
 
@@ -177,7 +141,7 @@ export type MissionMessageRole =
 /**
  * Core message entity for mission orchestrator communication
  */
-export interface MissionMessage {
+export interface MissionMessageModel {
   id: string;
   missionId: string;
   role: MissionMessageRole;
@@ -216,7 +180,7 @@ export interface MissionChatResponse {
 /**
  * Mission clarity assessment - tracks 5-dimension clarity scoring
  */
-export interface MissionClarity {
+export interface MissionClarityModel {
   id: string;
   missionId: string;
   objectiveClarity: number;        // 0-10: How specific and clear is the mission objective?
@@ -259,69 +223,15 @@ export interface UpdateMissionClarityRequest {
 }
 
 // ============================================================================
-// MISSION WORKFLOW TYPES
+// MISSION BLUEPRINT APPROVAL
 // ============================================================================
 
 /**
- * Mission workflow - executable workflow DSL for mission execution
+ * Request to update blueprint approval status
  */
-export interface MissionWorkflow {
-  id: string;
-  missionId: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  approvedAt?: string;
-}
-
-/**
- * Individual node in the workflow graph
- */
-export interface WorkflowNode {
-  id: string;
-  type: 'start' | 'agent' | 'end';
-  name: string;
-  description: string;
-  parameters: {
-    agentId?: string;
-    estimatedTime?: number;
-    [key: string]: unknown;
-  };
-}
-
-/**
- * Edge connecting workflow nodes
- */
-export interface WorkflowEdge {
-  id: string;
-  from: string;
-  to: string;
-}
-
-/**
- * Request to create a new mission workflow
- */
-export interface CreateWorkflowRequest {
-  missionId: string;
-  nodes: (Omit<WorkflowNode, 'id'> & { aiId?: string })[];
-  edges: Omit<WorkflowEdge, 'id'>[];
-}
-
-/**
- * Request to update workflow approval status
- */
-export interface UpdateWorkflowApprovalRequest {
+export interface UpdateBlueprintApprovalRequest {
   approvalStatus: 'approved' | 'rejected';
   rejectionReason?: string;
-}
-
-/**
- * Response containing workflow data with associated agent details
- */
-export interface WorkflowResponse {
-  workflow: MissionWorkflow;
-  agents: Record<string, Agent>; // agentId -> Agent details
 }
 
 

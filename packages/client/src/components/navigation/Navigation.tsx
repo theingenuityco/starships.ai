@@ -3,8 +3,8 @@
 import { usePathname } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  Users, BookOpen, Brain,
-  Zap, Eye, Command,
+  Users, BookOpen,
+  Zap, Command,
   Target, MessageSquare
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
@@ -23,8 +23,6 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
     title: "Starship Systems",
     items: [
       { href: `/ship/${starshipSlug}/chat`, label: "Unified Chat", icon: MessageSquare, status: "optimal" },
-      { href: `/ship/${starshipSlug}/vision-chamber`, label: "Vision Chamber", icon: Eye, status: "optimal" },
-      { href: `/ship/${starshipSlug}/sibil`, label: "Sibil AI", icon: Brain, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
       { href: `/ship/${starshipSlug}/missions`, label: "Missions", icon: Target, status: "optimal" }
     ]

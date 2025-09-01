@@ -6,20 +6,29 @@
  */
 
 import { createConnection, Neo4jConfig } from '../helpers/database';
-import { LLMRepository } from '../repositories/LLMRepository';
 
+export async function seedLLMModels_Disabled() {
+  console.log('🌱 LLMRepository not available - skipping LLM model seeding...');
+  console.log('ℹ️  This functionality has been temporarily disabled during refactoring');
+  return;
+}
 
 export async function seedLLMModels() {
   console.log('🌱 Seeding LLM models...');
   
   try {
+    // Note: LLMRepository temporarily removed during refactoring
+    console.log('ℹ️  LLMRepository not available - skipping LLM model seeding');
+    return;
+    
+    /*
     const llmRepo = new LLMRepository();
     const existingModels = await llmRepo.findAll();
     console.log(`📋 Found ${existingModels.length} existing LLM models in database`);
     
     if (existingModels.length > 0) {
       console.log('✅ LLM models already seeded. Available models:');
-      existingModels.forEach(model => {
+      existingModels.forEach((model: any) => {
         console.log(`  - ${model.name} (${model.provider})`);
       });
       return;
@@ -93,6 +102,7 @@ export async function seedLLMModels() {
     
     const finalModels = await llmRepo.findAll();
     console.log(`🎉 Seeding completed! Total LLM models: ${finalModels.length}`);
+    */
     
   } catch (error) {
     console.error('❌ Error during LLM model seeding:', error);
@@ -157,12 +167,14 @@ if (require.main === module) {
     await seedLLMModels();
     
     // List all models
-    console.log('\n📋 Available LLM models:');
+    console.log('\n📋 LLM model listing temporarily disabled during refactoring');
+    /*
     const llmRepo = new LLMRepository();
     const allModels = await llmRepo.findAll();
-    allModels.forEach(model => {
+    allModels.forEach((model: any) => {
       console.log(`  - ${model.id}: ${model.name} (${model.provider})`);
     });
+    */
     
     await connection.disconnect();
   }

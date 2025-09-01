@@ -9,7 +9,6 @@ Production-ready Express.js HTTP API server powering the Starships mission contr
 - **Workflow DSL**: Complete workflow definition and execution system with approval workflows
 - **Real-time Communication**: Socket.IO integration for live updates and progress tracking
 - **MCP Tool Integration**: HTTP bridge for Model Context Protocol tool discovery and execution
-- **Vision Refinement**: AI-powered vision statement improvement with quality metrics
 - **Stripe Integration**: Complete subscription billing with webhook idempotency
 - **Enterprise Security**: JWT authentication, rate limiting, and comprehensive audit logging
 - **Production Monitoring**: Health checks, metrics, and performance monitoring
@@ -50,7 +49,6 @@ src/
 │   ├── workflows.ts          # Workflow DSL execution
 │   ├── chat.ts              # Basic chat processing
 │   ├── sibil.ts             # AI assistant for onboarding
-│   ├── vision.ts            # Vision refinement and analysis
 │   ├── mcp-servers.ts       # MCP server template management
 │   ├── native-api-keys.ts   # Encrypted tool API key management
 │   ├── agent-communication.ts # Bidirectional agent communication
@@ -63,8 +61,6 @@ src/
 │   ├── MissionService.ts             # Mission lifecycle management
 │   ├── WorkflowExecutionService.ts   # Workflow DSL execution
 │   ├── FirstOfficerService.ts        # AI expedition coordinator
-│   ├── VisionRefinementService.ts    # AI-powered vision improvement
-│   ├── VisionMetricsCalculator.ts    # Vision quality analysis
 │   ├── SocketIOService.ts            # Real-time communication
 │   ├── BidirectionalCommunicationService.ts # Agent-to-First Officer communication
 │   ├── SubscriptionService.ts        # Stripe subscription management
@@ -205,38 +201,6 @@ Content-Type: application/json
 }
 ```
 
-#### AI-Powered Vision Refinement
-```http
-PUT /starships/:id/vision
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "statement": "To build better AI tools"
-}
-```
-
-**Response:**
-```json
-{
-  "vision": {
-    "statement": "To build better AI tools",
-    "metrics": {
-      "clarity": 0.6,
-      "specificity": 0.4,
-      "actionability": 0.5,
-      "inspirational": 0.3
-    },
-    "suggestions": [
-      {
-        "type": "specificity",
-        "suggestion": "Consider specifying which types of AI tools and for what specific use cases",
-        "improvedVersion": "To develop AI-powered productivity tools that streamline workflow automation for knowledge workers"
-      }
-    ]
-  }
-}
-```
 
 #### Create Starship
 ```http
@@ -360,7 +324,6 @@ Content-Type: application/json
 {
   "name": "Code Assistant",
   "model": "gpt-4",
-  "systemPrompt": "You are a helpful coding assistant",
   "starshipId": "starship-123",
   "category": "coding",
   "tags": ["coding", "development"],
@@ -374,7 +337,6 @@ Content-Type: application/json
   "id": "agent-456",
   "name": "Code Assistant",
   "model": "gpt-4",
-  "systemPrompt": "You are a helpful coding assistant",
   "starshipId": "starship-123",
   "category": "coding",
   "tags": ["coding", "development"],
@@ -508,7 +470,6 @@ Content-Type: application/json
 **Socket.IO Events:**
 - `expedition:progress` - Real-time expedition updates
 - `mission:message` - Mission chat messages
-- `vision:refinement` - Live vision improvement suggestions
 - `agent:activity` - Agent status and activity
 - `workflow:status` - Workflow execution progress
 

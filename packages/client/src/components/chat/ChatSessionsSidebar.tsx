@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { MessageSquare, Bot, Sparkles, Clock, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { chatAPI } from '@/lib/api'
-import type { ChatSession, ChatSourceType } from '@starships/protocol'
+import type { Session, SessionSourceType } from '@starships/protocol'
 
 interface ChatSessionsSidebarProps {
   starshipId: string
@@ -22,7 +22,7 @@ export function ChatSessionsSidebar({
   className = "" 
 }: ChatSessionsSidebarProps) {
   const { isAuthenticated, userId } = useAuth()
-  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,22 +62,20 @@ export function ChatSessionsSidebar({
     return date.toLocaleDateString()
   }
 
-  const getSessionIcon = (source: ChatSourceType) => {
+  const getSessionIcon = (source: SessionSourceType) => {
     switch (source) {
       case 'agent':
         return <Bot className="w-4 h-4" />
-      case 'sibil':
-        return <Sparkles className="w-4 h-4" />
       default:
         return <MessageSquare className="w-4 h-4" />
     }
   }
 
-  const getSessionTitle = (session: ChatSession) => {
+  const getSessionTitle = (session: Session) => {
     if (session.source === 'agent') {
-      return session.agent_id ? `Agent Chat` : 'Agent Session'
+      return session.agentId ? `Agent Chat` : 'Agent Session'
     }
-    return 'AI Chat'
+    return 'Chat Session'
   }
 
   if (!isAuthenticated) {
@@ -143,7 +141,7 @@ export function ChatSessionsSidebar({
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                         <Clock className="w-3 h-3" />
-                        {formatSessionTime(session.last_activity_at)}
+                        {formatSessionTime(session.lastActivityAt)}
                       </div>
                     </div>
                   </div>
@@ -157,9 +155,9 @@ export function ChatSessionsSidebar({
                   <div className="capitalize">
                     {session.source} mode
                   </div>
-                  {session.total_tokens > 0 && (
+                  {session.totalTokens && session.totalTokens > 0 && (
                     <div>
-                      {session.total_tokens.toLocaleString()} tokens
+                      {session.totalTokens.toLocaleString()} tokens
                     </div>
                   )}
                 </div>

@@ -82,12 +82,11 @@ export class Engine {
     blueprint: Blueprint,
     initialExecution?: Execution
   ): Promise<Execution> {
-    // Set the provided initial execution or create a default one
-    this.execution = initialExecution || {
-      currentNodeRef: undefined,
-      status: 'not_started',
-      executionResults: new Map()
-    };
+    // Set the provided initial execution - it must have agentMemory
+    if (!initialExecution) {
+      throw new Error('Execution with agentMemory is required');
+    }
+    this.execution = initialExecution;
 
     try {
       // Validate workflow before execution

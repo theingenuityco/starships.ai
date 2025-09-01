@@ -12,10 +12,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
 import { WorkflowVisualization } from '@/components/workflow';
-import type { Mission, MissionWorkflow } from '@starships/protocol';
+import type { MissionModel } from '@starships/protocol';
+
+// Extended mission type for client-side usage
+interface ClientMissionModel extends MissionModel {
+  executionResult?: any;
+  executionState?: any;
+}
+
+// Workflow types for client-side usage
+type MissionWorkflow = any;
 
 interface WorkflowPhaseContentProps {
-  mission: Mission;
+  mission: ClientMissionModel;
   onWorkflowApproval?: (approved: boolean) => void;
   readonly?: boolean;
 }
@@ -47,7 +56,7 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
       }
       
       setWorkflow(response.data.workflow);
-      setAgents(response.data.agents || {});
+      setAgents((response.data as any)?.agents || {});
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load workflow';
       setError(errorMessage);
@@ -105,13 +114,13 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
 
   // Get workflow summary for display
   const getWorkflowSummary = (workflow: MissionWorkflow) => {
-    const agentTasks = workflow.nodes.filter(node => node.type === 'agent');
-    const uniqueAgents = new Set(agentTasks.map(task => task.parameters.agentId));
+    const agentTasks = workflow.nodes.filter((node: any) => node.type === 'agent');
+    const uniqueAgents = new Set(agentTasks.map((task: any) => task.parameters.agentId));
     
     return {
       totalTasks: agentTasks.length,
       uniqueAgents: uniqueAgents.size,
-      estimatedTime: agentTasks.reduce((sum, task) => 
+      estimatedTime: agentTasks.reduce((sum: number, task: any) =>
         sum + (task.parameters.estimatedTime || 0), 0)
     };
   };

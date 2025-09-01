@@ -27,6 +27,7 @@
     "db-cli": "tsx src/scripts/db-cli.ts"
   },
   "dependencies": {
+    "@starships/autopilot": "workspace:*",
     "@starships/protocol": "workspace:*",
     "fs-extra": "^11.3.0",
     "neo4j-driver": "^5.28.1",

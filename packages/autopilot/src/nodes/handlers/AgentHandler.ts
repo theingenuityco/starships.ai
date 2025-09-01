@@ -32,8 +32,6 @@ export class AgentHandler extends BaseHandler {
         return this.createSuccessResult(execution, {
           agentName: params.name,
           model: params.model,
-          systemPrompt: params.systemPrompt,
-          instructions: params.instructions,
           workflowResults: agentOutputs,
           workflowStatus: agentResult.status,
           output: `Agent ${params.name} completed workflow execution successfully`
@@ -73,6 +71,13 @@ export class AgentHandler extends BaseHandler {
       ));
     }
 
+    if (!params.memory) {
+      errors.push(this.createValidationError(
+        'MISSING_REQUIRED_FIELD',
+        'Agent memory is required'
+      ));
+    }
+
     if (!params.blueprint) {
       errors.push(this.createValidationError(
         'MISSING_REQUIRED_FIELD',
@@ -81,7 +86,7 @@ export class AgentHandler extends BaseHandler {
     } else {
       // Only do comprehensive validation if basic fields are present
       // to avoid duplicate error messages
-      if (params.name && params.model) {
+      if (params.name && params.model && params.memory) {
         // Use Agent class validation for comprehensive checking
         const agent = new Agent(params);
         const agentValidation = agent.validate();
@@ -91,6 +96,7 @@ export class AgentHandler extends BaseHandler {
             // Skip errors we already caught above
             if (!error.includes('Agent name is required') &&
                 !error.includes('Agent model is required') &&
+                !error.includes('Agent memory is required') &&
                 !error.includes('Agent blueprint is required')) {
               errors.push(this.createValidationError(
                 'VALIDATION_FAILED',

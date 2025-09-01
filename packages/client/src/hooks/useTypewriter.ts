@@ -53,13 +53,13 @@ export function useTypewriter(options: UseTypewriterOptions = {}): UseTypewriter
 
     if (chunk.type === 'character') {
       setDisplayText(prev => prev + chunk.content);
-      setProgress(chunk.position / (chunk.total_length || 1));
+      setProgress(chunk.position / (chunk.totalLength || 1));
       
       onCharacter?.(chunk.content, chunk.position);
 
       let delay = 1000 / currentSpeed;
       
-      if (chunk.is_code) {
+      if (chunk.isCode) {
         delay *= 0.8;
       } else if (chunk.content === ' ') {
         delay *= 0.5;
@@ -89,8 +89,8 @@ export function useTypewriter(options: UseTypewriterOptions = {}): UseTypewriter
 
     queueRef.current.push(chunk);
     
-    if (chunk.total_length) {
-      totalLengthRef.current = chunk.total_length;
+    if (chunk.totalLength) {
+      totalLengthRef.current = chunk.totalLength;
     }
 
     if (!isTyping && !isPaused) {

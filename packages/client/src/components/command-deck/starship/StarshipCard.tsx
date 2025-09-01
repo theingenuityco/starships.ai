@@ -144,8 +144,8 @@ export function StarshipCard({
     if (!agentData) {
       getStarshipAgents(starship.id)
     }
-    // Navigate to the starship's vision chamber
-    router.push(`/ship/${starship.slug}/vision-chamber`)
+    // Navigate to the starship's command deck
+    router.push(`/ship/${starship.slug}/command-deck`)
   }
 
   const handleCommandDeckClick = () => {

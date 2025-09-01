@@ -1,13 +1,13 @@
 import { io, Socket } from 'socket.io-client';
-import type { SocketEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
+import type { SessionSocketEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
 
 class SocketClient {
   private static instance: SocketClient;
-  private socket: Socket<SocketEvents> | null = null;
+  private socket: Socket<SessionSocketEvents> | null = null;
   private connectionState: SocketConnectionState = {
     connected: false,
     authenticated: false,
-    room_joined: false
+    roomJoined: false
   };
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -45,10 +45,10 @@ class SocketClient {
         this.connectionState = {
           connected: true,
           authenticated: true,
-          room_joined: true,
-          user_id: userId,
-          connection_id: this.socket!.id,
-          last_ping: Date.now()
+          roomJoined: true,
+          userId: userId,
+          connectionId: this.socket!.id,
+          lastPing: Date.now()
         };
         this.reconnectAttempts = 0;
         resolve();
@@ -77,7 +77,7 @@ class SocketClient {
       setInterval(() => {
         if (this.socket?.connected) {
           // Use socket.io's built-in ping mechanism
-          this.connectionState.last_ping = Date.now();
+          this.connectionState.lastPing = Date.now();
         }
       }, 30000);
     });
@@ -89,7 +89,7 @@ class SocketClient {
       // Reset connection state but don't throw error
       this.connectionState.connected = false;
       this.connectionState.authenticated = false;
-      this.connectionState.room_joined = false;
+      this.connectionState.roomJoined = false;
       return;
     }
 
@@ -120,12 +120,12 @@ class SocketClient {
       this.connectionState = {
         connected: false,
         authenticated: false,
-        room_joined: false
+        roomJoined: false
       };
     }
   }
 
-  getSocket(): Socket<SocketEvents> | null {
+  getSocket(): Socket<SessionSocketEvents> | null {
     return this.socket;
   }
 
@@ -140,7 +140,7 @@ class SocketClient {
   // Agent-specific room management
   joinAgentRoom(agentId: string, userId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('chat:join-room', { userId, agentId, source: 'agent' });
+      this.socket.emit('session:join-room', { roomId: `agent:${agentId}:${userId}`, userId });
       console.log(`[SOCKET CLIENT] Joining agent room: agent:${agentId}:${userId}`);
     } else {
       console.warn('[SOCKET CLIENT] Cannot join agent room - not connected');
@@ -149,7 +149,7 @@ class SocketClient {
 
   leaveAgentRoom(agentId: string, userId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('chat:leave-room', { userId, agentId, source: 'agent' });
+      this.socket.emit('session:leave-room', { roomId: `agent:${agentId}:${userId}`, userId });
       console.log(`[SOCKET CLIENT] Leaving agent room: agent:${agentId}:${userId}`);
     } else {
       console.warn('[SOCKET CLIENT] Cannot leave agent room - not connected');

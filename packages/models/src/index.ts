@@ -9,25 +9,28 @@ export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 // Repository implementations
 export { AgentRepository } from './repositories/AgentRepository';
 export { UserRepository } from './repositories/UserRepository';
-export { LLMRepository } from './repositories/LLMRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
-export { ChatSessionRepository } from './repositories/ChatSessionRepository';
-export { ChatMessageRepository } from './repositories/ChatMessageRepository';
 
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
-export { VisionRepository } from './repositories/VisionRepository';
 export { MissionRepository } from './repositories/MissionRepository';
 export { MissionMessageRepository } from './repositories/MissionMessageRepository';
-export { WorkflowRepository } from './repositories/WorkflowRepository';
-export { WorkflowNodeRepository } from './repositories/WorkflowNodeRepository';
-export { WorkflowEdgeRepository } from './repositories/WorkflowEdgeRepository';
-export { WorkflowRuntimeStateRepository } from './repositories/WorkflowRuntimeStateRepository';
+export { BlueprintRepository } from './repositories/BlueprintRepository';
+export { NodeRepository } from './repositories/NodeRepository';
+export { EdgeRepository } from './repositories/EdgeRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';
+
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 
 // NEW: Agent Templates
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
+
+// NEW: Workflows
+export { WorkflowRepository } from './repositories/WorkflowRepository';
+
+// NEW: Memory and Message repositories
+export { MemoryRepository } from './repositories/MemoryRepository';
+export { MessageRepository } from './repositories/MessageRepository';
 
 // Factory for creating repositories
 export { RepositoryFactory } from './repositories';
@@ -56,17 +59,6 @@ export {
 export { ErrorSeverity } from './helpers/logging/error-monitor';
 export { ErrorCategory } from './helpers/errors';
 
-// Export LLM collection types from protocol
-export type {
-  LLM,
-  LLMProviderType,
-  CreateLLMRequest,
-  UpdateLLMRequest,
-  LLMResponse,
-  LLMListResponse,
-  LLMFilters,
-  LLMSort
-} from '@starships/protocol';
 
 // NEW: Export structured logging and monitoring system
 export {
@@ -83,6 +75,11 @@ export type {
   PerformanceMetrics,
   HealthStatus
 } from './helpers/logging';
+
+
+
+// All domain model types have been moved to @starships/protocol
+// Repository implementations remain in this package for data access
 
 // Export scripts
 export { seedLLMModels } from './scripts/seed-llm-models';

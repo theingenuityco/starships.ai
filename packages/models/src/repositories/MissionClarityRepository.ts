@@ -1,16 +1,16 @@
 /**
- * MissionClarityRepository - Neo4j-native storage for mission clarity assessments
+ * MissionClarityModelRepository - Neo4j-native storage for mission clarity assessments
  * 
- * Handles CRUD operations for MissionClarity nodes with single clarity per mission.
+ * Handles CRUD operations for MissionClarityModel nodes with single clarity per mission.
  * Uses MERGE pattern for upsert operations following existing repository patterns.
  */
 
 import { BaseRepository } from './BaseRepository';
 import { getConnection } from '../helpers/database';
 import { 
-  MissionClarity, 
-  CreateMissionClarityRequest, 
-  UpdateMissionClarityRequest 
+  MissionClarityModel,
+  CreateMissionClarityRequest,
+  UpdateMissionClarityRequest
 } from '@starships/protocol';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -23,7 +23,7 @@ export class MissionClarityRepository extends BaseRepository {
    * Create or update mission clarity (single clarity per mission)
    * Uses MERGE pattern to handle both create and update scenarios
    */
-  async upsertByMissionId(missionId: string, request: CreateMissionClarityRequest): Promise<MissionClarity> {
+  async upsertByMissionId(missionId: string, request: CreateMissionClarityRequest): Promise<MissionClarityModel> {
     return this.executeWithErrorHandling(async () => {
       // Validate required fields
       this.validateRequired(request, ['missionId', 'objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment', 'reasoning', 'iteration'], 'upsert');
@@ -57,7 +57,7 @@ export class MissionClarityRepository extends BaseRepository {
 
       const cypher = `
         MATCH (m:Mission {id: $missionId})
-        MERGE (m)-[:HAS_CLARITY]->(mc:MissionClarity {missionId: $missionId})
+        MERGE (m)-[:HAS_CLARITY]->(mc:MissionClarityModel {missionId: $missionId})
         ON CREATE SET 
           mc.id = $clarityId,
           mc.createdAt = $now
@@ -93,14 +93,14 @@ export class MissionClarityRepository extends BaseRepository {
         this.handleNotFound('Mission', missionId, 'upsert');
       }
 
-      return result[0].mc as MissionClarity;
-    }, 'upsertByMissionId', 'MissionClarity', missionId);
+      return result[0].mc as MissionClarityModel;
+    }, 'upsertByMissionId', 'MissionClarityModel', missionId);
   }
 
   /**
    * Get mission clarity by mission ID
    */
-  async getByMissionId(missionId: string): Promise<MissionClarity | null> {
+  async getByMissionId(missionId: string): Promise<MissionClarityModel | null> {
     return this.executeWithErrorHandling(async () => {
       if (!missionId) {
         this.handleValidationError([{
@@ -111,7 +111,7 @@ export class MissionClarityRepository extends BaseRepository {
       }
 
       const cypher = `
-        MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarity)
+        MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarityModel)
         RETURN mc
       `;
 
@@ -122,14 +122,14 @@ export class MissionClarityRepository extends BaseRepository {
         return null;
       }
 
-      return result[0].mc as MissionClarity;
-    }, 'getByMissionId', 'MissionClarity', missionId);
+      return result[0].mc as MissionClarityModel;
+    }, 'getByMissionId', 'MissionClarityModel', missionId);
   }
 
   /**
    * Update existing mission clarity
    */
-  async updateByMissionId(missionId: string, request: UpdateMissionClarityRequest): Promise<MissionClarity> {
+  async updateByMissionId(missionId: string, request: UpdateMissionClarityRequest): Promise<MissionClarityModel> {
     return this.executeWithErrorHandling(async () => {
       if (!missionId) {
         this.handleValidationError([{
@@ -182,7 +182,7 @@ export class MissionClarityRepository extends BaseRepository {
         // Get current scores for missing fields
         const currentClarity = await this.getByMissionId(missionId);
         if (!currentClarity) {
-          this.handleNotFound('MissionClarity', missionId, 'update');
+          this.handleNotFound('MissionClarityModel', missionId, 'update');
         }
 
         const allScores = [
@@ -199,7 +199,7 @@ export class MissionClarityRepository extends BaseRepository {
       }
 
       const cypher = `
-        MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarity)
+        MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarityModel)
         SET ${setClauses.join(', ')}
         RETURN mc
       `;
@@ -208,11 +208,11 @@ export class MissionClarityRepository extends BaseRepository {
       const result = await connection.executeWrite(cypher, params);
 
       if (result.length === 0) {
-        this.handleNotFound('MissionClarity', missionId, 'update');
+        this.handleNotFound('MissionClarityModel', missionId, 'update');
       }
 
-      return result[0].mc as MissionClarity;
-    }, 'updateByMissionId', 'MissionClarity', missionId);
+      return result[0].mc as MissionClarityModel;
+    }, 'updateByMissionId', 'MissionClarityModel', missionId);
   }
 
   /**
@@ -229,7 +229,7 @@ export class MissionClarityRepository extends BaseRepository {
       }
 
       const cypher = `
-        MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarity)
+        MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarityModel)
         DELETE mc
         RETURN count(mc) as deletedCount
       `;
@@ -238,16 +238,16 @@ export class MissionClarityRepository extends BaseRepository {
       const result = await connection.executeWrite(cypher, { missionId });
 
       return result.length > 0 && result[0].deletedCount > 0;
-    }, 'deleteByMissionId', 'MissionClarity', missionId);
+    }, 'deleteByMissionId', 'MissionClarityModel', missionId);
   }
 
   /**
    * Get all mission clarities (for analytics/debugging)
    */
-  async getAll(): Promise<MissionClarity[]> {
+  async getAll(): Promise<MissionClarityModel[]> {
     return this.executeWithErrorHandling(async () => {
       const cypher = `
-        MATCH (mc:MissionClarity)
+        MATCH (mc:MissionClarityModel)
         RETURN mc
         ORDER BY mc.createdAt DESC
       `;
@@ -255,14 +255,14 @@ export class MissionClarityRepository extends BaseRepository {
       const connection = getConnection();
       const result = await connection.executeQuery(cypher);
 
-      return result.map(row => row.mc as MissionClarity);
-    }, 'getAll', 'MissionClarity');
+      return result.map(row => row.mc as MissionClarityModel);
+    }, 'getAll', 'MissionClarityModel');
   }
 
   /**
    * Get mission clarities by score range (for analytics)
    */
-  async getByScoreRange(minScore: number, maxScore: number): Promise<MissionClarity[]> {
+  async getByScoreRange(minScore: number, maxScore: number): Promise<MissionClarityModel[]> {
     return this.executeWithErrorHandling(async () => {
       if (minScore < 0 || maxScore > 10 || minScore > maxScore) {
         this.handleValidationError([{
@@ -273,7 +273,7 @@ export class MissionClarityRepository extends BaseRepository {
       }
 
       const cypher = `
-        MATCH (mc:MissionClarity)
+        MATCH (mc:MissionClarityModel)
         WHERE mc.overallScore >= $minScore AND mc.overallScore <= $maxScore
         RETURN mc
         ORDER BY mc.overallScore DESC, mc.createdAt DESC
@@ -282,7 +282,7 @@ export class MissionClarityRepository extends BaseRepository {
       const connection = getConnection();
       const result = await connection.executeQuery(cypher, { minScore, maxScore });
 
-      return result.map(row => row.mc as MissionClarity);
-    }, 'getByScoreRange', 'MissionClarity');
+      return result.map(row => row.mc as MissionClarityModel);
+    }, 'getByScoreRange', 'MissionClarityModel');
   }
 }

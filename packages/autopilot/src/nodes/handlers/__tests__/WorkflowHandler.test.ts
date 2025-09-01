@@ -84,13 +84,13 @@ describe('WorkflowHandler', () => {
         data: { message: 'Completed' }
       };
 
-      const mockRuntimeState: Execution = {
+      const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
         executionResults: new Map([
           ['start', mockNodeResult1],
           ['end', mockNodeResult2]
         ])
-      };
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -107,47 +107,32 @@ describe('WorkflowHandler', () => {
       expect(resultData.output).toBe('Workflow completed successfully');
     });
 
-    it('should execute workflow with custom context', async () => {
-      const nodeWithContext: Node = {
-        ...mockNode,
-        parameters: {
-          blueprint: mockBlueprint,
-          workflowContext: {
-            customKey: 'customValue',
-            userId: 'custom-user'
-          }
-        } as WorkflowNodeParameters
-      };
-
-      const contextHandler = new WorkflowHandler(nodeWithContext);
-
-      const mockRuntimeState: Execution = {
-        status: 'completed',
-        executionResults: new Map()
-      };
+    it('should execute workflow successfully', async () => {
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'completed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
-      await contextHandler.execute(mockExecution);
+      await handler.execute(mockExecution);
 
-      // Verify Workflow was created with correct blueprint
-      expect(Workflow).toHaveBeenCalledWith(mockBlueprint);
+      // Verify Workflow was created with correct parameters
+      expect(Workflow).toHaveBeenCalledWith(mockNode.parameters);
 
       // Verify execute was called
       expect(mockWorkflow.execute).toHaveBeenCalled();
     });
 
     it('should handle workflow execution failure', async () => {
-      const mockRuntimeState: Execution = {
+      const mockRuntimeState: Execution = global.createMockExecution({
         status: 'failed',
-        executionResults: new Map(),
         error: {
           code: 'NODE_EXECUTION_FAILED',
           message: 'Something went wrong',
           timestamp: new Date().toISOString(),
           recoverable: false
         }
-      };
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -160,10 +145,9 @@ describe('WorkflowHandler', () => {
     });
 
     it('should handle workflow execution failure without error message', async () => {
-      const mockRuntimeState: Execution = {
-        status: 'failed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'failed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -195,31 +179,27 @@ describe('WorkflowHandler', () => {
       expect(nodeResult?.error).toContain('Unknown error');
     });
 
-    it('should merge existing workflow context', async () => {
-      const nodeWithContext: Node = {
+    it('should execute workflow with timeout parameter', async () => {
+      const nodeWithTimeout: Node = {
         ...mockNode,
         parameters: {
           blueprint: mockBlueprint,
-          workflowContext: {
-            newKey: 'newValue',
-            sharedKey: 'overriddenValue'
-          }
+          timeout: 30000
         } as WorkflowNodeParameters
       };
 
-      const contextHandler = new WorkflowHandler(nodeWithContext);
+      const timeoutHandler = new WorkflowHandler(nodeWithTimeout);
 
-      const mockRuntimeState: Execution = {
-        status: 'completed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'completed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
-      await contextHandler.execute(mockExecution);
+      await timeoutHandler.execute(mockExecution);
 
-      // Verify Workflow was created with correct blueprint
-      expect(Workflow).toHaveBeenCalledWith(mockBlueprint);
+      // Verify Workflow was created with correct parameters
+      expect(Workflow).toHaveBeenCalledWith(nodeWithTimeout.parameters);
       expect(mockWorkflow.execute).toHaveBeenCalled();
     });
 
@@ -234,13 +214,13 @@ describe('WorkflowHandler', () => {
         error: 'Failed to execute'
       };
 
-      const mockRuntimeState: Execution = {
+      const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
         executionResults: new Map([
           ['success-node', successfulResult],
           ['failed-node', failedResult]
         ])
-      };
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
@@ -254,10 +234,9 @@ describe('WorkflowHandler', () => {
     });
 
     it('should set execution timestamp', async () => {
-      const mockRuntimeState: Execution = {
-        status: 'completed',
-        executionResults: new Map()
-      };
+      const mockRuntimeState: Execution = global.createMockExecution({
+        status: 'completed'
+      });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 

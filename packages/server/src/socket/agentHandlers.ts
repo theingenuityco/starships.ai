@@ -1,50 +1,30 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
-import type { SocketEvents, ChatRequest, ChatStreamChunk } from '@starships/protocol';
-import { AgentExecutionService } from '../services/AgentExecutionService';
+import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import { RepositoryFactory } from '@starships/models';
 import getStore from '../store';
 
-export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
-  // Helper functions for agent chat session management (following sibil pattern)
-  const getOrCreateAgentChatSession = async (userId: string, agentId: string): Promise<any> => {
-    const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
+export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
+  // Helper functions for agent session management using MessageRepository
+  const getOrCreateAgentSession = async (userId: string, agentId: string): Promise<string> => {
+    const messageRepo = RepositoryFactory.getMessageRepository();
     
     // Get agent to retrieve starship_id for proper session association
     const agent = await AgentService.getAgent(agentId);
     if (!agent) {
       console.error(`❌ [AGENT SESSION] Agent not found: ${agentId}`);
-      return null;
+      return `session-${agentId}-${userId}-${Date.now()}`;
     }
 
     // CRITICAL FIX: Ensure agent has a starshipId before creating session
     if (!agent.starshipId) {
-      console.error(`❌ [AGENT SESSION] Agent ${agentId} has no starshipId assigned - cannot create session`);
-      return null;
+      console.error(`❌ [AGENT SESSION] Agent ${agentId} has no starshipId assigned - using fallback session`);
+      return `session-${agentId}-${userId}-${Date.now()}`;
     }
     
-    // Try to find active session for this agent/starship combination
-    const activeSessions = await chatSessionRepo.findByStarship(agent.starshipId, 10);
-    const existingSession = activeSessions.find((session: any) =>
-      session.agent_id === agentId &&
-      session.source === 'agent' &&
-      isSessionActive(session)
-    );
-    
-    if (existingSession) {
-      await chatSessionRepo.updateActivity(existingSession.id);
-      return existingSession;
-    }
-    
-    console.log(`✅ [AGENT SESSION] Creating new session for agent ${agentId} on starship ${agent.starshipId}`);
-    
-    // Create new session with proper starship relationship
-    return await chatSessionRepo.create({
-      source: 'agent',
-      agent_id: agentId,
-      starship_id: agent.starshipId  // Required - no undefined check
-    });
+    // For now, just return a session ID based on agent and user
+    return `session-${agentId}-${userId}`;
   };
   
   const isSessionActive = (session: any): boolean => {
@@ -54,14 +34,15 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
     return diffMinutes < 30; // 30 minute timeout
   };
   
-  const storeMessage = async (sessionId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> => {
-    const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
-    await chatMessageRepo.create({
-      session_id: sessionId,
+  const storeMessage = async (starshipId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> => {
+    const messageRepo = RepositoryFactory.getMessageRepository();
+    await messageRepo.create({
       role,
       content,
-      structured_content: metadata?.structured_content,
-      stream_id: metadata?.stream_id
+      starshipId: starshipId,
+      timestamp: new Date().toISOString(),
+      version: '1.0.0',
+      metadata: metadata || {}
     });
   };
 
@@ -70,78 +51,69 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
     const socketService = SocketIOService.getInstance();
 
     // Handle agent stream start
-    socket.on('chat:start-stream', async (request: ChatRequest) => {
-      if (request.source !== 'agent' || !request.agent_id) return;
-      console.log(`[AGENT SOCKET] Starting stream for user ${userId}, agent ${request.agent_id}:`, request.stream_id);
+    socket.on('session:start-stream', async (request: SessionRequest) => {
+      if (request.source !== 'agent' || !request.agentId) return;
+      console.log(`[AGENT SOCKET] Starting stream for user ${userId}, agent ${request.agentId}:`, request.streamId);
 
       try {
         // Validate request
-        if (!request.message || !request.agent_id) {
-          socket.emit('agent:stream-error', {
-            stream_id: request.stream_id,
-            agent_id: request.agent_id,
-            error_code: 'INVALID_REQUEST',
-            message: 'Message and agent_id are required',
+        if (!request.message || !request.agentId) {
+          socket.emit('session:stream-error', {
+            streamId: request.streamId,
+            agentId: request.agentId,
+            errorCode: 'INVALID_REQUEST',
+            message: 'Message and agentId are required',
             timestamp: Date.now(),
             recoverable: false
           });
           return;
         }
 
-        // Get or create chat session in database
-        const chatSession = await getOrCreateAgentChatSession(userId, request.agent_id);
-        if (!chatSession) {
-          socket.emit('agent:stream-error', {
-            stream_id: request.stream_id,
-            agent_id: request.agent_id,
-            error_code: 'SESSION_CREATION_FAILED',
-            message: 'Failed to create or retrieve chat session',
-            timestamp: Date.now(),
-            recoverable: true
-          });
-          return;
-        }
+        // Get or create session ID
+        const sessionId = await getOrCreateAgentSession(userId, request.agentId);
+        
+        console.log(`✅ [AGENT SESSION] Using session: ${sessionId} for agent ${request.agentId}`);
 
-        console.log(`✅ [AGENT SESSION] Using session: ${chatSession.id} for agent ${request.agent_id}`);
+        // Get agent to get starshipId for message storage
+        const agent = await AgentService.getAgent(request.agentId);
+        const starshipId = agent?.starshipId || 'unknown';
 
         // Store user message
-        await storeMessage(chatSession.id, 'user', request.message, {
-          stream_id: request.stream_id
+        await storeMessage(starshipId, 'user', request.message, {
+          streamId: request.streamId
         });
 
-        // Verify agent exists
-        const agent = await AgentService.getAgent(request.agent_id);
+        // Verify agent exists (reuse the agent variable from above)
         if (!agent) {
-          socket.emit('agent:stream-error', {
-            stream_id: request.stream_id,
-            agent_id: request.agent_id,
-            error_code: 'AGENT_NOT_FOUND',
-            message: `Agent ${request.agent_id} not found`,
+          socket.emit('session:stream-error', {
+            streamId: request.streamId,
+            agentId: request.agentId,
+            errorCode: 'AGENT_NOT_FOUND',
+            message: `Agent ${request.agentId} not found`,
             timestamp: Date.now(),
             recoverable: false
           });
           return;
         }
 
-        // Send stream start confirmation
-        socket.emit('chat:stream-start', { streamId: request.stream_id, source: 'agent', agentId: request.agent_id });
-        socket.emit('chat:typing-start', { source: 'agent', agentId: request.agent_id });
+        // Send typing start indication
+        socket.emit('session:typing-start', { userId, sessionId, isTyping: true });
 
         // Track agent usage
         try {
-          await AgentService.trackUsage(request.agent_id);
+          await AgentService.trackUsage(request.agentId);
         } catch (error) {
-          console.warn(`[AGENT SOCKET] Failed to track usage for agent ${request.agent_id}:`, error);
+          console.warn(`[AGENT SOCKET] Failed to track usage for agent ${request.agentId}:`, error);
           // Continue with streaming - don't fail on analytics
         }
 
-        // Convert to ChatRequest for agent engine with proper session_id
-        const chatRequest: ChatRequest = {
+        // Convert to SessionRequest for agent engine with proper sessionId
+        const sessionRequest: SessionRequest = {
           source: 'agent',
-          agent_id: request.agent_id,
-          user_id: userId,
+          agentId: request.agentId,
+          userId: userId,
           message: request.message,
-          session_id: chatSession.id, // Use the actual database session ID
+          sessionId: sessionId, // Use the session ID
           stream: true // Enable true streaming
         };
 
@@ -149,12 +121,12 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
         const store = getStore();
 
         // Use the full agent engine with all features (vision, tools, memory)
-        const typingSpeed = request.typing_speed || 75; // chars per second
-        const typewriterEnabled = request.typewriter_enabled !== false;
+        const typingSpeed = request.typingSpeed || 75; // chars per second
+        const typewriterEnabled = request.typewriterEnabled !== false;
         
         try {
           // Call the full agent engine
-          const response = await AgentExecutionService.executeChat(chatRequest);
+          const response = await AgentService.executeChat(sessionRequest);
           const fullResponse = response.content;
 
           // Simulate streaming with typewriter effect for better UX
@@ -164,25 +136,25 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
               const char = characters[i];
               const delay = 1000 / typingSpeed; // milliseconds per character
 
-              const typewriterChunk: ChatStreamChunk = {
+              const typewriterChunk: SessionStreamChunk = {
                 source: 'agent' as const,
-                stream_id: request.stream_id,
-                agent_id: request.agent_id,
+                streamId: request.streamId || `stream-${Date.now()}`,
+                agentId: request.agentId,
                 type: 'content',
                 content: char,
                 typewriter: {
                   type: 'character',
                   content: char,
                   position: i,
-                  total_length: fullResponse.length,
+                  totalLength: fullResponse.length,
                   delay,
-                  is_code: false, // TODO: Add code detection if needed
-                  is_markdown: false // TODO: Add markdown detection if needed
+                  isCode: false, // TODO: Add code detection if needed
+                  isMarkdown: false // TODO: Add markdown detection if needed
                 },
                 timestamp: Date.now()
               };
 
-              socket.emit('chat:stream-chunk', typewriterChunk);
+              socket.emit('session:stream-chunk', typewriterChunk);
 
               // Add small delay for typewriter effect
               if (i < characters.length - 1) {
@@ -191,47 +163,47 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
             }
           } else {
             // Send all content at once if typewriter is disabled
-            const streamChunk: ChatStreamChunk = {
+            const streamChunk: SessionStreamChunk = {
               source: 'agent' as const,
-              stream_id: request.stream_id,
-              agent_id: request.agent_id,
+              streamId: request.streamId || `stream-${Date.now()}`,
+              agentId: request.agentId,
               type: 'content',
               content: fullResponse,
               timestamp: Date.now()
             };
-            socket.emit('chat:stream-chunk', streamChunk);
+            socket.emit('session:stream-chunk', streamChunk);
           }
 
           // Store assistant message
-          await storeMessage(chatSession.id, 'assistant', fullResponse, {
-            stream_id: request.stream_id,
+          await storeMessage(starshipId, 'assistant', fullResponse, {
+            streamId: request.streamId,
             usage: response.usage
           });
 
           // Send completion
-          socket.emit('chat:typing-stop', { source: 'agent', agentId: request.agent_id });
-          socket.emit('chat:stream-complete', {
+          socket.emit('session:typing-stop', { userId, sessionId, isTyping: false });
+          socket.emit('session:stream-complete', {
+            source: 'agent' as const,
+            streamId: request.streamId || `stream-${Date.now()}`,
+            agentId: request.agentId,
+            type: 'complete',
             content: fullResponse,
-            agent_id: request.agent_id,
-            session_id: chatSession.id, // Use the actual database session ID
-            timestamp: new Date().toISOString(),
-            source: 'agent',
-            usage: response.usage
+            timestamp: Date.now()
           });
         } catch (agentError) {
           console.error(`[AGENT SOCKET] Agent engine error:`, agentError);
           throw agentError;
         }
 
-        console.log(`[AGENT SOCKET] Stream completed for user ${userId}, agent ${request.agent_id}`);
+        console.log(`[AGENT SOCKET] Stream completed for user ${userId}, agent ${request.agentId}`);
 
       } catch (error) {
-        console.error(`[AGENT SOCKET] Stream error for user ${userId}, agent ${request.agent_id}:`, error);
-        socket.emit('chat:typing-stop', { source: 'agent', agentId: request.agent_id });
-        socket.emit('chat:stream-error', {
-          stream_id: request.stream_id,
-          agent_id: request.agent_id,
-          error_code: 'SERVER_ERROR',
+        console.error(`[AGENT SOCKET] Stream error for user ${userId}, agent ${request.agentId}:`, error);
+        socket.emit('session:typing-stop', { userId, sessionId: 'unknown', isTyping: false });
+        socket.emit('session:stream-error', {
+          streamId: request.streamId,
+          agentId: request.agentId,
+          errorCode: 'SERVER_ERROR',
           message: error instanceof Error ? error.message : 'Unknown server error',
           timestamp: Date.now(),
           recoverable: true
@@ -240,26 +212,28 @@ export function setupAgentHandlers(io: SocketIOServer<SocketEvents>) {
     });
 
     // Handle agent stream stop
-    socket.on('agent:stop-stream', (streamId: string) => {
+    socket.on('session:stop-stream', (streamId: string) => {
       console.log(`[AGENT SOCKET] Stream stopped by user ${userId}:`, streamId);
       // TODO: Implement stream cancellation logic
       // For now, just stop typing indicator
-      socket.emit('chat:typing-stop', { source: 'agent', agentId: 'unknown' });
+      socket.emit('session:typing-stop', { userId, sessionId: 'unknown', isTyping: false });
     });
 
     // Handle agent room management
-    socket.on('chat:join-room', (data: { userId: string, agentId?: string, source: string }) => {
+    socket.on('session:join-room', (data: { roomId: string, userId: string, sessionId?: string }) => {
       // Only allow users to join their own agent rooms
-      if (data.userId === userId && data.source === 'agent' && data.agentId) {
-        socketService.joinAgentRoom(socket, data.agentId, userId);
+      if (data.userId === userId) {
+        socket.join(data.roomId);
+        console.log(`[AGENT SOCKET] User ${userId} joined room ${data.roomId}`);
       } else {
         console.warn(`[AGENT SOCKET] User ${userId} attempted to join room for user ${data.userId}`);
       }
     });
 
-    socket.on('chat:leave-room', (data: { userId: string, agentId?: string, source: string }) => {
-      if (data.userId === userId && data.source === 'agent' && data.agentId) {
-        socketService.leaveAgentRoom(socket, data.agentId, userId);
+    socket.on('session:leave-room', (data: { roomId: string, userId: string, sessionId?: string }) => {
+      if (data.userId === userId) {
+        socket.leave(data.roomId);
+        console.log(`[AGENT SOCKET] User ${userId} left room ${data.roomId}`);
       } else {
         console.warn(`[AGENT SOCKET] User ${userId} attempted to leave room for user ${data.userId}`);
       }

@@ -24,6 +24,18 @@ export * from './execution';
 // Validation and error reporting
 export * from './validation';
 
+// ===== MEMORY SYSTEM =====
+// Base memory types only (no classes)
+export type { Message } from '../Memory';
+
+// Agent memory types only (no classes)
+export type {
+  AgentIdentity,
+  AgentPurpose,
+  AgentSpace,
+  AgentMemoryConfig
+} from '../AgentMemory';
+
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)
 export type { BaseNode, BaseBlueprint } from './base';

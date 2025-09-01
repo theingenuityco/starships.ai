@@ -217,33 +217,14 @@ export function CrewManagement() {
                         </Badge>
                       )}
                     </div>
-                    {/* ADD: Enhanced description */}
+                    {/* Enhanced description */}
                     {agent.description && (
                       <p className="text-xs text-white/60 truncate mb-1">{agent.description}</p>
                     )}
-                    {/* ADD: Tags display */}
-                    {agent.tags && agent.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {agent.tags.slice(0, 2).map(tag => (
-                          <span key={tag} className="text-xs bg-white/10 px-1 rounded">
-                            {tag.charAt(0).toUpperCase() + tag.slice(1)}
-                          </span>
-                        ))}
-                        {agent.tags.length > 2 && (
-                          <span className="text-xs text-white/40">+{agent.tags.length - 2}</span>
-                        )}
-                      </div>
-                    )}
-                    {/* ADD: Usage stats */}
+                    {/* Usage stats */}
                     <div className="flex items-center gap-2 text-xs text-white/50">
                       {agent.usageCount !== undefined && <span>{agent.usageCount} uses</span>}
                       {agent.version && <span>v{agent.version}</span>}
-                      {agent.rating && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                          <span>{agent.rating.toFixed(1)}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <Button
@@ -306,33 +287,14 @@ export function CrewManagement() {
                         </Badge>
                       )}
                     </div>
-                    {/* ADD: Enhanced description */}
+                    {/* Enhanced description */}
                     {agent.description && (
                       <p className="text-xs text-white/50 truncate mb-1">{agent.description}</p>
                     )}
-                    {/* ADD: Tags display */}
-                    {agent.tags && agent.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {agent.tags.slice(0, 2).map(tag => (
-                          <span key={tag} className="text-xs bg-white/5 px-1 rounded opacity-80">
-                            {tag.charAt(0).toUpperCase() + tag.slice(1)}
-                          </span>
-                        ))}
-                        {agent.tags.length > 2 && (
-                          <span className="text-xs text-white/30">+{agent.tags.length - 2}</span>
-                        )}
-                      </div>
-                    )}
-                    {/* ADD: Usage stats */}
+                    {/* Usage stats */}
                     <div className="flex items-center gap-2 text-xs text-white/40">
                       {agent.usageCount !== undefined && <span>{agent.usageCount} uses</span>}
                       {agent.version && <span>v{agent.version}</span>}
-                      {agent.rating && (
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                          <span>{agent.rating.toFixed(1)}</span>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <Button

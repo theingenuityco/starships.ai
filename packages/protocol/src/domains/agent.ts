@@ -1,53 +1,43 @@
 /**
- * Agent Domain Types
- * 
- * Consolidated agent interface definitions and domain-specific types.
- * Moved from contracts/agent.ts as agents are now domain concepts.
+ * Database Agent Types
+ *
+ * Database-specific agent interfaces and API contract types.
+ * Imports workflow and memory types from @starships/autopilot to avoid duplication.
  */
 
+// Import autopilot types at the top level
+import type {
+  AgentMemoryConfig,
+  Blueprint,
+  AgentNodeParameters
+} from '@starships/autopilot';
+
 // ============================================================================
-// CORE AGENT INTERFACE
+// DATABASE AGENT INTERFACE
 // ============================================================================
 
 /**
- * Agent interface - core API contract type
+ * Database Agent interface - core API contract type
+ * Extends AgentNodeParameters to be a superset with additional database/marketplace fields
  */
-export interface Agent {
-  // Existing fields
+export interface AgentModel extends AgentNodeParameters {
+  // Core database fields
   id: string;
-  name: string;
-  model: string;
-  systemPrompt?: string;
   createdAt: string;
-
-  // Enhanced marketplace fields
-  description?: string;
-  tags: string[];
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  authorId: string;
-  isPublic: boolean;
-  version: string;
   updatedAt: string;
-  usageCount: number;
-  rating?: number;
+  version: string;
 
-  // Advanced configuration
-  temperature?: number;
-  maxTokens?: number;
-  customInstructions?: string;
+  // Marketplace fields
+  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  usageCount: number;
+
+  // Template relationship
+  templateId?: string;
 
   // Deployment settings
   starshipId: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-  requiredPermissions?: string[];
 }
 
-/**
- * Agent configuration interface
- */
-export interface AgentConfig extends Agent {
-  provider?: 'openai' | 'anthropic';
-}
 
 // ============================================================================
 // AGENT REQUEST/RESPONSE TYPES
@@ -59,17 +49,17 @@ export interface AgentConfig extends Agent {
 export interface CreateAgentRequest {
   name: string;
   description?: string;
-  category: Agent['category'];
-  systemPrompt?: string;
+  category: AgentModel['category'];
   model: string;
-  tags?: string[];
-  isPublic?: boolean;
   temperature?: number;
   maxTokens?: number;
-  customInstructions?: string;
-  allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[];
-  authorId?: string;
+  templateId?: string; // Reference to template if agent is created from template
   starshipId: string; // REQUIRED for new agents
+
+  // Autopilot-specific fields (optional for backward compatibility)
+  blueprint?: Blueprint;
+  memory?: AgentMemoryConfig;
+  timeout?: number;
 }
 
 /**
@@ -81,61 +71,6 @@ export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
 }
 
 // ============================================================================
-// AGENT TEMPLATE SYSTEM
-// ============================================================================
-
-/**
- * Agent template for marketplace
- */
-export interface AgentTemplate {
-  id: string;
-  name: string;
-  description: string;
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  tags: string[];
-
-  // Template configuration
-  systemPrompt: string;
-  model: string; // References LLM.id
-  temperature?: number;
-  maxTokens?: number;
-
-  // Template metadata
-  authorId: string;
-  isPublic: boolean;
-  usageCount: number;
-  rating?: number;
-
-  // Template preview
-  icon?: string;
-  previewPrompts?: string[]; // Example prompts to show what the template can do
-
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ============================================================================
-// AGENT ANALYTICS
-// ============================================================================
-
-/**
- * Agent performance analytics
- */
-export interface AgentAnalytics {
-  agentId: string;
-  totalInvocations: number;
-  averageResponseTime: number;
-  successRate: number;
-  errorRate: number;
-  last30DaysUsage: number;
-  ratings: {
-    average: number;
-    total: number;
-    distribution: Record<number, number>;
-  };
-}
-
-// ============================================================================
 // AGENT COLLECTION-SPECIFIC TYPES
 // ============================================================================
 
@@ -143,7 +78,7 @@ export interface AgentAnalytics {
  * Agent database response with pagination
  */
 export interface AgentListResponse {
-  agents: Agent[];
+  agents: AgentModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -154,7 +89,7 @@ export interface AgentListResponse {
  * Agent response with single agent
  */
 export interface AgentResponse {
-  agent: Agent;
+  agent: AgentModel;
 }
 
 /**
@@ -163,10 +98,6 @@ export interface AgentResponse {
 export interface SearchAgentsRequest {
   query: string;
   category?: string;
-  tags?: string[];
-  isPublic?: boolean;
-  authorId?: string;
-  starshipClass?: 'scout' | 'cruiser';
   limit?: number;
   offset?: number;
 }
@@ -175,7 +106,7 @@ export interface SearchAgentsRequest {
  * Response for search agents
  */
 export interface SearchAgentsResponse {
-  agents: Agent[];
+  agents: AgentModel[];
   total: number;
   searchQuery: string;
 }
@@ -185,10 +116,6 @@ export interface SearchAgentsResponse {
  */
 export interface AgentFilters {
   category?: string;
-  tags?: string[];
-  isPublic?: boolean;
-  authorId?: string;
-  starshipClass?: 'scout' | 'cruiser';
   starshipId?: string;
 }
 
@@ -221,4 +148,21 @@ export interface AgentUsageStats {
   totalUsage: number;
   last30Days: number;
   lastUsedAt: string | null;
+}
+
+/**
+ * Agent performance analytics
+ */
+export interface AgentAnalytics {
+  agentId: string;
+  totalInvocations: number;
+  averageResponseTime: number;
+  successRate: number;
+  errorRate: number;
+  last30DaysUsage: number;
+  ratings: {
+    average: number;
+    total: number;
+    distribution: Record<number, number>;
+  };
 }

@@ -3,7 +3,7 @@
  */
 
 import { Workflow } from '../Workflow';
-import { Blueprint, Node, Edge, Execution } from '../types';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '../types';
 
 describe('Workflow', () => {
   let mockExecution: Execution;
@@ -13,13 +13,16 @@ describe('Workflow', () => {
   });
 
   describe('constructor', () => {
-    it('should create workflow from blueprint', () => {
+    it('should create workflow from parameters', () => {
       const testBlueprint = {
         nodes: [],
         edges: [],
         metadata: {}
       };
-      const workflow = new Workflow(testBlueprint);
+      const params: WorkflowNodeParameters = {
+        blueprint: testBlueprint
+      };
+      const workflow = new Workflow(params);
       
       expect(workflow.getNodes()).toHaveLength(0);
       expect(workflow.getEdges()).toHaveLength(0);
@@ -30,7 +33,7 @@ describe('Workflow', () => {
       expect(blueprint.metadata).toEqual({});
     });
 
-    it('should create workflow from blueprint object', () => {
+    it('should create workflow from parameters with blueprint', () => {
       const mockBlueprint: Blueprint = {
         nodes: [
           { ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }
@@ -41,10 +44,15 @@ describe('Workflow', () => {
         metadata: { version: '1.0' }
       };
 
-      const workflow = new Workflow(mockBlueprint);
+      const params: WorkflowNodeParameters = {
+        blueprint: mockBlueprint,
+        timeout: 30000
+      };
+      const workflow = new Workflow(params);
       
       expect(workflow.getNodes()).toHaveLength(1);
       expect(workflow.getEdges()).toHaveLength(1);
+      expect(workflow.getTimeout()).toBe(30000);
       
       const blueprint = workflow.getBlueprint();
       expect(blueprint.metadata?.version).toBe('1.0');
@@ -59,7 +67,10 @@ describe('Workflow', () => {
         metadata: {}
       };
 
-      const workflow = new Workflow(originalBlueprint);
+      const params: WorkflowNodeParameters = {
+        blueprint: originalBlueprint
+      };
+      const workflow = new Workflow(params);
       
       // Get initial state
       const initialNodeCount = workflow.getNodes().length;

@@ -323,9 +323,8 @@ router.get('/memories/starship/:starshipId', authMiddleware, async (req: Request
 
     const memoryRepository = RepositoryFactory.getMemoryRepository();
     
-    // Get memories for this starship with filtering
+    // Get memories with filtering
     const allMemories = await memoryRepository.findWithFilters({
-      starshipId: starshipId,
       limit: limit
     });
 
@@ -333,9 +332,6 @@ router.get('/memories/starship/:starshipId', authMiddleware, async (req: Request
       memoriesCount: allMemories.length,
       memories: allMemories.map((m: MemoryStateModel) => ({
         id: m.id,
-        name: m.name,
-        starshipId: m.starshipId,
-        agentId: m.agentId,
         messageCount: m.messageCount
       }))
     });

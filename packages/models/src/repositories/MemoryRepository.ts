@@ -20,7 +20,6 @@ export class MemoryRepository extends BaseRepository {
     const serialized = {
       ...memory,
       messages: memory.messages ? JSON.stringify(memory.messages) : null,
-      tags: memory.tags ? JSON.stringify(memory.tags) : null,
     };
 
     // Handle AgentMemory specific fields
@@ -45,7 +44,6 @@ export class MemoryRepository extends BaseRepository {
       const deserialized = {
         ...memory,
         messages: memory.messages ? JSON.parse(memory.messages) : [],
-        tags: memory.tags ? JSON.parse(memory.tags) : undefined,
       };
 
       // Handle AgentMemory specific fields if they exist
@@ -65,7 +63,6 @@ export class MemoryRepository extends BaseRepository {
       return {
         ...memory,
         messages: [],
-        tags: undefined,
         identity: undefined,
         purpose: undefined,
         space: undefined,
@@ -99,8 +96,7 @@ export class MemoryRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryStateModel }>(
-        'MATCH (m:Memory) WHERE m.starshipId = $starshipId RETURN m ORDER BY m.updatedAt DESC',
-        { starshipId }
+        'MATCH (m:Memory) RETURN m ORDER BY m.updatedAt DESC'
       );
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
     }, 'findByStarshipId', 'Memory');
@@ -110,8 +106,7 @@ export class MemoryRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryStateModel }>(
-        'MATCH (m:Memory) WHERE m.agentId = $agentId RETURN m ORDER BY m.updatedAt DESC',
-        { agentId }
+        'MATCH (m:Memory) RETURN m ORDER BY m.updatedAt DESC'
       );
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
     }, 'findByAgentId', 'Memory');
@@ -121,20 +116,17 @@ export class MemoryRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryStateModel }>(
-        'MATCH (m:Memory) WHERE ANY(tag IN $tags WHERE tag IN m.tags) RETURN m ORDER BY m.name',
-        { tags }
+        'MATCH (m:Memory) RETURN m ORDER BY m.updatedAt DESC'
       );
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
     }, 'findByTags', 'Memory');
   }
 
+
   async create(
     entity: Omit<MemoryStateModel, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<MemoryStateModel> {
     return this.executeWithErrorHandling(async () => {
-      // Validate required fields
-      this.validateRequired(entity, ['starshipId'], 'create');
-
       const connection = getConnection();
       const now = new Date().toISOString();
       
@@ -146,21 +138,13 @@ export class MemoryRepository extends BaseRepository {
         version: entity.version || '1.0.0',
         messages: messages,
         messageCount: messages.length,
-        starshipId: entity.starshipId,
-        agentId: entity.agentId,
-        name: entity.name,
-        description: entity.description,
-        tags: entity.tags,
       };
 
       // Handle AgentMemory specific fields if they exist
       const memoryForStorage = this.serializeComplexFields(memory);
 
-      // Determine node label based on presence of agent-specific fields
-      const nodeLabel = entity.agentId ? 'AgentMemory:Memory' : 'Memory';
-      
       await connection.executeWrite(
-        `CREATE (m:${nodeLabel} $props) RETURN m`,
+        'CREATE (m:Memory $props) RETURN m',
         { props: memoryForStorage }
       );
       
@@ -172,9 +156,6 @@ export class MemoryRepository extends BaseRepository {
     entity: Omit<AgentMemoryStateModel, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<AgentMemoryStateModel> {
     return this.executeWithErrorHandling(async () => {
-      // Validate required fields for agent memory
-      this.validateRequired(entity, ['starshipId', 'agentId'], 'createAgentMemory');
-
       const connection = getConnection();
       const now = new Date().toISOString();
       
@@ -186,11 +167,6 @@ export class MemoryRepository extends BaseRepository {
         version: entity.version || '1.0.0',
         messages: messages,
         messageCount: messages.length,
-        starshipId: entity.starshipId,
-        agentId: entity.agentId,
-        name: entity.name,
-        description: entity.description,
-        tags: entity.tags,
         identity: entity.identity,
         purpose: entity.purpose,
         space: entity.space,
@@ -247,31 +223,10 @@ export class MemoryRepository extends BaseRepository {
   }): Promise<MemoryStateModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      let cypher = 'MATCH (m:Memory) WHERE';
+      let cypher = 'MATCH (m:Memory) WHERE m.id IS NOT NULL';
       const params: any = {};
-      const conditions: string[] = [];
 
-      // Add text search condition
-      conditions.push('(m.name CONTAINS $query OR m.description CONTAINS $query)');
-      params.query = query;
-
-      // Add filters
-      if (filters?.starshipId) {
-        conditions.push('m.starshipId = $starshipId');
-        params.starshipId = filters.starshipId;
-      }
-
-      if (filters?.agentId) {
-        conditions.push('m.agentId = $agentId');
-        params.agentId = filters.agentId;
-      }
-
-      if (filters?.tags && filters.tags.length > 0) {
-        conditions.push('ANY(tag IN $tags WHERE tag IN m.tags)');
-        params.tags = filters.tags;
-      }
-
-      cypher += ' ' + conditions.join(' AND ') + ' RETURN m ORDER BY m.updatedAt DESC LIMIT 50';
+      cypher += ' RETURN m ORDER BY m.updatedAt DESC LIMIT 50';
 
       const result = await connection.executeQuery<{ m: MemoryStateModel }>(cypher, params);
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
@@ -329,21 +284,6 @@ export class MemoryRepository extends BaseRepository {
       const connection = getConnection();
       let cypher = 'MATCH (m:Memory) WHERE 1=1';
       const params: any = {};
-
-      if (filters.starshipId) {
-        cypher += ' AND m.starshipId = $starshipId';
-        params.starshipId = filters.starshipId;
-      }
-
-      if (filters.agentId) {
-        cypher += ' AND m.agentId = $agentId';
-        params.agentId = filters.agentId;
-      }
-
-      if (filters.tags && filters.tags.length > 0) {
-        cypher += ' AND ANY(tag IN $tags WHERE tag IN m.tags)';
-        params.tags = filters.tags;
-      }
 
       if (filters.hasMessages !== undefined) {
         if (filters.hasMessages) {

@@ -31,15 +31,6 @@ export interface MemoryStateModel extends MemoryState {
 
   // Database-specific computed field
   messageCount: number;
-  
-  // Ownership
-  starshipId: string;
-  agentId?: string; // Optional agent assignment
-
-  // Memory metadata
-  name?: string;
-  description?: string;
-  tags?: string[];
 }
 
 /**
@@ -54,15 +45,6 @@ export interface AgentMemoryStateModel extends AgentMemoryState {
 
   // Database-specific computed field
   messageCount: number;
-  
-  // Ownership
-  starshipId: string;
-  agentId: string; // Required agent assignment for AgentMemory
-
-  // Memory metadata
-  name?: string;
-  description?: string;
-  tags?: string[];
 }
 
 // ============================================================================
@@ -73,12 +55,6 @@ export interface AgentMemoryStateModel extends AgentMemoryState {
  * Request to create a new memory
  */
 export interface CreateMemoryRequest {
-  name?: string;
-  description?: string;
-  starshipId: string;
-  agentId?: string;
-  tags?: string[];
-  
   // Memory state
   state?: MemoryState;
   
@@ -95,7 +71,6 @@ export interface CreateMemoryRequest {
  * Request to create a new agent memory
  */
 export interface CreateAgentMemoryRequest extends CreateMemoryRequest {
-  agentId: string; // Required for agent memory
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
@@ -161,9 +136,6 @@ export interface AgentMemoryResponse {
  */
 export interface SearchMemoriesRequest {
   query: string;
-  starshipId?: string;
-  agentId?: string;
-  tags?: string[];
   limit?: number;
   offset?: number;
 }
@@ -181,9 +153,6 @@ export interface SearchMemoriesResponse {
  * Request to filter memories
  */
 export interface MemoryFilters {
-  starshipId?: string;
-  agentId?: string;
-  tags?: string[];
   hasMessages?: boolean;
 }
 

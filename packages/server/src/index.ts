@@ -12,7 +12,6 @@ import {
   AgentRepository,
   UserRepository,
   StarshipRepository,
-  VisionRepository,
   RepositoryFactory,
   createConnection,
 } from '@starships/models';
@@ -21,12 +20,10 @@ import { migrationRunner, seedWaitlist } from '@starships/models';
 // Route imports
 import agentRoutes from './routes/agents';
 import chatRoutes from './routes/chat';
-import sibilRoutes from './routes/sibil';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
 import starshipEnhancedRoutes, { initializeEnhancedStarshipRoutes } from './routes/starships-enhanced';
-import visionRoutes, { initializeVisionRoutes } from './routes/vision';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
@@ -103,7 +100,6 @@ const userRepository = new UserRepository();
 
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
-const visionRepository = new VisionRepository();
 // Middleware - Order is important!
 app.use(cors());
 app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
@@ -122,7 +118,6 @@ initializeStarshipRoutes({
   starshipRepository,
   agentRepository,
   userRepository,
-  visionRepository,
 });
 
 // Initialize webhook routes with dependencies
@@ -130,17 +125,6 @@ initializeWebhookRoutes({
   starshipRepository,
 });
 
-// Initialize vision routes with dependencies
-initializeVisionRoutes({
-  starshipRepository,
-  visionRepository,
-});
-
-// Initialize enhanced starship routes with dependencies (for vision onboarding)
-initializeEnhancedStarshipRoutes({
-  starshipRepository,
-  visionRepository,
-});
 
 
 // Public pricing endpoint - must be before auth-protected routes
@@ -162,12 +146,9 @@ app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unaut
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/sibil', sibilRoutes);
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);
-app.use('/api', starshipEnhancedRoutes); // Enhanced starship routes with vision support
-app.use('/api', visionRoutes);
 // app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/missions', missionRoutes);

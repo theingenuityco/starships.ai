@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ChatRequest } from '@starships/protocol';
+import type { MemoryModel, MessageModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
@@ -71,8 +71,8 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     validateUUID(agent_id, 'agent_id');
 
     // Build chat request using authenticated user ID from middleware
-    const chatRequest: ChatRequest = {
-      source: 'agent',
+    const chatRequest = {
+      source: 'agent' as const,
       agent_id,
       user_id: userId,
       message,
@@ -176,10 +176,10 @@ router.delete('/:sessionKey/memory', authMiddleware, async (req: Request, res: R
   }
 });
 
-// GET endpoint for fetching chat messages by session ID
-router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET endpoint for fetching messages by memory ID
+router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId } = req.params;
+    const { memoryId } = req.params;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -191,8 +191,8 @@ router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Res
       return;
     }
 
-    // Validate sessionId is a UUID
-    validateUUID(sessionId, 'sessionId');
+    // Validate memoryId is a UUID
+    validateUUID(memoryId, 'memoryId');
 
     // Parse limit and offset parameters
     const limit = Math.floor(parseInt(req.query.limit as string) || 50);
@@ -217,31 +217,32 @@ router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Res
       return;
     }
 
-    const chatMessageRepository = RepositoryFactory.getChatMessageRepository();
-    const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
+    const messageRepository = RepositoryFactory.getMessageRepository();
+    const memoryRepository = RepositoryFactory.getMemoryRepository();
     
-    // First, verify the session exists and belongs to the user
-    const session = await chatSessionRepository.findById(sessionId);
-    if (!session) {
+    // First, verify the memory exists
+    const memory = await memoryRepository.findById(memoryId);
+    if (!memory) {
       res.status(404).json({
         success: false,
-        error: 'Chat session not found',
-        code: 'SESSION_NOT_FOUND'
+        error: 'Memory not found',
+        code: 'MEMORY_NOT_FOUND'
       });
       return;
     }
 
-    // Note: Removed user-based access control as sessions are no longer tied to specific users
-
-    // Fetch messages for the session
-    const messages = await chatMessageRepository.findBySession(sessionId, limit, offset);
+    // Fetch messages for the memory with pagination
+    const allMessages = await messageRepository.findByMemoryId(memoryId);
+    const messages = allMessages.slice(offset, offset + limit);
 
     res.json({
       success: true,
       data: {
         messages,
-        sessionId,
-        total: messages.length
+        memoryId,
+        total: allMessages.length,
+        limit,
+        offset
       }
     });
 
@@ -274,13 +275,13 @@ router.get('/messages/:sessionId', authMiddleware, async (req: Request, res: Res
   }
 });
 
-// GET endpoint for fetching chat sessions by starship
-router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET endpoint for fetching memories by starship
+router.get('/memories/starship/:starshipId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { starshipId } = req.params;
     const userId = req.user?.id;
 
-    console.log('🚀 [CHAT ROUTE] GET sessions/starship endpoint called:', {
+    console.log('🚀 [CHAT ROUTE] GET memories/starship endpoint called:', {
       starshipId,
       userId,
       userObject: req.user,
@@ -320,27 +321,31 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
       limit
     });
 
-    const chatSessionRepository = RepositoryFactory.getChatSessionRepository();
-    const sessions = await chatSessionRepository.findByStarship(
-      starshipId,
-      limit
-    );
+    const memoryRepository = RepositoryFactory.getMemoryRepository();
+    
+    // Get memories for this starship with filtering
+    const allMemories = await memoryRepository.findWithFilters({
+      starshipId: starshipId,
+      limit: limit
+    });
 
     console.log('🚀 [CHAT ROUTE] Repository returned:', {
-      sessionsCount: sessions.length,
-      sessions: sessions.map(s => ({
-        id: s.id,
-        source: s.source,
-        starship_id: s.starship_id
+      memoriesCount: allMemories.length,
+      memories: allMemories.map((m: MemoryModel) => ({
+        id: m.id,
+        name: m.name,
+        starshipId: m.starshipId,
+        agentId: m.agentId,
+        messageCount: m.messageCount
       }))
     });
 
     res.json({
-      sessions
+      memories: allMemories
     });
 
   } catch (error) {
-    console.error('Chat sessions fetch error:', error);
+    console.error('Chat memories fetch error:', error);
     
     if (error instanceof ValidationError) {
       res.status(400).json({
@@ -356,6 +361,95 @@ router.get('/sessions/starship/:starshipId', authMiddleware, async (req: Request
         success: false,
         error: getErrorMessage(error),
         code: 'STARSHIP_NOT_FOUND'
+      });
+      return;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR'
+    });
+  }
+});
+
+// GET endpoint for fetching conversation messages by conversation ID
+router.get('/conversation/:conversationId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        error: 'User not authenticated',
+        code: 'UNAUTHORIZED'
+      });
+      return;
+    }
+
+    if (!conversationId || typeof conversationId !== 'string') {
+      throw new ValidationError(
+        'conversationId is required and must be a string',
+        'conversationId'
+      );
+    }
+
+    // Parse pagination parameters
+    const limit = Math.floor(parseInt(req.query.limit as string) || 50);
+    const offset = Math.floor(parseInt(req.query.offset as string) || 0);
+    
+    if (limit < 1 || limit > 200) {
+      res.status(400).json({
+        success: false,
+        error: 'Limit must be between 1 and 200',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    if (offset < 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Offset must be non-negative',
+        code: 'VALIDATION_ERROR'
+      });
+      return;
+    }
+
+    const messageRepository = RepositoryFactory.getMessageRepository();
+    
+    // Fetch conversation messages
+    const messages = await messageRepository.findByConversationId(conversationId, limit, offset);
+
+    if (messages.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Conversation not found',
+        code: 'CONVERSATION_NOT_FOUND'
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        messages,
+        conversationId,
+        total: messages.length,
+        limit,
+        offset
+      }
+    });
+
+  } catch (error) {
+    console.error('Conversation messages fetch error:', error);
+    
+    if (error instanceof ValidationError) {
+      res.status(400).json({
+        success: false,
+        error: getErrorMessage(error),
+        code: 'VALIDATION_ERROR'
       });
       return;
     }

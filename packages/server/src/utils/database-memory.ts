@@ -1,20 +1,26 @@
 import { RepositoryFactory } from "@starships/models";
-import type { MemoryEntry, MemorySearchResult, SessionKey, ChatSession, ChatMessage } from "@starships/protocol";
+import type { MemoryModel, MessageModel } from "@starships/protocol";
 
 /**
- * Database-backed memory store using ChatSession and ChatMessage repositories
- * Moved from agents/memory to utils for cleaner architecture
+ * Database-backed memory store using Memory and Message repositories
+ * Migrated from old ChatSession/ChatMessage system to new Memory/Message system
  */
 export class DatabaseMemoryStore {
   constructor() {
-    console.log('🧠 [DATABASE-MEMORY] Database memory store initialized');
+    console.log('🧠 [DATABASE-MEMORY] Database memory store initialized with Memory/Message system');
   }
 
-  makeKey(agentId: string, userId: string): SessionKey {
+  makeKey(agentId: string, userId: string): string {
     return `${agentId}:${userId}`;
   }
 
-  async get(sessionKey: SessionKey): Promise<MemoryEntry[]> {
+  async get(sessionKey: string): Promise<Array<{
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp?: number;
+    importance?: number;
+    summary?: string;
+  }>> {
     console.log('🧠 [DATABASE-MEMORY] Getting memory for session:', sessionKey);
     
     try {
@@ -24,24 +30,28 @@ export class DatabaseMemoryStore {
         return [];
       }
 
-      // Get or create chat session
-      const session = await this.getOrCreateSession(agentId, userId);
-      if (!session) {
-        console.log('❌ [DATABASE-MEMORY] No session found for:', sessionKey);
+      // Get or create memory for this agent
+      const memory = await this.getOrCreateMemory(agentId, userId);
+      if (!memory) {
+        console.log('❌ [DATABASE-MEMORY] No memory found for:', sessionKey);
         return [];
       }
 
-      // Get conversation history
-      const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
-      const messages = await chatMessageRepo.getRecentMessages(session.id, 20);
+      // Get recent messages from memory
+      const messageRepo = RepositoryFactory.getMessageRepository();
+      const messages = await messageRepo.findByMemoryId(memory.id);
 
-      console.log('💬 [DATABASE-MEMORY] Messages found:', messages.length);
+      // Take only the last 20 messages for context
+      const recentMessages = messages.slice(-20);
+
+      console.log('💬 [DATABASE-MEMORY] Messages found:', recentMessages.length);
 
       // Convert to MemoryEntry format
-      const entries = messages.map((msg: any) => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
+      const entries = recentMessages.map((msg: MessageModel) => ({
+        role: msg.role,
         content: msg.content,
         timestamp: new Date(msg.timestamp).getTime(),
+        importance: msg.importance === 'high' ? 1 : msg.importance === 'critical' ? 2 : 0,
       }));
 
       console.log('📝 [DATABASE-MEMORY] Returning memory entries:', entries.length);
@@ -53,7 +63,13 @@ export class DatabaseMemoryStore {
     }
   }
 
-  async append(sessionKey: SessionKey, entry: MemoryEntry): Promise<void> {
+  async append(sessionKey: string, entry: {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp?: number;
+    importance?: number;
+    summary?: string;
+  }): Promise<void> {
     console.log('📝 [DATABASE-MEMORY] Appending message to session:', sessionKey);
 
     try {
@@ -63,20 +79,34 @@ export class DatabaseMemoryStore {
         return;
       }
 
-      // Get or create chat session
-      const session = await this.getOrCreateSession(agentId, userId);
-      if (!session) {
-        console.error('❌ [DATABASE-MEMORY] Failed to get/create session for:', sessionKey);
+      // Get or create memory for this agent
+      const memory = await this.getOrCreateMemory(agentId, userId);
+      if (!memory) {
+        console.error('❌ [DATABASE-MEMORY] Failed to get/create memory for:', sessionKey);
         return;
       }
 
+      // Create a conversation ID for this session (using memory ID as base)
+      const conversationId = `conv_${memory.id}`;
+
       // Store message
-      const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
-      await chatMessageRepo.create({
-        session_id: session.id,
+      const messageRepo = RepositoryFactory.getMessageRepository();
+      await messageRepo.create({
+        version: '1.0.0',
         role: entry.role,
-        content: entry.content
+        content: entry.content,
+        starshipId: memory.starshipId,
+        agentId: memory.agentId,
+        memoryId: memory.id,
+        conversationId: conversationId,
+        messageType: entry.role === 'user' ? 'user_input' : entry.role === 'assistant' ? 'agent_response' : 'system_event',
+        importance: entry.importance === 2 ? 'critical' : entry.importance === 1 ? 'high' : 'medium',
+        timestamp: entry.timestamp ? new Date(entry.timestamp).toISOString() : new Date().toISOString(),
       });
+
+      // Update memory message count
+      const messageCount = await messageRepo.findByMemoryId(memory.id);
+      await this.updateMemoryMessageCount(memory.id, messageCount.length);
 
       console.log('✅ [DATABASE-MEMORY] Message stored successfully');
 
@@ -85,13 +115,57 @@ export class DatabaseMemoryStore {
     }
   }
 
-  async semanticSearch(sessionKey: SessionKey, query: string, _limit: number = 5): Promise<MemorySearchResult> {
-    // Not implemented for now - return empty results
-    console.log('⚠️ [DATABASE-MEMORY] Semantic search not implemented');
-    return { entries: [], relevanceScores: [] };
+  async semanticSearch(sessionKey: string, query: string, limit: number = 5): Promise<{
+    entries: Array<{
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+      timestamp?: number;
+      importance?: number;
+      summary?: string;
+    }>;
+    relevanceScores: number[];
+  }> {
+    console.log('🔍 [DATABASE-MEMORY] Performing semantic search:', query);
+    
+    try {
+      const [agentId, userId] = sessionKey.split(':');
+      if (!agentId || !userId) {
+        console.error('❌ [DATABASE-MEMORY] Invalid session key format:', sessionKey);
+        return { entries: [], relevanceScores: [] };
+      }
+
+      // Get memory for this agent
+      const memory = await this.getOrCreateMemory(agentId, userId);
+      if (!memory) {
+        return { entries: [], relevanceScores: [] };
+      }
+
+      // Search messages
+      const messageRepo = RepositoryFactory.getMessageRepository();
+      const messages = await messageRepo.searchMessages(query, {
+        memoryId: memory.id,
+        limit: limit
+      });
+
+      const entries = messages.map((msg: MessageModel) => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date(msg.timestamp).getTime(),
+        importance: msg.importance === 'high' ? 1 : msg.importance === 'critical' ? 2 : 0,
+      }));
+
+      // Simple relevance scoring (all equal for now)
+      const relevanceScores = new Array(entries.length).fill(1);
+
+      return { entries, relevanceScores };
+
+    } catch (error) {
+      console.error('❌ [DATABASE-MEMORY] Error in semantic search:', error);
+      return { entries: [], relevanceScores: [] };
+    }
   }
 
-  async clear(sessionKey: SessionKey): Promise<void> {
+  async clear(sessionKey: string): Promise<void> {
     console.log('🗑️ [DATABASE-MEMORY] Clearing session:', sessionKey);
     
     try {
@@ -101,18 +175,25 @@ export class DatabaseMemoryStore {
         return;
       }
 
-      // Find session
-      const session = await this.findExistingSession(agentId, userId);
-      if (!session) {
-        console.log('📂 [DATABASE-MEMORY] No session found to clear:', sessionKey);
+      // Find memory
+      const memory = await this.findExistingMemory(agentId, userId);
+      if (!memory) {
+        console.log('📂 [DATABASE-MEMORY] No memory found to clear:', sessionKey);
         return;
       }
 
-      // Delete all messages in session
-      const chatMessageRepo = RepositoryFactory.getChatMessageRepository();
-      const deletedCount = await chatMessageRepo.deleteBySession(session.id);
+      // Delete all messages in memory
+      const messageRepo = RepositoryFactory.getMessageRepository();
+      const messages = await messageRepo.findByMemoryId(memory.id);
+      const messageIds = messages.map((msg: MessageModel) => msg.id);
+      
+      if (messageIds.length > 0) {
+        const result = await messageRepo.bulkDelete(messageIds);
+        console.log('💾 [DATABASE-MEMORY] Memory cleared:', result.processed, 'messages deleted');
+      }
 
-      console.log('💾 [DATABASE-MEMORY] Session cleared:', deletedCount, 'messages deleted');
+      // Update memory message count to 0
+      await this.updateMemoryMessageCount(memory.id, 0);
 
     } catch (error) {
       console.error('❌ [DATABASE-MEMORY] Failed to clear session:', error);
@@ -125,11 +206,11 @@ export class DatabaseMemoryStore {
   }
 
   /**
-   * Get or create chat session for agent/user combination
+   * Get or create memory for agent/user combination
    */
-  private async getOrCreateSession(agentId: string, userId: string): Promise<ChatSession | null> {
+  private async getOrCreateMemory(agentId: string, userId: string): Promise<MemoryModel | null> {
     try {
-      // Get agent to retrieve starship_id for proper session association
+      // Get agent to retrieve starship_id for proper memory association
       const agentRepo = RepositoryFactory.getAgentRepository();
       const agent = await agentRepo.findById(agentId);
       
@@ -138,77 +219,90 @@ export class DatabaseMemoryStore {
         return null;
       }
 
-      // CRITICAL FIX: Ensure agent has a starshipId before creating session
+      // CRITICAL FIX: Ensure agent has a starshipId before creating memory
       if (!agent.starshipId) {
         console.error('❌ [DATABASE-MEMORY] Agent has no starshipId assigned:', agentId);
         return null;
       }
 
-      // Try to find existing active session
-      const existingSession = await this.findExistingSession(agentId, userId, agent.starshipId);
-      if (existingSession) {
-        // Update activity timestamp
-        const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
-        await chatSessionRepo.updateActivity(existingSession.id);
-        return existingSession;
+      // Try to find existing memory
+      const existingMemory = await this.findExistingMemory(agentId, userId, agent.starshipId);
+      if (existingMemory) {
+        return existingMemory;
       }
 
-      console.log('✅ [DATABASE-MEMORY] Creating new session for agent on starship:', {
+      console.log('✅ [DATABASE-MEMORY] Creating new memory for agent on starship:', {
         agentId: agentId,
         starshipId: agent.starshipId,
         userId: userId
       });
 
-      // Create new session
-      const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
-      const newSession = await chatSessionRepo.create({
-        source: 'agent',
-        agent_id: agentId,
-        starship_id: agent.starshipId  // CRITICAL: Include starship_id for proper relationships
+      // Create new agent memory
+      const memoryRepo = RepositoryFactory.getMemoryRepository();
+      const newMemory = await memoryRepo.createAgentMemory({
+        version: '1.0.0',
+        starshipId: agent.starshipId,
+        agentId: agentId,
+        name: `Agent Memory: ${agent.name || agentId}`,
+        description: `Conversation memory for agent ${agent.name || agentId} with user ${userId}`,
+        tags: ['agent-conversation', `user:${userId}`, `agent:${agentId}`],
+        messages: [],
+        messageCount: 0,
       });
 
-      console.log('✅ [DATABASE-MEMORY] Created new session:', {
-        sessionId: newSession.id,
+      console.log('✅ [DATABASE-MEMORY] Created new memory:', {
+        memoryId: newMemory.id,
         agentId: agentId,
         starshipId: agent.starshipId,
         userId: userId
       });
-      return newSession;
+      
+      return newMemory;
 
     } catch (error) {
-      console.error('❌ [DATABASE-MEMORY] Error getting/creating session:', error);
+      console.error('❌ [DATABASE-MEMORY] Error getting/creating memory:', error);
       return null;
     }
   }
 
   /**
-   * Find existing active session for agent/starship combination (removed user dependency)
+   * Find existing memory for agent/starship combination
    */
-  private async findExistingSession(agentId: string, userId: string, starshipId?: string): Promise<ChatSession | null> {
+  private async findExistingMemory(agentId: string, userId: string, starshipId?: string): Promise<MemoryModel | null> {
     try {
       if (!starshipId) {
         return null;
       }
 
-      const chatSessionRepo = RepositoryFactory.getChatSessionRepository();
-      const sessions = await chatSessionRepo.findByStarship(starshipId, 10);
+      const memoryRepo = RepositoryFactory.getMemoryRepository();
+      const memories = await memoryRepo.findByAgentId(agentId);
 
-      // Find session for this agent that's still active (within 30 minutes)
-      const activeSession = sessions.find((session: any) => {
-        if (session.agent_id !== agentId) return false;
-        
-        const lastActivity = new Date(session.last_activity_at);
-        const now = new Date();
-        const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
-        
-        return diffMinutes < 30; // 30 minute timeout
+      // Find memory for this agent that matches the user tag
+      const userMemory = memories.find((memory: MemoryModel) => {
+        return memory.tags?.includes(`user:${userId}`) && 
+               memory.starshipId === starshipId;
       });
 
-      return activeSession || null;
+      return userMemory || null;
 
     } catch (error) {
-      console.error('❌ [DATABASE-MEMORY] Error finding existing session:', error);
+      console.error('❌ [DATABASE-MEMORY] Error finding existing memory:', error);
       return null;
+    }
+  }
+
+  /**
+   * Update memory message count
+   */
+  private async updateMemoryMessageCount(memoryId: string, count: number): Promise<void> {
+    try {
+      const memoryRepo = RepositoryFactory.getMemoryRepository();
+      await memoryRepo.update(memoryId, {
+        messageCount: count,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ [DATABASE-MEMORY] Error updating memory message count:', error);
     }
   }
 }

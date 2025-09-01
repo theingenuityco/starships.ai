@@ -173,11 +173,10 @@ api.interceptors.response.use(
 
 // Import Agent and Starship related types from protocol package
 import {
-  Agent,
-  AgentConfig,
+  AgentModel,
   CreateAgentRequest,
   UpdateAgentRequest,
-  AgentTemplate,
+  AgentTemplateModel,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
   StarshipResponse,
@@ -190,11 +189,8 @@ import {
 
 // Re-export types for use in other client components
 export type {
-  Agent,
-  AgentConfig,
   CreateAgentRequest,
   UpdateAgentRequest,
-  AgentTemplate,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
   StarshipResponse,
@@ -204,6 +200,10 @@ export type {
   CreateStarshipRequest,
   ChatSession
 }
+
+// For compatibility, alias the types
+export type Agent = AgentModel
+export type AgentTemplate = AgentTemplateModel
 
 // MCP Server Option interface (matching backend model)
 export interface MCPServerOption {
@@ -258,15 +258,6 @@ export interface SyncedUser {
 // Export Starship type for backward compatibility
 export type Starship = StarshipResponse['starship']
 
-export interface Vision {
-  id: string
-  starshipId: string
-  statement: string
-  confidence: number
-  lastRefined: string
-  refinementCount: number
-  updatedAt: string
-}
 
 // Backend request/response types (snake_case)
 interface ChatBackendRequest {
@@ -611,19 +602,12 @@ export const starshipAPI = {
     return data
   },
 
-  // Create new starship (with optional vision support)
+  // Create new starship
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser' | 'draught'
-      vision?: {
-      statement: string
-      confidence?: number
-      sibilSessionId?: string
-    }
-  }): Promise<{ starship: Starship; vision?: any }> => {
-    // Use enhanced endpoint if vision is provided
-    const endpoint = data.vision ? '/api/starships/enhanced' : '/api/starships';
-    return api.post(endpoint, data).then(res => res.data);
+  }): Promise<{ starship: Starship }> => {
+    return api.post('/api/starships', data).then(res => res.data);
   },
 
   // Get starship details with caching (supports both ID and slug)
@@ -721,14 +705,6 @@ export const starshipAPI = {
   },
 }
 
-// NEW: Vision API
-export const visionAPI = {
-  get: (starshipId: string): Promise<{ vision: string }> =>
-    api.get(`/api/starships/${starshipId}/vision`).then(res => res.data),
-
-  save: (starshipId: string, vision: string): Promise<{ success: boolean }> =>
-    api.post(`/api/starships/${starshipId}/vision`, { vision }).then(res => res.data),
-}
 
 // MCP Server API response types
 interface MCPServersResponse {

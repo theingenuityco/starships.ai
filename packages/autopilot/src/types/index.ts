@@ -33,7 +33,7 @@ export type {
   AgentIdentity,
   AgentPurpose,
   AgentSpace,
-  AgentMemoryConfig
+  AgentMemoryState
 } from '../AgentMemory';
 
 // ===== INTERNAL TYPES =====

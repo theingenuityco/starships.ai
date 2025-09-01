@@ -405,7 +405,8 @@ export class MissionOrchestratorAgent {
       const autopilotWorkflow = this.convertToAutopilotWorkflow(blueprint);
       
       // Create agent memory for workflow execution context
-      const agentMemory = createAgentMemory('Mission execution coordinator');
+      const agentMemory = createAgentMemory();
+      agentMemory.addMessage('system', 'Mission execution coordinator');
       agentMemory.setIdentity({
         name: 'Mission Executor',
         role: 'Workflow Coordinator',

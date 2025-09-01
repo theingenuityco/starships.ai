@@ -7,7 +7,8 @@
 
 // Import autopilot types at the top level
 import type {
-  AgentMemoryConfig,
+  MemoryState,
+  AgentMemoryState,
   AgentIdentity,
   AgentPurpose,
   AgentSpace
@@ -56,8 +57,9 @@ export interface AgentMemoryModel extends MemoryModel {
   purpose?: AgentPurpose;
   space?: AgentSpace;
   
-  // Agent memory configuration
-  config?: AgentMemoryConfig;
+  // Agent memory state
+  state?: AgentMemoryState;
+  
   
   // Required agent assignment for AgentMemory
   agentId: string;
@@ -77,7 +79,11 @@ export interface CreateMemoryRequest {
   agentId?: string;
   tags?: string[];
   
-  // Initial messages (optional)
+  // Memory state
+  state?: MemoryState;
+  
+  // Initial messages (optional) - deprecated in favor of state
+  /** @deprecated Use state.messages instead */
   initialMessages?: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
@@ -93,7 +99,7 @@ export interface CreateAgentMemoryRequest extends CreateMemoryRequest {
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
-  config?: AgentMemoryConfig;
+  state?: AgentMemoryState;
 }
 
 /**

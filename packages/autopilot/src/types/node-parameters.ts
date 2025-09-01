@@ -6,7 +6,7 @@
  */
 
 import type { BaseNodeParameters, BaseBlueprint } from './base';
-import type { AgentMemoryConfig } from '../AgentMemory';
+import type { AgentMemoryState } from '../AgentMemory';
 
 /**
  * Agent-specific node parameters
@@ -26,7 +26,7 @@ export interface AgentNodeParameters extends BaseNodeParameters {
   timeout?: number;
   
   // Memory system (required)
-  memory: AgentMemoryConfig;
+  memory: AgentMemoryState;
   
   // Blueprint execution
   blueprint: BaseBlueprint;

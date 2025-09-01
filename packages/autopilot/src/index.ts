@@ -14,7 +14,7 @@ export { Agent } from './Agent';
 
 // Memory system
 export { Memory } from './Memory';
-export type { Message } from './Memory';
+export type { Message, MemoryState } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
@@ -22,7 +22,7 @@ export type {
   AgentIdentity,
   AgentPurpose,
   AgentSpace,
-  AgentMemoryConfig
+  AgentMemoryState
 } from './AgentMemory';
 
 // ===== LLM SYSTEM =====
@@ -112,17 +112,13 @@ export const createAgent = (config: AgentNodeParameters): Agent => {
 };
 
 // Helper function to create basic memory
-export const createMemory = (initialSystemMessage?: string): Memory => {
-  return new Memory(initialSystemMessage);
+export const createMemory = (state?: { messages?: any[] }): Memory => {
+  return new Memory(state);
 };
 
 // Helper function to create agent memory
-export const createAgentMemory = (initialSystemPrompt?: string): AgentMemory => {
-  const memory = new AgentMemory();
-  if (initialSystemPrompt) {
-    memory.addMessage('system', initialSystemPrompt);
-  }
-  return memory;
+export const createAgentMemory = (state?: { identity?: any; purpose?: any; space?: any; messages?: any[] }): AgentMemory => {
+  return new AgentMemory(state);
 };
 
 // Helper function to create a new LLM

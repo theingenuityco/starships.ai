@@ -1,7 +1,7 @@
 import { AgentTemplateModel, AgentModel } from '@starships/protocol';
 import { AgentTemplateRepository } from '@starships/models';
 import { Neo4jConnection } from '@starships/models';
-import { Blueprint, AgentMemoryConfig } from '@starships/autopilot';
+import { Blueprint, AgentMemoryState } from '@starships/autopilot';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
@@ -298,7 +298,7 @@ export class AgentTemplateService {
     category: string, 
     description: string,
     expertise: string[]
-  ): AgentMemoryConfig {
+  ): AgentMemoryState {
     const roleMap = {
       general: 'General Assistant',
       coding: 'Software Developer',
@@ -352,7 +352,7 @@ export class AgentTemplateService {
 
     const defaultTemplates: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
       blueprint?: Blueprint;
-      memory?: AgentMemoryConfig;
+      memory?: AgentMemoryState;
       executionMode?: 'simple' | 'workflow';
       timeout?: number;
     }> = [

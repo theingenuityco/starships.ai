@@ -34,39 +34,32 @@ export interface AgentSpace {
 }
 
 /**
- * Agent memory configuration for autopilot
+ * Agent memory state configuration for AgentMemory class
  */
-export interface AgentMemoryConfig {
+export interface AgentMemoryState {
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
   messages?: Message[];
 }
 
-
 /**
  * Agent Memory Class
- * 
+ *
  * Sophisticated memory system for agents with structured context management
  */
 export class AgentMemory extends Memory {
-  private identity?: AgentIdentity;
-  private purpose?: AgentPurpose;
-  private space?: AgentSpace;
+  protected state: AgentMemoryState;
 
-  constructor(config?: AgentMemoryConfig) {
-    super();
+  constructor(state?: AgentMemoryState) {
+    super(state);
+    this.state = state || {};
     
-    // Initialize from config if provided
-    if (config) {
-      if (config.identity) this.setIdentity(config.identity);
-      if (config.purpose) this.setPurpose(config.purpose);
-      if (config.space) this.setSpace(config.space);
-      if (config.messages) {
-        config.messages.forEach(msgEntry => {
-          this.addMessage(msgEntry.role, msgEntry.content, msgEntry.metadata);
-        });
-      }
+    // Initialize from state if provided
+    if (state) {
+      if (state.identity) this.setIdentity(state.identity);
+      if (state.purpose) this.setPurpose(state.purpose);
+      if (state.space) this.setSpace(state.space);
     }
   }
 
@@ -74,21 +67,21 @@ export class AgentMemory extends Memory {
    * Set agent identity
    */
   setIdentity(identity: AgentIdentity): void {
-    this.identity = identity;
+    this.state.identity = identity;
   }
 
   /**
    * Set agent purpose
    */
   setPurpose(purpose: AgentPurpose): void {
-    this.purpose = purpose;
+    this.state.purpose = purpose;
   }
 
   /**
    * Set agent space
    */
   setSpace(space: AgentSpace): void {
-    this.space = space;
+    this.state.space = space;
   }
 
 
@@ -124,21 +117,21 @@ export class AgentMemory extends Memory {
    * Get agent identity
    */
   getIdentity(): AgentIdentity | undefined {
-    return this.identity ? { ...this.identity } : undefined;
+    return this.state.identity ? { ...this.state.identity } : undefined;
   }
 
   /**
    * Get agent purpose
    */
   getPurpose(): AgentPurpose | undefined {
-    return this.purpose ? { ...this.purpose } : undefined;
+    return this.state.purpose ? { ...this.state.purpose } : undefined;
   }
 
   /**
    * Get agent space
    */
   getSpace(): AgentSpace | undefined {
-    return this.space ? { ...this.space } : undefined;
+    return this.state.space ? { ...this.state.space } : undefined;
   }
 
   /**
@@ -176,13 +169,13 @@ export class AgentMemory extends Memory {
     const parts: string[] = [];
 
     // Identity section
-    if (this.identity) {
+    if (this.state.identity) {
       const identityParts: string[] = [];
-      if (this.identity.name) identityParts.push(`Name: ${this.identity.name}`);
-      if (this.identity.role) identityParts.push(`Role: ${this.identity.role}`);
-      if (this.identity.personality) identityParts.push(`Personality: ${this.identity.personality}`);
-      if (this.identity.expertise && this.identity.expertise.length > 0) {
-        identityParts.push(`Expertise: ${this.identity.expertise.join(', ')}`);
+      if (this.state.identity.name) identityParts.push(`Name: ${this.state.identity.name}`);
+      if (this.state.identity.role) identityParts.push(`Role: ${this.state.identity.role}`);
+      if (this.state.identity.personality) identityParts.push(`Personality: ${this.state.identity.personality}`);
+      if (this.state.identity.expertise && this.state.identity.expertise.length > 0) {
+        identityParts.push(`Expertise: ${this.state.identity.expertise.join(', ')}`);
       }
       
       if (identityParts.length > 0) {
@@ -191,22 +184,22 @@ export class AgentMemory extends Memory {
     }
 
     // Purpose section
-    if (this.purpose) {
+    if (this.state.purpose) {
       const purposeParts: string[] = [];
-      purposeParts.push(`Primary Purpose: ${this.purpose.primary}`);
-      if (this.purpose.secondary && this.purpose.secondary.length > 0) {
-        purposeParts.push(`Secondary Goals: ${this.purpose.secondary.join(', ')}`);
+      purposeParts.push(`Primary Purpose: ${this.state.purpose.primary}`);
+      if (this.state.purpose.secondary && this.state.purpose.secondary.length > 0) {
+        purposeParts.push(`Secondary Goals: ${this.state.purpose.secondary.join(', ')}`);
       }
-      if (this.purpose.constraints && this.purpose.constraints.length > 0) {
-        purposeParts.push(`Constraints: ${this.purpose.constraints.join(', ')}`);
+      if (this.state.purpose.constraints && this.state.purpose.constraints.length > 0) {
+        purposeParts.push(`Constraints: ${this.state.purpose.constraints.join(', ')}`);
       }
       
       parts.push(`<purpose>\n${purposeParts.join('\n')}\n</purpose>`);
     }
 
     // Space section
-    if (this.space) {
-      parts.push(`<space>\n${this.space.description}\n</space>`);
+    if (this.state.space) {
+      parts.push(`<space>\n${this.state.space.description}\n</space>`);
     }
 
     return parts.length > 0 ? parts.join('\n\n') : '';
@@ -236,9 +229,9 @@ export class AgentMemory extends Memory {
    */
   clear(): void {
     super.clear();
-    this.identity = undefined;
-    this.purpose = undefined;
-    this.space = undefined;
+    this.state.identity = undefined;
+    this.state.purpose = undefined;
+    this.state.space = undefined;
   }
 
   /**
@@ -251,9 +244,9 @@ export class AgentMemory extends Memory {
       cloned.addMessage(msg.role, msg.content, msg.metadata)
     );
     // Copy agent-specific data
-    cloned.identity = this.identity ? { ...this.identity } : undefined;
-    cloned.purpose = this.purpose ? { ...this.purpose } : undefined;
-    cloned.space = this.space ? { ...this.space } : undefined;
+    cloned.state.identity = this.state.identity ? { ...this.state.identity } : undefined;
+    cloned.state.purpose = this.state.purpose ? { ...this.state.purpose } : undefined;
+    cloned.state.space = this.state.space ? { ...this.state.space } : undefined;
     return cloned;
   }
 
@@ -278,9 +271,9 @@ export class AgentMemory extends Memory {
     return {
       messages: messageStats,
       messageEntries: super.getMessageEntries().length,
-      hasIdentity: !!this.identity,
-      hasPurpose: !!this.purpose,
-      hasSpace: !!this.space
+      hasIdentity: !!this.state.identity,
+      hasPurpose: !!this.state.purpose,
+      hasSpace: !!this.state.space
     };
   }
 }

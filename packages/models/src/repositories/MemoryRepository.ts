@@ -33,9 +33,6 @@ export class MemoryRepository extends BaseRepository {
     if ('space' in memory && memory.space) {
       (serialized as any).space = JSON.stringify(memory.space);
     }
-    if ('config' in memory && memory.config) {
-      (serialized as any).config = JSON.stringify(memory.config);
-    }
 
     return serialized;
   }
@@ -61,9 +58,6 @@ export class MemoryRepository extends BaseRepository {
       if (memory.space) {
         deserialized.space = JSON.parse(memory.space);
       }
-      if (memory.config) {
-        deserialized.config = JSON.parse(memory.config);
-      }
 
       return deserialized;
     } catch (error) {
@@ -75,7 +69,6 @@ export class MemoryRepository extends BaseRepository {
         identity: undefined,
         purpose: undefined,
         space: undefined,
-        config: undefined,
       };
     }
   }
@@ -199,7 +192,6 @@ export class MemoryRepository extends BaseRepository {
         identity: entity.identity,
         purpose: entity.purpose,
         space: entity.space,
-        config: entity.config,
       };
 
       const memoryForStorage = this.serializeComplexFields(agentMemory);

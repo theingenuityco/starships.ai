@@ -19,6 +19,13 @@ export interface Message {
 }
 
 /**
+ * Memory state configuration for base Memory class
+ */
+export interface MemoryState {
+  messages?: Message[];
+}
+
+/**
  * Base Memory Class
  *
  * Core message management system that stores rich Message objects internally
@@ -26,10 +33,18 @@ export interface Message {
  */
 export class Memory {
   protected messages: Message[] = [];
+  protected state: MemoryState;
 
-  constructor(initialSystemMessage?: string) {
-    if (initialSystemMessage) {
-      this.addMessage('system', initialSystemMessage);
+  constructor(state?: MemoryState) {
+    this.state = state || {};
+    
+    // Initialize from state if provided
+    if (state) {
+      if (state.messages) {
+        state.messages.forEach(message => {
+          this.addMessage(message.role, message.content, message.metadata);
+        });
+      }
     }
   }
 

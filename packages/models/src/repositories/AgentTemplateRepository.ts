@@ -4,7 +4,7 @@ import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
-import { AgentMemoryConfig } from '@starships/autopilot';
+import { AgentMemoryState } from '@starships/autopilot';
 
 export class AgentTemplateRepository extends BaseRepository {
   private connection: Neo4jConnection;
@@ -67,7 +67,7 @@ export class AgentTemplateRepository extends BaseRepository {
         temperature: entity.temperature as number | undefined,
         maxTokens: entity.maxTokens as number | undefined,
         timeout: this.getSafeValue(entity.timeout, 30000) as number,
-        memory: entity.memory as any, // AgentMemoryConfig
+        memory: entity.memory as any, // AgentMemoryState
         blueprint: entity.blueprint as any, // BaseBlueprint
         
         // Database-specific fields
@@ -409,7 +409,7 @@ export class AgentTemplateRepository extends BaseRepository {
       };
 
       // Create default memory config
-      const defaultMemory: AgentMemoryConfig = {
+      const defaultMemory: AgentMemoryState = {
         identity: {
           name: String(agent.name || 'AI Assistant'),
           role: 'AI Assistant',

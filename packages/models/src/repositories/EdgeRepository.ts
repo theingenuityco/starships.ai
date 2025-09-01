@@ -2,7 +2,7 @@ import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import type { Edge } from '@starships/autopilot';
-import type { EdgeModel } from '../types/edge';
+import type { EdgeModel } from '@starships/protocol';
 
 export class EdgeRepository extends BaseRepository {
   constructor() {

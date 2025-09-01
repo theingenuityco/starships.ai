@@ -24,7 +24,7 @@ import type {
   CreateMissionClarityRequest
 } from '@starships/protocol';
 import type { Starship, Vision } from '@starships/protocol';
-import type { AgentModel } from '@starships/models';
+import type { AgentModel } from '@starships/protocol';
 
 /**
  * Configuration for MissionOrchestratorAgent

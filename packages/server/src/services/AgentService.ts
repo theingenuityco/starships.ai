@@ -7,7 +7,7 @@
  */
 
 import { AgentRepository, RepositoryFactory } from '@starships/models';
-import { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/models';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { MemoryEntry, ChatRequest, ChatResponse } from '@starships/protocol';

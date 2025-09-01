@@ -186,4 +186,3 @@ export interface LegacyCreateWorkflowRequest {
     to: string;
   }>;
 }
-

@@ -316,6 +316,10 @@ importers:
         version: 4.20.3
 
   packages/protocol:
+    dependencies:
+      '@starships/autopilot':
+        specifier: workspace:*
+        version: link:../autopilot
     devDependencies:
       '@types/node':
         specifier: ^24.0.10

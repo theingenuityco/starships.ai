@@ -1,5 +1,4 @@
-import { AgentTemplateModel } from '@starships/models';
-import { AgentModel } from '@starships/models';
+import { AgentTemplateModel, AgentModel } from '@starships/protocol';
 import { AgentTemplateRepository } from '@starships/models';
 import { Neo4jConnection } from '@starships/models';
 import { Blueprint, AgentMemoryConfig } from '@starships/autopilot';

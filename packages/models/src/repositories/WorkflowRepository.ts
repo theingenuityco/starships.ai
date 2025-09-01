@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { WorkflowModel } from '../types/workflow';
+import type { WorkflowModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
 import { v4 as uuidv4 } from 'uuid';

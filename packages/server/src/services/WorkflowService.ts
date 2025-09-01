@@ -7,7 +7,7 @@
  */
 
 import { WorkflowRepository, RepositoryFactory } from '@starships/models';
-import { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/models';
+import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
 import { Workflow, Blueprint, Execution, createAgentMemory } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
 

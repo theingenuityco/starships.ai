@@ -4,7 +4,7 @@ import type {
   AgentModel,
   CreateAgentRequest,
   UpdateAgentRequest,
-} from '@starships/models';
+} from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 

@@ -262,7 +262,7 @@ export interface WorkflowEdge {
 /**
  * Request to create a new mission workflow
  */
-export interface CreateWorkflowRequest {
+export interface CreateMissionWorkflowRequest {
   missionId: string;
   nodes: (Omit<WorkflowNode, 'id'> & { aiId?: string })[];
   edges: Omit<WorkflowEdge, 'id'>[];
@@ -279,7 +279,7 @@ export interface UpdateWorkflowApprovalRequest {
 /**
  * Response containing workflow data
  */
-export interface WorkflowResponse {
+export interface MissionWorkflowResponse {
   workflow: MissionWorkflow;
   // Agent details are now managed by the models package
 }

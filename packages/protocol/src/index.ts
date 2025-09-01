@@ -7,12 +7,19 @@
 export * from './contracts/socket';
 
 // Export domain types (database domains)
+export * from './domains/agent';
+export * from './domains/agent-template';
+export * from './domains/blueprint';
 export * from './domains/chat';
+export * from './domains/edge';
+export * from './domains/execution';
 export * from './domains/mission';
+export * from './domains/node';
 export * from './domains/starship';
 export * from './domains/vision';
 export * from './domains/user';
 export * from './domains/waitlist';
+export * from './domains/workflow';
 export * from './domains/native-tool';
 
 

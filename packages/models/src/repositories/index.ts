@@ -1,11 +1,9 @@
 import { AgentRepository } from './AgentRepository';
 import { UserRepository } from './UserRepository';
-import { LLMRepository } from './LLMRepository';
 import { getConnection } from '../helpers/database';
 
 export { AgentRepository } from './AgentRepository';
 export { UserRepository } from './UserRepository';
-export { LLMRepository } from './LLMRepository';
 
 // NEW: Aether Core Repositories
 export { StarshipRepository } from './StarshipRepository';
@@ -79,7 +77,6 @@ export class RepositoryFactory {
   // Repository instances - all initialized synchronously
   private static agentRepo: AgentRepository | null = null;
   private static userRepo: UserRepository | null = null;
-  private static llmRepo: LLMRepository | null = null;
 
   // Aether Core repository instances
   private static starshipRepo: StarshipRepository | null = null;
@@ -161,7 +158,6 @@ export class RepositoryFactory {
       // Initialize basic repositories first (no dependencies)
       this.agentRepo = new AgentRepository();
       this.userRepo = new UserRepository();
-      this.llmRepo = new LLMRepository();
       this.visionRepo = new VisionRepository();
       this.missionRepo = new MissionRepository();
       this.missionMessageRepo = new MissionMessageRepository();
@@ -237,7 +233,6 @@ export class RepositoryFactory {
       repositoryStatus: {
         agentRepo: this.agentRepo !== null,
         userRepo: this.userRepo !== null,
-        llmRepo: this.llmRepo !== null,
         starshipRepo: this.starshipRepo !== null,
         visionRepo: this.visionRepo !== null,
         missionRepo: this.missionRepo !== null,
@@ -282,16 +277,6 @@ export class RepositoryFactory {
   }
 
 
-  /**
-   * Get LLMRepository instance (synchronous)
-   */
-  static getLLMRepository(): LLMRepository {
-    this.ensureInitialized();
-    if (!this.llmRepo) {
-      throw new Error('LLMRepository not initialized');
-    }
-    return this.llmRepo;
-  }
 
   /**
    * Get StarshipRepository instance (synchronous)
@@ -464,7 +449,6 @@ export class RepositoryFactory {
     // Clear all repository instances
     this.agentRepo = null;
     this.userRepo = null;
-    this.llmRepo = null;
     this.starshipRepo = null;
     this.visionRepo = null;
     this.missionRepo = null;

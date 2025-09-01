@@ -5,8 +5,7 @@
  * Separated from orchestrator agent to follow separation of concerns pattern.
  */
 
-import { CreateWorkflowRequest } from '@starships/protocol';
-import { AgentModel } from '@starships/models';
+import type { LegacyCreateWorkflowRequest, AgentModel } from '@starships/protocol';
 import { Logger } from '../utils/logger';
 
 export class WorkflowParsingService {
@@ -16,7 +15,7 @@ export class WorkflowParsingService {
    * Parse AI response and convert to WorkflowDSL
    * Moved from MissionOrchestratorAgent to follow separation of concerns
    */
-  static parseAIResponse(aiResponse: string, missionId: string, agents: AgentModel[]): CreateWorkflowRequest {
+  static parseAIResponse(aiResponse: string, missionId: string, agents: AgentModel[]): LegacyCreateWorkflowRequest {
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -88,7 +87,7 @@ export class WorkflowParsingService {
   /**
    * Validate workflow structure
    */
-  static validateWorkflow(workflow: CreateWorkflowRequest): boolean {
+  static validateWorkflow(workflow: LegacyCreateWorkflowRequest): boolean {
     try {
       // Check basic structure
       if (!workflow.nodes || workflow.nodes.length === 0) {

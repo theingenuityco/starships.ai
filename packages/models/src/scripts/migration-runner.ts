@@ -30,7 +30,7 @@ export interface MigrationResult {
 
 export class MigrationRunner {
   private connection: any = null;
-  private migrationsPath = join(__dirname, '../migrations');
+  private migrationsPath = join(__dirname, '../../migrations');
 
   private getConnection() {
     if (!this.connection) {

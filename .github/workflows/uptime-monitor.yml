@@ -87,7 +87,7 @@ jobs:
       - name: Send Discord Alert on Status Change
         if: steps.health_check.outputs.status != 'operational' || (steps.previous_status.outputs.previous != 'operational' && steps.health_check.outputs.status == 'operational')
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+          DISCORD_WEBHOOK: ${{ matrix.environment == 'prod' && secrets.DISCORD_PROD_WEBHOOK || secrets.DISCORD_DEV_WEBHOOK }}
           STATUS: ${{ steps.health_check.outputs.status }}
           PREV_STATUS: ${{ steps.previous_status.outputs.previous }}
           HTTP_CODE: ${{ steps.health_check.outputs.http_code }}
@@ -195,7 +195,7 @@ jobs:
     steps:
       - name: Send Daily Summary
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_PROD_WEBHOOK }}
         run: |
           curl -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \

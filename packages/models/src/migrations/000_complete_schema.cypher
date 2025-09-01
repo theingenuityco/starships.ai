@@ -84,10 +84,10 @@ CREATE CONSTRAINT message_type_values IF NOT EXISTS FOR (msg:Message) REQUIRE ms
 CREATE CONSTRAINT message_importance_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.importance IN ['low', 'medium', 'high', 'critical'];
 CREATE CONSTRAINT message_processing_status_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.processingStatus IN ['pending', 'processing', 'processed', 'failed'];
 
-// Chat Session constraints
-CREATE CONSTRAINT chat_session_id_unique IF NOT EXISTS FOR (cs:ChatSession) REQUIRE cs.id IS UNIQUE;
-CREATE CONSTRAINT chat_session_required_props IF NOT EXISTS FOR (cs:ChatSession) REQUIRE (cs.id, cs.source, cs.created_by, cs.created_at, cs.last_activity_at, cs.total_tokens) IS NOT NULL;
-CREATE CONSTRAINT chat_session_source_values IF NOT EXISTS FOR (cs:ChatSession) REQUIRE cs.source IN ['sibil', 'agent'];
+// Session Model constraints
+CREATE CONSTRAINT session_model_id_unique IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.id IS UNIQUE;
+CREATE CONSTRAINT session_model_required_props IF NOT EXISTS FOR (cs:SessionModel) REQUIRE (cs.id, cs.source, cs.created_by, cs.created_at, cs.last_activity_at, cs.total_tokens) IS NOT NULL;
+CREATE CONSTRAINT session_model_source_values IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.source IN ['sibil', 'agent'];
 
 // Chat Message constraints
 CREATE CONSTRAINT chat_message_id_unique IF NOT EXISTS FOR (cm:ChatMessage) REQUIRE cm.id IS UNIQUE;
@@ -244,14 +244,14 @@ CREATE INDEX message_content_hash_index IF NOT EXISTS FOR (msg:Message) ON (msg.
 CREATE RANGE INDEX message_timestamp_range IF NOT EXISTS FOR (msg:Message) ON (msg.timestamp);
 CREATE RANGE INDEX message_created_at_range IF NOT EXISTS FOR (msg:Message) ON (msg.createdAt);
 
-// Chat Session indexes
-CREATE INDEX chat_session_created_by_index IF NOT EXISTS FOR (cs:ChatSession) ON (cs.created_by);
-CREATE INDEX chat_session_source_index IF NOT EXISTS FOR (cs:ChatSession) ON (cs.source);
-CREATE RANGE INDEX chat_session_created_at_range IF NOT EXISTS FOR (cs:ChatSession) ON (cs.created_at);
-CREATE RANGE INDEX chat_session_last_activity_range IF NOT EXISTS FOR (cs:ChatSession) ON (cs.last_activity_at);
-CREATE INDEX chat_session_total_tokens_index IF NOT EXISTS FOR (cs:ChatSession) ON (cs.total_tokens);
-CREATE INDEX chat_session_user_activity_composite IF NOT EXISTS FOR (cs:ChatSession) ON (cs.created_by, cs.last_activity_at);
-CREATE INDEX chat_session_user_source_composite IF NOT EXISTS FOR (cs:ChatSession) ON (cs.created_by, cs.source);
+// Session Model indexes
+CREATE INDEX session_model_created_by_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by);
+CREATE INDEX session_model_source_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.source);
+CREATE RANGE INDEX session_model_created_at_range IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_at);
+CREATE RANGE INDEX session_model_last_activity_range IF NOT EXISTS FOR (cs:SessionModel) ON (cs.last_activity_at);
+CREATE INDEX session_model_total_tokens_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.total_tokens);
+CREATE INDEX session_model_user_activity_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by, cs.last_activity_at);
+CREATE INDEX session_model_user_source_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by, cs.source);
 
 // Chat Message indexes
 CREATE INDEX chat_message_session_index IF NOT EXISTS FOR (cm:ChatMessage) ON (cm.session_id);
@@ -482,7 +482,7 @@ CREATE (m:Migration {
     'memory_management',
     'agent_memory',
     'message_system',
-    'chat_sessions',
+    'session_models',
     'chat_messages',
     'execution_tracking',
     'stripe_integration',

@@ -7,7 +7,16 @@
 
 import type { MissionChatState } from '../services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
-import type { LLMChatPrompt } from '@starships/protocol';
+// Note: LLMChatPrompt type needs to be defined based on the actual interface needed
+// For now, creating a local interface until the proper type is available
+interface LLMChatPrompt {
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  temperature?: number;
+  maxTokens?: number;
+}
 import { MISSION_PHASES, type MissionWorkflow } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 

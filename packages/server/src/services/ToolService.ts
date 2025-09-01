@@ -1,5 +1,18 @@
 import { RepositoryFactory } from '@starships/models';
-import type { LLMToolDefinition } from '@starships/protocol';
+// Note: LLMToolDefinition type needs to be defined based on the actual interface needed
+// For now, creating a local interface until the proper type is available
+interface LLMToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, any>;
+      required?: string[];
+    };
+  };
+}
 
 /**
  * Simple tool interface that replaces LangChain's DynamicTool

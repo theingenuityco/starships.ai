@@ -1,4 +1,15 @@
-import type { MemoryEntry, LLMChatPrompt } from "@starships/protocol";
+import type { MemoryEntry } from "@starships/protocol";
+
+// Note: LLMChatPrompt type needs to be defined based on the actual interface needed
+// For now, creating a local interface until the proper type is available
+interface LLMChatPrompt {
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
+  temperature?: number;
+  maxTokens?: number;
+}
 
 /**
  * Build LLM chat prompt from system prompt, memory, and current message

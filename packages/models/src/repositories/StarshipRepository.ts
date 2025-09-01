@@ -551,7 +551,7 @@ export class StarshipRepository extends BaseRepository {
    * @param additionalFields - Additional fields to update
    */
   async updatePaymentStatus(
-    starshipId: string, 
+    starshipId: string,
     status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
     additionalFields?: Partial<StarshipModel>
   ): Promise<void> {
@@ -567,5 +567,69 @@ export class StarshipRepository extends BaseRepository {
        SET s += $updates`,
       { id: starshipId, updates }
     );
+  }
+
+  /**
+   * Get all memories for a starship using Neo4j relationships
+   * @param starshipId - The starship ID
+   * @returns Array of memories belonging to this starship
+   */
+  async getMemories(starshipId: string): Promise<any[]> {
+    if (!starshipId) {
+      throw new Error('Starship ID is required');
+    }
+
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ m: any }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
+       RETURN m ORDER BY m.createdAt DESC`,
+      { starshipId }
+    );
+    return result.map((record) => record.m);
+  }
+
+  /**
+   * Get memory count for a starship
+   * @param starshipId - The starship ID
+   * @returns Number of memories
+   */
+  async getMemoryCount(starshipId: string): Promise<number> {
+    if (!starshipId) {
+      throw new Error('Starship ID is required');
+    }
+
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ count: number }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
+       RETURN count(m) as count`,
+      { starshipId }
+    );
+
+    return Number(result[0]?.count || 0);
+  }
+
+  /**
+   * Remove a specific memory from a starship (deletes the memory and relationship)
+   * @param starshipId - The starship ID
+   * @param memoryId - The memory ID
+   * @returns True if memory was removed
+   */
+  async removeMemory(starshipId: string, memoryId: string): Promise<boolean> {
+    if (!starshipId) {
+      throw new Error('Starship ID is required');
+    }
+    if (!memoryId) {
+      throw new Error('Memory ID is required');
+    }
+
+    const connection = getConnection();
+    const result = await connection.executeWrite<{ deletedCount: number }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory {id: $memoryId})
+       DETACH DELETE m
+       RETURN count(m) as deletedCount`,
+      { starshipId, memoryId }
+    );
+
+    return result[0]?.deletedCount > 0;
   }
 }

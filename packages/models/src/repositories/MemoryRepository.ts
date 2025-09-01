@@ -71,7 +71,8 @@ export class MemoryRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryModel }>(
-        'MATCH (m:Memory) RETURN m ORDER BY m.updatedAt DESC'
+        'MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory) RETURN m ORDER BY m.updatedAt DESC',
+        { starshipId }
       );
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
     }, 'findByStarshipId', 'Memory');
@@ -99,7 +100,8 @@ export class MemoryRepository extends BaseRepository {
 
 
   async create(
-    entity: Omit<MemoryModel, 'id' | 'createdAt' | 'updatedAt'>
+    entity: Omit<MemoryModel, 'id' | 'createdAt' | 'updatedAt' | 'messageCount'>,
+    starshipId: string
   ): Promise<MemoryModel> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
@@ -118,8 +120,15 @@ export class MemoryRepository extends BaseRepository {
       const memoryForStorage = this.serializeComplexFields(memory);
 
       await connection.executeWrite(
-        'CREATE (m:Memory $props) RETURN m',
-        { props: memoryForStorage }
+        `MATCH (s:Starship {id: $starshipId})
+         CREATE (m:Memory $props)
+         CREATE (s)-[:HAS_MEMORY {createdAt: $createdAt}]->(m)
+         RETURN m`,
+        {
+          props: memoryForStorage,
+          starshipId,
+          createdAt: now
+        }
       );
       
       return convertNeo4jIntsInObject(memory);
@@ -169,6 +178,12 @@ export class MemoryRepository extends BaseRepository {
       const connection = getConnection();
       let cypher = 'MATCH (m:Memory) WHERE m.id IS NOT NULL';
       const params: any = {};
+
+      // Add starship filter using relationship
+      if (filters?.starshipId) {
+        cypher = 'MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory) WHERE m.id IS NOT NULL';
+        params.starshipId = filters.starshipId;
+      }
 
       cypher += ' RETURN m ORDER BY m.updatedAt DESC LIMIT 50';
 
@@ -228,6 +243,12 @@ export class MemoryRepository extends BaseRepository {
       const connection = getConnection();
       let cypher = 'MATCH (m:Memory) WHERE 1=1';
       const params: any = {};
+
+      // Use relationship for starship filtering
+      if (filters.starshipId) {
+        cypher = 'MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory) WHERE 1=1';
+        params.starshipId = filters.starshipId;
+      }
 
       if (filters.hasMessages !== undefined) {
         if (filters.hasMessages) {

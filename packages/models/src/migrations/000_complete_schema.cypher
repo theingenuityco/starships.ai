@@ -67,7 +67,7 @@ CREATE CONSTRAINT edge_required_props IF NOT EXISTS FOR (e:Edge) REQUIRE (e.id, 
 
 // Memory constraints
 CREATE CONSTRAINT memory_id_unique IF NOT EXISTS FOR (mem:Memory) REQUIRE mem.id IS UNIQUE;
-CREATE CONSTRAINT memory_required_props IF NOT EXISTS FOR (mem:Memory) REQUIRE (mem.id, mem.starshipId, mem.createdAt) IS NOT NULL;
+CREATE CONSTRAINT memory_required_props IF NOT EXISTS FOR (mem:Memory) REQUIRE (mem.id, mem.createdAt) IS NOT NULL;
 
 
 // Message constraints
@@ -195,8 +195,7 @@ CREATE INDEX edge_from_index IF NOT EXISTS FOR (e:Edge) ON (e.from);
 CREATE INDEX edge_to_index IF NOT EXISTS FOR (e:Edge) ON (e.to);
 CREATE INDEX edge_workflow_id_index IF NOT EXISTS FOR (e:Edge) ON (e.workflowId);
 
-// Memory indexes
-CREATE INDEX memory_starship_id_index IF NOT EXISTS FOR (mem:Memory) ON (mem.starshipId);
+// Memory indexes - using relationships instead of foreign keys
 CREATE INDEX memory_agent_id_index IF NOT EXISTS FOR (mem:Memory) ON (mem.agentId);
 CREATE INDEX memory_tags_array IF NOT EXISTS FOR (mem:Memory) ON (mem.tags);
 CREATE INDEX memory_message_count_index IF NOT EXISTS FOR (mem:Memory) ON (mem.messageCount);

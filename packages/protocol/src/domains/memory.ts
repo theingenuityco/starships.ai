@@ -45,6 +45,9 @@ export interface MemoryModel {
  * Request to create a new memory
  */
 export interface CreateMemoryRequest {
+  // Starship ID for establishing HAS_MEMORY relationship
+  starshipId: string;
+  
   // Memory state
   state?: MemoryState;
   
@@ -143,7 +146,12 @@ export interface SearchMemoriesResponse {
  * Request to filter memories
  */
 export interface MemoryFilters {
+  starshipId?: string; // Filter memories by starship using Neo4j relationships
   hasMessages?: boolean;
+  agentId?: string;
+  tags?: string[];
+  limit?: number;
+  offset?: number;
 }
 
 /**

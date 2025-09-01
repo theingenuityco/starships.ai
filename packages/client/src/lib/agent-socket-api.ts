@@ -1,6 +1,6 @@
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { ChatRequest, ChatStreamChunk, ChatStreamError, ChatResponse } from '@starships/protocol';
+import type { ChatRequest, ChatStreamChunk, ChatStreamError, ChatResponse, ChatTypingData } from '@starships/protocol';
 
 export interface Message {
   id: string;
@@ -59,11 +59,6 @@ export const agentSocketAPI = {
       typingSpeed: 75
     };
 
-    const handleStreamStart = (data: { streamId: string; source: 'agent' | 'sibil'; agentId?: string }) => {
-      if (data.streamId === streamId && data.agentId === agentId && data.source === 'agent') {
-        console.log('[AGENT API] Stream started:', streamId, 'for agent:', agentId);
-      }
-    };
 
     const handleStreamChunk = (chunk: ChatStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && !isAborted) {
@@ -78,22 +73,17 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamComplete = (response: ChatResponse) => {
-      if (response.agentId === agentId && response.source === 'agent' && !isAborted) {
-        // Ensure we have a session ID from server
-        if (!response.sessionId) {
-          console.error('[AGENT API] No sessionId in response, using fallback');
-        }
-        
+    const handleStreamComplete = (chunk: ChatStreamChunk) => {
+      if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
         const finalMessage: Message = {
           id: generateId(),
-          content: response.content,
+          content: chunk.content,
           role: 'assistant',
-          timestamp: response.timestamp || new Date().toISOString(),
-          sessionId: response.sessionId || 'missing-session-id', // Server should always provide this
-          agentId: response.agentId,
+          timestamp: new Date(chunk.timestamp).toISOString(),
+          sessionId: 'session-' + streamId, // Generate session ID from stream ID
+          agentId: chunk.agentId,
           streaming: false,
-          usage: response.usage
+          usage: undefined // Usage not available in stream chunks
         };
         callbacks.onComplete(finalMessage);
         cleanup();
@@ -101,26 +91,25 @@ export const agentSocketAPI = {
     };
 
     const handleStreamError = (error: ChatStreamError) => {
-      if (error.streamId === streamId && error.agentId === agentId && error.source === 'agent' && !isAborted) {
+      if (error.streamId === streamId && error.agentId === agentId && !isAborted) {
         callbacks.onError(error.message);
         cleanup();
       }
     };
 
-    const handleTypingStart = (data: { source: 'agent' | 'sibil'; agentId?: string }) => {
-      if (data.agentId === agentId && data.source === 'agent') {
+    const handleTypingStart = (data: ChatTypingData) => {
+      if (data.isTyping) {
         callbacks.onTypingStart?.();
       }
     };
 
-    const handleTypingStop = (data: { source: 'agent' | 'sibil'; agentId?: string }) => {
-      if (data.agentId === agentId && data.source === 'agent') {
+    const handleTypingStop = (data: ChatTypingData) => {
+      if (!data.isTyping) {
         callbacks.onTypingStop?.();
       }
     };
 
     const cleanup = () => {
-      socket.off('session:stream-start', handleStreamStart);
       socket.off('session:stream-chunk', handleStreamChunk);
       socket.off('session:stream-complete', handleStreamComplete);
       socket.off('session:stream-error', handleStreamError);
@@ -129,7 +118,6 @@ export const agentSocketAPI = {
     };
 
     // Set up event listeners
-    socket.on('session:stream-start', handleStreamStart);
     socket.on('session:stream-chunk', handleStreamChunk);
     socket.on('session:stream-complete', handleStreamComplete);
     socket.on('session:stream-error', handleStreamError);
@@ -140,7 +128,7 @@ export const agentSocketAPI = {
     socketClient.joinAgentRoom(agentId, 'current-user'); // Will be overridden by server auth
 
     // Start the stream
-    socket.emit('session:stream-start', socketRequest);
+    socket.emit('session:start-stream', socketRequest);
 
     return {
       abort: () => {

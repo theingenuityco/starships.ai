@@ -204,7 +204,7 @@ export interface SessionSocketEvents {
   ping: () => void;
   pong: () => void;
   'connection-status': (data: ConnectionStatusEvent) => void;
-  'session:stream-start': (data: SessionStreamChunk) => void;
+  'session:start-stream': (data: SessionRequest) => void;
   'session:stream-chunk': (data: SessionStreamChunk) => void;
   'session:stream-complete': (data: SessionStreamChunk) => void;
   'session:stream-error': (data: SessionError) => void;

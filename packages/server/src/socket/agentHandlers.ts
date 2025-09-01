@@ -51,7 +51,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
     const socketService = SocketIOService.getInstance();
 
     // Handle agent stream start
-    socket.on('session:stream-start', async (request: SessionRequest) => {
+    socket.on('session:start-stream', async (request: SessionRequest) => {
       if (request.source !== 'agent' || !request.agentId) return;
       console.log(`[AGENT SOCKET] Starting stream for user ${userId}, agent ${request.agentId}:`, request.streamId);
 
@@ -96,8 +96,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           return;
         }
 
-        // Send stream start confirmation
-        socket.emit('session:stream-start', { streamId: request.streamId, source: 'agent', agentId: request.agentId, type: 'content', content: '', timestamp: Date.now() });
+        // Send typing start indication
         socket.emit('session:typing-start', { userId, sessionId, isTyping: true });
 
         // Track agent usage

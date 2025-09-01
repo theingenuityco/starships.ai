@@ -307,7 +307,7 @@ export class MemoryRepository extends BaseRepository {
       // Calculate statistics
       const messagesByRole = { system: 0, user: 0, assistant: 0 };
       messages.forEach((msg: any) => {
-        if (msg.role && messagesByRole.hasOwnProperty(msg.role)) {
+        if (msg.role && Object.prototype.hasOwnProperty.call(messagesByRole, msg.role)) {
           messagesByRole[msg.role as keyof typeof messagesByRole]++;
         }
       });

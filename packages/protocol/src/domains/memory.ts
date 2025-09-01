@@ -7,8 +7,6 @@
 
 // Import autopilot types at the top level
 import type {
-  Memory,
-  AgentMemory,
   AgentMemoryConfig,
   AgentIdentity,
   AgentPurpose,
@@ -31,7 +29,12 @@ export interface MemoryModel {
   version: string;
 
   // Memory content
-  messages: any[]; // JSON serialized messages from Memory class
+  messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+    metadata?: Record<string, unknown>;
+    timestamp?: string;
+  }>; // JSON serialized messages from Memory class
   messageCount: number;
   
   // Ownership

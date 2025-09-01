@@ -51,9 +51,7 @@ export interface CreateNodeRequest {
 /**
  * Request to update a node
  */
-export interface UpdateNodeRequest extends Partial<CreateNodeRequest> {
-  // Allow updating any field except id
-}
+export type UpdateNodeRequest = Partial<CreateNodeRequest>;
 
 // ============================================================================
 // NODE COLLECTION-SPECIFIC TYPES

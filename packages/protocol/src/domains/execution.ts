@@ -87,9 +87,7 @@ export interface CreateExecutionRequest {
 /**
  * Request to update execution
  */
-export interface UpdateExecutionRequest extends Partial<CreateExecutionRequest> {
-  // All fields are optional for updates
-}
+export type UpdateExecutionRequest = Partial<CreateExecutionRequest>;
 
 /**
  * Execution response with single execution

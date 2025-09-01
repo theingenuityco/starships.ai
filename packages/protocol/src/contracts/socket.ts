@@ -39,6 +39,51 @@ export interface SocketConnectionState {
 // BASE SOCKET EVENTS
 // ============================================================================
 
+// ============================================================================
+// CHAT EVENT DATA TYPES
+// ============================================================================
+
+/**
+ * Chat stream event data
+ */
+export interface ChatStreamData {
+  streamId: string;
+  content: string;
+  messageId?: string;
+  sessionId?: string;
+  userId?: string;
+}
+
+/**
+ * Chat room event data
+ */
+export interface ChatRoomData {
+  roomId: string;
+  userId: string;
+  sessionId?: string;
+}
+
+/**
+ * Chat typing event data
+ */
+export interface ChatTypingData {
+  userId: string;
+  sessionId?: string;
+  roomId?: string;
+  isTyping: boolean;
+}
+
+/**
+ * Agent stream error data
+ */
+export interface AgentStreamErrorData {
+  streamId: string;
+  error: string;
+  code?: string;
+  agentId?: string;
+  timestamp: string;
+}
+
 /**
  * Base socket events
  */
@@ -49,16 +94,16 @@ export interface BaseSocketEvents {
   ping: () => void;
   pong: () => void;
   'connection-status': (data: ConnectionStatusEvent) => void;
-  'chat:start-stream': (data: any) => void;
-  'chat:stream-chunk': (data: any) => void;
-  'chat:stream-complete': (data: any) => void;
-  'chat:stream-error': (data: any) => void;
-  'chat:stream-start': (data: any) => void;
-  'chat:typing-start': (data: any) => void;
-  'chat:typing-stop': (data: any) => void;
-  'chat:join-room': (data: any) => void;
-  'chat:leave-room': (data: any) => void;
-  'agent:stream-error': (data: any) => void;
+  'chat:start-stream': (data: ChatStreamData) => void;
+  'chat:stream-chunk': (data: ChatStreamData) => void;
+  'chat:stream-complete': (data: ChatStreamData) => void;
+  'chat:stream-error': (data: AgentStreamErrorData) => void;
+  'chat:stream-start': (data: ChatStreamData) => void;
+  'chat:typing-start': (data: ChatTypingData) => void;
+  'chat:typing-stop': (data: ChatTypingData) => void;
+  'chat:join-room': (data: ChatRoomData) => void;
+  'chat:leave-room': (data: ChatRoomData) => void;
+  'agent:stream-error': (data: AgentStreamErrorData) => void;
   'agent:stop-stream': (streamId: string) => void;
 }
 

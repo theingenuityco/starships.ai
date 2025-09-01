@@ -469,7 +469,7 @@ export class MessageRepository extends BaseRepository {
       // Count by role
       const byRole = { system: 0, user: 0, assistant: 0 };
       record.roles.forEach(role => {
-        if (byRole.hasOwnProperty(role)) {
+        if (Object.prototype.hasOwnProperty.call(byRole, role)) {
           byRole[role as keyof typeof byRole]++;
         }
       });

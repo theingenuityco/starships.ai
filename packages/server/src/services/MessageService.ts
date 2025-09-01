@@ -432,15 +432,15 @@ export class MessageService {
         case 'delete':
           return await this.messageRepository.bulkDelete(request.messageIds);
 
-        case 'update_status':
+        case 'update_status': {
           if (!request.operationData?.processingStatus) {
             throw new Error('processingStatus required for update_status operation');
           }
           
           const results = await Promise.allSettled(
-            request.messageIds.map(id => 
-              this.messageRepository.update(id, { 
-                processingStatus: request.operationData!.processingStatus as any 
+            request.messageIds.map(id =>
+              this.messageRepository.update(id, {
+                processingStatus: request.operationData!.processingStatus as 'pending' | 'processing' | 'processed' | 'failed'
               })
             )
           );
@@ -456,16 +456,17 @@ export class MessageService {
             }));
 
           return { processed, failed, errors };
+        }
 
-        case 'assign_conversation':
+        case 'assign_conversation': {
           if (!request.operationData?.conversationId) {
             throw new Error('conversationId required for assign_conversation operation');
           }
 
           const assignResults = await Promise.allSettled(
-            request.messageIds.map(id => 
-              this.messageRepository.update(id, { 
-                conversationId: request.operationData!.conversationId as string 
+            request.messageIds.map(id =>
+              this.messageRepository.update(id, {
+                conversationId: request.operationData!.conversationId as string
               })
             )
           );
@@ -481,6 +482,7 @@ export class MessageService {
             }));
 
           return { processed: assignProcessed, failed: assignFailed, errors: assignErrors };
+        }
 
         default:
           throw new Error(`Unsupported bulk operation: ${request.operation}`);
@@ -535,7 +537,7 @@ export class MessageService {
     const participants = new Set<string>();
 
     for (const message of messages) {
-      if (messagesByRole.hasOwnProperty(message.role)) {
+      if (Object.prototype.hasOwnProperty.call(messagesByRole, message.role)) {
         messagesByRole[message.role as keyof typeof messagesByRole]++;
       }
       

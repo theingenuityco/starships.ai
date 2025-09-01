@@ -49,9 +49,7 @@ export interface CreateEdgeRequest {
 /**
  * Request to update an edge
  */
-export interface UpdateEdgeRequest extends Partial<CreateEdgeRequest> {
-  // Allow updating any field except id
-}
+export type UpdateEdgeRequest = Partial<CreateEdgeRequest>;
 
 // ============================================================================
 // EDGE COLLECTION-SPECIFIC TYPES

@@ -93,8 +93,8 @@ export interface StarshipAgentsResponse {
     temperature?: number;
     maxTokens?: number;
     timeout?: number;
-    memory?: any; // AgentMemoryConfig
-    blueprint?: any; // BaseBlueprint
+    memory?: Record<string, unknown>; // AgentMemoryConfig - keeping flexible for now
+    blueprint?: Record<string, unknown>; // BaseBlueprint - keeping flexible for now
     
     // Database-specific fields
     id: string;

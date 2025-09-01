@@ -20,14 +20,8 @@ describe('Logging and Monitoring System', () => {
     // Reset console mocks
     jest.clearAllMocks();
     
-    // Reset environment variables
-    delete process.env.LOG_LEVEL;
-    delete process.env.LOG_CONSOLE;
-    delete process.env.LOG_FILE;
-    delete process.env.LOG_METRICS;
-    
-    // Reset singleton instance to force recreation with new env vars
-    (Logger as any).instance = undefined;
+    // Reset singleton instance
+    Logger.resetInstance();
     
     // Clear performance monitor timers
     (PerformanceMonitor as any).timers.clear();
@@ -56,9 +50,8 @@ describe('Logging and Monitoring System', () => {
       expect(logger1).toBe(logger2);
     });
 
-    it('should parse log level from environment', () => {
-      process.env.LOG_LEVEL = 'debug';
-      const testLogger = Logger.getInstance();
+    it('should parse log level from configuration', () => {
+      const testLogger = Logger.createInstance({ logLevel: 'debug' });
       
       // Test by logging at debug level - should output if properly parsed
       testLogger.debug('Test debug message');
@@ -66,8 +59,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should default to info level for invalid log level', () => {
-      process.env.LOG_LEVEL = 'invalid';
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'invalid' });
       
       // Debug should not log at info level
       testLogger.debug('Test debug message');
@@ -79,8 +71,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should respect log level hierarchy', () => {
-      process.env.LOG_LEVEL = 'warn';
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'warn' });
       
       testLogger.debug('Debug message');
       testLogger.info('Info message');
@@ -98,8 +89,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should log debug messages', () => {
-      process.env.LOG_LEVEL = 'debug';
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'debug' });
       
       const context: LogContext = {
         requestId: 'req-123',
@@ -118,7 +108,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should log info messages', () => {
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'info' });
       
       testLogger.info('Info message');
       
@@ -129,7 +119,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should log warning messages with error', () => {
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'warn' });
       const error = new Error('Test error');
       
       testLogger.warn('Warning message', { component: 'test' }, error);
@@ -176,8 +166,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should log performance metrics', () => {
-      process.env.LOG_METRICS = 'true';
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ enableMetrics: true });
       
       const metrics: PerformanceMetrics = {
         operation: 'database_query',
@@ -249,8 +238,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should skip logging when level is below threshold', () => {
-      process.env.LOG_LEVEL = 'error';
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'error' });
       
       testLogger.debug('Debug message');
       testLogger.info('Info message');
@@ -261,7 +249,7 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should include timestamp in log entries', () => {
-      const testLogger = Logger.getInstance();
+      const testLogger = Logger.createInstance({ logLevel: 'info' });
       
       testLogger.info('Test message');
       
@@ -273,12 +261,10 @@ describe('Logging and Monitoring System', () => {
   });
 
   describe('PerformanceMonitor', () => {
-    beforeEach(() => {
-      // Clear any existing timers
-      (PerformanceMonitor as any).timers.clear();
-    });
-
     it('should start and end timing operations', async () => {
+      // Clear any existing timers first
+      (PerformanceMonitor as any).timers.clear();
+      
       const operationId = 'test-op-123';
       
       PerformanceMonitor.start(operationId);
@@ -295,9 +281,12 @@ describe('Logging and Monitoring System', () => {
     });
 
     it('should handle missing timer gracefully', () => {
-      // Ensure warn level logging is enabled
-      process.env.LOG_LEVEL = 'warn';
-      const testLogger = Logger.getInstance();
+      // Clear any existing timers first
+      (PerformanceMonitor as any).timers.clear();
+      
+      // Reset and create a new logger instance with warn level enabled
+      Logger.resetInstance();
+      Logger.getInstance({ logLevel: 'warn' });
       
       const duration = PerformanceMonitor.end(
         'non-existent-op',
@@ -306,9 +295,10 @@ describe('Logging and Monitoring System', () => {
       
       expect(duration).toBe(0);
       // The warn method should be called, and it goes to console.log
+      // The logger outputs a formatted message string and empty context object
       expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('WARN'),
-        expect.stringContaining('Performance timer not found')
+        expect.stringContaining('Performance timer not found for operation: non-existent-op'),
+        ""
       );
     });
 

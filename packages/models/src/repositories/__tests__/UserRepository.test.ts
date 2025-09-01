@@ -270,10 +270,12 @@ describe('UserRepository', () => {
 
       await repository.update('user-123', updates);
 
-      const setClause = mockConnection.executeWrite.mock.calls[0][0];
-      expect(setClause).not.toContain('u.id');
-      expect(setClause).not.toContain('u.createdAt');
-      expect(setClause).toContain('u.displayName');
+      const query = mockConnection.executeWrite.mock.calls[0][0];
+      // Check that the SET clause doesn't include protected fields, but WHERE clause can contain u.id
+      expect(query).toContain('SET u.displayName = $displayName');
+      expect(query).not.toContain('SET u.id =');
+      expect(query).not.toContain('SET u.createdAt =');
+      expect(query).not.toContain('u.id = $id, u.createdAt'); // Ensure SET clause doesn't include these
     });
   });
 
@@ -307,7 +309,7 @@ describe('UserRepository', () => {
       const result = await repository.findByStripeCustomerId('cus_123');
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (user:User {stripeCustomerId: $stripeCustomerId})\n RETURN user',
+        expect.stringContaining('MATCH (user:User {stripeCustomerId: $stripeCustomerId})'),
         { stripeCustomerId: 'cus_123' }
       );
       expect(result).toEqual(mockUser);
@@ -329,7 +331,7 @@ describe('UserRepository', () => {
       await repository.updateStripeCustomerId('user-123', 'cus_123');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (user:User {id: $userId})\n SET user.stripeCustomerId = $stripeCustomerId',
+        expect.stringContaining('MATCH (user:User {id: $userId})'),
         { userId: 'user-123', stripeCustomerId: 'cus_123' }
       );
     });

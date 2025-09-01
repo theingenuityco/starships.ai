@@ -85,6 +85,16 @@ export interface HealthStatus {
 }
 
 /**
+ * Logger configuration interface
+ */
+export interface LoggerConfig {
+  logLevel?: string;
+  enableConsole?: boolean;
+  enableFile?: boolean;
+  enableMetrics?: boolean;
+}
+
+/**
  * Structured logger class
  */
 export class Logger {
@@ -94,21 +104,35 @@ export class Logger {
   private enableFile: boolean;
   private enableMetrics: boolean;
 
-  private constructor() {
-    this.logLevel = this.parseLogLevel(process.env.LOG_LEVEL || 'info');
-    this.enableConsole = process.env.LOG_CONSOLE !== 'false';
-    this.enableFile = process.env.LOG_FILE === 'true';
-    this.enableMetrics = process.env.LOG_METRICS === 'true';
+  private constructor(config?: LoggerConfig) {
+    this.logLevel = this.parseLogLevel(config?.logLevel ?? process.env.LOG_LEVEL ?? 'info');
+    this.enableConsole = config?.enableConsole ?? (process.env.LOG_CONSOLE !== 'false');
+    this.enableFile = config?.enableFile ?? (process.env.LOG_FILE === 'true');
+    this.enableMetrics = config?.enableMetrics ?? (process.env.LOG_METRICS === 'true');
   }
 
   /**
    * Get singleton logger instance
    */
-  public static getInstance(): Logger {
+  public static getInstance(config?: LoggerConfig): Logger {
     if (!Logger.instance) {
-      Logger.instance = new Logger();
+      Logger.instance = new Logger(config);
     }
     return Logger.instance;
+  }
+
+  /**
+   * Reset singleton instance (for testing purposes)
+   */
+  public static resetInstance(): void {
+    Logger.instance = undefined as any;
+  }
+
+  /**
+   * Create a new logger instance with specific configuration (for testing)
+   */
+  public static createInstance(config: LoggerConfig): Logger {
+    return new Logger(config);
   }
 
   /**
@@ -305,7 +329,13 @@ export class Logger {
  */
 class PerformanceMonitorClass {
   private static timers: Map<string, number> = new Map();
-  private static logger = Logger.getInstance();
+
+  /**
+   * Get current logger instance
+   */
+  private static getLogger(): Logger {
+    return Logger.getInstance();
+  }
 
   /**
    * Start timing an operation
@@ -326,7 +356,7 @@ class PerformanceMonitorClass {
   ): number {
     const startTime = this.timers.get(operationId);
     if (!startTime) {
-      this.logger.warn(`Performance timer not found for operation: ${operationId}`);
+      this.getLogger().warn(`Performance timer not found for operation: ${operationId}`);
       return 0;
     }
 
@@ -342,7 +372,7 @@ class PerformanceMonitorClass {
       metadata,
     };
 
-    this.logger.metrics(metrics);
+    this.getLogger().metrics(metrics);
     return duration;
   }
 
@@ -391,8 +421,14 @@ class PerformanceMonitorClass {
  * Health monitoring utility
  */
 class HealthMonitorClass {
-  private static logger = Logger.getInstance();
   private static healthChecks: Map<string, HealthStatus> = new Map();
+
+  /**
+   * Get current logger instance
+   */
+  private static getLogger(): Logger {
+    return Logger.getInstance();
+  }
 
   /**
    * Register a health check
@@ -421,7 +457,7 @@ class HealthMonitorClass {
       };
 
       this.healthChecks.set(serviceName, status);
-      this.logger.health(status);
+      this.getLogger().health(status);
       return status;
     } catch (error) {
       const responseTime = Date.now() - startTime;
@@ -437,7 +473,7 @@ class HealthMonitorClass {
       };
 
       this.healthChecks.set(serviceName, status);
-      this.logger.health(status);
+      this.getLogger().health(status);
       return status;
     }
   }

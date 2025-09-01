@@ -2,7 +2,7 @@
  * Neo4j Database Connection Unit Tests
  */
 
-import { Neo4jConnection, createConnection, getConnection, Neo4jConfig } from '../connection';
+import { Neo4jConnection, createConnection, getConnection, resetConnection, Neo4jConfig } from '../connection';
 import neo4j, { Driver, Session, ManagedTransaction, Integer } from 'neo4j-driver';
 
 // Mock neo4j-driver
@@ -465,7 +465,7 @@ describe('Connection Factory Functions', () => {
 
   beforeEach(() => {
     // Reset the connection instance
-    (global as any).__connectionInstance = null;
+    resetConnection();
     jest.clearAllMocks();
   });
 
@@ -493,8 +493,8 @@ describe('Connection Factory Functions', () => {
     });
 
     it('should throw error when no connection exists', () => {
-      // Reset the global instance to simulate no connection
-      delete (global as any).__connectionInstance;
+      // Reset the connection instance to simulate no connection
+      resetConnection();
       
       expect(() => getConnection()).toThrow(
         'Neo4j connection not initialized. Call createConnection() first.'

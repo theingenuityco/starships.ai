@@ -267,3 +267,8 @@ export function getConnection(): Neo4jConnection {
   }
   return connectionInstance;
 }
+
+// Test helper function to reset connection instance
+export function resetConnection(): void {
+  connectionInstance = null;
+}

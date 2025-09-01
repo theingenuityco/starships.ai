@@ -41,19 +41,26 @@ describe('Error Handling System', () => {
     });
 
     it('should create error with optional properties', () => {
-      const error = new TestError('Test message');
-      error.requestId = 'req-123';
-      error.path = '/test/path';
+      class TestErrorWithContext extends BaseError {
+        constructor(message: string, details?: any, requestId?: string, path?: string) {
+          super(message, 'TEST_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path);
+        }
+      }
+
+      const error = new TestErrorWithContext('Test message', undefined, 'req-123', '/test/path');
       
       expect(error.requestId).toBe('req-123');
       expect(error.path).toBe('/test/path');
     });
 
     it('should convert to response format', () => {
-      const error = new TestError('Test message');
-      error.requestId = 'req-123';
-      error.path = '/test/path';
-      error.details = { field: 'testField' };
+      class TestErrorWithContext extends BaseError {
+        constructor(message: string, details?: any, requestId?: string, path?: string) {
+          super(message, 'TEST_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path);
+        }
+      }
+
+      const error = new TestErrorWithContext('Test message', { field: 'testField' }, 'req-123', '/test/path');
       
       const response = error.toResponse();
       
@@ -461,8 +468,7 @@ describe('Error Handling System', () => {
     });
 
     it('should extract log details', () => {
-      const error = new ValidationError('Test error', 'field1');
-      error.requestId = 'req-123';
+      const error = new ValidationError('Test error', 'field1', undefined, 'req-123');
       
       const details = ErrorUtils.extractLogDetails(error);
       

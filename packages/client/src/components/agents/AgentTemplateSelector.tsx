@@ -106,8 +106,7 @@ export function AgentTemplateSelector({
       filtered = filtered.filter(
         template =>
           template.name.toLowerCase().includes(query) ||
-          template.description.toLowerCase().includes(query) ||
-          template.tags.some((tag: string) => tag.toLowerCase().includes(query))
+          (template.description && template.description.toLowerCase().includes(query))
       )
     }
 
@@ -171,12 +170,6 @@ export function AgentTemplateSelector({
                     <CategoryIcon className="w-3 h-3 mr-1" />
                     {template.category.charAt(0).toUpperCase() + template.category.slice(1)}
                   </Badge>
-                  {template.rating && (
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                      <span>{template.rating}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -189,18 +182,7 @@ export function AgentTemplateSelector({
         <CardContent className="pt-4">
           <CardDescription className="mb-4 line-clamp-2">{template.description}</CardDescription>
 
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {template.tags.slice(0, 3).map((tag: string) => (
-              <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5">
-                {tag.charAt(0).toUpperCase() + tag.slice(1)}
-              </Badge>
-            ))}
-            {template.tags.length > 3 && (
-              <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                +{template.tags.length - 3}
-              </Badge>
-            )}
-          </div>
+          {/* Tags section removed - not available in AgentTemplateModel */}
 
           {template.previewPrompts && template.previewPrompts.length > 0 && (
             <div className="mb-4 bg-muted/10 p-3 rounded-md">

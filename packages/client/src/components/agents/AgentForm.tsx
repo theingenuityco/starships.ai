@@ -47,17 +47,17 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     name: agent?.name || '',
     description: agent?.description || '',
     category: agent?.category || 'general',
-    systemPrompt: agent?.systemPrompt || '',
     model: agent?.model || 'gpt-4',
-    tags: agent?.tags || [],
-    isPublic: agent?.isPublic || false,
     temperature: agent?.temperature,
     maxTokens: agent?.maxTokens,
-    customInstructions: agent?.customInstructions || '',
-    allowedStarshipClasses: agent?.allowedStarshipClasses || ['scout', 'cruiser'],
     starshipId: agent?.starshipId || '',
-  } as CreateAgentRequest)
+  })
 
+  // Legacy UI state (not part of protocol)
+  const [tags, setTags] = useState<string[]>([])
+  const [isPublic, setIsPublic] = useState(false)
+  const [systemPrompt, setSystemPrompt] = useState('')
+  const [customInstructions, setCustomInstructions] = useState('')
   const [newTag, setNewTag] = useState('')
   const [loading, setLoading] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -100,8 +100,6 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
         // Create data - authorId will be set by server from auth context
         const createData: CreateAgentRequest = {
           ...formData,
-          tags: formData.tags || [],
-          isPublic: formData.isPublic || false,
         }
         savedAgent = await agentAPI.create(createData)
       }
@@ -114,20 +112,14 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
   }
 
   const addTag = () => {
-    if (newTag.trim() && !(formData.tags || []).includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...(prev.tags || []), newTag.trim()],
-      }))
+    if (newTag.trim() && !tags.includes(newTag.trim())) {
+      setTags([...tags, newTag.trim()])
       setNewTag('')
     }
   }
 
   const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: (prev.tags || []).filter((tag: any) => tag !== tagToRemove),
-    }))
+    setTags(tags.filter(tag => tag !== tagToRemove))
   }
 
   // Category icons mapping
@@ -273,8 +265,8 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   System Prompt
                 </label>
                 <Textarea
-                  value={formData.systemPrompt}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                  value={systemPrompt}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSystemPrompt(e.target.value)}
                   placeholder="Instructions that define the agent's behavior and personality"
                   className="border-muted-foreground/20 focus:border-primary min-h-[120px]"
                   rows={4}
@@ -301,10 +293,10 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   Tags
                 </label>
                 <div className="flex flex-wrap gap-2 mb-2 min-h-[40px] p-2 border rounded-md border-muted-foreground/20 bg-background">
-                  {(formData.tags || []).length === 0 ? (
+                  {tags.length === 0 ? (
                     <span className="text-sm text-muted-foreground italic">No tags added yet</span>
                   ) : (
-                    (formData.tags || []).map((tag: any) => (
+                    tags.map((tag: string) => (
                       <Badge
                         key={tag}
                         variant="secondary"
@@ -344,7 +336,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 border rounded-md border-muted-foreground/20 bg-muted/5">
                   <div className="flex items-start gap-3">
-                    {formData.isPublic ? (
+                    {isPublic ? (
                       <Globe className="h-5 w-5 text-primary mt-0.5" />
                     ) : (
                       <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -357,16 +349,14 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     </div>
                   </div>
                   <Switch
-                    checked={formData.isPublic}
-                    onCheckedChange={checked =>
-                      setFormData(prev => ({ ...prev, isPublic: checked }))
-                    }
+                    checked={isPublic}
+                    onCheckedChange={setIsPublic}
                     className="data-[state=checked]:bg-primary"
                   />
                 </div>
 
                 {/* Only show convert to template button when editing an existing public agent */}
-                {agent && formData.isPublic && (
+                {agent && isPublic && (
                   <div className="flex items-center justify-between p-4 border rounded-md border-muted-foreground/20 bg-blue-500/5 border-blue-500/20">
                     <div className="flex items-start gap-3">
                       <Sparkles className="h-5 w-5 text-blue-500 mt-0.5" />
@@ -499,9 +489,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     Custom Instructions
                   </label>
                   <Textarea
-                    value={formData.customInstructions}
+                    value={customInstructions}
                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      setFormData(prev => ({ ...prev, customInstructions: e.target.value }))
+                      setCustomInstructions(e.target.value)
                     }
                     placeholder="Additional instructions or constraints"
                     className="border-muted-foreground/20 focus:border-primary min-h-[100px]"

@@ -378,11 +378,11 @@ function MissionCard({
   onStatusChange,
   onClick 
 }: {
-  mission: Mission;
-  onEdit: (mission: Mission) => void;
+  mission: MissionModel;
+  onEdit: (mission: MissionModel) => void;
   onDelete: (id: string) => void;
-  onStatusChange: (mission: Mission, status: MissionStatus) => void;
-  onClick: (mission: Mission) => void;
+  onStatusChange: (mission: MissionModel, status: MissionStatus) => void;
+  onClick: (mission: MissionModel) => void;
 }) {
   return (
     <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onClick(mission)}>
@@ -672,7 +672,7 @@ function EditMissionForm({
   onSubmit, 
   onCancel 
 }: {
-  mission: Mission;
+  mission: MissionModel;
   onSubmit: (updates: UpdateMissionRequest) => void;
   onCancel: () => void;
 }) {

@@ -31,13 +31,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface AgentCardProps {
-  agent: Agent
+  agent: AgentModel
   isSelected: boolean
   onClick: () => void
-  onEdit?: (agent: Agent) => void
-  onDelete?: (agent: Agent) => void
-  onTest?: (agent: Agent) => void
-  onAnalytics?: (agent: Agent) => void
+  onEdit?: (agent: AgentModel) => void
+  onDelete?: (agent: AgentModel) => void
+  onTest?: (agent: AgentModel) => void
+  onAnalytics?: (agent: AgentModel) => void
   showActions?: boolean
 }
 
@@ -168,10 +168,10 @@ export function AgentCard({
                 )}
               </div>
 
-              {agent.rating && (
+              {(agent as any).rating && (
                 <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
                   <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
-                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{agent.rating.toFixed(1)}</span>
+                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{((agent as any).rating as number).toFixed(1)}</span>
                 </div>
               )}
             </div>
@@ -196,9 +196,9 @@ export function AgentCard({
             )}
 
             {/* Enhanced Tags display */}
-            {agent.tags && agent.tags.length > 0 && (
+            {(agent as any).tags && Array.isArray((agent as any).tags) && (agent as any).tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {agent.tags?.slice(0, 3).map((tag: any) => (
+                {((agent as any).tags as string[]).slice(0, 3).map((tag: string) => (
                   <Badge
                     key={tag}
                     variant="outline"
@@ -208,12 +208,12 @@ export function AgentCard({
                     {tag.charAt(0).toUpperCase() + tag.slice(1)}
                   </Badge>
                 ))}
-                {agent.tags.length > 3 && (
+                {((agent as any).tags as string[]).length > 3 && (
                   <Badge
                     variant="outline"
                     className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold"
                   >
-                    +{agent.tags.length - 3} more
+                    +{((agent as any).tags as string[]).length - 3} more
                   </Badge>
                 )}
               </div>

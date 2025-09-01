@@ -56,7 +56,7 @@ export function WorkflowPhaseContent({ mission, onWorkflowApproval }: WorkflowPh
       }
       
       setWorkflow(response.data.workflow);
-      setAgents(response.data?.agents || {});
+      setAgents((response.data as any)?.agents || {});
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load workflow';
       setError(errorMessage);

@@ -23,8 +23,6 @@ interface AgentSelectorProps {
 
 interface FilterState {
   category?: Agent['category']
-  tags: string[]
-  isPublic?: boolean
   searchQuery: string
 }
 
@@ -55,7 +53,6 @@ export function AgentSelector({
 
   // Filter state
   const [filters] = useState<FilterState>({
-    tags: [],
     searchQuery: '',
   })
 
@@ -128,24 +125,13 @@ export function AgentSelector({
       filtered = filtered.filter(agent => agent.category === filters.category)
     }
 
-    // Tags filter
-    if (filters.tags.length > 0) {
-      filtered = filtered.filter(agent => filters.tags.some(tag => agent.tags?.includes(tag)))
-    }
-
-    // Public/Private filter
-    if (filters.isPublic !== undefined) {
-      filtered = filtered.filter(agent => agent.isPublic === filters.isPublic)
-    }
-
     // Search filter
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase()
       filtered = filtered.filter(
         agent =>
           agent.name.toLowerCase().includes(query) ||
-          agent.description?.toLowerCase().includes(query) ||
-          agent.tags?.some(tag => tag.toLowerCase().includes(query))
+          agent.description?.toLowerCase().includes(query)
       )
     }
 
@@ -357,7 +343,7 @@ export function AgentSelector({
             </svg>
           </div>
           <p className="text-base text-muted-foreground mb-3">
-            {filters.searchQuery || filters.category || filters.tags.length > 0
+            {filters.searchQuery || filters.category
               ? 'No agents match your filters'
               : AGENT_TEXT.NO_AGENTS_AVAILABLE}
           </p>

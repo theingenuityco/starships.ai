@@ -35,7 +35,7 @@ type MissionWorkflow = any;
 
 export interface WorkflowVisualizationProps {
   workflow: WorkflowDSL | MissionWorkflow;
-  agents?: Record<string, Agent>;
+  agents?: Record<string, AgentModel>;
   currentNodeId?: string;
   onNodeClick?: (nodeId: string) => void;
   className?: string;
@@ -46,7 +46,7 @@ interface FlowNode extends Node {
   data: {
     label: string;
     node: WorkflowDSLNode;
-    agent?: Agent;
+    agent?: AgentModel;
     icon: React.ReactNode;
     isActive: boolean;
   };

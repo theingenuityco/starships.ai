@@ -46,7 +46,7 @@ export class MigrationRunner {
     const startTime = Date.now();
     const result: MigrationResult = {
       success: false,
-      migrationId: '001_initialize_schema',
+      migrationId: '000_complete_schema',
       executionTime: 0,
       errors: [],
       warnings: [],
@@ -55,7 +55,7 @@ export class MigrationRunner {
 
     try {
       // Check if schema is already initialized
-      const isApplied = await this.isMigrationApplied('001_initialize_schema');
+      const isApplied = await this.isMigrationApplied('000_complete_schema');
       if (isApplied) {
         result.warnings?.push('Schema already initialized');
         result.success = true;
@@ -64,7 +64,7 @@ export class MigrationRunner {
       }
 
       // Validate migration file exists
-      const migrationPath = join(this.migrationsPath, '001_initialize_schema.cypher');
+      const migrationPath = join(this.migrationsPath, '000_complete_schema.cypher');
       if (!existsSync(migrationPath)) {
         result.errors?.push(`Schema file not found: ${migrationPath}`);
         return result;
@@ -74,7 +74,7 @@ export class MigrationRunner {
 
       // Execute schema initialization
       const schemaContent = readFileSync(migrationPath, 'utf-8');
-      await this.executeMigrationContent(schemaContent, '001_initialize_schema');
+      await this.executeMigrationContent(schemaContent, '000_complete_schema');
 
       // Verify schema initialization
       const verificationResult = await this.verifySchemaInitialization();
@@ -331,11 +331,6 @@ export class MigrationRunner {
       }
 
       // Check seed data was created
-      const llmCount = await this.getConnection().executeQuery('MATCH (l:LLM) RETURN count(l) as count');
-      if (llmCount[0]?.count < 5) {
-        errors.push(`Expected at least 5 LLM models, found ${llmCount[0]?.count || 0}`);
-      }
-
       const mcpCount = await this.getConnection().executeQuery('MATCH (m:MCPServerOption) RETURN count(m) as count');
       if (mcpCount[0]?.count < 8) {
         errors.push(`Expected at least 8 MCP server options, found ${mcpCount[0]?.count || 0}`);

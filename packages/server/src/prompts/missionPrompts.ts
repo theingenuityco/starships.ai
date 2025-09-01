@@ -8,7 +8,7 @@ import type { MissionModel } from '@starships/protocol';
 // Template variables interfaces for type safety
 export interface MissionContextData {
   activePhase: string;
-  mission: Mission;
+  mission: MissionModel;
   starship?: {
     name: string;
     class: string;
@@ -43,7 +43,7 @@ export interface AnalysisPhaseData extends MissionContextData {
 }
 
 export interface WelcomeMessageData {
-  mission: Mission;
+  mission: MissionModel;
   agents: any[];
 }
 

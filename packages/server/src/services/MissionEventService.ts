@@ -31,7 +31,7 @@ export class MissionEventService {
   /**
    * Emit clarity update to all clients in mission room
    */
-  public emitClarityUpdate(missionId: string, clarity: MissionClarity): void {
+  public emitClarityUpdate(missionId: string, clarity: MissionClarityModel): void {
     if (!this.io) {
       this.logger.warn('Socket.IO not initialized, cannot emit clarity update');
       return;
@@ -132,7 +132,7 @@ export class MissionEventService {
   /**
    * Emit general mission update (for any other mission changes)
    */
-  public emitMissionUpdate(missionId: string, mission: Mission, changeType: string): void {
+  public emitMissionUpdate(missionId: string, mission: MissionModel, changeType: string): void {
     if (!this.io) {
       this.logger.warn('Socket.IO not initialized, cannot emit mission update');
       return;

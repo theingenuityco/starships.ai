@@ -439,24 +439,27 @@ MISSION CLARITY ASSESSMENT:
   }
 
   private buildWorkflowSection(): string {
-    const { workflow } = this.state;
-    if (!workflow) return '';
+    const { blueprint, metadata } = this.state;
+    if (!blueprint) return '';
     
-    const agentNodes = workflow.nodes.filter(n => n.type === 'agent');
-    const workflowStatus = workflow.approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' : 
-                          workflow.approvalStatus === 'rejected' ? '❌ REJECTED' : 
+    const agentNodes = blueprint.nodes?.filter((n: any) => n.type === 'agent') || [];
+    const approvalStatus = metadata?.mission.approvalStatus || 'pending';
+    const workflowStatus = approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' :
+                          approvalStatus === 'rejected' ? '❌ REJECTED' :
                           '⏳ PENDING APPROVAL';
     
-    const taskList = agentNodes.map((node, index) => 
+    const taskList = agentNodes.map((node: any, index: number) =>
       `├─ Task ${index + 1}: ${node.name}`
     ).join('\n');
+    
+    const createdDate = blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : 'Unknown';
     
     return `
 MISSION WORKFLOW:
 ├─ Status: ${workflowStatus}
 ├─ Total Tasks: ${agentNodes.length}
 ${taskList}
-└─ Created: ${new Date(workflow.createdAt).toLocaleDateString()}`;
+└─ Created: ${createdDate}`;
   }
 
   private buildExecutionResultsSection(): string {
@@ -580,10 +583,10 @@ ${taskResults}
   /**
    * Build workflow data section for presentation
    */
-  private buildWorkflowDataSection(workflow: MissionWorkflow): string {
-    const agentNodes = workflow.nodes.filter(node => node.type === 'agent');
-    const agentAssignments = agentNodes.reduce((assignments, node) => {
-      const agentId = node.parameters.agentId;
+  private buildWorkflowDataSection(blueprint: BlueprintModel): string {
+    const agentNodes = blueprint.nodes?.filter((node: any) => node.type === 'agent') || [];
+    const agentAssignments = agentNodes.reduce((assignments: Record<string, string[]>, node: any) => {
+      const agentId = node.parameters?.agentId;
       if (agentId && typeof agentId === 'string') {
         if (!assignments[agentId]) {
           assignments[agentId] = [];
@@ -594,23 +597,23 @@ ${taskResults}
     }, {} as Record<string, string[]>);
 
     let workflowText = `EXECUTION WORKFLOW OVERVIEW:
-├─ Total Nodes: ${workflow.nodes.length}
+├─ Total Nodes: ${blueprint.nodes?.length || 0}
 ├─ Agent Tasks: ${agentNodes.length}
-├─ Workflow Edges: ${workflow.edges.length}
+├─ Workflow Edges: ${blueprint.edges?.length || 0}
 └─ Agents Involved: ${Object.keys(agentAssignments).length}
 
 WORKFLOW STRUCTURE:`;
 
-    workflow.nodes.forEach((node, index) => {
+    blueprint.nodes?.forEach((node: any, index: number) => {
       if (node.type === 'start') {
         workflowText += `\n${index + 1}. [START] ${node.name}
    └─ ${node.description}`;
       } else if (node.type === 'agent') {
         workflowText += `\n${index + 1}. [AGENT] ${node.name}
-   ├─ Agent: ${node.parameters.agentId}
-   ├─ Priority: ${node.parameters.priority || 'medium'}
-   ├─ Expected Output: ${node.parameters.expectedOutput}
-   └─ Instructions: ${node.parameters.instructions}`;
+   ├─ Agent: ${node.parameters?.agentId}
+   ├─ Priority: ${node.parameters?.priority || 'medium'}
+   ├─ Expected Output: ${node.parameters?.expectedOutput}
+   └─ Instructions: ${node.parameters?.instructions}`;
       } else if (node.type === 'end') {
         workflowText += `\n${index + 1}. [END] ${node.name}
    └─ ${node.description}`;
@@ -618,14 +621,14 @@ WORKFLOW STRUCTURE:`;
     });
 
     workflowText += '\n\nEXECUTION FLOW:';
-    workflow.edges.forEach((edge) => {
-      const fromNode = workflow.nodes.find(n => n.id === edge.from);
-      const toNode = workflow.nodes.find(n => n.id === edge.to);
+    blueprint.edges?.forEach((edge: any) => {
+      const fromNode = blueprint.nodes?.find((n: any) => n.id === edge.from);
+      const toNode = blueprint.nodes?.find((n: any) => n.id === edge.to);
       workflowText += `\n├─ ${fromNode?.name || edge.from} → ${toNode?.name || edge.to}`;
     });
 
     workflowText += '\n\nAGENT ASSIGNMENTS:';
-    Object.entries(agentAssignments).forEach(([agentId, nodeIds]) => {
+    Object.entries(agentAssignments).forEach(([agentId, nodeIds]: [string, string[]]) => {
       workflowText += `\n├─ ${agentId}: ${nodeIds.length} task(s)`;
     });
 

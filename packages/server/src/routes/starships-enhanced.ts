@@ -47,7 +47,7 @@ interface CreateStarshipWithVisionRequest {
 // Enhanced POST /starships - Create new starship with optional vision
 router.post('/starships/enhanced', authMiddleware, async (req: Request, res: Response) => {
   let createdStarship: any = null;
-  let createdVision: Vision | null = null;
+  let createdVision: VisionModel | null = null;
   
   try {
     const userId = req.user!.id;
@@ -254,7 +254,7 @@ router.put('/starships/:id/vision', authMiddleware, async (req: Request, res: Re
     // Check if vision already exists
     const existingVision = await visionRepo.findByStarship(starshipId);
     
-    let vision: Vision | null;
+    let vision: VisionModel | null;
     if (existingVision) {
       // Update existing vision
       vision = await visionRepo.update(existingVision.id, {

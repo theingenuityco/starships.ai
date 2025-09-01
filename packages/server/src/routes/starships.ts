@@ -405,7 +405,7 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
     }
 
     // Validate allowed updates
-    const allowedUpdates: Partial<Starship> = {};
+    const allowedUpdates: Partial<StarshipModel> = {};
 
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim().length === 0) {

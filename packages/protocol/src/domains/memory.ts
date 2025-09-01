@@ -16,6 +16,21 @@ import type {
 } from '@starships/autopilot';
 
 // ============================================================================
+// MEMORY ENTRY INTERFACE (LEGACY COMPATIBILITY)
+// ============================================================================
+
+/**
+ * Memory entry interface for backward compatibility
+ * @deprecated Use MessageModel from domains/message instead
+ */
+export interface MemoryEntry {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  metadata?: Record<string, unknown>;
+}
+
+// ============================================================================
 // DATABASE MEMORY INTERFACE
 // ============================================================================
 

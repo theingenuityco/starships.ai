@@ -10,7 +10,7 @@ import { AgentRepository, RepositoryFactory } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import { DatabaseMemoryStore } from '../utils/database-memory';
-import type { MemoryEntry, ChatRequest, ChatResponse } from '@starships/protocol';
+import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -323,9 +323,9 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Execute agent chat using ChatRequest format (replaces AgentExecutionService.executeChat)
+   * Execute agent chat using SessionRequest format (replaces AgentExecutionService.executeChat)
    */
-  static async executeChat(request: ChatRequest): Promise<ChatResponse> {
+  static async executeChat(request: SessionRequest): Promise<SessionResponse> {
     const { agent_id, user_id, message, session_id } = request;
 
     if (!agent_id) {
@@ -551,13 +551,24 @@ export class AgentService {
    * Get agent conversation history
    */
   async getAgentConversationHistory(
-    agentId: string, 
-    userId: string, 
+    agentId: string,
+    userId: string,
     limit: number = 50
-  ): Promise<MemoryEntry[]> {
+  ): Promise<MessageModel[]> {
     const memoryKey = this.memoryStore.makeKey(agentId, userId);
     const history = await this.memoryStore.get(memoryKey);
-    return history.slice(-limit);
+    return history.slice(-limit).map(entry => ({
+      id: `${agentId}-${userId}-${entry.timestamp || Date.now()}`,
+      role: entry.role,
+      content: entry.content,
+      timestamp: new Date(entry.timestamp || Date.now()).toISOString(),
+      metadata: {},
+      createdAt: new Date(entry.timestamp || Date.now()).toISOString(),
+      updatedAt: new Date(entry.timestamp || Date.now()).toISOString(),
+      version: '1.0.0',
+      starshipId: '', // Will be populated by caller if needed
+      contentLength: entry.content.length
+    }));
   }
 
   /**
@@ -715,7 +726,7 @@ export class AgentService {
           role: conv.role,
           content: conv.content,
           timestamp: parseInt(conv.timestamp) || Date.now()
-        } as MemoryEntry);
+        });
       }
 
       console.log(`[AGENT-SERVICE] Saved ${newConversations.length} new conversations for agent ${agentId}`);

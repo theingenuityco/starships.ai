@@ -23,7 +23,6 @@ import chatRoutes from './routes/chat';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
-import starshipEnhancedRoutes, { initializeEnhancedStarshipRoutes } from './routes/starships-enhanced';
 import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';

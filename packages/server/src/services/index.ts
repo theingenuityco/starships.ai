@@ -8,7 +8,6 @@
 export { SocketIOService } from './SocketIOService';
 export { AgentService } from './AgentService';
 export { UserService } from './UserService';
-export { SibilService } from './SibilService';
 
 // Core data management services
 export { MessageService } from './MessageService';

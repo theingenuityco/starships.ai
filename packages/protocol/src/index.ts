@@ -10,6 +10,7 @@ export * from './contracts/socket';
 export * from './domains/agent';
 export * from './domains/agent-template';
 export * from './domains/blueprint';
+export * from './domains/chat';
 export * from './domains/edge';
 export * from './domains/execution';
 export * from './domains/mission';

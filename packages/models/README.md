@@ -91,7 +91,6 @@ try {
 | **MissionMessageRepository** | Mission communication logs |
 | **MissionClarityRepository** | Mission requirement analysis |
 | **WorkflowRepository** | Workflow definitions and execution |
-| **LLMRepository** | LLM provider configurations |
 | **NativeToolApiKeyRepository** | API key management |
 | **WaitlistRepository** | User onboarding queue |
 
@@ -101,9 +100,6 @@ try {
 ```bash
 # Run database migrations
 npm run migrate
-
-# Seed LLM models
-npm run seed:llm
 
 # Seed waitlist data
 npm run seed:waitlist
@@ -269,7 +265,6 @@ LOG_METRICS=true
   "dev": "tsx watch src/index.ts",
   "build": "tsc --build tsconfig.json",
   "migrate": "tsx src/scripts/migration-runner.ts",
-  "seed:llm": "tsx src/scripts/seed-llm-models.ts",
   "backup:create": "tsx src/scripts/backup-cli.ts create",
   "monitor": "tsx src/scripts/performance-monitor.ts",
   "db-cli": "tsx src/scripts/db-cli.ts"

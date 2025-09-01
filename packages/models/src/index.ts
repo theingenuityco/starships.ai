@@ -82,6 +82,5 @@ export type {
 // Repository implementations remain in this package for data access
 
 // Export scripts
-export { seedLLMModels } from './scripts/seed-llm-models';
 export { seedWaitlist } from './scripts/seed-waitlist';
 export { migrationRunner } from './scripts/migration-runner';

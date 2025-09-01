@@ -12,7 +12,6 @@
     "clean": "rm -rf dist && find tests -name '*.js' -o -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.js.map' | xargs rm -f",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "migrate": "tsx src/scripts/migration-runner.ts",
-    "seed:llm": "tsx src/scripts/seed-llm-models.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",

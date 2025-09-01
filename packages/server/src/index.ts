@@ -198,8 +198,6 @@ httpServer.listen(PORT, async () => {
       );
     }
 
-    // LLM Models are now initialized automatically with schema
-    console.log('✅ LLM Models ready (seeded during schema initialization)');
 
     // Initialize Waitlist (seeds approved emails)
     try {

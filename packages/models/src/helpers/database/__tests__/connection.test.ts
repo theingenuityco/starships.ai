@@ -96,11 +96,21 @@ describe('Neo4jConnection', () => {
     });
 
     it('should handle connection timeout', async () => {
+      let timeoutHandle: NodeJS.Timeout;
       mockDriver.verifyConnectivity.mockImplementation(
-        () => new Promise(resolve => setTimeout(resolve, 6000))
+        () => new Promise(resolve => {
+          timeoutHandle = setTimeout(resolve, 6000);
+        })
       );
 
-      await expect(connection.connect()).rejects.toThrow('Neo4j connection timeout');
+      try {
+        await expect(connection.connect()).rejects.toThrow('Neo4j connection timeout');
+      } finally {
+        // Clean up the mock timeout to prevent handle leaks
+        if (timeoutHandle!) {
+          clearTimeout(timeoutHandle);
+        }
+      }
     });
 
     it('should handle connection failure', async () => {

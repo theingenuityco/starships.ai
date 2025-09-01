@@ -38,11 +38,19 @@ export class Neo4jConnection {
       );
 
       // Add timeout to connectivity check
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Neo4j connection timeout')), 5000);
+      let timeoutHandle: NodeJS.Timeout;
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error('Neo4j connection timeout')), 5000);
       });
 
-      await Promise.race([this.driver.verifyConnectivity(), timeoutPromise]);
+      try {
+        await Promise.race([this.driver.verifyConnectivity(), timeoutPromise]);
+      } finally {
+        // Always clear the timeout to prevent handle leaks
+        if (timeoutHandle!) {
+          clearTimeout(timeoutHandle);
+        }
+      }
     } catch (error) {
       console.error('Failed to connect to Neo4j:', error);
       throw error;

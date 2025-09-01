@@ -440,9 +440,11 @@ class HealthMonitorClass {
   ): Promise<HealthStatus> {
     const startTime = Date.now();
 
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    
     try {
       const timeoutPromise = new Promise<boolean>((_, reject) => {
-        setTimeout(() => reject(new Error('Health check timeout')), timeout);
+        timeoutHandle = setTimeout(() => reject(new Error('Health check timeout')), timeout);
       });
 
       const isHealthy = await Promise.race([healthCheckFn(), timeoutPromise]);
@@ -475,6 +477,11 @@ class HealthMonitorClass {
       this.healthChecks.set(serviceName, status);
       this.getLogger().health(status);
       return status;
+    } finally {
+      // Always clear timeout handle to prevent leaks
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
     }
   }
 

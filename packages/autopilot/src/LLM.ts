@@ -140,9 +140,7 @@ export class LLM {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${OPENROUTER_API_KEY}',
-        'HTTP-Referer': '${OPENROUTER_HTTP_REFERER}', // Optional: for analytics
-        'X-Title': '${OPENROUTER_APP_NAME}' // Optional: for analytics
+        'Authorization': `Bearer ${this.params.openrouterApiKey}`
       },
       body,
       timeout: this.params.timeout || 60000,
@@ -184,6 +182,10 @@ export class LLM {
 
     if (!this.params.prompt) {
       errors.push('Prompt is required');
+    }
+
+    if (!this.params.openrouterApiKey) {
+      errors.push('OpenRouter API key is required');
     }
 
     // LLM-specific parameter range validation

@@ -129,6 +129,7 @@ export interface HttpAuthentication {
 export interface LlmNodeParameters extends BaseNodeParameters {
   model: string;
   prompt: string;
+  openrouterApiKey: string;
   temperature?: number;
   maxTokens?: number;
   timeout?: number;

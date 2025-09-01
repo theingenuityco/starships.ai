@@ -46,7 +46,27 @@ export interface BaseSocketEvents {
   connect: () => void;
   disconnect: () => void;
   error: (error: Error) => void;
+  ping: () => void;
+  pong: () => void;
+  'connection-status': (data: ConnectionStatusEvent) => void;
+  'chat:start-stream': (data: any) => void;
+  'chat:stream-chunk': (data: any) => void;
+  'chat:stream-complete': (data: any) => void;
+  'chat:stream-error': (data: any) => void;
+  'chat:stream-start': (data: any) => void;
+  'chat:typing-start': (data: any) => void;
+  'chat:typing-stop': (data: any) => void;
+  'chat:join-room': (data: any) => void;
+  'chat:leave-room': (data: any) => void;
+  'agent:stream-error': (data: any) => void;
+  'agent:stop-stream': (streamId: string) => void;
 }
+
+/**
+ * Extended socket events (for backward compatibility)
+ * @deprecated Use BaseSocketEvents directly
+ */
+export type SocketEvents = BaseSocketEvents;
 
 /**
  * Connection status event data

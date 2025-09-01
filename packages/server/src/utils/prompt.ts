@@ -1,4 +1,4 @@
-import type { MemoryEntry } from "@starships/protocol";
+import type { MessageModel } from "@starships/protocol";
 
 // Note: LLMChatPrompt type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available
@@ -16,8 +16,8 @@ interface LLMChatPrompt {
  * Moved from agents/prompt.ts to utils for cleaner architecture
  */
 export function buildPrompt(
-  systemPrompt: string | undefined, 
-  memory: MemoryEntry[], 
+  systemPrompt: string | undefined,
+  memory: MessageModel[],
   currentMessage: string,
   relevantContext?: string,
   visionContext?: string

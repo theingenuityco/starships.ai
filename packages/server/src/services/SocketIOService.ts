@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import type {
   SocketConnectionState,
-  SocketEvents,
+  BaseSocketEvents,
   EventEmissionOptions,
   EventEmissionResult,
 } from '@starships/protocol';
@@ -51,7 +51,7 @@ async function verifySocketJWT(token: string) {
  */
 export class SocketIOService {
   private static instance: SocketIOService;
-  private io: SocketIOServer<SocketEvents>;
+  private io: SocketIOServer<BaseSocketEvents>;
   private connections: Map<string, SocketConnectionState> = new Map();
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
@@ -518,7 +518,7 @@ export class SocketIOService {
   }
 
   // Public methods for other services
-  getIO(): SocketIOServer<SocketEvents> {
+  getIO(): SocketIOServer<BaseSocketEvents> {
     return this.io;
   }
 
@@ -543,7 +543,7 @@ export class SocketIOService {
     console.log(`[SOCKET.IO] User ${userId} left agent room: ${room}`);
   }
 
-  emitToAgentRoom(agentId: string, userId: string, event: keyof SocketEvents, data: any) {
+  emitToAgentRoom(agentId: string, userId: string, event: keyof BaseSocketEvents, data: any) {
     const agentRoom = this.getAgentRoom(agentId, userId);
     this.io.to(agentRoom).emit(event, data);
   }
@@ -562,10 +562,10 @@ export class SocketIOService {
   }
 
   // Enhanced event emission with error handling and retry logic
-  async emitToUser<K extends keyof SocketEvents>(
+  async emitToUser<K extends keyof BaseSocketEvents>(
     userId: string,
     event: K,
-    data: Parameters<SocketEvents[K]>[0],
+    data: Parameters<BaseSocketEvents[K]>[0],
     options?: Partial<EventEmissionOptions>
   ): Promise<EventEmissionResult> {
     const userRoom = this.getUserRoom(userId);
@@ -575,17 +575,17 @@ export class SocketIOService {
   // Legacy method for backward compatibility
   async emitToUserWithRetry(
     userId: string,
-    event: keyof SocketEvents,
+    event: keyof BaseSocketEvents,
     data: any,
     options: EventEmissionOptions = {}
   ): Promise<EventEmissionResult> {
     return this.emitToUser(userId, event, data, options);
   }
 
-  private async emitToRoom<K extends keyof SocketEvents>(
+  private async emitToRoom<K extends keyof BaseSocketEvents>(
     room: string,
     event: K,
-    data: Parameters<SocketEvents[K]>[0],
+    data: Parameters<BaseSocketEvents[K]>[0],
     options: EventEmissionOptions
   ): Promise<EventEmissionResult> {
     // const startTime = Date.now();

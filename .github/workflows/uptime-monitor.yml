@@ -1,0 +1,225 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:  # Allow manual trigger for testing
+
+jobs:
+  check-health:
+    name: Check Service Health
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: "Production"
+            environment: "prod"
+            emoji: "🚀"
+          - name: "Development"
+            environment: "dev"  
+            emoji: "🛠️"
+    
+    environment: ${{ matrix.environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Check ${{ matrix.name }} Health
+        id: health_check
+        env:
+          SERVICE_URL: ${{ vars.CLIENT_URL || vars.KINDE_SITE_URL }}
+          SERVICE_NAME: ${{ matrix.name }}
+          SERVICE_EMOJI: ${{ matrix.emoji }}
+        run: |
+          # Verify URL is set
+          if [ -z "$SERVICE_URL" ]; then
+            echo "❌ ERROR: SERVICE_URL not set for $SERVICE_NAME environment"
+            echo "Please configure CLIENT_URL or KINDE_SITE_URL in GitHub environment: ${{ matrix.environment }}"
+            echo "status=misconfigured" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "Checking health of $SERVICE_NAME at $SERVICE_URL"
+          
+          # Perform health check with timeout (using /api/health endpoint)
+          START_TIME=$(date +%s%3N)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SERVICE_URL/api/health" || echo "000")
+          END_TIME=$(date +%s%3N)
+          RESPONSE_TIME=$((END_TIME - START_TIME))
+          
+          echo "HTTP Code: $HTTP_CODE"
+          echo "Response Time: ${RESPONSE_TIME}ms"
+          
+          # Store results
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "response_time=$RESPONSE_TIME" >> $GITHUB_OUTPUT
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          
+          # Determine status
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "status=operational" >> $GITHUB_OUTPUT
+            echo "✅ $SERVICE_NAME is operational"
+          elif [ "$HTTP_CODE" = "000" ]; then
+            echo "status=timeout" >> $GITHUB_OUTPUT
+            echo "⏱️ $SERVICE_NAME timed out"
+          else
+            echo "status=down" >> $GITHUB_OUTPUT
+            echo "🔴 $SERVICE_NAME is down"
+          fi
+      
+      - name: Load Previous Status
+        id: previous_status
+        run: |
+          # Check if status file exists
+          if [ -f ".github/status/${{ matrix.environment }}-status.txt" ]; then
+            PREV_STATUS=$(cat .github/status/${{ matrix.environment }}-status.txt)
+            echo "previous=$PREV_STATUS" >> $GITHUB_OUTPUT
+          else
+            echo "previous=unknown" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Discord Alert on Status Change
+        if: steps.health_check.outputs.status != 'operational' || (steps.previous_status.outputs.previous != 'operational' && steps.health_check.outputs.status == 'operational')
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+          STATUS: ${{ steps.health_check.outputs.status }}
+          PREV_STATUS: ${{ steps.previous_status.outputs.previous }}
+          HTTP_CODE: ${{ steps.health_check.outputs.http_code }}
+          RESPONSE_TIME: ${{ steps.health_check.outputs.response_time }}
+          SERVICE_URL: ${{ steps.health_check.outputs.service_url }}
+          SERVICE_NAME: ${{ matrix.name }}
+          SERVICE_EMOJI: ${{ matrix.emoji }}
+        run: |
+          # Determine alert type and color
+          if [ "$STATUS" = "operational" ]; then
+            TITLE="✅ SERVICE RECOVERED"
+            COLOR=5763719  # Green
+            DESCRIPTION="${SERVICE_EMOJI} **${SERVICE_NAME}** is back online!"
+          elif [ "$STATUS" = "timeout" ]; then
+            TITLE="⏱️ SERVICE TIMEOUT"
+            COLOR=16705372  # Orange
+            DESCRIPTION="${SERVICE_EMOJI} **${SERVICE_NAME}** is not responding (timeout after 10s)"
+          else
+            TITLE="🚨 SERVICE DOWN"
+            COLOR=15548997  # Red
+            DESCRIPTION="${SERVICE_EMOJI} **${SERVICE_NAME}** is currently unavailable"
+          fi
+          
+          # Send Discord notification
+          curl -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "'"$TITLE"'",
+                "description": "'"$DESCRIPTION"'",
+                "color": '"$COLOR"',
+                "fields": [
+                  {
+                    "name": "🌐 Service",
+                    "value": "'"$SERVICE_NAME"'",
+                    "inline": true
+                  },
+                  {
+                    "name": "📊 Status",
+                    "value": "'"$STATUS"'",
+                    "inline": true
+                  },
+                  {
+                    "name": "⚡ Response",
+                    "value": "'"${RESPONSE_TIME}ms"'",
+                    "inline": true
+                  },
+                  {
+                    "name": "🔗 URL",
+                    "value": "'"$SERVICE_URL"'",
+                    "inline": false
+                  },
+                  {
+                    "name": "💻 HTTP Code",
+                    "value": "'"$HTTP_CODE"'",
+                    "inline": true
+                  },
+                  {
+                    "name": "⏰ Time",
+                    "value": "'"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"'",
+                    "inline": true
+                  }
+                ],
+                "footer": {
+                  "text": "Starships Uptime Monitor",
+                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+                },
+                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
+              }]
+            }'
+      
+      - name: Update Status Data
+        if: always()
+        env:
+          NODE_ENV: ${{ matrix.environment }}
+          PROD_URL: ${{ matrix.environment == 'prod' && (vars.CLIENT_URL || vars.KINDE_SITE_URL) || '' }}
+          DEV_URL: ${{ matrix.environment == 'dev' && (vars.CLIENT_URL || vars.KINDE_SITE_URL) || '' }}
+        run: |
+          # Update status data file
+          if [ -f ".github/scripts/update-status-data.js" ]; then
+            node .github/scripts/update-status-data.js \
+              "${{ matrix.environment }}" \
+              "${{ steps.health_check.outputs.status }}" \
+              "${{ steps.health_check.outputs.response_time }}" \
+              "${{ steps.health_check.outputs.http_code }}"
+          fi
+          
+          # Save simple status for tracking
+          mkdir -p .github/status
+          echo "${{ steps.health_check.outputs.status }}" > .github/status/${{ matrix.environment }}-status.txt
+          
+          # Only commit if status changed
+          if [ "${{ steps.health_check.outputs.status }}" != "${{ steps.previous_status.outputs.previous }}" ]; then
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add .github/status/ status-page/data/ || true
+            git diff --staged --quiet || git commit -m "chore: update ${{ matrix.environment }} status to ${{ steps.health_check.outputs.status }}"
+            git push || echo "No changes to push"
+          fi
+
+  daily-summary:
+    name: Daily Summary Report
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 9 * * *'  # Only run at 9 AM UTC
+    steps:
+      - name: Send Daily Summary
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+        run: |
+          curl -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "📊 Daily Uptime Summary",
+                "description": "Service health report for the last 24 hours",
+                "color": 3447003,
+                "fields": [
+                  {
+                    "name": "🚀 Production",
+                    "value": "Uptime: Calculating...",
+                    "inline": true
+                  },
+                  {
+                    "name": "🛠️ Development",
+                    "value": "Uptime: Calculating...",
+                    "inline": true
+                  }
+                ],
+                "footer": {
+                  "text": "Full report available at uptime.starships.ai",
+                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+                },
+                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
+              }]
+            }'

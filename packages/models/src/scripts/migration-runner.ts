@@ -83,8 +83,6 @@ export class MigrationRunner {
         return result;
       }
 
-      console.log('🚀 Initializing database schema...');
-
       // Execute schema initialization
       const schemaContent = readFileSync(migrationPath, 'utf-8');
       console.log('🚀 Initializing database schema...');

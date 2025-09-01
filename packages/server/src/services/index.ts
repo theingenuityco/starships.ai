@@ -10,6 +10,10 @@ export { AgentService } from './AgentService';
 export { UserService } from './UserService';
 export { SibilService } from './SibilService';
 
+// Core data management services
+export { MessageService } from './MessageService';
+export { MemoryService } from './MemoryService';
+
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';
 export { VisionFileService } from './VisionFileService';

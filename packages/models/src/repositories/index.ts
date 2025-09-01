@@ -35,6 +35,10 @@ export { ChatMessageRepository } from './ChatMessageRepository';
 // Export workflow repository
 export { WorkflowRepository } from './WorkflowRepository';
 
+// Export memory and message repositories
+export { MemoryRepository } from './MemoryRepository';
+export { MessageRepository } from './MessageRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { VisionRepository } from './VisionRepository';
@@ -62,6 +66,10 @@ import { ChatMessageRepository } from './ChatMessageRepository';
 
 // Import workflow repository
 import { WorkflowRepository } from './WorkflowRepository';
+
+// Import memory and message repositories
+import { MemoryRepository } from './MemoryRepository';
+import { MessageRepository } from './MessageRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -107,6 +115,10 @@ export class RepositoryFactory {
 
   // Workflow repository instance
   private static workflowRepo: WorkflowRepository | null = null;
+
+  // Memory and message repository instances
+  private static memoryRepo: MemoryRepository | null = null;
+  private static messageRepo: MessageRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -183,6 +195,10 @@ export class RepositoryFactory {
       // Initialize workflow repository (no dependencies)
       this.workflowRepo = new WorkflowRepository();
 
+      // Initialize memory and message repositories (no dependencies)
+      this.memoryRepo = new MemoryRepository();
+      this.messageRepo = new MessageRepository();
+
       // Initialize repositories with dependencies
       this.starshipRepo = new StarshipRepository();
 
@@ -246,6 +262,8 @@ export class RepositoryFactory {
         chatSessionRepo: this.chatSessionRepo !== null,
         chatMessageRepo: this.chatMessageRepo !== null,
         workflowRepo: this.workflowRepo !== null,
+        memoryRepo: this.memoryRepo !== null,
+        messageRepo: this.messageRepo !== null,
       }
     };
   }
@@ -436,6 +454,28 @@ export class RepositoryFactory {
     return this.workflowRepo;
   }
 
+  /**
+   * Get MemoryRepository instance (synchronous)
+   */
+  static getMemoryRepository(): MemoryRepository {
+    this.ensureInitialized();
+    if (!this.memoryRepo) {
+      throw new Error('MemoryRepository not initialized');
+    }
+    return this.memoryRepo;
+  }
+
+  /**
+   * Get MessageRepository instance (synchronous)
+   */
+  static getMessageRepository(): MessageRepository {
+    this.ensureInitialized();
+    if (!this.messageRepo) {
+      throw new Error('MessageRepository not initialized');
+    }
+    return this.messageRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -462,6 +502,8 @@ export class RepositoryFactory {
     this.chatSessionRepo = null;
     this.chatMessageRepo = null;
     this.workflowRepo = null;
+    this.memoryRepo = null;
+    this.messageRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

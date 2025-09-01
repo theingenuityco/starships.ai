@@ -21,6 +21,8 @@ export * from './domains/user';
 export * from './domains/waitlist';
 export * from './domains/workflow';
 export * from './domains/native-tool';
+export * from './domains/memory';
+export * from './domains/message';
 
 
 

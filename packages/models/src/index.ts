@@ -31,6 +31,10 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 // NEW: Workflows
 export { WorkflowRepository } from './repositories/WorkflowRepository';
 
+// NEW: Memory and Message repositories
+export { MemoryRepository } from './repositories/MemoryRepository';
+export { MessageRepository } from './repositories/MessageRepository';
+
 // Factory for creating repositories
 export { RepositoryFactory } from './repositories';
 

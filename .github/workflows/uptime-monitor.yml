@@ -37,6 +37,14 @@ jobs:
           SERVICE_NAME: ${{ matrix.name }}
           SERVICE_EMOJI: ${{ matrix.emoji }}
         run: |
+          # Verify URL is set
+          if [ -z "$SERVICE_URL" ]; then
+            echo "❌ ERROR: SERVICE_URL not set for $SERVICE_NAME environment"
+            echo "Please configure CLIENT_URL or KINDE_SITE_URL in GitHub environment: ${{ matrix.environment }}"
+            echo "status=misconfigured" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
           echo "Checking health of $SERVICE_NAME at $SERVICE_URL"
           
           # Perform health check with timeout
@@ -151,9 +159,23 @@ jobs:
               }]
             }'
       
-      - name: Save Current Status
+      - name: Update Status Data
         if: always()
+        env:
+          NODE_ENV: ${{ matrix.environment }}
+          PROD_URL: ${{ matrix.environment == 'prod' && (vars.CLIENT_URL || vars.KINDE_SITE_URL) || '' }}
+          DEV_URL: ${{ matrix.environment == 'dev' && (vars.CLIENT_URL || vars.KINDE_SITE_URL) || '' }}
         run: |
+          # Update status data file
+          if [ -f ".github/scripts/update-status-data.js" ]; then
+            node .github/scripts/update-status-data.js \
+              "${{ matrix.environment }}" \
+              "${{ steps.health_check.outputs.status }}" \
+              "${{ steps.health_check.outputs.response_time }}" \
+              "${{ steps.health_check.outputs.http_code }}"
+          fi
+          
+          # Save simple status for tracking
           mkdir -p .github/status
           echo "${{ steps.health_check.outputs.status }}" > .github/status/${{ matrix.environment }}-status.txt
           
@@ -161,7 +183,7 @@ jobs:
           if [ "${{ steps.health_check.outputs.status }}" != "${{ steps.previous_status.outputs.previous }}" ]; then
             git config --local user.email "github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
-            git add .github/status/${{ matrix.environment }}-status.txt
+            git add .github/status/ status-page/data/ || true
             git diff --staged --quiet || git commit -m "chore: update ${{ matrix.environment }} status to ${{ steps.health_check.outputs.status }}"
             git push || echo "No changes to push"
           fi

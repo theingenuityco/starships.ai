@@ -55,9 +55,6 @@ module.exports = {
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
   
-  // Global teardown
-  globalTeardown: '<rootDir>/src/tests/teardown.ts',
-  
   // Clear mocks between tests
   clearMocks: true,
   

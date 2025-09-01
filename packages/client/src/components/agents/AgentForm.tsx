@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Agent, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
+import { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
 import { agentAPI } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,8 +37,8 @@ import {
 import { cn } from '@/lib/utils'
 
 interface AgentFormProps {
-  agent?: Agent
-  onSave: (agent: Agent) => void
+  agent?: AgentModel
+  onSave: (agent: AgentModel) => void
   onCancel: () => void
 }
 
@@ -93,7 +93,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     setLoading(true)
 
     try {
-      let savedAgent: Agent
+      let savedAgent: AgentModel
       if (agent) {
         savedAgent = await agentAPI.update(agent.id, formData as UpdateAgentRequest)
       } else {
@@ -114,7 +114,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
   }
 
   const addTag = () => {
-    if (newTag.trim() && !formData.tags!.includes(newTag.trim())) {
+    if (newTag.trim() && !(formData.tags || []).includes(newTag.trim())) {
       setFormData(prev => ({
         ...prev,
         tags: [...(prev.tags || []), newTag.trim()],
@@ -126,7 +126,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
   const removeTag = (tagToRemove: string) => {
     setFormData(prev => ({
       ...prev,
-      tags: (prev.tags || []).filter(tag => tag !== tagToRemove),
+      tags: (prev.tags || []).filter((tag: any) => tag !== tagToRemove),
     }))
   }
 
@@ -184,7 +184,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 <Select
                   value={formData.category}
                   onValueChange={value =>
-                    setFormData(prev => ({ ...prev, category: value as Agent['category'] }))
+                    setFormData(prev => ({ ...prev, category: value as AgentModel['category'] }))
                   }
                 >
                   <SelectTrigger className="border-muted-foreground/20 focus:border-primary">
@@ -304,7 +304,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   {(formData.tags || []).length === 0 ? (
                     <span className="text-sm text-muted-foreground italic">No tags added yet</span>
                   ) : (
-                    (formData.tags || []).map(tag => (
+                    (formData.tags || []).map((tag: any) => (
                       <Badge
                         key={tag}
                         variant="secondary"

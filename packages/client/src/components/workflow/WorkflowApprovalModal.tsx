@@ -25,7 +25,10 @@ import {
   MessageSquare
 } from 'lucide-react'
 import { WorkflowVisualization } from './WorkflowVisualization'
-import type { WorkflowDSL } from '@starships/protocol'
+import type { WorkflowModel } from '@starships/protocol'
+
+// Client-side workflow type for compatibility
+type WorkflowDSL = WorkflowModel | any;
 
 export interface WorkflowApprovalModalProps {
   workflow: WorkflowDSL | null
@@ -40,11 +43,11 @@ export interface WorkflowApprovalModalProps {
  * Workflow summary component
  */
 const WorkflowSummary: React.FC<{ workflow: WorkflowDSL }> = ({ workflow }) => {
-  const agentNodes = workflow.nodes.filter(n => n.type === 'agent')
-  const userPrompts = workflow.nodes.filter(n => n.type === 'user_prompt')
+  const agentNodes = workflow.nodes?.filter((n: any) => n.type === 'agent') || []
+  const userPrompts = workflow.nodes?.filter((n: any) => n.type === 'user_prompt') || []
   const totalEstimatedTime = workflow.nodes
-    .filter(n => n.estimatedTime)
-    .reduce((sum, n) => sum + (n.estimatedTime || 0), 0)
+    ?.filter((n: any) => n.estimatedTime)
+    .reduce((sum: number, n: any) => sum + (n.estimatedTime || 0), 0) || 0
 
   return (
     <div className="space-y-4">
@@ -87,7 +90,7 @@ const WorkflowSummary: React.FC<{ workflow: WorkflowDSL }> = ({ workflow }) => {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Tags:</span>
             <div className="flex flex-wrap gap-1">
-              {workflow.metadata.tags.map((tag, index) => (
+              {workflow.metadata?.tags?.map((tag: any, index: number) => (
                 <Badge key={index} variant="outline" className="text-xs">
                   {tag}
                 </Badge>

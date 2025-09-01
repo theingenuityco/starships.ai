@@ -73,7 +73,7 @@ export function ChatSessionsSidebar({
 
   const getSessionTitle = (session: Session) => {
     if (session.source === 'agent') {
-      return session.agent_id ? `Agent Chat` : 'Agent Session'
+      return session.agentId ? `Agent Chat` : 'Agent Session'
     }
     return 'Chat Session'
   }
@@ -141,7 +141,7 @@ export function ChatSessionsSidebar({
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                         <Clock className="w-3 h-3" />
-                        {formatSessionTime(session.last_activity_at)}
+                        {formatSessionTime(session.lastActivityAt)}
                       </div>
                     </div>
                   </div>
@@ -155,9 +155,9 @@ export function ChatSessionsSidebar({
                   <div className="capitalize">
                     {session.source} mode
                   </div>
-                  {session.total_tokens > 0 && (
+                  {session.totalTokens && session.totalTokens > 0 && (
                     <div>
-                      {session.total_tokens.toLocaleString()} tokens
+                      {session.totalTokens.toLocaleString()} tokens
                     </div>
                   )}
                 </div>

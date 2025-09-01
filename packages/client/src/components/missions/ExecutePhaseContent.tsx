@@ -7,12 +7,43 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { missionApi } from '@/lib/missionApi';
 import { WorkflowVisualization } from '@/components/workflow';
-import type { Mission, MissionExecutionState, MissionNodeResult, MissionWorkflow, Agent } from '@starships/protocol';
+import type { MissionModel, AgentModel } from '@starships/protocol';
+
+// Client-side types for execution-related data
+type MissionExecutionState = {
+  status: string;
+  totalNodes: number;
+  currentNodeIndex: number;
+  startedAt: string;
+  completedAt?: string;
+  error?: string;
+  nodeResults?: Array<{
+    nodeId: string;
+    nodeName: string;
+    success: boolean;
+    output?: string;
+    error?: string;
+    timestamp: string;
+  }>;
+};
+
+type MissionNodeResult = {
+  nodeId: string;
+  nodeName: string;
+  success: boolean;
+  output?: string;
+  error?: string;
+  timestamp: string;
+};
+
+interface ClientMissionModel extends MissionModel {
+  executionState?: MissionExecutionState;
+}
 
 interface ExecutePhaseContentProps {
-  mission: Mission;
-  workflow?: MissionWorkflow;
-  agents?: Record<string, Agent>;
+  mission: ClientMissionModel;
+  workflow?: any;
+  agents?: Record<string, AgentModel>;
   onExecutionComplete?: () => void;
 }
 
@@ -180,7 +211,7 @@ export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComp
             <WorkflowVisualization 
               workflow={workflow} 
               agents={agents}
-              currentNodeId={executionState?.nodeResults[executionState.currentNodeIndex]?.nodeId}
+              currentNodeId={executionState?.nodeResults?.[executionState.currentNodeIndex]?.nodeId}
             />
           </CardContent>
         </Card>
@@ -191,7 +222,7 @@ export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComp
         <CardContent className="p-6">
           <h4 className="font-medium text-gray-900 mb-4">Task Execution Details</h4>
           
-          {executionState.nodeResults.length === 0 ? (
+          {!executionState.nodeResults || executionState.nodeResults.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>No tasks executed yet...</p>
@@ -199,7 +230,7 @@ export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComp
             </div>
           ) : (
             <div className="space-y-3">
-              {executionState.nodeResults.map((result, index) => (
+              {executionState.nodeResults?.map((result, index) => (
                 <motion.div
                   key={result.nodeId}
                   initial={{ opacity: 0, x: -20 }}

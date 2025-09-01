@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { Agent } from '@starships/protocol';
+import type { AgentModel } from '@starships/protocol';
 import {
   Bot,
   Edit,
@@ -51,7 +51,7 @@ export function AgentCard({
   onAnalytics,
   showActions = false,
 }: AgentCardProps) {
-  const getCategoryColor = (category: Agent['category']) => {
+  const getCategoryColor = (category: AgentModel['category']) => {
     const colors = {
       general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
       coding: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
@@ -62,7 +62,7 @@ export function AgentCard({
     return colors[category] || colors.general
   }
 
-  const getAvatarBackgroundColor = (category: Agent['category']) => {
+  const getAvatarBackgroundColor = (category: AgentModel['category']) => {
     const colors = {
       general: 'bg-gradient-to-br from-gray-500/20 to-gray-500/30',
       coding: 'bg-gradient-to-br from-blue-500/20 to-blue-500/30',
@@ -72,7 +72,7 @@ export function AgentCard({
     }
     return colors[category] || colors.general
   }
-  const getCategoryIcon = (category: Agent['category']) => {
+  const getCategoryIcon = (category: AgentModel['category']) => {
     switch (category) {
       case 'coding':
         return <Code className="w-3.5 h-3.5 mr-1" />
@@ -88,7 +88,7 @@ export function AgentCard({
   }
 
 
-  const getAgentAvatarContent = (agent: Agent) => {
+  const getAgentAvatarContent = (agent: AgentModel) => {
     // Determine emoji-like icon based on agent name or category
     if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
       return '🎧' // Headphones emoji
@@ -198,7 +198,7 @@ export function AgentCard({
             {/* Enhanced Tags display */}
             {agent.tags && agent.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {agent.tags.slice(0, 3).map(tag => (
+                {agent.tags?.slice(0, 3).map((tag: any) => (
                   <Badge
                     key={tag}
                     variant="outline"

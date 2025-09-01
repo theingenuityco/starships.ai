@@ -10,12 +10,12 @@ import type {
   MissionSort,
   MissionListResponse,
   MissionResponse,
-  MissionMessage,
+  MissionMessageModel,
   SendMissionMessageRequest,
   MissionChatResponse,
-  MissionClarity,
+  MissionClarityModel,
   WorkflowResponse,
-  MissionExecutionState,
+  // MissionExecutionState - removed as it's not exported from protocol
   MissionPhase,
 } from '@starships/protocol';
 import api from './api';
@@ -192,15 +192,15 @@ export const missionApi = {
     });
   },
 
-  async getMessageHistory(missionId: string): Promise<ApiResponse<{ messages: MissionMessage[] }>> {
-    return apiRequest<{ messages: MissionMessage[] }>(`/api/missions/${missionId}/messages`);
+  async getMessageHistory(missionId: string): Promise<ApiResponse<{ messages: MissionMessageModel[] }>> {
+    return apiRequest<{ messages: MissionMessageModel[] }>(`/api/missions/${missionId}/messages`);
   },
 
   /**
    * Get mission clarity assessment
    */
-  async getMissionClarity(missionId: string): Promise<ApiResponse<MissionClarity | null>> {
-    return apiRequest<MissionClarity | null>(`/api/missions/${missionId}/clarity`);
+  async getMissionClarity(missionId: string): Promise<ApiResponse<MissionClarityModel | null>> {
+    return apiRequest<MissionClarityModel | null>(`/api/missions/${missionId}/clarity`);
   },
 
   /**
@@ -234,7 +234,7 @@ export const missionApi = {
   /**
    * Get mission execution status
    */
-  async getExecutionStatus(missionId: string): Promise<ApiResponse<{ executionState: MissionExecutionState | null; phase: MissionPhase }>> {
-    return apiRequest<{ executionState: MissionExecutionState | null; phase: MissionPhase }>(`/api/missions/${missionId}/execution-status`);
+  async getExecutionStatus(missionId: string): Promise<ApiResponse<{ executionState: any | null; phase: MissionPhase }>> {
+    return apiRequest<{ executionState: any | null; phase: MissionPhase }>(`/api/missions/${missionId}/execution-status`);
   }
 };

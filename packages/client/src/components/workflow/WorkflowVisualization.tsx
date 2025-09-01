@@ -26,7 +26,12 @@ import {
   Eye, 
   Clock 
 } from 'lucide-react';
-import type { WorkflowDSL, WorkflowDSLNode, Agent, MissionWorkflow } from '@starships/protocol';
+import type { WorkflowModel, AgentModel } from '@starships/protocol';
+
+// Client-side workflow types for compatibility
+type WorkflowDSL = WorkflowModel | any;
+type WorkflowDSLNode = any;
+type MissionWorkflow = any;
 
 export interface WorkflowVisualizationProps {
   workflow: WorkflowDSL | MissionWorkflow;
@@ -278,7 +283,7 @@ const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: 
 };
 
 // Convert workflow to React Flow format
-const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeId?: string, agents?: Record<string, Agent>) => {
+const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeId?: string, agents?: Record<string, AgentModel>) => {
   const nodes: FlowNode[] = [];
   const edges: Edge[] = [];
 
@@ -319,7 +324,7 @@ const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeI
   const nodeIds = new Set(nodes.map(n => n.id));
   
   // Create edges with validation
-  workflow.edges.forEach((edge) => {
+  workflow.edges?.forEach((edge: any) => {
     // Validate edge references
     if (!nodeIds.has(edge.from)) {
       console.warn(`Edge references invalid source node: ${edge.from}`);

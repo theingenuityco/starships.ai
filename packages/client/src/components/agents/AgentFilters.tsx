@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Agent } from '@starships/protocol'
+import { AgentModel } from '@starships/protocol'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { X, Filter, ChevronDown } from 'lucide-react'
 
 interface FilterState {
-  category?: Agent['category']
+  category?: AgentModel['category']
   tags: string[]
   isPublic?: boolean
   searchQuery: string

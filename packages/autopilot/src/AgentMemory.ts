@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, Message, MemoryState } from './Memory';
+import { Memory, Message, MemoryState, MemoryParams } from './Memory';
 
 /**
  * Agent identity information
@@ -43,23 +43,23 @@ export interface AgentMemoryState extends MemoryState {
 }
 
 /**
+ * Agent memory constructor parameters
+ */
+export interface AgentMemoryParams extends MemoryParams {
+  state?: AgentMemoryState;
+}
+
+/**
  * Agent Memory Class
  *
  * Sophisticated memory system for agents with structured context management
  */
 export class AgentMemory extends Memory {
-  protected state: AgentMemoryState;
+  protected state: AgentMemoryState = {};
 
-  constructor(state?: AgentMemoryState) {
-    super(state);
-    this.state = state || {};
-    
-    // Initialize from state if provided
-    if (state) {
-      if (state.identity) this.setIdentity(state.identity);
-      if (state.purpose) this.setPurpose(state.purpose);
-      if (state.space) this.setSpace(state.space);
-    }
+  constructor(params: AgentMemoryParams = {}) {
+    // Call parent constructor first
+    super(params);
   }
 
   /**
@@ -278,4 +278,4 @@ export class AgentMemory extends Memory {
 }
 
 // Export types for external use
-export type { Message } from './Memory';
+export type { Message, MemoryParams } from './Memory';

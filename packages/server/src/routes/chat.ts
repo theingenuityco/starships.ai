@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { MemoryStateModel, MessageModel } from '@starships/protocol';
+import type { MemoryModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
@@ -330,7 +330,7 @@ router.get('/memories/starship/:starshipId', authMiddleware, async (req: Request
 
     console.log('🚀 [CHAT ROUTE] Repository returned:', {
       memoriesCount: allMemories.length,
-      memories: allMemories.map((m: MemoryStateModel) => ({
+      memories: allMemories.map((m: MemoryModel) => ({
         id: m.id,
         messageCount: m.messageCount
       }))

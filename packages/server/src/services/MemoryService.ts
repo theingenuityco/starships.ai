@@ -7,14 +7,10 @@
 
 import { MemoryRepository, RepositoryFactory } from '@starships/models';
 import type {
-  MemoryStateModel,
+  MemoryModel,
   CreateMemoryRequest,
   CreateAgentMemoryRequest,
   UpdateMemoryRequest,
-  UpdateAgentMemoryRequest,
-  MemoryListResponse,
-  MemoryResponse,
-  AgentMemoryResponse,
   SearchMemoriesRequest,
   SearchMemoriesResponse,
   MemoryFilters
@@ -51,7 +47,7 @@ export class MemoryService {
   /**
    * Create memory - Static method
    */
-  static async createMemory(request: CreateMemoryRequest): Promise<MemoryStateModel> {
+  static async createMemory(request: CreateMemoryRequest): Promise<MemoryModel> {
     const repository = RepositoryFactory.getMemoryRepository();
     
     // Process initial messages if provided and convert to Message format
@@ -64,8 +60,10 @@ export class MemoryService {
     }));
     
     return await repository.create({
-      ...request,
-      messages,
+      state: {
+        ...request.state,
+        messages
+      },
       messageCount: messages.length,
       version: '1.0.0'
     });
@@ -74,7 +72,7 @@ export class MemoryService {
   /**
    * Create agent memory - Static method
    */
-  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<MemoryStateModel> {
+  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<MemoryModel> {
     const repository = RepositoryFactory.getMemoryRepository();
     
     // Process initial messages if provided and convert to Message format
@@ -87,20 +85,22 @@ export class MemoryService {
     }));
     
     return await repository.create({
-      ...request,
-      messages,
+      state: {
+        ...request.state,
+        messages,
+        identity: request.identity,
+        purpose: request.purpose,
+        space: request.space,
+      },
       messageCount: messages.length,
-      version: '1.0.0',
-      identity: request.identity,
-      purpose: request.purpose,
-      space: request.space,
+      version: '1.0.0'
     });
   }
 
   /**
    * Get memory by ID - Static method
    */
-  static async getMemory(memoryId: string): Promise<MemoryStateModel | null> {
+  static async getMemory(memoryId: string): Promise<MemoryModel | null> {
     const repository = RepositoryFactory.getMemoryRepository();
     return await repository.findById(memoryId);
   }
@@ -108,9 +108,9 @@ export class MemoryService {
   /**
    * Update memory - Static method
    */
-  static async updateMemory(memoryId: string, updates: UpdateMemoryRequest): Promise<MemoryStateModel | null> {
+  static async updateMemory(memoryId: string, updates: UpdateMemoryRequest): Promise<MemoryModel | null> {
     const repository = RepositoryFactory.getMemoryRepository();
-    return await repository.update(memoryId, updates as Partial<MemoryStateModel>);
+    return await repository.update(memoryId, updates as Partial<MemoryModel>);
   }
 
   /**
@@ -124,7 +124,7 @@ export class MemoryService {
   /**
    * Get memories by starship - Static method
    */
-  static async getMemoriesByStarship(starshipId: string): Promise<MemoryStateModel[]> {
+  static async getMemoriesByStarship(starshipId: string): Promise<MemoryModel[]> {
     const repository = RepositoryFactory.getMemoryRepository();
     return await repository.findByStarshipId(starshipId);
   }
@@ -132,7 +132,7 @@ export class MemoryService {
   /**
    * Get memories by agent - Static method
    */
-  static async getMemoriesByAgent(agentId: string): Promise<MemoryStateModel[]> {
+  static async getMemoriesByAgent(agentId: string): Promise<MemoryModel[]> {
     const repository = RepositoryFactory.getMemoryRepository();
     return await repository.findByAgentId(agentId);
   }
@@ -158,7 +158,7 @@ export class MemoryService {
   /**
    * Create a new memory
    */
-  async createMemory(request: CreateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryStateModel> {
+  async createMemory(request: CreateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel> {
     console.log('🧠 [MEMORY-SERVICE] Creating memory:', {
       hasInitialMessages: !!(request.initialMessages && request.initialMessages.length > 0),
       timestamp: new Date().toISOString()
@@ -174,7 +174,10 @@ export class MemoryService {
     }));
     
     const memory = await this.memoryRepository.create({
-      messages,
+      state: {
+        ...request.state,
+        messages
+      },
       messageCount: messages.length,
       version: '1.0.0'
     });
@@ -186,7 +189,7 @@ export class MemoryService {
   /**
    * Create a new agent memory
    */
-  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryStateModel> {
+  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel> {
     console.log('🤖 [MEMORY-SERVICE] Creating agent memory:', {
       hasIdentity: !!request.identity,
       hasPurpose: !!request.purpose,
@@ -205,12 +208,15 @@ export class MemoryService {
     }));
     
     const agentMemory = await this.memoryRepository.create({
-      messages,
+      state: {
+        ...request.state,
+        messages,
+        identity: request.identity,
+        purpose: request.purpose,
+        space: request.space
+      },
       messageCount: messages.length,
-      version: '1.0.0',
-      identity: request.identity,
-      purpose: request.purpose,
-      space: request.space
+      version: '1.0.0'
     });
 
     console.log('✅ [MEMORY-SERVICE] Agent memory created:', agentMemory.id);
@@ -220,7 +226,7 @@ export class MemoryService {
   /**
    * Get memory by ID
    */
-  async getMemory(memoryId: string, options: MemoryServiceOptions = {}): Promise<MemoryStateModel | null> {
+  async getMemory(memoryId: string, options: MemoryServiceOptions = {}): Promise<MemoryModel | null> {
     const memory = await this.memoryRepository.findById(memoryId);
     
     if (!memory) {
@@ -238,14 +244,14 @@ export class MemoryService {
   /**
    * Update memory
    */
-  async updateMemory(memoryId: string, updates: UpdateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryStateModel | null> {
+  async updateMemory(memoryId: string, updates: UpdateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel | null> {
     console.log('✏️ [MEMORY-SERVICE] Updating memory:', {
       memoryId,
       updates: Object.keys(updates),
       timestamp: new Date().toISOString()
     });
 
-    const updatedMemory = await this.memoryRepository.update(memoryId, updates as Partial<MemoryStateModel>);
+    const updatedMemory = await this.memoryRepository.update(memoryId, updates as Partial<MemoryModel>);
     
     if (updatedMemory) {
       console.log('✅ [MEMORY-SERVICE] Memory updated:', memoryId);
@@ -283,15 +289,17 @@ export class MemoryService {
     purpose?: any;
     space?: any;
     tags?: string[];
-  }): Promise<MemoryStateModel> {
+  }): Promise<MemoryModel> {
     console.log('🚀 [MEMORY-SERVICE] Initializing agent memory:', {
       timestamp: new Date().toISOString()
     });
 
     return await this.createAgentMemory({
-      identity: config.identity,
-      purpose: config.purpose,
-      space: config.space
+      state: {
+        identity: config.identity,
+        purpose: config.purpose,
+        space: config.space
+      }
     });
   }
 
@@ -305,7 +313,7 @@ export class MemoryService {
       content: string;
       metadata?: Record<string, unknown>;
     }
-  ): Promise<MemoryStateModel | null> {
+  ): Promise<MemoryModel | null> {
     console.log('💭 [MEMORY-SERVICE] Adding message to memory:', {
       memoryId,
       role: message.role,
@@ -320,7 +328,8 @@ export class MemoryService {
     }
 
     // Add message to existing messages
-    const updatedMessages = [...(memory.messages || []), {
+    const currentMessages = (memory.state as any).messages || [];
+    const updatedMessages = [...currentMessages, {
       id: uuidv4(),
       timestamp: new Date().toISOString(),
       ...message
@@ -328,7 +337,10 @@ export class MemoryService {
 
     // Update memory with new message
     return await this.memoryRepository.update(memoryId, {
-      messages: updatedMessages,
+      state: {
+        ...memory.state,
+        messages: updatedMessages
+      },
       messageCount: updatedMessages.length,
       updatedAt: new Date().toISOString()
     });
@@ -337,14 +349,23 @@ export class MemoryService {
   /**
    * Clear memory messages
    */
-  async clearMemoryMessages(memoryId: string): Promise<MemoryStateModel | null> {
+  async clearMemoryMessages(memoryId: string): Promise<MemoryModel | null> {
     console.log('🧹 [MEMORY-SERVICE] Clearing memory messages:', {
       memoryId,
       timestamp: new Date().toISOString()
     });
 
+    // Get current memory
+    const memory = await this.memoryRepository.findById(memoryId);
+    if (!memory) {
+      throw new Error(`Memory ${memoryId} not found`);
+    }
+
     return await this.memoryRepository.update(memoryId, {
-      messages: [],
+      state: {
+        ...memory.state,
+        messages: []
+      },
       messageCount: 0,
       updatedAt: new Date().toISOString()
     });
@@ -375,7 +396,7 @@ export class MemoryService {
   /**
    * Get memories by filters
    */
-  async getMemoriesByFilters(filters: MemoryFilters, limit?: number, offset?: number): Promise<MemoryStateModel[]> {
+  async getMemoriesByFilters(filters: MemoryFilters, limit?: number, offset?: number): Promise<MemoryModel[]> {
     console.log('🎯 [MEMORY-SERVICE] Getting memories by filters:', {
       filters,
       limit,
@@ -393,14 +414,14 @@ export class MemoryService {
   /**
    * Get memories by tags
    */
-  async getMemoriesByTags(tags: string[], starshipId?: string): Promise<MemoryStateModel[]> {
+  async getMemoriesByTags(tags: string[], starshipId?: string): Promise<MemoryModel[]> {
     console.log('🏷️ [MEMORY-SERVICE] Getting memories by tags:', {
       tags,
       starshipId,
       timestamp: new Date().toISOString()
     });
 
-    let memories = await this.memoryRepository.findByTags(tags);
+    const memories = await this.memoryRepository.findByTags(tags);
 
     return memories;
   }
@@ -485,7 +506,7 @@ export class MemoryService {
   /**
    * Get memories by starship
    */
-  async getMemoriesByStarship(starshipId: string, limit?: number, offset?: number): Promise<MemoryStateModel[]> {
+  async getMemoriesByStarship(starshipId: string, limit?: number, offset?: number): Promise<MemoryModel[]> {
     const memories = await this.memoryRepository.findByStarshipId(starshipId);
     
     if (limit) {
@@ -498,7 +519,7 @@ export class MemoryService {
   /**
    * Get memories by agent
    */
-  async getMemoriesByAgent(agentId: string, limit?: number, offset?: number): Promise<MemoryStateModel[]> {
+  async getMemoriesByAgent(agentId: string, limit?: number, offset?: number): Promise<MemoryModel[]> {
     const memories = await this.memoryRepository.findByAgentId(agentId);
     
     if (limit) {
@@ -511,7 +532,7 @@ export class MemoryService {
   /**
    * Get all memories
    */
-  async getAllMemories(limit?: number, offset?: number): Promise<MemoryStateModel[]> {
+  async getAllMemories(limit?: number, offset?: number): Promise<MemoryModel[]> {
     const memories = await this.memoryRepository.findAll();
     
     if (limit) {
@@ -528,7 +549,7 @@ export class MemoryService {
     name?: string;
     includeMessages?: boolean;
     tags?: string[];
-  } = {}): Promise<MemoryStateModel> {
+  } = {}): Promise<MemoryModel> {
     console.log('📋 [MEMORY-SERVICE] Cloning memory:', {
       sourceMemoryId,
       targetStarshipId: targetContext.starshipId,
@@ -544,8 +565,12 @@ export class MemoryService {
     }
 
     // Create cloned memory
+    const sourceMessages = options.includeMessages ? (sourceMemory.state as any).messages || [] : [];
     const clonedMemory = await this.memoryRepository.create({
-      messages: options.includeMessages ? sourceMemory.messages : [],
+      state: {
+        ...sourceMemory.state,
+        messages: sourceMessages
+      },
       messageCount: options.includeMessages ? (sourceMemory.messageCount || 0) : 0,
       version: '1.0.0'
     });
@@ -565,7 +590,7 @@ export class MemoryService {
     name?: string;
     description?: string;
     preserveSourceTags?: boolean;
-  } = {}): Promise<MemoryStateModel> {
+  } = {}): Promise<MemoryModel> {
     console.log('🔀 [MEMORY-SERVICE] Merging memories:', {
       targetMemoryId,
       sourceMemoryIds,
@@ -590,17 +615,21 @@ export class MemoryService {
     }
 
     // Merge messages and metadata
-    const allMessages = [...(targetMemory.messages || [])];
+    const targetMessages = (targetMemory.state as any).messages || [];
+    const allMessages = [...targetMessages];
 
     for (const sourceMemory of sourceMemories) {
-      if (sourceMemory && sourceMemory.messages) {
-        allMessages.push(...sourceMemory.messages);
+      if (sourceMemory && (sourceMemory.state as any).messages) {
+        allMessages.push(...(sourceMemory.state as any).messages);
       }
     }
 
     // Update target memory
     const updatedMemory = await this.memoryRepository.update(targetMemoryId, {
-      messages: allMessages,
+      state: {
+        ...targetMemory.state,
+        messages: allMessages
+      },
       messageCount: allMessages.length,
       updatedAt: new Date().toISOString()
     });

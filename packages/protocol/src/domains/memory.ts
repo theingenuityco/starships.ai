@@ -20,9 +20,9 @@ import type {
 
 /**
  * Database Memory interface - core API contract type
- * Extends MemoryState from autopilot with database fields
+ * Contains state as a key instead of inheritance for better serialization
  */
-export interface MemoryStateModel extends MemoryState {
+export interface MemoryModel {
   // Core database fields
   id: string;
   createdAt: string;
@@ -31,6 +31,9 @@ export interface MemoryStateModel extends MemoryState {
 
   // Database-specific computed field
   messageCount: number;
+  
+  // State container
+  state: MemoryState;
 }
 
 
@@ -86,7 +89,7 @@ export interface UpdateAgentMemoryRequest extends Partial<CreateAgentMemoryReque
  * Memory database response with pagination
  */
 export interface MemoryListResponse {
-  memories: MemoryStateModel[];
+  memories: MemoryModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -97,7 +100,7 @@ export interface MemoryListResponse {
  * AgentMemory database response with pagination
  */
 export interface AgentMemoryListResponse {
-  memories: MemoryStateModel[];
+  memories: MemoryModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -108,14 +111,14 @@ export interface AgentMemoryListResponse {
  * Memory response with single memory
  */
 export interface MemoryResponse {
-  memory: MemoryStateModel;
+  memory: MemoryModel;
 }
 
 /**
  * AgentMemory response with single agent memory
  */
 export interface AgentMemoryResponse {
-  memory: MemoryStateModel;
+  memory: MemoryModel;
 }
 
 /**
@@ -131,7 +134,7 @@ export interface SearchMemoriesRequest {
  * Response for search memories
  */
 export interface SearchMemoriesResponse {
-  memories: MemoryStateModel[];
+  memories: MemoryModel[];
   total: number;
   searchQuery: string;
 }

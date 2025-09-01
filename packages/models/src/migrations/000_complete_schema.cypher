@@ -69,9 +69,6 @@ CREATE CONSTRAINT edge_required_props IF NOT EXISTS FOR (e:Edge) REQUIRE (e.id, 
 CREATE CONSTRAINT memory_id_unique IF NOT EXISTS FOR (mem:Memory) REQUIRE mem.id IS UNIQUE;
 CREATE CONSTRAINT memory_required_props IF NOT EXISTS FOR (mem:Memory) REQUIRE (mem.id, mem.starshipId, mem.createdAt) IS NOT NULL;
 
-// AgentMemory constraints
-CREATE CONSTRAINT agent_memory_id_unique IF NOT EXISTS FOR (am:AgentMemory) REQUIRE am.id IS UNIQUE;
-CREATE CONSTRAINT agent_memory_required_props IF NOT EXISTS FOR (am:AgentMemory) REQUIRE (am.id, am.starshipId, am.agentId, am.createdAt) IS NOT NULL;
 
 // Message constraints
 CREATE CONSTRAINT message_id_unique IF NOT EXISTS FOR (msg:Message) REQUIRE msg.id IS UNIQUE;
@@ -205,11 +202,6 @@ CREATE INDEX memory_tags_array IF NOT EXISTS FOR (mem:Memory) ON (mem.tags);
 CREATE INDEX memory_message_count_index IF NOT EXISTS FOR (mem:Memory) ON (mem.messageCount);
 CREATE RANGE INDEX memory_created_at_range IF NOT EXISTS FOR (mem:Memory) ON (mem.createdAt);
 
-// AgentMemory indexes
-CREATE INDEX agent_memory_starship_id_index IF NOT EXISTS FOR (am:AgentMemory) ON (am.starshipId);
-CREATE INDEX agent_memory_agent_id_index IF NOT EXISTS FOR (am:AgentMemory) ON (am.agentId);
-CREATE INDEX agent_memory_tags_array IF NOT EXISTS FOR (am:AgentMemory) ON (am.tags);
-CREATE RANGE INDEX agent_memory_created_at_range IF NOT EXISTS FOR (am:AgentMemory) ON (am.createdAt);
 
 // Message indexes
 CREATE INDEX message_starship_id_index IF NOT EXISTS FOR (msg:Message) ON (msg.starshipId);
@@ -453,7 +445,6 @@ CREATE (m:Migration {
     'blueprint_management',
     'node_edge_system',
     'memory_management',
-    'agent_memory',
     'message_system',
     'session_models',
     'execution_tracking',

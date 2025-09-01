@@ -29,7 +29,7 @@ export class Agent {
     };
 
     // Create AgentMemory instance from config
-    this.memory = new AgentMemory(params.memory);
+    this.memory = new AgentMemory({ state: params.memory });
 
     // Create engine - handles all node types internally
     this.engine = new Engine();

@@ -162,27 +162,3 @@ export interface WorkflowAnalytics {
   popularityScore: number;
   lastExecuted?: string;
 }
-
-// ============================================================================
-// LEGACY WORKFLOW SUPPORT TYPES (for backward compatibility)
-// ============================================================================
-
-/**
- * Legacy CreateWorkflowRequest interface for WorkflowParsingService
- * TODO: Migrate to autopilot Blueprint pattern
- */
-export interface LegacyCreateWorkflowRequest {
-  missionId?: string;
-  expeditionId?: string;
-  nodes: Array<{
-    type: string;
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-    aiId?: string;
-  }>;
-  edges: Array<{
-    from: string;
-    to: string;
-  }>;
-}

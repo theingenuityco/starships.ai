@@ -502,14 +502,14 @@ export class MissionOrchestratorAgent {
     const mockWorkflow: MissionWorkflow = {
       id: `workflow-${missionId}`,
       missionId: missionId,
-      nodes: createRequest.nodes.map((node, index) => ({
-        id: node.aiId || `node-${index}`,
+      nodes: createRequest.blueprint!.nodes.map((node, index) => ({
+        id: node.ref || `node-${index}`,
         type: node.type as any,
         name: node.name,
         description: node.description,
         parameters: node.parameters
       })),
-      edges: createRequest.edges.map((edge, index) => ({
+      edges: createRequest.blueprint!.edges.map((edge, index) => ({
         id: `edge-${index}`,
         from: edge.from,
         to: edge.to

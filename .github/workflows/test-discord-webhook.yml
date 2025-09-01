@@ -2,6 +2,15 @@ name: Test Discord Webhook
 
 on:
   workflow_dispatch:  # Manual trigger only
+    inputs:
+      environment:
+        description: 'Which environment webhook to test'
+        required: true
+        default: 'prod'
+        type: choice
+        options:
+          - prod
+          - dev
 
 jobs:
   test-webhook:
@@ -10,7 +19,8 @@ jobs:
     steps:
       - name: Send Test Alert to Discord
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+          DISCORD_WEBHOOK: ${{ github.event.inputs.environment == 'prod' && secrets.DISCORD_PROD_WEBHOOK || secrets.DISCORD_DEV_WEBHOOK }}
+          ENV_NAME: ${{ github.event.inputs.environment == 'prod' && 'Production (#incident)' || 'Development (#dev-alerts)' }}
         run: |
           # Test message to verify webhook is working
           curl -X POST "$DISCORD_WEBHOOK" \
@@ -18,7 +28,7 @@ jobs:
             -d '{
               "embeds": [{
                 "title": "🧪 Webhook Test Successful!",
-                "description": "Your Discord webhook is properly configured and ready for uptime monitoring.",
+                "description": "Your '"$ENV_NAME"' Discord webhook is properly configured and ready for uptime monitoring.",
                 "color": 5814783,
                 "fields": [
                   {

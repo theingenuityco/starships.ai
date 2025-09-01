@@ -91,15 +91,15 @@ CREATE RANGE INDEX mission_created_at IF NOT EXISTS FOR (m:MissionModel) ON (m.c
 CREATE RANGE INDEX message_created_at IF NOT EXISTS FOR (msg:Message) ON (msg.createdAt);
 
 // ============================================================================
-// FULL-TEXT SEARCH INDEXES
+// FULL-TEXT SEARCH INDEXES (Neo4j 5.x syntax)
 // ============================================================================
 
-CALL db.index.fulltext.createNodeIndex('agentSearch', ['Agent'], ['name', 'description', 'systemPrompt', 'tags']);
-CALL db.index.fulltext.createNodeIndex('missionSearch', ['Mission'], ['name', 'description']);
-CALL db.index.fulltext.createNodeIndex('messageSearch', ['Message'], ['content']);
-CALL db.index.fulltext.createNodeIndex('workflowSearch', ['Workflow'], ['name', 'description', 'category', 'tags']);
-CALL db.index.fulltext.createNodeIndex('userSearch', ['User'], ['username', 'displayName', 'email']);
-CALL db.index.fulltext.createNodeIndex('starshipSearch', ['Starship'], ['name', 'description']);
+CREATE FULLTEXT INDEX agentSearch IF NOT EXISTS FOR (n:Agent) ON EACH [n.name, n.description, n.systemPrompt, n.tags];
+CREATE FULLTEXT INDEX missionSearch IF NOT EXISTS FOR (n:Mission) ON EACH [n.name, n.description];
+CREATE FULLTEXT INDEX messageSearch IF NOT EXISTS FOR (n:Message) ON EACH [n.content];
+CREATE FULLTEXT INDEX workflowSearch IF NOT EXISTS FOR (n:Workflow) ON EACH [n.name, n.description, n.category, n.tags];
+CREATE FULLTEXT INDEX userSearch IF NOT EXISTS FOR (n:User) ON EACH [n.username, n.displayName, n.email];
+CREATE FULLTEXT INDEX starshipSearch IF NOT EXISTS FOR (n:Starship) ON EACH [n.name, n.description];
 
 // ============================================================================
 // MIGRATION RECORD

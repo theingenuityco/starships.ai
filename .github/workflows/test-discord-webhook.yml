@@ -1,0 +1,47 @@
+name: Test Discord Webhook
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  test-webhook:
+    name: Test Discord Alert
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Test Alert to Discord
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_ALERTS_WEBHOOK }}
+        run: |
+          # Test message to verify webhook is working
+          curl -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "🧪 Webhook Test Successful!",
+                "description": "Your Discord webhook is properly configured and ready for uptime monitoring.",
+                "color": 5814783,
+                "fields": [
+                  {
+                    "name": "Test Type",
+                    "value": "Manual webhook test",
+                    "inline": true
+                  },
+                  {
+                    "name": "Triggered By",
+                    "value": "${{ github.actor }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Time",
+                    "value": "'"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"'",
+                    "inline": true
+                  }
+                ],
+                "footer": {
+                  "text": "Starships Uptime Monitor",
+                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+                }
+              }]
+            }'
+          
+          echo "✅ Test alert sent to Discord #system-alerts channel"

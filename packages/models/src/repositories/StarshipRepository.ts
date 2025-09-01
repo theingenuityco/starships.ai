@@ -26,33 +26,7 @@ export class StarshipRepository extends BaseRepository {
     }
   }
 
-  /**
-   * Validate starship class
-   */
-  private validateStarshipClass(starshipClass: StarshipModel['class']): void {
-    const validClasses: StarshipModel['class'][] = ['scout', 'cruiser', 'draught'];
-    if (!validClasses.includes(starshipClass)) {
-      this.handleValidationError([{ 
-        field: 'class', 
-        message: `Starship class must be one of: ${validClasses.join(', ')}. Got: ${starshipClass}`,
-        value: starshipClass
-      }]);
-    }
-  }
-
-  /**
-   * Validate starship status
-   */
-  private validateStarshipStatus(status: StarshipModel['status']): void {
-    const validStatuses: StarshipModel['status'][] = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
-    if (!validStatuses.includes(status)) {
-      this.handleValidationError([{ 
-        field: 'status', 
-        message: `Starship status must be one of: ${validStatuses.join(', ')}. Got: ${status}`,
-        value: status
-      }]);
-    }
-  }
+  // Validation removed - relying on database constraints instead
 
 
   async findAll(): Promise<StarshipModel[]> {
@@ -119,11 +93,6 @@ export class StarshipRepository extends BaseRepository {
       // Generate unique slug if not provided
       const slug = entity.slug || await this.generateUniqueSlug(entity.name, entity.ownerId);
       
-      // Validate status using the validation method
-      if (entity.status) {
-        this.validateStarshipStatus(entity.status);
-      }
-      
       const starship: StarshipModel = {
         ...entity,
         id: uuidv4(),
@@ -164,11 +133,6 @@ export class StarshipRepository extends BaseRepository {
         if (existingStarship) {
           updates.slug = await this.generateUniqueSlug(updates.name, existingStarship.ownerId);
         }
-      }
-      
-      // Validate status using the validation method
-      if (updates.status) {
-        this.validateStarshipStatus(updates.status);
       }
       
       const updateProps = {
@@ -300,9 +264,7 @@ export class StarshipRepository extends BaseRepository {
   async updateStatus(starshipId: string, status: StarshipModel['status']): Promise<boolean> {
     const connection = getConnection();
     
-    // Validate status using the validation method
-    this.validateStarshipStatus(status);
-    
+    // Database constraints will validate the status values
     const result = await connection.executeWrite<{ count: number }>(
       `MATCH (s:Starship) WHERE s.id = $starshipId
        SET s.status = $status, s.updatedAt = $timestamp

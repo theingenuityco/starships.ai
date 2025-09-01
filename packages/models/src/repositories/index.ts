@@ -15,6 +15,7 @@ export { MissionMessageRepository } from './MissionMessageRepository';
 export { BlueprintRepository } from './BlueprintRepository';
 export { NodeRepository } from './NodeRepository';
 export { EdgeRepository } from './EdgeRepository';
+export { ExecutionRepository } from './ExecutionRepository';
 
 // Export mission clarity repository
 export { MissionClarityRepository } from './MissionClarityRepository';
@@ -47,6 +48,7 @@ import { WaitlistRepository } from './WaitlistRepository';
 import { BlueprintRepository } from './BlueprintRepository';
 import { NodeRepository } from './NodeRepository';
 import { EdgeRepository } from './EdgeRepository';
+import { ExecutionRepository } from './ExecutionRepository';
 
 // Import mission clarity repository
 import { MissionClarityRepository } from './MissionClarityRepository';
@@ -90,6 +92,7 @@ export class RepositoryFactory {
   private static blueprintRepo: BlueprintRepository | null = null;
   private static nodeRepo: NodeRepository | null = null;
   private static edgeRepo: EdgeRepository | null = null;
+  private static executionRepo: ExecutionRepository | null = null;
 
   // Mission clarity repository instance
   private static missionClarityRepo: MissionClarityRepository | null = null;
@@ -169,6 +172,7 @@ export class RepositoryFactory {
       this.blueprintRepo = new BlueprintRepository();
       this.nodeRepo = new NodeRepository();
       this.edgeRepo = new EdgeRepository();
+      this.executionRepo = new ExecutionRepository();
 
       // Initialize mission clarity repository (no dependencies)
       this.missionClarityRepo = new MissionClarityRepository();
@@ -243,6 +247,7 @@ export class RepositoryFactory {
         blueprintRepo: this.blueprintRepo !== null,
         nodeRepo: this.nodeRepo !== null,
         edgeRepo: this.edgeRepo !== null,
+        executionRepo: this.executionRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
         waitlistRepo: this.waitlistRepo !== null,
@@ -442,6 +447,17 @@ export class RepositoryFactory {
     return this.sessionRepo;
   }
 
+  /**
+   * Get ExecutionRepository instance (synchronous)
+   */
+  static getExecutionRepository(): ExecutionRepository {
+    this.ensureInitialized();
+    if (!this.executionRepo) {
+      throw new Error('ExecutionRepository not initialized');
+    }
+    return this.executionRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -468,6 +484,7 @@ export class RepositoryFactory {
     this.memoryRepo = null;
     this.messageRepo = null;
     this.sessionRepo = null;
+    this.executionRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

@@ -24,13 +24,13 @@ CREATE CONSTRAINT starship_subscription_id_unique IF NOT EXISTS FOR (s:Starship)
 
 // Agent constraints
 CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE;
-CREATE CONSTRAINT agent_required_props IF NOT EXISTS FOR (a:Agent) REQUIRE (a.id, a.name, a.starshipId, a.authorId, a.createdAt) IS NOT NULL;
+CREATE CONSTRAINT agent_required_props IF NOT EXISTS FOR (a:Agent) REQUIRE (a.id, a.name, a.starshipId, a.createdAt) IS NOT NULL;
 CREATE CONSTRAINT agent_category_values IF NOT EXISTS FOR (a:Agent) REQUIRE a.category IN ['general', 'coding', 'creative', 'analysis', 'support'];
 
 // Agent Template constraints
-CREATE CONSTRAINT agent_template_id_unique IF NOT EXISTS FOR (at:AgentTemplateModel) REQUIRE at.id IS UNIQUE;
-CREATE CONSTRAINT agent_template_required_props IF NOT EXISTS FOR (at:AgentTemplateModel) REQUIRE (at.id, at.name, at.createdAt) IS NOT NULL;
-CREATE CONSTRAINT agent_template_category_values IF NOT EXISTS FOR (at:AgentTemplateModel) REQUIRE at.category IN ['general', 'coding', 'creative', 'analysis', 'support'];
+CREATE CONSTRAINT agent_template_id_unique IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
+CREATE CONSTRAINT agent_template_required_props IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE (at.id, at.name, at.createdAt) IS NOT NULL;
+CREATE CONSTRAINT agent_template_category_values IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.category IN ['general', 'coding', 'creative', 'analysis', 'support'];
 
 // Mission constraints
 CREATE CONSTRAINT mission_id_unique IF NOT EXISTS FOR (m:MissionModel) REQUIRE m.id IS UNIQUE;
@@ -80,7 +80,7 @@ CREATE CONSTRAINT message_processing_status_values IF NOT EXISTS FOR (msg:Messag
 
 // Session Model constraints
 CREATE CONSTRAINT session_model_id_unique IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.id IS UNIQUE;
-CREATE CONSTRAINT session_model_required_props IF NOT EXISTS FOR (cs:SessionModel) REQUIRE (cs.id, cs.source, cs.created_by, cs.created_at, cs.last_activity_at, cs.total_tokens) IS NOT NULL;
+CREATE CONSTRAINT session_model_required_props IF NOT EXISTS FOR (cs:SessionModel) REQUIRE (cs.id, cs.source, cs.createdBy, cs.createdAt, cs.lastActivityAt, cs.totalTokens) IS NOT NULL;
 CREATE CONSTRAINT session_model_source_values IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.source IN ['sibil', 'agent'];
 
 
@@ -102,6 +102,7 @@ CREATE CONSTRAINT stripe_event_id_unique IF NOT EXISTS FOR (se:StripeEvent) REQU
 
 // Waitlist constraints
 CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS FOR (w:Waitlist) REQUIRE w.email IS UNIQUE;
+CREATE CONSTRAINT waitlist_required_props IF NOT EXISTS FOR (w:Waitlist) REQUIRE (w.email, w.status, w.createdAt) IS NOT NULL;
 CREATE CONSTRAINT waitlist_status_values IF NOT EXISTS FOR (w:Waitlist) REQUIRE w.status IN ['approved', 'pending', 'rejected'];
 
 // ============================================================================
@@ -137,10 +138,10 @@ CREATE RANGE INDEX agent_created_at_range IF NOT EXISTS FOR (a:Agent) ON (a.crea
 CREATE INDEX agent_template_id_index IF NOT EXISTS FOR (a:Agent) ON (a.templateId);
 
 // Agent Template indexes
-CREATE INDEX agent_template_category_index IF NOT EXISTS FOR (at:AgentTemplateModel) ON (at.category);
-CREATE INDEX agent_template_author_index IF NOT EXISTS FOR (at:AgentTemplateModel) ON (at.authorId);
-CREATE INDEX agent_template_public_index IF NOT EXISTS FOR (at:AgentTemplateModel) ON (at.isPublic);
-CREATE INDEX agent_template_usage_index IF NOT EXISTS FOR (at:AgentTemplateModel) ON (at.usageCount);
+CREATE INDEX agent_template_category_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.category);
+CREATE INDEX agent_template_author_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.authorId);
+CREATE INDEX agent_template_public_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.isPublic);
+CREATE INDEX agent_template_usage_index IF NOT EXISTS FOR (at:AgentTemplate) ON (at.usageCount);
 
 // Mission indexes
 CREATE INDEX mission_starship_id_index IF NOT EXISTS FOR (m:MissionModel) ON (m.starshipId);
@@ -211,13 +212,13 @@ CREATE RANGE INDEX message_timestamp_range IF NOT EXISTS FOR (msg:Message) ON (m
 CREATE RANGE INDEX message_created_at_range IF NOT EXISTS FOR (msg:Message) ON (msg.createdAt);
 
 // Session Model indexes
-CREATE INDEX session_model_created_by_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by);
+CREATE INDEX session_model_created_by_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.createdBy);
 CREATE INDEX session_model_source_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.source);
-CREATE RANGE INDEX session_model_created_at_range IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_at);
-CREATE RANGE INDEX session_model_last_activity_range IF NOT EXISTS FOR (cs:SessionModel) ON (cs.last_activity_at);
-CREATE INDEX session_model_total_tokens_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.total_tokens);
-CREATE INDEX session_model_user_activity_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by, cs.last_activity_at);
-CREATE INDEX session_model_user_source_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.created_by, cs.source);
+CREATE RANGE INDEX session_model_created_at_range IF NOT EXISTS FOR (cs:SessionModel) ON (cs.createdAt);
+CREATE RANGE INDEX session_model_last_activity_range IF NOT EXISTS FOR (cs:SessionModel) ON (cs.lastActivityAt);
+CREATE INDEX session_model_total_tokens_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.totalTokens);
+CREATE INDEX session_model_user_activity_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.createdBy, cs.lastActivityAt);
+CREATE INDEX session_model_user_source_composite IF NOT EXISTS FOR (cs:SessionModel) ON (cs.createdBy, cs.source);
 
 
 // Execution indexes
@@ -238,7 +239,6 @@ CREATE INDEX workflow_runtime_status_idx IF NOT EXISTS FOR (wrs:WorkflowRuntimeS
 
 // Waitlist indexes
 CREATE INDEX waitlist_status_index IF NOT EXISTS FOR (w:Waitlist) ON (w.status);
-CREATE INDEX waitlist_added_by_index IF NOT EXISTS FOR (w:Waitlist) ON (w.addedBy);
 CREATE RANGE INDEX waitlist_created_at_range IF NOT EXISTS FOR (w:Waitlist) ON (w.createdAt);
 
 // ============================================================================
@@ -257,6 +257,18 @@ RETURN "Created full-text search index: " + name as result;
 CALL db.index.fulltext.createNodeIndex('messageSearch', ['Message'], ['content']) YIELD name
 RETURN "Created full-text search index: " + name as result;
 
+// Workflow full-text search
+CALL db.index.fulltext.createNodeIndex('workflowSearch', ['Workflow'], ['name', 'description', 'category', 'tags']) YIELD name
+RETURN "Created full-text search index: " + name as result;
+
+// User full-text search
+CALL db.index.fulltext.createNodeIndex('userSearch', ['User'], ['username', 'displayName', 'email']) YIELD name
+RETURN "Created full-text search index: " + name as result;
+
+// Starship full-text search
+CALL db.index.fulltext.createNodeIndex('starshipSearch', ['Starship'], ['name', 'description']) YIELD name
+RETURN "Created full-text search index: " + name as result;
+
 
 // ============================================================================
 // PERFORMANCE MONITORING SETUP
@@ -270,6 +282,34 @@ SET pm.name = 'Starship System Performance Monitor',
     pm.queryStats = {},
     pm.indexUsage = {},
     pm.constraintViolations = 0;
+
+// ============================================================================
+// RELATIONSHIP CREATION
+// ============================================================================
+
+// Create explicit relationships after nodes are created
+// These are example relationships - actual relationships will be created by repositories during operations
+
+// User owns Starships
+// MATCH (u:User), (s:Starship {ownerId: u.id})
+// CREATE (u)-[:OWNS {ownedSince: s.createdAt}]->(s);
+
+// Agents deployed on Starships
+// MATCH (a:Agent), (s:Starship {id: a.starshipId})
+// CREATE (a)-[:DEPLOYED_ON {deployedAt: a.createdAt, isActive: true}]->(s);
+
+// Starships have Memories
+// MATCH (s:Starship), (m:Memory)
+// WHERE EXISTS((m)<-[:HAS_MEMORY]-(s))
+// CREATE (s)-[:HAS_MEMORY]->(m);
+
+// Missions use Blueprints
+// MATCH (m:MissionModel), (b:Blueprint {id: m.blueprintId})
+// CREATE (m)-[:USES]->(b);
+
+// Workflows have Executions
+// MATCH (w:Workflow), (e:Execution {workflowId: w.id})
+// CREATE (w)-[:HAS_EXECUTION]->(e);
 
 // ============================================================================
 // MIGRATION COMPLETION RECORD
@@ -301,7 +341,9 @@ CREATE (m:Migration {
     'stripe_integration',
     'native_tool_api_keys',
     'waitlist_management',
-    'performance_optimizations'
+    'performance_optimizations',
+    'full_text_search_indexes',
+    'explicit_relationships'
   ]
 });
 

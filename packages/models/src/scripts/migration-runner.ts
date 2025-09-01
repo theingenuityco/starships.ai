@@ -313,7 +313,7 @@ export class MigrationRunner {
 
     try {
       // Check if migration record was created
-      const migrationExists = await this.isMigrationApplied('001_initialize_schema');
+      const migrationExists = await this.isMigrationApplied('000_complete_schema');
       if (!migrationExists) {
         errors.push('Schema initialization record not found');
       }

@@ -16,13 +16,6 @@ export { MemoryService } from './MemoryService';
 
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';
-export { VisionFileService } from './VisionFileService';
-
-// Vision refinement services
-export { VisionRefinementService } from './VisionRefinementService';
-export { AffirmationDetector } from './AffirmationDetector';
-export { VisionMetricsCalculator } from './VisionMetricsCalculator';
-export { VisionRefinementSessionManager } from './VisionRefinementSessionManager';
 
 // Mission services
 export { MissionOrchestratorService } from './MissionOrchestratorService';
@@ -34,18 +27,3 @@ export { WorkflowService } from './WorkflowService';
 export { ToolService } from './ToolService';
 
 // Note: Workflow execution engine has been moved to @starships/autopilot package
-
-// Vision refinement types
-export type {
-  VisionAnalysis,
-  RefinementContext,
-  VisionRefinementResponse
-} from './VisionRefinementService';
-
-export type {
-  VisionMetrics
-} from './VisionMetricsCalculator';
-
-export type {
-  VisionRefinementSession
-} from './VisionRefinementSessionManager';

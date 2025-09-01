@@ -23,7 +23,7 @@ import type {
   CreateMissionClarityRequest
 } from '@starships/protocol';
 import type { BlueprintModel } from '@starships/protocol';
-import type { StarshipModel, VisionModel } from '@starships/protocol';
+import type { StarshipModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 
 /**
@@ -51,7 +51,6 @@ export interface GraphExecutionCallbacks {
 interface MissionMetadata {
   mission: MissionModel;
   starship: StarshipModel;
-  vision: VisionModel;
 }
 
 /**
@@ -561,22 +560,13 @@ export class MissionOrchestratorAgent {
       }
 
       const starshipRepo = RepositoryFactory.getStarshipRepository();
-      const visionRepo = RepositoryFactory.getVisionRepository();
-
-      const [starship, vision] = await Promise.all([
-        starshipRepo.findById(mission.starshipId),
-        visionRepo.findByStarship(mission.starshipId)
-      ]);
+      const starship = await starshipRepo.findById(mission.starshipId);
 
       if (!starship) {
         throw new Error(`Starship not found: ${mission.starshipId}`);
       }
 
-      if (!vision) {
-        throw new Error(`Vision not found for starship: ${mission.starshipId}`);
-      }
-
-      return { mission, starship, vision };
+      return { mission, starship };
     } catch (error) {
       this.logger.error('Failed to load mission metadata', error as Error);
       throw error;

@@ -396,12 +396,11 @@ You coordinate starship missions by:
     const { metadata } = this.state;
     if (!metadata) return '';
     
-    const { mission, starship, vision } = metadata;
+    const { mission, starship } = metadata;
     
     return `MISSION: "${mission.name}"
 ├─ OBJECTIVE: ${mission.description}
 ├─ STARSHIP: ${starship.name} (${starship.class}-class)
-├─ VISION: ${vision.statement}
 └─ STATUS: ${mission.status}`;
   }
 

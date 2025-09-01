@@ -33,6 +33,9 @@ export { WorkflowRepository } from './WorkflowRepository';
 export { MemoryRepository } from './MemoryRepository';
 export { MessageRepository } from './MessageRepository';
 
+// Export session repository
+export { SessionRepository } from './SessionRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { MissionRepository } from './MissionRepository';
@@ -58,6 +61,9 @@ import { WorkflowRepository } from './WorkflowRepository';
 // Import memory and message repositories
 import { MemoryRepository } from './MemoryRepository';
 import { MessageRepository } from './MessageRepository';
+
+// Import session repository
+import { SessionRepository } from './SessionRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -101,6 +107,9 @@ export class RepositoryFactory {
   // Memory and message repository instances
   private static memoryRepo: MemoryRepository | null = null;
   private static messageRepo: MessageRepository | null = null;
+
+  // Session repository instance
+  private static sessionRepo: SessionRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -175,6 +184,9 @@ export class RepositoryFactory {
       this.memoryRepo = new MemoryRepository();
       this.messageRepo = new MessageRepository();
 
+      // Initialize session repository (no dependencies)
+      this.sessionRepo = new SessionRepository();
+
       // Initialize repositories with dependencies
       this.starshipRepo = new StarshipRepository();
 
@@ -237,6 +249,7 @@ export class RepositoryFactory {
         workflowRepo: this.workflowRepo !== null,
         memoryRepo: this.memoryRepo !== null,
         messageRepo: this.messageRepo !== null,
+        sessionRepo: this.sessionRepo !== null,
       }
     };
   }
@@ -418,6 +431,17 @@ export class RepositoryFactory {
     return this.messageRepo;
   }
 
+  /**
+   * Get SessionRepository instance (synchronous)
+   */
+  static getSessionRepository(): SessionRepository {
+    this.ensureInitialized();
+    if (!this.sessionRepo) {
+      throw new Error('SessionRepository not initialized');
+    }
+    return this.sessionRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -443,6 +467,7 @@ export class RepositoryFactory {
     this.workflowRepo = null;
     this.memoryRepo = null;
     this.messageRepo = null;
+    this.sessionRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

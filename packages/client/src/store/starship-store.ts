@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
-import { starshipAPI, visionAPI, type StarshipModel } from '@/lib/api';
+import { starshipAPI, type Starship } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { StarshipAgentsResponse } from '@starships/protocol';
 
@@ -50,19 +50,9 @@ interface StarshipState {
   // Command deck state (preserved)
   commandDeck: CommandDeckState;
   
-  // Vision state (restored to complex object)
-  vision: {
-    statement: string;
-    confidence: number;
-    lastUpdated: string;
-  };
-  visionLoading: boolean;
-  visionError: string | null;
-  
   // Legacy fields for backward compatibility (derived from active starship)
   get class(): 'scout' | 'cruiser' | 'draught';
   get powerLevel(): number;
-  get sibilInsights(): number;
   currentRoute: string;
 }
 
@@ -72,12 +62,7 @@ interface StarshipActions {
   createStarship: (data: {
     name: string;
     class: 'scout' | 'cruiser' | 'draught';
-    vision?: {
-      statement: string;
-      confidence?: number;
-      sibilSessionId?: string;
-    };
-  }) => Promise<{ id: string; slug: string; ownerId: string; class: 'scout' | 'cruiser' | 'draught'; name: string; maxAgents: number; status: 'active' | 'inactive' | 'disabled' | 'restricted' | 'pending_payment'; createdAt: string; updatedAt: string; plan?: 'scout' | 'cruiser' | 'draught'; subscriptionId?: string; billingPeriod?: 'monthly' | 'yearly'; }>;
+  }) => Promise<Starship>;
   deployAgent: (agentId: string) => Promise<void>;
   removeAgent: (agentId: string) => Promise<void>;
   
@@ -96,10 +81,6 @@ interface StarshipActions {
   clearErrors: () => void;
   clearError: (errorType: 'update' | 'delete' | 'status' | 'agents') => void;
   
-  // Vision actions (restored to complex object)
-  loadVision: (starshipId: string) => Promise<void>;
-  saveVision: (starshipId: string, statement: string, confidence?: number) => Promise<void>;
-  
   // Command deck actions (preserved)
   setCommandDeckVisibility: (visibility: CommandDeckState['visibility']) => void;
   updateProximityState: (proximityState: ProximityState) => void;
@@ -109,7 +90,6 @@ interface StarshipActions {
   setCommandDeckHover: (isHovered: boolean) => void;
   
   // Legacy actions for backward compatibility
-  updateVision: (statement: string) => void;
   navigateTo: (route: string) => void;
 }
 
@@ -148,15 +128,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           hasFocus: false,
           isHovered: false
         },
-        
-        // Vision state (restored to complex object)
-        vision: {
-          statement: '',
-          confidence: 0.8,
-          lastUpdated: new Date().toISOString()
-        },
-        visionLoading: false,
-        visionError: null,
 
         // Computed properties for backward compatibility
         get class() {
@@ -182,16 +153,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
         },
         
         
-        get sibilInsights() {
-          try {
-            const state = get();
-            if (!state || !state.starships) return 0;
-            const activeStarship = state.starships.find(s => s.id === state.activeStarshipId);
-            return 0; // Default sibil insights since sibilInsights doesn't exist on Starship
-          } catch {
-            return 0;
-          }
-        },
 
         // API Actions
         loadUserStarships: async () => {
@@ -226,12 +187,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             set({
               starships: newStarships,
               activeStarshipId: response.starship.id,
-              loading: false,
-              vision: {
-                statement: '',
-                confidence: 0.8,
-                lastUpdated: new Date().toISOString()
-              }
+              loading: false
             });
             
             // Return the created starship for navigation
@@ -404,8 +360,7 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
             updateError: null,
             deleteError: null,
             statusUpdateError: null,
-            agentsError: null,
-            visionError: null
+            agentsError: null
           });
         },
 
@@ -443,40 +398,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           set({ activeStarshipId: id });
         },
 
-        // Vision actions (restored to complex object)
-        loadVision: async (starshipId: string) => {
-          set({ visionLoading: true, visionError: null });
-          try {
-            const data = await visionAPI.get(starshipId);
-            set({
-              vision: {
-                statement: typeof data.vision === 'string' ? data.vision : '',
-                confidence: 0.8,
-                lastUpdated: new Date().toISOString()
-              },
-              visionLoading: false
-            });
-          } catch (error) {
-            set({ visionError: 'Failed to load vision', visionLoading: false });
-          }
-        },
-        
-        saveVision: async (starshipId: string, statement: string, confidence?: number) => {
-          set({ visionLoading: true, visionError: null });
-          try {
-            await visionAPI.save(starshipId, statement);
-            set({
-              vision: {
-                statement,
-                confidence: confidence || 0.8,
-                lastUpdated: new Date().toISOString()
-              },
-              visionLoading: false
-            });
-          } catch (error) {
-            set({ visionError: 'Failed to save vision', visionLoading: false });
-          }
-        },
 
         // Command deck actions (preserved)
         setCommandDeckVisibility: (visibility) =>
@@ -534,16 +455,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           }), false, 'commandDeck/setHover'),
 
         // Legacy actions for backward compatibility
-        updateVision: (statement) => {
-          set({
-            vision: {
-              statement,
-              confidence: get().vision.confidence,
-              lastUpdated: new Date().toISOString()
-            }
-          });
-        },
-
         navigateTo: (route) =>
           set({ currentRoute: route }, false, 'navigation/navigate')
       }),

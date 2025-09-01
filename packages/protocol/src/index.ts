@@ -15,18 +15,10 @@ export * from './domains/execution';
 export * from './domains/mission';
 export * from './domains/node';
 export * from './domains/starship';
-export * from './domains/vision';
 export * from './domains/user';
 export * from './domains/waitlist';
 export * from './domains/workflow';
 export * from './domains/native-tool';
 export * from './domains/memory';
 export * from './domains/message';
-
-
-
-// Export Vision Socket Events
-export type {
-  VisionSocketEvents,
-} from './domains/vision';
 

@@ -66,8 +66,6 @@ export function ChatSessionsSidebar({
     switch (source) {
       case 'agent':
         return <Bot className="w-4 h-4" />
-      case 'sibil':
-        return <Sparkles className="w-4 h-4" />
       default:
         return <MessageSquare className="w-4 h-4" />
     }
@@ -77,7 +75,7 @@ export function ChatSessionsSidebar({
     if (session.source === 'agent') {
       return session.agent_id ? `Agent Chat` : 'Agent Session'
     }
-    return 'AI Chat'
+    return 'Chat Session'
   }
 
   if (!isAuthenticated) {

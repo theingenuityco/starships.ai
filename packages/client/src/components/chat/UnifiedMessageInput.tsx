@@ -6,13 +6,11 @@ import { Button } from '@/components/ui/button'
 import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
-import { sibilAPI } from '@/lib/sibil-api'
 import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import type { Agent } from '@/lib/api'
 import type { ChatMode } from './ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
-import type { SibilMessage } from '@/lib/sibil-api'
 
 interface UnifiedMessageInputProps {
   mode: ChatMode
@@ -22,8 +20,8 @@ interface UnifiedMessageInputProps {
   starshipId?: string
   sessionId?: string | null
   onSessionStart?: (sessionId: string) => void
-  onMessageSent?: (message: Message | SibilMessage) => void
-  onMessageReceived?: (message: Message | SibilMessage) => void
+  onMessageSent?: (message: Message) => void
+  onMessageReceived?: (message: Message) => void
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
@@ -77,71 +75,41 @@ export function UnifiedMessageInput({
       }
 
       // Create user message (sessionId will be provided by server)
-      const userMessage: Message | SibilMessage = {
+      const userMessage: Message = {
         id: generateId(),
         content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
         sessionId: currentSessionId || 'pending', // Temporary until server provides real sessionId
-        ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
+        agentId: selectedAgent!.id
       }
 
       // Emit user message (no need to store manually - server handles this)
       onMessageSent?.(userMessage)
 
-      // Send to appropriate API
-      if (mode === 'agent') {
-        currentStreamRef.current = agentSocketAPI.sendMessageStream(
-          selectedAgent!.id,
-          { sessionId: currentSessionId, message: messageToSend },
-          {
-            onChunk: (chunk, accumulatedContent) => {
-              // Handle streaming updates if needed
-            },
-            onComplete: (assistantMessage) => {
-              // Always use the session ID from server response for future requests
-              if (assistantMessage.sessionId) {
-                onSessionStart?.(assistantMessage.sessionId)
-              }
-              // No need to store manually - server handles this via socket handlers
-              onMessageReceived?.(assistantMessage)
-              currentStreamRef.current = null
-            },
-            onError: (error) => {
-              console.error('Agent chat error:', error)
-              currentStreamRef.current = null
-            }
-          }
-        )
-      } else {
-        currentStreamRef.current = sibilAPI.sendMessageStream(
-          {
-            provider,
-            model,
-            message: messageToSend,
-            sessionId: currentSessionId,
-            starshipId
+      // Send to agent API
+      currentStreamRef.current = agentSocketAPI.sendMessageStream(
+        selectedAgent!.id,
+        { sessionId: currentSessionId, message: messageToSend },
+        {
+          onChunk: (chunk, accumulatedContent) => {
+            // Handle streaming updates if needed
           },
-          {
-            onChunk: (chunk, accumulatedContent) => {
-              // Handle streaming updates if needed
-            },
-            onComplete: (assistantMessage) => {
-              // Always use the session ID from server response for future requests
-              if (assistantMessage.sessionId) {
-                onSessionStart?.(assistantMessage.sessionId)
-              }
-              // No need to store manually - server handles this via socket handlers
-              onMessageReceived?.(assistantMessage)
-              currentStreamRef.current = null
-            },
-            onError: (error) => {
-              console.error('Sibil chat error:', error)
-              currentStreamRef.current = null
+          onComplete: (assistantMessage) => {
+            // Always use the session ID from server response for future requests
+            if (assistantMessage.sessionId) {
+              onSessionStart?.(assistantMessage.sessionId)
             }
+            // No need to store manually - server handles this via socket handlers
+            onMessageReceived?.(assistantMessage)
+            currentStreamRef.current = null
+          },
+          onError: (error) => {
+            console.error('Agent chat error:', error)
+            currentStreamRef.current = null
           }
-        )
-      }
+        }
+      )
       
       setMessage('')
       
@@ -183,71 +151,41 @@ export function UnifiedMessageInput({
       }
 
       // Create user message (sessionId will be provided by server)
-      const userMessage: Message | SibilMessage = {
+      const userMessage: Message = {
         id: generateId(),
         content: suggestionText,
         role: 'user',
         timestamp: new Date().toISOString(),
         sessionId: currentSessionId || 'pending', // Temporary until server provides real sessionId
-        ...(mode === 'agent' ? { agentId: selectedAgent!.id } : { provider, model })
+        agentId: selectedAgent!.id
       }
 
       // Emit user message (no need to store manually - server handles this)
       onMessageSent?.(userMessage)
 
-      // Send to appropriate API
-      if (mode === 'agent') {
-        currentStreamRef.current = agentSocketAPI.sendMessageStream(
-          selectedAgent!.id,
-          { sessionId: currentSessionId, message: suggestionText },
-          {
-            onChunk: (chunk, accumulatedContent) => {
-              // Handle streaming updates if needed
-            },
-            onComplete: (assistantMessage) => {
-              // Always use the session ID from server response for future requests
-              if (assistantMessage.sessionId) {
-                onSessionStart?.(assistantMessage.sessionId)
-              }
-              // No need to store manually - server handles this via socket handlers
-              onMessageReceived?.(assistantMessage)
-              currentStreamRef.current = null
-            },
-            onError: (error) => {
-              console.error('Agent chat error:', error)
-              currentStreamRef.current = null
-            }
-          }
-        )
-      } else {
-        currentStreamRef.current = sibilAPI.sendMessageStream(
-          {
-            provider,
-            model,
-            message: suggestionText,
-            sessionId: currentSessionId,
-            starshipId
+      // Send to agent API
+      currentStreamRef.current = agentSocketAPI.sendMessageStream(
+        selectedAgent!.id,
+        { sessionId: currentSessionId, message: suggestionText },
+        {
+          onChunk: (chunk, accumulatedContent) => {
+            // Handle streaming updates if needed
           },
-          {
-            onChunk: (chunk, accumulatedContent) => {
-              // Handle streaming updates if needed
-            },
-            onComplete: (assistantMessage) => {
-              // Always use the session ID from server response for future requests
-              if (assistantMessage.sessionId) {
-                onSessionStart?.(assistantMessage.sessionId)
-              }
-              // No need to store manually - server handles this via socket handlers
-              onMessageReceived?.(assistantMessage)
-              currentStreamRef.current = null
-            },
-            onError: (error) => {
-              console.error('Sibil chat error:', error)
-              currentStreamRef.current = null
+          onComplete: (assistantMessage) => {
+            // Always use the session ID from server response for future requests
+            if (assistantMessage.sessionId) {
+              onSessionStart?.(assistantMessage.sessionId)
             }
+            // No need to store manually - server handles this via socket handlers
+            onMessageReceived?.(assistantMessage)
+            currentStreamRef.current = null
+          },
+          onError: (error) => {
+            console.error('Agent chat error:', error)
+            currentStreamRef.current = null
           }
-        )
-      }
+        }
+      )
     } catch (error) {
       console.error('Failed to send suggestion:', error)
     } finally {

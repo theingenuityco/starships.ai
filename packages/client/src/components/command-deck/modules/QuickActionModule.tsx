@@ -7,7 +7,6 @@ import { useEffect, useState } from 'react';
 import { CrewQuickModule } from './quick-actions/CrewQuickModule';
 import { DriveQuickModule } from './quick-actions/DriveQuickModule';
 import { LogbookQuickModule } from './quick-actions/LogbookQuickModule';
-import { SibilQuickModule } from './quick-actions/SibilQuickModule';
 import { SystemQuickModule } from './quick-actions/SystemQuickModule';
 
 interface QuickActionModuleProps {
@@ -39,7 +38,6 @@ export function QuickActionModule({ className = '' }: QuickActionModuleProps) {
       if (Math.random() > 0.8) {
         const routeInsights = {
           '/crew': ['Crew morale high', 'New assignment available', 'Training session completed'],
-          '/sibil': ['Pattern recognition enhanced', 'Prediction accuracy increased', 'New data correlation found'],
           '/drive': ['Engine efficiency improved', 'Navigation recalibrated', 'Fuel optimization active'],
           '/logbook': ['New entries archived', 'Search index updated', 'Data integrity verified']
         };
@@ -80,8 +78,6 @@ export function QuickActionModule({ className = '' }: QuickActionModuleProps) {
         return <DriveQuickModule {...moduleProps} />;
       case '/logbook':
         return <LogbookQuickModule {...moduleProps} />;
-      case '/sibil':
-        return <SibilQuickModule {...moduleProps} />;
       default:
         return <SystemQuickModule {...moduleProps} />;
     }
@@ -92,7 +88,6 @@ export function QuickActionModule({ className = '' }: QuickActionModuleProps) {
       case '/crew': return 'Crew Status';
       case '/drive': return 'Drive Systems';
       case '/logbook': return 'Ship Logs';
-      case '/sibil': return 'AI Insights';
       default: return 'Ship Overview';
     }
   };
@@ -102,7 +97,6 @@ export function QuickActionModule({ className = '' }: QuickActionModuleProps) {
       case '/crew': return '👥';
       case '/drive': return '🚀';
       case '/logbook': return '📚';
-      case '/sibil': return '🧠';
       default: return '🛸';
     }
   };

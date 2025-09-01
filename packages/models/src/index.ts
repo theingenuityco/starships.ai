@@ -10,12 +10,9 @@ export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 export { AgentRepository } from './repositories/AgentRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
-export { ChatSessionRepository } from './repositories/ChatSessionRepository';
-export { ChatMessageRepository } from './repositories/ChatMessageRepository';
 
 // Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
-export { VisionRepository } from './repositories/VisionRepository';
 export { MissionRepository } from './repositories/MissionRepository';
 export { MissionMessageRepository } from './repositories/MissionMessageRepository';
 export { BlueprintRepository } from './repositories/BlueprintRepository';

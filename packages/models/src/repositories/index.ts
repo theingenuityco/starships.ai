@@ -7,7 +7,6 @@ export { UserRepository } from './UserRepository';
 
 // NEW: Aether Core Repositories
 export { StarshipRepository } from './StarshipRepository';
-export { VisionRepository } from './VisionRepository';
 export { MissionRepository } from './MissionRepository';
 export { MissionMessageRepository } from './MissionMessageRepository';
 
@@ -36,7 +35,6 @@ export { MessageRepository } from './MessageRepository';
 
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
-import { VisionRepository } from './VisionRepository';
 import { MissionRepository } from './MissionRepository';
 import { MissionMessageRepository } from './MissionMessageRepository';
 import { WaitlistRepository } from './WaitlistRepository';
@@ -78,7 +76,6 @@ export class RepositoryFactory {
 
   // Aether Core repository instances
   private static starshipRepo: StarshipRepository | null = null;
-  private static visionRepo: VisionRepository | null = null;
   private static missionRepo: MissionRepository | null = null;
   private static missionMessageRepo: MissionMessageRepository | null = null;
 
@@ -155,7 +152,6 @@ export class RepositoryFactory {
       // Initialize basic repositories first (no dependencies)
       this.agentRepo = new AgentRepository();
       this.userRepo = new UserRepository();
-      this.visionRepo = new VisionRepository();
       this.missionRepo = new MissionRepository();
       this.missionMessageRepo = new MissionMessageRepository();
 
@@ -230,7 +226,6 @@ export class RepositoryFactory {
         agentRepo: this.agentRepo !== null,
         userRepo: this.userRepo !== null,
         starshipRepo: this.starshipRepo !== null,
-        visionRepo: this.visionRepo !== null,
         missionRepo: this.missionRepo !== null,
         missionMessageRepo: this.missionMessageRepo !== null,
         blueprintRepo: this.blueprintRepo !== null,
@@ -285,16 +280,6 @@ export class RepositoryFactory {
     return this.starshipRepo;
   }
 
-  /**
-   * Get VisionRepository instance (synchronous)
-   */
-  static getVisionRepository(): VisionRepository {
-    this.ensureInitialized();
-    if (!this.visionRepo) {
-      throw new Error('VisionRepository not initialized');
-    }
-    return this.visionRepo;
-  }
 
 
 
@@ -447,7 +432,6 @@ export class RepositoryFactory {
     this.agentRepo = null;
     this.userRepo = null;
     this.starshipRepo = null;
-    this.visionRepo = null;
     this.missionRepo = null;
     this.missionMessageRepo = null;
     this.blueprintRepo = null;

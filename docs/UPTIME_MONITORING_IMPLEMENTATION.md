@@ -50,21 +50,24 @@
 - [ ] Test Discord webhook connection (pending - needs workflow on main branch)
 - [ ] Test manual workflow trigger
 
+##### ✅ Just Completed
+- [x] Create PR to main branch ✅ (PR #203: https://github.com/theingenuityco/starships.ai/pull/203)
+
 ##### 📋 Upcoming Tasks
-- [ ] Create PR to main branch
-- [ ] Merge and deploy
+- [ ] Get PR reviewed and merged
+- [ ] Test Discord webhook after merge
 - [ ] Verify automated runs
-- [ ] Build status page
-- [ ] Configure GitHub Pages
+- [ ] Configure GitHub Pages for status page
+- [ ] Set up DNS for uptime.starships.ai
 
 ### ⚠️ Current Blockers & Risks
 
 | Type | Description | Impact | Mitigation |
 |------|-------------|--------|------------|
-| 🔴 **Blocker** | Webhook test not confirmed | Cannot proceed to deployment | Test webhook manually via script |
-| 🟡 **Risk** | Workflows only visible on main branch | Testing limited until PR merged | Use manual script testing |
-| 🟡 **Risk** | Health endpoints not verified | May get false positives | Test endpoints manually first |
-| 🟢 **Dependency** | Requires team approval for PR | Delay in go-live | Get early review from team |
+| ✅ **Resolved** | ~~Health endpoints not verified~~ | ~~May get false positives~~ | ✅ Verified working at /api/health |
+| 🟡 **In Progress** | PR awaiting review | Cannot test workflows until merged | PR #203 created, needs team review |
+| 🟢 **Next Step** | Webhook test after merge | Need main branch for testing | Will test immediately after merge |
+| 🟢 **Ready** | All components built | Implementation complete | Just needs deployment |
 
 ## Overview
 Implementation of a comprehensive uptime monitoring system for starships.ai and dev.starships.ai with public status page and Discord alerting.
@@ -561,11 +564,11 @@ Jan 22            ░░░░░░░░░░  Go Live 🚀
 
 | Milestone | Target Date | Status | Completion |
 |-----------|------------|--------|------------|
-| **M1: Discord Alerts Working** | Jan 15 | 🟡 In Progress | 70% |
-| **M2: Monitoring Active** | Jan 16 | ⏳ Pending | 0% |
-| **M3: Status Page Live** | Jan 18 | ⏳ Pending | 0% |
-| **M4: Production Ready** | Jan 19 | ⏳ Pending | 0% |
-| **M5: Public Launch** | Jan 22 | ⏳ Pending | 0% |
+| **M1: Discord Alerts Working** | Jan 15 | 🟡 In Progress | 90% - PR created, awaiting merge |
+| **M2: Monitoring Active** | Jan 16 | 🟡 Ready | 80% - Will activate on merge |
+| **M3: Status Page Live** | Jan 18 | ✅ Built | 100% - HTML ready, needs GitHub Pages |
+| **M4: Production Ready** | Jan 19 | 🟢 On Track | 85% - Just needs testing |
+| **M5: Public Launch** | Jan 22 | 🟢 On Track | 80% - Pending deployment |
 
 ### Week 1: Development
 - ✅ Day 1 (Jan 15): Core monitoring implementation - **IN PROGRESS**

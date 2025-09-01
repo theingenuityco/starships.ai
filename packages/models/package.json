@@ -23,7 +23,10 @@
     "cleanup:abandoned-starships:dry": "tsx src/scripts/cleanup-abandoned-starships.ts --dry-run",
     "validate-schema": "tsx src/scripts/schema-validator.ts",
     "monitor": "tsx src/scripts/performance-monitor.ts",
-    "db-cli": "tsx src/scripts/db-cli.ts"
+    "db-cli": "tsx src/scripts/db-cli.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@starships/autopilot": "workspace:*",
@@ -34,11 +37,14 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.10",
     "@types/node-fetch": "^2.6.12",
     "@types/uuid": "^10.0.0",
     "dotenv": "^17.1.0",
+    "jest": "^30.1.1",
     "node-fetch": "^2.7.0",
+    "ts-jest": "^29.4.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }

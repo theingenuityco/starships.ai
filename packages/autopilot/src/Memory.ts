@@ -21,7 +21,7 @@ export interface Message {
 /**
  * Memory state configuration for base Memory class
  */
-export interface MemoryState {
+export interface MemoryState extends Record<string, any> {
   messages?: Message[];
 }
 

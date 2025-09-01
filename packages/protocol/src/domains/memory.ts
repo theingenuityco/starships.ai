@@ -33,19 +33,6 @@ export interface MemoryStateModel extends MemoryState {
   messageCount: number;
 }
 
-/**
- * Database AgentMemory interface - extends AgentMemoryState from autopilot with database fields
- */
-export interface AgentMemoryStateModel extends AgentMemoryState {
-  // Core database fields
-  id: string;
-  createdAt: string;
-  updatedAt: string;
-  version: string;
-
-  // Database-specific computed field
-  messageCount: number;
-}
 
 // ============================================================================
 // MEMORY REQUEST/RESPONSE TYPES
@@ -110,7 +97,7 @@ export interface MemoryListResponse {
  * AgentMemory database response with pagination
  */
 export interface AgentMemoryListResponse {
-  memories: AgentMemoryStateModel[];
+  memories: MemoryStateModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -128,7 +115,7 @@ export interface MemoryResponse {
  * AgentMemory response with single agent memory
  */
 export interface AgentMemoryResponse {
-  memory: AgentMemoryStateModel;
+  memory: MemoryStateModel;
 }
 
 /**

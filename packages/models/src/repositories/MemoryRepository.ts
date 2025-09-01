@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import type { MemoryStateModel, AgentMemoryStateModel } from '@starships/protocol';
+import type { MemoryStateModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
@@ -16,7 +16,7 @@ export class MemoryRepository extends BaseRepository {
   /**
    * Serialize complex objects for Neo4j storage
    */
-  private serializeComplexFields(memory: MemoryStateModel | AgentMemoryStateModel): any {
+  private serializeComplexFields(memory: MemoryStateModel): any {
     const serialized = {
       ...memory,
       messages: memory.messages ? JSON.stringify(memory.messages) : null,
@@ -138,6 +138,7 @@ export class MemoryRepository extends BaseRepository {
         version: entity.version || '1.0.0',
         messages: messages,
         messageCount: messages.length,
+        ...entity, // Include all other fields including AgentMemory-specific ones
       };
 
       // Handle AgentMemory specific fields if they exist
@@ -152,36 +153,6 @@ export class MemoryRepository extends BaseRepository {
     }, 'create', 'Memory');
   }
 
-  async createAgentMemory(
-    entity: Omit<AgentMemoryStateModel, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<AgentMemoryStateModel> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      const now = new Date().toISOString();
-      
-      const messages = entity.messages || [];
-      const agentMemory: AgentMemoryStateModel = {
-        id: uuidv4(),
-        createdAt: now,
-        updatedAt: now,
-        version: entity.version || '1.0.0',
-        messages: messages,
-        messageCount: messages.length,
-        identity: entity.identity,
-        purpose: entity.purpose,
-        space: entity.space,
-      };
-
-      const memoryForStorage = this.serializeComplexFields(agentMemory);
-
-      await connection.executeWrite(
-        'CREATE (m:AgentMemory:Memory $props) RETURN m',
-        { props: memoryForStorage }
-      );
-      
-      return convertNeo4jIntsInObject(agentMemory) as AgentMemoryStateModel;
-    }, 'createAgentMemory', 'AgentMemory');
-  }
 
   async update(id: string, updates: Partial<MemoryStateModel>): Promise<MemoryStateModel | null> {
     return this.executeWithErrorHandling(async () => {

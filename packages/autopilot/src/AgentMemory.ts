@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, Message } from './Memory';
+import { Memory, Message, MemoryState } from './Memory';
 
 /**
  * Agent identity information
@@ -36,11 +36,10 @@ export interface AgentSpace {
 /**
  * Agent memory state configuration for AgentMemory class
  */
-export interface AgentMemoryState {
+export interface AgentMemoryState extends MemoryState {
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
-  messages?: Message[];
 }
 
 /**

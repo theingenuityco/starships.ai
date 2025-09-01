@@ -8,7 +8,6 @@
 import { MemoryRepository, RepositoryFactory } from '@starships/models';
 import type {
   MemoryStateModel,
-  AgentMemoryStateModel,
   CreateMemoryRequest,
   CreateAgentMemoryRequest,
   UpdateMemoryRequest,
@@ -75,7 +74,7 @@ export class MemoryService {
   /**
    * Create agent memory - Static method
    */
-  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<AgentMemoryStateModel> {
+  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<MemoryStateModel> {
     const repository = RepositoryFactory.getMemoryRepository();
     
     // Process initial messages if provided and convert to Message format
@@ -87,11 +86,14 @@ export class MemoryService {
       metadata: msg.metadata
     }));
     
-    return await repository.createAgentMemory({
+    return await repository.create({
       ...request,
       messages,
       messageCount: messages.length,
-      version: '1.0.0'
+      version: '1.0.0',
+      identity: request.identity,
+      purpose: request.purpose,
+      space: request.space,
     });
   }
 
@@ -184,7 +186,7 @@ export class MemoryService {
   /**
    * Create a new agent memory
    */
-  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<AgentMemoryStateModel> {
+  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryStateModel> {
     console.log('🤖 [MEMORY-SERVICE] Creating agent memory:', {
       hasIdentity: !!request.identity,
       hasPurpose: !!request.purpose,
@@ -202,7 +204,7 @@ export class MemoryService {
       metadata: msg.metadata
     }));
     
-    const agentMemory = await this.memoryRepository.createAgentMemory({
+    const agentMemory = await this.memoryRepository.create({
       messages,
       messageCount: messages.length,
       version: '1.0.0',
@@ -281,7 +283,7 @@ export class MemoryService {
     purpose?: any;
     space?: any;
     tags?: string[];
-  }): Promise<AgentMemoryStateModel> {
+  }): Promise<MemoryStateModel> {
     console.log('🚀 [MEMORY-SERVICE] Initializing agent memory:', {
       timestamp: new Date().toISOString()
     });

@@ -1,9 +1,9 @@
-name: Uptime Monitor
+name: Uptime Monitor with Discord Bot
 
 on:
   schedule:
     - cron: '*/5 * * * *'  # Every 5 minutes
-  workflow_dispatch:  # Allow manual trigger for testing
+  workflow_dispatch:
 
 jobs:
   check-health:
@@ -15,9 +15,11 @@ jobs:
           - name: "Production"
             environment: "prod"
             emoji: "🚀"
+            channel_name: "incidents"  # Production alerts to #incidents
           - name: "Development"
             environment: "dev"  
             emoji: "🛠️"
+            channel_name: "dev-alerts"  # Dev alerts to #dev-alerts
     
     environment: ${{ matrix.environment }}
     
@@ -30,24 +32,30 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Check ${{ matrix.name }} Health
+      - name: Install Discord.js
+        run: |
+          # Check if discord.js is already installed, if not install it
+          if [ ! -d ".github/scripts/node_modules/discord.js" ]; then
+            cd .github/scripts
+            npm install discord.js
+          fi
+      
+      - name: Check Health
         id: health_check
         env:
           SERVICE_URL: ${{ vars.CLIENT_URL || vars.KINDE_SITE_URL }}
           SERVICE_NAME: ${{ matrix.name }}
-          SERVICE_EMOJI: ${{ matrix.emoji }}
         run: |
           # Verify URL is set
           if [ -z "$SERVICE_URL" ]; then
             echo "❌ ERROR: SERVICE_URL not set for $SERVICE_NAME environment"
-            echo "Please configure CLIENT_URL or KINDE_SITE_URL in GitHub environment: ${{ matrix.environment }}"
             echo "status=misconfigured" >> $GITHUB_OUTPUT
             exit 1
           fi
           
           echo "Checking health of $SERVICE_NAME at $SERVICE_URL"
           
-          # Perform health check with timeout (using /api/health endpoint)
+          # Perform health check
           START_TIME=$(date +%s%3N)
           HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SERVICE_URL/api/health" || echo "000")
           END_TIME=$(date +%s%3N)
@@ -76,7 +84,6 @@ jobs:
       - name: Load Previous Status
         id: previous_status
         run: |
-          # Check if status file exists
           if [ -f ".github/status/${{ matrix.environment }}-status.txt" ]; then
             PREV_STATUS=$(cat .github/status/${{ matrix.environment }}-status.txt)
             echo "previous=$PREV_STATUS" >> $GITHUB_OUTPUT
@@ -84,10 +91,12 @@ jobs:
             echo "previous=unknown" >> $GITHUB_OUTPUT
           fi
       
-      - name: Send Discord Alert on Status Change
+      - name: Send Discord Alert via Bot
         if: steps.health_check.outputs.status != 'operational' || (steps.previous_status.outputs.previous != 'operational' && steps.health_check.outputs.status == 'operational')
         env:
-          DISCORD_WEBHOOK: ${{ matrix.environment == 'prod' && secrets.DISCORD_PROD_WEBHOOK || secrets.DISCORD_DEV_WEBHOOK }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_GUILD_ID: ${{ secrets.DISCORD_GUILD_ID }}
+          CHANNEL_NAME: ${{ matrix.channel_name }}
           STATUS: ${{ steps.health_check.outputs.status }}
           PREV_STATUS: ${{ steps.previous_status.outputs.previous }}
           HTTP_CODE: ${{ steps.health_check.outputs.http_code }}
@@ -96,86 +105,90 @@ jobs:
           SERVICE_NAME: ${{ matrix.name }}
           SERVICE_EMOJI: ${{ matrix.emoji }}
         run: |
-          # Determine alert type and color
-          if [ "$STATUS" = "operational" ]; then
-            TITLE="✅ SERVICE RECOVERED"
-            COLOR=5763719  # Green
-            DESCRIPTION="${SERVICE_EMOJI} **${SERVICE_NAME}** is back online!"
-          elif [ "$STATUS" = "timeout" ]; then
-            TITLE="⏱️ SERVICE TIMEOUT"
-            COLOR=16705372  # Orange
-            DESCRIPTION="${SERVICE_EMOJI} **${SERVICE_NAME}** is not responding (timeout after 10s)"
-          else
-            TITLE="🚨 SERVICE DOWN"
-            COLOR=15548997  # Red
-            DESCRIPTION="${SERVICE_EMOJI} **${SERVICE_NAME}** is currently unavailable"
-          fi
+          cat << 'EOF' > send-alert.js
+          const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
           
-          # Send Discord notification
-          curl -X POST "$DISCORD_WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "'"$TITLE"'",
-                "description": "'"$DESCRIPTION"'",
-                "color": '"$COLOR"',
-                "fields": [
-                  {
-                    "name": "🌐 Service",
-                    "value": "'"$SERVICE_NAME"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "📊 Status",
-                    "value": "'"$STATUS"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "⚡ Response",
-                    "value": "'"${RESPONSE_TIME}ms"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "🔗 URL",
-                    "value": "'"$SERVICE_URL"'",
-                    "inline": false
-                  },
-                  {
-                    "name": "💻 HTTP Code",
-                    "value": "'"$HTTP_CODE"'",
-                    "inline": true
-                  },
-                  {
-                    "name": "⏰ Time",
-                    "value": "'"$(date -u '+%Y-%m-%d %H:%M:%S UTC')"'",
-                    "inline": true
-                  }
-                ],
-                "footer": {
-                  "text": "Starships Uptime Monitor",
-                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-                },
-                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
-              }]
-            }'
+          async function sendAlert() {
+            const client = new Client({
+              intents: [
+                GatewayIntentBits.Guilds,
+                GatewayIntentBits.GuildMessages
+              ]
+            });
+            
+            try {
+              await client.login(process.env.DISCORD_BOT_TOKEN);
+              console.log('Bot logged in successfully');
+              
+              // Get the guild
+              const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID);
+              
+              // Find the channel by name
+              const channel = guild.channels.cache.find(
+                ch => ch.name === process.env.CHANNEL_NAME && ch.type === 0 // 0 = text channel
+              );
+              
+              if (!channel) {
+                console.error(`Channel #${process.env.CHANNEL_NAME} not found`);
+                process.exit(1);
+              }
+              
+              // Determine alert type and color
+              let title, color, description;
+              const status = process.env.STATUS;
+              const serviceName = process.env.SERVICE_NAME;
+              const emoji = process.env.SERVICE_EMOJI;
+              
+              if (status === 'operational') {
+                title = '✅ SERVICE RECOVERED';
+                color = 0x57F287; // Green
+                description = `${emoji} **${serviceName}** is back online!`;
+              } else if (status === 'timeout') {
+                title = '⏱️ SERVICE TIMEOUT';
+                color = 0xFEE75C; // Orange
+                description = `${emoji} **${serviceName}** is not responding (timeout after 10s)`;
+              } else {
+                title = '🚨 SERVICE DOWN';
+                color = 0xED4245; // Red
+                description = `${emoji} **${serviceName}** is currently unavailable`;
+              }
+              
+              // Create embed
+              const embed = new EmbedBuilder()
+                .setTitle(title)
+                .setDescription(description)
+                .setColor(color)
+                .addFields(
+                  { name: '🌐 Service', value: serviceName, inline: true },
+                  { name: '📊 Status', value: status, inline: true },
+                  { name: '⚡ Response', value: `${process.env.RESPONSE_TIME}ms`, inline: true },
+                  { name: '🔗 URL', value: process.env.SERVICE_URL, inline: false },
+                  { name: '💻 HTTP Code', value: process.env.HTTP_CODE, inline: true },
+                  { name: '⏰ Time', value: new Date().toUTCString(), inline: true }
+                )
+                .setFooter({ text: 'Starships Uptime Monitor' })
+                .setTimestamp();
+              
+              // Send the message
+              await channel.send({ embeds: [embed] });
+              console.log(`Alert sent to #${process.env.CHANNEL_NAME}`);
+              
+              // Cleanup
+              client.destroy();
+            } catch (error) {
+              console.error('Error sending alert:', error.message);
+              process.exit(1);
+            }
+          }
+          
+          sendAlert();
+          EOF
+          
+          node send-alert.js
       
-      - name: Update Status Data
+      - name: Update Status
         if: always()
-        env:
-          NODE_ENV: ${{ matrix.environment }}
-          PROD_URL: ${{ matrix.environment == 'prod' && (vars.CLIENT_URL || vars.KINDE_SITE_URL) || '' }}
-          DEV_URL: ${{ matrix.environment == 'dev' && (vars.CLIENT_URL || vars.KINDE_SITE_URL) || '' }}
         run: |
-          # Update status data file
-          if [ -f ".github/scripts/update-status-data.js" ]; then
-            node .github/scripts/update-status-data.js \
-              "${{ matrix.environment }}" \
-              "${{ steps.health_check.outputs.status }}" \
-              "${{ steps.health_check.outputs.response_time }}" \
-              "${{ steps.health_check.outputs.http_code }}"
-          fi
-          
-          # Save simple status for tracking
           mkdir -p .github/status
           echo "${{ steps.health_check.outputs.status }}" > .github/status/${{ matrix.environment }}-status.txt
           
@@ -183,43 +196,7 @@ jobs:
           if [ "${{ steps.health_check.outputs.status }}" != "${{ steps.previous_status.outputs.previous }}" ]; then
             git config --local user.email "github-actions[bot]@users.noreply.github.com"
             git config --local user.name "github-actions[bot]"
-            git add .github/status/ status-page/data/ || true
+            git add .github/status/
             git diff --staged --quiet || git commit -m "chore: update ${{ matrix.environment }} status to ${{ steps.health_check.outputs.status }}"
             git push || echo "No changes to push"
           fi
-
-  daily-summary:
-    name: Daily Summary Report
-    runs-on: ubuntu-latest
-    if: github.event.schedule == '0 9 * * *'  # Only run at 9 AM UTC
-    steps:
-      - name: Send Daily Summary
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_PROD_WEBHOOK }}
-        run: |
-          curl -X POST "$DISCORD_WEBHOOK" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "embeds": [{
-                "title": "📊 Daily Uptime Summary",
-                "description": "Service health report for the last 24 hours",
-                "color": 3447003,
-                "fields": [
-                  {
-                    "name": "🚀 Production",
-                    "value": "Uptime: Calculating...",
-                    "inline": true
-                  },
-                  {
-                    "name": "🛠️ Development",
-                    "value": "Uptime: Calculating...",
-                    "inline": true
-                  }
-                ],
-                "footer": {
-                  "text": "Full report available at uptime.starships.ai",
-                  "icon_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
-                },
-                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
-              }]
-            }'

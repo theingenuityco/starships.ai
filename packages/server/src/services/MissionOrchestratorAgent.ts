@@ -5,28 +5,24 @@
  * using direct LLM integration with mission context awareness.
  */
 
-import { LLMService } from './LLMService';
 import { RepositoryFactory } from '@starships/models';
 import { AIMessage, HumanMessage, SystemMessage } from '../utils/message-types';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
-import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
-import { WorkflowService } from './WorkflowService';
 import { MissionService } from './MissionService';
-import { MISSION_PHASES } from '@starships/protocol';
 import { WorkflowParsingService } from './WorkflowParsingService';
-import { Workflow, createAgentMemory, AgentMemory } from '@starships/autopilot';
+import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
+import { MISSION_PHASES } from '@starships/protocol';
+import { Workflow, createAgentMemory, AgentMemory, LLM, createLLM } from '@starships/autopilot';
+import type { LlmNodeParameters } from '@starships/autopilot';
 import type {
   Mission,
   MissionPhase,
   MissionClarity,
   MissionWorkflow,
   CreateWorkflowRequest,
-  CreateMissionClarityRequest,
-  LLMChatPrompt,
-  LLMProvider
+  CreateMissionClarityRequest
 } from '@starships/protocol';
-import type { LLM } from '@starships/models';
 import type { Starship, Vision } from '@starships/protocol';
 import type { AgentModel } from '@starships/models';
 
@@ -96,7 +92,7 @@ interface WorkflowApprovalResult {
  */
 export class MissionOrchestratorAgent {
   private logger: Logger;
-  private llmProvider: LLMProvider | null = null;
+  private llm: LLM | null = null;
   
   // Clarity assessment configuration constants
   private static readonly CLARITY_THRESHOLD = 7.5;
@@ -254,9 +250,8 @@ export class MissionOrchestratorAgent {
    */
   private async handleWelcomePhase(state: MissionChatState): Promise<string> {
     const systemPrompt = new MissionPromptBuilder(state).buildWelcomePrompt();
-    const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     
-    const response = await this.callLLM(prompt);
+    const response = await this.callLLM(systemPrompt);
     
     // Update mission phase to analysis after welcome
     if (state.metadata) {
@@ -340,7 +335,7 @@ export class MissionOrchestratorAgent {
       // Present workflow for approval (only for pending workflows)
       if (workflow.approvalStatus === 'pending') {
         const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
-        return await this.callLLM(prompt);
+        return await this.callLLM(prompt.messages[0].content);
       }
       
       // For approved workflows, move to execute phase
@@ -384,9 +379,8 @@ export class MissionOrchestratorAgent {
    */
   private async handleConversePhase(state: MissionChatState): Promise<string> {
     const systemPrompt = new MissionPromptBuilder(state).buildConversePrompt();
-    const prompt: LLMChatPrompt = { messages: [{ role: 'system', content: systemPrompt }] };
     
-    return await this.callLLM(prompt);
+    return await this.callLLM(systemPrompt);
   }
 
   /**
@@ -497,7 +491,7 @@ export class MissionOrchestratorAgent {
   private async generateWorkflow(missionId: string, state: MissionChatState): Promise<MissionWorkflow> {
     const agents = await this.getAssignedAgents(missionId);
     const prompt = new MissionPromptBuilder(state).buildWorkflowGenerationPrompt(agents);
-    const aiResponse = await this.callLLM(prompt);
+    const aiResponse = await this.callLLM(prompt.messages[0].content);
     
     console.log('[Workflow Generation] LLM Response:', aiResponse);
     
@@ -606,42 +600,28 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Call LLM provider for response generation
+   * Call LLM for response generation
    */
-  private async callLLM(prompt: LLMChatPrompt): Promise<string> {
-    if (!this.llmProvider) {
-      await this.initializeLLMProvider();
-    }
-
-    if (!this.llmProvider) {
-      throw new Error('LLM provider not initialized');
-    }
-
-    const result = await this.llmProvider.complete(prompt, {
-      temperature: this.config.temperature,
-      maxTokens: this.config.maxTokens
-    });
-
-    return result.reply;
-  }
-
-  /**
-   * Initialize LLM provider
-   */
-  private async initializeLLMProvider(): Promise<void> {
+  private async callLLM(promptContent: string): Promise<string> {
     try {
-      const llmConfig: LLM = {
-        id: 'default-mission-orchestrator',
-        name: this.config.model,
-        provider: this.config.provider,
+      // Create LLM instance with specific prompt for each call
+      const llmConfig: LlmNodeParameters = {
+        model: this.config.model,
+        prompt: promptContent,
         temperature: this.config.temperature,
-        maxTokens: this.config.maxTokens,
-        createdAt: new Date().toISOString()
+        maxTokens: this.config.maxTokens
       };
 
-      this.llmProvider = new LLMService(llmConfig);
+      const llm = createLLM(llmConfig);
+      const result = await llm.execute();
+
+      if (result.status === 'completed' && result.data?.llmResponse) {
+        return result.data.llmResponse;
+      } else {
+        throw new Error(`LLM execution failed: ${result.error?.message || 'Unknown error'}`);
+      }
     } catch (error) {
-      this.logger.error('Failed to initialize LLM provider', error as Error);
+      this.logger.error('Failed to call LLM', error as Error);
       throw error;
     }
   }
@@ -687,11 +667,8 @@ export class MissionOrchestratorAgent {
    */
   private async assessMissionClarity(state: MissionChatState, iteration: number): Promise<CreateMissionClarityRequest> {
     const systemPrompt = new MissionPromptBuilder(state).buildClarityAssessmentPrompt();
-    const prompt: LLMChatPrompt = {
-      messages: [{ role: 'system', content: systemPrompt }]
-    };
 
-    const response = await this.callLLM(prompt);
+    const response = await this.callLLM(systemPrompt);
     const clarityData = this.parseJSONResponse(response);
     
     return {
@@ -711,11 +688,8 @@ export class MissionOrchestratorAgent {
    */
   private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
     const systemPrompt = new MissionPromptBuilder(state).buildClarityQuestionPrompt(isFirstIteration);
-    const prompt: LLMChatPrompt = {
-      messages: [{ role: 'system', content: systemPrompt }]
-    };
 
-    return await this.callLLM(prompt);
+    return await this.callLLM(systemPrompt);
   }
 
   /**
@@ -723,11 +697,8 @@ export class MissionOrchestratorAgent {
    */
   private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
     const systemPrompt = new MissionPromptBuilder(state).buildClarityCompletionPrompt(isFirstIteration);
-    const prompt: LLMChatPrompt = {
-      messages: [{ role: 'system', content: systemPrompt }]
-    };
 
-    return await this.callLLM(prompt);
+    return await this.callLLM(systemPrompt);
   }
 
   /**
@@ -806,7 +777,7 @@ export class MissionOrchestratorAgent {
       const promptBuilder = new MissionPromptBuilder(state);
       const prompt = promptBuilder.buildWorkflowApprovalIntentPrompt(message);
       
-      const response = await this.callLLM(prompt);
+      const response = await this.callLLM(prompt.messages[0].content);
       const result = this.parseWorkflowApprovalResponse(response);
       
       return result;

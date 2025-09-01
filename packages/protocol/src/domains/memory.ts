@@ -20,22 +20,16 @@ import type {
 
 /**
  * Database Memory interface - core API contract type
- * Extends base Memory functionality with database fields
+ * Extends MemoryState from autopilot with database fields
  */
-export interface MemoryModel {
+export interface MemoryStateModel extends MemoryState {
   // Core database fields
   id: string;
   createdAt: string;
   updatedAt: string;
   version: string;
 
-  // Memory content
-  messages: Array<{
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-    metadata?: Record<string, unknown>;
-    timestamp?: string;
-  }>; // JSON serialized messages from Memory class
+  // Database-specific computed field
   messageCount: number;
   
   // Ownership
@@ -49,20 +43,26 @@ export interface MemoryModel {
 }
 
 /**
- * Database AgentMemory interface - extends MemoryModel with agent-specific fields
+ * Database AgentMemory interface - extends AgentMemoryState from autopilot with database fields
  */
-export interface AgentMemoryModel extends MemoryModel {
-  // Agent-specific memory fields
-  identity?: AgentIdentity;
-  purpose?: AgentPurpose;
-  space?: AgentSpace;
+export interface AgentMemoryStateModel extends AgentMemoryState {
+  // Core database fields
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  version: string;
+
+  // Database-specific computed field
+  messageCount: number;
   
-  // Agent memory state
-  state?: AgentMemoryState;
-  
-  
-  // Required agent assignment for AgentMemory
-  agentId: string;
+  // Ownership
+  starshipId: string;
+  agentId: string; // Required agent assignment for AgentMemory
+
+  // Memory metadata
+  name?: string;
+  description?: string;
+  tags?: string[];
 }
 
 // ============================================================================
@@ -124,7 +124,7 @@ export interface UpdateAgentMemoryRequest extends Partial<CreateAgentMemoryReque
  * Memory database response with pagination
  */
 export interface MemoryListResponse {
-  memories: MemoryModel[];
+  memories: MemoryStateModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -135,7 +135,7 @@ export interface MemoryListResponse {
  * AgentMemory database response with pagination
  */
 export interface AgentMemoryListResponse {
-  memories: AgentMemoryModel[];
+  memories: AgentMemoryStateModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -146,14 +146,14 @@ export interface AgentMemoryListResponse {
  * Memory response with single memory
  */
 export interface MemoryResponse {
-  memory: MemoryModel;
+  memory: MemoryStateModel;
 }
 
 /**
  * AgentMemory response with single agent memory
  */
 export interface AgentMemoryResponse {
-  memory: AgentMemoryModel;
+  memory: AgentMemoryStateModel;
 }
 
 /**
@@ -172,7 +172,7 @@ export interface SearchMemoriesRequest {
  * Response for search memories
  */
 export interface SearchMemoriesResponse {
-  memories: MemoryModel[];
+  memories: MemoryStateModel[];
   total: number;
   searchQuery: string;
 }

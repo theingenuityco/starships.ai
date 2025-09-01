@@ -192,12 +192,14 @@ describe('UserRepository', () => {
     it('should handle merge operation for existing kindeId', async () => {
       const userData = {
         kindeId: 'existing-kinde',
+        username: 'existinguser',
         email: 'updated@example.com',
         displayName: 'Updated Name'
       };
 
       const existingUser = global.createMockUser({
         kindeId: 'existing-kinde',
+        username: 'existinguser',
         email: 'updated@example.com',
         displayName: 'Updated Name'
       });
@@ -356,6 +358,7 @@ describe('UserRepository', () => {
 
       const userData = {
         kindeId: 'kinde-123',
+        username: 'testuser',
         email: 'test@example.com'
       };
 
@@ -374,6 +377,7 @@ describe('UserRepository', () => {
     it('should handle user registration flow', async () => {
       const kindeUserData = {
         kindeId: 'kinde_oauth_user',
+        username: 'oauthuser',
         email: 'oauth@example.com',
         displayName: 'OAuth User'
       };

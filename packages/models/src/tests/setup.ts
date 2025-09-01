@@ -29,11 +29,11 @@ const mockDriver = {
 // Mock user data
 (global as any).createMockUser = (overrides: any = {}) => ({
   id: 'user-123',
+  username: 'testuser',
   email: 'test@example.com',
   kindeId: 'kinde-123',
-  name: 'Test User',
+  displayName: 'Test User',
   createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides
 });
 
@@ -42,9 +42,11 @@ const mockDriver = {
   id: 'starship-123',
   name: 'Test Starship',
   slug: 'test-starship',
-  description: 'A test starship for testing purposes',
+  ownerId: 'user-123',
+  class: 'scout',
+  maxAgents: 3,
+  maxActiveMissions: 3,
   status: 'active',
-  userId: 'user-123',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides
@@ -144,7 +146,7 @@ const mockDriver = {
   new ConflictError(message, conflictType);
 
 // Mock database session with common patterns
-(global as any).createMockSession = () => {
+(global as any).createMockDatabaseSession = () => {
   const session = {
     run: jest.fn(),
     close: jest.fn(),

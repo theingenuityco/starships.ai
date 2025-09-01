@@ -170,7 +170,7 @@ describe('StarshipRepository', () => {
         name: 'Test Scout',
         ownerId: 'owner-123',
         class: 'scout' as const,
-        description: 'A test scout ship'
+        status: 'active' as const
       };
 
       mockConnection.executeWrite.mockResolvedValueOnce([]); // CREATE starship
@@ -201,7 +201,8 @@ describe('StarshipRepository', () => {
       const starshipData = {
         name: 'Test Cruiser',
         ownerId: 'owner-123',
-        class: 'cruiser' as const
+        class: 'cruiser' as const,
+        status: 'active' as const
       };
 
       mockConnection.executeWrite.mockResolvedValueOnce([]);
@@ -226,7 +227,8 @@ describe('StarshipRepository', () => {
       const starshipData = {
         name: 'Test Draught',
         ownerId: 'owner-123',
-        class: 'draught' as const
+        class: 'draught' as const,
+        status: 'active' as const
       };
 
       mockConnection.executeWrite.mockResolvedValueOnce([]);
@@ -260,7 +262,8 @@ describe('StarshipRepository', () => {
       const starshipData = {
         name: 'Test Ship',
         ownerId: 'owner-123',
-        class: 'scout' as const
+        class: 'scout' as const,
+        status: 'active' as const
       };
 
       mockConnection.executeWrite.mockResolvedValueOnce([]);
@@ -680,7 +683,8 @@ describe('StarshipRepository', () => {
       const starshipData = {
         name: 'Test Ship',
         ownerId: 'owner-123',
-        class: 'scout' as const
+        class: 'scout' as const,
+        status: 'active' as const
       };
 
       await expect(repository.create(starshipData)).rejects.toThrow();

@@ -351,7 +351,7 @@ describe('Neo4jConnection', () => {
 
     it('should preserve Neo4j Integer objects', () => {
       const mockInt = { toNumber: () => 123 };
-      (neo4j.isInt as jest.Mock).mockReturnValue(true);
+      (neo4j.isInt as unknown as jest.Mock).mockReturnValue(true);
 
       const result = sanitizeMethod(mockInt);
 

@@ -39,8 +39,8 @@ export default function ShipsPage() {
       const isOnboarding = isOnboardingFromSearchParams || isOnboardingFromWindow;
       const isResumed = isResumedFromSearchParams || isResumedFromWindow;
       
-      // Alternative: Check if there's a pending vision session regardless of URL params
-      let hasPendingVisionSession = false;
+      // Alternative: Check if there's a pending onboarding session regardless of URL params
+      let hasPendingOnboardingSession = false;
       let onboardingCompleted = false;
       
       try {
@@ -50,12 +50,12 @@ export default function ShipsPage() {
           // Check if onboarding was already completed
           if (parsed?.data?.onboardingStep === 'complete') {
             onboardingCompleted = true;
-          } else if (parsed?.data?.pendingVision && parsed?.data?.isOnboarding) {
-            hasPendingVisionSession = true;
+          } else if (parsed?.data?.isOnboarding) {
+            hasPendingOnboardingSession = true;
           }
         }
       } catch (e) {
-        console.error('[Fleet] Failed to check for pending vision:', e);
+        console.error('[Fleet] Failed to check for pending onboarding session:', e);
       }
       
       // If onboarding was already completed, clear the session and don't open modal
@@ -66,17 +66,17 @@ export default function ShipsPage() {
         return;
       }
       
-      console.log('[Fleet] Onboarding check:', { 
-        isOnboarding, 
+      console.log('[Fleet] Onboarding check:', {
+        isOnboarding,
         isResumed,
-        hasPendingVisionSession,
+        hasPendingOnboardingSession,
         hasProcessedOnboarding,
         searchParamsValue: searchParams.toString(),
-        windowLocationSearch: window.location.search 
+        windowLocationSearch: window.location.search
       });
       
       // Check both URL params and session existence
-      if ((isOnboarding || hasPendingVisionSession) && !hasProcessedOnboarding) {
+      if ((isOnboarding || hasPendingOnboardingSession) && !hasProcessedOnboarding) {
         // Try to restore the session
         let restoredSession = restoreSession();
         console.log('[Fleet] Restored session from hook:', restoredSession);
@@ -97,7 +97,7 @@ export default function ShipsPage() {
           }
         }
         
-        if (restoredSession && restoredSession.pendingVision && restoredSession.onboardingStep !== 'complete') {
+        if (restoredSession && restoredSession.onboardingStep !== 'complete') {
           // Only update step if not already set to avoid re-renders
           if (restoredSession.onboardingStep !== 'creation') {
             updateStep('creation');
@@ -105,18 +105,18 @@ export default function ShipsPage() {
           setShouldOpenCreate(true);
           setHasProcessedOnboarding(true); // Mark as processed to prevent reopening
           
-          console.log('[Fleet] Opening create modal with vision:', restoredSession.pendingVision?.slice(0, 50));
+          console.log('[Fleet] Opening create modal for onboarding');
           
           // Show a welcome back message if resumed
           if (isResumed) {
             toast.success('Welcome back! Let\'s continue creating your starship.', {
-              description: `Vision: "${restoredSession.pendingVision?.slice(0, 50) || 'Your vision'}..."`,
+              description: 'Complete your starship setup to get started.',
               duration: 5000,
             });
           } else {
-            // Show vision confirmation toast
-            toast.success('Vision captured! Let\'s create your starship.', {
-              description: `"${restoredSession.pendingVision?.slice(0, 50) || 'Your vision'}..."`,
+            // Show onboarding confirmation toast
+            toast.success('Let\'s create your starship!', {
+              description: 'Configure your starship to begin your journey.',
               duration: 5000,
             });
           }

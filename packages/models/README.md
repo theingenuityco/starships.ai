@@ -46,7 +46,6 @@ const starships = await starshipRepo.findAll();
 - **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`)
 - **Agents**: AI entities deployed on starships with specific roles and capabilities
 - **Missions**: Task execution contexts with phases and messaging
-- **Vision**: Strategic goals and objectives for each starship
 
 ### Repository Factory
 Centralized repository management with synchronous access for Socket.IO compatibility:
@@ -91,7 +90,6 @@ try {
 | **MissionRepository** | Mission lifecycle management |
 | **MissionMessageRepository** | Mission communication logs |
 | **MissionClarityRepository** | Mission requirement analysis |
-| **VisionRepository** | Starship vision and goals |
 | **WorkflowRepository** | Workflow definitions and execution |
 | **LLMRepository** | LLM provider configurations |
 | **NativeToolApiKeyRepository** | API key management |

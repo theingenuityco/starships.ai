@@ -536,14 +536,7 @@ export class StarshipRepository extends BaseRepository {
   async cleanupAbandonedStarship(starshipId: string): Promise<void> {
     const connection = getConnection();
     
-    // Delete associated vision first
-    await connection.executeWrite(
-      `MATCH (v:Vision {starshipId: $starshipId})
-       DELETE v`,
-      { starshipId }
-    );
-    
-    // Then delete the starship
+    // Delete the starship
     await connection.executeWrite(
       `MATCH (s:Starship {id: $starshipId})
        DELETE s`,

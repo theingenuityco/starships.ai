@@ -48,9 +48,6 @@ CREATE CONSTRAINT mission_message_role_values IF NOT EXISTS FOR (mm:MissionMessa
 CREATE CONSTRAINT mission_clarity_id_unique IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE mc.id IS UNIQUE;
 CREATE CONSTRAINT mission_clarity_required_props IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE (mc.id, mc.missionId, mc.createdAt) IS NOT NULL;
 
-// Vision constraints
-CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE;
-CREATE CONSTRAINT vision_starship_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.starshipId IS UNIQUE;
 
 // Workflow constraints
 CREATE CONSTRAINT workflow_id_unique IF NOT EXISTS FOR (w:Workflow) REQUIRE w.id IS UNIQUE;
@@ -173,18 +170,6 @@ CREATE RANGE INDEX mission_message_timestamp_range IF NOT EXISTS FOR (mm:Mission
 CREATE INDEX mission_clarity_mission_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.missionId);
 CREATE INDEX mission_clarity_score_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.overallScore);
 
-// Vision indexes
-CREATE INDEX vision_starship_id_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId);
-CREATE INDEX vision_clarity_score_index IF NOT EXISTS FOR (v:Vision) ON (v.clarityScore);
-CREATE INDEX vision_specificity_score_index IF NOT EXISTS FOR (v:Vision) ON (v.specificityScore);
-CREATE INDEX vision_actionability_score_index IF NOT EXISTS FOR (v:Vision) ON (v.actionabilityScore);
-CREATE INDEX vision_inspirational_score_index IF NOT EXISTS FOR (v:Vision) ON (v.inspirationalScore);
-CREATE INDEX vision_overall_quality_index IF NOT EXISTS FOR (v:Vision) ON (v.overallQuality);
-CREATE INDEX vision_starship_quality_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId, v.overallQuality);
-CREATE INDEX vision_starship_active_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId, v.isActive);
-CREATE INDEX vision_has_objectives_index IF NOT EXISTS FOR (v:Vision) ON (v.hasObjectives);
-CREATE INDEX vision_has_timeframe_index IF NOT EXISTS FOR (v:Vision) ON (v.hasTimeframe);
-CREATE INDEX vision_has_measurables_index IF NOT EXISTS FOR (v:Vision) ON (v.hasMeasurables);
 
 // Workflow indexes
 CREATE INDEX workflow_author_id_index IF NOT EXISTS FOR (w:Workflow) ON (w.authorId);
@@ -463,7 +448,6 @@ CREATE (m:Migration {
     'agent_templates',
     'mission_clarity',
     'mission_messages',
-    'vision_metrics',
     'mission_execution',
     'workflow_dsl',
     'blueprint_management',

@@ -1,5 +1,5 @@
 /**
- * Comprehensive logging utility for vision refinement services
+ * Comprehensive logging utility for server services
  * Provides structured logging with different levels and contexts
  */
 

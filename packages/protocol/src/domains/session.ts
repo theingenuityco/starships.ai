@@ -173,6 +173,11 @@ export interface SessionModel {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Session type alias for client compatibility
+ */
+export type Session = SessionModel;
+
 // ============================================================================
 // SESSION ERROR TYPES
 // ============================================================================

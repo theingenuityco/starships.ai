@@ -120,7 +120,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         // Get memory store
         const store = getStore();
 
-        // Use the full agent engine with all features (vision, tools, memory)
+        // Use the full agent engine with all features (tools, memory)
         const typingSpeed = request.typingSpeed || 75; // chars per second
         const typewriterEnabled = request.typewriterEnabled !== false;
         

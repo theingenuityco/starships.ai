@@ -27,7 +27,6 @@ import {
   Mission,
   Agent,
   User,
-  Vision,
   Workflow,
   NativeToolApiKey
 } from '@starships/protocol';
@@ -38,7 +37,6 @@ import {
 - [`Starship`](src/domains/starship.ts) - Starship management with billing integration
 - [`Mission`](src/domains/mission.ts) - Mission orchestration with workflow execution
 - [`User`](src/domains/user.ts) - User management and authentication
-- [`Vision`](src/domains/vision.ts) - Vision refinement system
 - [`Workflow`](src/domains/workflow.ts) - Workflow execution definitions
 - [`NativeToolApiKey`](src/domains/native-tool.ts) - Encrypted API key storage for native tools
 
@@ -111,7 +109,6 @@ src/
 │   ├── mission.ts          # Mission orchestration
 │   ├── agent-template.ts   # Agent templates
 │   ├── user.ts             # User management
-│   ├── vision.ts           # Vision refinement
 │   ├── workflow.ts         # Workflow execution
 │   ├── waitlist.ts         # Waitlist management
 │   └── native-tool.ts      # Native tool API key storage

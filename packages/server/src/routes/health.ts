@@ -227,7 +227,6 @@ router.get('/detailed', async (req, res) => {
       'StarshipRepository',
       'UserRepository',
       'AgentRepository',
-      'VisionRepository',
     ];
 
     for (const repoType of repositoryTypes) {

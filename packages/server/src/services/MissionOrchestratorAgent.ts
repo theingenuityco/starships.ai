@@ -665,7 +665,6 @@ export class MissionOrchestratorAgent {
       successMetrics: clarityData.successMetrics,
       timelineDefinition: clarityData.timelineDefinition,
       scopeBoundaries: clarityData.scopeBoundaries,
-      visionAlignment: clarityData.visionAlignment,
       reasoning: clarityData.reasoning,
       iteration
     };

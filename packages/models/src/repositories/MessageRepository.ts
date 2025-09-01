@@ -225,7 +225,6 @@ export class MessageRepository extends BaseRepository {
 
   async getMessageThread(messageId: string, includeParents = true, includeChildren = true, maxDepth = 10): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
       const thread: MessageModel[] = [];
 
       // Get the root message

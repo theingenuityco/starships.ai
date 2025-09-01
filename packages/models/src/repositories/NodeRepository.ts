@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
-import type { Node } from '@starships/autopilot';
 import type { NodeModel } from '@starships/protocol';
 
 export class NodeRepository extends BaseRepository {

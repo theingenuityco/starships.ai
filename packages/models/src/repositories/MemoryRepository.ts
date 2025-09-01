@@ -78,7 +78,7 @@ export class MemoryRepository extends BaseRepository {
     }, 'findByStarshipId', 'Memory');
   }
 
-  async findByAgentId(agentId: string): Promise<MemoryModel[]> {
+  async findByAgentId(): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryModel }>(
@@ -88,7 +88,7 @@ export class MemoryRepository extends BaseRepository {
     }, 'findByAgentId', 'Memory');
   }
 
-  async findByTags(tags: string[]): Promise<MemoryModel[]> {
+  async findByTags(): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryModel }>(

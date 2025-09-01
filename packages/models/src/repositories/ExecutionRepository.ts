@@ -141,10 +141,10 @@ export class ExecutionRepository extends BaseRepository {
       
       // Handle status transitions
       const updateProps: any = { ...updates };
-      if (updates.status === 'running' && !updates.hasOwnProperty('startTime')) {
+      if (updates.status === 'running' && !Object.prototype.hasOwnProperty.call(updates, 'startTime')) {
         updateProps.startTime = now;
       }
-      if ((updates.status === 'completed' || updates.status === 'failed' || updates.status === 'cancelled') && !updates.hasOwnProperty('endTime')) {
+      if ((updates.status === 'completed' || updates.status === 'failed' || updates.status === 'cancelled') && !Object.prototype.hasOwnProperty.call(updates, 'endTime')) {
         updateProps.endTime = now;
       }
 

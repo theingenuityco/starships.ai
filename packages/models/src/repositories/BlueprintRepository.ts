@@ -9,7 +9,6 @@ import { BaseRepository } from './BaseRepository';
 import { getConnection } from '../helpers/database';
 import { NodeRepository } from './NodeRepository';
 import { EdgeRepository } from './EdgeRepository';
-import type { Blueprint } from '@starships/autopilot';
 import type { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 import { v4 as uuidv4 } from 'uuid';
 

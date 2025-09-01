@@ -348,7 +348,7 @@ export class DisasterRecoveryManager {
           let validation = { valid: true };
           try {
             await this.backupManager['loadBackupFromFile'](backupPath);
-          } catch (error) {
+          } catch {
             validation = { valid: false };
           }
           if (validation.valid) {

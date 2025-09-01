@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { Starship } from '@starships/protocol';
+import { StarshipModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
@@ -29,8 +29,8 @@ export class StarshipRepository extends BaseRepository {
   /**
    * Validate starship class
    */
-  private validateStarshipClass(starshipClass: Starship['class']): void {
-    const validClasses: Starship['class'][] = ['scout', 'cruiser', 'draught'];
+  private validateStarshipClass(starshipClass: StarshipModel['class']): void {
+    const validClasses: StarshipModel['class'][] = ['scout', 'cruiser', 'draught'];
     if (!validClasses.includes(starshipClass)) {
       this.handleValidationError([{ 
         field: 'class', 
@@ -43,8 +43,8 @@ export class StarshipRepository extends BaseRepository {
   /**
    * Validate starship status
    */
-  private validateStarshipStatus(status: Starship['status']): void {
-    const validStatuses: Starship['status'][] = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
+  private validateStarshipStatus(status: StarshipModel['status']): void {
+    const validStatuses: StarshipModel['status'][] = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
     if (!validStatuses.includes(status)) {
       this.handleValidationError([{ 
         field: 'status', 
@@ -58,7 +58,7 @@ export class StarshipRepository extends BaseRepository {
   async findAll(): Promise<Starship[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ s: Starship }>(
+      const result = await connection.executeQuery<{ s: StarshipModel }>(
         'MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC'
       );
       return result.map((record) => record.s);
@@ -70,7 +70,7 @@ export class StarshipRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ s: Starship }>(
+      const result = await connection.executeQuery<{ s: StarshipModel }>(
         'MATCH (s:Starship) WHERE s.id = $id RETURN s',
         { id }
       );
@@ -83,7 +83,7 @@ export class StarshipRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ s: Starship }>(
+      const result = await connection.executeQuery<{ s: StarshipModel }>(
         'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId RETURN s',
         { slug, ownerId }
       );
@@ -96,7 +96,7 @@ export class StarshipRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ s: Starship }>(
+      const result = await connection.executeQuery<{ s: StarshipModel }>(
         'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
         { ownerId }
       );
@@ -124,7 +124,7 @@ export class StarshipRepository extends BaseRepository {
         this.validateStarshipStatus(entity.status);
       }
       
-      const starship: Starship = {
+      const starship: StarshipModel = {
         ...entity,
         id: uuidv4(),
         slug,
@@ -176,7 +176,7 @@ export class StarshipRepository extends BaseRepository {
         updatedAt: new Date().toISOString()
       };
 
-      const result = await connection.executeWrite<{ s: Starship }>(
+      const result = await connection.executeWrite<{ s: StarshipModel }>(
         'MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s',
         { id, updates: updateProps }
       );
@@ -297,7 +297,7 @@ export class StarshipRepository extends BaseRepository {
   }
 
 
-  async updateStatus(starshipId: string, status: Starship['status']): Promise<boolean> {
+  async updateStatus(starshipId: string, status: StarshipModel['status']): Promise<boolean> {
     const connection = getConnection();
     
     // Validate status using the validation method
@@ -401,7 +401,7 @@ export class StarshipRepository extends BaseRepository {
 
   async findBySubscriptionId(subscriptionId: string): Promise<Starship | null> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ starship: Starship }>(
+    const result = await connection.executeQuery<{ starship: StarshipModel }>(
       `MATCH (starship:Starship {subscriptionId: $subscriptionId})
        RETURN starship`,
       { subscriptionId }
@@ -501,7 +501,7 @@ export class StarshipRepository extends BaseRepository {
    */
   async findByStripeCustomerId(customerId: string): Promise<Starship | null> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ s: Starship }>(
+    const result = await connection.executeQuery<{ s: StarshipModel }>(
       'MATCH (s:Starship {stripeCustomerId: $customerId}) RETURN s LIMIT 1',
       { customerId }
     );
@@ -517,7 +517,7 @@ export class StarshipRepository extends BaseRepository {
     const connection = getConnection();
     const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
     
-    const result = await connection.executeQuery<{ s: Starship }>(
+    const result = await connection.executeQuery<{ s: StarshipModel }>(
       `MATCH (s:Starship)
        WHERE s.status = 'pending_payment' 
        AND s.createdAt < $cutoffTime

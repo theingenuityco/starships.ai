@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { Vision } from '@starships/protocol';
+import { VisionModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,7 +14,7 @@ export class VisionRepository extends BaseRepository {
   async findAll(): Promise<Vision[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ v: Vision }>(
+      const result = await connection.executeQuery<{ v: VisionModel }>(
         'MATCH (v:Vision) RETURN v ORDER BY v.createdAt DESC'
       );
       return result.map(record => record.v);
@@ -26,7 +26,7 @@ export class VisionRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ v: Vision }>(
+      const result = await connection.executeQuery<{ v: VisionModel }>(
         'MATCH (v:Vision) WHERE v.id = $id RETURN v',
         { id }
       );
@@ -39,7 +39,7 @@ export class VisionRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ v: Vision }>(
+      const result = await connection.executeQuery<{ v: VisionModel }>(
         'MATCH (v:Vision) WHERE v.starshipId = $starshipId RETURN v',
         { starshipId }
       );
@@ -52,7 +52,7 @@ export class VisionRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const vision: Vision = {
+      const vision: VisionModel = {
         ...entity,
         id: uuidv4(),
         createdAt: new Date().toISOString(),
@@ -84,7 +84,7 @@ export class VisionRepository extends BaseRepository {
     
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeWrite<{ v: Vision }>(
+      const result = await connection.executeWrite<{ v: VisionModel }>(
         `MATCH (v:Vision) WHERE v.starshipId = $starshipId 
          SET v.statement = $statement, 
              v.updatedAt = $timestamp,
@@ -112,7 +112,7 @@ export class VisionRepository extends BaseRepository {
         updatedAt: new Date().toISOString() 
       };
       
-      const result = await connection.executeWrite<{ v: Vision }>(
+      const result = await connection.executeWrite<{ v: VisionModel }>(
         'MATCH (v:Vision) WHERE v.id = $id SET v += $updates RETURN v',
         { id, updates: updateProps }
       );
@@ -152,7 +152,7 @@ export class VisionRepository extends BaseRepository {
     }
   ): Promise<Vision | null> {
     const connection = getConnection();
-    const result = await connection.executeWrite<{ v: Vision }>(
+    const result = await connection.executeWrite<{ v: VisionModel }>(
       `MATCH (v:Vision) WHERE v.starshipId = $starshipId 
        SET v.clarityScore = $clarityScore,
            v.specificityScore = $specificityScore,
@@ -218,7 +218,7 @@ export class VisionRepository extends BaseRepository {
    */
   async findVisionsMissingMetrics(limit: number = 50): Promise<Vision[]> {
     const connection = getConnection();
-    const result = await connection.executeQuery<{ v: Vision }>(
+    const result = await connection.executeQuery<{ v: VisionModel }>(
       'MATCH (v:Vision) WHERE v.overallQuality IS NULL RETURN v ORDER BY v.createdAt DESC LIMIT $limit',
       { limit }
     );

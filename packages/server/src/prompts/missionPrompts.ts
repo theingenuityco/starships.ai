@@ -3,7 +3,7 @@
  * Simple const object with key-value pairs using template literals
  */
 
-import type { Mission } from '@starships/protocol';
+import type { MissionModel } from '@starships/protocol';
 
 // Template variables interfaces for type safety
 export interface MissionContextData {

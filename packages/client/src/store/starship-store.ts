@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { ProximityState } from '@/hooks/useProximityDetection';
-import { starshipAPI, visionAPI, type Starship } from '@/lib/api';
+import { starshipAPI, visionAPI, type StarshipModel } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { StarshipAgentsResponse } from '@starships/protocol';
 

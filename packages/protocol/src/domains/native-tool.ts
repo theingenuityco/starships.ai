@@ -3,12 +3,12 @@
 // ============================================================================
 
 /**
- * NativeToolApiKey - Encrypted API key storage for native tools per starship
- * 
+ * NativeToolApiKeyModel - Encrypted API key storage for native tools per starship
+ *
  * Stores encrypted API keys for native tools like web scraping, email, etc.
  * Each starship can have multiple API keys for different tools.
  */
-export interface NativeToolApiKey {
+export interface NativeToolApiKeyModel {
   id: string;
   starshipId: string;
   toolName: string;

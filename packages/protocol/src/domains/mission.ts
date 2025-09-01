@@ -43,7 +43,7 @@ export const MISSION_PHASES = {
 /**
  * Main mission entity - simplified and clean
  */
-export interface Mission {
+export interface MissionModel {
   id: string;
   starshipId: string;
   name: string;
@@ -90,14 +90,14 @@ export interface UpdateMissionRequest {
  * Response containing mission data
  */
 export interface MissionResponse {
-  mission: Mission;
+  mission: MissionModel;
 }
 
 /**
  * Response for mission list
  */
 export interface MissionListResponse {
-  missions: Mission[];
+  missions: MissionModel[];
   total: number;
 }
 
@@ -137,7 +137,7 @@ export type MissionMessageRole =
 /**
  * Core message entity for mission orchestrator communication
  */
-export interface MissionMessage {
+export interface MissionMessageModel {
   id: string;
   missionId: string;
   role: MissionMessageRole;
@@ -176,7 +176,7 @@ export interface MissionChatResponse {
 /**
  * Mission clarity assessment - tracks 5-dimension clarity scoring
  */
-export interface MissionClarity {
+export interface MissionClarityModel {
   id: string;
   missionId: string;
   objectiveClarity: number;        // 0-10: How specific and clear is the mission objective?
@@ -225,7 +225,7 @@ export interface UpdateMissionClarityRequest {
 /**
  * Mission workflow - executable workflow DSL for mission execution
  */
-export interface MissionWorkflow {
+export interface MissionWorkflowModel {
   id: string;
   missionId: string;
   nodes: WorkflowNode[];
@@ -280,7 +280,7 @@ export interface UpdateWorkflowApprovalRequest {
  * Response containing workflow data
  */
 export interface MissionWorkflowResponse {
-  workflow: MissionWorkflow;
+  workflow: MissionWorkflowModel;
   // Agent details are now managed by the models package
 }
 

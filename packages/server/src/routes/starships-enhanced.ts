@@ -4,7 +4,7 @@ import {
   StarshipRepository,
   VisionRepository,
 } from '@starships/models';
-import type { Vision } from '@starships/protocol';
+import type { VisionModel } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import {
   ValidationError,

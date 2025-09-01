@@ -11,7 +11,7 @@
 /**
  * Core user entity
  */
-export interface User {
+export interface UserModel {
   id: string;
   kindeId?: string;
   username: string;
@@ -55,14 +55,14 @@ export interface UpdateUserRequest {
  * User response structure
  */
 export interface UserResponse {
-  user: User;
+  user: UserModel;
 }
 
 /**
  * User list response
  */
 export interface UserListResponse {
-  users: User[];
+  users: UserModel[];
   total: number;
 }
 

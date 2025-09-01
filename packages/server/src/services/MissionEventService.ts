@@ -5,7 +5,7 @@
 
 import { Server } from 'socket.io';
 import { Logger } from '../utils/logger';
-import type { Mission, MissionClarity, MissionPhase, MissionStatus } from '@starships/protocol';
+import type { MissionModel, MissionClarityModel, MissionPhase, MissionStatus } from '@starships/protocol';
 
 export class MissionEventService {
   private static instance: MissionEventService | null = null;

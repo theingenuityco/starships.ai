@@ -16,14 +16,14 @@ import { MISSION_PHASES } from '@starships/protocol';
 import { Workflow, createAgentMemory, AgentMemory, LLM, createLLM } from '@starships/autopilot';
 import type { LlmNodeParameters } from '@starships/autopilot';
 import type {
-  Mission,
+  MissionModel,
   MissionPhase,
-  MissionClarity,
-  MissionWorkflow,
+  MissionClarityModel,
+  MissionWorkflowModel,
   CreateWorkflowRequest,
   CreateMissionClarityRequest
 } from '@starships/protocol';
-import type { Starship, Vision } from '@starships/protocol';
+import type { StarshipModel, VisionModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 
 /**
@@ -49,9 +49,9 @@ export interface GraphExecutionCallbacks {
  * Mission metadata for AI response generation
  */
 interface MissionMetadata {
-  mission: Mission;
-  starship: Starship;
-  vision: Vision;
+  mission: MissionModel;
+  starship: StarshipModel;
+  vision: VisionModel;
 }
 
 /**
@@ -62,8 +62,8 @@ export interface MissionChatState {
   activePhase: MissionPhase;
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
-  clarity: MissionClarity | undefined;
-  workflow: MissionWorkflow | undefined;
+  clarity: MissionClarityModel | undefined;
+  workflow: MissionWorkflowModel | undefined;
   executionResult: any | undefined;
   messages: Array<AIMessage | HumanMessage | SystemMessage>;
 }
@@ -386,9 +386,9 @@ export class MissionOrchestratorAgent {
   /**
    * Start mission execution in background using autopilot workflow system
    */
-  private async startMissionExecution(missionId: string, missionWorkflow: MissionWorkflow): Promise<void> {
+  private async startMissionExecution(missionId: string, missionWorkflow: MissionWorkflowModel): Promise<void> {
     try {
-      // Convert MissionWorkflow to autopilot Workflow
+      // Convert MissionWorkflowModel to autopilot Workflow
       const autopilotWorkflow = this.convertToAutopilotWorkflow(missionWorkflow);
       
       // Create agent memory for workflow execution context
@@ -461,9 +461,9 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Convert MissionWorkflow to autopilot Workflow format
+   * Convert MissionWorkflowModel to autopilot Workflow format
    */
-  private convertToAutopilotWorkflow(missionWorkflow: MissionWorkflow): Workflow {
+  private convertToAutopilotWorkflow(missionWorkflow: MissionWorkflowModel): Workflow {
     const workflow = new Workflow();
     
     // Add nodes
@@ -488,7 +488,7 @@ export class MissionOrchestratorAgent {
   /**
    * Generate workflow using AI
    */
-  private async generateWorkflow(missionId: string, state: MissionChatState): Promise<MissionWorkflow> {
+  private async generateWorkflow(missionId: string, state: MissionChatState): Promise<MissionWorkflowModel> {
     const agents = await this.getAssignedAgents(missionId);
     const prompt = new MissionPromptBuilder(state).buildWorkflowGenerationPrompt(agents);
     const aiResponse = await this.callLLM(prompt.messages[0].content);
@@ -497,9 +497,9 @@ export class MissionOrchestratorAgent {
     
     const createRequest = WorkflowParsingService.parseAIResponse(aiResponse, missionId, agents);
     
-    // TODO: Replace with proper MissionWorkflow creation once MissionWorkflowRepository is implemented
-    // For now, return a mock MissionWorkflow structure
-    const mockWorkflow: MissionWorkflow = {
+    // TODO: Replace with proper MissionWorkflowModel creation once MissionWorkflowModelRepository is implemented
+    // For now, return a mock MissionWorkflowModel structure
+    const mockWorkflow: MissionWorkflowModel = {
       id: `workflow-${missionId}`,
       missionId: missionId,
       nodes: createRequest.blueprint!.nodes.map((node, index) => ({

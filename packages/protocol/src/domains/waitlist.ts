@@ -16,7 +16,7 @@ export type WaitlistStatus = 'approved' | 'pending' | 'rejected';
 /**
  * Core waitlist entry entity
  */
-export interface WaitlistEntry {
+export interface WaitlistEntryModel {
   email: string;
   status: WaitlistStatus;
   createdAt: Date;
@@ -50,14 +50,14 @@ export interface UpdateWaitlistEntryRequest {
  * Waitlist entry response structure
  */
 export interface WaitlistEntryResponse {
-  entry: WaitlistEntry;
+  entry: WaitlistEntryModel;
 }
 
 /**
  * Waitlist entries list response
  */
 export interface WaitlistEntriesResponse {
-  entries: WaitlistEntry[];
+  entries: WaitlistEntryModel[];
   total: number;
 }
 

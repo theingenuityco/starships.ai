@@ -1,5 +1,5 @@
 import { RepositoryFactory } from '@starships/models';
-import { User } from '@starships/protocol';
+import { UserModel } from '@starships/protocol';
 
 interface KindeUserData {
   kindeId: string;

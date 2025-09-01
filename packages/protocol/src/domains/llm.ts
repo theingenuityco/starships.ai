@@ -96,7 +96,7 @@ export interface LLMProvider {
 /**
  * LLM model configuration
  */
-export interface LLM {
+export interface LLMModel {
   id: string;
   name: string;
   provider: 'openai' | 'anthropic' | 'huggingface' | 'ollama';

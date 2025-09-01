@@ -15,7 +15,7 @@ import {
   ConflictError as ConstraintViolationError,
   NotFoundError,
 } from '@starships/models';
-import type { Starship } from '@starships/protocol';
+import type { StarshipModel } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
 

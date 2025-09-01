@@ -30,7 +30,7 @@ export type BillingPeriod = 'monthly' | 'yearly';
 /**
  * Core starship entity
  */
-export interface Starship {
+export interface StarshipModel {
   id: string;
   slug: string;
   ownerId: string; // Foreign key to User
@@ -74,20 +74,7 @@ export interface UpdateStarshipStatusRequest {
  * Starship response structure
  */
 export interface StarshipResponse {
-  starship: {
-    id: string;
-    slug: string;
-    ownerId: string;
-    class: StarshipClass;
-    name: string;
-    maxAgents: number;
-    status: StarshipStatus;
-    createdAt: string;
-    updatedAt: string;
-    plan?: StarshipClass;
-    subscriptionId?: string;
-    billingPeriod?: BillingPeriod;
-  };
+  starship: StarshipModel;
 }
 
 /**
@@ -127,7 +114,7 @@ export interface StarshipAgentsResponse {
  * Starship list response
  */
 export interface StarshipListResponse {
-  starships: StarshipResponse['starship'][];
+  starships: StarshipModel[];
 }
 
 /**

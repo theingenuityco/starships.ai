@@ -11,7 +11,7 @@
 /**
  * Core vision entity
  */
-export interface Vision {
+export interface VisionModel {
   id: string;
   starshipId: string; // Direct FK to Starship
   statement: string;

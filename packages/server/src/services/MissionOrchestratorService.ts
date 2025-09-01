@@ -12,9 +12,8 @@ import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ErrorFactory, InternalServerError } from '@starships/models';
-import { AIMessage } from '../utils/message-types';
 import type {
-  MissionMessage,
+  MissionMessageModel,
   MissionChatResponse,
   MissionPhase
 } from '@starships/protocol';
@@ -103,7 +102,7 @@ export class MissionOrchestratorService {
       missionId,
       message,
       {
-        onMessageGenerated: async (aiMessage: AIMessage) => {
+        onMessageGenerated: async (aiMessage: any) => {
           const savedMessage = await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
           this.emitMessageEvent(missionId, savedMessage);
         },
@@ -151,7 +150,7 @@ export class MissionOrchestratorService {
    * Get message history for a mission with pagination
    */
   async getMessageHistory(missionId: string, page?: number, pageSize?: number): Promise<{
-    messages: MissionMessage[];
+    messages: MissionMessageModel[];
     total: number;
     page: number;
     pageSize: number;
@@ -199,7 +198,7 @@ export class MissionOrchestratorService {
   /**
    * Get recent messages for a mission (for context)
    */
-  async getRecentMessages(missionId: string, limit: number = 10): Promise<MissionMessage[]> {
+  async getRecentMessages(missionId: string, limit: number = 10): Promise<MissionMessageModel[]> {
     const context = {
       service: 'MissionOrchestratorService',
       operation: 'getRecentMessages',
@@ -241,7 +240,7 @@ export class MissionOrchestratorService {
   /**
    * Save user message to database
    */
-  private async saveUserMessage(missionId: string, userId: string, content: string): Promise<MissionMessage> {
+  private async saveUserMessage(missionId: string, userId: string, content: string): Promise<MissionMessageModel> {
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
       const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
@@ -277,7 +276,7 @@ export class MissionOrchestratorService {
   /**
    * Save orchestrator message to database
    */
-  private async saveOrchestratorMessage(missionId: string, content: string): Promise<MissionMessage> {
+  private async saveOrchestratorMessage(missionId: string, content: string): Promise<MissionMessageModel> {
     try {
       const missionRepo = RepositoryFactory.getMissionRepository();
       const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
@@ -328,7 +327,7 @@ export class MissionOrchestratorService {
   /**
    * Emit message event via WebSocket for real-time updates
    */
-  private emitMessageEvent(missionId: string, message: MissionMessage): void {
+  private emitMessageEvent(missionId: string, message: MissionMessageModel): void {
     if (this.socketService) {
       const missionRoom = `mission:${missionId}`;
       const eventData = {

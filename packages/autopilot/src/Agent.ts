@@ -3,27 +3,33 @@
  *
  * Executable agent that combines agent configuration with execution capabilities.
  * Uses an internal Engine for execution that manages all node handlers automatically.
+ * Memory-first architecture with AgentMemory system.
  */
 
 import { Blueprint, Node, Edge, Execution, AgentNodeParameters } from './types';
 import { Engine } from './engine/Engine';
+import { AgentMemory, AgentMemoryConfig } from './AgentMemory';
 
 export class Agent {
-  private config: AgentNodeParameters;
+  private params: AgentNodeParameters;
+  private memory: AgentMemory;
   private engine: Engine;
 
-  constructor(config: AgentNodeParameters) {
-    // Store agent configuration
-    this.config = {
-      ...config,
+  constructor(params: AgentNodeParameters) {
+    // Store agent parameters
+    this.params = {
+      ...params,
       // Ensure blueprint has a deep copy to avoid mutations
       blueprint: {
-        ...config.blueprint,
-        nodes: config.blueprint.nodes.map(node => ({ ...node })),
-        edges: config.blueprint.edges.map(edge => ({ ...edge })),
-        metadata: { ...config.blueprint.metadata }
+        ...params.blueprint,
+        nodes: params.blueprint.nodes.map(node => ({ ...node })),
+        edges: params.blueprint.edges.map(edge => ({ ...edge })),
+        metadata: { ...params.blueprint.metadata }
       }
     };
+
+    // Create AgentMemory instance from config
+    this.memory = new AgentMemory(params.memory);
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -33,70 +39,85 @@ export class Agent {
    * Get agent name
    */
   getName(): string {
-    return this.config.name;
+    return this.params.name;
   }
 
   /**
    * Get agent model
    */
   getModel(): string {
-    return this.config.model;
+    return this.params.model;
   }
 
   /**
-   * Get agent system prompt
+   * Get agent memory
    */
-  getSystemPrompt(): string | undefined {
-    return this.config.systemPrompt;
+  getMemory(): AgentMemory {
+    return this.memory;
   }
 
   /**
-   * Get agent instructions
+   * Add content to agent memory
    */
-  getInstructions(): string | undefined {
-    return this.config.instructions;
+  addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
+    this.memory.addConversation(role, content, metadata);
   }
+
 
   /**
    * Get agent description
    */
   getDescription(): string | undefined {
-    return this.config.description;
+    return this.params.description;
   }
 
   /**
-   * Get agent configuration (read-only copy)
+   * Get agent parameters (read-only copy)
    */
-  getConfig(): AgentNodeParameters {
-    return JSON.parse(JSON.stringify(this.config));
+  getParameters(): AgentNodeParameters {
+    return JSON.parse(JSON.stringify(this.params));
+  }
+
+  /**
+   * Get agent timeout
+   */
+  getTimeout(): number | undefined {
+    return this.params.timeout;
   }
 
   /**
    * Get agent blueprint (read-only copy)
    */
   getBlueprint(): Blueprint {
-    return JSON.parse(JSON.stringify(this.config.blueprint));
+    return JSON.parse(JSON.stringify(this.params.blueprint));
   }
 
   /**
    * Get agent nodes
    */
   getNodes(): Node[] {
-    return [...this.config.blueprint.nodes];
+    return [...this.params.blueprint.nodes];
   }
 
   /**
    * Get agent edges
    */
   getEdges(): Edge[] {
-    return [...this.config.blueprint.edges];
+    return [...this.params.blueprint.edges];
   }
 
   /**
    * Execute the agent (delegates to internal Engine using the blueprint)
    */
   async execute(initialExecution?: Execution): Promise<Execution> {
-    return this.engine.execute(this.config.blueprint, initialExecution);
+    const executionWithMemory: Execution = {
+      currentNodeRef: undefined,
+      status: 'not_started',
+      executionResults: new Map(),
+      agentMemory: this.memory,
+      ...initialExecution
+    };
+    return this.engine.execute(this.params.blueprint, executionWithMemory);
   }
 
   /**
@@ -106,33 +127,40 @@ export class Agent {
     const errors: string[] = [];
 
     // Check required agent fields
-    if (!this.config.name) {
+    if (!this.params.name) {
       errors.push('Agent name is required');
     }
 
-    if (!this.config.model) {
+    if (!this.params.model) {
       errors.push('Agent model is required');
     }
 
+    // Check memory is present and valid
+    if (!this.params.memory) {
+      errors.push('Agent memory is required');
+    } else if (!this.memory || typeof this.memory.toMessages !== 'function') {
+      errors.push('Invalid agent memory instance');
+    }
+
     // Check blueprint structure
-    if (!this.config.blueprint) {
+    if (!this.params.blueprint) {
       errors.push('Agent blueprint is required');
     } else {
       // Check for start node
-      const hasStartNode = this.config.blueprint.nodes.some(node => node.type === 'start');
+      const hasStartNode = this.params.blueprint.nodes.some(node => node.type === 'start');
       if (!hasStartNode) {
         errors.push('Agent blueprint must have a start node');
       }
 
       // Check that all node types have handlers (delegate to engine)
-      const unsupportedNodes = this.config.blueprint.nodes.filter(node => !this.engine.hasHandler(node.type));
+      const unsupportedNodes = this.params.blueprint.nodes.filter(node => !this.engine.hasHandler(node.type));
       if (unsupportedNodes.length > 0) {
         errors.push(`Unsupported node types in agent blueprint: ${unsupportedNodes.map(n => n.type).join(', ')}`);
       }
 
       // Check edge references
-      const nodeRefs = new Set(this.config.blueprint.nodes.map(n => n.ref));
-      const invalidEdges = this.config.blueprint.edges.filter(
+      const nodeRefs = new Set(this.params.blueprint.nodes.map(n => n.ref));
+      const invalidEdges = this.params.blueprint.edges.filter(
         edge => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
       );
       if (invalidEdges.length > 0) {
@@ -141,17 +169,17 @@ export class Agent {
     }
 
     // Validate timeout if provided
-    if (this.config.timeout !== undefined && this.config.timeout < 1000) {
+    if (this.params.timeout !== undefined && this.params.timeout < 1000) {
       errors.push('Agent timeout should be at least 1000ms');
     }
 
     // Validate temperature if provided
-    if (this.config.temperature !== undefined && (this.config.temperature < 0 || this.config.temperature > 2)) {
+    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
       errors.push('Agent temperature should be between 0 and 2');
     }
 
     // Validate maxTokens if provided
-    if (this.config.maxTokens !== undefined && this.config.maxTokens < 1) {
+    if (this.params.maxTokens !== undefined && this.params.maxTokens < 1) {
       errors.push('Agent maxTokens should be at least 1');
     }
 
@@ -162,32 +190,51 @@ export class Agent {
   }
 
   /**
-   * Clone agent with the same configuration
+   * Clone agent with the same parameters and memory
    */
   clone(): Agent {
-    const clonedConfig: AgentNodeParameters = {
-      ...this.config,
+    // Convert current memory back to config for cloning
+    const memoryConfig: AgentMemoryConfig = {
+      identity: this.memory.getIdentity(),
+      purpose: this.memory.getPurpose(),
+      space: this.memory.getSpace(),
+      messages: this.memory.getMessageHistory()
+    };
+
+    const clonedParams: AgentNodeParameters = {
+      ...this.params,
+      memory: memoryConfig,
       blueprint: {
-        ...this.config.blueprint,
-        nodes: this.config.blueprint.nodes.map(node => ({ ...node })),
-        edges: this.config.blueprint.edges.map(edge => ({ ...edge }))
+        ...this.params.blueprint,
+        nodes: this.params.blueprint.nodes.map(node => ({ ...node })),
+        edges: this.params.blueprint.edges.map(edge => ({ ...edge }))
       }
     };
 
-    return new Agent(clonedConfig);
+    return new Agent(clonedParams);
   }
 
   /**
-   * Update agent configuration
+   * Update agent parameters
    */
-  updateConfig(updates: Partial<AgentNodeParameters>): Agent {
-    const updatedConfig = {
-      ...this.config,
-      ...updates,
-      // Preserve blueprint if not being updated
-      blueprint: updates.blueprint || this.config.blueprint
+  updateParameters(updates: Partial<AgentNodeParameters>): Agent {
+    // Convert current memory back to config if not being updated
+    const currentMemoryConfig: AgentMemoryConfig = {
+      identity: this.memory.getIdentity(),
+      purpose: this.memory.getPurpose(),
+      space: this.memory.getSpace(),
+      messages: this.memory.getMessageHistory()
     };
 
-    return new Agent(updatedConfig);
+    const updatedParams = {
+      ...this.params,
+      ...updates,
+      // Use provided memory config or current memory config
+      memory: updates.memory || currentMemoryConfig,
+      // Preserve blueprint if not being updated
+      blueprint: updates.blueprint || this.params.blueprint
+    };
+
+    return new Agent(updatedParams);
   }
 }

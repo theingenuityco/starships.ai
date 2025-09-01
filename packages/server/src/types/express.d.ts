@@ -1,4 +1,4 @@
-import { User } from '@starships/models';
+import { UserModel } from '@starships/protocol';
 
 declare global {
   namespace Express {

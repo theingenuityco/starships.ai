@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
 import {
-  MissionMessage,
+  MissionMessageModel,
   MissionMessageRole
 } from '@starships/protocol';
 
@@ -13,7 +13,7 @@ export class MissionMessageRepository extends BaseRepository {
     super('MissionMessageRepository');
   }
 
-  async saveMessage(message: Omit<MissionMessage, 'id'>): Promise<MissionMessage> {
+  async saveMessage(message: Omit<MissionMessageModel, 'id'>): Promise<MissionMessageModel> {
     return this.executeWithErrorHandling(async () => {
       // Validate required fields
       this.validateRequired(message, ['missionId', 'role', 'content', 'timestamp'], 'saveMessage');
@@ -56,7 +56,7 @@ export class MissionMessageRepository extends BaseRepository {
       }
 
       // Prepare message data
-      const messageData: MissionMessage = {
+      const messageData: MissionMessageModel = {
         ...message,
         id
       };
@@ -70,7 +70,7 @@ export class MissionMessageRepository extends BaseRepository {
         query = `
           MATCH (m:Mission {id: $missionId})
           MATCH (u:User {id: $userId})
-          CREATE (msg:MissionMessage $messageProps)
+          CREATE (msg:MissionMessageModel $messageProps)
           CREATE (u)-[:SENT]->(msg)
           CREATE (msg)-[:BELONGS_TO]->(m)
           RETURN msg
@@ -84,7 +84,7 @@ export class MissionMessageRepository extends BaseRepository {
         // Create message without user relationship (orchestrator/system)
         query = `
           MATCH (m:Mission {id: $missionId})
-          CREATE (msg:MissionMessage $messageProps)
+          CREATE (msg:MissionMessageModel $messageProps)
           CREATE (msg)-[:BELONGS_TO]->(m)
           RETURN msg
         `;
@@ -94,17 +94,17 @@ export class MissionMessageRepository extends BaseRepository {
         };
       }
 
-      const result = await connection.executeWrite<{ msg: MissionMessage }>(query, params);
+      const result = await connection.executeWrite<{ msg: MissionMessageModel }>(query, params);
 
       if (!result || result.length === 0) {
         throw new Error('Failed to save message');
       }
 
       return convertNeo4jIntsInObject(result[0].msg);
-    }, 'saveMessage', 'MissionMessage');
+    }, 'saveMessage', 'MissionMessageModel');
   }
 
-  async getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessage[]> {
+  async getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessageModel[]> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ missionId }, ['missionId'], 'getMessagesByMission');
 
@@ -112,7 +112,7 @@ export class MissionMessageRepository extends BaseRepository {
 
       // Build query with optional LIMIT and SKIP
       let query = `
-        MATCH (msg:MissionMessage)-[:BELONGS_TO]->(m:Mission {id: $missionId})
+        MATCH (msg:MissionMessageModel)-[:BELONGS_TO]->(m:Mission {id: $missionId})
         RETURN msg
         ORDER BY msg.timestamp ASC
       `;
@@ -128,10 +128,10 @@ export class MissionMessageRepository extends BaseRepository {
         params.limit = int(Math.floor(limit));
       }
 
-      const result = await connection.executeQuery<{ msg: MissionMessage }>(query, params);
+      const result = await connection.executeQuery<{ msg: MissionMessageModel }>(query, params);
 
       return convertNeo4jIntsInArray(result?.map(record => record.msg) || []);
-    }, 'getMessagesByMission', 'MissionMessage');
+    }, 'getMessagesByMission', 'MissionMessageModel');
   }
 
   async getMessageCount(missionId: string): Promise<number> {
@@ -141,7 +141,7 @@ export class MissionMessageRepository extends BaseRepository {
       const connection = getConnection();
 
       const result = await connection.executeQuery<{ count: number }>(
-        `MATCH (msg:MissionMessage)-[:BELONGS_TO]->(m:Mission {id: $missionId})
+        `MATCH (msg:MissionMessageModel)-[:BELONGS_TO]->(m:Mission {id: $missionId})
          RETURN count(msg) as count`,
         { missionId }
       );
@@ -149,7 +149,7 @@ export class MissionMessageRepository extends BaseRepository {
       const count = result?.[0]?.count || 0;
       // Convert Neo4j integer to regular number
       return convertNeo4jIntsInObject({ count }).count;
-    }, 'getMessageCount', 'MissionMessage');
+    }, 'getMessageCount', 'MissionMessageModel');
   }
 
   async getMessagesByMissionWithPagination(
@@ -157,7 +157,7 @@ export class MissionMessageRepository extends BaseRepository {
     page: number = 1, 
     pageSize: number = 50
   ): Promise<{
-    messages: MissionMessage[];
+    messages: MissionMessageModel[];
     total: number;
     page: number;
     pageSize: number;
@@ -201,7 +201,7 @@ export class MissionMessageRepository extends BaseRepository {
         pageSize,
         totalPages
       };
-    }, 'getMessagesByMissionWithPagination', 'MissionMessage');
+    }, 'getMessagesByMissionWithPagination', 'MissionMessageModel');
   }
 
   async deleteMessagesByMission(missionId: string): Promise<void> {
@@ -222,11 +222,11 @@ export class MissionMessageRepository extends BaseRepository {
 
       // Delete all messages belonging to the mission
       await connection.executeWrite(
-        `MATCH (msg:MissionMessage)-[:BELONGS_TO]->(m:Mission {id: $missionId})
+        `MATCH (msg:MissionMessageModel)-[:BELONGS_TO]->(m:Mission {id: $missionId})
          DETACH DELETE msg`,
         { missionId }
       );
-    }, 'deleteMessagesByMission', 'MissionMessage');
+    }, 'deleteMessagesByMission', 'MissionMessageModel');
   }
 
   async deleteMessage(messageId: string): Promise<boolean> {
@@ -236,33 +236,33 @@ export class MissionMessageRepository extends BaseRepository {
       const connection = getConnection();
 
       // Check if message exists
-      const existingResult = await connection.executeQuery<{ msg: MissionMessage }>(
-        'MATCH (msg:MissionMessage {id: $messageId}) RETURN msg',
+      const existingResult = await connection.executeQuery<{ msg: MissionMessageModel }>(
+        'MATCH (msg:MissionMessageModel {id: $messageId}) RETURN msg',
         { messageId }
       );
 
       if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('MissionMessage', messageId, 'deleteMessage');
+        this.handleNotFound('MissionMessageModel', messageId, 'deleteMessage');
       }
 
       // Delete the message
       await connection.executeWrite(
-        'MATCH (msg:MissionMessage {id: $messageId}) DETACH DELETE msg',
+        'MATCH (msg:MissionMessageModel {id: $messageId}) DETACH DELETE msg',
         { messageId }
       );
 
       return true;
-    }, 'deleteMessage', 'MissionMessage', messageId);
+    }, 'deleteMessage', 'MissionMessageModel', messageId);
   }
 
-  async findMessageById(messageId: string): Promise<MissionMessage | null> {
+  async findMessageById(messageId: string): Promise<MissionMessageModel | null> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ messageId }, ['messageId'], 'findMessageById');
 
       const connection = getConnection();
 
-      const result = await connection.executeQuery<{ msg: MissionMessage }>(
-        'MATCH (msg:MissionMessage {id: $messageId}) RETURN msg',
+      const result = await connection.executeQuery<{ msg: MissionMessageModel }>(
+        'MATCH (msg:MissionMessageModel {id: $messageId}) RETURN msg',
         { messageId }
       );
 
@@ -271,6 +271,6 @@ export class MissionMessageRepository extends BaseRepository {
       }
 
       return convertNeo4jIntsInObject(result[0].msg);
-    }, 'findMessageById', 'MissionMessage', messageId);
+    }, 'findMessageById', 'MissionMessageModel', messageId);
   }
 }

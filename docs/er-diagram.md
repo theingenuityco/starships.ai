@@ -72,7 +72,6 @@ erDiagram
         string description
         string category "general|coding|creative|analysis|support"
         string[] tags
-        string systemPrompt
         string model FK "References LLM.id"
         float temperature
         int maxTokens
@@ -91,7 +90,6 @@ erDiagram
         string starshipId FK "Direct FK - Key Change"
         string name
         string model FK "References LLM.id"
-        string systemPrompt
         string description
         string[] tags
         string category "general|coding|creative|analysis|support"
@@ -102,7 +100,6 @@ erDiagram
         float rating
         float temperature
         int maxTokens
-        string customInstructions
         string[] allowedStarshipClasses
         string[] requiredPermissions
         string createdAt

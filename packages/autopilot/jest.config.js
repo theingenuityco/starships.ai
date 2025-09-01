@@ -11,8 +11,7 @@ module.exports = {
   // Test file patterns
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.test.ts',
-    '<rootDir>/src/**/*.test.ts',
-    '<rootDir>/tests/**/*.test.ts'
+    '<rootDir>/src/**/*.test.ts'
   ],
   
   // Module file extensions
@@ -52,7 +51,7 @@ module.exports = {
   coverageDirectory: 'coverage',
   
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
   
   // Clear mocks between tests
   clearMocks: true,

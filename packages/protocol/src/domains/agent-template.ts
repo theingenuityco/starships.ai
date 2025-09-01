@@ -1,8 +1,10 @@
 /**
  * Agent Template Collection Types
  *
- * Clean agent template type definitions for protocol contract.
+ * Clean agent template type definitions for model types.
  */
+
+import type { Blueprint, AgentMemoryConfig, AgentNodeParameters } from '@starships/autopilot';
 
 // ============================================================================
 // AGENT TEMPLATE TYPES
@@ -16,31 +18,19 @@ export type AgentTemplateCategory = 'general' | 'coding' | 'creative' | 'analysi
 /**
  * Core agent template entity
  */
-export interface AgentTemplate {
+export interface AgentTemplateModel extends AgentNodeParameters {
+  // Core template fields
   id: string;
-  name: string;
-  description: string;
-  category: AgentTemplateCategory;
-  tags: string[];
-
-  // Template configuration
-  systemPrompt: string;
-  model: string; // References LLM.id
-  temperature?: number;
-  maxTokens?: number;
+  createdAt: string;
+  updatedAt: string;
 
   // Template metadata
-  authorId: string;
-  isPublic: boolean;
+  category: AgentTemplateCategory;
   usageCount: number;
-  rating?: number;
 
   // Template preview
   icon?: string;
   previewPrompts?: string[]; // Example prompts to show what the template can do
-
-  createdAt: string;
-  updatedAt: string;
 }
 
 // ============================================================================
@@ -54,12 +44,12 @@ export interface CreateAgentTemplateRequest {
   name: string;
   description: string;
   category: AgentTemplateCategory;
-  tags: string[];
-  systemPrompt: string;
   model: string;
   temperature?: number;
   maxTokens?: number;
-  isPublic: boolean;
+  blueprint: Blueprint;
+  memory: AgentMemoryConfig;
+  timeout: number;
   icon?: string;
   previewPrompts?: string[];
 }
@@ -71,13 +61,12 @@ export interface UpdateAgentTemplateRequest {
   name?: string;
   description?: string;
   category?: AgentTemplateCategory;
-  tags?: string[];
-  systemPrompt?: string;
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  isPublic?: boolean;
-  rating?: number;
+  blueprint?: Blueprint;
+  memory?: AgentMemoryConfig;
+  timeout?: number;
   icon?: string;
   previewPrompts?: string[];
 }
@@ -86,14 +75,14 @@ export interface UpdateAgentTemplateRequest {
  * Agent template response structure
  */
 export interface AgentTemplateResponse {
-  template: AgentTemplate;
+  template: AgentTemplateModel;
 }
 
 /**
  * Agent template list response
  */
 export interface AgentTemplateListResponse {
-  templates: AgentTemplate[];
+  templates: AgentTemplateModel[];
   total: number;
 }
 
@@ -106,17 +95,13 @@ export interface AgentTemplateListResponse {
  */
 export interface AgentTemplateFilters {
   category?: AgentTemplateCategory;
-  authorId?: string;
-  isPublic?: boolean;
-  tags?: string[];
-  minRating?: number;
 }
 
 /**
  * Sorting options for agent templates
  */
 export interface AgentTemplateSort {
-  field: 'createdAt' | 'updatedAt' | 'name' | 'usageCount' | 'rating';
+  field: 'createdAt' | 'updatedAt' | 'name' | 'usageCount';
   direction: 'asc' | 'desc';
 }
 
@@ -130,8 +115,6 @@ export interface AgentTemplateSort {
 export interface AgentTemplateUsage {
   templateId: string;
   usageCount: number;
-  averageRating?: number;
-  totalRatings: number;
   lastUsed?: string;
 }
 
@@ -141,13 +124,4 @@ export interface AgentTemplateUsage {
 export interface IncrementTemplateUsageRequest {
   templateId: string;
   userId: string;
-}
-
-/**
- * Request to rate a template
- */
-export interface RateTemplateRequest {
-  templateId: string;
-  userId: string;
-  rating: number; // 1-5 stars
 }

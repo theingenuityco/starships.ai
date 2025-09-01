@@ -32,8 +32,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { useStarshipStore } from '@/store/starship-store';
-import { useOnboardingSession } from '@/hooks/useOnboardingSession';
-import { analyzeVisionPreAuth } from '@/lib/sibil/preview-api';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -107,7 +105,6 @@ export function StarshipCreateModalUnified({
   isOnboarding = false 
 }: StarshipCreateModalUnifiedProps) {
   const { createStarship, loading, starships } = useStarshipStore();
-  const { session: hookSession, clearSession, updateStep } = useOnboardingSession();
   const router = useRouter();
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
@@ -119,46 +116,17 @@ export function StarshipCreateModalUnified({
   const [classesLoading, setClassesLoading] = useState(true);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   
-  // Try to get session from hook or fallback to localStorage for onboarding
-  let session = hookSession;
-  if (isOnboarding && !session) {
-    try {
-      const stored = localStorage.getItem('onboarding_session');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && parsed.data) {
-          session = parsed.data;
-        }
-      }
-    } catch (e) {
-      console.error('[CreateModal] Failed to get localStorage fallback:', e);
-    }
-  }
-  
   // Now only 3 steps: Vision+Name, Class, Review
-  const hasPrefilledVision = isOnboarding && session?.pendingVision;
   const totalSteps = 3;
   
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<StarshipFormData>({
     name: '',
     class: 'cruiser',
-    vision: hasPrefilledVision ? (session?.pendingVision || '') : ''
+    vision: ''
   });
   const [errors, setErrors] = useState<StarshipFormErrors>({});
 
-  // Update form data if session changes (for onboarding)
-  useEffect(() => {
-    if (session?.pendingVision && isOnboarding) {
-      setFormData(prev => ({
-        ...prev,
-        vision: session.pendingVision || '',
-        name: session.visionAnalysis?.suggestedName || prev.name,
-        class: session.visionAnalysis?.recommendedClass || prev.class
-      }));
-      setVisionAnalysis(session.visionAnalysis);
-    }
-  }, [session, isOnboarding]);
 
   // Combine pricing and class data from API
   useEffect(() => {
@@ -240,26 +208,8 @@ export function StarshipCreateModalUnified({
   };
 
   const handleAnalyzeVision = async () => {
-    if (!formData.vision?.trim()) return;
-
-    setAnalyzingVision(true);
-    try {
-      const result = await analyzeVisionPreAuth(formData.vision);
-      const analysis = result.analysis;
-      setVisionAnalysis(analysis);
-      
-      // Update form with AI suggestions
-      if (analysis.suggestedName && !formData.name) {
-        setFormData(prev => ({ ...prev, name: analysis.suggestedName }));
-      }
-      if (analysis.recommendedClass) {
-        setFormData(prev => ({ ...prev, class: analysis.recommendedClass }));
-      }
-    } catch (error) {
-      console.error('Failed to analyze vision:', error);
-    } finally {
-      setAnalyzingVision(false);
-    }
+    // Vision analysis functionality removed
+    return;
   };
 
   const handleNext = async () => {
@@ -307,25 +257,19 @@ export function StarshipCreateModalUnified({
         if (formData.vision) {
           starshipData.vision = {
             statement: formData.vision,
-            confidence: visionAnalysis?.confidence || 0.8,
-            sibilSessionId: session?.sibilSessionId
+            confidence: visionAnalysis?.confidence || 0.8
           };
         }
         
         const newStarship = await createStarship(starshipData);
         
-        // Clear onboarding session if we're in onboarding flow
-        if (isOnboarding) {
-          updateStep('complete');
-          setTimeout(() => clearSession(), 1000);
-        }
         
         onSuccess();
         handleReset();
         
-        // Navigate to the new starship's vision-chamber
+        // Navigate to the new starship's command deck
         if (newStarship && typeof newStarship === 'object' && 'slug' in newStarship) {
-          router.push(`/ship/${newStarship.slug}/vision-chamber`);
+          router.push(`/ship/${newStarship.slug}/command-deck`);
         }
       } else {
         // Paid starship - create starship first, then redirect to Stripe checkout  
@@ -382,12 +326,8 @@ export function StarshipCreateModalUnified({
   };
 
   const handleClose = () => {
-    if (isOnboarding && session?.pendingVision) {
-      setShowExitConfirmation(true);
-    } else {
-      onOpenChange(false);
-      handleReset();
-    }
+    onOpenChange(false);
+    handleReset();
   };
 
   const renderStepContent = () => {
@@ -427,7 +367,7 @@ export function StarshipCreateModalUnified({
                   "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                   errors.vision && "border-destructive focus:border-destructive"
                 )}
-                disabled={!!(isOnboarding && hasPrefilledVision)}
+                disabled={false}
                 tabIndex={1}
               />
               {errors.vision && (

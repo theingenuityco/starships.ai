@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { AgentService } from '../services/AgentService';
 import type {
-  Agent,
+  AgentModel,
   CreateAgentRequest,
   UpdateAgentRequest,
 } from '@starships/protocol';
@@ -30,8 +30,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       // Default: get user's agents + public agents
       console.log(`[AGENTS] Loading agents for user: ${req.user!.id}`);
 
-      let userAgents: Agent[] = [];
-      let publicAgents: Agent[] = [];
+      let userAgents: AgentModel[] = [];
+      let publicAgents: AgentModel[] = [];
 
       try {
         console.log(`[AGENTS] Fetching user agents for: ${req.user!.id}`);

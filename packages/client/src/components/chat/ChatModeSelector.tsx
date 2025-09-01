@@ -4,7 +4,7 @@ import { motion } from 'motion/react'
 import { Bot, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type ChatMode = 'agent' | 'sibil'
+export type ChatMode = 'agent'
 
 interface ChatModeSelectorProps {
   mode: ChatMode
@@ -15,12 +15,6 @@ interface ChatModeSelectorProps {
 
 export function ChatModeSelector({ mode, onModeChange, disabled = false, compact = false }: ChatModeSelectorProps) {
   const modes = [
-    {
-      id: 'sibil' as const,
-      label: 'AI Mode',
-      icon: Bot,
-      description: 'General AI assistance'
-    },
     {
       id: 'agent' as const,
       label: 'Agent Mode',

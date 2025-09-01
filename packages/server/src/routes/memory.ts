@@ -5,12 +5,12 @@ import getStore from "../store";
 const router: Router = Router();
 
 router.post("/reset", async (req: Request, res: Response) => {
-  const { agent_id, user_id } = req.body as {
-    agent_id: string;
-    user_id: string;
+  const { agentId, userId } = req.body as {
+    agentId: string;
+    userId: string;
   };
   const store = getStore();
-  const key = store.makeKey(agent_id, user_id);
+  const key = store.makeKey(agentId, userId);
   await store.clear(key);
   res.status(204).send();
 });

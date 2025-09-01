@@ -2,7 +2,7 @@ import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  Mission,
+  MissionModel,
   MissionStatus,
   CreateMissionRequest,
   UpdateMissionRequest,
@@ -27,7 +27,7 @@ export class MissionRepository extends BaseRepository {
     }
   }
 
-  async createMission(request: CreateMissionRequest, userId: string): Promise<Mission> {
+  async createMission(request: CreateMissionRequest, userId: string): Promise<MissionModel> {
     return this.executeWithErrorHandling(async () => {
       // Validate required fields
       this.validateRequired(request, ['starshipId', 'name', 'description', 'agentIds'], 'create');
@@ -87,41 +87,41 @@ export class MissionRepository extends BaseRepository {
         status: 'draft',
         phase: 'welcome',
         agentIds: request.agentIds,
+        approvalStatus: 'pending',
         createdAt: now,
         updatedAt: now,
-        createdBy: userId,
-        executionState: undefined
+        createdBy: userId
       };
 
       await connection.executeWrite(
-        'CREATE (m:Mission $props) RETURN m',
+        'CREATE (m:MissionModel $props) RETURN m',
         { props: missionData }
       );
 
-      return missionData as Mission;
-    }, 'create', 'Mission');
+      return missionData as MissionModel;
+    }, 'create', 'MissionModel');
   }
 
-  async getMissionById(id: string): Promise<Mission> {
+  async getMissionById(id: string): Promise<MissionModel> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ id }, ['id'], 'findById');
 
       const connection = getConnection();
-      const result = await connection.executeQuery<{ m: Mission }>(
-        'MATCH (m:Mission {id: $id}) RETURN m',
+      const result = await connection.executeQuery<{ m: MissionModel }>(
+        'MATCH (m:MissionModel {id: $id}) RETURN m',
         { id }
       );
 
       if (!result || result.length === 0) {
-        this.handleNotFound('Mission', id, 'findById');
+        this.handleNotFound('MissionModel', id, 'findById');
       }
 
       const mission = result[0].m;
       return this.parseMissionFromRecord(mission);
-    }, 'findById', 'Mission', id);
+    }, 'findById', 'MissionModel', id);
   }
 
-  async getMissionsByStarshipId(
+  async getMissionModelsByStarshipId(
     starshipId: string,
     filters?: MissionFilters,
     sort?: MissionSort
@@ -152,21 +152,21 @@ export class MissionRepository extends BaseRepository {
       }
 
       const query = `
-        MATCH (m:Mission)
+        MATCH (m:MissionModel)
         WHERE ${whereClause}
         RETURN m
         ${orderByClause}
       `;
 
-      const result = await connection.executeQuery<{ m: Mission }>(query, params);
+      const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-      const missions: Mission[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
+      const missions: MissionModel[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
 
       return {
         missions,
         total: missions.length
       };
-    }, 'findByStarshipId', 'Mission');
+    }, 'findByStarshipId', 'MissionModel');
   }
 
   async getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
@@ -205,24 +205,24 @@ export class MissionRepository extends BaseRepository {
       }
 
       const query = `
-        MATCH (m:Mission)
+        MATCH (m:MissionModel)
         ${whereClause}
         RETURN m
         ${orderByClause}
       `;
 
-      const result = await connection.executeQuery<{ m: Mission }>(query, params);
+      const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-      const missions: Mission[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
+      const missions: MissionModel[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
 
       return {
         missions,
         total: missions.length
       };
-    }, 'findAll', 'Mission');
+    }, 'findAll', 'MissionModel');
   }
 
-  async updateMission(id: string, updates: UpdateMissionRequest): Promise<Mission> {
+  async updateMission(id: string, updates: UpdateMissionRequest): Promise<MissionModel> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ id }, ['id'], 'update');
 
@@ -249,13 +249,13 @@ export class MissionRepository extends BaseRepository {
       const connection = getConnection();
       
       // Check if mission exists
-      const existingResult = await connection.executeQuery<{ m: Mission }>(
-        'MATCH (m:Mission {id: $id}) RETURN m',
+      const existingResult = await connection.executeQuery<{ m: MissionModel }>(
+        'MATCH (m:MissionModel {id: $id}) RETURN m',
         { id }
       );
 
       if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('Mission', id, 'update');
+        this.handleNotFound('MissionModel', id, 'update');
       }
 
       // Build SET clause dynamically
@@ -299,60 +299,55 @@ export class MissionRepository extends BaseRepository {
         params.agentIds = updates.agentIds;
       }
 
-      if (updates.executionState !== undefined) {
-        setClause.push('m.executionState = $executionState');
-        params.executionState = updates.executionState ? JSON.stringify(updates.executionState) : null;
-      }
-
-      if (updates.executionResult !== undefined) {
-        setClause.push('m.executionResult = $executionResult');
-        params.executionResult = updates.executionResult ? JSON.stringify(updates.executionResult) : null;
+      if (updates.approvalStatus !== undefined) {
+        setClause.push('m.approvalStatus = $approvalStatus');
+        params.approvalStatus = updates.approvalStatus;
       }
 
       const query = `
-        MATCH (m:Mission {id: $id})
+        MATCH (m:MissionModel {id: $id})
         SET ${setClause.join(', ')}
         RETURN m
       `;
 
-      const result = await connection.executeWrite<{ m: Mission }>(query, params);
+      const result = await connection.executeWrite<{ m: MissionModel }>(query, params);
 
       if (!result || result.length === 0) {
         throw new Error('Failed to update mission');
       }
 
       return this.parseMissionFromRecord(result[0].m);
-    }, 'update', 'Mission', id);
+    }, 'update', 'MissionModel', id);
   }
 
-  async deleteMission(id: string): Promise<void> {
+  async deleteMissionModel(id: string): Promise<void> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ id }, ['id'], 'delete');
 
       const connection = getConnection();
       
       // Check if mission exists
-      const existingResult = await connection.executeQuery<{ m: Mission }>(
-        'MATCH (m:Mission {id: $id}) RETURN m',
+      const existingResult = await connection.executeQuery<{ m: MissionModel }>(
+        'MATCH (m:MissionModel {id: $id}) RETURN m',
         { id }
       );
 
       if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('Mission', id, 'delete');
+        this.handleNotFound('MissionModel', id, 'delete');
       }
 
       // Delete the mission
       await connection.executeWrite(
-        'MATCH (m:Mission {id: $id}) DELETE m',
+        'MATCH (m:MissionModel {id: $id}) DELETE m',
         { id }
       );
-    }, 'delete', 'Mission', id);
+    }, 'delete', 'MissionModel', id);
   }
 
   /**
    * Parse mission from Neo4j record, handling JSON fields
    */
-  private parseMissionFromRecord(record: any): Mission {
+  private parseMissionFromRecord(record: any): MissionModel {
     return {
       id: record.id,
       starshipId: record.starshipId,
@@ -361,11 +356,10 @@ export class MissionRepository extends BaseRepository {
       status: record.status,
       phase: record.phase,
       agentIds: record.agentIds || [],
+      approvalStatus: record.approvalStatus || 'pending',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      createdBy: record.createdBy,
-      executionState: record.executionState ? JSON.parse(record.executionState) : undefined,
-      executionResult: record.executionResult ? JSON.parse(record.executionResult) : undefined
+      createdBy: record.createdBy
     };
   }
 }

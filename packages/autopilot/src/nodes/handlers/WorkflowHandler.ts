@@ -18,8 +18,8 @@ export class WorkflowHandler extends BaseHandler {
     try {
       console.log('Executing embedded workflow');
 
-      // Create workflow instance from the blueprint and execute
-      const workflow = new Workflow(params.blueprint);
+      // Create workflow instance from the full parameters and execute
+      const workflow = new Workflow(params);
       const workflowResult = await workflow.execute();
       
       // Check if workflow execution was successful

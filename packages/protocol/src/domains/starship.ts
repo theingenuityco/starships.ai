@@ -30,7 +30,7 @@ export type BillingPeriod = 'monthly' | 'yearly';
 /**
  * Core starship entity
  */
-export interface Starship {
+export interface StarshipModel {
   id: string;
   slug: string;
   ownerId: string; // Foreign key to User
@@ -74,20 +74,7 @@ export interface UpdateStarshipStatusRequest {
  * Starship response structure
  */
 export interface StarshipResponse {
-  starship: {
-    id: string;
-    slug: string;
-    ownerId: string;
-    class: StarshipClass;
-    name: string;
-    maxAgents: number;
-    status: StarshipStatus;
-    createdAt: string;
-    updatedAt: string;
-    plan?: StarshipClass;
-    subscriptionId?: string;
-    billingPeriod?: BillingPeriod;
-  };
+  starship: StarshipModel;
 }
 
 /**
@@ -99,25 +86,25 @@ export interface StarshipAgentsResponse {
   starshipClass: StarshipClass;
   maxAgents: number;
   deployedAgents: Array<{
-    id: string;
+    // Core AgentNodeParameters fields
     name: string;
-    model: string;
-    systemPrompt?: string;
-    createdAt: string;
     description?: string;
-    tags: string[];
-    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-    authorId: string;
-    isPublic: boolean;
-    version: string;
-    updatedAt: string;
-    usageCount: number;
-    rating?: number;
+    model: string;
     temperature?: number;
     maxTokens?: number;
-    customInstructions?: string;
-    allowedStarshipClasses?: StarshipClass[];
-    requiredPermissions?: string[];
+    timeout?: number;
+    memory?: Record<string, unknown>; // AgentMemoryConfig - keeping flexible for now
+    blueprint?: Record<string, unknown>; // BaseBlueprint - keeping flexible for now
+    
+    // Database-specific fields
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+    version: string;
+    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+    usageCount: number;
+    templateId?: string;
+    starshipId: string;
   }>;
   availableSlots: number;
   deployedCount: number;
@@ -127,7 +114,7 @@ export interface StarshipAgentsResponse {
  * Starship list response
  */
 export interface StarshipListResponse {
-  starships: StarshipResponse['starship'][];
+  starships: StarshipModel[];
 }
 
 /**

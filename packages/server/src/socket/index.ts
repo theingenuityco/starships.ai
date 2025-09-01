@@ -1,6 +1,5 @@
 import { SocketIOService } from '../services/SocketIOService';
 import { MissionEventService } from '../services/MissionEventService';
-import { setupSibilHandlers } from './sibilHandlers';
 import { setupAgentHandlers } from './agentHandlers';
 import { setupMissionHandlers } from './missionHandlers';
 import type { Server as HTTPServer } from 'http';
@@ -17,9 +16,6 @@ export function initializeSocketIO(httpServer: HTTPServer) {
 
   // Start health monitoring for connection stability
   socketService.startHealthMonitoring();
-
-  // Setup Sibil-specific handlers
-  setupSibilHandlers(io);
 
   // Setup Agent-specific handlers
   setupAgentHandlers(io);

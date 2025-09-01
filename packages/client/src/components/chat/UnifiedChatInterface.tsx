@@ -12,9 +12,7 @@ import { AgentSelector } from './AgentSelector'
 import { ProviderSelector } from './ProviderSelector'
 import type { Agent } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
-import type { SibilMessage } from '@/lib/sibil-api'
-
-export type ChatMode = 'agent' | 'sibil'
+export type ChatMode = 'agent'
 
 interface UnifiedChatInterfaceProps {
   defaultMode?: ChatMode
@@ -22,7 +20,7 @@ interface UnifiedChatInterfaceProps {
 }
 
 export function UnifiedChatInterface({
-  defaultMode = 'sibil',
+  defaultMode = 'agent',
   starshipId
 }: UnifiedChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
@@ -44,11 +42,6 @@ export function UnifiedChatInterface({
     if (userId && isAuthenticated) {
       if (chatMode === 'agent' && selectedAgent) {
         // Reset session for agent mode - server will provide actual session ID
-        setCurrentSessionId(null)
-        setHasMessages(false)
-        setRefreshMessages(prev => prev + 1)
-      } else if (chatMode === 'sibil') {
-        // Reset session for sibil mode - server will provide actual session ID
         setCurrentSessionId(null)
         setHasMessages(false)
         setRefreshMessages(prev => prev + 1)
@@ -103,7 +96,7 @@ export function UnifiedChatInterface({
   }
 
   // Handle first message to trigger layout transition
-  const handleFirstMessage = (message: Message | SibilMessage) => {
+  const handleFirstMessage = (message: Message) => {
     setHasMessages(true)
     setRefreshMessages(prev => prev + 1)
   }
@@ -209,7 +202,7 @@ export function UnifiedChatInterface({
                 sessionId={currentSessionId}
                 onSessionStart={handleSessionStart}
                 onMessageSent={handleFirstMessage}
-                onMessageReceived={(message: Message | SibilMessage) => {
+                onMessageReceived={(message: Message) => {
                   setRefreshMessages(prev => prev + 1)
                 }}
                 disabled={!isConnected || (chatMode === 'agent' && !selectedAgent)}
@@ -270,7 +263,7 @@ export function UnifiedChatInterface({
                   transition={{ delay: 0.45, duration: 0.4 }}
                   className="mt-8 space-y-3"
                 >
-                  {(chatMode === 'agent' ? AGENT_SUGGESTIONS : SIBIL_SUGGESTIONS).map((suggestion, index) => (
+                  {AGENT_SUGGESTIONS.map((suggestion, index) => (
                     <motion.button
                       key={suggestion}
                       initial={{ opacity: 0, x: -20 }}
@@ -322,10 +315,4 @@ const AGENT_SUGGESTIONS = [
   "Help me plan a project timeline with milestones",
   "Analyze this data set and find patterns",  
   "Write code for a responsive navigation component"
-]
-
-const SIBIL_SUGGESTIONS = [
-  "Help me pack for my trip to Jaipur next week",
-  "Compare leather sofas vs fabric sofas",
-  "How to identify if the pashmina shawl I am buying is genuine?"
 ]

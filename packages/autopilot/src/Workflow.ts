@@ -5,31 +5,35 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, Execution } from './types';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from './types';
 import { Engine } from './engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Workflow {
-  private blueprint: Blueprint;
+  private params: WorkflowNodeParameters;
   private engine: Engine;
 
-  constructor(blueprint?: Blueprint) {
-    // Initialize blueprint
-    if (!blueprint) {
-      this.blueprint = {
-        nodes: [],
-        edges: [],
-        metadata: {}
-      };
-    } else {
-      // Create a deep copy to avoid mutations to the original blueprint
-      this.blueprint = {
-        ...blueprint,
-        nodes: blueprint.nodes.map(node => ({ ...node })),
-        edges: blueprint.edges.map(edge => ({ ...edge })),
-        metadata: { ...blueprint.metadata }
-      };
-    }
+  constructor(params?: WorkflowNodeParameters) {
+    // Create blueprint or use provided one
+    const blueprint: Blueprint = params?.blueprint || {
+      nodes: [],
+      edges: [],
+      metadata: {}
+    };
+
+    // Create a deep copy to avoid mutations to the original blueprint
+    const clonedBlueprint = {
+      ...blueprint,
+      nodes: blueprint.nodes.map(node => ({ ...node })),
+      edges: blueprint.edges.map(edge => ({ ...edge })),
+      metadata: { ...blueprint.metadata }
+    };
+
+    // Store parameters with cloned blueprint
+    this.params = {
+      ...params,
+      blueprint: clonedBlueprint
+    };
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -48,7 +52,7 @@ export class Workflow {
       metadata: nodeConfig.metadata
     };
 
-    this.blueprint.nodes.push(node);
+    this.params.blueprint.nodes.push(node);
     return this;
   }
 
@@ -65,7 +69,7 @@ export class Workflow {
       metadata: {}
     };
 
-    this.blueprint.edges.push(edge);
+    this.params.blueprint.edges.push(edge);
     return this;
   }
 
@@ -74,10 +78,10 @@ export class Workflow {
    */
   removeNode(nodeRef: string): Workflow {
     // Remove the node
-    this.blueprint.nodes = this.blueprint.nodes.filter(node => node.ref !== nodeRef);
+    this.params.blueprint.nodes = this.params.blueprint.nodes.filter(node => node.ref !== nodeRef);
     
     // Remove associated edges
-    this.blueprint.edges = this.blueprint.edges.filter(
+    this.params.blueprint.edges = this.params.blueprint.edges.filter(
       edge => edge.from !== nodeRef && edge.to !== nodeRef
     );
     
@@ -88,7 +92,7 @@ export class Workflow {
    * Builder method: Remove an edge
    */
   removeEdge(edgeRef: string): Workflow {
-    this.blueprint.edges = this.blueprint.edges.filter(edge => edge.ref !== edgeRef);
+    this.params.blueprint.edges = this.params.blueprint.edges.filter(edge => edge.ref !== edgeRef);
     return this;
   }
 
@@ -96,29 +100,42 @@ export class Workflow {
    * Get the current blueprint (read-only copy)
    */
   getBlueprint(): Blueprint {
-    return JSON.parse(JSON.stringify(this.blueprint));
+    return JSON.parse(JSON.stringify(this.params.blueprint));
   }
 
+  /**
+   * Get workflow parameters (read-only copy)
+   */
+  getParameters(): WorkflowNodeParameters {
+    return JSON.parse(JSON.stringify(this.params));
+  }
+
+  /**
+   * Get workflow timeout
+   */
+  getTimeout(): number | undefined {
+    return this.params.timeout;
+  }
 
   /**
    * Get workflow nodes
    */
   getNodes(): Node[] {
-    return [...this.blueprint.nodes];
+    return [...this.params.blueprint.nodes];
   }
 
   /**
    * Get workflow edges
    */
   getEdges(): Edge[] {
-    return [...this.blueprint.edges];
+    return [...this.params.blueprint.edges];
   }
 
   /**
    * Execute the workflow (delegates to internal Engine)
    */
   async execute(initialExecution?: Execution): Promise<Execution> {
-    return this.engine.execute(this.blueprint, initialExecution);
+    return this.engine.execute(this.params.blueprint, initialExecution);
   }
 
   /**
@@ -128,20 +145,20 @@ export class Workflow {
     const errors: string[] = [];
 
     // Check for start node
-    const hasStartNode = this.blueprint.nodes.some(node => node.type === 'start');
+    const hasStartNode = this.params.blueprint.nodes.some(node => node.type === 'start');
     if (!hasStartNode) {
       errors.push('Workflow must have a start node');
     }
 
     // Check that all node types have handlers (delegate to engine)
-    const unsupportedNodes = this.blueprint.nodes.filter(node => !this.engine.hasHandler(node.type));
+    const unsupportedNodes = this.params.blueprint.nodes.filter(node => !this.engine.hasHandler(node.type));
     if (unsupportedNodes.length > 0) {
       errors.push(`Unsupported node types: ${unsupportedNodes.map(n => n.type).join(', ')}`);
     }
 
     // Check edge references
-    const nodeRefs = new Set(this.blueprint.nodes.map(n => n.ref));
-    const invalidEdges = this.blueprint.edges.filter(
+    const nodeRefs = new Set(this.params.blueprint.nodes.map(n => n.ref));
+    const invalidEdges = this.params.blueprint.edges.filter(
       edge => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
     );
     if (invalidEdges.length > 0) {
@@ -159,11 +176,16 @@ export class Workflow {
    */
   clone(): Workflow {
     const clonedBlueprint: Blueprint = {
-      ...this.blueprint,
-      nodes: this.blueprint.nodes.map(node => ({ ...node })),
-      edges: this.blueprint.edges.map(edge => ({ ...edge }))
+      ...this.params.blueprint,
+      nodes: this.params.blueprint.nodes.map(node => ({ ...node })),
+      edges: this.params.blueprint.edges.map(edge => ({ ...edge }))
     };
 
-    return new Workflow(clonedBlueprint);
+    const clonedParams: WorkflowNodeParameters = {
+      ...this.params,
+      blueprint: clonedBlueprint
+    };
+    
+    return new Workflow(clonedParams);
   }
 }

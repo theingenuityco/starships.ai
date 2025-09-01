@@ -4,6 +4,7 @@
 
 import { AgentHandler } from '../AgentHandler';
 import { Node, Execution, AgentNodeParameters } from '../../../types';
+import { AgentMemoryConfig } from '../../../AgentMemory';
 
 interface AgentExecutionResult {
   agentName: string;
@@ -31,10 +32,18 @@ describe('AgentHandler', () => {
         name: 'Customer Support Agent',
         description: 'Helps customers with inquiries',
         model: 'anthropic/claude-3.5-sonnet',
-        systemPrompt: 'You are a helpful customer support agent.',
+        memory: {
+          identity: {
+            name: 'Customer Support Agent',
+            role: 'customer support representative',
+            personality: 'helpful and friendly'
+          },
+          purpose: {
+            primary: 'Help customers with their inquiries'
+          }
+        } as AgentMemoryConfig,
         temperature: 0.7,
         maxTokens: 500,
-        instructions: 'Test instructions for the agent',
         timeout: 5000,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters
@@ -62,8 +71,6 @@ describe('AgentHandler', () => {
       expect(nodeResult?.data).toEqual(expect.objectContaining({
         agentName: 'Customer Support Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        systemPrompt: 'You are a helpful customer support agent.',
-        instructions: 'Test instructions for the agent',
         workflowResults: expect.any(Array),
         workflowStatus: 'completed',
         output: 'Agent Customer Support Agent completed workflow execution successfully'
@@ -84,6 +91,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Basic Agent',
         model: 'openai/gpt-4',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -158,6 +166,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Test Agent',
         model: 'openai/gpt-4',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -179,9 +188,9 @@ describe('AgentHandler', () => {
     it('should fail validation when name is missing', () => {
       const paramsWithoutName = {
         model: 'openai/gpt-4',
-        instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
-      } as AgentNodeParameters;
+      } as unknown as AgentNodeParameters;
       
       const nodeWithoutName: Node = {
         ref: 'no-name-agent-node',
@@ -207,9 +216,9 @@ describe('AgentHandler', () => {
     it('should fail validation when model is missing', () => {
       const paramsWithoutModel = {
         name: 'Test Agent',
-        instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
-      } as AgentNodeParameters;
+      } as unknown as AgentNodeParameters;
       
       const nodeWithoutModel: Node = {
         ref: 'no-model-agent-node',
@@ -233,9 +242,9 @@ describe('AgentHandler', () => {
 
     it('should fail validation when both name and model are missing', () => {
       const paramsWithoutRequiredParams = {
-        instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
-      } as AgentNodeParameters;
+      } as unknown as AgentNodeParameters;
       
       const nodeWithoutRequiredParams: Node = {
         ref: 'no-required-agent-node',
@@ -267,17 +276,18 @@ describe('AgentHandler', () => {
       const result = handlerWithoutParams.validate();
       
       expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(3);
+      expect(result.errors).toHaveLength(4); // name, model, memory, blueprint
       expect(result.errors[0].code).toBe('MISSING_REQUIRED_FIELD');
       expect(result.errors[1].code).toBe('MISSING_REQUIRED_FIELD');
       expect(result.errors[2].code).toBe('MISSING_REQUIRED_FIELD');
+      expect(result.errors[3].code).toBe('MISSING_REQUIRED_FIELD');
     });
 
     it('should handle empty string values as invalid', () => {
       const paramsWithEmptyValues = {
         name: '',
         model: '',
-        instructions: 'Some instructions',
+        memory: {} as AgentMemoryConfig,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -292,7 +302,7 @@ describe('AgentHandler', () => {
       const result = handlerWithEmptyValues.validate();
       
       expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(2);
+      expect(result.errors).toHaveLength(2); // empty name and model
     });
   });
 

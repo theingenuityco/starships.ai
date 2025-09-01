@@ -6,6 +6,7 @@
  */
 
 import type { BaseNodeParameters, BaseBlueprint } from './base';
+import type { AgentMemoryConfig } from '../AgentMemory';
 
 /**
  * Agent-specific node parameters
@@ -18,17 +19,17 @@ export interface AgentNodeParameters extends BaseNodeParameters {
   
   // LLM configuration
   model: string;
-  systemPrompt?: string;
   temperature?: number;
   maxTokens?: number;
   
   // Execution parameters
-  instructions?: string;
   timeout?: number;
+  
+  // Memory system (required)
+  memory: AgentMemoryConfig;
   
   // Blueprint execution
   blueprint: BaseBlueprint;
-  workflowContext?: Record<string, unknown>;
 }
 
 /**
@@ -128,9 +129,9 @@ export interface HttpAuthentication {
 export interface LlmNodeParameters extends BaseNodeParameters {
   model: string;
   prompt: string;
+  openrouterApiKey: string;
   temperature?: number;
   maxTokens?: number;
-  systemMessage?: string;
   timeout?: number;
   stream?: boolean;
   topP?: number;
@@ -143,7 +144,6 @@ export interface LlmNodeParameters extends BaseNodeParameters {
  */
 export interface WorkflowNodeParameters extends BaseNodeParameters {
   blueprint: BaseBlueprint;
-  workflowContext?: Record<string, unknown>;
   timeout?: number;
 }
 

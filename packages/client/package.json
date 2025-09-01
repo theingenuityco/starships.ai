@@ -27,6 +27,7 @@
     "@radix-ui/react-switch": "^1.1.7",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@starships/env-config": "workspace:*",
+    "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",
     "@tanstack/react-query": "5.81.5",
     "@tanstack/react-query-devtools": "5.81.5",

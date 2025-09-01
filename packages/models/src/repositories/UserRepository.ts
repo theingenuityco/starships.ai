@@ -1,5 +1,5 @@
 import { getConnection } from '../helpers/database';
-import { User } from '@starships/protocol';
+import { UserModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -7,20 +7,20 @@ export class UserRepository extends BaseRepository {
   constructor() {
     super('UserRepository');
   }
-  async findAll(): Promise<User[]> {
+  async findAll(): Promise<UserModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ u: User }>(
+      const result = await connection.executeQuery<{ u: UserModel }>(
         'MATCH (u:User) RETURN u ORDER BY u.createdAt DESC'
       );
       return result.map(record => record.u);
     }, 'findAll', 'User');
   }
 
-  async findById(id: string): Promise<User | null> {
+  async findById(id: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ u: User }>(
+      const result = await connection.executeQuery<{ u: UserModel }>(
         'MATCH (u:User) WHERE u.id = $id RETURN u',
         { id: id }
       );
@@ -28,10 +28,10 @@ export class UserRepository extends BaseRepository {
     }, 'findById', 'User', id);
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ u: User }>(
+      const result = await connection.executeQuery<{ u: UserModel }>(
         'MATCH (u:User) WHERE u.email = $email RETURN u',
         { email: email }
       );
@@ -39,10 +39,10 @@ export class UserRepository extends BaseRepository {
     }, 'findByEmail', 'User', email);
   }
 
-  async findByUsername(username: string): Promise<User | null> {
+  async findByUsername(username: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ u: User }>(
+      const result = await connection.executeQuery<{ u: UserModel }>(
         'MATCH (u:User) WHERE u.username = $username RETURN u',
         { username: username }
       );
@@ -50,10 +50,10 @@ export class UserRepository extends BaseRepository {
     }, 'findByUsername', 'User', username);
   }
 
-  async findByKindeId(kindeId: string): Promise<User | null> {
+  async findByKindeId(kindeId: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ u: User }>(
+      const result = await connection.executeQuery<{ u: UserModel }>(
         'MATCH (u:User) WHERE u.kindeId = $kindeId RETURN u',
         { kindeId: kindeId }
       );
@@ -61,7 +61,7 @@ export class UserRepository extends BaseRepository {
     }, 'findByKindeId', 'User', kindeId);
   }
 
-  async create(entity: Omit<User, 'id' | 'createdAt'>): Promise<User> {
+  async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(entity, ['kindeId', 'email'], 'create');
       
@@ -71,7 +71,7 @@ export class UserRepository extends BaseRepository {
       
       // Use MERGE to prevent duplicate users with same kindeId
       // This is atomic and thread-safe
-      const result = await connection.executeWrite<{ u: User }>(
+      const result = await connection.executeWrite<{ u: UserModel }>(
         `MERGE (u:User {kindeId: $kindeId})
         ON CREATE SET 
           u.id = $id,
@@ -101,7 +101,7 @@ export class UserRepository extends BaseRepository {
     }, 'create', 'User');
   }
 
-  async update(id: string, updates: Partial<User>): Promise<User | null> {
+  async update(id: string, updates: Partial<UserModel>): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       
@@ -114,7 +114,7 @@ export class UserRepository extends BaseRepository {
         return this.findById(id);
       }
 
-      const result = await connection.executeWrite<{ u: User }>(
+      const result = await connection.executeWrite<{ u: UserModel }>(
         `MATCH (u:User) WHERE u.id = $id
          SET ${setClause}
          RETURN u`,
@@ -152,10 +152,10 @@ export class UserRepository extends BaseRepository {
 
 
   // Stripe integration methods
-  async findByStripeCustomerId(stripeCustomerId: string): Promise<User | null> {
+  async findByStripeCustomerId(stripeCustomerId: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
-      const result = await connection.executeQuery<{ user: User }>(
+      const result = await connection.executeQuery<{ user: UserModel }>(
         `MATCH (user:User {stripeCustomerId: $stripeCustomerId})
          RETURN user`,
         { stripeCustomerId }

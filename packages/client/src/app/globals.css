@@ -2,9 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Sibil-specific design tokens and animations */
-@import '../styles/sibil-theme.css';
-
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

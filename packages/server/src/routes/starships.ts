@@ -7,7 +7,6 @@ import type { Request, Response } from 'express';
 import type {
   StarshipRepository,
   AgentRepository,
-  VisionRepository,
   UserRepository,
 } from '@starships/models';
 import {
@@ -15,7 +14,7 @@ import {
   ConflictError as ConstraintViolationError,
   NotFoundError,
 } from '@starships/models';
-import type { Starship } from '@starships/protocol';
+import type { StarshipModel } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
 
@@ -68,18 +67,15 @@ const router: Router = Router();
 let starshipRepo: StarshipRepository;
 let agentRepo: AgentRepository;
 let userRepo: UserRepository;
-let visionRepo: VisionRepository;
 
 export function initializeStarshipRoutes(deps: {
   starshipRepository: StarshipRepository;
   agentRepository: AgentRepository;
   userRepository: UserRepository;
-  visionRepository: VisionRepository;
 }) {
   starshipRepo = deps.starshipRepository;
   agentRepo = deps.agentRepository;
   userRepo = deps.userRepository;
-  visionRepo = deps.visionRepository;
 }
 
 // GET /starships - Get user's starships
@@ -159,18 +155,6 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response) =>
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
-    console.log('[STARSHIP-CREATE] Creating empty vision in database...');
-    // Create empty vision in database for the new starship
-    await visionRepo.create({
-      starshipId: starship.id,
-      statement: '',
-      confidence: 0.5,
-      refinementCount: 0,
-      lastRefined: new Date().toISOString(),
-      isActive: true,
-    });
-    console.log('[STARSHIP-CREATE] Vision created successfully in database');
-
     console.log('[STARSHIP-CREATE] Starship creation completed successfully');
     res.status(201).json({ starship });
   } catch (error) {
@@ -236,17 +220,6 @@ router.post('/starships/create-paid', authMiddleware, async (req: Request, res: 
       billingPeriod // Store billing period
     });
     console.log('[STARSHIP-CREATE-PAID] Starship created with ID:', starship.id);
-
-    // CRITICAL: Create empty vision for the starship (REQUIRED for all starships)
-    console.log('[STARSHIP-CREATE-PAID] Creating empty vision...');
-    await visionRepo.create({
-      starshipId: starship.id,
-      statement: 'Initial Vision Statement',
-      confidence: 0.5,
-      refinementCount: 0,
-      lastRefined: new Date().toISOString(),
-      isActive: true
-    });
 
     // Create Stripe checkout session with starshipId
     console.log('[STARSHIP-CREATE-PAID] Creating Stripe checkout session...');
@@ -405,7 +378,7 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
     }
 
     // Validate allowed updates
-    const allowedUpdates: Partial<Starship> = {};
+    const allowedUpdates: Partial<StarshipModel> = {};
 
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim().length === 0) {

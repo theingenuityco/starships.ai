@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import type { Agent } from '@starships/protocol';
+import type { AgentModel } from '@starships/protocol';
 import {
   Bot,
   Edit,
@@ -31,13 +31,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface AgentCardProps {
-  agent: Agent
+  agent: AgentModel
   isSelected: boolean
   onClick: () => void
-  onEdit?: (agent: Agent) => void
-  onDelete?: (agent: Agent) => void
-  onTest?: (agent: Agent) => void
-  onAnalytics?: (agent: Agent) => void
+  onEdit?: (agent: AgentModel) => void
+  onDelete?: (agent: AgentModel) => void
+  onTest?: (agent: AgentModel) => void
+  onAnalytics?: (agent: AgentModel) => void
   showActions?: boolean
 }
 
@@ -51,7 +51,7 @@ export function AgentCard({
   onAnalytics,
   showActions = false,
 }: AgentCardProps) {
-  const getCategoryColor = (category: Agent['category']) => {
+  const getCategoryColor = (category: AgentModel['category']) => {
     const colors = {
       general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
       coding: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
@@ -62,7 +62,7 @@ export function AgentCard({
     return colors[category] || colors.general
   }
 
-  const getAvatarBackgroundColor = (category: Agent['category']) => {
+  const getAvatarBackgroundColor = (category: AgentModel['category']) => {
     const colors = {
       general: 'bg-gradient-to-br from-gray-500/20 to-gray-500/30',
       coding: 'bg-gradient-to-br from-blue-500/20 to-blue-500/30',
@@ -72,7 +72,7 @@ export function AgentCard({
     }
     return colors[category] || colors.general
   }
-  const getCategoryIcon = (category: Agent['category']) => {
+  const getCategoryIcon = (category: AgentModel['category']) => {
     switch (category) {
       case 'coding':
         return <Code className="w-3.5 h-3.5 mr-1" />
@@ -88,7 +88,7 @@ export function AgentCard({
   }
 
 
-  const getAgentAvatarContent = (agent: Agent) => {
+  const getAgentAvatarContent = (agent: AgentModel) => {
     // Determine emoji-like icon based on agent name or category
     if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
       return '🎧' // Headphones emoji
@@ -168,10 +168,10 @@ export function AgentCard({
                 )}
               </div>
 
-              {agent.rating && (
+              {(agent as any).rating && (
                 <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
                   <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
-                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{agent.rating.toFixed(1)}</span>
+                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{((agent as any).rating as number).toFixed(1)}</span>
                 </div>
               )}
             </div>
@@ -196,9 +196,9 @@ export function AgentCard({
             )}
 
             {/* Enhanced Tags display */}
-            {agent.tags && agent.tags.length > 0 && (
+            {(agent as any).tags && Array.isArray((agent as any).tags) && (agent as any).tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {agent.tags.slice(0, 3).map(tag => (
+                {((agent as any).tags as string[]).slice(0, 3).map((tag: string) => (
                   <Badge
                     key={tag}
                     variant="outline"
@@ -208,12 +208,12 @@ export function AgentCard({
                     {tag.charAt(0).toUpperCase() + tag.slice(1)}
                   </Badge>
                 ))}
-                {agent.tags.length > 3 && (
+                {((agent as any).tags as string[]).length > 3 && (
                   <Badge
                     variant="outline"
                     className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold"
                   >
-                    +{agent.tags.length - 3} more
+                    +{((agent as any).tags as string[]).length - 3} more
                   </Badge>
                 )}
               </div>

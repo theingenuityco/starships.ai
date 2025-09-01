@@ -183,17 +183,47 @@ const templateRepo = RepositoryFactory.getAgentTemplateRepository();
 const template = await templateRepo.create({
   name: 'Data Analyst',
   category: 'analysis',
-  systemPrompt: 'You are a data analysis specialist...',
   isPublic: true
 });
 
 // Instantiate from template
 const agentRepo = RepositoryFactory.getAgentRepository();
 const agent = await agentRepo.createFromTemplate(
-  template.id, 
+  template.id,
   'starship-123',
   { name: 'My Data Agent' }
 );
+```
+
+### Workflow Management
+```typescript
+const workflowRepo = RepositoryFactory.getWorkflowRepository();
+
+// Create workflow
+const workflow = await workflowRepo.create({
+  name: 'Data Processing Pipeline',
+  category: 'automation',
+  authorId: 'user-123',
+  starshipId: 'starship-456',
+  isPublic: false,
+  blueprint: {
+    nodes: [
+      { ref: 'start', type: 'start', name: 'Start', description: 'Begin workflow', parameters: {} },
+      { ref: 'process', type: 'agent', name: 'Process Data', description: 'AI data processing', parameters: { agentId: 'agent-789' } },
+      { ref: 'end', type: 'end', name: 'End', description: 'Complete workflow', parameters: {} }
+    ],
+    edges: [
+      { ref: 'start-to-process', from: 'start', to: 'process' },
+      { ref: 'process-to-end', from: 'process', to: 'end' }
+    ]
+  }
+});
+
+// Deploy workflow to starship
+await workflowRepo.updateStarshipId(workflow.id, 'starship-456');
+
+// Find workflows by category
+const automationWorkflows = await workflowRepo.findByCategory('automation');
 ```
 
 ## Logging & Monitoring

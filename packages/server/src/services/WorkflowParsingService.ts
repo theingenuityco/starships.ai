@@ -5,17 +5,18 @@
  * Separated from orchestrator agent to follow separation of concerns pattern.
  */
 
-import { Agent, CreateWorkflowRequest } from '@starships/protocol';
+import type { CreateWorkflowRequest, AgentModel } from '@starships/protocol';
+import type { Blueprint } from '@starships/autopilot';
 import { Logger } from '../utils/logger';
 
 export class WorkflowParsingService {
   private static logger = Logger.getInstance();
 
   /**
-   * Parse AI response and convert to WorkflowDSL
-   * Moved from MissionOrchestratorAgent to follow separation of concerns
+   * Parse AI response and convert to CreateWorkflowRequest with Blueprint
+   * Migrated from legacy format to autopilot Blueprint pattern
    */
-  static parseAIResponse(aiResponse: string, missionId: string, agents: Agent[]): CreateWorkflowRequest {
+  static parseAIResponse(aiResponse: string, missionId: string, agents: AgentModel[]): CreateWorkflowRequest {
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -53,29 +54,38 @@ export class WorkflowParsingService {
         throw new Error('Workflow must have an end node');
       }
 
-      // Process nodes and preserve AI IDs for mapping
-      const processedNodes = parsed.nodes.map((node: any) => {
+      // Process nodes for Blueprint format
+      const blueprintNodes = parsed.nodes.map((node: any) => {
         return {
+          ref: node.id || node.name, // Use AI-provided ID or fallback to name
           type: node.type,
           name: node.name || '',
           description: node.description || '',
-          parameters: node.parameters || {},
-          aiId: node.id // Preserve AI-provided ID for mapping
+          parameters: node.parameters || {}
         };
       });
 
-      // Process edges directly - they reference AI IDs
-      const processedEdges = parsed.edges.map((edge: any) => {
+      // Process edges for Blueprint format
+      const blueprintEdges = parsed.edges.map((edge: any) => {
         return {
           from: edge.from,
           to: edge.to
         };
       });
 
+      // Create Blueprint structure
+      const blueprint: Blueprint = {
+        nodes: blueprintNodes,
+        edges: blueprintEdges
+      };
+
       return {
-        missionId,
-        nodes: processedNodes,
-        edges: processedEdges
+        name: `Mission Workflow ${Date.now()}`,
+        description: 'Auto-generated workflow from AI response',
+        category: 'generated',
+        executionMode: 'workflow' as const,
+        blueprint,
+        isPublic: false
       };
 
     } catch (error) {
@@ -85,22 +95,22 @@ export class WorkflowParsingService {
   }
 
   /**
-   * Validate workflow structure
+   * Validate workflow structure using Blueprint format
    */
   static validateWorkflow(workflow: CreateWorkflowRequest): boolean {
     try {
       // Check basic structure
-      if (!workflow.nodes || workflow.nodes.length === 0) {
+      if (!workflow.blueprint?.nodes || workflow.blueprint.nodes.length === 0) {
         throw new Error('Workflow must have nodes');
       }
 
-      if (!workflow.edges || workflow.edges.length === 0) {
+      if (!workflow.blueprint?.edges || workflow.blueprint.edges.length === 0) {
         throw new Error('Workflow must have edges');
       }
 
       // Check for required node types
-      const hasStart = workflow.nodes.some(node => node.type === 'start');
-      const hasEnd = workflow.nodes.some(node => node.type === 'end');
+      const hasStart = workflow.blueprint.nodes.some((node: any) => node.type === 'start');
+      const hasEnd = workflow.blueprint.nodes.some((node: any) => node.type === 'end');
       
       if (!hasStart) {
         throw new Error('Workflow must have a start node');

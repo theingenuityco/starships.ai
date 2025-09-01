@@ -41,7 +41,7 @@ const getErrorMessage = (error: unknown): string => {
 router.post('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const { agent_id, message } = req.body;
+    const { agentId, message } = req.body;
 
     if (!userId) {
       res.status(401).json({
@@ -53,10 +53,10 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     }
 
     // Validate required fields
-    if (!agent_id || typeof agent_id !== 'string') {
+    if (!agentId || typeof agentId !== 'string') {
       throw new ValidationError(
-        'agent_id is required and must be a string',
-        'agent_id'
+        'agentId is required and must be a string',
+        'agentId'
       );
     }
 
@@ -67,14 +67,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
       );
     }
 
-    // Validate agent_id format
-    validateUUID(agent_id, 'agent_id');
+    // Validate agentId format
+    validateUUID(agentId, 'agentId');
 
     // Build chat request using authenticated user ID from middleware
     const chatRequest = {
       source: 'agent' as const,
-      agent_id,
-      user_id: userId,
+      agentId,
+      userId,
       message,
       stream: false,
     };
@@ -85,8 +85,8 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
     // Track agent usage after successful chat
     try {
-      await AgentService.trackUsage(chatRequest.agent_id!);
-      console.log(`[ANALYTICS] Tracked usage for agent: ${chatRequest.agent_id}`);
+      await AgentService.trackUsage(chatRequest.agentId!);
+      console.log(`[ANALYTICS] Tracked usage for agent: ${chatRequest.agentId}`);
     } catch (trackingError) {
       // Don't fail the chat request if usage tracking fails
       console.warn('Failed to track agent usage:', trackingError);

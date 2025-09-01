@@ -324,27 +324,27 @@ export class AgentService {
    * Execute agent chat using SessionRequest format (replaces AgentExecutionService.executeChat)
    */
   static async executeChat(request: SessionRequest): Promise<SessionResponse> {
-    const { agent_id, user_id, message, session_id } = request;
+    const { agentId, userId, message, sessionId } = request;
 
-    if (!agent_id) {
-      throw new Error('agent_id is required for agent chat');
+    if (!agentId) {
+      throw new Error('agentId is required for agent chat');
     }
 
     console.log('🚀 [AGENT-SERVICE] Starting agent chat:', {
-      agent_id,
-      user_id,
+      agentId,
+      userId,
       message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-      session_id,
+      sessionId,
       timestamp: new Date().toISOString(),
     });
 
     // Get agent from database
     const agentRepo = RepositoryFactory.getAgentRepository();
-    const dbAgent = await agentRepo.findById(agent_id);
+    const dbAgent = await agentRepo.findById(agentId);
 
     if (!dbAgent) {
-      console.error('❌ [AGENT-SERVICE] Agent not found:', agent_id);
-      throw new Error(`Agent ${agent_id} not found`);
+      console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
+      throw new Error(`Agent ${agentId} not found`);
     }
 
     console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
@@ -361,15 +361,15 @@ export class AgentService {
       const agentService = new AgentService();
       const executionResult = await agentService.executeAgent(
         {
-          agentId: agent_id,
-          userId: user_id,
-          sessionId: session_id,
+          agentId: agentId,
+          userId: userId,
+          sessionId: sessionId,
           userMessage: message
         },
         {
           includeMemory: true,
-          userId: user_id,
-          sessionId: session_id,
+          userId: userId,
+          sessionId: sessionId,
           loadConversationHistory: true
         }
       );
@@ -383,17 +383,17 @@ export class AgentService {
       return {
         source: 'agent',
         content: executionResult.response,
-        agent_id: agent_id,
+        agentId: agentId,
         usage: {
-          prompt_tokens: Math.floor(executionResult.usage.total_tokens * 0.7), // Estimate prompt tokens
-          completion_tokens: Math.floor(executionResult.usage.total_tokens * 0.3) // Estimate completion tokens
+          promptTokens: Math.floor(executionResult.usage.total_tokens * 0.7), // Estimate prompt tokens
+          completionTokens: Math.floor(executionResult.usage.total_tokens * 0.3) // Estimate completion tokens
         }
       };
 
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Agent execution failed:', {
-        agent_id,
-        user_id,
+        agentId,
+        userId,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });

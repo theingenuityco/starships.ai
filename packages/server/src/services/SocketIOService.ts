@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import type {
   SocketConnectionState,
-  BaseSocketEvents,
+  SessionSocketEvents,
   EventEmissionOptions,
   EventEmissionResult,
 } from '@starships/protocol';
@@ -51,7 +51,7 @@ async function verifySocketJWT(token: string) {
  */
 export class SocketIOService {
   private static instance: SocketIOService;
-  private io: SocketIOServer<BaseSocketEvents>;
+  private io: SocketIOServer<SessionSocketEvents>;
   private connections: Map<string, SocketConnectionState> = new Map();
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
@@ -167,10 +167,10 @@ export class SocketIOService {
       this.connections.set(socketId, {
         connected: true,
         authenticated: true,
-        room_joined: false,
-        user_id: tempUserId,
-        connection_id: socketId,
-        last_ping: Date.now(),
+        roomJoined: false,
+        userId: tempUserId,
+        connectionId: socketId,
+        lastPing: Date.now(),
       });
 
       // Track user sockets using temporary ID initially
@@ -182,7 +182,7 @@ export class SocketIOService {
       // Auto-join user to their personal room (using temp ID initially)
       const userRoom = this.getUserRoom(tempUserId);
       socket.join(userRoom);
-      this.updateConnectionState(socketId, { room_joined: true });
+      this.updateConnectionState(socketId, { roomJoined: true });
 
       // Send initial connection confirmation with degraded status
       socket.emit('connection-status', {
@@ -197,7 +197,7 @@ export class SocketIOService {
 
       // Handle ping/pong for connection health
       socket.on('ping', () => {
-        this.updateConnectionState(socketId, { last_ping: Date.now() });
+        this.updateConnectionState(socketId, { lastPing: Date.now() });
         socket.emit('pong');
       });
 
@@ -392,7 +392,7 @@ export class SocketIOService {
       socket.data.userResolutionInProgress = false;
 
       // Update connection state
-      this.updateConnectionState(socketId, { user_id: newUserId });
+      this.updateConnectionState(socketId, { userId: newUserId });
 
       // Update user socket tracking
       // Remove from old tracking
@@ -459,7 +459,7 @@ export class SocketIOService {
 
       // Check for stale connections
       this.connections.forEach((state, socketId) => {
-        if (now - (state.last_ping || 0) > staleThreshold) {
+        if (now - (state.lastPing || 0) > staleThreshold) {
           console.warn(`[SOCKET.IO] Stale connection detected: ${socketId}`);
           const socket = this.io.sockets.sockets.get(socketId);
           if (socket) {
@@ -518,7 +518,7 @@ export class SocketIOService {
   }
 
   // Public methods for other services
-  getIO(): SocketIOServer<BaseSocketEvents> {
+  getIO(): SocketIOServer<SessionSocketEvents> {
     return this.io;
   }
 
@@ -543,7 +543,7 @@ export class SocketIOService {
     console.log(`[SOCKET.IO] User ${userId} left agent room: ${room}`);
   }
 
-  emitToAgentRoom(agentId: string, userId: string, event: keyof BaseSocketEvents, data: any) {
+  emitToAgentRoom(agentId: string, userId: string, event: keyof SessionSocketEvents, data: any) {
     const agentRoom = this.getAgentRoom(agentId, userId);
     this.io.to(agentRoom).emit(event, data);
   }
@@ -562,10 +562,10 @@ export class SocketIOService {
   }
 
   // Enhanced event emission with error handling and retry logic
-  async emitToUser<K extends keyof BaseSocketEvents>(
+  async emitToUser<K extends keyof SessionSocketEvents>(
     userId: string,
     event: K,
-    data: Parameters<BaseSocketEvents[K]>[0],
+    data: Parameters<SessionSocketEvents[K]>[0],
     options?: Partial<EventEmissionOptions>
   ): Promise<EventEmissionResult> {
     const userRoom = this.getUserRoom(userId);
@@ -575,17 +575,17 @@ export class SocketIOService {
   // Legacy method for backward compatibility
   async emitToUserWithRetry(
     userId: string,
-    event: keyof BaseSocketEvents,
+    event: keyof SessionSocketEvents,
     data: any,
     options: EventEmissionOptions = {}
   ): Promise<EventEmissionResult> {
     return this.emitToUser(userId, event, data, options);
   }
 
-  private async emitToRoom<K extends keyof BaseSocketEvents>(
+  private async emitToRoom<K extends keyof SessionSocketEvents>(
     room: string,
     event: K,
-    data: Parameters<BaseSocketEvents[K]>[0],
+    data: Parameters<SessionSocketEvents[K]>[0],
     options: EventEmissionOptions
   ): Promise<EventEmissionResult> {
     // const startTime = Date.now();
@@ -695,7 +695,7 @@ export class SocketIOService {
   private getAveragePingTime(): number {
     const now = Date.now();
     const pingTimes = Array.from(this.connections.values())
-      .map((conn) => now - (conn.last_ping || now))
+      .map((conn) => now - (conn.lastPing || now))
       .filter((time) => time < 60000); // Only consider pings within last minute
 
     return pingTimes.length > 0
@@ -706,7 +706,7 @@ export class SocketIOService {
   private getHealthyConnectionsCount(): number {
     const now = Date.now();
     return Array.from(this.connections.values()).filter(
-      (conn) => conn.connected && now - (conn.last_ping || 0) < 60000
+      (conn) => conn.connected && now - (conn.lastPing || 0) < 60000
     ).length;
   }
 }

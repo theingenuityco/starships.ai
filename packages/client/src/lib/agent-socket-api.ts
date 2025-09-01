@@ -11,10 +11,10 @@ export interface Message {
   agentId?: string;
   sending?: boolean;
   streaming?: boolean;
-  stream_id?: string;
+  streamId?: string;
   usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
+    promptTokens: number;
+    completionTokens: number;
   };
 }
 
@@ -50,13 +50,13 @@ export const agentSocketAPI = {
 
     const socketRequest: ChatRequest = {
       source: 'agent',
-      agent_id: agentId,
-      session_id: request.sessionId,
+      agentId: agentId,
+      sessionId: request.sessionId,
       message: request.message,
-      stream_id: streamId,
-      user_id: 'client-user', // Overridden by server auth
-      typewriter_enabled: true,
-      typing_speed: 75
+      streamId: streamId,
+      userId: 'client-user', // Overridden by server auth
+      typewriterEnabled: true,
+      typingSpeed: 75
     };
 
     const handleStreamStart = (data: { streamId: string; source: 'agent' | 'sibil'; agentId?: string }) => {
@@ -66,7 +66,7 @@ export const agentSocketAPI = {
     };
 
     const handleStreamChunk = (chunk: ChatStreamChunk) => {
-      if (chunk.stream_id === streamId && chunk.agent_id === agentId && chunk.source === 'agent' && !isAborted) {
+      if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
           callbacks.onChunk(chunk, accumulatedContent);
@@ -79,10 +79,10 @@ export const agentSocketAPI = {
     };
 
     const handleStreamComplete = (response: ChatResponse) => {
-      if (response.agent_id === agentId && response.source === 'agent' && !isAborted) {
+      if (response.agentId === agentId && response.source === 'agent' && !isAborted) {
         // Ensure we have a session ID from server
-        if (!response.session_id) {
-          console.error('[AGENT API] No session_id in response, using fallback');
+        if (!response.sessionId) {
+          console.error('[AGENT API] No sessionId in response, using fallback');
         }
         
         const finalMessage: Message = {
@@ -90,8 +90,8 @@ export const agentSocketAPI = {
           content: response.content,
           role: 'assistant',
           timestamp: response.timestamp || new Date().toISOString(),
-          sessionId: response.session_id || 'missing-session-id', // Server should always provide this
-          agentId: response.agent_id,
+          sessionId: response.sessionId || 'missing-session-id', // Server should always provide this
+          agentId: response.agentId,
           streaming: false,
           usage: response.usage
         };
@@ -101,7 +101,7 @@ export const agentSocketAPI = {
     };
 
     const handleStreamError = (error: ChatStreamError) => {
-      if (error.stream_id === streamId && error.agent_id === agentId && error.source === 'agent' && !isAborted) {
+      if (error.streamId === streamId && error.agentId === agentId && error.source === 'agent' && !isAborted) {
         callbacks.onError(error.message);
         cleanup();
       }
@@ -120,32 +120,32 @@ export const agentSocketAPI = {
     };
 
     const cleanup = () => {
-      socket.off('chat:stream-start', handleStreamStart);
-      socket.off('chat:stream-chunk', handleStreamChunk);
-      socket.off('chat:stream-complete', handleStreamComplete);
-      socket.off('chat:stream-error', handleStreamError);
-      socket.off('chat:typing-start', handleTypingStart);
-      socket.off('chat:typing-stop', handleTypingStop);
+      socket.off('session:stream-start', handleStreamStart);
+      socket.off('session:stream-chunk', handleStreamChunk);
+      socket.off('session:stream-complete', handleStreamComplete);
+      socket.off('session:stream-error', handleStreamError);
+      socket.off('session:typing-start', handleTypingStart);
+      socket.off('session:typing-stop', handleTypingStop);
     };
 
     // Set up event listeners
-    socket.on('chat:stream-start', handleStreamStart);
-    socket.on('chat:stream-chunk', handleStreamChunk);
-    socket.on('chat:stream-complete', handleStreamComplete);
-    socket.on('chat:stream-error', handleStreamError);
-    socket.on('chat:typing-start', handleTypingStart);
-    socket.on('chat:typing-stop', handleTypingStop);
+    socket.on('session:stream-start', handleStreamStart);
+    socket.on('session:stream-chunk', handleStreamChunk);
+    socket.on('session:stream-complete', handleStreamComplete);
+    socket.on('session:stream-error', handleStreamError);
+    socket.on('session:typing-start', handleTypingStart);
+    socket.on('session:typing-stop', handleTypingStop);
 
     // Join agent room for this session
     socketClient.joinAgentRoom(agentId, 'current-user'); // Will be overridden by server auth
 
     // Start the stream
-    socket.emit('chat:start-stream', socketRequest);
+    socket.emit('session:stream-start', socketRequest);
 
     return {
       abort: () => {
         isAborted = true;
-        socket.emit('chat:stop-stream', streamId);
+        socket.emit('session:stop-stream', streamId);
         socketClient.leaveAgentRoom(agentId, 'current-user');
         cleanup();
       }

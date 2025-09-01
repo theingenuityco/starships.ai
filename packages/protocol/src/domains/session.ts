@@ -14,10 +14,10 @@
 export interface SocketConnectionState {
   connected: boolean;
   authenticated: boolean;
-  room_joined: boolean;
-  user_id?: string;
-  connection_id?: string;
-  last_ping?: number;
+  roomJoined: boolean;
+  userId?: string;
+  connectionId?: string;
+  lastPing?: number;
 }
 
 /**
@@ -25,8 +25,8 @@ export interface SocketConnectionState {
  */
 export interface ConnectionStatusEvent {
   status: 'connected' | 'disconnected' | 'reconnecting' | 'error';
-  user_id: string;
-  connection_id: string;
+  userId: string;
+  connectionId: string;
   timestamp: string;
 }
 
@@ -43,19 +43,19 @@ export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | '
  * Chat room event data
  */
 export interface ChatRoomData {
-  room_id: string;
-  user_id: string;
-  session_id?: string;
+  roomId: string;
+  userId: string;
+  sessionId?: string;
 }
 
 /**
  * Chat typing event data
  */
 export interface ChatTypingData {
-  user_id: string;
-  session_id?: string;
-  room_id?: string;
-  is_typing: boolean;
+  userId: string;
+  sessionId?: string;
+  roomId?: string;
+  isTyping: boolean;
 }
 
 // ============================================================================
@@ -66,9 +66,9 @@ export interface ChatTypingData {
  * Event emission options
  */
 export interface EventEmissionOptions {
-  exclude_user?: string;
-  include_users?: string[];
-  retry_count?: number;
+  excludeUser?: string;
+  includeUsers?: string[];
+  retryCount?: number;
   timeout?: number;
 }
 
@@ -77,10 +77,10 @@ export interface EventEmissionOptions {
  */
 export interface EventEmissionResult {
   success: boolean;
-  event_type: string;
-  recipient_count: number;
+  eventType: string;
+  recipientCount: number;
   errors?: Array<{
-    user_id: string;
+    userId: string;
     error: string;
   }>;
   timestamp: string;
@@ -100,14 +100,14 @@ export type SessionSourceType = 'agent' | 'sibil' | 'user';
  */
 export interface SessionRequest {
   source: SessionSourceType;
-  agent_id?: string;
-  user_id?: string;
+  agentId?: string;
+  userId?: string;
   message: string;
-  session_id?: string;
+  sessionId?: string;
   stream?: boolean;
-  stream_id?: string;
-  typing_speed?: number;
-  typewriter_enabled?: boolean;
+  streamId?: string;
+  typingSpeed?: number;
+  typewriterEnabled?: boolean;
   context?: Record<string, unknown>;
 }
 
@@ -117,12 +117,12 @@ export interface SessionRequest {
 export interface SessionResponse {
   source: SessionSourceType;
   content: string;
-  agent_id?: string;
-  session_id?: string;
+  agentId?: string;
+  sessionId?: string;
   usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens?: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens?: number;
     cost?: number;
   };
   timestamp?: string;
@@ -134,18 +134,18 @@ export interface SessionResponse {
  */
 export interface SessionStreamChunk {
   source: SessionSourceType;
-  stream_id: string;
-  agent_id?: string;
+  streamId: string;
+  agentId?: string;
   type: 'content' | 'status' | 'error' | 'complete';
   content: string;
   typewriter?: {
     type: 'character' | 'word' | 'line';
     content: string;
     position: number;
-    total_length: number;
+    totalLength: number;
     delay: number;
-    is_code?: boolean;
-    is_markdown?: boolean;
+    isCode?: boolean;
+    isMarkdown?: boolean;
   };
   timestamp: number;
   metadata?: Record<string, unknown>;
@@ -161,14 +161,14 @@ export interface SessionStreamChunk {
 export interface Session {
   id: string;
   source: SessionSourceType;
-  agent_id?: string;
-  user_id?: string;
-  starship_id?: string;
-  created_at: string;
-  updated_at: string;
-  last_activity_at: string;
-  message_count: number;
-  total_tokens?: number;
+  agentId?: string;
+  userId?: string;
+  starshipId?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastActivityAt: string;
+  messageCount: number;
+  totalTokens?: number;
   status: 'active' | 'paused' | 'completed' | 'archived';
   metadata?: Record<string, unknown>;
 }
@@ -181,9 +181,9 @@ export interface Session {
  * Session error response
  */
 export interface SessionError {
-  stream_id?: string;
-  agent_id?: string;
-  error_code: string;
+  streamId?: string;
+  agentId?: string;
+  errorCode: string;
   message: string;
   timestamp: number;
   recoverable: boolean;
@@ -212,10 +212,39 @@ export interface SessionSocketEvents {
   'session:typing-stop': (data: ChatTypingData) => void;
   'session:join-room': (data: ChatRoomData) => void;
   'session:leave-room': (data: ChatRoomData) => void;
-  'session:stop-stream': (stream_id: string) => void;
+  'session:stop-stream': (streamId: string) => void;
 }
 
 /**
  * Generic type helper for socket event data
  */
 export type SocketEventData<T extends (...args: unknown[]) => unknown> = Parameters<T>[0];
+
+// ============================================================================
+// TYPE ALIASES FOR CLIENT COMPATIBILITY
+// ============================================================================
+
+/**
+ * Chat request type alias for client compatibility
+ */
+export type ChatRequest = SessionRequest;
+
+/**
+ * Chat response type alias for client compatibility
+ */
+export type ChatResponse = SessionResponse;
+
+/**
+ * Chat stream chunk type alias for client compatibility
+ */
+export type ChatStreamChunk = SessionStreamChunk;
+
+/**
+ * Chat stream error type alias for client compatibility
+ */
+export type ChatStreamError = SessionError;
+
+/**
+ * Base socket events type alias for server compatibility
+ */
+export type BaseSocketEvents = SessionSocketEvents;

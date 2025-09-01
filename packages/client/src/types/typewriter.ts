@@ -11,10 +11,10 @@ export interface TypewriterChunk {
   type: 'character' | 'word' | 'line' | 'complete';
   content: string;
   position: number;
-  total_length?: number;
+  totalLength?: number;
   delay?: number; // milliseconds
-  is_code?: boolean;
-  is_markdown?: boolean;
+  isCode?: boolean;
+  isMarkdown?: boolean;
 }
 
 // Import unified types from protocol
@@ -22,7 +22,7 @@ import type { ChatStreamChunk } from '@starships/protocol';
 
 export type AgentSocketStreamChunk = ChatStreamChunk & {
   source: 'agent';
-  agent_id: string;
+  agentId: string;
   typewriter?: TypewriterChunk;
 };
 

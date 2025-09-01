@@ -19,7 +19,7 @@ export function useSocketConnection(): UseSocketConnectionReturn {
   const [connectionState, setConnectionState] = useState<SocketConnectionState>({
     connected: false,
     authenticated: false,
-    room_joined: false
+    roomJoined: false
   });
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export function useSocketConnection(): UseSocketConnectionReturn {
     setConnectionState({
       connected: false,
       authenticated: false,
-      room_joined: false
+      roomJoined: false
     });
     setConnectionStatus('disconnected');
     setError(null);

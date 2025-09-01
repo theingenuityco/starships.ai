@@ -7,7 +7,7 @@ export class UserRepository extends BaseRepository {
   constructor() {
     super('UserRepository');
   }
-  async findAll(): Promise<User[]> {
+  async findAll(): Promise<UserModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ u: UserModel }>(
@@ -17,7 +17,7 @@ export class UserRepository extends BaseRepository {
     }, 'findAll', 'User');
   }
 
-  async findById(id: string): Promise<User | null> {
+  async findById(id: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ u: UserModel }>(
@@ -28,7 +28,7 @@ export class UserRepository extends BaseRepository {
     }, 'findById', 'User', id);
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ u: UserModel }>(
@@ -39,7 +39,7 @@ export class UserRepository extends BaseRepository {
     }, 'findByEmail', 'User', email);
   }
 
-  async findByUsername(username: string): Promise<User | null> {
+  async findByUsername(username: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ u: UserModel }>(
@@ -50,7 +50,7 @@ export class UserRepository extends BaseRepository {
     }, 'findByUsername', 'User', username);
   }
 
-  async findByKindeId(kindeId: string): Promise<User | null> {
+  async findByKindeId(kindeId: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ u: UserModel }>(
@@ -61,7 +61,7 @@ export class UserRepository extends BaseRepository {
     }, 'findByKindeId', 'User', kindeId);
   }
 
-  async create(entity: Omit<User, 'id' | 'createdAt'>): Promise<User> {
+  async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(entity, ['kindeId', 'email'], 'create');
       
@@ -101,7 +101,7 @@ export class UserRepository extends BaseRepository {
     }, 'create', 'User');
   }
 
-  async update(id: string, updates: Partial<User>): Promise<User | null> {
+  async update(id: string, updates: Partial<UserModel>): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       
@@ -152,7 +152,7 @@ export class UserRepository extends BaseRepository {
 
 
   // Stripe integration methods
-  async findByStripeCustomerId(stripeCustomerId: string): Promise<User | null> {
+  async findByStripeCustomerId(stripeCustomerId: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ user: UserModel }>(

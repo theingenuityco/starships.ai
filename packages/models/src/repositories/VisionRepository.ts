@@ -11,7 +11,7 @@ export class VisionRepository extends BaseRepository {
   constructor() {
     super('VisionRepository');
   }
-  async findAll(): Promise<Vision[]> {
+  async findAll(): Promise<VisionModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ v: VisionModel }>(
@@ -21,7 +21,7 @@ export class VisionRepository extends BaseRepository {
     }, 'findAll', 'Vision');
   }
 
-  async findById(id: string): Promise<Vision | null> {
+  async findById(id: string): Promise<VisionModel | null> {
     this.validateRequired({ id }, ['id'], 'findById');
     
     return this.executeWithErrorHandling(async () => {
@@ -34,7 +34,7 @@ export class VisionRepository extends BaseRepository {
     }, 'findById', 'Vision', id);
   }
 
-  async findByStarship(starshipId: string): Promise<Vision | null> {
+  async findByStarship(starshipId: string): Promise<VisionModel | null> {
     this.validateRequired({ starshipId }, ['starshipId'], 'findByStarship');
     
     return this.executeWithErrorHandling(async () => {
@@ -47,7 +47,7 @@ export class VisionRepository extends BaseRepository {
     }, 'findByStarship', 'Vision');
   }
 
-  async create(entity: Omit<Vision, 'id' | 'createdAt' | 'updatedAt'>): Promise<Vision> {
+  async create(entity: Omit<VisionModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<VisionModel> {
     this.validateRequired(entity, ['starshipId', 'statement'], 'create');
     
     return this.executeWithErrorHandling(async () => {
@@ -79,7 +79,7 @@ export class VisionRepository extends BaseRepository {
     }, 'create', 'Vision');
   }
 
-  async updateStatement(starshipId: string, statement: string): Promise<Vision | null> {
+  async updateStatement(starshipId: string, statement: string): Promise<VisionModel | null> {
     this.validateRequired({ starshipId, statement }, ['starshipId', 'statement'], 'updateStatement');
     
     return this.executeWithErrorHandling(async () => {
@@ -102,7 +102,7 @@ export class VisionRepository extends BaseRepository {
     }, 'updateStatement', 'Vision', starshipId);
   }
 
-  async update(id: string, updates: Partial<Vision>): Promise<Vision | null> {
+  async update(id: string, updates: Partial<VisionModel>): Promise<VisionModel | null> {
     this.validateRequired({ id }, ['id'], 'update');
     
     return this.executeWithErrorHandling(async () => {
@@ -150,7 +150,7 @@ export class VisionRepository extends BaseRepository {
       hasTimeframe: boolean;
       hasMeasurables: boolean;
     }
-  ): Promise<Vision | null> {
+  ): Promise<VisionModel | null> {
     const connection = getConnection();
     const result = await connection.executeWrite<{ v: VisionModel }>(
       `MATCH (v:Vision) WHERE v.starshipId = $starshipId 
@@ -216,7 +216,7 @@ export class VisionRepository extends BaseRepository {
   /**
    * Finds visions that need metrics calculation (where overallQuality is null)
    */
-  async findVisionsMissingMetrics(limit: number = 50): Promise<Vision[]> {
+  async findVisionsMissingMetrics(limit: number = 50): Promise<VisionModel[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ v: VisionModel }>(
       'MATCH (v:Vision) WHERE v.overallQuality IS NULL RETURN v ORDER BY v.createdAt DESC LIMIT $limit',
@@ -239,7 +239,7 @@ export class VisionRepository extends BaseRepository {
   /**
    * Updates vision statement by starship ID (alias for updateStatement)
    */
-  async updateVision(starshipId: string, newVision: string): Promise<Vision | null> {
+  async updateVision(starshipId: string, newVision: string): Promise<VisionModel | null> {
     return this.updateStatement(starshipId, newVision);
   }
 }

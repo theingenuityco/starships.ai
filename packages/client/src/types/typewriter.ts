@@ -20,12 +20,6 @@ export interface TypewriterChunk {
 // Import unified types from protocol
 import type { ChatStreamChunk } from '@starships/protocol';
 
-// Legacy type aliases for backward compatibility in client code
-export type SibilSocketStreamChunk = ChatStreamChunk & {
-  source: 'sibil';
-  typewriter?: TypewriterChunk;
-};
-
 export type AgentSocketStreamChunk = ChatStreamChunk & {
   source: 'agent';
   agent_id: string;

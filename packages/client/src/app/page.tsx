@@ -9,10 +9,6 @@ import { DynamicLoginButton } from '@/components/auth/DynamicLoginButton';
 import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
-import { LandingSibilWidgetStaticChat } from '@/components/onboarding/LandingSibilWidgetStaticChat';
-import { LandingSibilWidgetAuthenticated } from '@/components/onboarding/LandingSibilWidgetAuthenticated';
-import { useOnboardingSession } from '@/hooks/useOnboardingSession';
-import { ReturnFlowBanner } from '@/components/onboarding/ReturnFlow';
 import { useStarshipStore } from '@/store/starship-store';
 const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import {
@@ -108,7 +104,6 @@ export default function HomePage() {
   const [hasVision, setHasVision] = useState(false);
   const [hasExistingStarships, setHasExistingStarships] = useState(false);
   const { isAuthenticated, isLoading, userName } = useAuth();
-  const { session } = useOnboardingSession();
   const starships = useStarshipStore(state => state.starships);
   
   // Use centralized loader - only loads when authenticated
@@ -126,12 +121,6 @@ export default function HomePage() {
     }
   }, [starships]);
 
-  // Check if user has a vision in session
-  useEffect(() => {
-    if (session?.pendingVision) {
-      setHasVision(true);
-    }
-  }, [session]);
 
   if (!mounted || isLoading) return null;
 
@@ -140,12 +129,7 @@ export default function HomePage() {
     // Don't reset launching state - let it continue until page unloads
     setTimeout(() => {
       if (isAuthenticated) {
-        // If user has no starships and has a vision, go through onboarding flow
-        if (!hasExistingStarships && hasVision) {
-          window.location.href = '/fleet?onboarding=true';
-        } else {
-          window.location.href = '/fleet';
-        }
+        window.location.href = '/fleet';
       } else {
         // Trigger login
         const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement;
@@ -156,11 +140,6 @@ export default function HomePage() {
     }, 1000);
   };
 
-  const handleVisionSubmit = () => {
-    setHasVision(true);
-    // The vision is already saved in session by the widget
-    // Just update our local state to transform the button
-  };
 
   return (
     <StarTheme theme="dark">
@@ -200,10 +179,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Return Flow Banner for users with abandoned sessions */}
-      {!isAuthenticated && (
-        <ReturnFlowBanner />
-      )}
       
       {/* Hero Section */}
       <motion.section 
@@ -368,30 +343,6 @@ export default function HomePage() {
             </div>
           </div>
           
-          {/* Sibil AI Widget */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.2, duration: 0.8 }}
-            className="w-full mb-8 mt-12"
-          >
-            {isAuthenticated ? (
-              <LandingSibilWidgetAuthenticated 
-                userName={(() => {
-                  // Simply use the first word from userName
-                  if (userName) {
-                    const firstName = userName.trim().split(' ')[0];
-                    return firstName;
-                  }
-                  
-                  // Fallback to 'there'
-                  return 'there';
-                })()}
-              />
-            ) : (
-              <LandingSibilWidgetStaticChat onVisionSubmit={handleVisionSubmit} />
-            )}
-          </motion.div>
           
         </motion.div>
         

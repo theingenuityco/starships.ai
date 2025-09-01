@@ -24,6 +24,30 @@ export class AgentTemplateRepository extends BaseRepository {
     return value as T;
   }
 
+  /**
+   * Helper to deserialize template from Neo4j format back to AgentTemplateModel
+   */
+  private deserializeTemplate(rawTemplate: any): AgentTemplateModel {
+    return {
+      ...rawTemplate,
+      memory: rawTemplate.memory ? JSON.parse(rawTemplate.memory) : undefined,
+      blueprint: rawTemplate.blueprint ? JSON.parse(rawTemplate.blueprint) : undefined,
+    };
+  }
+
+  /**
+   * Helper to serialize template for Neo4j storage
+   */
+  private serializeTemplate(template: any): any {
+    // Exclude complex objects first, then add serialized versions
+    const { memory, blueprint, ...primitiveFields } = template;
+    return {
+      ...primitiveFields,
+      memory: memory ? JSON.stringify(memory) : null,
+      blueprint: blueprint ? JSON.stringify(blueprint) : null,
+    };
+  }
+
   async findAll(): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(async () => {
       const query = `
@@ -32,8 +56,8 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY t.createdAt DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query);
-      return convertNeo4jIntsInArray(results.map((result) => result.t));
+      const results = await this.connection.executeQuery<{ t: any }>(query);
+      return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
     }, 'findAll', 'AgentTemplate');
   }
 
@@ -46,49 +70,74 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN t
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
+      const results = await this.connection.executeQuery<{ t: any }>(query, { id });
       const template = results.length > 0 ? results[0].t : null;
-      return template ? convertNeo4jIntsInObject(template) : null;
+      return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
     }, 'findById', 'AgentTemplate', id);
   }
 
   async create(entity: Omit<AgentTemplateModel, 'id' | 'createdAt'>): Promise<AgentTemplateModel> {
+    console.log('=== REPOSITORY CREATE METHOD CALLED ===');
+    console.log('Entity name:', entity.name);
+    console.log('Entity keys:', Object.keys(entity));
+    
     return this.executeWithErrorHandling(async () => {
+      console.log('[Repository] Inside executeWithErrorHandling - Creating template:', entity.name);
+      console.log('[Repository] Entity memory type:', typeof entity.memory);
+      console.log('[Repository] Entity blueprint type:', typeof entity.blueprint);
+      
       this.validateRequired(entity, ['name', 'description'], 'create');
       
       const id = uuidv4();
       const now = new Date().toISOString();
 
-      const template: AgentTemplateModel = {
-        // Core AgentNodeParameters fields
-        name: entity.name as string,
-        description: entity.description as string | undefined,
-        model: entity.model as string,
-        temperature: entity.temperature as number | undefined,
-        maxTokens: entity.maxTokens as number | undefined,
+      // Build template explicitly, ensuring no complex objects
+      const template = {
+        // Explicit primitive fields
+        name: entity.name,
+        description: entity.description,
+        category: entity.category,
+        model: entity.model,
+        temperature: entity.temperature,
+        maxTokens: entity.maxTokens,
         timeout: this.getSafeValue(entity.timeout, 30000) as number,
-        memory: entity.memory as any, // AgentMemoryState
-        blueprint: entity.blueprint as any, // BaseBlueprint
+        authorId: entity.authorId,
+        isPublic: entity.isPublic,
+        rating: entity.rating,
+        icon: entity.icon,
+        previewPrompts: entity.previewPrompts,
+        tags: entity.tags,
         
-        // Database-specific fields
+        // Database fields
         id,
         createdAt: now,
         updatedAt: now,
-        category: entity.category as AgentTemplateModel['category'],
         usageCount: 0,
         
-        // Template-specific fields
-        icon: entity.icon as string | undefined,
-        previewPrompts: entity.previewPrompts as string[] | undefined,
+        // Serialize complex objects to JSON strings for Neo4j storage
+        memory: entity.memory ? JSON.stringify(entity.memory) : null,
+        blueprint: entity.blueprint ? JSON.stringify(entity.blueprint) : null,
       };
+
+      console.log('[Repository] Template before Neo4j create (types):', {
+        memory: typeof template.memory,
+        blueprint: typeof template.blueprint,
+        memoryIsString: typeof template.memory === 'string',
+        blueprintIsString: typeof template.blueprint === 'string'
+      });
 
       const query = `
         CREATE (t:AgentTemplate $template)
         RETURN t
       `;
       
-      const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(query, { template });
-      const created = convertNeo4jIntsInObject(results[0].t);
+      const results = await this.connection.executeWrite<{ t: any }>(query, { template });
+      const rawTemplate = results[0].t;
+      
+      console.log('[Repository] Created successfully, deserializing...');
+      
+      // Deserialize JSON strings back to objects
+      const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawTemplate));
 
       return created;
     }, 'create', 'AgentTemplate');
@@ -98,8 +147,11 @@ export class AgentTemplateRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ id }, ['id'], 'update');
       
-      const updateFields = Object.keys(updates)
-        .filter((key) => key !== 'id' && key !== 'createdAt')
+      // Serialize complex objects in updates
+      const serializedUpdates = this.serializeTemplate(updates);
+      
+      const updateFields = Object.keys(serializedUpdates)
+        .filter((key) => key !== 'id' && key !== 'createdAt' && serializedUpdates[key] !== undefined)
         .map((key) => `t.${key} = $updates.${key}`)
         .join(', ');
 
@@ -113,14 +165,14 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN t
       `;
 
-      const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(query, {
+      const results = await this.connection.executeWrite<{ t: any }>(query, {
         id,
-        updates,
+        updates: serializedUpdates,
         now: new Date().toISOString(),
       });
 
       const template = results.length > 0 ? results[0].t : null;
-      return template ? convertNeo4jIntsInObject(template) : null;
+      return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
     }, 'update', 'AgentTemplate', id);
   }
 
@@ -149,8 +201,8 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY t.createdAt DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { authorId });
-      return convertNeo4jIntsInArray(results.map((result) => result.t));
+      const results = await this.connection.executeQuery<{ t: any }>(query, { authorId });
+      return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
     }, 'findByAuthor', 'AgentTemplate');
   }
 
@@ -165,8 +217,8 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY t.usageCount DESC, t.rating DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { category });
-      return convertNeo4jIntsInArray(results.map((result) => result.t));
+      const results = await this.connection.executeQuery<{ t: any }>(query, { category });
+      return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
     }, 'findByCategory', 'AgentTemplate');
   }
 
@@ -189,8 +241,8 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY matchCount DESC, t.usageCount DESC, t.rating DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, { tags });
-      return convertNeo4jIntsInArray(results.map((result) => result.t));
+      const results = await this.connection.executeQuery<{ t: any }>(query, { tags });
+      return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
     }, 'findByTags', 'AgentTemplate');
   }
 
@@ -220,11 +272,11 @@ export class AgentTemplateRepository extends BaseRepository {
         LIMIT $limit
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(query, {
+      const results = await this.connection.executeQuery<{ t: any }>(query, {
         limit: int(limit),
         offset: int(offset),
       });
-      return convertNeo4jIntsInArray(results.map((result) => result.t));
+      return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
     }, 'findPublic', 'AgentTemplate');
   }
 
@@ -249,10 +301,10 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY relevance DESC, t.usageCount DESC, t.rating DESC
       `;
 
-      const results = await this.connection.executeQuery<{ t: AgentTemplateModel }>(searchQuery, {
+      const results = await this.connection.executeQuery<{ t: any }>(searchQuery, {
         query,
       });
-      return convertNeo4jIntsInArray(results.map((result) => result.t));
+      return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
     }, 'searchTemplates', 'AgentTemplate');
   }
 
@@ -309,7 +361,8 @@ export class AgentTemplateRepository extends BaseRepository {
     const agentId = uuidv4();
     const now = new Date().toISOString();
 
-    const agent: AgentModel = {
+    // Serialize complex objects for Neo4j storage
+    const serializedAgent = {
       // Core AgentNodeParameters fields from template
       name: agentName,
       description: template.description,
@@ -317,8 +370,8 @@ export class AgentTemplateRepository extends BaseRepository {
       temperature: template.temperature,
       maxTokens: template.maxTokens,
       timeout: template.timeout || 30000,
-      memory: template.memory,
-      blueprint: template.blueprint,
+      memory: template.memory ? JSON.stringify(template.memory) : null,
+      blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
       
       // Database-specific fields
       id: agentId,
@@ -338,10 +391,17 @@ export class AgentTemplateRepository extends BaseRepository {
       RETURN a
     `;
     
-    const results = await this.connection.executeWrite<{ a: AgentModel }>(query, { agent, starshipId });
-    const createdAgent = convertNeo4jIntsInObject(results[0].a);
+    const results = await this.connection.executeWrite<{ a: any }>(query, { agent: serializedAgent, starshipId });
+    const rawAgent = results[0].a;
+    
+    // Deserialize for return (assuming Agent has similar structure)
+    const createdAgent = {
+      ...convertNeo4jIntsInObject(rawAgent),
+      memory: rawAgent.memory ? JSON.parse(rawAgent.memory) : undefined,
+      blueprint: rawAgent.blueprint ? JSON.parse(rawAgent.blueprint) : undefined,
+    };
 
-    return createdAgent;
+    return createdAgent as AgentModel;
   }
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
@@ -424,7 +484,8 @@ export class AgentTemplateRepository extends BaseRepository {
         }
       };
 
-      const template: AgentTemplateModel = {
+      // Serialize complex objects for Neo4j storage
+      const serializedTemplate = {
         // Core AgentNodeParameters fields
         name: `${agent.name} Template`,
         description: this.getSafeValue(agent.description, '') as string,
@@ -432,8 +493,8 @@ export class AgentTemplateRepository extends BaseRepository {
         temperature: agent.temperature as number | undefined,
         maxTokens: agent.maxTokens as number | undefined,
         timeout: 30000,
-        memory: defaultMemory,
-        blueprint: defaultBlueprint,
+        memory: JSON.stringify(defaultMemory),
+        blueprint: JSON.stringify(defaultBlueprint),
         
         // Database-specific fields
         id: templateId,
@@ -452,20 +513,20 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN t
       `;
       
-      const results = await this.connection.executeWrite<{ t: AgentTemplateModel }>(createQuery, {
-        template,
+      const results = await this.connection.executeWrite<{ t: any }>(createQuery, {
+        template: serializedTemplate,
       });
-      const created = convertNeo4jIntsInObject(results[0].t);
+      const created = this.deserializeTemplate(convertNeo4jIntsInObject(results[0].t));
 
       // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
       try {
-        if (template.authorId && template.authorId !== 'system') {
+        if (created.authorId && created.authorId !== 'system') {
           await this.connection.executeWrite(
             `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
              MERGE (u)-[r:CREATES]->(t)
              ON CREATE SET r.createdAt = $now`,
             {
-              authorId: template.authorId,
+              authorId: created.authorId,
               templateId: created.id,
               now
             }

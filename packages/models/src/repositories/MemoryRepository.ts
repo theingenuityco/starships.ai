@@ -78,21 +78,23 @@ export class MemoryRepository extends BaseRepository {
     }, 'findByStarshipId', 'Memory');
   }
 
-  async findByAgentId(): Promise<MemoryModel[]> {
+  async findByAgentId(agentId: string): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryModel }>(
-        'MATCH (m:Memory) RETURN m ORDER BY m.updatedAt DESC'
+        'MATCH (a:Agent {id: $agentId})-[:HAS_MEMORY]->(m:Memory) RETURN m ORDER BY m.updatedAt DESC',
+        { agentId }
       );
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
     }, 'findByAgentId', 'Memory');
   }
 
-  async findByTags(): Promise<MemoryModel[]> {
+  async findByTags(tags: string[]): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const result = await connection.executeQuery<{ m: MemoryModel }>(
-        'MATCH (m:Memory) RETURN m ORDER BY m.updatedAt DESC'
+        'MATCH (m:Memory) WHERE any(tag IN $tags WHERE tag IN m.tags) RETURN m ORDER BY m.updatedAt DESC',
+        { tags }
       );
       return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
     }, 'findByTags', 'Memory');
@@ -100,20 +102,20 @@ export class MemoryRepository extends BaseRepository {
 
 
   async create(
-    entity: Omit<MemoryModel, 'id' | 'createdAt' | 'updatedAt' | 'messageCount'>,
-    starshipId: string
+    entity: Omit<MemoryModel, 'id' | 'createdAt' | 'updatedAt' | 'messageCount'> & { starshipId: string }
   ): Promise<MemoryModel> {
     return this.executeWithErrorHandling(async () => {
       const connection = getConnection();
       const now = new Date().toISOString();
+      const { starshipId, ...memoryData } = entity;
       
       const memory: MemoryModel = {
         id: uuidv4(),
         createdAt: now,
         updatedAt: now,
-        version: entity.version || '1.0.0',
+        version: memoryData.version || '1.0.0',
         messageCount: 0, // Will be computed based on stored messages separately
-        state: entity.state || {},
+        state: memoryData.state || {},
       };
 
       // Handle AgentMemory specific fields if they exist

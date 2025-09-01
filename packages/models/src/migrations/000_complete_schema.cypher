@@ -72,11 +72,14 @@ CREATE CONSTRAINT memory_required_props IF NOT EXISTS FOR (mem:Memory) REQUIRE (
 
 // Message constraints
 CREATE CONSTRAINT message_id_unique IF NOT EXISTS FOR (msg:Message) REQUIRE msg.id IS UNIQUE;
-CREATE CONSTRAINT message_required_props IF NOT EXISTS FOR (msg:Message) REQUIRE (msg.id, msg.role, msg.content, msg.starshipId, msg.createdAt) IS NOT NULL;
+CREATE CONSTRAINT message_required_props IF NOT EXISTS FOR (msg:Message) REQUIRE (msg.id, msg.role, msg.content, msg.starshipId, msg.createdAt, msg.updatedAt, msg.version, msg.threadDepth, msg.processingStatus, msg.messageType, msg.importance, msg.contentLength, msg.hasAttachments) IS NOT NULL;
 CREATE CONSTRAINT message_role_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.role IN ['system', 'user', 'assistant'];
-CREATE CONSTRAINT message_type_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.messageType IN ['user_input', 'agent_response', 'system_event', 'tool_output', 'error'];
+CREATE CONSTRAINT message_type_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.messageType IN ['user_input', 'agent_response', 'system_message', 'workflow_output'];
 CREATE CONSTRAINT message_importance_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.importance IN ['low', 'medium', 'high', 'critical'];
-CREATE CONSTRAINT message_processing_status_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.processingStatus IN ['pending', 'processing', 'processed', 'failed'];
+CREATE CONSTRAINT message_processing_status_values IF NOT EXISTS FOR (msg:Message) REQUIRE msg.processingStatus IN ['pending', 'processing', 'completed', 'failed'];
+CREATE CONSTRAINT message_thread_depth_range IF NOT EXISTS FOR (msg:Message) REQUIRE msg.threadDepth >= 0;
+CREATE CONSTRAINT message_content_length_range IF NOT EXISTS FOR (msg:Message) REQUIRE msg.contentLength >= 0;
+CREATE CONSTRAINT message_has_attachments_boolean IF NOT EXISTS FOR (msg:Message) REQUIRE msg.hasAttachments IN [true, false];
 
 // Session Model constraints
 CREATE CONSTRAINT session_model_id_unique IF NOT EXISTS FOR (cs:SessionModel) REQUIRE cs.id IS UNIQUE;
@@ -208,8 +211,20 @@ CREATE INDEX message_type_index IF NOT EXISTS FOR (msg:Message) ON (msg.messageT
 CREATE INDEX message_importance_index IF NOT EXISTS FOR (msg:Message) ON (msg.importance);
 CREATE INDEX message_processing_status_index IF NOT EXISTS FOR (msg:Message) ON (msg.processingStatus);
 CREATE INDEX message_content_hash_index IF NOT EXISTS FOR (msg:Message) ON (msg.contentHash);
+CREATE INDEX message_version_index IF NOT EXISTS FOR (msg:Message) ON (msg.version);
+CREATE INDEX message_thread_depth_index IF NOT EXISTS FOR (msg:Message) ON (msg.threadDepth);
+CREATE INDEX message_has_attachments_index IF NOT EXISTS FOR (msg:Message) ON (msg.hasAttachments);
+CREATE RANGE INDEX message_content_length_range IF NOT EXISTS FOR (msg:Message) ON (msg.contentLength);
+CREATE RANGE INDEX message_token_count_range IF NOT EXISTS FOR (msg:Message) ON (msg.tokenCount);
+CREATE RANGE INDEX message_processing_time_range IF NOT EXISTS FOR (msg:Message) ON (msg.processingTimeMs);
 CREATE RANGE INDEX message_timestamp_range IF NOT EXISTS FOR (msg:Message) ON (msg.timestamp);
 CREATE RANGE INDEX message_created_at_range IF NOT EXISTS FOR (msg:Message) ON (msg.createdAt);
+CREATE RANGE INDEX message_updated_at_range IF NOT EXISTS FOR (msg:Message) ON (msg.updatedAt);
+// Composite indexes for common query patterns
+CREATE INDEX message_starship_status_composite IF NOT EXISTS FOR (msg:Message) ON (msg.starshipId, msg.processingStatus);
+CREATE INDEX message_conversation_role_composite IF NOT EXISTS FOR (msg:Message) ON (msg.conversationId, msg.role);
+CREATE INDEX message_parent_thread_composite IF NOT EXISTS FOR (msg:Message) ON (msg.parentMessageId, msg.threadDepth);
+CREATE INDEX message_type_importance_composite IF NOT EXISTS FOR (msg:Message) ON (msg.messageType, msg.importance);
 
 // Session Model indexes
 CREATE INDEX session_model_created_by_index IF NOT EXISTS FOR (cs:SessionModel) ON (cs.createdBy);

@@ -42,7 +42,13 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
       starshipId: starshipId,
       timestamp: new Date().toISOString(),
       version: '1.0.0',
-      metadata: metadata || {}
+      metadata: metadata || {},
+      // Provide defaults for required fields
+      threadDepth: 0,
+      processingStatus: 'pending',
+      messageType: role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
+      importance: 'medium',
+      hasAttachments: false
     });
   };
 

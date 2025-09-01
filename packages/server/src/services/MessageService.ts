@@ -58,7 +58,13 @@ export class MessageService {
     return await repository.create({
       ...request,
       timestamp: request.metadata?.timestamp as string || new Date().toISOString(),
-      version: '1.0.0'
+      version: '1.0.0',
+      // Provide defaults for required fields
+      threadDepth: request.threadDepth || 0,
+      processingStatus: request.processingStatus || 'pending',
+      messageType: request.messageType || 'user_input',
+      importance: request.importance || 'medium',
+      hasAttachments: request.hasAttachments || false
     });
   }
 
@@ -140,7 +146,13 @@ export class MessageService {
     const message = await this.messageRepository.create({
       ...request,
       timestamp: request.metadata?.timestamp as string || new Date().toISOString(),
-      version: '1.0.0'
+      version: '1.0.0',
+      // Provide defaults for required fields
+      threadDepth: request.threadDepth ?? 0,
+      processingStatus: request.processingStatus || 'pending',
+      messageType: request.messageType || 'user_input',
+      importance: request.importance || 'medium',
+      hasAttachments: request.hasAttachments || false
     });
 
     console.log('✅ [MESSAGE-SERVICE] Message created:', message.id);
@@ -231,7 +243,7 @@ export class MessageService {
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId,
-        messageType: 'system_event',
+        messageType: 'system_message',
         importance: 'medium'
       });
     }
@@ -300,7 +312,7 @@ export class MessageService {
       starshipId: context.starshipId,
       agentId: context.agentId,
       conversationId,
-      messageType: role === 'system' ? 'system_event' : role === 'user' ? 'user_input' : 'agent_response',
+      messageType: role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
       metadata
     });
   }
@@ -440,7 +452,7 @@ export class MessageService {
           const results = await Promise.allSettled(
             request.messageIds.map(id =>
               this.messageRepository.update(id, {
-                processingStatus: request.operationData!.processingStatus as 'pending' | 'processing' | 'processed' | 'failed'
+                processingStatus: request.operationData!.processingStatus as 'pending' | 'processing' | 'completed' | 'failed'
               })
             )
           );

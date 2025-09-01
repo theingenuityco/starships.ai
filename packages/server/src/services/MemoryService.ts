@@ -64,8 +64,8 @@ export class MemoryService {
         ...request.state,
         messages
       },
-      messageCount: messages.length,
-      version: '1.0.0'
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
   }
 
@@ -92,8 +92,8 @@ export class MemoryService {
         purpose: request.purpose,
         space: request.space,
       },
-      messageCount: messages.length,
-      version: '1.0.0'
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
   }
 
@@ -178,8 +178,8 @@ export class MemoryService {
         ...request.state,
         messages
       },
-      messageCount: messages.length,
-      version: '1.0.0'
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
 
     console.log('✅ [MEMORY-SERVICE] Memory created:', memory.id);
@@ -215,8 +215,8 @@ export class MemoryService {
         purpose: request.purpose,
         space: request.space
       },
-      messageCount: messages.length,
-      version: '1.0.0'
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
 
     console.log('✅ [MEMORY-SERVICE] Agent memory created:', agentMemory.id);
@@ -295,6 +295,7 @@ export class MemoryService {
     });
 
     return await this.createAgentMemory({
+      starshipId: context.starshipId,
       state: {
         identity: config.identity,
         purpose: config.purpose,
@@ -571,8 +572,8 @@ export class MemoryService {
         ...sourceMemory.state,
         messages: sourceMessages
       },
-      messageCount: options.includeMessages ? (sourceMemory.messageCount || 0) : 0,
-      version: '1.0.0'
+      version: '1.0.0',
+      starshipId: targetContext.starshipId
     });
 
     console.log('✅ [MEMORY-SERVICE] Memory cloned:', {

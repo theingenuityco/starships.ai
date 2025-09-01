@@ -21,10 +21,33 @@ import type {
 export interface MessageModel extends Message {
   // Additional database fields (Message already has id, timestamp, role, content, metadata)
   createdAt: string;
+  updatedAt: string;
+  version: string;
   starshipId: string;
   agentId?: string; // Optional agent that created/processed this message
   memoryId?: string; // Optional memory container this message belongs to
   conversationId?: string; // Group related messages together
+  
+  // Threading and hierarchy
+  parentMessageId?: string;
+  threadDepth: number;
+  
+  // Processing status and metadata
+  processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  processingMetadata?: Record<string, unknown>;
+  
+  // Message classification
+  messageType: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance: 'low' | 'medium' | 'high' | 'critical';
+  
+  // Content analysis
+  contentHash?: string;
+  contentLength: number;
+  
+  // Attachments and tokens
+  hasAttachments: boolean;
+  tokenCount?: number;
+  processingTimeMs?: number;
 }
 
 // ============================================================================
@@ -42,6 +65,26 @@ export interface CreateMessageRequest {
   memoryId?: string;
   conversationId?: string;
   metadata?: Record<string, unknown>;
+  
+  // Threading and hierarchy (optional)
+  parentMessageId?: string;
+  threadDepth?: number;
+  
+  // Processing status and metadata (optional)
+  processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  processingMetadata?: Record<string, unknown>;
+  
+  // Message classification (optional)
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance?: 'low' | 'medium' | 'high' | 'critical';
+  
+  // Content analysis (optional)
+  contentHash?: string;
+  
+  // Attachments and tokens (optional)
+  hasAttachments?: boolean;
+  tokenCount?: number;
+  processingTimeMs?: number;
 }
 
 /**
@@ -83,6 +126,8 @@ export interface SearchMessagesRequest {
   memoryId?: string;
   conversationId?: string;
   role?: 'system' | 'user' | 'assistant';
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance?: 'low' | 'medium' | 'high' | 'critical';
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
@@ -107,6 +152,8 @@ export interface MessageFilters {
   memoryId?: string;
   conversationId?: string;
   role?: 'system' | 'user' | 'assistant';
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance?: 'low' | 'medium' | 'high' | 'critical';
   dateFrom?: string;
   dateTo?: string;
 }

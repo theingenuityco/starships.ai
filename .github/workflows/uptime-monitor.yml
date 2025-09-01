@@ -47,9 +47,9 @@ jobs:
           
           echo "Checking health of $SERVICE_NAME at $SERVICE_URL"
           
-          # Perform health check with timeout
+          # Perform health check with timeout (using /api/health endpoint)
           START_TIME=$(date +%s%3N)
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SERVICE_URL/health" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$SERVICE_URL/api/health" || echo "000")
           END_TIME=$(date +%s%3N)
           RESPONSE_TIME=$((END_TIME - START_TIME))
           

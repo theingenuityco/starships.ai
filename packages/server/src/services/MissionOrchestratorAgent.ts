@@ -19,10 +19,10 @@ import type {
   MissionModel,
   MissionPhase,
   MissionClarityModel,
-  MissionWorkflowModel,
-  CreateWorkflowRequest,
+  UpdateBlueprintApprovalRequest,
   CreateMissionClarityRequest
 } from '@starships/protocol';
+import type { BlueprintModel } from '@starships/protocol';
 import type { StarshipModel, VisionModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 
@@ -63,7 +63,7 @@ export interface MissionChatState {
   isSystemInitiated: boolean;
   metadata: MissionMetadata | null;
   clarity: MissionClarityModel | undefined;
-  workflow: MissionWorkflowModel | undefined;
+  blueprint: BlueprintModel | undefined;
   executionResult: any | undefined;
   messages: Array<AIMessage | HumanMessage | SystemMessage>;
 }
@@ -200,8 +200,8 @@ export class MissionOrchestratorAgent {
     // Load mission metadata
     const metadata = await this.loadMissionMetadata(missionId);
     
-    // Load existing workflow and clarity
-    const [workflow, clarity] = await Promise.all([
+    // Load existing blueprint and clarity
+    const [blueprint, clarity] = await Promise.all([
       MissionService.getWorkflowByMissionId(missionId),
       this.getClarityFromDB(missionId)
     ]);
@@ -217,7 +217,7 @@ export class MissionOrchestratorAgent {
       isSystemInitiated,
       metadata,
       clarity: clarity || undefined,
-      workflow: workflow || undefined,
+      blueprint: blueprint || undefined,
       executionResult: undefined, // Execution results now managed by autopilot workflow system
       messages: [messageObj]
     };
@@ -292,7 +292,7 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Handle plan phase - workflow generation and approval
+   * Handle plan phase - blueprint generation and approval
    */
   private async handlePlanPhase(state: MissionChatState): Promise<string> {
     try {
@@ -300,30 +300,32 @@ export class MissionOrchestratorAgent {
       
       if (!metadata) throw new Error('Missing metadata in state');
       
-      // Get workflow from state or generate new one
-      let workflow = state.workflow;
+      // Get blueprint from state or generate new one
+      let blueprint = state.blueprint;
       
-      if (!workflow || state.isSystemInitiated || workflow.approvalStatus === 'rejected') {
-        // Generate new workflow
-        workflow = await this.generateWorkflow(metadata.mission.id, state);
+      if (!blueprint || state.isSystemInitiated || metadata.mission.approvalStatus === 'rejected') {
+        // Generate new blueprint
+        blueprint = await this.generateBlueprint(metadata.mission.id, state);
         
         // Update mission phase in database
-        await MissionService.updateMission(metadata.mission.id, { phase: MISSION_PHASES.PLAN });
-      } else if (workflow.approvalStatus === 'pending') {
-        // Handle workflow approval intent
+        await MissionService.updateMission(metadata.mission.id, {
+          phase: MISSION_PHASES.PLAN,
+          blueprintId: blueprint.id,
+          approvalStatus: 'pending'
+        });
+      } else if (metadata.mission.approvalStatus === 'pending') {
+        // Handle blueprint approval intent
         const recentMessage = state.messages[state.messages.length - 1];
         if (recentMessage && recentMessage.content && typeof recentMessage.content === 'string') {
           const intent = await this.classifyWorkflowApprovalIntent(recentMessage.content, state);
-          const taskCount = workflow.nodes.filter(n => n.type === 'agent').length;
+          const taskCount = blueprint.nodes.filter((n: any) => n.type === 'agent').length;
           const approvalResult = await this.processWorkflowApprovalIntent(intent, recentMessage.content, taskCount);
           
           if (approvalResult.shouldUpdate && approvalResult.newStatus) {
-            await MissionService.updateWorkflowApproval(metadata.mission.id, {
+            await MissionService.updateMission(metadata.mission.id, {
               approvalStatus: approvalResult.newStatus,
-              ...(approvalResult.rejectionReason && { rejectionReason: approvalResult.rejectionReason })
+              ...(approvalResult.newStatus === 'approved' && { approvedAt: new Date().toISOString() })
             });
-            
-            workflow = { ...workflow, approvalStatus: approvalResult.newStatus };
           }
           
           if (approvalResult.responseMessage && !approvalResult.shouldUpdate) {
@@ -332,19 +334,19 @@ export class MissionOrchestratorAgent {
         }
       }
       
-      // Present workflow for approval (only for pending workflows)
-      if (workflow.approvalStatus === 'pending') {
-        const prompt = new MissionPromptBuilder({ ...state, workflow }).buildWorkflowPresentationPrompt(workflow);
+      // Present blueprint for approval (only for pending)
+      if (metadata.mission.approvalStatus === 'pending') {
+        const prompt = new MissionPromptBuilder({ ...state, blueprint }).buildWorkflowPresentationPrompt(blueprint);
         return await this.callLLM(prompt.messages[0].content);
       }
       
-      // For approved workflows, move to execute phase
-      if (workflow.approvalStatus === 'approved') {
+      // For approved blueprints, move to execute phase
+      if (metadata.mission.approvalStatus === 'approved') {
         await MissionService.updateMission(metadata.mission.id, { phase: MISSION_PHASES.EXECUTE });
-        return this.handleExecutePhase({ ...state, workflow });
+        return this.handleExecutePhase({ ...state, blueprint });
       }
       
-      return "Workflow processing completed. Please provide feedback or approval.";
+      return "Blueprint processing completed. Please provide feedback or approval.";
     } catch (error) {
       this.logger.error('Plan phase failed', { error });
       return "I encountered an issue with the planning phase. Let me help you start over with the analysis.";
@@ -352,21 +354,21 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Handle execute phase - run approved workflow
+   * Handle execute phase - run approved blueprint
    */
   private async handleExecutePhase(state: MissionChatState): Promise<string> {
-    const { workflow, missionId } = state;
+    const { blueprint, missionId, metadata } = state;
     
-    if (!workflow || workflow.approvalStatus !== 'approved') {
-      return "⚠️ Workflow must be approved before execution can begin.";
+    if (!blueprint || !metadata || metadata.mission.approvalStatus !== 'approved') {
+      return "⚠️ Blueprint must be approved before execution can begin.";
     }
 
     try {
-      const agentTaskCount = workflow.nodes.filter(n => n.type === 'agent').length;
+      const agentTaskCount = blueprint.nodes.filter((n: any) => n.type === 'agent').length;
       const message = `🚀 Starting mission execution with ${agentTaskCount} tasks...\n\nI'll run each task sequentially and keep you updated on the progress. This may take a few minutes depending on the complexity of the tasks.`;
       
       // Start execution in background
-      this.startMissionExecution(missionId, workflow);
+      this.startMissionExecution(missionId, blueprint);
       
       return message;
     } catch (error) {
@@ -386,10 +388,10 @@ export class MissionOrchestratorAgent {
   /**
    * Start mission execution in background using autopilot workflow system
    */
-  private async startMissionExecution(missionId: string, missionWorkflow: MissionWorkflowModel): Promise<void> {
+  private async startMissionExecution(missionId: string, blueprint: BlueprintModel): Promise<void> {
     try {
-      // Convert MissionWorkflowModel to autopilot Workflow
-      const autopilotWorkflow = this.convertToAutopilotWorkflow(missionWorkflow);
+      // Convert BlueprintModel to autopilot Workflow
+      const autopilotWorkflow = this.convertToAutopilotWorkflow(blueprint);
       
       // Create agent memory for workflow execution context
       const agentMemory = createAgentMemory('Mission execution coordinator');
@@ -403,13 +405,13 @@ export class MissionOrchestratorAgent {
         secondary: ['Track task progress', 'Handle errors gracefully', 'Provide detailed results']
       });
       agentMemory.setSpace({
-        description: `Executing mission ${missionId} with ${missionWorkflow.nodes.filter(n => n.type === 'agent').length} tasks`
+        description: `Executing mission ${missionId} with ${blueprint.nodes.filter((n: any) => n.type === 'agent').length} tasks`
       });
       
       this.logger.info('Starting mission execution with autopilot workflow system', {
         missionId,
-        workflowId: missionWorkflow.id,
-        agentNodesCount: missionWorkflow.nodes.filter(n => n.type === 'agent').length
+        blueprintId: blueprint.id,
+        agentNodesCount: blueprint.nodes.filter((n: any) => n.type === 'agent').length
       });
       
       // Execute workflow using autopilot
@@ -461,15 +463,15 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Convert MissionWorkflowModel to autopilot Workflow format
+   * Convert BlueprintModel to autopilot Workflow format
    */
-  private convertToAutopilotWorkflow(missionWorkflow: MissionWorkflowModel): Workflow {
+  private convertToAutopilotWorkflow(blueprint: BlueprintModel): Workflow {
     const workflow = new Workflow();
     
     // Add nodes
-    missionWorkflow.nodes.forEach(node => {
+    blueprint.nodes.forEach((node: any) => {
       workflow.addNode({
-        ref: node.id,
+        ref: node.ref || node.id,
         type: node.type as any, // Convert to autopilot node types
         name: node.name,
         description: node.description || '',
@@ -478,7 +480,7 @@ export class MissionOrchestratorAgent {
     });
     
     // Add edges
-    missionWorkflow.edges.forEach(edge => {
+    blueprint.edges.forEach((edge: any) => {
       workflow.addEdge(edge.from, edge.to);
     });
     
@@ -486,39 +488,31 @@ export class MissionOrchestratorAgent {
   }
 
   /**
-   * Generate workflow using AI
+   * Generate blueprint using AI
    */
-  private async generateWorkflow(missionId: string, state: MissionChatState): Promise<MissionWorkflowModel> {
+  private async generateBlueprint(missionId: string, state: MissionChatState): Promise<BlueprintModel> {
     const agents = await this.getAssignedAgents(missionId);
     const prompt = new MissionPromptBuilder(state).buildWorkflowGenerationPrompt(agents);
     const aiResponse = await this.callLLM(prompt.messages[0].content);
     
-    console.log('[Workflow Generation] LLM Response:', aiResponse);
+    console.log('[Blueprint Generation] LLM Response:', aiResponse);
     
     const createRequest = WorkflowParsingService.parseAIResponse(aiResponse, missionId, agents);
     
-    // TODO: Replace with proper MissionWorkflowModel creation once MissionWorkflowModelRepository is implemented
-    // For now, return a mock MissionWorkflowModel structure
-    const mockWorkflow: MissionWorkflowModel = {
-      id: `workflow-${missionId}`,
-      missionId: missionId,
-      nodes: createRequest.blueprint!.nodes.map((node, index) => ({
-        id: node.ref || `node-${index}`,
-        type: node.type as any,
-        name: node.name,
-        description: node.description,
-        parameters: node.parameters
-      })),
-      edges: createRequest.blueprint!.edges.map((edge, index) => ({
-        id: `edge-${index}`,
-        from: edge.from,
-        to: edge.to
-      })),
-      approvalStatus: 'pending' as const,
-      createdAt: new Date().toISOString()
+    // TODO: Replace with proper BlueprintModel creation using BlueprintRepository
+    // For now, return a mock BlueprintModel structure
+    const mockBlueprint: BlueprintModel = {
+      id: `blueprint-${missionId}`,
+      name: `Mission ${missionId} Blueprint`,
+      description: `Execution blueprint for mission ${missionId}`,
+      category: 'mission',
+      nodes: createRequest.blueprint!.nodes,
+      edges: createRequest.blueprint!.edges,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
     
-    return mockWorkflow;
+    return mockBlueprint;
   }
 
   /**
@@ -640,7 +634,7 @@ export class MissionOrchestratorAgent {
   /**
    * Assess clarity and save to database
    */
-  private async assessAndSaveClarity(state: MissionChatState): Promise<MissionClarity> {
+  private async assessAndSaveClarity(state: MissionChatState): Promise<MissionClarityModel> {
     try {
       const currentClarity = await this.getClarityFromDB(state.missionId);
       const iteration = (currentClarity?.iteration || 0) + 1;
@@ -686,7 +680,7 @@ export class MissionOrchestratorAgent {
   /**
    * Generate focused question based on clarity assessment
    */
-  private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
+  private async generateFocusedQuestion(state: MissionChatState, _clarity: MissionClarityModel, isFirstIteration: boolean = false): Promise<string> {
     const systemPrompt = new MissionPromptBuilder(state).buildClarityQuestionPrompt(isFirstIteration);
 
     return await this.callLLM(systemPrompt);
@@ -695,7 +689,7 @@ export class MissionOrchestratorAgent {
   /**
    * Generate completion summary when clarity threshold is met
    */
-  private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarity, isFirstIteration: boolean = false): Promise<string> {
+  private async generateCompletionSummary(state: MissionChatState, _clarity: MissionClarityModel, isFirstIteration: boolean = false): Promise<string> {
     const systemPrompt = new MissionPromptBuilder(state).buildClarityCompletionPrompt(isFirstIteration);
 
     return await this.callLLM(systemPrompt);
@@ -704,7 +698,7 @@ export class MissionOrchestratorAgent {
   /**
    * Get clarity from database
    */
-  private async getClarityFromDB(missionId: string): Promise<MissionClarity | null> {
+  private async getClarityFromDB(missionId: string): Promise<MissionClarityModel | null> {
     try {
       const clarityRepo = RepositoryFactory.getMissionClarityRepository();
       return await clarityRepo.getByMissionId(missionId);

@@ -51,12 +51,14 @@ export interface MissionModel {
   status: MissionStatus;
   phase: MissionPhase;
   agentIds: string[]; // Assigned agent IDs from starship's crew
+  blueprintId?: string; // Reference to BlueprintModel for execution plan
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'modified';
+  approvedAt?: string; // When blueprint was approved for execution
   createdAt: string;
   updatedAt: string;
   createdBy: string; // User ID
   // Workflow execution is now handled by the autopilot package
-  // Mission tracks workflow through MissionWorkflow relationship
+  // Mission tracks blueprint through blueprintId reference
 }
 
 // ============================================================================
@@ -82,7 +84,9 @@ export interface UpdateMissionRequest {
   status?: MissionStatus;
   phase?: MissionPhase;
   agentIds?: string[]; // Update agent assignments
+  blueprintId?: string; // Update blueprint reference
   approvalStatus?: 'pending' | 'approved' | 'rejected' | 'modified';
+  approvedAt?: string; // When blueprint was approved
   // Execution state is now managed by the autopilot workflow system
 }
 
@@ -219,69 +223,15 @@ export interface UpdateMissionClarityRequest {
 }
 
 // ============================================================================
-// MISSION WORKFLOW TYPES
+// MISSION BLUEPRINT APPROVAL
 // ============================================================================
 
 /**
- * Mission workflow - executable workflow DSL for mission execution
+ * Request to update blueprint approval status
  */
-export interface MissionWorkflowModel {
-  id: string;
-  missionId: string;
-  nodes: WorkflowNode[];
-  edges: WorkflowEdge[];
-  approvalStatus: 'pending' | 'approved' | 'rejected';
-  createdAt: string;
-  approvedAt?: string;
-}
-
-/**
- * Individual node in the workflow graph
- */
-export interface WorkflowNode {
-  id: string;
-  type: 'start' | 'agent' | 'end';
-  name: string;
-  description: string;
-  parameters: {
-    agentId?: string;
-    estimatedTime?: number;
-    [key: string]: unknown;
-  };
-}
-
-/**
- * Edge connecting workflow nodes
- */
-export interface WorkflowEdge {
-  id: string;
-  from: string;
-  to: string;
-}
-
-/**
- * Request to create a new mission workflow
- */
-export interface CreateMissionWorkflowRequest {
-  missionId: string;
-  nodes: (Omit<WorkflowNode, 'id'> & { aiId?: string })[];
-  edges: Omit<WorkflowEdge, 'id'>[];
-}
-
-/**
- * Request to update workflow approval status
- */
-export interface UpdateWorkflowApprovalRequest {
+export interface UpdateBlueprintApprovalRequest {
   approvalStatus: 'approved' | 'rejected';
   rejectionReason?: string;
-}
-
-/**
- * Response containing workflow data
- */
-export interface MissionWorkflowResponse {
-  workflow: MissionWorkflowModel;
-  // Agent details are now managed by the models package
 }
 
 

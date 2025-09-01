@@ -17,7 +17,8 @@ interface LLMChatPrompt {
   temperature?: number;
   maxTokens?: number;
 }
-import { MISSION_PHASES, type MissionWorkflow } from '@starships/protocol';
+import { MISSION_PHASES } from '@starships/protocol';
+import type { BlueprintModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 
 /**
@@ -253,9 +254,9 @@ export class MissionPromptBuilder {
   /**
    * Build workflow presentation prompt
    */
-  buildWorkflowPresentationPrompt(workflow: MissionWorkflow): LLMChatPrompt {
+  buildWorkflowPresentationPrompt(blueprint: BlueprintModel): LLMChatPrompt {
     const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION
-      .replace('{planData}', this.buildWorkflowDataSection(workflow));
+      .replace('{planData}', this.buildWorkflowDataSection(blueprint));
 
     return {
       messages: [{

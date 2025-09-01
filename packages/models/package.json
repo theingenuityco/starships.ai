@@ -6,10 +6,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --build tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist && find tests -name '*.js' -o -name '*.d.ts' -o -name '*.d.ts.map' -o -name '*.js.map' | xargs rm -f",
+    "clean": "rm -rf dist",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "migrate": "tsx src/scripts/migration-runner.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
@@ -39,6 +39,7 @@
     "@types/uuid": "^10.0.0",
     "dotenv": "^17.1.0",
     "node-fetch": "^2.7.0",
-    "tsx": "^4.20.3"
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }

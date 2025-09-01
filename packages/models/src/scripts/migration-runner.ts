@@ -55,12 +55,25 @@ export class MigrationRunner {
 
     try {
       // Check if schema is already initialized
+      console.log('🔍 Checking for existing migration records...');
       const isApplied = await this.isMigrationApplied('000_complete_schema');
+      console.log(`   └─ Schema initialization status: ${isApplied ? 'exists' : 'needed'}`);
+      
       if (isApplied) {
-        result.warnings?.push('Schema already initialized');
-        result.success = true;
-        result.executionTime = Date.now() - startTime;
-        return result;
+        // Force re-verification even if migration exists
+        console.log('🔍 Migration exists but forcing verification check...');
+        const verificationResult = await this.verifySchemaInitialization();
+        if (verificationResult.success) {
+          result.warnings?.push('Schema already initialized and verified');
+          result.success = true;
+          result.executionTime = Date.now() - startTime;
+          return result;
+        } else {
+          console.log('⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...');
+          // Clear the incomplete migration record and re-run
+          await this.getConnection().executeWrite('MATCH (m:Migration {id: "000_complete_schema"}) DELETE m');
+          console.log('   └─ Cleared incomplete migration record');
+        }
       }
 
       // Validate migration file exists
@@ -74,7 +87,15 @@ export class MigrationRunner {
 
       // Execute schema initialization
       const schemaContent = readFileSync(migrationPath, 'utf-8');
-      await this.executeMigrationContent(schemaContent, '000_complete_schema');
+      console.log('🚀 Initializing database schema...');
+      
+      try {
+        await this.executeMigrationContent(schemaContent, '000_complete_schema');
+        console.log('✅ Migration content executed successfully, now verifying...');
+      } catch (executionError) {
+        console.error('❌ Migration content execution failed:', executionError);
+        throw executionError;
+      }
 
       // Verify schema initialization
       const verificationResult = await this.verifySchemaInitialization();
@@ -262,21 +283,68 @@ export class MigrationRunner {
    * Execute migration content with transaction handling
    */
   private async executeMigrationContent(content: string, migrationId: string): Promise<void> {
-    // Split content into individual statements
-    const statements = content
+    // Clean content: remove comment lines and empty lines, but preserve multi-line statements
+    const lines = content.split('\n');
+    const cleanedLines: string[] = [];
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      // Skip empty lines and comment-only lines
+      if (trimmedLine.length === 0 || trimmedLine.startsWith('//')) {
+        continue;
+      }
+      cleanedLines.push(line);
+    }
+    
+    const cleanContent = cleanedLines.join('\n');
+    
+    // Split content into individual statements by semicolons
+    const statements = cleanContent
       .split(';')
       .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('//'));
+      .filter(stmt => stmt.length > 0);
+
+    console.log(`📝 Executing ${statements.length} statements for schema initialization`);
 
     // Execute each statement
-    for (const statement of statements) {
-      if (statement.trim()) {
+    for (let i = 0; i < statements.length; i++) {
+      const statement = statements[i].trim();
+      if (statement) {
         try {
+          // Show friendly progress without revealing statement content
+          const statementType = this.getStatementType(statement);
+          console.log(`  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`);
           await this.getConnection().executeWrite(statement);
         } catch (error) {
-          throw new Error(`Failed to execute statement in ${migrationId}: ${statement.substring(0, 100)}... Error: ${error instanceof Error ? error.message : String(error)}`);
+          console.error(`❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`);
+          throw new Error(`Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
+    }
+    
+    console.log(`✅ Successfully executed all ${statements.length} statements`);
+  }
+
+  /**
+   * Get a friendly description of statement type without revealing content
+   */
+  private getStatementType(statement: string): string {
+    const upperStatement = statement.toUpperCase().trim();
+    
+    if (upperStatement.startsWith('CREATE CONSTRAINT')) {
+      return 'Creating database constraint';
+    } else if (upperStatement.startsWith('CREATE INDEX')) {
+      return 'Creating database index';
+    } else if (upperStatement.startsWith('CREATE RANGE INDEX')) {
+      return 'Creating range index';
+    } else if (upperStatement.startsWith('CREATE FULLTEXT INDEX')) {
+      return 'Creating fulltext search index';
+    } else if (upperStatement.startsWith('CREATE (')) {
+      return 'Creating migration record';
+    } else if (upperStatement.startsWith('MATCH')) {
+      return 'Running verification query';
+    } else {
+      return 'Executing database operation';
     }
   }
 

@@ -10,6 +10,7 @@ import { AgentRepository, RepositoryFactory } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
+import getStore, { type MemoryStore } from '../store';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -188,6 +189,13 @@ export class AgentService {
       category: agent.category,
       isPublic: agent.isPublic
     };
+  }
+
+  /**
+   * Get memory store - Static method
+   */
+  static getMemoryStore(): MemoryStore {
+    return getStore();
   }
 
   // ============================================================================

@@ -6,7 +6,6 @@
  */
 
 import { RepositoryFactory } from '@starships/models';
-import { AIMessage, HumanMessage, SystemMessage } from '../utils/message-types';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionService } from './MissionService';
@@ -37,10 +36,18 @@ export interface MissionOrchestratorAgentConfig {
 }
 
 /**
+ * Simple message interface to replace AIMessage
+ */
+interface SimpleMessage {
+  content: string;
+  name?: string;
+}
+
+/**
  * Callbacks for real-time execution
  */
 export interface GraphExecutionCallbacks {
-  onMessageGenerated: (message: AIMessage, nodeId: string, missionId: string) => Promise<void>;
+  onMessageGenerated: (message: SimpleMessage, nodeId: string, missionId: string) => Promise<void>;
   onPhaseChange?: (newPhase: MissionPhase, missionId: string) => Promise<void>;
   onStateUpdate?: (state: Partial<MissionChatState>) => Promise<void>;
 }
@@ -64,7 +71,7 @@ export interface MissionChatState {
   clarity: MissionClarityModel | undefined;
   blueprint: BlueprintModel | undefined;
   executionResult: any | undefined;
-  messages: Array<AIMessage | HumanMessage | SystemMessage>;
+  messages: Array<SimpleMessage>;
 }
 
 /**
@@ -151,13 +158,16 @@ export class MissionOrchestratorAgent {
       // Process message and get response
       const response = await this.processMessage(state);
       
-      // Create AI message for callback
-      const aiMessage = this.createAIMessage(response, state);
+      // Create simple message for callback
+      const simpleMessage: SimpleMessage = {
+        content: response,
+        name: `Commander ARIA-${missionId.slice(-4)}`
+      };
       
       // Execute callback
       if (callbacks.onMessageGenerated) {
         await callbacks.onMessageGenerated(
-          aiMessage,
+          simpleMessage,
           `${state.activePhase}_phase`,
           missionId
         );
@@ -206,9 +216,9 @@ export class MissionOrchestratorAgent {
     ]);
 
     // Create message object
-    const messageObj = isSystemInitiated
-      ? new SystemMessage({ content: message })
-      : new HumanMessage({ content: message });
+    const messageObj: SimpleMessage = {
+      content: message
+    };
 
     return {
       missionId,
@@ -573,15 +583,6 @@ export class MissionOrchestratorAgent {
     }
   }
 
-  /**
-   * Create AIMessage with Commander ARIA name
-   */
-  private createAIMessage(content: string, state: MissionChatState): AIMessage {
-    return new AIMessage({ 
-      content,
-      name: `Commander ARIA-${state.missionId.slice(-4)}`
-    });
-  }
 
   /**
    * Call LLM for response generation

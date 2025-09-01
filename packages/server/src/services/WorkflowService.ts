@@ -9,7 +9,6 @@
 import { WorkflowRepository, RepositoryFactory } from '@starships/models';
 import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
 import { Workflow, Blueprint, Execution, createAgentMemory } from '@starships/autopilot';
-import { DatabaseMemoryStore } from '../utils/database-memory';
 
 export interface WorkflowOptions {
   includeMemory?: boolean;
@@ -36,11 +35,9 @@ export interface WorkflowExecutionContext {
  */
 export class WorkflowService {
   private workflowRepository: WorkflowRepository;
-  private memoryStore: DatabaseMemoryStore;
 
   constructor() {
     this.workflowRepository = new WorkflowRepository();
-    this.memoryStore = new DatabaseMemoryStore();
   }
 
   // ============================================================================
@@ -382,12 +379,6 @@ export class WorkflowService {
     );
   }
 
-  /**
-   * Get memory store for workflow execution
-   */
-  getMemoryStore(): DatabaseMemoryStore {
-    return this.memoryStore;
-  }
 
   /**
    * Validate workflow

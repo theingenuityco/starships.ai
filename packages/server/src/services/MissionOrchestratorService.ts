@@ -12,7 +12,6 @@ import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ErrorFactory, InternalServerError } from '@starships/models';
-import { AIMessage } from '../utils/message-types';
 import type {
   MissionMessageModel,
   MissionChatResponse,
@@ -103,7 +102,7 @@ export class MissionOrchestratorService {
       missionId,
       message,
       {
-        onMessageGenerated: async (aiMessage: AIMessage) => {
+        onMessageGenerated: async (aiMessage: any) => {
           const savedMessage = await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
           this.emitMessageEvent(missionId, savedMessage);
         },

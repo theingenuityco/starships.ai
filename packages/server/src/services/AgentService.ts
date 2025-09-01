@@ -9,7 +9,6 @@
 import { AgentRepository, RepositoryFactory } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
-import { DatabaseMemoryStore } from '../utils/database-memory';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
 
 export interface AgentOptions {
@@ -43,18 +42,9 @@ export interface AgentExecutionContext {
  */
 export class AgentService {
   private agentRepository: AgentRepository;
-  private memoryStore: DatabaseMemoryStore;
 
   constructor() {
     this.agentRepository = new AgentRepository();
-    this.memoryStore = new DatabaseMemoryStore();
-  }
-
-  /**
-   * Get memory store instance
-   */
-  getMemoryStore(): DatabaseMemoryStore {
-    return this.memoryStore;
   }
 
   // ============================================================================
@@ -405,13 +395,6 @@ export class AgentService {
     }
   }
 
-  /**
-   * Get memory store instance for backward compatibility
-   */
-  static getMemoryStore(): DatabaseMemoryStore {
-    const agentService = new AgentService();
-    return agentService.getMemoryStore();
-  }
 
   /**
    * Test agent configuration without executing
@@ -500,14 +483,7 @@ export class AgentService {
       // Calculate usage statistics
       const usage = this.calculateUsage(execution);
 
-      // Save conversation history back to database
-      if (options.includeMemory && options.userId) {
-        await this.saveConversationHistory(
-          agent.getMemory(),
-          context.agentId,
-          options.userId
-        );
-      }
+      // Note: Conversation history persistence removed
 
       // Update agent usage count
       await this.agentRepository.incrementUsageCount(context.agentId);
@@ -547,37 +523,6 @@ export class AgentService {
     );
   }
 
-  /**
-   * Get agent conversation history
-   */
-  async getAgentConversationHistory(
-    agentId: string,
-    userId: string,
-    limit: number = 50
-  ): Promise<MessageModel[]> {
-    const memoryKey = this.memoryStore.makeKey(agentId, userId);
-    const history = await this.memoryStore.get(memoryKey);
-    return history.slice(-limit).map(entry => ({
-      id: `${agentId}-${userId}-${entry.timestamp || Date.now()}`,
-      role: entry.role,
-      content: entry.content,
-      timestamp: new Date(entry.timestamp || Date.now()).toISOString(),
-      metadata: {},
-      createdAt: new Date(entry.timestamp || Date.now()).toISOString(),
-      updatedAt: new Date(entry.timestamp || Date.now()).toISOString(),
-      version: '1.0.0',
-      starshipId: '', // Will be populated by caller if needed
-      contentLength: entry.content.length
-    }));
-  }
-
-  /**
-   * Clear agent conversation history
-   */
-  async clearAgentConversationHistory(agentId: string, userId: string): Promise<void> {
-    const memoryKey = this.memoryStore.makeKey(agentId, userId);
-    await this.memoryStore.clear(memoryKey);
-  }
 
   // ============================================================================
   // PRIVATE HELPER METHODS
@@ -665,75 +610,11 @@ export class AgentService {
       });
     }
 
-    // Load conversation history from database if requested
-    if (options.includeMemory && options.userId && options.loadConversationHistory) {
-      await this.loadConversationHistory(memory, dbAgent.id, options.userId);
-    }
+    // Note: Conversation history loading removed
 
     return memory;
   }
 
-  /**
-   * Load conversation history from database into agent memory
-   */
-  private async loadConversationHistory(
-    memory: AgentMemory,
-    agentId: string,
-    userId: string
-  ): Promise<void> {
-    try {
-      const memoryKey = this.memoryStore.makeKey(agentId, userId);
-      const history = await this.memoryStore.get(memoryKey);
-
-      // Load last 10 conversation entries to maintain context window
-      const recentHistory = history.slice(-10);
-
-      for (const entry of recentHistory) {
-        if (entry.role === 'user' || entry.role === 'assistant') {
-          memory.addConversation(entry.role, entry.content, {
-            timestamp: entry.timestamp,
-            fromDatabase: true
-          });
-        }
-      }
-
-      console.log(`[AGENT-SERVICE] Loaded ${recentHistory.length} conversation entries for agent ${agentId}`);
-    } catch (error) {
-      console.warn(`[AGENT-SERVICE] Failed to load conversation history for agent ${agentId}:`, error);
-      // Continue without history - not a critical failure
-    }
-  }
-
-  /**
-   * Save agent memory conversation back to database
-   */
-  private async saveConversationHistory(
-    memory: AgentMemory,
-    agentId: string,
-    userId: string
-  ): Promise<void> {
-    try {
-      const memoryKey = this.memoryStore.makeKey(agentId, userId);
-      const conversations = memory.getConversationHistory();
-
-      // Save only recent conversations that haven't been saved yet
-      const newConversations = conversations.filter(
-        conv => !conv.metadata?.fromDatabase
-      ).slice(-2); // Last user/assistant pair
-
-      for (const conv of newConversations) {
-        await this.memoryStore.append(memoryKey, {
-          role: conv.role,
-          content: conv.content,
-          timestamp: parseInt(conv.timestamp) || Date.now()
-        });
-      }
-
-      console.log(`[AGENT-SERVICE] Saved ${newConversations.length} new conversations for agent ${agentId}`);
-    } catch (error) {
-      console.error(`[AGENT-SERVICE] Failed to save conversation history for agent ${agentId}:`, error);
-    }
-  }
 
   /**
    * Extract response from autopilot agent execution result

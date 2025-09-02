@@ -65,7 +65,7 @@ export class HttpRequest {
   /**
    * Execute the HTTP request
    */
-  async execute(): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  async execute(): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     try {
       console.log(`Executing HTTP ${this.params.method} request to: ${this.params.url}`);
 

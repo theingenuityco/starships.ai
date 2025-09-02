@@ -50,7 +50,7 @@ export class LLM {
   /**
    * Execute the LLM request (delegates to HttpRequest)
    */
-  async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     try {
       console.log(`Executing LLM: ${this.params.model}`);
 
@@ -152,16 +152,33 @@ export class LLM {
   /**
    * Extract LLM response from OpenRouter response body
    */
-  private extractLlmResponse(responseBody: any): string {
+  private extractLlmResponse(responseBody: unknown): string {
     try {
-      // OpenRouter uses OpenAI-compatible format
-      const openAIContent = responseBody.choices?.[0]?.message?.content;
-      if (openAIContent) return openAIContent;
+      // Type guard and safe access for OpenRouter OpenAI-compatible format
+      if (responseBody && typeof responseBody === 'object') {
+        const body = responseBody as Record<string, unknown>;
+        const choices = body.choices;
+        if (Array.isArray(choices) && choices[0]) {
+          const choice = choices[0] as Record<string, unknown>;
+          const message = choice.message;
+          if (message && typeof message === 'object') {
+            const messageObj = message as Record<string, unknown>;
+            const content = messageObj.content;
+            if (typeof content === 'string') return content;
+          }
+        }
+        
+        // Fallback: try to extract any text content
+        const content = body.content;
+        if (typeof content === 'string') return content;
+        const text = body.text;
+        if (typeof text === 'string') return text;
+      }
       
-      // Fallback: try to extract any text content
+      // If it's already a string, return it
       if (typeof responseBody === 'string') return responseBody;
-      if (responseBody?.content) return responseBody.content;
-      if (responseBody?.text) return responseBody.text;
+      
+      // Last resort: stringify the response
       return JSON.stringify(responseBody);
     } catch {
       // If parsing fails completely, return empty string

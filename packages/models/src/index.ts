@@ -54,8 +54,6 @@ export {
   ErrorCategory
 } from '@starships/errors';
 
-// Export local error types
-export { ErrorSeverity } from './helpers/logging/error-monitor';
 
 
 // NEW: Export structured logging and monitoring system

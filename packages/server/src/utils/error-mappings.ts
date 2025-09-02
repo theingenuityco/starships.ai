@@ -7,7 +7,6 @@
 
 import {
   ErrorCategory,
-  ErrorSeverity,
 } from '@starships/models';
 
 // Define StandardErrorCode locally since it's server-specific
@@ -264,101 +263,6 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'AGENT_NOT_AVAILABLE': ErrorCategory.SERVICE_UNAVAILABLE,
 };
 
-/**
- * Error severity mapping for error codes
- */
-export const ERROR_SEVERITY_MAP: Record<StandardErrorCode, ErrorSeverity> = {
-  // Low severity
-  'VALIDATION_ERROR': ErrorSeverity.LOW,
-  'INVALID_INPUT': ErrorSeverity.LOW,
-  'MISSING_REQUIRED_FIELD': ErrorSeverity.LOW,
-  'INVALID_FORMAT': ErrorSeverity.LOW,
-  'INVALID_RANGE': ErrorSeverity.LOW,
-  'INVALID_TYPE': ErrorSeverity.LOW,
-  'MESSAGE_INVALID_TYPE': ErrorSeverity.LOW,
-  'MISSION_MESSAGE_INVALID': ErrorSeverity.LOW,
-  'RESOURCE_NOT_FOUND': ErrorSeverity.LOW,
-  'EXPEDITION_NOT_FOUND': ErrorSeverity.LOW,
-  'STARSHIP_NOT_FOUND': ErrorSeverity.LOW,
-  'TASK_NOT_FOUND': ErrorSeverity.LOW,
-  'AGENT_NOT_FOUND': ErrorSeverity.LOW,
-  'MESSAGE_NOT_FOUND': ErrorSeverity.LOW,
-  'MISSION_ORCHESTRATOR_NOT_FOUND': ErrorSeverity.LOW,
-  'RESULT_NOT_FOUND': ErrorSeverity.LOW,
-  
-  // Medium severity
-  'AUTHENTICATION_REQUIRED': ErrorSeverity.MEDIUM,
-  'AUTHENTICATION_FAILED': ErrorSeverity.MEDIUM,
-  'ACCESS_DENIED': ErrorSeverity.MEDIUM,
-  'INSUFFICIENT_PERMISSIONS': ErrorSeverity.MEDIUM,
-  'FORBIDDEN_OPERATION': ErrorSeverity.MEDIUM,
-  'EXPEDITION_ACCESS_DENIED': ErrorSeverity.MEDIUM,
-  'STARSHIP_ACCESS_DENIED': ErrorSeverity.MEDIUM,
-  'RESOURCE_ALREADY_EXISTS': ErrorSeverity.MEDIUM,
-  'RESOURCE_CONFLICT': ErrorSeverity.MEDIUM,
-  'EXPEDITION_ALREADY_STARTED': ErrorSeverity.MEDIUM,
-  'TASK_ALREADY_ASSIGNED': ErrorSeverity.MEDIUM,
-  'AGENT_ALREADY_DEPLOYED': ErrorSeverity.MEDIUM,
-  'EXPEDITION_CANNOT_MODIFY': ErrorSeverity.MEDIUM,
-  'EXPEDITION_CANNOT_DELETE': ErrorSeverity.MEDIUM,
-  'TASK_CANNOT_ASSIGN': ErrorSeverity.MEDIUM,
-  'TASK_CANNOT_COMPLETE': ErrorSeverity.MEDIUM,
-  'TASK_CANNOT_DELETE': ErrorSeverity.MEDIUM,
-  'INVALID_STATUS_TRANSITION': ErrorSeverity.MEDIUM,
-  'OPERATION_NOT_ALLOWED': ErrorSeverity.MEDIUM,
-  'RESULT_VALIDATION_FAILED': ErrorSeverity.MEDIUM,
-  'AGENT_NOT_QUALIFIED': ErrorSeverity.MEDIUM,
-  'RESOURCE_EXPIRED': ErrorSeverity.MEDIUM,
-  'MISSION_ORCHESTRATOR_FAILED': ErrorSeverity.MEDIUM,
-  'MISSION_ORCHESTRATOR_INITIALIZATION_FAILED': ErrorSeverity.MEDIUM,
-  'MISSION_MESSAGE_SEND_FAILED': ErrorSeverity.MEDIUM,
-  'MISSION_CHAT_FAILED': ErrorSeverity.MEDIUM,
-  
-  // High severity
-  'TOKEN_EXPIRED': ErrorSeverity.HIGH,
-  'TOKEN_INVALID': ErrorSeverity.HIGH,
-  'RESOURCE_LOCKED': ErrorSeverity.HIGH,
-  'STARSHIP_MAINTENANCE': ErrorSeverity.HIGH,
-  'RATE_LIMIT_EXCEEDED': ErrorSeverity.HIGH,
-  'QUOTA_EXCEEDED': ErrorSeverity.HIGH,
-  'CONCURRENT_LIMIT_EXCEEDED': ErrorSeverity.HIGH,
-  'TASK_DEPENDENCY_NOT_MET': ErrorSeverity.HIGH,
-  'EXPEDITION_INVALID_STATUS': ErrorSeverity.HIGH,
-  'RESOURCE_LIMIT_EXCEEDED': ErrorSeverity.HIGH,
-  'STARSHIP_CAPACITY_EXCEEDED': ErrorSeverity.HIGH,
-  'NETWORK_ERROR': ErrorSeverity.HIGH,
-  'CONNECTION_FAILED': ErrorSeverity.HIGH,
-  'REQUEST_TIMEOUT': ErrorSeverity.HIGH,
-  'SERVICE_UNREACHABLE': ErrorSeverity.HIGH,
-  'TIMEOUT_ERROR': ErrorSeverity.HIGH,
-  'OPERATION_TIMEOUT': ErrorSeverity.HIGH,
-  'AGENT_NOT_AVAILABLE': ErrorSeverity.HIGH,
-  
-  // Critical severity
-  'UNKNOWN_ERROR': ErrorSeverity.CRITICAL,
-  'INTERNAL_SERVER_ERROR': ErrorSeverity.CRITICAL,
-  'SERVICE_UNAVAILABLE': ErrorSeverity.CRITICAL,
-  'DATABASE_ERROR': ErrorSeverity.CRITICAL,
-  'DATABASE_CONNECTION_FAILED': ErrorSeverity.CRITICAL,
-  'DATABASE_QUERY_FAILED': ErrorSeverity.CRITICAL,
-  'DATABASE_CONSTRAINT_VIOLATION': ErrorSeverity.CRITICAL,
-  'DATABASE_TRANSACTION_FAILED': ErrorSeverity.CRITICAL,
-  'DATABASE_TIMEOUT': ErrorSeverity.CRITICAL,
-  'EXPEDITION_WORKFLOW_FAILED': ErrorSeverity.CRITICAL,
-  'EXPEDITION_4PHASE_START_FAILED': ErrorSeverity.CRITICAL,
-  'EXPEDITION_PHASE_PROGRESSION_FAILED': ErrorSeverity.CRITICAL,
-  'EXPEDITION_PLAN_APPROVAL_FAILED': ErrorSeverity.CRITICAL,
-  'EXPEDITION_EXECUTION_START_FAILED': ErrorSeverity.CRITICAL,
-  'STARSHIP_VALIDATION_FAILED': ErrorSeverity.CRITICAL,
-  'AGENT_DEPLOYMENT_FAILED': ErrorSeverity.CRITICAL,
-  'MESSAGE_SEND_FAILED': ErrorSeverity.CRITICAL,
-  'RESULT_QUALITY_ASSESSMENT_FAILED': ErrorSeverity.CRITICAL,
-  'CREATE_FAILED': ErrorSeverity.CRITICAL,
-  'UPDATE_FAILED': ErrorSeverity.CRITICAL,
-  'DELETE_FAILED': ErrorSeverity.CRITICAL,
-  'STATUS_UPDATE_FAILED': ErrorSeverity.CRITICAL,
-  'CONFIGURATION_ERROR': ErrorSeverity.CRITICAL,
-};
 
 /**
  * Get HTTP status code for an error code
@@ -372,13 +276,6 @@ export function getHttpStatusCode(errorCode: StandardErrorCode): number {
  */
 export function getErrorCategory(errorCode: StandardErrorCode): ErrorCategory {
   return ERROR_CATEGORY_MAP[errorCode] || ErrorCategory.INTERNAL;
-}
-
-/**
- * Get error severity for an error code
- */
-export function getErrorSeverity(errorCode: StandardErrorCode): ErrorSeverity {
-  return ERROR_SEVERITY_MAP[errorCode] || ErrorSeverity.MEDIUM;
 }
 
 /**
@@ -403,8 +300,8 @@ export function isRetryableError(errorCode: StandardErrorCode): boolean {
 }
 
 /**
- * Check if an error should be logged based on its severity
+ * Check if an error should be logged based on its status code
  */
-export function shouldLogError(severity: ErrorSeverity): boolean {
-  return [ErrorSeverity.HIGH, ErrorSeverity.CRITICAL].includes(severity);
+export function shouldLogError(statusCode: number): boolean {
+  return statusCode >= 500;
 }

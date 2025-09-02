@@ -20,10 +20,6 @@ import {
   ErrorFactory,
 } from '@starships/errors';
 
-import type {
-  ErrorSeverity,
-} from '@starships/models';
-
 // Define local types that were previously imported from protocol
 interface ErrorResponse {
   success: false;
@@ -31,7 +27,6 @@ interface ErrorResponse {
     code: string;
     message: string;
     category: string;
-    severity: ErrorSeverity;
     details?: any;
     timestamp: string;
     requestId?: string;
@@ -190,20 +185,6 @@ class ErrorLogger {
     this.logError(standardError, req, { unhandled: true });
   }
 
-  private getSeverityLogLevel(severity: ErrorSeverity): string {
-    switch (severity) {
-      case 'critical':
-        return 'error';
-      case 'high':
-        return 'error';
-      case 'medium':
-        return 'warn';
-      case 'low':
-        return 'info';
-      default:
-        return 'error';
-    }
-  }
 
   private sanitizeHeaders(headers: any): Record<string, any> {
     const sanitized = { ...headers };
@@ -412,7 +393,6 @@ export function errorHandler(config: Partial<ErrorHandlerConfig> = {}) {
         code: baseResponse.code as any,
         message: baseResponse.message,
         category: baseResponse.category as any,
-        severity: 'medium' as any, // Default severity since it's not in BaseError
         details: baseResponse.details,
         timestamp: baseResponse.timestamp,
         requestId: baseResponse.requestId,
@@ -525,7 +505,6 @@ export function createErrorResponse(
       code: code,
       message: baseResponse.message,
       category: baseResponse.category as any,
-      severity: 'high' as any,
       details: baseResponse.details,
       timestamp: baseResponse.timestamp,
       requestId: baseResponse.requestId,

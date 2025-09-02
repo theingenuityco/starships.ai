@@ -207,9 +207,3 @@ process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890')
 }));
-
-// Cleanup global error monitor instance after all tests
-import { errorMonitor } from '../helpers/logging/error-monitor';
-afterAll(() => {
-  errorMonitor.cleanup();
-});

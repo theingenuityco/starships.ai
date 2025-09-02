@@ -35,7 +35,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/useToast';
 import { missionApi } from '@/lib/missionApi';
-import { starshipAPI } from '@/lib/api';
+import { useStarshipAgents } from '@/hooks/useStarships';
 
 // Type for deployed agents - use the API response type directly
 type DeployedAgent = {
@@ -502,10 +502,10 @@ function MissionCard({
 }
 
 // Create Mission Form Component
-function CreateMissionForm({ 
-  starshipId, 
-  onSubmit, 
-  onCancel 
+function CreateMissionForm({
+  starshipId,
+  onSubmit,
+  onCancel
 }: {
   starshipId: string;
   onSubmit: (data: CreateMissionRequest) => void;
@@ -517,32 +517,15 @@ function CreateMissionForm({
     description: '',
     agentIds: []
   });
-  const [agents, setAgents] = useState<DeployedAgent[]>([]);
-  const [loadingAgents, setLoadingAgents] = useState(true);
-  const [agentsError, setAgentsError] = useState<string | null>(null);
 
-  // Load agents for this starship
-  useEffect(() => {
-    const loadAgents = async () => {
-      try {
-        setLoadingAgents(true);
-        setAgentsError(null);
-        const response = await starshipAPI.getStarshipAgents(starshipId);
-        setAgents(response.deployedAgents?.map((agent: any) => ({
-          ...agent,
-          tags: agent.tags || [],
-          authorId: agent.authorId || '',
-          isPublic: agent.isPublic || false
-        })) || []);
-      } catch (error) {
-        setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
-      } finally {
-        setLoadingAgents(false);
-      }
-    };
-
-    loadAgents();
-  }, [starshipId]);
+  // Use TanStack Query hook for agents
+  const { data: agentsData, isLoading: loadingAgents, error: agentsError } = useStarshipAgents(starshipId);
+  const agents = agentsData?.deployedAgents?.map((agent: any) => ({
+    ...agent,
+    tags: agent.tags || [],
+    authorId: agent.authorId || '',
+    isPublic: agent.isPublic || false
+  })) || [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -606,7 +589,7 @@ function CreateMissionForm({
               <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
             </div>
           ) : agentsError ? (
-            <div className="text-sm text-red-500 py-2">{agentsError}</div>
+           <div className="text-sm text-red-500 py-2">{agentsError?.message || 'Failed to load agents'}</div>
           ) : agents.length === 0 ? (
             <div className="text-sm text-muted-foreground py-2">
               No agents available. Deploy agents to your starship first.
@@ -667,10 +650,10 @@ function CreateMissionForm({
 }
 
 // Edit Mission Form Component
-function EditMissionForm({ 
-  mission, 
-  onSubmit, 
-  onCancel 
+function EditMissionForm({
+  mission,
+  onSubmit,
+  onCancel
 }: {
   mission: MissionModel;
   onSubmit: (updates: UpdateMissionRequest) => void;
@@ -682,32 +665,15 @@ function EditMissionForm({
     status: mission.status,
     agentIds: mission.agentIds
   });
-  const [agents, setAgents] = useState<DeployedAgent[]>([]);
-  const [loadingAgents, setLoadingAgents] = useState(true);
-  const [agentsError, setAgentsError] = useState<string | null>(null);
 
-  // Load agents for this starship
-  useEffect(() => {
-    const loadAgents = async () => {
-      try {
-        setLoadingAgents(true);
-        setAgentsError(null);
-        const response = await starshipAPI.getStarshipAgents(mission.starshipId);
-        setAgents(response.deployedAgents?.map((agent: any) => ({
-          ...agent,
-          tags: agent.tags || [],
-          authorId: agent.authorId || '',
-          isPublic: agent.isPublic || false
-        })) || []);
-      } catch (error) {
-        setAgentsError(error instanceof Error ? error.message : 'Failed to load agents');
-      } finally {
-        setLoadingAgents(false);
-      }
-    };
-
-    loadAgents();
-  }, [mission.starshipId]);
+  // Use TanStack Query hook for agents
+  const { data: agentsData, isLoading: loadingAgents, error: agentsError } = useStarshipAgents(mission.starshipId);
+  const agents = agentsData?.deployedAgents?.map((agent: any) => ({
+    ...agent,
+    tags: agent.tags || [],
+    authorId: agent.authorId || '',
+    isPublic: agent.isPublic || false
+  })) || [];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -764,7 +730,7 @@ function EditMissionForm({
               <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
             </div>
           ) : agentsError ? (
-            <div className="text-sm text-red-500 py-2">{agentsError}</div>
+           <div className="text-sm text-red-500 py-2">{agentsError?.message || 'Failed to load agents'}</div>
           ) : agents.length === 0 ? (
             <div className="text-sm text-muted-foreground py-2">
               No agents available.

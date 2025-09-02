@@ -6,8 +6,6 @@ import {
   Agent,
   MCPServerConnector,
   mcpServerAPI,
-  starshipAPI,
-  Starship,
 } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
@@ -15,13 +13,13 @@ import { ChatInterface } from '@/components/chat/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
+import {
   ArrowLeft, Users, Plug, Bot, Loader2, Activity,
   Shield, Zap, MessageSquare, Info
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
-import { useStarships } from '@/hooks/useStarships'
+import { useStarships, useStarshipBySlug } from '@/hooks/useStarships'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -30,12 +28,12 @@ interface StarshipCrewContentProps {
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [starship, setStarship] = useState<Starship | null>(null)
-  const [starshipLoading, setStarshipLoading] = useState(true)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { data: starshipsResponse } = useStarships()
+  const { data: starshipData, isLoading: starshipLoading, error: starshipError } = useStarshipBySlug(slug)
   const starships = starshipsResponse?.starships || []
+  const starship = starshipData?.starship || null
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
@@ -85,26 +83,16 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
     setCurrentTab(value)
   }
 
-  // Fetch starship data on component mount
+  // Handle starship loading error with toast
   useEffect(() => {
-    const fetchStarship = async () => {
-      try {
-        setStarshipLoading(true)
-        const data = await starshipAPI.getStarshipBySlug(slug)
-        setStarship(data.starship)
-      } catch (error) {
-        console.error('Failed to fetch starship:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to load starship data',
-          variant: 'destructive',
-        })
-      } finally {
-        setStarshipLoading(false)
-      }
+    if (starshipError) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load starship data',
+        variant: 'destructive',
+      })
     }
-    fetchStarship()
-  }, [slug, toast])
+  }, [starshipError, toast])
 
   // Check if this is the user's first starship and show onboarding
   useEffect(() => {

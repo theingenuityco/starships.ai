@@ -280,6 +280,9 @@ importers:
 
   packages/errors:
     dependencies:
+      '@starships/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       uuid:
         specifier: ^10.0.0
         version: 10.0.0

@@ -4,44 +4,19 @@
  * Contains only the core error classes that are actually needed.
  */
 
-/**
- * Error categories for classification
- */
-export enum ErrorCategory {
-  VALIDATION = 'validation',
-  AUTHENTICATION = 'authentication',
-  AUTHORIZATION = 'authorization',
-  NOT_FOUND = 'not_found',
-  CONFLICT = 'conflict',
-  DATABASE = 'database',
-  NETWORK = 'network',
-  RATE_LIMIT = 'rate_limit',
-  SERVICE_UNAVAILABLE = 'service_unavailable',
-  INTERNAL = 'internal',
-}
+// Import types from protocol package
+import { ErrorCategory } from '@starships/protocol';
+import type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
 
-/**
- * Base error interface
- */
-export interface ErrorDetails {
-  code: string;
-  message: string;
-  details?: any;
-  timestamp: string;
-  requestId?: string;
-  path?: string;
-  statusCode: number;
-  category: ErrorCategory;
-  field?: string;
-  entityType?: string;
-  entityId?: string;
-}
+// Re-export types for backward compatibility
+export { ErrorCategory } from '@starships/protocol';
+export type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
 
 /**
  * Base application error class
  */
 export abstract class BaseError extends Error {
-  public readonly code: string;
+  public readonly code: StandardErrorCode;
   public readonly statusCode: number;
   public readonly category: ErrorCategory;
   public readonly timestamp: string;
@@ -51,7 +26,7 @@ export abstract class BaseError extends Error {
 
   constructor(
     message: string,
-    code: string,
+    code: StandardErrorCode,
     statusCode: number,
     category: ErrorCategory,
     details?: any,
@@ -141,7 +116,7 @@ export class NotFoundError extends BaseError {
     requestId?: string,
     path?: string
   ) {
-    super(message, 'NOT_FOUND_ERROR', 404, ErrorCategory.NOT_FOUND, details, requestId, path);
+    super(message, 'RESOURCE_NOT_FOUND', 404, ErrorCategory.NOT_FOUND, details, requestId, path);
     this.entityType = entityType;
     this.entityId = entityId;
   }
@@ -167,7 +142,7 @@ export class AuthenticationError extends BaseError {
   ) {
     super(
       message,
-      'AUTHENTICATION_ERROR',
+      'AUTHENTICATION_REQUIRED',
       401,
       ErrorCategory.AUTHENTICATION,
       details,
@@ -194,7 +169,7 @@ export class AuthorizationError extends BaseError {
   ) {
     super(
       message,
-      'AUTHORIZATION_ERROR',
+      'ACCESS_DENIED',
       403,
       ErrorCategory.AUTHORIZATION,
       details,
@@ -230,7 +205,7 @@ export class ConflictError extends BaseError {
     requestId?: string,
     path?: string
   ) {
-    super(message, 'CONFLICT_ERROR', 409, ErrorCategory.CONFLICT, details, requestId, path);
+    super(message, 'RESOURCE_CONFLICT', 409, ErrorCategory.CONFLICT, details, requestId, path);
     this.conflictType = conflictType;
   }
 
@@ -343,7 +318,7 @@ export class RateLimitError extends BaseError {
   ) {
     super(
       message,
-      'RATE_LIMIT_ERROR',
+      'RATE_LIMIT_EXCEEDED',
       429,
       ErrorCategory.RATE_LIMIT,
       details,
@@ -385,7 +360,7 @@ export class ServiceUnavailableError extends BaseError {
   ) {
     super(
       message,
-      'SERVICE_UNAVAILABLE_ERROR',
+      'SERVICE_UNAVAILABLE',
       503,
       ErrorCategory.SERVICE_UNAVAILABLE,
       details,
@@ -410,7 +385,6 @@ export class ServiceUnavailableError extends BaseError {
 
 // Export error mapping utilities
 export * from './mappings';
-export type { StandardErrorCode } from './mappings';
 
 /**
  * Error utilities for common operations

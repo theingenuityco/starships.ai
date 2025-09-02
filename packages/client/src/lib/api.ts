@@ -291,6 +291,11 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   }
 }
 
+// Helper function to extract data from standardized API responses
+function extractResponseData<T>(response: AxiosResponse<{ data: T; meta?: any }>): T {
+  return response.data.data;
+}
+
 // API functions with caching
 export const agentAPI = {
   getAll: async (): Promise<Agent[]> => {
@@ -302,9 +307,10 @@ export const agentAPI = {
     }
 
     console.log('[API] Fetching all agents from server')
-    const data = await api.get('/api/v1/agents').then((res: AxiosResponse<Agent[]>) => {
-      console.log('[API] Received agents from server:', res.data.length)
-      return res.data
+    const data = await api.get('/api/v1/agents').then((res) => {
+      const agents = extractResponseData<Agent[]>(res);
+      console.log('[API] Received agents from server:', agents.length)
+      return agents
     })
     apiCache.set(cacheKey, data)
     return data
@@ -320,7 +326,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/starships/${starshipId}/agents`)
-      .then((res: AxiosResponse<Agent[]>) => res.data)
+      .then((res) => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -332,7 +338,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api.get(`/api/v1/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data)
+    const data = await api.get(`/api/v1/agents/${id}`).then((res) => extractResponseData<Agent>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -340,9 +346,10 @@ export const agentAPI = {
   // CRUD methods with cache invalidation
   create: async (agent: CreateAgentRequest): Promise<Agent> => {
     console.log('[API] Creating new agent:', agent.name)
-    const data = await api.post('/api/v1/agents', agent).then((res: AxiosResponse<Agent>) => {
-      console.log('[API] Agent created successfully:', res.data.id, 'authorId:', res.data.authorId)
-      return res.data
+    const data = await api.post('/api/v1/agents', agent).then((res) => {
+      const agent = extractResponseData<Agent>(res);
+      console.log('[API] Agent created successfully:', agent.id, 'authorId:', agent.authorId)
+      return agent
     })
     console.log('[API] Invalidating agent caches after creation')
     invalidateAgentCaches()
@@ -352,7 +359,7 @@ export const agentAPI = {
   update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
     const data = await api
       .put(`/api/v1/agents/${id}`, updates)
-      .then((res: AxiosResponse<Agent>) => res.data)
+      .then((res) => extractResponseData<Agent>(res))
     invalidateAgentCaches(id)
     return data
   },
@@ -372,7 +379,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/agents?category=${category}`)
-      .then((res: AxiosResponse<Agent[]>) => res.data)
+      .then((res) => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -386,7 +393,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/users/${authorId}/agents`)
-      .then((res: AxiosResponse<Agent[]>) => res.data)
+      .then((res) => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -400,7 +407,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/agents/public?limit=${limit}&offset=${offset}`)
-      .then((res: AxiosResponse<Agent[]>) => res.data)
+      .then((res) => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -414,7 +421,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/agents/search?q=${encodeURIComponent(query)}`)
-      .then((res: AxiosResponse<Agent[]>) => res.data)
+      .then((res) => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
     return data
   },
@@ -423,7 +430,7 @@ export const agentAPI = {
   getAnalytics: async (id: string): Promise<any> => {
     const data = await api
       .get(`/api/v1/agents/${id}/analytics`)
-      .then((res: AxiosResponse<any>) => res.data)
+      .then((res) => extractResponseData<any>(res))
     return data
   },
 }
@@ -439,7 +446,7 @@ export const templateAPI = {
 
     const data = await api
       .get('/api/v1/agent-templates')
-      .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
+      .then((res) => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -453,7 +460,7 @@ export const templateAPI = {
 
     const data = await api
       .get(`/api/v1/agent-templates/${id}`)
-      .then((res: AxiosResponse<AgentTemplate>) => res.data)
+      .then((res) => extractResponseData<AgentTemplate>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -467,7 +474,7 @@ export const templateAPI = {
 
     const data = await api
       .get(`/api/v1/agent-templates?category=${category}`)
-      .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
+      .then((res) => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -481,7 +488,7 @@ export const templateAPI = {
 
     const data = await api
       .get(`/api/v1/agent-templates?authorId=${authorId}`)
-      .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
+      .then((res) => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -499,7 +506,7 @@ export const templateAPI = {
 
       const data = await api
         .post(`/api/v1/agent-templates/${templateId}/agents`, requestBody)
-        .then((res: AxiosResponse<Agent>) => res.data)
+        .then((res) => extractResponseData<Agent>(res))
 
       // Invalidate agent caches since we've created a new agent
       invalidateAgentCaches()
@@ -520,9 +527,10 @@ export const templateAPI = {
       console.log('[API] Converting agent to template:', agentId)
       const data = await api
         .post(`/api/v1/agent-templates/from-agents/${agentId}`)
-        .then((res: AxiosResponse<AgentTemplate>) => {
-          console.log('[API] Agent converted to template successfully:', res.data.id)
-          return res.data
+        .then((res) => {
+          const template = extractResponseData<AgentTemplate>(res);
+          console.log('[API] Agent converted to template successfully:', template.id)
+          return template
         })
 
       // Invalidate both agent and template caches
@@ -820,16 +828,16 @@ export const userAPI = {
     avatar?: string
   }): Promise<SyncedUser> => {
     const response = await api.post('/api/v1/users/sync', userData)
-    return response.data as SyncedUser
+    return extractResponseData<SyncedUser>(response)
   },
 
   // Get user by ID
   getById: (id: string): Promise<SyncedUser> =>
-    api.get(`/api/v1/users/${id}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+    api.get(`/api/v1/users/${id}`).then((res) => extractResponseData<SyncedUser>(res)),
 
   // Get user by Kinde ID
   getByKindeId: (kindeId: string): Promise<SyncedUser> =>
-    api.get(`/api/v1/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+    api.get(`/api/v1/users/kinde/${kindeId}`).then((res) => extractResponseData<SyncedUser>(res)),
 }
 
 // Memory API
@@ -837,7 +845,7 @@ export const memoryAPI = {
   // Reset memory for agent and user
   resetMemory: async (agentId: string): Promise<{ message: string }> => {
     const response = await api.post('/api/v1/memory/reset', { agentId })
-    return response.data
+    return extractResponseData<{ message: string }>(response)
   },
 }
 

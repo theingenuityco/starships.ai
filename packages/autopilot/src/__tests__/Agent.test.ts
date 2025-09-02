@@ -325,7 +325,7 @@ describe('Agent', () => {
         basicParams.blueprint,
         expect.objectContaining({
           currentNodeRef: 'start',
-          status: 'in_progress',
+          status: 'running',
           executionResults: expect.any(Map),
           agentMemory: expect.any(AgentMemory)
         })

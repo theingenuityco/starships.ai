@@ -20,12 +20,12 @@ export class Agent {
     this.params = {
       ...params,
       // Ensure blueprint has a deep copy to avoid mutations
-      blueprint: {
+      blueprint: params.blueprint ? {
         ...params.blueprint,
-        nodes: params.blueprint.nodes.map(node => ({ ...node })),
-        edges: params.blueprint.edges.map(edge => ({ ...edge })),
+        nodes: params.blueprint.nodes?.map(node => ({ ...node })) || [],
+        edges: params.blueprint.edges?.map(edge => ({ ...edge })) || [],
         metadata: { ...params.blueprint.metadata }
-      }
+      } : undefined
     };
 
     // Create AgentMemory instance from config

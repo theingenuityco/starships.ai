@@ -58,8 +58,14 @@ export class AgentMemory extends Memory {
   protected state: AgentMemoryState = {};
 
   constructor(params: AgentMemoryParams = {}) {
+    // Extract messages from state for parent constructor
+    const memoryParams = {
+      ...params,
+      messages: params.state?.messages || params.messages
+    };
+    
     // Call parent constructor first
-    super(params);
+    super(memoryParams);
     
     // Initialize state from params if provided
     if (params.state) {
@@ -156,14 +162,10 @@ export class AgentMemory extends Memory {
     const messages: Message[] = [];
     const allMessages = super.getMessages();
     
-    // Add system messages first
-    const systemMessages = allMessages.filter(msg => msg.role === 'system');
-    messages.push(...systemMessages);
-    
-    // Add structured system context if available and no system messages exist
+    // Add structured system context if available (always first)
     const systemContext = this.buildSystemContext();
-    if (systemContext && systemMessages.length === 0) {
-      messages.unshift({
+    if (systemContext) {
+      messages.push({
         id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         role: 'system',
@@ -174,6 +176,10 @@ export class AgentMemory extends Memory {
     // Add all non-system messages
     const nonSystemMessages = allMessages.filter(msg => msg.role !== 'system');
     messages.push(...nonSystemMessages);
+
+    // Add existing system messages last
+    const systemMessages = allMessages.filter(msg => msg.role === 'system');
+    messages.push(...systemMessages);
 
     return messages;
   }

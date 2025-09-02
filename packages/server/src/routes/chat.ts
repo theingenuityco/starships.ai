@@ -4,28 +4,17 @@ import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
 import { RepositoryFactory, ValidationError, NotFoundError } from '@starships/models';
+import {
+  sendSuccess,
+  sendError,
+  handleCommonError,
+  validateUUID,
+  validatePagination,
+  createPaginationMeta,
+  ERROR_CODES,
+} from '../utils/responseHelpers';
 
 const router: Router = Router();
-
-/**
- * UUID validation helper (consistent with other routes)
- */
-const validateUUID = (id: string, fieldName: string): void => {
-  if (!id || typeof id !== 'string') {
-    throw new ValidationError(
-      `${fieldName} is required and must be a string`,
-      fieldName
-    );
-  }
-
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(id)) {
-    throw new ValidationError(
-      `${fieldName} must be a valid UUID format`,
-      fieldName
-    );
-  }
-};
 
 /**
  * Error helper consistent with project patterns
@@ -37,38 +26,40 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
-// POST /chat - Send message to agent
+// POST / - Send message to agent (renamed from /chat to follow new pattern)
 router.post('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     const { agentId, message } = req.body;
 
     if (!userId) {
-      res.status(401).json({
-        success: false,
-        error: 'User not authenticated',
-        code: 'UNAUTHORIZED'
-      });
+      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
       return;
     }
 
     // Validate required fields
     if (!agentId || typeof agentId !== 'string') {
-      throw new ValidationError(
-        'agentId is required and must be a string',
-        'agentId'
-      );
+      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'agentId is required and must be a string', 400, {
+        field: 'agentId',
+        provided: typeof agentId,
+      });
+      return;
     }
 
     if (!message || typeof message !== 'string') {
-      throw new ValidationError(
-        'message is required and must be a string',
-        'message'
-      );
+      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'message is required and must be a string', 400, {
+        field: 'message',
+        provided: typeof message,
+      });
+      return;
     }
 
     // Validate agentId format
-    validateUUID(agentId, 'agentId');
+    const { isValid, error } = validateUUID(agentId, 'agentId');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
 
     // Build chat request using authenticated user ID from middleware
     const chatRequest = {
@@ -92,37 +83,12 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
       console.warn('Failed to track agent usage:', trackingError);
     }
 
-    res.json({
-      success: true,
-      data: result
-    });
+    sendSuccess(res, result, 201);
 
   } catch (error) {
-    console.error('Chat error:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'processing chat message')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to process chat message');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'AGENT_NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 

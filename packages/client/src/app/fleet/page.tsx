@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AuthGate } from '@/components/auth/AuthGate';
-import { StarshipDashboard } from '@/components/command-deck/starship/StarshipDashboard';
+import { StarshipDashboard } from '@/components/starships/StarshipDashboard';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { toast } from 'sonner';
 

@@ -146,12 +146,12 @@
   background: hsl(var(--primary) / 0.5);
 }
 
-/* 
- * COMMAND DECK UTILITY CLASSES
- * ============================
+/*
+ * STARSHIP UTILITY CLASSES
+ * =========================
  * Pre-built classes for consistent theming across components
  */
-.command-deck-bg {
+.starship-bg {
   background: var(--command-bg);
   /* Performance: Promote to composite layer for smooth animations */
   will-change: background;

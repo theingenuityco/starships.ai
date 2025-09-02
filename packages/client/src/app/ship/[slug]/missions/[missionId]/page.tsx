@@ -419,7 +419,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
 
   if (loading) {
     return (
-      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+      <div className="h-full bg-background p-8 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
       </div>
     );
@@ -427,7 +427,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
 
   if (error || !mission) {
     return (
-      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+      <div className="h-full bg-background p-8 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 mb-2">⚠️ Error</div>
           <p className="text-muted-foreground mb-4">{error || 'Mission not found'}</p>
@@ -441,7 +441,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   }
 
   return (
-    <div className="h-screen command-deck-bg flex flex-col">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex-shrink-0">
         <div className="flex items-center gap-4">

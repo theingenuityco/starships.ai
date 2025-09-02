@@ -87,7 +87,8 @@ describe('EdgeRepository', () => {
     it('should generate ref when not provided', async () => {
       const edgeDataWithoutRef = {
         from: 'node-1',
-        to: 'node-2'
+        to: 'node-2',
+        ref: ''  // Empty ref should fall back to generated ID
       };
 
       mockConnection.executeQuery

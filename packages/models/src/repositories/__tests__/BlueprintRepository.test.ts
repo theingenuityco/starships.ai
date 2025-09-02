@@ -152,7 +152,7 @@ describe('BlueprintRepository', () => {
     it('should throw ValidationError for invalid edges', async () => {
       const invalidRequest = {
         name: 'Test Blueprint',
-        nodes: [{ type: 'start', name: 'Start', parameters: {} }],
+        nodes: [{ type: 'start' as const, name: 'Start', description: 'Start node', parameters: {}, ref: 'start' }],
         edges: 'invalid' as any
       };
 
@@ -504,7 +504,7 @@ describe('BlueprintRepository', () => {
 
       const validRequest: CreateBlueprintRequest = {
         name: 'Test Blueprint',
-        nodes: [{ type: 'start', name: 'Start', parameters: {} }],
+        nodes: [{ type: 'start' as const, name: 'Start', description: 'Start node', parameters: {}, ref: 'start' }],
         edges: []
       };
 

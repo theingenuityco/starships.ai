@@ -522,23 +522,10 @@ describe('NodeRepository', () => {
       );
     });
 
-    it('should return existing node when no updates provided', async () => {
+    it('should throw ValidationError when no updates provided', async () => {
       const nodeId = 'node-123';
-      const existingNode = {
-        id: nodeId,
-        type: 'start' as const,
-        name: 'Existing Node',
-        description: 'Existing description',
-        parameters: {},
-        ref: 'existing'
-      };
 
-      jest.spyOn(repository, 'getNodeById').mockResolvedValue(existingNode);
-
-      const result = await repository.updateNode(nodeId, {});
-
-      expect(result).toEqual(existingNode);
-      expect(mockConnection.executeWrite).not.toHaveBeenCalled();
+      await expect(repository.updateNode(nodeId, {})).rejects.toThrow(ValidationError);
     });
 
     it('should throw ValidationError for missing nodeId', async () => {

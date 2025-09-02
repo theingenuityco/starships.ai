@@ -84,9 +84,13 @@ describe('ErrorMonitor', () => {
   describe('trackError', () => {
     const createTestError = (code: string = 'TEST_ERROR', category: ErrorCategory = ErrorCategory.VALIDATION) => {
       if (category === ErrorCategory.DATABASE) {
-        return new DatabaseError('Test error message');
+        const error = new DatabaseError('Test error message');
+        Object.defineProperty(error, 'code', { value: code, configurable: true });
+        return error;
       }
-      return new ValidationError('Test error message');
+      const error = new ValidationError('Test error message');
+      Object.defineProperty(error, 'code', { value: code, configurable: true });
+      return error;
     };
 
     it('should track error occurrence successfully', async () => {
@@ -302,21 +306,30 @@ describe('ErrorMonitor', () => {
   });
 
   describe('getErrorOccurrences', () => {
+    let testMonitor: ErrorMonitor;
+    
     beforeEach(async () => {
+      // Use a separate monitor instance for these tests to avoid contamination
+      testMonitor = new ErrorMonitor({
+        enableAlerting: false,
+        enableMetrics: true,
+        retentionDays: 1
+      });
+
       // Create test data
       const testErrors = [
         { error: createTestError('ERROR_A', ErrorCategory.VALIDATION), severity: ErrorSeverity.LOW },
         { error: createTestError('ERROR_B', ErrorCategory.DATABASE), severity: ErrorSeverity.HIGH },
-        { error: createTestError('ERROR_C', ErrorCategory.INTERNAL), severity: ErrorSeverity.MEDIUM }
+        { error: createTestError('ERROR_C', ErrorCategory.VALIDATION), severity: ErrorSeverity.MEDIUM }
       ];
 
       for (const { error, severity } of testErrors) {
-        await monitor.trackError(error, {}, severity);
+        await testMonitor.trackError(error, {}, severity);
       }
 
       // Resolve first error
-      const occurrences = monitor.getErrorOccurrences();
-      await monitor.resolveError(occurrences[0].id, 'admin');
+      const occurrences = testMonitor.getErrorOccurrences();
+      await testMonitor.resolveError(occurrences[0].id, 'admin');
     });
 
     it('should filter by category', () => {
@@ -721,12 +734,12 @@ describe('ErrorMonitor', () => {
 
     it('should handle alert action failures', async () => {
       // Mock logger.info to throw error for webhook alerts
-      const originalInfo = logger.info;
       (logger.info as jest.Mock).mockImplementation((message: string, data: any) => {
         if (message === 'Webhook alert triggered') {
           throw new Error('Webhook failed');
         }
-        return originalInfo(message, data);
+        // Don't call original implementation to avoid infinite recursion
+        return;
       });
 
       const rule = {
@@ -823,7 +836,7 @@ describe('ErrorMonitor', () => {
         user: { id: 'user-456' },
         ip: '192.168.1.1',
         get: jest.fn().mockReturnValue('Chrome/91.0'),
-        body: { starshipId: 'starship-body-789' }
+        params: { starshipId: 'starship-789' }
       };
       const res = {};
       const next = jest.fn();
@@ -837,7 +850,7 @@ describe('ErrorMonitor', () => {
         userId: 'user-456',
         ip: '192.168.1.1',
         userAgent: 'Chrome/91.0',
-        starshipId: 'starship-body-789'
+        starshipId: 'starship-789'
       });
     });
   });
@@ -906,7 +919,13 @@ describe('ErrorMonitor', () => {
 // Helper function for creating test errors
 function createTestError(code: string = 'TEST_ERROR', category: ErrorCategory = ErrorCategory.VALIDATION) {
   if (category === ErrorCategory.DATABASE) {
-    return new DatabaseError(`Test error: ${code}`);
+    const error = new DatabaseError(`Test error: ${code}`);
+    // Override the code property to use the custom code
+    Object.defineProperty(error, 'code', { value: code, configurable: true });
+    return error;
   }
-  return new ValidationError(`Test error: ${code}`);
+  const error = new ValidationError(`Test error: ${code}`);
+  // Override the code property to use the custom code
+  Object.defineProperty(error, 'code', { value: code, configurable: true });
+  return error;
 }

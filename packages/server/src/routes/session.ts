@@ -3,7 +3,7 @@ import type { SessionModel, SessionSourceType } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { SessionService } from '../services/SessionService';
-import { ValidationError, NotFoundError } from '@starships/errors';
+import { ValidationError, NotFoundError, StandardErrorCode } from '@starships/errors';
 import { RepositoryFactory } from '@starships/models';
 import {
   sendSuccess,
@@ -12,7 +12,6 @@ import {
   validateUUID,
   validatePagination,
   createPaginationMeta,
-  ERROR_CODES,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -35,13 +34,13 @@ router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request
     const { agentId, message } = req.body;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
     // Validate required fields
     if (!agentId || typeof agentId !== 'string') {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'agentId is required and must be a string', 400, {
+      sendError(res, "MISSING_REQUIRED_FIELD", 'agentId is required and must be a string', 400, {
         field: 'agentId',
         provided: typeof agentId,
       });
@@ -49,7 +48,7 @@ router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request
     }
 
     if (!message || typeof message !== 'string') {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'message is required and must be a string', 400, {
+      sendError(res, "MISSING_REQUIRED_FIELD", 'message is required and must be a string', 400, {
         field: 'message',
         provided: typeof message,
       });
@@ -73,7 +72,7 @@ router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request
     // Verify session exists and belongs to user
     const session = await SessionService.getSessionById(sessionId);
     if (!session) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Session not found', 404, {
+      sendError(res, "RESOURCE_NOT_FOUND", 'Session not found', 404, {
         resource: 'session',
         id: sessionId
       });
@@ -81,7 +80,7 @@ router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request
     }
 
     if (session.userId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this session', 403);
+      sendError(res, "ACCESS_DENIED", 'Access denied to this session', 403);
       return;
     }
 
@@ -118,7 +117,7 @@ router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request
 
   } catch (error) {
     if (!handleCommonError(error, res, 'processing session message')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to process session message');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to process session message');
     }
   }
 });
@@ -130,7 +129,7 @@ router.delete('/sessions/:sessionId/memory', authMiddleware, async (req: Request
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
@@ -144,7 +143,7 @@ router.delete('/sessions/:sessionId/memory', authMiddleware, async (req: Request
     // Verify session exists and belongs to user
     const session = await SessionService.getSessionById(sessionId);
     if (!session) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Session not found', 404, {
+      sendError(res, "RESOURCE_NOT_FOUND", 'Session not found', 404, {
         resource: 'session',
         id: sessionId
       });
@@ -152,7 +151,7 @@ router.delete('/sessions/:sessionId/memory', authMiddleware, async (req: Request
     }
 
     if (session.userId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this session', 403);
+      sendError(res, "ACCESS_DENIED", 'Access denied to this session', 403);
       return;
     }
 
@@ -165,7 +164,7 @@ router.delete('/sessions/:sessionId/memory', authMiddleware, async (req: Request
 
   } catch (error) {
     if (!handleCommonError(error, res, 'clearing session memory')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to clear session memory');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to clear session memory');
     }
   }
 });
@@ -285,7 +284,7 @@ router.get('/starships/:starshipId/sessions', authMiddleware, async (req: Reques
 
     if (!userId) {
       console.error('🚀 [SESSION ROUTE] User not authenticated - missing userId');
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
@@ -331,7 +330,7 @@ router.get('/starships/:starshipId/sessions', authMiddleware, async (req: Reques
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship sessions')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch starship sessions');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to fetch starship sessions');
     }
   }
 });
@@ -343,7 +342,7 @@ router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Res
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
@@ -357,7 +356,7 @@ router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Res
     // Get session details
     const session = await SessionService.getSessionById(sessionId);
     if (!session) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Session not found', 404, {
+      sendError(res, "RESOURCE_NOT_FOUND", 'Session not found', 404, {
         resource: 'session',
         id: sessionId
       });
@@ -366,7 +365,7 @@ router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Res
 
     // Verify session belongs to user
     if (session.userId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this session', 403);
+      sendError(res, "ACCESS_DENIED", 'Access denied to this session', 403);
       return;
     }
 
@@ -420,13 +419,13 @@ router.get('/users/:userId/sessions', authMiddleware, async (req: Request, res: 
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
     // Users can only access their own sessions
     if (targetUserId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied', 403);
+      sendError(res, "ACCESS_DENIED", 'Access denied', 403);
       return;
     }
 
@@ -462,7 +461,7 @@ router.get('/users/:userId/sessions', authMiddleware, async (req: Request, res: 
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching user sessions')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch user sessions');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to fetch user sessions');
     }
   }
 });
@@ -474,13 +473,13 @@ router.post('/sessions', authMiddleware, async (req: Request, res: Response): Pr
     const { source, agentId, starshipId, metadata } = req.body;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
     // Validate required fields
     if (!source || typeof source !== 'string') {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'source is required and must be a string', 400, {
+      sendError(res, "MISSING_REQUIRED_FIELD", 'source is required and must be a string', 400, {
         field: 'source',
         provided: typeof source,
       });
@@ -490,7 +489,7 @@ router.post('/sessions', authMiddleware, async (req: Request, res: Response): Pr
     // Validate source is a valid SessionSourceType
     const validSources = ['agent', 'sibil', 'user'] as const;
     if (!validSources.includes(source as any)) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'source must be one of: agent, sibil, user', 400, {
+      sendError(res, "VALIDATION_ERROR", 'source must be one of: agent, sibil, user', 400, {
         field: 'source',
         provided: source,
         allowedValues: validSources,
@@ -530,7 +529,7 @@ router.post('/sessions', authMiddleware, async (req: Request, res: Response): Pr
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating session')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create session');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to create session');
     }
   }
 });
@@ -542,7 +541,7 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req: Request, res: 
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
@@ -556,7 +555,7 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req: Request, res: 
     // Verify session exists and belongs to user
     const session = await SessionService.getSessionById(sessionId);
     if (!session) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Session not found', 404, {
+      sendError(res, "RESOURCE_NOT_FOUND", 'Session not found', 404, {
         resource: 'session',
         id: sessionId
       });
@@ -564,7 +563,7 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req: Request, res: 
     }
 
     if (session.userId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this session', 403);
+      sendError(res, "ACCESS_DENIED", 'Access denied to this session', 403);
       return;
     }
 
@@ -574,12 +573,12 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req: Request, res: 
     if (deleted) {
       sendSuccess(res, { message: 'Session deleted successfully' }, 200);
     } else {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to delete session');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to delete session');
     }
 
   } catch (error) {
     if (!handleCommonError(error, res, 'deleting session')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to delete session');
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to delete session');
     }
   }
 });

@@ -4,13 +4,13 @@
 
 import { MemoryRepository } from '../MemoryRepository';
 import { Neo4jConnection } from '../../helpers/database';
-import { DatabaseError } from '../../helpers/errors';
+import { DatabaseError, ConflictError } from '../../helpers/errors';
 import type { MemoryModel } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-memory-id')
+  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890')
 }));
 
 describe('MemoryRepository', () => {
@@ -271,13 +271,25 @@ describe('MemoryRepository', () => {
         state: { messages: [{ role: 'user', content: 'updated' }] },
         messageCount: 10
       };
-      const mockUpdated = createMockMemory(updates);
+      const mockUpdated = createMockMemory({
+        ...updates,
+        state: { messages: [{ role: 'user', content: 'updated' }] }
+      });
       
-      mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdated }]);
+      // Mock the memory with serialized state as it would come from DB
+      const mockUpdatedWithSerializedState = {
+        ...mockUpdated,
+        state: JSON.stringify(mockUpdated.state)
+      };
+      
+      mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdatedWithSerializedState }]);
 
       const result = await repository.update('memory-123', updates);
 
-      expect(result).toMatchObject(updates);
+      expect(result).toMatchObject({
+        messageCount: 10,
+        state: { messages: [{ role: 'user', content: 'updated' }] }
+      });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('SET m += $updates'),
         expect.objectContaining({
@@ -411,7 +423,12 @@ describe('MemoryRepository', () => {
         },
         updatedAt: '2024-01-01T12:00:00.000Z'
       });
-      mockConnection.executeQuery.mockResolvedValue([{ m: mockMemory }]);
+      // Mock the memory with serialized state as it would come from DB
+      const mockMemoryWithSerializedState = {
+        ...mockMemory,
+        state: JSON.stringify(mockMemory.state)
+      };
+      mockConnection.executeQuery.mockResolvedValue([{ m: mockMemoryWithSerializedState }]);
 
       const result = await repository.getMemoryStats('memory-123');
 
@@ -474,7 +491,12 @@ describe('MemoryRepository', () => {
           ]
         }
       });
-      mockConnection.executeQuery.mockResolvedValue([{ m: mockMemory }]);
+      // Mock the memory with serialized state as it would come from DB
+      const mockMemoryWithSerializedState = {
+        ...mockMemory,
+        state: JSON.stringify(mockMemory.state)
+      };
+      mockConnection.executeQuery.mockResolvedValue([{ m: mockMemoryWithSerializedState }]);
 
       const result = await repository.getMemoryStats('memory-123');
 
@@ -656,7 +678,7 @@ describe('MemoryRepository', () => {
       // Create
       mockConnection.executeWrite.mockResolvedValue([]);
       const created = await repository.create(createInput);
-      expect(created.id).toBe('test-memory-id');
+      expect(created.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
       // Find by starship
       const mockMemories = [createMockMemory()];
@@ -717,7 +739,7 @@ describe('MemoryRepository', () => {
     it('should handle constraint violations', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
-      await expect(repository.create(createMockCreateInput())).rejects.toThrow(DatabaseError);
+      await expect(repository.create(createMockCreateInput())).rejects.toThrow(ConflictError);
     });
 
     it('should handle connection timeouts', async () => {

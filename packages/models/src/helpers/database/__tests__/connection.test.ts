@@ -96,21 +96,26 @@ describe('Neo4jConnection', () => {
     });
 
     it('should handle connection timeout', async () => {
-      let timeoutHandle: NodeJS.Timeout;
+      // Use fake timers to speed up the test
+      jest.useFakeTimers();
+      
+      // Mock verifyConnectivity to never resolve, simulating a timeout scenario
       mockDriver.verifyConnectivity.mockImplementation(
-        () => new Promise(resolve => {
-          timeoutHandle = setTimeout(resolve, 6000);
+        () => new Promise(() => {
+          // Never resolves, causing the timeout to trigger
         })
       );
 
-      try {
-        await expect(connection.connect()).rejects.toThrow('Neo4j connection timeout');
-      } finally {
-        // Clean up the mock timeout to prevent handle leaks
-        if (timeoutHandle!) {
-          clearTimeout(timeoutHandle);
-        }
-      }
+      // Start the connection attempt
+      const connectPromise = connection.connect();
+      
+      // Fast-forward time to trigger the timeout
+      jest.advanceTimersByTime(5000);
+      
+      await expect(connectPromise).rejects.toThrow('Neo4j connection timeout');
+      
+      // Restore real timers
+      jest.useRealTimers();
     });
 
     it('should handle connection failure', async () => {

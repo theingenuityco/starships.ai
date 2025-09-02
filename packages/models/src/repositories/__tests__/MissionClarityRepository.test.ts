@@ -4,7 +4,7 @@
 
 import { MissionClarityRepository } from '../MissionClarityRepository';
 import { Neo4jConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError, NotFoundError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '../../helpers/errors';
 import type { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
 
 // Mock dependencies
@@ -269,13 +269,18 @@ describe('MissionClarityRepository', () => {
       const updates = { reasoning: 'New reasoning', iteration: 3 };
       const mockUpdated = createMockClarity(updates);
       
+      // Set up spy to track if method is called
+      const getByMissionIdSpy = jest.spyOn(repository, 'getByMissionId');
       mockConnection.executeWrite.mockResolvedValue([{ mc: mockUpdated }]);
 
       const result = await repository.updateByMissionId('mission-123', updates);
 
       expect(result).toMatchObject(updates);
       // Should not call getByMissionId since no scores were updated
-      expect(repository.getByMissionId).not.toHaveBeenCalled();
+      expect(getByMissionIdSpy).not.toHaveBeenCalled();
+      
+      // Clean up spy
+      getByMissionIdSpy.mockRestore();
     });
   });
 
@@ -487,7 +492,7 @@ describe('MissionClarityRepository', () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
       await expect(repository.upsertByMissionId('mission-123', request))
-        .rejects.toThrow(DatabaseError);
+        .rejects.toThrow(ConflictError);
     });
 
     it('should handle connection timeouts', async () => {

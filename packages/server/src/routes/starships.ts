@@ -17,6 +17,7 @@ import {
 import type { StarshipModel } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
+import type { StandardErrorCode } from '@starships/errors';
 import {
   sendSuccess,
   sendError,
@@ -24,7 +25,6 @@ import {
   validateUUID,
   validatePagination,
   createPaginationMeta,
-  ERROR_CODES,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -69,7 +69,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starships')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch starships');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starships');
     }
   }
 });
@@ -84,7 +84,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
     // Validate required fields
     if (!name || !starshipClass) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'Missing required fields', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
         required_fields: ['name', 'class'],
         provided: { name: !!name, class: !!starshipClass },
       });
@@ -92,7 +92,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     }
 
     if (typeof name !== 'string' || name.trim().length === 0) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'Name must be a non-empty string', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'Name must be a non-empty string', 400, {
         field: 'name',
       });
       return;
@@ -100,7 +100,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
     // Validate starship class
     if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
-      sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid starship class', 400, {
+      sendError(res, 'INVALID_INPUT', 'Invalid starship class', 400, {
         field: 'class',
         allowed_values: ['scout', 'cruiser', 'draught'],
         provided: starshipClass,
@@ -112,7 +112,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     if (plan && billingPeriod) {
       // Validate paid plan only
       if (!['cruiser', 'draught'].includes(plan)) {
-        sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid paid plan', 400, {
+        sendError(res, 'INVALID_INPUT', 'Invalid paid plan', 400, {
           field: 'plan',
           allowed_values: ['cruiser', 'draught'],
           provided: plan,
@@ -122,7 +122,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
       // Validate billing period
       if (!['monthly', 'yearly'].includes(billingPeriod)) {
-        sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid billing period', 400, {
+        sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
           field: 'billingPeriod',
           allowed_values: ['monthly', 'yearly'],
           provided: billingPeriod,
@@ -169,7 +169,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
       
       if (scoutStarships.length >= 3) {
         console.log('[STARSHIP-CREATE] Scout limit reached. User has', scoutStarships.length, 'Scout starships');
-        sendError(res, ERROR_CODES.QUOTA_EXCEEDED, 'Scout plan limit reached', 403, {
+        sendError(res, 'QUOTA_EXCEEDED', 'Scout plan limit reached', 403, {
           message: 'Scout plan allows a maximum of 3 starships. Please upgrade to Cruiser or Draught plan for more starships.',
           current_count: scoutStarships.length,
           limit: 3,
@@ -198,7 +198,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating starship')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create starship');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create starship');
     }
   }
 });
@@ -218,7 +218,7 @@ router.get('/:idOrSlug', authMiddleware, async (req: Request, res: Response): Pr
     }
 
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: idOrSlug,
       });
@@ -227,7 +227,7 @@ router.get('/:idOrSlug', authMiddleware, async (req: Request, res: Response): Pr
 
     // Check ownership
     if (starship.ownerId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
@@ -243,7 +243,7 @@ router.get('/:idOrSlug', authMiddleware, async (req: Request, res: Response): Pr
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch starship');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship');
     }
   }
 });
@@ -269,7 +269,7 @@ router.post('/:id/agents/:agentId', authMiddleware, async (req: Request, res: Re
     // Verify starship exists and ownership
     const starship = await starshipRepo.findById(starshipId);
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: starshipId,
       });
@@ -277,14 +277,14 @@ router.post('/:id/agents/:agentId', authMiddleware, async (req: Request, res: Re
     }
 
     if (starship.ownerId !== (req as any).user!.id) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
     // Verify agent exists
     const agent = await agentRepo.findById(agentId);
     if (!agent) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: agentId,
       });
@@ -301,17 +301,17 @@ router.post('/:id/agents/:agentId', authMiddleware, async (req: Request, res: Re
 
     if (error instanceof Error) {
       if (error.message.includes('No available agent slots')) {
-        sendError(res, ERROR_CODES.BUSINESS_RULE_VIOLATION, error.message, 400);
+        sendError(res, 'OPERATION_NOT_ALLOWED', error.message, 400);
         return;
       }
       if (error.message.includes('already deployed')) {
-        sendError(res, ERROR_CODES.RESOURCE_CONFLICT, error.message, 409);
+        sendError(res, 'RESOURCE_CONFLICT', error.message, 409);
         return;
       }
     }
 
     if (!handleCommonError(error, res, 'deploying agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to deploy agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to deploy agent');
     }
   }
 });
@@ -337,7 +337,7 @@ router.delete('/:id/agents/:agentId', authMiddleware, async (req: Request, res: 
     // Verify starship exists and ownership
     const starship = await starshipRepo.findById(starshipId);
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: starshipId,
       });
@@ -345,14 +345,14 @@ router.delete('/:id/agents/:agentId', authMiddleware, async (req: Request, res: 
     }
 
     if (starship.ownerId !== (req as any).user!.id) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
     // Remove agent
     const removed = await starshipRepo.removeAgent(starshipId, agentId);
     if (!removed) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not deployed on this starship', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not deployed on this starship', 404, {
         resource: 'deployed_agent',
         starshipId,
         agentId,
@@ -365,7 +365,7 @@ router.delete('/:id/agents/:agentId', authMiddleware, async (req: Request, res: 
 
   } catch (error) {
     if (!handleCommonError(error, res, 'removing agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to remove agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to remove agent');
     }
   }
 });
@@ -387,7 +387,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
     // Verify starship exists and ownership
     const starship = await starshipRepo.findById(starshipId);
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: starshipId,
       });
@@ -395,7 +395,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
     }
 
     if (starship.ownerId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
@@ -404,7 +404,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
     if (name !== undefined) {
       if (typeof name !== 'string' || name.trim().length === 0) {
-        sendError(res, ERROR_CODES.VALIDATION_ERROR, 'Name must be a non-empty string', 400, {
+        sendError(res, 'VALIDATION_ERROR', 'Name must be a non-empty string', 400, {
           field: 'name',
         });
         return;
@@ -414,7 +414,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
     if (status !== undefined) {
       if (!['active', 'inactive'].includes(status)) {
-        sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid status value', 400, {
+        sendError(res, 'INVALID_INPUT', 'Invalid status value', 400, {
           field: 'status',
           allowed_values: ['active', 'inactive'],
           provided: status,
@@ -426,7 +426,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
     if (starshipClass !== undefined) {
       if (!['scout', 'cruiser', 'draught'].includes(starshipClass)) {
-        sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid starship class', 400, {
+        sendError(res, 'INVALID_INPUT', 'Invalid starship class', 400, {
           field: 'class',
           allowed_values: ['scout', 'cruiser', 'draught'],
           provided: starshipClass,
@@ -438,7 +438,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
       if (starshipClass === 'scout') {
         const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
         if (deployedAgents.length > 3) {
-          sendError(res, ERROR_CODES.BUSINESS_RULE_VIOLATION, 'Cannot change to scout class: too many deployed agents', 400, {
+          sendError(res, 'OPERATION_NOT_ALLOWED', 'Cannot change to scout class: too many deployed agents', 400, {
             message: 'Scout class allows maximum 3 deployed agents',
             current_deployed: deployedAgents.length,
             max_allowed: 3,
@@ -452,7 +452,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
     }
 
     if (Object.keys(allowedUpdates).length === 0) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'No valid updates provided', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'No valid updates provided', 400, {
         message: 'At least one valid field must be provided for update',
         allowed_fields: ['name', 'status', 'class'],
       });
@@ -461,7 +461,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
     const updatedStarship = await starshipRepo.update(starshipId, allowedUpdates);
     if (!updatedStarship) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to update starship in database');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update starship in database');
       return;
     }
 
@@ -469,7 +469,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
   } catch (error) {
     if (!handleCommonError(error, res, 'updating starship')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to update starship');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update starship');
     }
   }
 });
@@ -492,7 +492,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
     // Verify starship exists and ownership
     const starship = await starshipRepo.findById(starshipId);
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: starshipId,
       });
@@ -500,7 +500,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
     }
 
     if (starship.ownerId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
@@ -517,7 +517,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
       if (!subscriptionCancelled) {
         // Subscription cancellation failed with a real error - DO NOT delete the starship
         console.error(`[STARSHIPS] Failed to cancel subscription ${starship.subscriptionId} - aborting starship deletion`);
-        sendError(res, ERROR_CODES.SERVICE_UNAVAILABLE, 'Could not cancel subscription', 400, {
+        sendError(res, 'SERVICE_UNAVAILABLE', 'Could not cancel subscription', 400, {
           message: 'There was an error cancelling your subscription. To prevent continued charges, we cannot delete the starship at this time.',
           subscriptionId: starship.subscriptionId,
           action: 'Please contact support or try again later.',
@@ -537,7 +537,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
     if (!deleted) {
       // Starship deletion failed but subscription was already cancelled
       console.error(`[STARSHIPS] Critical: Subscription cancelled but starship deletion failed for ${starshipId}`);
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Starship deletion failed after subscription cancellation', 500, {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Starship deletion failed after subscription cancellation', 500, {
         message: 'Subscription was cancelled but starship deletion failed. Please contact support.',
         warning: 'Your subscription has been cancelled and you will not be charged further.',
         subscriptionCancelled: true,
@@ -559,7 +559,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
 
   } catch (error) {
     if (!handleCommonError(error, res, 'deleting starship')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to process starship deletion');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process starship deletion');
     }
   }
 });
@@ -580,7 +580,7 @@ router.get('/:id/agents', authMiddleware, async (req: Request, res: Response): P
     // Verify starship exists and ownership
     const starship = await starshipRepo.findById(starshipId);
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: starshipId,
       });
@@ -588,7 +588,7 @@ router.get('/:id/agents', authMiddleware, async (req: Request, res: Response): P
     }
 
     if (starship.ownerId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
@@ -608,7 +608,7 @@ router.get('/:id/agents', authMiddleware, async (req: Request, res: Response): P
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship agents')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch starship agents');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship agents');
     }
   }
 });
@@ -623,7 +623,7 @@ router.get('/pricing', async (req: Request, res: Response): Promise<void> => {
     sendSuccess(res, pricing);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching pricing')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch pricing');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch pricing');
     }
   }
 });
@@ -635,13 +635,13 @@ router.post('/checkout-sessions', authMiddleware, async (req: Request, res: Resp
     const userId = (req as any).user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'Authentication required', 401);
       return;
     }
 
     // Validate required fields
     if (!starshipName || !plan || !billingPeriod) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'Missing required fields', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
         required_fields: ['starshipName', 'plan', 'billingPeriod'],
         provided: { starshipName: !!starshipName, plan: !!plan, billingPeriod: !!billingPeriod },
       });
@@ -650,7 +650,7 @@ router.post('/checkout-sessions', authMiddleware, async (req: Request, res: Resp
 
     // Validate plan
     if (!['cruiser', 'draught'].includes(plan)) {
-      sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid plan', 400, {
+      sendError(res, 'INVALID_INPUT', 'Invalid plan', 400, {
         field: 'plan',
         allowed_values: ['cruiser', 'draught'],
         provided: plan,
@@ -660,7 +660,7 @@ router.post('/checkout-sessions', authMiddleware, async (req: Request, res: Resp
 
     // Validate billing period
     if (!['monthly', 'yearly'].includes(billingPeriod)) {
-      sendError(res, ERROR_CODES.INVALID_VALUE, 'Invalid billing period', 400, {
+      sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
         field: 'billingPeriod',
         allowed_values: ['monthly', 'yearly'],
         provided: billingPeriod,
@@ -680,7 +680,7 @@ router.post('/checkout-sessions', authMiddleware, async (req: Request, res: Resp
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating checkout session')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create checkout session');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create checkout session');
     }
   }
 });
@@ -692,7 +692,7 @@ router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Res
     const userId = (req as any).user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'Authentication required', 401);
       return;
     }
 
@@ -710,7 +710,7 @@ router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Res
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating billing portal')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create billing portal');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create billing portal');
     }
   }
 });
@@ -722,7 +722,7 @@ router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Resp
     const userId = (req as any).user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'Authentication required', 401);
       return;
     }
 
@@ -737,7 +737,7 @@ router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Resp
     const starship = await starshipRepo.findById(starshipId);
     
     if (!starship) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
         id: starshipId,
       });
@@ -745,13 +745,13 @@ router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Resp
     }
 
     if (starship.ownerId !== userId) {
-      sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
     // Only allow retry for pending_payment status
     if (starship.status !== 'pending_payment') {
-      sendError(res, ERROR_CODES.BUSINESS_RULE_VIOLATION, 'Invalid status for payment retry', 400, {
+      sendError(res, 'OPERATION_NOT_ALLOWED', 'Invalid status for payment retry', 400, {
         message: 'Can only retry payment for starships with pending_payment status',
         currentStatus: starship.status,
         allowedStatus: 'pending_payment',
@@ -761,7 +761,7 @@ router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Resp
 
     // Verify starship has plan and billing period
     if (!starship.plan || !starship.billingPeriod) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'Invalid starship configuration', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid starship configuration', 400, {
         message: 'Starship is missing plan or billing period',
         missing: {
           plan: !starship.plan,
@@ -790,7 +790,7 @@ router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Resp
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating checkout session for retry')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create checkout session for retry');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create checkout session for retry');
     }
   }
 });

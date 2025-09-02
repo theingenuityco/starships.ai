@@ -2,7 +2,7 @@
  * AgentMemory Unit Tests
  */
 
-import { AgentMemory, AgentIdentity, AgentPurpose, AgentSpace, AgentMemoryParams } from '../AgentMemory';
+import { AgentMemory, AgentIdentity, AgentPurpose, AgentSpace } from '../AgentMemory';
 import { Message } from '../Memory';
 
 describe('AgentMemory', () => {

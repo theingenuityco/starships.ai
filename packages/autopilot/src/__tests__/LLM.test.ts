@@ -189,7 +189,7 @@ describe('LLM', () => {
       agentMemory.addMessage('user', 'Previous user message');
 
       const execution: Execution = {
-        status: 'in_progress',
+        status: 'running',
         executionResults: new Map(),
         agentMemory
       };
@@ -243,7 +243,7 @@ describe('LLM', () => {
       agentMemory.addMessage('user', 'Previous message');
 
       const execution: Execution = {
-        status: 'in_progress',
+        status: 'running',
         executionResults: new Map(),
         agentMemory
       };

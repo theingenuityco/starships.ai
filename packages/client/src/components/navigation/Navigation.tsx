@@ -70,7 +70,7 @@ export function Navigation({
       return getStarshipNavigationSections(starshipSlug);
     }
     
-    // No navigation for fleet-level routes
+    // No navigation for non-starship routes
     return [];
   };
 

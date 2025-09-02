@@ -53,7 +53,7 @@ export function LogbookContent({ slug }: LogbookContentProps) {
               className="text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all -ml-2 px-2"
               asChild
             >
-              <Link href="/fleet">
+              <Link href="/">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>

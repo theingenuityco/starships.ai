@@ -128,7 +128,13 @@ export default function HomePage() {
     // Don't reset launching state - let it continue until page unloads
     setTimeout(() => {
       if (isAuthenticated) {
-        window.location.href = '/fleet';
+        // If user has starships, redirect to first one, otherwise stay on main page to create
+        if (hasExistingStarships && starships && starships.length > 0) {
+          window.location.href = `/ship/${starships[0].slug}`;
+        } else {
+          // Stay on current page - they can create a starship here
+          setLaunching(false);
+        }
       } else {
         // Trigger login
         const loginButton = document.querySelector('[data-login-button]') as HTMLButtonElement;

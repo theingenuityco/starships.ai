@@ -21,7 +21,7 @@ export function DynamicLoginButton({
   size = 'default',
   className,
   children,
-  postLoginRedirectURL = '/fleet',
+  postLoginRedirectURL = '/',
   showIcon = true,
   ...props
 }: DynamicLoginButtonProps) {

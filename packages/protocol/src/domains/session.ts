@@ -225,30 +225,6 @@ export interface SessionSocketEvents {
  */
 export type SocketEventData<T extends (...args: unknown[]) => unknown> = Parameters<T>[0];
 
-// ============================================================================
-// TYPE ALIASES FOR CLIENT COMPATIBILITY
-// ============================================================================
-
-/**
- * Chat request type alias for client compatibility
- */
-export type ChatRequest = SessionRequest;
-
-/**
- * Chat response type alias for client compatibility
- */
-export type ChatResponse = SessionResponse;
-
-/**
- * Chat stream chunk type alias for client compatibility
- */
-export type ChatStreamChunk = SessionStreamChunk;
-
-/**
- * Chat stream error type alias for client compatibility
- */
-export type ChatStreamError = SessionError;
-
 /**
  * Base socket events type alias for server compatibility
  */

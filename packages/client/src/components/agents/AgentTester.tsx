@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Agent, chatAPI } from '@/lib/api'
+import { Agent } from '@/lib/api'
+import api from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { Button } from '@/components/ui/button'
@@ -222,7 +223,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
 
   const clearChat = async () => {
     try {
-      await chatAPI.clearMemory(sessionId)
+      await api.delete(`/api/v1/sessions/${sessionId}/memory`)
       setMessages([])
       toast({
         title: 'Success',

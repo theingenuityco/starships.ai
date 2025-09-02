@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { MessageList } from './MessageList'
 import { MessageBubble } from './MessageBubble'
 import type { Message } from '@/lib/agent-socket-api'
 import type { ChatMode } from './ChatModeSelector'
-import { chatAPI } from '@/lib/api'
+import { useSessionMessages, type Message as SessionMessage } from '@/hooks/useSessions'
 
 interface UnifiedMessageListProps {
   mode: ChatMode
@@ -24,65 +24,36 @@ export function UnifiedMessageList({
   starshipId,
   onMessageAdded
 }: UnifiedMessageListProps) {
-  const [messages, setMessages] = useState<UnifiedMessage[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // Use TanStack Query to fetch messages
+  const {
+    data: messages = [],
+    isLoading: loading,
+    error: queryError
+  } = useSessionMessages(sessionId || '', !!sessionId)
+  
+  const error = queryError ? 'Failed to load chat history' : null
 
-  // Load messages when session changes
-  useEffect(() => {
-    if (sessionId) {
-      loadMessages(sessionId)
-    } else {
-      setMessages([])
-    }
-  }, [sessionId, mode])
+  // Convert session messages to unified message format
+  const unifiedMessages: UnifiedMessage[] = messages.map((msg: SessionMessage) => ({
+    id: msg.id,
+    content: msg.content,
+    role: msg.role,
+    timestamp: msg.timestamp,
+    sessionId: msg.sessionId,
+    // Add mode-specific fields based on message structure
+    agentId: sessionId?.split(':')[0]?.replace('agent-', '')
+  } as UnifiedMessage))
 
-  const loadMessages = async (sessionId: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      // Load messages from database
-      const dbMessages = await chatAPI.getMessagesBySession(sessionId)
-      
-      // Convert to unified message format
-      const unifiedMessages: UnifiedMessage[] = dbMessages.map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        role: msg.role,
-        timestamp: msg.timestamp,
-        sessionId: msg.sessionId,
-        // Add mode-specific fields based on message structure
-        agentId: sessionId.split(':')[0]?.replace('agent-', '')
-      } as UnifiedMessage))
-      
-      setMessages(unifiedMessages)
-    } catch (err) {
-      console.error('Failed to load messages:', err)
-      setError('Failed to load chat history')
-      // Fallback to empty array on error
-      setMessages([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Add new message to the list
+  // Add new message to the list (for real-time updates)
   const addMessage = (newMessage: UnifiedMessage) => {
-    setMessages(prevMessages => {
-      const updatedMessages = [...prevMessages, newMessage]
-      
-      // Note: Messages are now saved to database via socket handlers
-      // No need to manually save to localStorage anymore
-      
-      onMessageAdded?.(newMessage)
-      return updatedMessages
-    })
+    // Note: With TanStack Query, real-time updates should be handled
+    // by invalidating queries or using optimistic updates in mutations
+    // This function is kept for compatibility but may not be needed
+    onMessageAdded?.(newMessage)
   }
 
-  // Expose method to parent component
+  // Expose method to parent component for compatibility
   useEffect(() => {
-    // This can be used by parent components to add messages
     if (typeof window !== 'undefined') {
       (window as any).addMessage = addMessage
     }
@@ -113,7 +84,7 @@ export function UnifiedMessageList({
         className="h-full"
       >
         <MessageList
-          messages={messages}
+          messages={unifiedMessages}
           loading={loading}
           error={error}
           MessageComponent={getMessageComponent() as any}

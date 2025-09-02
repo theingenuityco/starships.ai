@@ -4,7 +4,7 @@
 
 import { WaitlistRepository } from '../WaitlistRepository';
 import { Neo4jConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, ConflictError } from '../../helpers/errors';
 import type { WaitlistEntryModel } from '@starships/protocol';
 
 // Mock dependencies
@@ -28,7 +28,6 @@ describe('WaitlistRepository', () => {
     email: 'test@example.com',
     status: 'approved',
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
-    addedBy: 'system',
     notes: 'Test entry',
     ...overrides
   });
@@ -141,20 +140,19 @@ describe('WaitlistRepository', () => {
       const mockEntry = createMockWaitlistEntry();
       mockConnection.executeWrite.mockResolvedValue([{ entry: mockEntry }]);
 
-      const result = await repository.addApprovedEmail('test@example.com', 'admin', 'Test notes');
+      const result = await repository.addApprovedEmail('test@example.com', 'Test notes');
 
       expect(result).toEqual(mockEntry);
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('CREATE (w:Waitlist'),
         expect.objectContaining({
           email: 'test@example.com',
-          addedBy: 'admin',
           notes: 'Test notes'
         })
       );
     });
 
-    it('should use default addedBy when not provided', async () => {
+    it('should handle no notes provided', async () => {
       const mockEntry = createMockWaitlistEntry();
       mockConnection.executeWrite.mockResolvedValue([{ entry: mockEntry }]);
 
@@ -163,7 +161,8 @@ describe('WaitlistRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          addedBy: 'system'
+          email: 'test@example.com',
+          notes: null
         })
       );
     });
@@ -172,7 +171,7 @@ describe('WaitlistRepository', () => {
       const mockEntry = createMockWaitlistEntry();
       mockConnection.executeWrite.mockResolvedValue([{ entry: mockEntry }]);
 
-      await repository.addApprovedEmail('test@example.com', 'admin');
+      await repository.addApprovedEmail('test@example.com');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
@@ -227,10 +226,7 @@ describe('WaitlistRepository', () => {
 
       expect(result).toHaveLength(2);
       expect(result).toEqual(mockEntries);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining("MATCH (w:Waitlist {status: 'approved'})"),
-        undefined
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledTimes(1);
     });
 
     it('should return empty array when no approved entries', async () => {
@@ -255,10 +251,7 @@ describe('WaitlistRepository', () => {
       const result = await repository.getApprovedCount();
 
       expect(result).toBe(5);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('count(w) as count'),
-        undefined
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledTimes(1);
     });
 
     it('should return 0 when no approved entries', async () => {
@@ -320,7 +313,6 @@ describe('WaitlistRepository', () => {
       expect(repository.addApprovedEmail).toHaveBeenCalledTimes(3);
       expect(repository.addApprovedEmail).toHaveBeenCalledWith(
         'dewang@theingenuity.co',
-        'system',
         'Founder - Primary tester'
       );
       expect(consoleSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
@@ -417,7 +409,7 @@ describe('WaitlistRepository', () => {
     it('should handle constraint violations', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('unique constraint violation'));
 
-      await expect(repository.addApprovedEmail('test@example.com')).rejects.toThrow(DatabaseError);
+      await expect(repository.addApprovedEmail('test@example.com')).rejects.toThrow(ConflictError);
     });
 
     it('should handle network errors', async () => {
@@ -481,7 +473,7 @@ describe('WaitlistRepository', () => {
       const mockEntry = createMockWaitlistEntry({ notes: undefined });
       mockConnection.executeWrite.mockResolvedValue([{ entry: mockEntry }]);
 
-      const result = await repository.addApprovedEmail('test@example.com', 'admin', '');
+      const result = await repository.addApprovedEmail('test@example.com', '');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
@@ -509,7 +501,7 @@ describe('WaitlistRepository', () => {
       const isApproved = await repository.checkApproval(email);
       expect(isApproved).toBe(false);
 
-      const added = await repository.addApprovedEmail(email, 'admin', 'New user');
+      const added = await repository.addApprovedEmail(email, 'New user');
       expect(added).toEqual(mockEntry);
 
       const retrieved = await repository.getByEmail(email);

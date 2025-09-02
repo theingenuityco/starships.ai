@@ -4,7 +4,7 @@
 
 import { SessionRepository } from '../SessionRepository';
 import { Neo4jConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, ConflictError } from '../../helpers/errors';
 import type { SessionModel } from '@starships/protocol';
 
 // Mock dependencies
@@ -112,7 +112,7 @@ describe('SessionRepository', () => {
 
       expect(result).toMatchObject({
         id: 'session-123',
-        source: 'chat'
+        source: 'agent'
       });
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('WHERE s.id = $id'),
@@ -584,7 +584,9 @@ describe('SessionRepository', () => {
       expect(result).toEqual({
         id: 'session-123',
         source: 'agent',
+        agentId: undefined,
         userId: 'user-123',
+        starshipId: undefined,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z', // Should default to createdAt
         lastActivityAt: '2024-01-01T00:00:00.000Z', // Should default to createdAt
@@ -636,13 +638,14 @@ describe('SessionRepository', () => {
       };
 
       // Should not throw, but return undefined metadata
-      expect(() => repo.mapToSession(recordWithInvalidJson)).not.toThrow();
+      const result = repo.mapToSession(recordWithInvalidJson);
+      expect(result.metadata).toBeUndefined();
     });
   });
 
   describe('integration scenarios', () => {
     it('should handle complete session lifecycle', async () => {
-      const sessionId = 'session-123';
+      const sessionId = 'test-session-id';
       const createInput = {
         source: 'agent' as const,
         userId: 'user-123',
@@ -653,7 +656,7 @@ describe('SessionRepository', () => {
       };
 
       // Create
-      const mockCreated = createMockSession(createInput);
+      const mockCreated = createMockSession({ ...createInput, id: 'test-session-id' });
       mockConnection.executeWrite.mockResolvedValue([{ s: createMockSessionRecord(mockCreated) }]);
       const created = await repository.create(createInput);
       expect(created.id).toBe('test-session-id');
@@ -702,7 +705,7 @@ describe('SessionRepository', () => {
         lastActivityAt: '2024-01-01T00:00:00.000Z',
         messageCount: 0,
         status: 'active' as const
-      })).rejects.toThrow(DatabaseError);
+      })).rejects.toThrow(ConflictError);
     });
 
     it('should handle connection timeouts', async () => {

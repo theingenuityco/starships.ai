@@ -18,13 +18,14 @@ describe('AgentTemplateRepository', () => {
   let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
+    jest.clearAllMocks();
+    
     mockConnection = {
-      executeQuery: jest.fn(),
-      executeWrite: jest.fn(),
+      executeQuery: jest.fn().mockResolvedValue([]),
+      executeWrite: jest.fn().mockResolvedValue([]),
     } as any;
     
     repository = new AgentTemplateRepository(mockConnection);
-    jest.clearAllMocks();
   });
 
   const createMockTemplate = (overrides: Partial<AgentTemplateModel> = {}): AgentTemplateModel => ({

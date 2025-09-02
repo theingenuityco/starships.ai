@@ -233,6 +233,17 @@ export class SessionRepository extends BaseRepository {
    * Map database SessionModel to Session domain model
    */
   private mapToSession(sessionModel: any): SessionModel {
+    let parsedMetadata = undefined;
+    if (sessionModel.metadata) {
+      try {
+        parsedMetadata = JSON.parse(sessionModel.metadata);
+      } catch (error) {
+        // Log the error but don't fail the mapping
+        console.warn('Failed to parse session metadata:', error);
+        parsedMetadata = undefined;
+      }
+    }
+
     return {
       id: sessionModel.id,
       source: sessionModel.source,
@@ -241,11 +252,11 @@ export class SessionRepository extends BaseRepository {
       starshipId: sessionModel.starship_id,
       createdAt: sessionModel.created_at,
       updatedAt: sessionModel.updated_at || sessionModel.created_at,
-      lastActivityAt: sessionModel.last_activity_at,
+      lastActivityAt: sessionModel.last_activity_at || sessionModel.created_at,
       messageCount: sessionModel.message_count || 0,
       totalTokens: sessionModel.total_tokens || 0,
       status: sessionModel.status || 'active',
-      metadata: sessionModel.metadata ? JSON.parse(sessionModel.metadata) : undefined
+      metadata: parsedMetadata
     };
   }
 }

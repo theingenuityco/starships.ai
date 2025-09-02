@@ -5,7 +5,7 @@
  * Handles messages in LLM-compatible format
  */
 
-import { v4 as uuidv4 } from 'uuid';
+// uuid import removed as it's no longer used in constructor
 
 /**
  * Message entry with metadata
@@ -19,6 +19,21 @@ export interface Message {
 }
 
 /**
+ * Memory state configuration for base Memory class
+ * Pure state container - messages are handled separately by Memory class
+ */
+export interface MemoryState extends Record<string, any> {
+}
+
+/**
+ * Memory constructor parameters
+ */
+export interface MemoryParams {
+  state?: MemoryState;
+  messages?: Message[];
+}
+
+/**
  * Base Memory Class
  *
  * Core message management system that stores rich Message objects internally
@@ -26,10 +41,16 @@ export interface Message {
  */
 export class Memory {
   protected messages: Message[] = [];
+  protected state: MemoryState = {};
 
-  constructor(initialSystemMessage?: string) {
-    if (initialSystemMessage) {
-      this.addMessage('system', initialSystemMessage);
+  constructor(params: MemoryParams = {}) {
+    this.state = params.state || {};
+    
+    // Initialize messages if provided
+    if (params.messages && params.messages.length > 0) {
+      params.messages.forEach(message => {
+        this.addMessage(message.role, message.content, message.metadata);
+      });
     }
   }
 

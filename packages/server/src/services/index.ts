@@ -12,6 +12,7 @@ export { UserService } from './UserService';
 // Core data management services
 export { MessageService } from './MessageService';
 export { MemoryService } from './MemoryService';
+export { SessionService } from './SessionService';
 
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';

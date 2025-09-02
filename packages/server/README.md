@@ -1,6 +1,6 @@
 # @starships/server
 
-Production-ready Express.js HTTP API server powering the Starships mission control platform. Features mission orchestration, multi-agent expedition management, real-time communication, MCP tool integration, vision refinement, and Stripe billing with comprehensive security and monitoring.
+Production-ready Express.js HTTP API server powering the Starships mission control platform. Features mission orchestration, multi-agent expedition management, real-time communication, MCP tool integration, and Stripe billing with comprehensive security and monitoring.
 
 ## 🚀 Features
 
@@ -43,7 +43,7 @@ src/
 │   ├── agents.ts              # Agent marketplace with analytics
 │   ├── agent-templates.ts     # Agent template marketplace
 │   ├── starships.ts          # Starship CRUD operations
-│   ├── starships-enhanced.ts # Enhanced starship creation with vision
+│   ├── starships-enhanced.ts # Enhanced starship creation
 │   ├── missions.ts           # Mission orchestration endpoints
 │   ├── expeditions.ts        # Multi-agent expedition management
 │   ├── workflows.ts          # Workflow DSL execution
@@ -162,45 +162,6 @@ Content-Type: application/json
 ### Starship Endpoints
 
 ### Enhanced Starship Management
-
-#### Create Starship with Vision
-```http
-POST /starships/enhanced
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Enterprise",
-  "class": "cruiser",
-  "vision": "To revolutionize AI-powered productivity through intelligent automation"
-}
-```
-
-**Response:**
-```json
-{
-  "starship": {
-    "id": "starship-123",
-    "slug": "enterprise",
-    "name": "Enterprise",
-    "class": "cruiser",
-    "maxActiveExpeditions": 5,
-    "maxAgents": 6,
-    "status": "active",
-    "subscriptionStatus": "trial",
-    "vision": {
-      "id": "vision-456",
-      "statement": "To revolutionize AI-powered productivity through intelligent automation",
-      "metrics": {
-        "clarity": 0.8,
-        "specificity": 0.7,
-        "actionability": 0.9
-      }
-    }
-  }
-}
-```
-
 
 #### Create Starship
 ```http

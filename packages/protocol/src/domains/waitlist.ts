@@ -20,7 +20,6 @@ export interface WaitlistEntryModel {
   email: string;
   status: WaitlistStatus;
   createdAt: Date;
-  addedBy: string;
   notes?: string;
 }
 
@@ -34,7 +33,6 @@ export interface WaitlistEntryModel {
 export interface AddWaitlistEntryRequest {
   email: string;
   status?: WaitlistStatus;
-  addedBy?: string;
   notes?: string;
 }
 
@@ -78,7 +76,6 @@ export interface WaitlistApprovalResponse {
  */
 export interface WaitlistFilters {
   status?: WaitlistStatus;
-  addedBy?: string;
   email?: string;
 }
 

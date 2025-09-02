@@ -589,9 +589,8 @@ export class AgentService {
     }
   ): Promise<AgentMemory> {
     // Initialize memory with default prompt
-    const memory = createAgentMemory(
-      'You are a helpful AI assistant.'
-    );
+    const memory = createAgentMemory();
+    memory.addMessage('system', 'You are a helpful AI assistant.');
 
     // Set structured context from database configuration
     if (dbAgent.memory) {

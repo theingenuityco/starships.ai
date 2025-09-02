@@ -190,7 +190,7 @@ export class AgentRepository extends BaseRepository {
         temperature: entity.temperature as number | undefined,
         maxTokens: entity.maxTokens as number | undefined,
         timeout: this.getSafeValue(entity.timeout, 30000) as number,
-        memory: entity.memory as any, // AgentMemoryConfig
+        memory: entity.memory as any, // AgentMemoryState
         blueprint: entity.blueprint as any, // BaseBlueprint
         
         // Database-specific fields

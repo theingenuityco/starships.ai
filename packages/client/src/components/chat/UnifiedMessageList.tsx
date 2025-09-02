@@ -84,12 +84,12 @@ export function UnifiedMessageList({
   useEffect(() => {
     // This can be used by parent components to add messages
     if (typeof window !== 'undefined') {
-      (window as any).addChatMessage = addMessage
+      (window as any).addMessage = addMessage
     }
     
     return () => {
       if (typeof window !== 'undefined') {
-        delete (window as any).addChatMessage
+        delete (window as any).addMessage
       }
     }
   }, [sessionId])

@@ -53,7 +53,7 @@ export class WaitlistRepository extends BaseRepository {
     try {
       const query = `
         MATCH (w:Waitlist {email: $email})
-        RETURN w {.email, .status, .createdAt, .addedBy, .notes} as entry
+        RETURN w {.email, .status, .createdAt, .notes} as entry
       `;
 
       const result = await this.connection.executeQuery<{ entry: WaitlistEntryModel }>(
@@ -72,7 +72,6 @@ export class WaitlistRepository extends BaseRepository {
    */
   async addApprovedEmail(
     email: string,
-    addedBy: string = 'system',
     notes?: string
   ): Promise<WaitlistEntryModel> {
     const normalizedEmail = this.normalizeEmail(email);
@@ -93,17 +92,15 @@ export class WaitlistRepository extends BaseRepository {
           email: $email,
           status: 'approved',
           createdAt: datetime(),
-          addedBy: $addedBy,
           notes: $notes
         })
-        RETURN w {.email, .status, .createdAt, .addedBy, .notes} as entry
+        RETURN w {.email, .status, .createdAt, .notes} as entry
       `;
 
       const result = await this.connection.executeWrite<{ entry: WaitlistEntryModel }>(
         query,
-        { 
+        {
           email: normalizedEmail,
-          addedBy,
           notes: notes || null
         }
       );
@@ -132,7 +129,7 @@ export class WaitlistRepository extends BaseRepository {
     try {
       const query = `
         MATCH (w:Waitlist {status: 'approved'})
-        RETURN w {.email, .status, .createdAt, .addedBy, .notes} as entry
+        RETURN w {.email, .status, .createdAt, .notes} as entry
         ORDER BY w.createdAt DESC
       `;
 
@@ -207,7 +204,7 @@ export class WaitlistRepository extends BaseRepository {
       try {
         const existing = await this.getByEmail(email);
         if (!existing) {
-          await this.addApprovedEmail(email, 'system', notes);
+          await this.addApprovedEmail(email, notes);
           console.log(`Added approved email: ${email}`);
         } else {
           console.log(`Email already exists: ${email}`);

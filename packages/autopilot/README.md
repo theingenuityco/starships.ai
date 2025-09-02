@@ -610,6 +610,9 @@ pnpm run lint
 
 # Run tests
 pnpm run test
+
+# Run tests with coverage
+pnpm run test:coverage
 ```
 
 ## License

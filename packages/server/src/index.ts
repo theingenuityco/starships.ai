@@ -72,10 +72,6 @@ function validateEnvironmentVariables() {
   }
 
   console.log('✅ Environment variables validated successfully');
-  console.log(`   CLIENT_URL: ${clientUrl}`);
-  console.log(`   NEXT_PUBLIC_API_URL: ${apiUrl}`);
-  console.log(`   NEO4J_URI: ${process.env.NEO4J_URI}`);
-  console.log(`   NEO4J_USERNAME: ${process.env.NEO4J_USERNAME}`);
 }
 
 const app: express.Application = express();
@@ -202,8 +198,6 @@ httpServer.listen(PORT, async () => {
       );
     }
 
-    // LLM Models are now initialized automatically with schema
-    console.log('✅ LLM Models ready (seeded during schema initialization)');
 
     // Initialize Waitlist (seeds approved emails)
     try {

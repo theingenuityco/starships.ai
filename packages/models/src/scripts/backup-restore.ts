@@ -38,7 +38,7 @@ export class BackupManager {
   private backupDir: string;
 
   constructor() {
-    this.backupDir = path.join(process.cwd(), 'packages', 'models', 'src', 'migrations', 'backups');
+    this.backupDir = path.join(process.cwd(), 'packages', 'models', 'migrations', 'backups');
     this.ensureBackupDirectory();
   }
 

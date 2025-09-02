@@ -23,31 +23,29 @@ export interface MessageModel extends Message {
   createdAt: string;
   updatedAt: string;
   version: string;
-
-  // Ownership and context
   starshipId: string;
   agentId?: string; // Optional agent that created/processed this message
   memoryId?: string; // Optional memory container this message belongs to
-
-  // Message context and relationships
   conversationId?: string; // Group related messages together
-  parentMessageId?: string; // For threaded conversations
-  threadDepth?: number; // Depth in conversation thread
-
-  // Message processing metadata
-  processingStatus?: 'pending' | 'processing' | 'processed' | 'failed';
+  
+  // Threading and hierarchy
+  parentMessageId?: string;
+  threadDepth: number;
+  
+  // Processing status and metadata
+  processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
   processingMetadata?: Record<string, unknown>;
   
   // Message classification
-  messageType?: 'user_input' | 'agent_response' | 'system_event' | 'tool_output' | 'error';
-  importance?: 'low' | 'medium' | 'high' | 'critical';
+  messageType: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance: 'low' | 'medium' | 'high' | 'critical';
   
-  // Content metadata
-  contentHash?: string; // For deduplication
+  // Content analysis
+  contentHash?: string;
   contentLength: number;
-  hasAttachments?: boolean;
   
-  // Analytics and usage
+  // Attachments and tokens
+  hasAttachments: boolean;
   tokenCount?: number;
   processingTimeMs?: number;
 }
@@ -66,21 +64,34 @@ export interface CreateMessageRequest {
   agentId?: string;
   memoryId?: string;
   conversationId?: string;
-  parentMessageId?: string;
-  messageType?: MessageModel['messageType'];
-  importance?: MessageModel['importance'];
   metadata?: Record<string, unknown>;
+  
+  // Threading and hierarchy (optional)
+  parentMessageId?: string;
+  threadDepth?: number;
+  
+  // Processing status and metadata (optional)
+  processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  processingMetadata?: Record<string, unknown>;
+  
+  // Message classification (optional)
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance?: 'low' | 'medium' | 'high' | 'critical';
+  
+  // Content analysis (optional)
+  contentHash?: string;
+  
+  // Attachments and tokens (optional)
+  hasAttachments?: boolean;
+  tokenCount?: number;
+  processingTimeMs?: number;
 }
 
 /**
  * Request to update a message
  */
 export interface UpdateMessageRequest extends Partial<CreateMessageRequest> {
-  version?: string;
-  processingStatus?: MessageModel['processingStatus'];
-  processingMetadata?: Record<string, unknown>;
-  tokenCount?: number;
-  processingTimeMs?: number;
+  // Simplified update request
 }
 
 // ============================================================================
@@ -115,8 +126,8 @@ export interface SearchMessagesRequest {
   memoryId?: string;
   conversationId?: string;
   role?: 'system' | 'user' | 'assistant';
-  messageType?: MessageModel['messageType'];
-  importance?: MessageModel['importance'];
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance?: 'low' | 'medium' | 'high' | 'critical';
   dateFrom?: string;
   dateTo?: string;
   limit?: number;
@@ -141,9 +152,8 @@ export interface MessageFilters {
   memoryId?: string;
   conversationId?: string;
   role?: 'system' | 'user' | 'assistant';
-  messageType?: MessageModel['messageType'];
-  importance?: MessageModel['importance'];
-  processingStatus?: MessageModel['processingStatus'];
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  importance?: 'low' | 'medium' | 'high' | 'critical';
   dateFrom?: string;
   dateTo?: string;
 }
@@ -198,8 +208,6 @@ export interface MessageUsageStats {
   viewCount: number;
   referencedByCount: number;
   lastAccessedAt: string | null;
-  processingTimeMs?: number;
-  tokenCount?: number;
 }
 
 /**
@@ -209,15 +217,11 @@ export interface MessageAnalytics {
   messageId: string;
   conversationId?: string;
   role: MessageModel['role'];
-  messageType?: MessageModel['messageType'];
   contentLength: number;
-  tokenCount?: number;
-  processingTimeMs?: number;
   createdAt: string;
   agentId?: string;
   hasResponses: boolean;
   responseCount: number;
-  threadDepth?: number;
 }
 
 /**

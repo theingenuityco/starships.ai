@@ -15,6 +15,7 @@ export { MissionMessageRepository } from './MissionMessageRepository';
 export { BlueprintRepository } from './BlueprintRepository';
 export { NodeRepository } from './NodeRepository';
 export { EdgeRepository } from './EdgeRepository';
+export { ExecutionRepository } from './ExecutionRepository';
 
 // Export mission clarity repository
 export { MissionClarityRepository } from './MissionClarityRepository';
@@ -33,6 +34,9 @@ export { WorkflowRepository } from './WorkflowRepository';
 export { MemoryRepository } from './MemoryRepository';
 export { MessageRepository } from './MessageRepository';
 
+// Export session repository
+export { SessionRepository } from './SessionRepository';
+
 // Import the new repositories for the factory
 import { StarshipRepository } from './StarshipRepository';
 import { MissionRepository } from './MissionRepository';
@@ -44,6 +48,7 @@ import { WaitlistRepository } from './WaitlistRepository';
 import { BlueprintRepository } from './BlueprintRepository';
 import { NodeRepository } from './NodeRepository';
 import { EdgeRepository } from './EdgeRepository';
+import { ExecutionRepository } from './ExecutionRepository';
 
 // Import mission clarity repository
 import { MissionClarityRepository } from './MissionClarityRepository';
@@ -58,6 +63,9 @@ import { WorkflowRepository } from './WorkflowRepository';
 // Import memory and message repositories
 import { MemoryRepository } from './MemoryRepository';
 import { MessageRepository } from './MessageRepository';
+
+// Import session repository
+import { SessionRepository } from './SessionRepository';
 
 /**
  * Synchronized Repository Factory for Socket.IO Compatibility
@@ -84,6 +92,7 @@ export class RepositoryFactory {
   private static blueprintRepo: BlueprintRepository | null = null;
   private static nodeRepo: NodeRepository | null = null;
   private static edgeRepo: EdgeRepository | null = null;
+  private static executionRepo: ExecutionRepository | null = null;
 
   // Mission clarity repository instance
   private static missionClarityRepo: MissionClarityRepository | null = null;
@@ -101,6 +110,9 @@ export class RepositoryFactory {
   // Memory and message repository instances
   private static memoryRepo: MemoryRepository | null = null;
   private static messageRepo: MessageRepository | null = null;
+
+  // Session repository instance
+  private static sessionRepo: SessionRepository | null = null;
 
   // Initialization state tracking
   private static isInitialized = false;
@@ -160,6 +172,7 @@ export class RepositoryFactory {
       this.blueprintRepo = new BlueprintRepository();
       this.nodeRepo = new NodeRepository();
       this.edgeRepo = new EdgeRepository();
+      this.executionRepo = new ExecutionRepository();
 
       // Initialize mission clarity repository (no dependencies)
       this.missionClarityRepo = new MissionClarityRepository();
@@ -174,6 +187,9 @@ export class RepositoryFactory {
       // Initialize memory and message repositories (no dependencies)
       this.memoryRepo = new MemoryRepository();
       this.messageRepo = new MessageRepository();
+
+      // Initialize session repository (no dependencies)
+      this.sessionRepo = new SessionRepository();
 
       // Initialize repositories with dependencies
       this.starshipRepo = new StarshipRepository();
@@ -231,12 +247,14 @@ export class RepositoryFactory {
         blueprintRepo: this.blueprintRepo !== null,
         nodeRepo: this.nodeRepo !== null,
         edgeRepo: this.edgeRepo !== null,
+        executionRepo: this.executionRepo !== null,
         missionClarityRepo: this.missionClarityRepo !== null,
         nativeToolApiKeyRepo: this.nativeToolApiKeyRepo !== null,
         waitlistRepo: this.waitlistRepo !== null,
         workflowRepo: this.workflowRepo !== null,
         memoryRepo: this.memoryRepo !== null,
         messageRepo: this.messageRepo !== null,
+        sessionRepo: this.sessionRepo !== null,
       }
     };
   }
@@ -418,6 +436,28 @@ export class RepositoryFactory {
     return this.messageRepo;
   }
 
+  /**
+   * Get SessionRepository instance (synchronous)
+   */
+  static getSessionRepository(): SessionRepository {
+    this.ensureInitialized();
+    if (!this.sessionRepo) {
+      throw new Error('SessionRepository not initialized');
+    }
+    return this.sessionRepo;
+  }
+
+  /**
+   * Get ExecutionRepository instance (synchronous)
+   */
+  static getExecutionRepository(): ExecutionRepository {
+    this.ensureInitialized();
+    if (!this.executionRepo) {
+      throw new Error('ExecutionRepository not initialized');
+    }
+    return this.executionRepo;
+  }
+
   // ========================================================================
   // UTILITY METHODS
   // ========================================================================
@@ -443,6 +483,8 @@ export class RepositoryFactory {
     this.workflowRepo = null;
     this.memoryRepo = null;
     this.messageRepo = null;
+    this.sessionRepo = null;
+    this.executionRepo = null;
 
     // Reset initialization state
     this.isInitialized = false;

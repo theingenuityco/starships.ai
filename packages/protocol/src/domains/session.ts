@@ -156,22 +156,27 @@ export interface SessionStreamChunk {
 // ============================================================================
 
 /**
- * Session information
+ * Core session model - database entity
  */
-export interface Session {
+export interface SessionModel {
   id: string;
   source: SessionSourceType;
   agentId?: string;
   userId?: string;
   starshipId?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   lastActivityAt: string;
   messageCount: number;
   totalTokens?: number;
   status: 'active' | 'paused' | 'completed' | 'archived';
   metadata?: Record<string, unknown>;
 }
+
+/**
+ * Session type alias for client compatibility
+ */
+export type Session = SessionModel;
 
 // ============================================================================
 // SESSION ERROR TYPES

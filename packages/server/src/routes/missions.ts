@@ -20,31 +20,20 @@ import {
   NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
+import {
+  sendSuccess,
+  sendError,
+  handleCommonError,
+  validateUUID,
+  validatePagination,
+  createPaginationMeta,
+  ERROR_CODES,
+} from '../utils/responseHelpers';
 
 const router: Router = Router();
 
 // Apply authentication to all mission routes
 router.use(authMiddleware);
-
-/**
- * Input validation helpers
- */
-const validateUUID = (id: string, fieldName: string): void => {
-  if (!id || typeof id !== 'string') {
-    throw new ValidationError(
-      `${fieldName} is required and must be a string`,
-      fieldName
-    );
-  }
-
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(id)) {
-    throw new ValidationError(
-      `${fieldName} must be a valid UUID format`,
-      fieldName
-    );
-  }
-};
 
 /**
  * Safely extract error message from unknown error
@@ -56,12 +45,18 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
-/**
- * GET /missions
- * Get all missions with optional filters and sorting
- */
+// GET / - Get all missions with optional filters and sorting
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
+    const { page, limit, error: paginationError } = validatePagination(
+      req.query.page as string,
+      req.query.limit as string
+    );
+
+    if (paginationError) {
+      sendError(res, paginationError.code, paginationError.message, 400);
+      return;
+    }
 
     // Parse query parameters
     const filters: MissionFilters = {};
@@ -70,19 +65,27 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       direction: 'desc'
     };
 
-    // Apply filters
+    // Apply filters with validation
     if (req.query.status) {
       const statusParam = Array.isArray(req.query.status) ? req.query.status : [req.query.status];
       filters.status = statusParam.map(s => String(s)) as any;
     }
 
     if (req.query.starshipId) {
-      validateUUID(String(req.query.starshipId), 'starshipId');
+      const { isValid, error } = validateUUID(String(req.query.starshipId), 'starshipId');
+      if (!isValid && error) {
+        sendError(res, error.code, error.message, 400, error.details);
+        return;
+      }
       filters.starshipId = String(req.query.starshipId);
     }
 
     if (req.query.createdBy) {
-      validateUUID(String(req.query.createdBy), 'createdBy');
+      const { isValid, error } = validateUUID(String(req.query.createdBy), 'createdBy');
+      if (!isValid && error) {
+        sendError(res, error.code, error.message, 400, error.details);
+        return;
+      }
       filters.createdBy = String(req.query.createdBy);
     }
 
@@ -103,202 +106,139 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     }
 
     const result = await MissionService.getAllMissions(filters, sort);
-    res.json(result);
-
-  } catch (error) {
-    console.error('Error fetching missions:', error);
     
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: getErrorMessage(error) });
-      return;
+    // Handle result structure - might be array or object with missions array
+    let missions: any[];
+    let total: number;
+    
+    if (Array.isArray(result)) {
+      missions = result;
+      total = result.length;
+    } else {
+      missions = result.missions || [];
+      total = result.total || missions.length;
     }
     
-    res.status(500).json({ error: 'Internal server error' });
+    // Apply pagination to missions
+    const offset = (page - 1) * limit;
+    const paginatedMissions = missions.slice(offset, offset + limit);
+
+    sendSuccess(res, paginatedMissions, 200, createPaginationMeta(page, limit, total));
+
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching missions')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch missions');
+    }
   }
 });
 
-/**
- * GET /missions/:id
- * Get a specific mission by ID
- */
+// GET /:id - Get a specific mission by ID
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
-    validateUUID(id, 'id');
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
 
     const mission = await MissionService.getMissionById(id);
-    res.json({ mission });
+    sendSuccess(res, mission);
 
   } catch (error) {
-    console.error('Error fetching mission:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: getErrorMessage(error) });
-      return;
+    if (!handleCommonError(error, res, 'fetching mission')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch mission');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({ error: getErrorMessage(error) });
-      return;
-    }
-    
-    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-/**
- * GET /missions/starship/:starshipId
- * Get all missions for a specific starship
- */
-router.get('/starship/:starshipId', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { starshipId } = req.params;
-
-    validateUUID(starshipId, 'starshipId');
-
-    // Parse query parameters
-    const filters: MissionFilters = {};
-    const sort: MissionSort = {
-      field: 'createdAt',
-      direction: 'desc'
-    };
-
-    // Apply filters
-    if (req.query.status) {
-      const statusParam = Array.isArray(req.query.status) ? req.query.status : [req.query.status];
-      filters.status = statusParam.map(s => String(s)) as any;
-    }
-
-    if (req.query.createdBy) {
-      validateUUID(String(req.query.createdBy), 'createdBy');
-      filters.createdBy = String(req.query.createdBy);
-    }
-
-    // Apply sorting
-    if (req.query.sortField) {
-      const validSortFields = ['createdAt', 'updatedAt', 'status', 'name'];
-      const sortField = String(req.query.sortField);
-      if (validSortFields.includes(sortField)) {
-        sort.field = sortField as any;
-      }
-    }
-
-    if (req.query.sortDirection) {
-      const sortDirection = String(req.query.sortDirection).toLowerCase();
-      if (sortDirection === 'asc' || sortDirection === 'desc') {
-        sort.direction = sortDirection;
-      }
-    }
-
-    const result = await MissionService.getMissionsByStarshipId(starshipId, filters, sort);
-    res.json(result);
-
-  } catch (error) {
-    console.error('Error fetching starship missions:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: getErrorMessage(error) });
-      return;
-    }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({ error: getErrorMessage(error) });
-      return;
-    }
-    
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * POST /missions
- * Create a new mission
- */
+// POST / - Create a new mission
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ error: 'User not authenticated' });
+      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
       return;
     }
 
     const createRequest: CreateMissionRequest = req.body;
 
-    // Basic validation
+    // Validate required fields
     if (!createRequest.starshipId) {
-      throw new ValidationError(
-        'starshipId is required',
-        'starshipId'
-      );
+      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'starshipId is required', 400, {
+        field: 'starshipId',
+      });
+      return;
     }
     
     if (!createRequest.name) {
-      throw new ValidationError(
-        'name is required',
-        'name'
-      );
+      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'name is required', 400, {
+        field: 'name',
+      });
+      return;
     }
     
     if (!createRequest.description) {
-      throw new ValidationError(
-        'description is required',
-        'description'
-      );
+      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'description is required', 400, {
+        field: 'description',
+      });
+      return;
     }
 
     if (!createRequest.agentIds || !Array.isArray(createRequest.agentIds)) {
-      throw new ValidationError(
-        'agentIds is required and must be an array',
-        'agentIds'
-      );
+      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'agentIds must be an array', 400, {
+        field: 'agentIds',
+        provided: typeof createRequest.agentIds,
+      });
+      return;
     }
 
     if (createRequest.agentIds.length === 0) {
-      throw new ValidationError(
-        'At least one agent must be assigned to the mission',
-        'agentIds'
-      );
+      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'At least one agent must be assigned to the mission', 400, {
+        field: 'agentIds',
+        constraint: 'min_length_1',
+      });
+      return;
     }
 
-    validateUUID(createRequest.starshipId, 'starshipId');
+    // Validate starshipId format
+    const { isValid: starshipValid, error: starshipError } = validateUUID(createRequest.starshipId, 'starshipId');
+    if (!starshipValid && starshipError) {
+      sendError(res, starshipError.code, starshipError.message, 400, starshipError.details);
+      return;
+    }
 
-    // Validate each agent ID is a valid UUID
-    createRequest.agentIds.forEach((agentId, index) => {
+    // Validate each agent ID
+    for (let i = 0; i < createRequest.agentIds.length; i++) {
+      const agentId = createRequest.agentIds[i];
       if (typeof agentId !== 'string') {
-        throw new ValidationError(
-          `agentIds[${index}] must be a string`,
-          'agentIds'
-        );
+        sendError(res, ERROR_CODES.VALIDATION_ERROR, `agentIds[${i}] must be a string`, 400, {
+          field: `agentIds[${i}]`,
+          provided: typeof agentId,
+        });
+        return;
       }
-      validateUUID(agentId, `agentIds[${index}]`);
-    });
+      
+      const { isValid: agentValid, error: agentError } = validateUUID(agentId, `agentIds[${i}]`);
+      if (!agentValid && agentError) {
+        sendError(res, agentError.code, agentError.message, 400, agentError.details);
+        return;
+      }
+    }
 
     const mission = await MissionService.createMission(createRequest, userId);
-    res.status(201).json({ mission });
+    sendSuccess(res, mission, 201);
 
   } catch (error) {
-    console.error('Error creating mission:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: getErrorMessage(error) });
-      return;
+    if (!handleCommonError(error, res, 'creating mission')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create mission');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({ error: getErrorMessage(error) });
-      return;
-    }
-    
-    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-/**
- * PUT /missions/:id
- * Update an existing mission
- */
+// PUT /:id - Update an existing mission
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -306,219 +246,155 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ error: 'User not authenticated' });
+      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
       return;
     }
 
-    validateUUID(id, 'id');
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
 
     // Ensure at least one field is being updated
     if (!updates || Object.keys(updates).length === 0) {
-      throw new ValidationError(
-        'At least one field must be provided for update',
-        'updates'
-      );
+      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'At least one field must be provided for update', 400, {
+        field: 'updates',
+        message: 'Request body must contain at least one field to update',
+      });
+      return;
     }
 
     const mission = await MissionService.updateMission(id, updates);
-    res.json({ mission });
+    sendSuccess(res, mission);
 
   } catch (error) {
-    console.error('Error updating mission:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: getErrorMessage(error) });
-      return;
+    if (!handleCommonError(error, res, 'updating mission')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to update mission');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({ error: getErrorMessage(error) });
-      return;
-    }
-    
-    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-/**
- * DELETE /missions/:id
- * Delete a mission
- */
+// DELETE /:id - Delete a mission
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ error: 'User not authenticated' });
+      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
       return;
     }
 
-    validateUUID(id, 'id');
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
 
     await MissionService.deleteMission(id);
     res.status(204).send();
 
   } catch (error) {
-    console.error('Error deleting mission:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({ error: getErrorMessage(error) });
-      return;
+    if (!handleCommonError(error, res, 'deleting mission')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to delete mission');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({ error: getErrorMessage(error) });
-      return;
-    }
-    
-    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-/**
- * POST /missions/:id/messages
- * Send message to mission orchestrator and get AI response
- */
-router.post('/:id/messages', 
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { id } = req.params;
-      const { content } = req.body as SendMissionMessageRequest;
-      const userId = req.user?.id;
-
-      if (!userId) {
-        res.status(401).json({ 
-          success: false, 
-          error: 'User not authenticated' 
-        });
-        return;
-      }
-
-      validateUUID(id, 'id');
-
-      const missionOrchestratorService = MissionOrchestratorService.getInstance();
-      const response = await missionOrchestratorService.handleUserMessage(id, userId, content);
-
-      res.json({ 
-        success: true, 
-        data: response 
-      });
-
-    } catch (error) {
-      console.error('Error sending mission message:', error);
-      
-      if (error instanceof ValidationError) {
-        res.status(400).json({
-          success: false,
-          error: getErrorMessage(error),
-          code: 'VALIDATION_ERROR'
-        });
-        return;
-      }
-      
-      if (error instanceof NotFoundError) {
-        res.status(404).json({
-          success: false,
-          error: getErrorMessage(error),
-          code: 'MISSION_NOT_FOUND'
-        });
-        return;
-      }
-
-      // Handle mission orchestrator specific errors
-      if (error instanceof Error && 'code' in error) {
-        const errorCode = (error as any).code;
-        let statusCode = 500;
-        
-        // Map error codes to appropriate HTTP status codes
-        if (errorCode === 'MISSION_MESSAGE_INVALID') statusCode = 400;
-        else if (errorCode === 'MISSION_ORCHESTRATOR_NOT_FOUND') statusCode = 404;
-        else if (errorCode === 'MISSION_MESSAGE_SEND_FAILED') statusCode = 500;
-        else if (errorCode === 'MISSION_CHAT_FAILED') statusCode = 500;
-
-        res.status(statusCode).json({
-          success: false,
-          error: error.message || 'Failed to send message',
-          code: errorCode
-        });
-        return;
-      }
-      
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-        code: 'INTERNAL_SERVER_ERROR'
-      });
-    }
-  }
-);
-
-/**
- * GET /missions/:id/messages
- * Get message history for a mission with pagination
- */
-router.get('/:id/messages', async (req: Request, res: Response): Promise<void> => {
+// POST /:id/messages - Send message to mission orchestrator
+router.post('/:id/messages', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const page = req.query.page ? parseInt(String(req.query.page)) : 1;
-    const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize)) : 50;
+    const { content } = req.body as SendMissionMessageRequest;
+    const userId = req.user?.id;
 
-    validateUUID(id, 'id');
+    if (!userId) {
+      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      return;
+    }
 
-    // Validate pagination parameters
-    if (page < 1) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'Page must be >= 1',
-        code: 'VALIDATION_ERROR'
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    if (!content || typeof content !== 'string') {
+      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'Message content is required', 400, {
+        field: 'content',
       });
       return;
     }
 
-    if (pageSize < 1 || pageSize > 200) {
-      res.status(400).json({ 
-        success: false, 
-        error: 'Page size must be between 1 and 200',
-        code: 'VALIDATION_ERROR'
+    const missionOrchestratorService = MissionOrchestratorService.getInstance();
+    const response = await missionOrchestratorService.handleUserMessage(id, userId, content);
+
+    sendSuccess(res, response, 201);
+
+  } catch (error) {
+    console.error('Error sending mission message:', error);
+
+    // Handle mission orchestrator specific errors
+    if (error instanceof Error && 'code' in error) {
+      const errorCode = (error as any).code;
+      let statusCode = 500;
+      let mappedErrorCode: string = ERROR_CODES.INTERNAL_SERVER_ERROR;
+      
+      // Map error codes to appropriate HTTP status codes
+      if (errorCode === 'MISSION_MESSAGE_INVALID') {
+        statusCode = 400;
+        mappedErrorCode = ERROR_CODES.VALIDATION_ERROR;
+      } else if (errorCode === 'MISSION_ORCHESTRATOR_NOT_FOUND') {
+        statusCode = 404;
+        mappedErrorCode = ERROR_CODES.RESOURCE_NOT_FOUND;
+      } else if (errorCode === 'MISSION_MESSAGE_SEND_FAILED' || errorCode === 'MISSION_CHAT_FAILED') {
+        statusCode = 500;
+        mappedErrorCode = ERROR_CODES.INTERNAL_SERVER_ERROR;
+      }
+
+      sendError(res, mappedErrorCode, error.message || 'Failed to send message', statusCode, {
+        originalErrorCode: errorCode,
       });
+      return;
+    }
+    
+    if (!handleCommonError(error, res, 'sending mission message')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to send message');
+    }
+  }
+});
+
+// GET /:id/messages - Get message history for a mission with pagination
+router.get('/:id/messages', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const { page, limit: pageSize, error: paginationError } = validatePagination(
+      req.query.page as string,
+      req.query.pageSize as string || req.query.limit as string
+    );
+
+    if (paginationError) {
+      sendError(res, paginationError.code, paginationError.message, 400);
       return;
     }
 
     const missionOrchestratorService = MissionOrchestratorService.getInstance();
     const result = await missionOrchestratorService.getMessageHistory(id, page, pageSize);
 
-    res.json({ 
-      success: true, 
-      data: result 
-    });
+    sendSuccess(res, result);
 
   } catch (error) {
-    console.error('Error fetching message history:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'fetching message history')) {
+      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch message history');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'MISSION_NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 

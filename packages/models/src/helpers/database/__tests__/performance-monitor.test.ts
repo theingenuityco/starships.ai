@@ -729,13 +729,3 @@ describe('PerformanceMonitor', () => {
     });
   });
 });
-
-// Helper function for creating test errors in error-monitor tests
-function createTestError(code: string = 'TEST_ERROR', category: any = 'validation'): any {
-  return {
-    code,
-    message: `Test error: ${code}`,
-    category,
-    statusCode: 400
-  };
-}

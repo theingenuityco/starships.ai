@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@starships/autopilot": "workspace:*",
+    "@starships/errors": "workspace:*",
     "@starships/protocol": "workspace:*",
     "fs-extra": "^11.3.0",
     "neo4j-driver": "^5.28.1",

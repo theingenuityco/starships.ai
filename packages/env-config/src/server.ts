@@ -21,6 +21,7 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     PORT: parseInt(process.env.PORT || '4000', 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+    CLIENT_URL: process.env.CLIENT_URL!,
     REDEPLOY_SECRET: process.env.REDEPLOY_SECRET || '',
     DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
     OPEN_WEBUI_BASE_URL: process.env.OPEN_WEBUI_BASE_URL,
@@ -61,16 +62,17 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
   const isLinting = process.env.NODE_ENV === undefined || process.env.npm_lifecycle_event === 'lint';
   
   if (!isLinting) {
-    // Validate required Neo4j configuration
-    const missingNeo4j = [];
-    if (!env.NEO4J_URI) missingNeo4j.push('NEO4J_URI');
-    if (!env.NEO4J_USERNAME) missingNeo4j.push('NEO4J_USERNAME');
-    if (!env.NEO4J_PASSWORD) missingNeo4j.push('NEO4J_PASSWORD');
+    // Validate required configuration
+    const missingRequired = [];
+    if (!env.CLIENT_URL) missingRequired.push('CLIENT_URL');
+    if (!env.NEO4J_URI) missingRequired.push('NEO4J_URI');
+    if (!env.NEO4J_USERNAME) missingRequired.push('NEO4J_USERNAME');
+    if (!env.NEO4J_PASSWORD) missingRequired.push('NEO4J_PASSWORD');
     
-    if (missingNeo4j.length > 0) {
+    if (missingRequired.length > 0) {
       throw new EnvironmentValidationError(
-        `Missing required Neo4j environment variables: ${missingNeo4j.join(', ')}`,
-        missingNeo4j
+        `Missing required environment variables: ${missingRequired.join(', ')}`,
+        missingRequired
       );
     }
 

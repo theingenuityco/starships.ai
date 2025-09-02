@@ -3,7 +3,7 @@
  */
 
 import { NodeRepository } from '../NodeRepository';
-import { ValidationError, NotFoundError, DatabaseError } from '../../helpers/errors';
+import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { NodeModel } from '@starships/protocol';
 
 // Mock the database connection

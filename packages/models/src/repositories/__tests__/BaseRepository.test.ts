@@ -9,7 +9,7 @@ import {
   NotFoundError,
   ConflictError,
   DatabaseError
-} from '../../helpers/errors';
+} from '@starships/errors';
 
 // Test implementation of BaseRepository
 class TestRepository extends BaseRepository {

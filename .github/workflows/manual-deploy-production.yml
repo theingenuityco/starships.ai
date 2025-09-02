@@ -156,7 +156,7 @@ jobs:
 
       - name: Upload backup artifact
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-backup-${{ steps.version.outputs.deployment_id }}
           path: backups/
@@ -206,7 +206,7 @@ jobs:
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
             --docker-username=${{ github.repository_owner }} \
-            --docker-password="${{ secrets.GHCR_PULL_TOKEN }}" \
+            --docker-password="${{ secrets.GHCR_PULL_TOKEN || secrets.GITHUB_TOKEN }}" \
             -n starships-prod
           
           echo "✅ Secrets updated successfully"
@@ -273,11 +273,11 @@ jobs:
           
           # Check pod status
           echo "📊 Pod Status:"
-          kubectl get pods -n starships-prod -l app=starships-app
+          kubectl get pods -n starships-prod -l app=starships-ai
           
           # Wait for pods to be ready
           echo "⏳ Waiting for pods to be ready..."
-          if ! kubectl wait --for=condition=ready pod -l app=starships-app -n starships-prod --timeout=300s; then
+          if ! kubectl wait --for=condition=ready pod -l app=starships-ai -n starships-prod --timeout=300s; then
             echo "❌ Pods failed to become ready within 5 minutes"
             echo "health_status=failed" >> $GITHUB_OUTPUT
             exit 1
@@ -330,7 +330,7 @@ jobs:
           
           # Get resource usage
           echo "Resource Usage:"
-          kubectl top pods -n starships-prod -l app=starships-app || echo "Metrics not available yet"
+          kubectl top pods -n starships-prod -l app=starships-ai || echo "Metrics not available yet"
           
           # Check replica status
           echo "Replica Status:"

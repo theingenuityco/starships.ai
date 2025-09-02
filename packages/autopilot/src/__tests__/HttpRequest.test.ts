@@ -157,7 +157,7 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { success: true },
         config: { 
           url: 'https://api.example.com/test'
@@ -436,7 +436,7 @@ describe('HttpRequest', () => {
       const result = await retryRequest.execute();
 
       expect(result.status).toBe('failed');
-      expect(result.error?.message).toBe('HTTP request failed: Persistent Network Error');
+      expect(result.error?.message).toBe('HTTP request execution failed: Persistent Network Error');
       expect(axiosInstance).toHaveBeenCalledTimes(2); // Initial + 1 retry
       
       jest.restoreAllMocks();

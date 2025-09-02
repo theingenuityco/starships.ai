@@ -151,7 +151,7 @@ export class AgentTemplateRepository extends BaseRepository {
       const serializedUpdates = this.serializeTemplate(updates);
       
       const updateFields = Object.keys(serializedUpdates)
-        .filter((key) => key !== 'id' && key !== 'createdAt' && serializedUpdates[key] !== undefined)
+        .filter((key) => key !== 'id' && key !== 'createdAt' && serializedUpdates[key] !== undefined && serializedUpdates[key] !== null)
         .map((key) => `t.${key} = $updates.${key}`)
         .join(', ');
 

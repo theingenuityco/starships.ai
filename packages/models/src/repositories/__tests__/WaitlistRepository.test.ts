@@ -27,7 +27,7 @@ describe('WaitlistRepository', () => {
   const createMockWaitlistEntry = (overrides: Partial<WaitlistEntryModel> = {}): WaitlistEntryModel => ({
     email: 'test@example.com',
     status: 'approved',
-    createdAt: '2024-01-01T00:00:00.000Z',
+    createdAt: new Date('2024-01-01T00:00:00.000Z'),
     addedBy: 'system',
     notes: 'Test entry',
     ...overrides

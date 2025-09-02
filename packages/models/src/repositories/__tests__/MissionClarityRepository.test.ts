@@ -491,7 +491,7 @@ describe('MissionClarityRepository', () => {
     });
 
     it('should handle connection timeouts', async () => {
-      mockConnection.executeQuery.mkRejectedValue(new Error('connection timeout'));
+      mockConnection.executeQuery.mockRejectedValue(new Error('connection timeout'));
 
       await expect(repository.getByMissionId('mission-123')).rejects.toThrow(DatabaseError);
     });

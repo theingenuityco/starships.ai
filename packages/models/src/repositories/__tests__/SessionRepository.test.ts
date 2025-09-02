@@ -34,7 +34,7 @@ describe('SessionRepository', () => {
 
   const createMockSession = (overrides: Partial<SessionModel> = {}): SessionModel => ({
     id: 'session-123',
-    source: 'chat',
+    source: 'agent',
     agentId: 'agent-123',
     userId: 'user-123',
     starshipId: 'starship-123',
@@ -214,10 +214,13 @@ describe('SessionRepository', () => {
   describe('create', () => {
     it('should create session successfully', async () => {
       const createInput = {
-        source: 'chat',
+        source: 'agent' as const,
         userId: 'user-123',
         starshipId: 'starship-123',
-        agentId: 'agent-123'
+        agentId: 'agent-123',
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        status: 'active' as const
       };
       const mockCreated = createMockSession(createInput);
       
@@ -226,13 +229,13 @@ describe('SessionRepository', () => {
       const result = await repository.create(createInput);
 
       expect(result).toMatchObject({
-        source: 'chat',
+        source: 'agent',
         userId: 'user-123'
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('CREATE (s:SessionModel'),
         expect.objectContaining({
-          source: 'chat',
+          source: 'agent',
           userId: 'user-123'
         })
       );
@@ -246,8 +249,11 @@ describe('SessionRepository', () => {
 
     it('should use default values for optional fields', async () => {
       const minimalInput = {
-        source: 'chat',
-        userId: 'user-123'
+        source: 'agent' as const,
+        userId: 'user-123',
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        status: 'active' as const
       };
       const mockCreated = createMockSession();
       
@@ -267,8 +273,11 @@ describe('SessionRepository', () => {
 
     it('should serialize metadata as JSON', async () => {
       const inputWithMetadata = {
-        source: 'chat',
+        source: 'agent' as const,
         userId: 'user-123',
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        status: 'active' as const,
         metadata: { theme: 'dark', language: 'en' }
       };
       const mockCreated = createMockSession();
@@ -288,13 +297,19 @@ describe('SessionRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.create({ source: 'chat', userId: 'user-123' })).rejects.toThrow(DatabaseError);
+      await expect(repository.create({
+        source: 'agent' as const,
+        userId: 'user-123',
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        status: 'active' as const
+      })).rejects.toThrow(DatabaseError);
     });
   });
 
   describe('update', () => {
     it('should update session successfully', async () => {
-      const updates = { status: 'completed', messageCount: 10 };
+      const updates = { status: 'completed' as const, messageCount: 10 };
       const mockUpdated = createMockSession(updates);
       
       mockConnection.executeWrite.mockResolvedValue([{ s: createMockSessionRecord(mockUpdated) }]);
@@ -524,7 +539,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const dbRecord = {
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         agent_id: 'agent-123',
         created_by: 'user-123',
         starship_id: 'starship-123',
@@ -541,7 +556,7 @@ describe('SessionRepository', () => {
 
       expect(result).toEqual({
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         agentId: 'agent-123',
         userId: 'user-123',
         starshipId: 'starship-123',
@@ -559,7 +574,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const minimalRecord = {
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         created_by: 'user-123',
         created_at: '2024-01-01T00:00:00.000Z'
       };
@@ -568,10 +583,11 @@ describe('SessionRepository', () => {
 
       expect(result).toEqual({
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         userId: 'user-123',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z', // Should default to createdAt
+        lastActivityAt: '2024-01-01T00:00:00.000Z', // Should default to createdAt
         messageCount: 0,
         totalTokens: 0,
         status: 'active',
@@ -583,7 +599,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const recordWithNullMetadata = {
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         created_by: 'user-123',
         created_at: '2024-01-01T00:00:00.000Z',
         metadata: null
@@ -598,7 +614,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const recordWithMetadata = {
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         created_by: 'user-123',
         created_at: '2024-01-01T00:00:00.000Z',
         metadata: JSON.stringify({ complex: { nested: 'value' } })
@@ -613,7 +629,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const recordWithInvalidJson = {
         id: 'session-123',
-        source: 'chat',
+        source: 'agent',
         created_by: 'user-123',
         created_at: '2024-01-01T00:00:00.000Z',
         metadata: 'invalid-json{'
@@ -628,9 +644,12 @@ describe('SessionRepository', () => {
     it('should handle complete session lifecycle', async () => {
       const sessionId = 'session-123';
       const createInput = {
-        source: 'chat',
+        source: 'agent' as const,
         userId: 'user-123',
-        starshipId: 'starship-123'
+        starshipId: 'starship-123',
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        status: 'active' as const
       };
 
       // Create
@@ -677,7 +696,13 @@ describe('SessionRepository', () => {
     it('should handle constraint violations', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
-      await expect(repository.create({ source: 'chat', userId: 'user-123' })).rejects.toThrow(DatabaseError);
+      await expect(repository.create({
+        source: 'agent' as const,
+        userId: 'user-123',
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        status: 'active' as const
+      })).rejects.toThrow(DatabaseError);
     });
 
     it('should handle connection timeouts', async () => {

@@ -23,12 +23,12 @@ export function convertNeo4jInt(value: any): number {
  * Recursively converts all Neo4j Integer objects in an object to JavaScript numbers
  * This is useful for converting entire database records
  */
-export function convertNeo4jIntsInObject<T extends Record<string, any>>(obj: T): T {
+export function convertNeo4jIntsInObject<T>(obj: T): T {
   if (!obj || typeof obj !== 'object') {
     return obj;
   }
 
-  const converted = { ...obj };
+  const converted = { ...obj } as any;
   
   for (const key in converted) {
     const value = converted[key];

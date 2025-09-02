@@ -220,7 +220,11 @@ describe('MemoryRepository', () => {
     });
 
     it('should use default values for optional fields', async () => {
-      const minimalInput = { starshipId: 'starship-123' };
+      const minimalInput = {
+        starshipId: 'starship-123',
+        version: '1.0.0',
+        state: {}
+      };
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.create(minimalInput);

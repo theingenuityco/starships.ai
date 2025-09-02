@@ -31,7 +31,7 @@ describe('AgentTemplateRepository', () => {
     id: 'template-123',
     name: 'Test Template',
     description: 'A test agent template',
-    category: 'assistant',
+    category: 'general',
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2000,
@@ -61,7 +61,7 @@ describe('AgentTemplateRepository', () => {
   const createMockCreateInput = (overrides: any = {}) => ({
     name: 'Test Template',
     description: 'A test agent template',
-    category: 'assistant',
+    category: 'general',
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2000,
@@ -351,17 +351,17 @@ describe('AgentTemplateRepository', () => {
 
   describe('findByCategory', () => {
     it('should return public templates by category', async () => {
-      const mockTemplates = [createMockTemplate({ category: 'assistant' })];
+      const mockTemplates = [createMockTemplate({ category: 'general' })];
       mockConnection.executeQuery.mockResolvedValue(
         mockTemplates.map(t => ({ t }))
       );
 
-      const result = await repository.findByCategory('assistant');
+      const result = await repository.findByCategory('general');
 
       expect(result).toHaveLength(1);
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('WHERE t.isPublic = true'),
-        { category: 'assistant' }
+        { category: 'general' }
       );
     });
 
@@ -555,7 +555,7 @@ describe('AgentTemplateRepository', () => {
         model: 'gpt-4',
         temperature: 0.7,
         maxTokens: 2000,
-        category: 'assistant'
+        category: 'general'
       };
       const mockTemplate = createMockTemplate();
 

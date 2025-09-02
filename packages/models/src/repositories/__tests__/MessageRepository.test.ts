@@ -47,10 +47,10 @@ describe('MessageRepository', () => {
     conversationId: 'conversation-123',
     parentMessageId: undefined,
     threadDepth: 0,
-    processingStatus: 'completed',
+    processingStatus: 'completed' as const,
     processingMetadata: { duration: 1500 },
-    messageType: 'user_input',
-    importance: 'medium',
+    messageType: 'user_input' as const,
+    importance: 'medium' as const,
     contentHash: 'abc123',
     contentLength: 13,
     hasAttachments: false,
@@ -61,12 +61,19 @@ describe('MessageRepository', () => {
 
   const createMockCreateInput = (overrides: any = {}) => ({
     timestamp: '2024-01-01T00:00:00.000Z',
-    role: 'user',
+    role: 'user' as const,
     content: 'Hello, world!',
     starshipId: 'starship-123',
     agentId: 'agent-123',
     memoryId: 'memory-123',
     conversationId: 'conversation-123',
+    version: '1.0.0',
+    threadDepth: 0,
+    processingStatus: 'pending' as const,
+    messageType: 'user_input' as const,
+    importance: 'medium' as const,
+    contentLength: 13,
+    hasAttachments: false,
     ...overrides
   });
 
@@ -298,9 +305,17 @@ describe('MessageRepository', () => {
 
     it('should use default values for optional fields', async () => {
       const minimalInput = {
-        role: 'user',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        role: 'user' as const,
         content: 'Test message',
-        starshipId: 'starship-123'
+        starshipId: 'starship-123',
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'pending' as const,
+        messageType: 'user_input' as const,
+        importance: 'medium' as const,
+        contentLength: 12,
+        hasAttachments: false
       };
       mockConnection.executeWrite.mockResolvedValue([]);
 
@@ -342,7 +357,7 @@ describe('MessageRepository', () => {
 
   describe('update', () => {
     it('should update message successfully', async () => {
-      const updates = { content: 'Updated content', processingStatus: 'completed' };
+      const updates = { content: 'Updated content', processingStatus: 'completed' as const };
       const mockUpdated = createMockMessage(updates);
       
       mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdated }]);

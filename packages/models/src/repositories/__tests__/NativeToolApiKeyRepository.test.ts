@@ -2,14 +2,30 @@
  * NativeToolApiKeyRepository Unit Tests
  */
 
+// Mock dependencies first
+jest.mock('../../helpers/database/connection');
+jest.mock('crypto', () => ({
+  randomBytes: jest.fn().mockReturnValue(Buffer.from('1234567890123456', 'hex')),
+  createHash: jest.fn().mockReturnValue({
+    update: jest.fn().mockReturnThis(),
+    digest: jest.fn().mockReturnValue(Buffer.from('secret-key'))
+  }),
+  createCipheriv: jest.fn().mockReturnValue({
+    update: jest.fn().mockReturnValue('encrypted-part'),
+    final: jest.fn().mockReturnValue('final-part'),
+    getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag'))
+  }),
+  createDecipheriv: jest.fn().mockReturnValue({
+    setAuthTag: jest.fn(),
+    update: jest.fn().mockReturnValue('decrypted-part'),
+    final: jest.fn().mockReturnValue('final-part')
+  })
+}));
+
 import { NativeToolApiKeyRepository } from '../NativeToolApiKeyRepository';
 import { Neo4jConnection } from '../../helpers/database';
 import { ValidationError, DatabaseError } from '../../helpers/errors';
 import crypto from 'crypto';
-
-// Mock dependencies
-jest.mock('../../helpers/database/connection');
-jest.mock('crypto');
 
 describe('NativeToolApiKeyRepository', () => {
   let repository: NativeToolApiKeyRepository;
@@ -25,24 +41,6 @@ describe('NativeToolApiKeyRepository', () => {
     // Mock getConnection to return our mock connection
     mockGetConnection = require('../../helpers/database/connection').getConnection;
     mockGetConnection.mockReturnValue(mockConnection);
-
-    // Mock crypto functions
-    const mockCrypto = crypto as jest.Mocked<typeof crypto>;
-    mockCrypto.randomBytes = jest.fn().mockReturnValue(Buffer.from('1234567890123456', 'hex'));
-    mockCrypto.createHash = jest.fn().mockReturnValue({
-      update: jest.fn().mockReturnThis(),
-      digest: jest.fn().mockReturnValue(Buffer.from('secret-key'))
-    } as any);
-    mockCrypto.createCipheriv = jest.fn().mockReturnValue({
-      update: jest.fn().mockReturnValue('encrypted-part'),
-      final: jest.fn().mockReturnValue('final-part'),
-      getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag'))
-    } as any);
-    mockCrypto.createDecipheriv = jest.fn().mockReturnValue({
-      setAuthTag: jest.fn(),
-      update: jest.fn().mockReturnValue('decrypted-part'),
-      final: jest.fn().mockReturnValue('final-part')
-    } as any);
 
     repository = new NativeToolApiKeyRepository();
     jest.clearAllMocks();

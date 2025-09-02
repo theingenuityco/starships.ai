@@ -157,7 +157,7 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: {},
         data: { success: true },
         config: { 
           url: 'https://api.example.com/test'

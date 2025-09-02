@@ -279,19 +279,26 @@ interface ChatBackendResponse {
   }
 }
 
-// Client-friendly request type (camelCase) - user_id now derived from auth token
+// Client-friendly request type (camelCase) - aligned with SessionRequest from protocol
 export interface ChatRequest {
-  agentId: string
-  sessionId?: string
+  source: 'agent' | 'sibil' | 'user'
+  agentId?: string
+  userId?: string
   message: string
+  sessionId?: string
+  stream?: boolean
+  streamId?: string
+  typingSpeed?: number
+  typewriterEnabled?: boolean
+  context?: Record<string, unknown>
 }
 
 // Utility to convert camelCase to snake_case for backend
 function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   return {
-    agent_id: req.agentId,
+    agent_id: req.agentId || '',
     message: req.message,
-    stream: false,
+    stream: req.stream || false,
   }
 }
 

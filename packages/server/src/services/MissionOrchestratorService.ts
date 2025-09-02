@@ -11,7 +11,7 @@ import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
-import { ErrorFactory, InternalServerError } from '@starships/models';
+import { ValidationError, InternalServerError } from '@starships/errors';
 import type {
   MissionMessageModel,
   MissionChatResponse,
@@ -82,10 +82,7 @@ export class MissionOrchestratorService {
 
     // Validate message content
     if (!message?.trim()) {
-      throw ErrorFactory.validation(
-        'Message content is required',
-        'message'
-      );
+      throw new ValidationError('Message content is required', 'message');
     }
 
     const { userId, isSystemMessage = false } = options;

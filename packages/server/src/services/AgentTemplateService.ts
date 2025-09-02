@@ -2,6 +2,7 @@ import { AgentTemplateModel, AgentModel } from '@starships/protocol';
 import { AgentTemplateRepository } from '@starships/models';
 import { Neo4jConnection } from '@starships/models';
 import { Blueprint, AgentMemoryState } from '@starships/autopilot';
+import { ValidationError } from '@starships/errors';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
@@ -39,12 +40,12 @@ export class AgentTemplateService {
   ): Promise<AgentTemplateModel> {
     // Validate required fields
     if (!templateData.name || !templateData.model) {
-      throw new Error('Template name and model are required');
+      throw new ValidationError('Template name and model are required');
     }
 
     // Ensure tags is an array
     if (!Array.isArray(templateData.tags)) {
-      throw new Error('Tags must be an array');
+      throw new ValidationError('Tags must be an array');
     }
 
     return this.templateRepository.create({
@@ -76,7 +77,7 @@ export class AgentTemplateService {
     starshipId: string
   ): Promise<AgentModel> {
     if (!agentName.trim()) {
-      throw new Error('Agent name is required');
+      throw new ValidationError('Agent name is required', 'agentName');
     }
 
     return this.templateRepository.createAgentFromTemplate(templateId, agentName.trim(), authorId, starshipId);
@@ -84,7 +85,7 @@ export class AgentTemplateService {
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
     if (!agentId) {
-      throw new Error('Agent ID is required');
+      throw new ValidationError('Agent ID is required', 'agentId');
     }
 
     console.log('[AgentTemplateService] Creating template from agent:', agentId);
@@ -95,7 +96,7 @@ export class AgentTemplateService {
 
   async rateTemplate(id: string, rating: number): Promise<void> {
     if (rating < 1 || rating > 5) {
-      throw new Error('Rating must be between 1 and 5');
+      throw new ValidationError('Rating must be between 1 and 5', 'rating');
     }
 
     await this.templateRepository.updateRating(id, rating);

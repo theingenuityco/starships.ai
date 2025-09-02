@@ -37,7 +37,7 @@ export { RepositoryFactory } from './repositories';
 
 
 
-// Export error classes from local implementation (models package)
+// Export error classes from @starships/errors package
 export {
   BaseError,
   ValidationError,
@@ -45,19 +45,15 @@ export {
   AuthorizationError,
   NotFoundError,
   ConflictError,
-  ConstraintViolationError,
   DatabaseError,
   NetworkError,
-  RateLimitError,
   ServiceUnavailableError,
   InternalServerError,
-  ErrorFactory,
-  ErrorUtils
-} from './helpers/errors';
+  RateLimitError,
+  ErrorUtils,
+  ErrorCategory
+} from '@starships/errors';
 
-// Export local error types
-export { ErrorSeverity } from './helpers/logging/error-monitor';
-export { ErrorCategory } from './helpers/errors';
 
 
 // NEW: Export structured logging and monitoring system

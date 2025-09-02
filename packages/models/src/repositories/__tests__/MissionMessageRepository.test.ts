@@ -4,7 +4,7 @@
 
 import { MissionMessageRepository } from '../MissionMessageRepository';
 import { Neo4jConnection, getConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
 import type { MissionMessageModel, MissionMessageRole } from '@starships/protocol';
 
 // Mock dependencies

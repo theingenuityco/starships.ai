@@ -8,7 +8,8 @@
 import express from 'express';
 import { getConnection } from '@starships/models';
 import { RepositoryFactory } from '@starships/models';
-import { logger, ErrorUtils } from '@starships/models';
+import { logger } from '@starships/models';
+import { ErrorUtils } from '@starships/errors';
 
 const router: express.Router = express.Router();
 

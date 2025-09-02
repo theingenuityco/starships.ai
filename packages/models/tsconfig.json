@@ -12,6 +12,7 @@
   "exclude": ["dist"],
   "references": [
     { "path": "../protocol" },
-    { "path": "../autopilot" }
+    { "path": "../autopilot" },
+    { "path": "../errors" }
   ]
 }

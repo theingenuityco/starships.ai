@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { SessionInterface } from '@/components/chat/SessionInterface';
-import { SessionsSidebar } from '@/components/chat/SessionsSidebar';
+import { SessionInterface } from '@/components/session/SessionInterface';
+import { SessionsSidebar } from '@/components/session/SessionsSidebar';
 import { starshipAPI, type Starship } from '@/lib/api';
 
 export default function StarshipSessionPage() {

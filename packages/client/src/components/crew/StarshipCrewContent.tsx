@@ -9,7 +9,7 @@ import {
 } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
-import { ChatInterface } from '@/components/chat/ChatInterface'
+import { ChatInterface } from '@/components/session/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'

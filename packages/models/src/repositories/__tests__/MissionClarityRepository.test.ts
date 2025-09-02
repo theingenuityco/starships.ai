@@ -3,7 +3,7 @@
  */
 
 import { MissionClarityRepository } from '../MissionClarityRepository';
-import { Neo4jConnection } from '../../helpers/database';
+import { Neo4jConnection, getConnection } from '../../helpers/database';
 import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '../../helpers/errors';
 import type { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
 
@@ -25,7 +25,7 @@ describe('MissionClarityRepository', () => {
     } as any;
 
     // Mock getConnection to return our mock connection
-    mockGetConnection = require('../../helpers/database/connection').getConnection;
+    mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
     mockGetConnection.mockReturnValue(mockConnection);
 
     repository = new MissionClarityRepository();

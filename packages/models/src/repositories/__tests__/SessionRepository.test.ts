@@ -3,7 +3,7 @@
  */
 
 import { SessionRepository } from '../SessionRepository';
-import { Neo4jConnection } from '../../helpers/database';
+import { Neo4jConnection, getConnection } from '../../helpers/database';
 import { ValidationError, DatabaseError, ConflictError } from '../../helpers/errors';
 import type { SessionModel } from '@starships/protocol';
 
@@ -25,7 +25,7 @@ describe('SessionRepository', () => {
     } as any;
 
     // Mock getConnection to return our mock connection
-    mockGetConnection = require('../../helpers/database/connection').getConnection;
+    mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
     mockGetConnection.mockReturnValue(mockConnection);
 
     repository = new SessionRepository();

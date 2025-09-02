@@ -49,11 +49,11 @@ describe('Neo4j Helpers', () => {
     });
 
     it('should handle large Neo4j integers', () => {
-      const largeInt = int(9223372036854775807); // Max safe integer
+      const largeInt = int(Number.MAX_SAFE_INTEGER); // Max safe integer
       const result = convertNeo4jInt(largeInt);
       
       expect(typeof result).toBe('number');
-      expect(result).toBe(9223372036854775807);
+      expect(result).toBe(Number.MAX_SAFE_INTEGER);
     });
 
     it('should handle negative Neo4j integers', () => {

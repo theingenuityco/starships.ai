@@ -3,7 +3,7 @@
  */
 
 import { MemoryRepository } from '../MemoryRepository';
-import { Neo4jConnection } from '../../helpers/database';
+import { Neo4jConnection, getConnection } from '../../helpers/database';
 import { DatabaseError, ConflictError } from '../../helpers/errors';
 import type { MemoryModel } from '@starships/protocol';
 
@@ -25,7 +25,7 @@ describe('MemoryRepository', () => {
     } as any;
 
     // Mock getConnection to return our mock connection
-    mockGetConnection = require('../../helpers/database/connection').getConnection;
+    mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
     mockGetConnection.mockReturnValue(mockConnection);
 
     repository = new MemoryRepository();

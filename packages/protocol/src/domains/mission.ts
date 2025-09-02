@@ -178,7 +178,7 @@ export interface MissionChatResponse {
 // ============================================================================
 
 /**
- * Mission clarity assessment - tracks 5-dimension clarity scoring
+ * Mission clarity assessment - tracks 4-dimension clarity scoring
  */
 export interface MissionClarityModel {
   id: string;
@@ -187,8 +187,7 @@ export interface MissionClarityModel {
   successMetrics: number;          // 0-10: Are success criteria well-defined?
   timelineDefinition: number;      // 0-10: Is the timeline clear and realistic?
   scopeBoundaries: number;         // 0-10: Are the boundaries and limitations defined?
-  visionAlignment: number;         // 0-10: How well does it align with the vision?
-  overallScore: number;            // Calculated average of the 5 dimensions
+  overallScore: number;            // Calculated average of the 4 dimensions
   reasoning: string;               // AI qualitative analysis and explanation
   iteration: number;               // Which evaluation iteration (starts at 1)
   createdAt: string;
@@ -204,7 +203,6 @@ export interface CreateMissionClarityRequest {
   successMetrics: number;
   timelineDefinition: number;
   scopeBoundaries: number;
-  visionAlignment: number;
   reasoning: string;
   iteration: number;
 }
@@ -217,7 +215,6 @@ export interface UpdateMissionClarityRequest {
   successMetrics?: number;
   timelineDefinition?: number;
   scopeBoundaries?: number;
-  visionAlignment?: number;
   reasoning?: string;
   iteration?: number;
 }

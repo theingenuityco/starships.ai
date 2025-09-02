@@ -4,7 +4,6 @@ export interface OnboardingSession {
   currentStep?: string;
   starshipId?: string;
   createdAt?: string;
-  pendingVision?: string;
   onboardingStep?: string;
 }
 

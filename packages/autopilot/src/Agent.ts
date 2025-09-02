@@ -8,7 +8,7 @@
 
 import { Blueprint, Node, Edge, Execution, AgentNodeParameters } from './types';
 import { Engine } from './engine/Engine';
-import { AgentMemory, AgentMemoryConfig } from './AgentMemory';
+import { AgentMemory, AgentMemoryState } from './AgentMemory';
 
 export class Agent {
   private params: AgentNodeParameters;
@@ -29,7 +29,7 @@ export class Agent {
     };
 
     // Create AgentMemory instance from config
-    this.memory = new AgentMemory(params.memory);
+    this.memory = new AgentMemory({ state: params.memory });
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -193,8 +193,8 @@ export class Agent {
    * Clone agent with the same parameters and memory
    */
   clone(): Agent {
-    // Convert current memory back to config for cloning
-    const memoryConfig: AgentMemoryConfig = {
+    // Convert current memory back to state for cloning
+    const memoryState: AgentMemoryState = {
       identity: this.memory.getIdentity(),
       purpose: this.memory.getPurpose(),
       space: this.memory.getSpace(),
@@ -203,7 +203,7 @@ export class Agent {
 
     const clonedParams: AgentNodeParameters = {
       ...this.params,
-      memory: memoryConfig,
+      memory: memoryState,
       blueprint: {
         ...this.params.blueprint,
         nodes: this.params.blueprint.nodes.map(node => ({ ...node })),
@@ -218,8 +218,8 @@ export class Agent {
    * Update agent parameters
    */
   updateParameters(updates: Partial<AgentNodeParameters>): Agent {
-    // Convert current memory back to config if not being updated
-    const currentMemoryConfig: AgentMemoryConfig = {
+    // Convert current memory back to state if not being updated
+    const currentMemoryState: AgentMemoryState = {
       identity: this.memory.getIdentity(),
       purpose: this.memory.getPurpose(),
       space: this.memory.getSpace(),
@@ -229,8 +229,8 @@ export class Agent {
     const updatedParams = {
       ...this.params,
       ...updates,
-      // Use provided memory config or current memory config
-      memory: updates.memory || currentMemoryConfig,
+      // Use provided memory state or current memory state
+      memory: updates.memory || currentMemoryState,
       // Preserve blueprint if not being updated
       blueprint: updates.blueprint || this.params.blueprint
     };

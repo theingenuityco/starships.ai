@@ -108,7 +108,7 @@ export class WaitlistService {
         return false;
       }
 
-      await this.waitlistRepo.addApprovedEmail(normalizedEmail, addedBy, notes);
+      await this.waitlistRepo.addApprovedEmail(normalizedEmail, notes);
       
       logger.info('WaitlistService: Added approved email', { 
         email: normalizedEmail,

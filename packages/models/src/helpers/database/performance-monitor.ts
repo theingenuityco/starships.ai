@@ -35,12 +35,12 @@ class PerformanceMonitor {
       timestamp: Date.now(),
     };
 
-    this.metrics.push(metric);
-
-    // Keep only the most recent metrics
-    if (this.metrics.length > this.maxMetrics) {
-      this.metrics = this.metrics.slice(-this.maxMetrics);
+    // Keep only the most recent metrics - ensure we don't exceed maxMetrics
+    if (this.metrics.length >= this.maxMetrics) {
+      this.metrics = this.metrics.slice(-(this.maxMetrics - 1));
     }
+    
+    this.metrics.push(metric);
 
     // Log slow queries
     if (duration > 1000) {

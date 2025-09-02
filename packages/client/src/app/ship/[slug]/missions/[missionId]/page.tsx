@@ -935,13 +935,12 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           </div>
                         </div>
 
-                      {/* 5-Dimension Breakdown */}
+                      {/* 4-Dimension Breakdown */}
                       {[
                         { key: 'objectiveClarity', label: 'Objective Clarity', score: clarity.objectiveClarity },
                         { key: 'successMetrics', label: 'Success Metrics', score: clarity.successMetrics },
                         { key: 'timelineDefinition', label: 'Timeline Definition', score: clarity.timelineDefinition },
-                        { key: 'scopeBoundaries', label: 'Scope Boundaries', score: clarity.scopeBoundaries },
-                        { key: 'visionAlignment', label: 'Vision Alignment', score: clarity.visionAlignment }
+                        { key: 'scopeBoundaries', label: 'Scope Boundaries', score: clarity.scopeBoundaries }
                       ].map((dimension) => (
                         <div key={dimension.key} className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
                           <div className="flex items-center gap-2.5 min-w-0">

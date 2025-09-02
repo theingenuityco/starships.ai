@@ -6,16 +6,11 @@
  */
 
 import { MemoryRepository, RepositoryFactory } from '@starships/models';
-import type { 
+import type {
   MemoryModel,
-  AgentMemoryModel,
   CreateMemoryRequest,
   CreateAgentMemoryRequest,
   UpdateMemoryRequest,
-  UpdateAgentMemoryRequest,
-  MemoryListResponse,
-  MemoryResponse,
-  AgentMemoryResponse,
   SearchMemoriesRequest,
   SearchMemoriesResponse,
   MemoryFilters
@@ -55,31 +50,50 @@ export class MemoryService {
   static async createMemory(request: CreateMemoryRequest): Promise<MemoryModel> {
     const repository = RepositoryFactory.getMemoryRepository();
     
-    // Process initial messages if provided
-    const messages = request.initialMessages || [];
+    // Process initial messages if provided and convert to Message format
+    const messages = (request.initialMessages || []).map(msg => ({
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      role: msg.role,
+      content: msg.content,
+      metadata: msg.metadata
+    }));
     
     return await repository.create({
-      ...request,
-      messages,
-      messageCount: messages.length,
-      version: '1.0.0'
+      state: {
+        ...request.state,
+        messages
+      },
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
   }
 
   /**
    * Create agent memory - Static method
    */
-  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<AgentMemoryModel> {
+  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<MemoryModel> {
     const repository = RepositoryFactory.getMemoryRepository();
     
-    // Process initial messages if provided
-    const messages = request.initialMessages || [];
+    // Process initial messages if provided and convert to Message format
+    const messages = (request.initialMessages || []).map(msg => ({
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      role: msg.role,
+      content: msg.content,
+      metadata: msg.metadata
+    }));
     
-    return await repository.createAgentMemory({
-      ...request,
-      messages,
-      messageCount: messages.length,
-      version: '1.0.0'
+    return await repository.create({
+      state: {
+        ...request.state,
+        messages,
+        identity: request.identity,
+        purpose: request.purpose,
+        space: request.space,
+      },
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
   }
 
@@ -128,11 +142,7 @@ export class MemoryService {
    */
   static async searchMemories(request: SearchMemoriesRequest): Promise<SearchMemoriesResponse> {
     const repository = RepositoryFactory.getMemoryRepository();
-    const memories = await repository.searchMemories(request.query, {
-      starshipId: request.starshipId,
-      agentId: request.agentId,
-      tags: request.tags
-    });
+    const memories = await repository.searchMemories(request.query, {});
 
     return {
       memories,
@@ -150,22 +160,26 @@ export class MemoryService {
    */
   async createMemory(request: CreateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel> {
     console.log('🧠 [MEMORY-SERVICE] Creating memory:', {
-      name: request.name,
-      starshipId: request.starshipId,
-      agentId: request.agentId,
-      tags: request.tags,
       hasInitialMessages: !!(request.initialMessages && request.initialMessages.length > 0),
       timestamp: new Date().toISOString()
     });
 
-    // Process initial messages if provided
-    const messages = request.initialMessages || [];
+    // Process initial messages if provided and convert to Message format
+    const messages = (request.initialMessages || []).map(msg => ({
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      role: msg.role,
+      content: msg.content,
+      metadata: msg.metadata
+    }));
     
     const memory = await this.memoryRepository.create({
-      ...request,
-      messages,
-      messageCount: messages.length,
-      version: '1.0.0'
+      state: {
+        ...request.state,
+        messages
+      },
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
 
     console.log('✅ [MEMORY-SERVICE] Memory created:', memory.id);
@@ -175,12 +189,8 @@ export class MemoryService {
   /**
    * Create a new agent memory
    */
-  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<AgentMemoryModel> {
+  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel> {
     console.log('🤖 [MEMORY-SERVICE] Creating agent memory:', {
-      name: request.name,
-      starshipId: request.starshipId,
-      agentId: request.agentId,
-      tags: request.tags,
       hasIdentity: !!request.identity,
       hasPurpose: !!request.purpose,
       hasSpace: !!request.space,
@@ -188,14 +198,25 @@ export class MemoryService {
       timestamp: new Date().toISOString()
     });
 
-    // Process initial messages if provided
-    const messages = request.initialMessages || [];
+    // Process initial messages if provided and convert to Message format
+    const messages = (request.initialMessages || []).map(msg => ({
+      id: uuidv4(),
+      timestamp: new Date().toISOString(),
+      role: msg.role,
+      content: msg.content,
+      metadata: msg.metadata
+    }));
     
-    const agentMemory = await this.memoryRepository.createAgentMemory({
-      ...request,
-      messages,
-      messageCount: messages.length,
-      version: '1.0.0'
+    const agentMemory = await this.memoryRepository.create({
+      state: {
+        ...request.state,
+        messages,
+        identity: request.identity,
+        purpose: request.purpose,
+        space: request.space
+      },
+      version: '1.0.0',
+      starshipId: request.starshipId
     });
 
     console.log('✅ [MEMORY-SERVICE] Agent memory created:', agentMemory.id);
@@ -268,27 +289,18 @@ export class MemoryService {
     purpose?: any;
     space?: any;
     tags?: string[];
-  }): Promise<AgentMemoryModel> {
-    if (!context.agentId) {
-      throw new Error('agentId is required for agent memory initialization');
-    }
-
+  }): Promise<MemoryModel> {
     console.log('🚀 [MEMORY-SERVICE] Initializing agent memory:', {
-      agentId: context.agentId,
-      starshipId: context.starshipId,
-      name: config.name,
       timestamp: new Date().toISOString()
     });
 
     return await this.createAgentMemory({
       starshipId: context.starshipId,
-      agentId: context.agentId,
-      name: config.name || `Memory for Agent ${context.agentId}`,
-      description: config.description,
-      identity: config.identity,
-      purpose: config.purpose,
-      space: config.space,
-      tags: config.tags
+      state: {
+        identity: config.identity,
+        purpose: config.purpose,
+        space: config.space
+      }
     });
   }
 
@@ -317,7 +329,8 @@ export class MemoryService {
     }
 
     // Add message to existing messages
-    const updatedMessages = [...(memory.messages || []), {
+    const currentMessages = (memory.state as any).messages || [];
+    const updatedMessages = [...currentMessages, {
       id: uuidv4(),
       timestamp: new Date().toISOString(),
       ...message
@@ -325,7 +338,10 @@ export class MemoryService {
 
     // Update memory with new message
     return await this.memoryRepository.update(memoryId, {
-      messages: updatedMessages,
+      state: {
+        ...memory.state,
+        messages: updatedMessages
+      },
       messageCount: updatedMessages.length,
       updatedAt: new Date().toISOString()
     });
@@ -340,8 +356,17 @@ export class MemoryService {
       timestamp: new Date().toISOString()
     });
 
+    // Get current memory
+    const memory = await this.memoryRepository.findById(memoryId);
+    if (!memory) {
+      throw new Error(`Memory ${memoryId} not found`);
+    }
+
     return await this.memoryRepository.update(memoryId, {
-      messages: [],
+      state: {
+        ...memory.state,
+        messages: []
+      },
       messageCount: 0,
       updatedAt: new Date().toISOString()
     });
@@ -357,19 +382,10 @@ export class MemoryService {
   async searchMemories(request: SearchMemoriesRequest): Promise<SearchMemoriesResponse> {
     console.log('🔍 [MEMORY-SERVICE] Searching memories:', {
       query: request.query.substring(0, 50) + (request.query.length > 50 ? '...' : ''),
-      filters: {
-        starshipId: request.starshipId,
-        agentId: request.agentId,
-        tags: request.tags
-      },
       timestamp: new Date().toISOString()
     });
 
-    const memories = await this.memoryRepository.searchMemories(request.query, {
-      starshipId: request.starshipId,
-      agentId: request.agentId,
-      tags: request.tags
-    });
+    const memories = await this.memoryRepository.searchMemories(request.query, {});
 
     return {
       memories,
@@ -390,9 +406,6 @@ export class MemoryService {
     });
 
     return await this.memoryRepository.findWithFilters({
-      starshipId: filters.starshipId,
-      agentId: filters.agentId,
-      tags: filters.tags,
       hasMessages: filters.hasMessages,
       limit,
       offset
@@ -409,12 +422,7 @@ export class MemoryService {
       timestamp: new Date().toISOString()
     });
 
-    let memories = await this.memoryRepository.findByTags(tags);
-
-    // Filter by starship if provided
-    if (starshipId) {
-      memories = memories.filter((memory: MemoryModel) => memory.starshipId === starshipId);
-    }
+    const memories = await this.memoryRepository.findByTags(tags);
 
     return memories;
   }
@@ -467,25 +475,11 @@ export class MemoryService {
 
     // Calculate analytics
     let totalMessages = 0;
-    const memoriesByAgent: Record<string, number> = {};
-    const memoriesByTag: Record<string, number> = {};
     let oldestDate = new Date();
     let newestDate = new Date(0);
 
     for (const memory of memories) {
       totalMessages += memory.messageCount || 0;
-
-      // Count by agent
-      if (memory.agentId) {
-        memoriesByAgent[memory.agentId] = (memoriesByAgent[memory.agentId] || 0) + 1;
-      }
-
-      // Count by tags
-      if (memory.tags) {
-        for (const tag of memory.tags) {
-          memoriesByTag[tag] = (memoriesByTag[tag] || 0) + 1;
-        }
-      }
 
       // Track dates
       const createdDate = new Date(memory.createdAt);
@@ -500,8 +494,6 @@ export class MemoryService {
     return {
       totalMemories: memories.length,
       averageMessageCount: Math.round(totalMessages / memories.length),
-      memoriesByAgent,
-      memoriesByTag,
       totalMessages,
       oldestMemory: oldestDate.toISOString(),
       newestMemory: newestDate.toISOString()
@@ -574,15 +566,14 @@ export class MemoryService {
     }
 
     // Create cloned memory
+    const sourceMessages = options.includeMessages ? (sourceMemory.state as any).messages || [] : [];
     const clonedMemory = await this.memoryRepository.create({
-      starshipId: targetContext.starshipId,
-      agentId: targetContext.agentId,
-      name: options.name || `Clone of ${sourceMemory.name || sourceMemory.id}`,
-      description: sourceMemory.description,
-      tags: options.tags || sourceMemory.tags,
-      messages: options.includeMessages ? sourceMemory.messages : [],
-      messageCount: options.includeMessages ? (sourceMemory.messageCount || 0) : 0,
-      version: '1.0.0'
+      state: {
+        ...sourceMemory.state,
+        messages: sourceMessages
+      },
+      version: '1.0.0',
+      starshipId: targetContext.starshipId
     });
 
     console.log('✅ [MEMORY-SERVICE] Memory cloned:', {
@@ -625,24 +616,21 @@ export class MemoryService {
     }
 
     // Merge messages and metadata
-    const allMessages = [...(targetMemory.messages || [])];
-    const allTags = new Set(targetMemory.tags || []);
+    const targetMessages = (targetMemory.state as any).messages || [];
+    const allMessages = [...targetMessages];
 
     for (const sourceMemory of sourceMemories) {
-      if (sourceMemory && sourceMemory.messages) {
-        allMessages.push(...sourceMemory.messages);
-      }
-      if (options.preserveSourceTags && sourceMemory?.tags) {
-        sourceMemory.tags.forEach((tag: string) => allTags.add(tag));
+      if (sourceMemory && (sourceMemory.state as any).messages) {
+        allMessages.push(...(sourceMemory.state as any).messages);
       }
     }
 
     // Update target memory
     const updatedMemory = await this.memoryRepository.update(targetMemoryId, {
-      name: options.name || targetMemory.name,
-      description: options.description || targetMemory.description,
-      tags: Array.from(allTags),
-      messages: allMessages,
+      state: {
+        ...targetMemory.state,
+        messages: allMessages
+      },
       messageCount: allMessages.length,
       updatedAt: new Date().toISOString()
     });

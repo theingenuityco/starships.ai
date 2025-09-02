@@ -186,6 +186,7 @@ export class WorkflowRepository extends BaseRepository {
         
         // Database fields
         id,
+        name: entity.name as string,
         createdAt: now,
         updatedAt: now,
         authorId: entity.authorId as string,

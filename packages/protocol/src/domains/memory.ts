@@ -7,7 +7,8 @@
 
 // Import autopilot types at the top level
 import type {
-  AgentMemoryConfig,
+  MemoryState,
+  AgentMemoryState,
   AgentIdentity,
   AgentPurpose,
   AgentSpace
@@ -19,7 +20,7 @@ import type {
 
 /**
  * Database Memory interface - core API contract type
- * Extends base Memory functionality with database fields
+ * Contains state as a key instead of inheritance for better serialization
  */
 export interface MemoryModel {
   // Core database fields
@@ -28,40 +29,13 @@ export interface MemoryModel {
   updatedAt: string;
   version: string;
 
-  // Memory content
-  messages: Array<{
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-    metadata?: Record<string, unknown>;
-    timestamp?: string;
-  }>; // JSON serialized messages from Memory class
+  // Database-specific computed field
   messageCount: number;
   
-  // Ownership
-  starshipId: string;
-  agentId?: string; // Optional agent assignment
-
-  // Memory metadata
-  name?: string;
-  description?: string;
-  tags?: string[];
+  // State container
+  state: MemoryState;
 }
 
-/**
- * Database AgentMemory interface - extends MemoryModel with agent-specific fields
- */
-export interface AgentMemoryModel extends MemoryModel {
-  // Agent-specific memory fields
-  identity?: AgentIdentity;
-  purpose?: AgentPurpose;
-  space?: AgentSpace;
-  
-  // Agent memory configuration
-  config?: AgentMemoryConfig;
-  
-  // Required agent assignment for AgentMemory
-  agentId: string;
-}
 
 // ============================================================================
 // MEMORY REQUEST/RESPONSE TYPES
@@ -71,13 +45,14 @@ export interface AgentMemoryModel extends MemoryModel {
  * Request to create a new memory
  */
 export interface CreateMemoryRequest {
-  name?: string;
-  description?: string;
+  // Starship ID for establishing HAS_MEMORY relationship
   starshipId: string;
-  agentId?: string;
-  tags?: string[];
   
-  // Initial messages (optional)
+  // Memory state
+  state?: MemoryState;
+  
+  // Initial messages (optional) - deprecated in favor of state
+  /** @deprecated Use state.messages instead */
   initialMessages?: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
@@ -89,11 +64,10 @@ export interface CreateMemoryRequest {
  * Request to create a new agent memory
  */
 export interface CreateAgentMemoryRequest extends CreateMemoryRequest {
-  agentId: string; // Required for agent memory
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
-  config?: AgentMemoryConfig;
+  state?: AgentMemoryState;
 }
 
 /**
@@ -129,7 +103,7 @@ export interface MemoryListResponse {
  * AgentMemory database response with pagination
  */
 export interface AgentMemoryListResponse {
-  memories: AgentMemoryModel[];
+  memories: MemoryModel[];
   total: number;
   page: number;
   pageSize: number;
@@ -147,7 +121,7 @@ export interface MemoryResponse {
  * AgentMemory response with single agent memory
  */
 export interface AgentMemoryResponse {
-  memory: AgentMemoryModel;
+  memory: MemoryModel;
 }
 
 /**
@@ -155,9 +129,6 @@ export interface AgentMemoryResponse {
  */
 export interface SearchMemoriesRequest {
   query: string;
-  starshipId?: string;
-  agentId?: string;
-  tags?: string[];
   limit?: number;
   offset?: number;
 }
@@ -175,10 +146,12 @@ export interface SearchMemoriesResponse {
  * Request to filter memories
  */
 export interface MemoryFilters {
-  starshipId?: string;
+  starshipId?: string; // Filter memories by starship using Neo4j relationships
+  hasMessages?: boolean;
   agentId?: string;
   tags?: string[];
-  hasMessages?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 /**

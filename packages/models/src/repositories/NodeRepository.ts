@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
-import type { Node } from '@starships/autopilot';
 import type { NodeModel } from '@starships/protocol';
 
 export class NodeRepository extends BaseRepository {
@@ -29,14 +28,14 @@ export class NodeRepository extends BaseRepository {
 
       const node: NodeModel = {
         id: nodeId,
-        ...nodeData
+        ...nodeData,
+        parameters: nodeData.parameters || {}
       };
 
       // Serialize parameters as JSON string for Neo4j storage
       const nodeProps = {
         ...node,
-        parameters: JSON.stringify(node.parameters || {}),
-        ref: node.ref || nodeId
+        parameters: JSON.stringify(node.parameters)
       };
 
       await connection.executeWrite(`
@@ -136,6 +135,8 @@ export class NodeRepository extends BaseRepository {
             console.warn('Failed to parse node parameters JSON:', nodeProps.id, error);
             nodeProps.parameters = {};
           }
+        } else if (nodeProps.parameters === null || nodeProps.parameters === undefined) {
+          nodeProps.parameters = {};
         }
         return nodeProps;
       }) || [];
@@ -166,6 +167,8 @@ export class NodeRepository extends BaseRepository {
           console.warn('Failed to parse node parameters JSON:', nodeProps.id, error);
           nodeProps.parameters = {};
         }
+      } else if (nodeProps.parameters === null || nodeProps.parameters === undefined) {
+        nodeProps.parameters = {};
       }
       
       return nodeProps;
@@ -212,6 +215,10 @@ export class NodeRepository extends BaseRepository {
       if (updates.parameters !== undefined) {
         setClause.push('n.parameters = $parameters');
         params.parameters = JSON.stringify(updates.parameters || {});
+      } else if (updates.parameters === undefined) {
+        // When parameters is explicitly undefined, we still want to set it to an empty object
+        setClause.push('n.parameters = $parameters');
+        params.parameters = '{}';
       }
 
       if (updates.description !== undefined) {
@@ -249,6 +256,8 @@ export class NodeRepository extends BaseRepository {
           console.warn('Failed to parse node parameters JSON:', nodeProps.id, error);
           nodeProps.parameters = {};
         }
+      } else if (nodeProps.parameters === null || nodeProps.parameters === undefined) {
+        nodeProps.parameters = {};
       }
 
       return nodeProps;

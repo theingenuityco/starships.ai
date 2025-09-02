@@ -16,7 +16,7 @@ export class AffirmationDetector {
     /^(that's|that is) (good|great|perfect|excellent|it|fine|right|correct)$/i,
     /^i (like|love|approve of?) (it|that|this)$/i,
     /^(go|move) (ahead|forward)( with (it|that|this))?$/i,
-    /^(update|save|use) (it|that|this|the vision)$/i,
+    /^(update|save|use) (it|that|this)$/i,
     /^(looks|sounds) (good|great|perfect|right|fine)( for now)?$/i,
     /^(accept|adopt|implement) (it|that|this)$/i,
     /^that('s| is) exactly what I (want|need|meant)$/i,
@@ -31,7 +31,6 @@ export class AffirmationDetector {
     
     // Contextual affirmations
     /^(thank you|thanks).*good$/i,
-    /perfect.*vision/i,
     /exactly.*wanted/i
   ];
 
@@ -251,19 +250,19 @@ export class AffirmationDetector {
   generateResponseSuggestion(analysis: ReturnType<typeof this.analyzeResponse>): string {
     switch (analysis.intent) {
       case 'accept':
-        return "Great! I'll update your vision statement now.";
+        return "Great! I'll update that now.";
       
       case 'reject':
         return "No problem! Let me know what specific aspects you'd like me to focus on instead.";
       
       case 'modify': {
         const feedbackSuggestions = this.generateFeedbackSuggestions(analysis.feedback);
-        return `I understand you'd like some adjustments. ${feedbackSuggestions} Let me refine the vision based on your feedback.`;
+        return `I understand you'd like some adjustments. ${feedbackSuggestions} Let me refine that based on your feedback.`;
       }
       
       case 'unclear':
       default:
-        return "I want to make sure I understand correctly. Are you happy with this vision direction, or would you like me to make some changes?";
+        return "I want to make sure I understand correctly. Are you happy with this direction, or would you like me to make some changes?";
     }
   }
 

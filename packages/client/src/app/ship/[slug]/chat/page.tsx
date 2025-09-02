@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { UnifiedChatInterface } from '@/components/chat/UnifiedChatInterface';
-import { ChatSessionsSidebar } from '@/components/chat/ChatSessionsSidebar';
+import { SessionsSidebar } from '@/components/chat/SessionsSidebar';
 import { starshipAPI, type Starship } from '@/lib/api';
 
 export default function StarshipChatPage() {
@@ -61,7 +61,7 @@ export default function StarshipChatPage() {
     <div className="h-full flex">
       {/* Chat Sessions Sidebar */}
       <div className="w-80 shrink-0">
-        <ChatSessionsSidebar
+        <SessionsSidebar
           starshipId={starship.id}
           onSessionSelect={(sessionId) => {
             // TODO: Handle session selection

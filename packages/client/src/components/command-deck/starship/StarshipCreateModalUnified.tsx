@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -22,11 +21,7 @@ import {
   Check,
   CheckCircle,
   Loader2,
-  Eye,
-  Sparkles,
   AlertCircle,
-  ArrowRight,
-  Brain,
   Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,13 +41,11 @@ interface StarshipCreateModalUnifiedProps {
 interface StarshipFormData {
   name: string;
   class: 'scout' | 'cruiser' | 'draught';
-  vision?: string;
 }
 
 interface StarshipFormErrors {
   name?: string;
   class?: string;
-  vision?: string;
 }
 
 // Helper functions to maintain UI consistency
@@ -107,8 +100,6 @@ export function StarshipCreateModalUnified({
   const { createStarship, loading, starships } = useStarshipStore();
   const router = useRouter();
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
-  const [visionAnalysis, setVisionAnalysis] = useState<any>(null);
-  const [analyzingVision, setAnalyzingVision] = useState(false);
   const [creatingPaidStarship, setCreatingPaidStarship] = useState(false);
   
   // New state for API-driven pricing data
@@ -116,14 +107,13 @@ export function StarshipCreateModalUnified({
   const [classesLoading, setClassesLoading] = useState(true);
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
   
-  // Now only 3 steps: Vision+Name, Class, Review
-  const totalSteps = 3;
+  // Now only 2 steps: Name, Class
+  const totalSteps = 2;
   
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<StarshipFormData>({
     name: '',
-    class: 'cruiser',
-    vision: ''
+    class: 'cruiser'
   });
   const [errors, setErrors] = useState<StarshipFormErrors>({});
 
@@ -177,7 +167,7 @@ export function StarshipCreateModalUnified({
   const validateStep = (stepNumber: number): boolean => {
     const newErrors: StarshipFormErrors = {};
     
-    // Combined Vision + Name step validation
+    // Name step validation
     if (stepNumber === 1) {
       if (!formData.name.trim()) {
         newErrors.name = 'Starship name is required';
@@ -185,13 +175,6 @@ export function StarshipCreateModalUnified({
         newErrors.name = 'Name must be at least 3 characters';
       } else if (formData.name.length > 50) {
         newErrors.name = 'Name must be less than 50 characters';
-      }
-      
-      // Vision is mandatory
-      if (!formData.vision?.trim()) {
-        newErrors.vision = 'Vision statement is required';
-      } else if (formData.vision.length < 20) {
-        newErrors.vision = 'Vision should be at least 20 characters';
       }
     }
     
@@ -207,23 +190,8 @@ export function StarshipCreateModalUnified({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleAnalyzeVision = async () => {
-    // Vision analysis functionality removed
-    return;
-  };
-
   const handleNext = async () => {
-    if (step === 1) {
-      // Validate first
-      if (!validateStep(step)) return;
-      
-      // Analyze vision if provided and not already analyzed
-      if (formData.vision?.trim() && !visionAnalysis) {
-        await handleAnalyzeVision();
-      }
-      
-      setStep(step + 1);
-    } else if (validateStep(step)) {
+    if (validateStep(step)) {
       setStep(step + 1);
     }
   };
@@ -248,18 +216,11 @@ export function StarshipCreateModalUnified({
           return;
         }
         
-        // Free starship - use existing logic with vision if available
+        // Free starship - use existing logic
         const starshipData: any = {
           name: formData.name,
           class: formData.class
         };
-        
-        if (formData.vision) {
-          starshipData.vision = {
-            statement: formData.vision,
-            confidence: visionAnalysis?.confidence || 0.8
-          };
-        }
         
         const newStarship = await createStarship(starshipData);
         
@@ -316,10 +277,8 @@ export function StarshipCreateModalUnified({
     setStep(1);
     setFormData({
       name: '',
-      class: 'cruiser',
-      vision: ''
+      class: 'cruiser'
     });
-    setVisionAnalysis(null);
     setErrors({});
     setBillingPeriod('monthly'); // Reset billing period
     // starshipClasses and pricingData persist across resets
@@ -331,7 +290,7 @@ export function StarshipCreateModalUnified({
   };
 
   const renderStepContent = () => {
-    // Step 1: Combined Vision + Name Input
+    // Step 1: Name Input
     if (step === 1) {
       return (
         <motion.div
@@ -343,41 +302,12 @@ export function StarshipCreateModalUnified({
         >
           <div className="text-center">
             <div className="flex items-center justify-center gap-3">
-              <Brain className="w-10 h-10 text-primary" />
-              <h3 className="text-xl font-semibold">Vision</h3>
+              <Rocket className="w-10 h-10 text-primary" />
+              <h3 className="text-xl font-semibold">Starship Name</h3>
             </div>
           </div>
 
           <div className="space-y-5 px-1">
-            {/* Vision Input (Required) */}
-            <div className="space-y-2">
-              <Label htmlFor="vision" className="flex items-center gap-2">
-                <Eye className="w-4 h-4" />
-                Vision Statement
-                <span className="text-xs text-destructive">*</span>
-              </Label>
-              <Textarea
-                id="vision"
-                placeholder="What would you like to build?"
-                value={formData.vision}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, vision: e.target.value })}
-                onBlur={handleAnalyzeVision}
-                className={cn(
-                  "min-h-[100px] bg-background/50 backdrop-blur-sm border border-border/50",
-                  "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                  errors.vision && "border-destructive focus:border-destructive"
-                )}
-                disabled={false}
-                tabIndex={1}
-              />
-              {errors.vision && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {errors.vision}
-                </p>
-              )}
-            </div>
-
             {/* Starship Name Input (Required) */}
             <div className="space-y-2">
               <Label htmlFor="starship-name" className="flex items-center gap-2">
@@ -396,7 +326,7 @@ export function StarshipCreateModalUnified({
                     "focus:border-primary focus:ring-0 focus:ring-offset-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
                     errors.name && "border-destructive focus:border-destructive"
                   )}
-                  tabIndex={2}
+                  tabIndex={1}
                 />
                 {formData.name && !errors.name && (
                   <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
@@ -409,45 +339,6 @@ export function StarshipCreateModalUnified({
                 </p>
               )}
             </div>
-
-            {/* AI Suggestions */}
-            {visionAnalysis && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 bg-primary/5 rounded-lg border border-primary/20"
-              >
-                <div className="flex items-start gap-3">
-                  <Bot className="w-4 h-4 text-emerald-500 mt-0.5" />
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <p className="text-xs font-medium text-primary tracking-wider mb-1">
-                        Sibil AI Analysis
-                      </p>
-                      <p className="text-sm text-muted-foreground">{visionAnalysis.summary}</p>
-                    </div>
-                    
-                    {visionAnalysis.suggestedName && formData.name !== visionAnalysis.suggestedName && (
-                      <div className="pt-2 border-t border-primary/10">
-                        <p className="text-xs text-muted-foreground mb-1">Suggested name:</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="p-0 h-auto font-medium text-foreground hover:text-primary hover:bg-transparent"
-                          onClick={() => setFormData({ 
-                            ...formData, 
-                            name: visionAnalysis.suggestedName 
-                          })}
-                        >
-                          Use &ldquo;{visionAnalysis.suggestedName}&rdquo;
-                          <ArrowRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            )}
 
             {/* Preview Card */}
             <div className="space-y-2">
@@ -465,13 +356,6 @@ export function StarshipCreateModalUnified({
                       </div>
                     </div>
                   </div>
-                  {formData.vision && (
-                    <div className="mt-3 pt-3 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground italic line-clamp-2">
-                        &ldquo;{formData.vision}&rdquo;
-                      </p>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </div>
@@ -568,7 +452,6 @@ export function StarshipCreateModalUnified({
               {/* Modern Card Grid with padding for badges */}
               <div className="grid grid-cols-1 gap-4 px-1 py-3">
                 {Object.entries(starshipClasses).map(([key, classData], index) => {
-                  const isRecommended = key === 'cruiser' && visionAnalysis?.recommendedClass === 'cruiser';
                   const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
                   const isScoutLimitReached = key === 'scout' && scoutStarships.length >= 3;
                   const isSelected = formData.class === key;
@@ -612,19 +495,6 @@ export function StarshipCreateModalUnified({
                             : "border-border/60 bg-card/40 hover:border-border hover:bg-card/60 hover:shadow-xl",
                           isScoutLimitReached && "opacity-50"
                         )}>
-                          {/* AI Recommended Badge */}
-                          {isRecommended && (
-                            <motion.div
-                              initial={{ y: -20, opacity: 0 }}
-                              animate={{ y: 0, opacity: 1 }}
-                              className="absolute -top-3 left-4 z-10"
-                            >
-                              <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg">
-                                <Sparkles className="w-3 h-3 text-white" />
-                                <span className="text-xs font-bold text-white">AI Pick</span>
-                              </div>
-                            </motion.div>
-                          )}
 
                           {/* Selection Checkmark */}
                           <AnimatePresence>
@@ -739,135 +609,6 @@ export function StarshipCreateModalUnified({
       );
     }
 
-    // Step 3: Review
-    if (step === 3) {
-      const selectedClass = starshipClasses[formData.class] || {
-        name: formData.class.charAt(0).toUpperCase() + formData.class.slice(1),
-        icon: getClassIcon(formData.class),
-        maxAgents: 3,
-        description: 'Loading...',
-        features: getClassFeatures(formData.class),
-        stats: getClassStats(formData.class),
-        pricing: { monthly: 0, yearly: 0 }
-      };
-      return (
-        <motion.div
-          key="step3"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          className="space-y-6"
-        >
-          <div className="text-center space-y-2">
-            <CheckCircle className="w-12 h-12 mx-auto text-green-500" />
-            <h3 className="text-xl font-semibold">Review & Create</h3>
-            <p className="text-muted-foreground">
-              Review your starship configuration before creation
-            </p>
-          </div>
-
-          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-3">
-                <div className="text-2xl">{selectedClass.icon}</div>
-                <div>
-                  <div className="text-xl">{formData.name}</div>
-                  <div className="text-sm text-muted-foreground font-normal">
-                    {selectedClass.name} Class Starship
-                  </div>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {formData.vision && (
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Eye className="w-4 h-4 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                        Vision
-                      </p>
-                      <p className="text-sm italic">&ldquo;{formData.vision}&rdquo;</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm font-medium">Agent Capacity</span>
-                  </div>
-                  <div className="text-2xl font-bold">{selectedClass.maxAgents}</div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium">Key Features</h4>
-                <ul className="space-y-2">
-                  {selectedClass.features.map((feature: string, index: number) => (
-                    <li key={index} className="flex items-center space-x-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-medium">Performance Profile</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(selectedClass.stats).map(([stat, value]) => (
-                    <div key={stat} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="capitalize">{stat}</span>
-                        <span>{value as number}%</span>
-                      </div>
-                      <Progress value={value as number} className="h-1" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Billing Information for Paid Plans */}
-          {(formData.class === 'cruiser' || formData.class === 'draught') && (
-            <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <h4 className="font-medium text-primary mb-2">Subscription Details</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Plan:</span>
-                  <span className="font-medium">{selectedClass?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Billing:</span>
-                  <span className="font-medium capitalize">{billingPeriod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Price:</span>
-                  <span className="font-medium">
-                    ${selectedClass?.pricing?.[billingPeriod] || 0}
-                    /{billingPeriod === 'monthly' ? 'month' : 'year'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Free Plan Information */}
-          {formData.class === 'scout' && (
-            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="font-medium text-green-800 mb-2">Free Plan</h4>
-              <p className="text-sm text-green-700">
-                No payment required. Limited to 3 scout starships per account.
-              </p>
-            </div>
-          )}
-        </motion.div>
-      );
-    }
 
     return null;
   };
@@ -916,22 +657,13 @@ export function StarshipCreateModalUnified({
                 Cancel
               </Button>
               {step < totalSteps ? (
-                <Button 
-                  onClick={handleNext} 
-                  disabled={analyzingVision || (step === 1 && (!formData.name.trim() || !formData.vision?.trim()))}
+                <Button
+                  onClick={handleNext}
+                  disabled={step === 1 && !formData.name.trim()}
                   className="flex items-center space-x-2"
                 >
-                  {analyzingVision ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Analyzing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Next</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </>
-                  )}
+                  <span>Next</span>
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               ) : (
                 <Button
@@ -977,7 +709,7 @@ export function StarshipCreateModalUnified({
           <DialogHeader>
             <DialogTitle>Are you sure you want to exit?</DialogTitle>
             <DialogDescription>
-              Your vision has been saved. You can continue creating your starship later from your fleet page.
+              You can continue creating your starship later from your fleet page.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end space-x-2 pt-4">

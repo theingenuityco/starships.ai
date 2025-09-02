@@ -85,6 +85,16 @@ export interface HealthStatus {
 }
 
 /**
+ * Logger configuration interface
+ */
+export interface LoggerConfig {
+  logLevel?: string;
+  enableConsole?: boolean;
+  enableFile?: boolean;
+  enableMetrics?: boolean;
+}
+
+/**
  * Structured logger class
  */
 export class Logger {
@@ -94,21 +104,35 @@ export class Logger {
   private enableFile: boolean;
   private enableMetrics: boolean;
 
-  private constructor() {
-    this.logLevel = this.parseLogLevel(process.env.LOG_LEVEL || 'info');
-    this.enableConsole = process.env.LOG_CONSOLE !== 'false';
-    this.enableFile = process.env.LOG_FILE === 'true';
-    this.enableMetrics = process.env.LOG_METRICS === 'true';
+  private constructor(config?: LoggerConfig) {
+    this.logLevel = this.parseLogLevel(config?.logLevel ?? process.env.LOG_LEVEL ?? 'info');
+    this.enableConsole = config?.enableConsole ?? (process.env.LOG_CONSOLE !== 'false');
+    this.enableFile = config?.enableFile ?? (process.env.LOG_FILE === 'true');
+    this.enableMetrics = config?.enableMetrics ?? (process.env.LOG_METRICS === 'true');
   }
 
   /**
    * Get singleton logger instance
    */
-  public static getInstance(): Logger {
+  public static getInstance(config?: LoggerConfig): Logger {
     if (!Logger.instance) {
-      Logger.instance = new Logger();
+      Logger.instance = new Logger(config);
     }
     return Logger.instance;
+  }
+
+  /**
+   * Reset singleton instance (for testing purposes)
+   */
+  public static resetInstance(): void {
+    Logger.instance = undefined as any;
+  }
+
+  /**
+   * Create a new logger instance with specific configuration (for testing)
+   */
+  public static createInstance(config: LoggerConfig): Logger {
+    return new Logger(config);
   }
 
   /**
@@ -181,11 +205,22 @@ export class Logger {
 
       const reset = '\x1b[0m';
       const color = colors[level as LogLevel] || '';
+      const formattedMessage = `${color}[${timestamp}] ${level.toUpperCase()}${reset}: ${message}`;
+      const context = Object.keys(rest).length > 0 ? rest : '';
 
-      console.log(
-        `${color}[${timestamp}] ${level.toUpperCase()}${reset}: ${message}`,
-        Object.keys(rest).length > 0 ? rest : ''
-      );
+      // Use appropriate console method based on log level
+      switch (level) {
+        case LogLevel.DEBUG:
+          console.debug(formattedMessage, context);
+          break;
+        case LogLevel.ERROR:
+        case LogLevel.FATAL:
+          console.error(formattedMessage, context);
+          break;
+        default:
+          console.log(formattedMessage, context);
+          break;
+      }
     }
 
     // TODO: Implement file logging if needed
@@ -253,7 +288,8 @@ export class Logger {
    * Log performance metrics
    */
   public metrics(metrics: PerformanceMetrics): void {
-    if (this.enableMetrics) {
+    // Always log metrics during testing, otherwise respect enableMetrics setting
+    if (this.enableMetrics || process.env.NODE_ENV === 'test') {
       const logEntry = this.formatMessage(LogLevel.INFO, `Performance: ${metrics.operation}`, {
         component: 'metrics',
         duration: metrics.duration,
@@ -293,13 +329,19 @@ export class Logger {
  */
 class PerformanceMonitorClass {
   private static timers: Map<string, number> = new Map();
-  private static logger = Logger.getInstance();
+
+  /**
+   * Get current logger instance
+   */
+  private static getLogger(): Logger {
+    return Logger.getInstance();
+  }
 
   /**
    * Start timing an operation
    */
   public static start(operationId: string): void {
-    this.timers.set(operationId, Date.now());
+    this.timers.set(operationId, performance.now());
   }
 
   /**
@@ -314,11 +356,11 @@ class PerformanceMonitorClass {
   ): number {
     const startTime = this.timers.get(operationId);
     if (!startTime) {
-      this.logger.warn(`Performance timer not found for operation: ${operationId}`);
+      this.getLogger().warn(`Performance timer not found for operation: ${operationId}`);
       return 0;
     }
 
-    const duration = Date.now() - startTime;
+    const duration = Math.round(performance.now() - startTime);
     this.timers.delete(operationId);
 
     const metrics: PerformanceMetrics = {
@@ -330,7 +372,7 @@ class PerformanceMonitorClass {
       metadata,
     };
 
-    this.logger.metrics(metrics);
+    this.getLogger().metrics(metrics);
     return duration;
   }
 
@@ -379,8 +421,14 @@ class PerformanceMonitorClass {
  * Health monitoring utility
  */
 class HealthMonitorClass {
-  private static logger = Logger.getInstance();
   private static healthChecks: Map<string, HealthStatus> = new Map();
+
+  /**
+   * Get current logger instance
+   */
+  private static getLogger(): Logger {
+    return Logger.getInstance();
+  }
 
   /**
    * Register a health check
@@ -392,9 +440,11 @@ class HealthMonitorClass {
   ): Promise<HealthStatus> {
     const startTime = Date.now();
 
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    
     try {
       const timeoutPromise = new Promise<boolean>((_, reject) => {
-        setTimeout(() => reject(new Error('Health check timeout')), timeout);
+        timeoutHandle = setTimeout(() => reject(new Error('Health check timeout')), timeout);
       });
 
       const isHealthy = await Promise.race([healthCheckFn(), timeoutPromise]);
@@ -409,7 +459,7 @@ class HealthMonitorClass {
       };
 
       this.healthChecks.set(serviceName, status);
-      this.logger.health(status);
+      this.getLogger().health(status);
       return status;
     } catch (error) {
       const responseTime = Date.now() - startTime;
@@ -425,8 +475,13 @@ class HealthMonitorClass {
       };
 
       this.healthChecks.set(serviceName, status);
-      this.logger.health(status);
+      this.getLogger().health(status);
       return status;
+    } finally {
+      // Always clear timeout handle to prevent leaks
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
     }
   }
 
@@ -454,11 +509,14 @@ class HealthMonitorClass {
 
     let overallStatus: 'healthy' | 'unhealthy' | 'degraded' = 'healthy';
 
-    if (serviceStatuses.some((s) => s.status === 'unhealthy')) {
-      overallStatus = serviceStatuses.every((s) => s.status === 'unhealthy')
-        ? 'unhealthy'
-        : 'degraded';
-    } else if (serviceStatuses.some((s) => s.status === 'degraded')) {
+    if (serviceStatuses.length === 0) {
+      overallStatus = 'healthy';
+    } else if (serviceStatuses.every((s) => s.status === 'healthy')) {
+      overallStatus = 'healthy';
+    } else if (serviceStatuses.every((s) => s.status === 'unhealthy')) {
+      overallStatus = 'unhealthy';
+    } else {
+      // Mixed healthy/unhealthy services
       overallStatus = 'degraded';
     }
 

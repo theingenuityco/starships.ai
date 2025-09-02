@@ -34,13 +34,12 @@ INSTRUCTIONS:
 4. Ask them to hold on while you assess the mission objective for clarity
 `,
 
-  CLARITY_ASSESSMENT: `Assess mission clarity across 5 dimensions (0-10 scale). Use your intelligence to infer reasonable assumptions from context and user intent rather than being overly pedantic:
+  CLARITY_ASSESSMENT: `Assess mission clarity across 4 dimensions (0-10 scale). Use your intelligence to infer reasonable assumptions from context and user intent rather than being overly pedantic:
 
 1. objectiveClarity: Rate 7-10 if deliverables/outcomes are reasonably clear; 4-6 if general goals mentioned; 0-3 if vague/unclear
 2. successMetrics: Rate 7-10 if success can be evaluated (implicit or explicit measures); 4-6 if some progress indicators exist; 0-3 if no success measures
 3. timelineDefinition: Rate 7-10 if timeframe is workable (stated, inferable, or has natural milestones); 4-6 if rough timeframe mentioned; 0-3 if no timeline
 4. scopeBoundaries: Rate 7-10 if scope is manageable (clear constraints or reasonable defaults); 4-6 if some limitations mentioned; 0-3 if scope unlimited/undefined
-5. visionAlignment: Rate 7-10 if supports vision goals (direct connection or clear pathway); 4-6 if loosely connected; 0-3 if misaligned/unclear
 
 Respond with ONLY this JSON format:
 {
@@ -48,7 +47,6 @@ Respond with ONLY this JSON format:
   "successMetrics": X,
   "timelineDefinition": X,
   "scopeBoundaries": X,
-  "visionAlignment": X,
   "reasoning": "Brief explanation of scores and key gaps. Make any reasonable assumptions explicit (e.g., 'Assuming X based on Y context')"
 }`,
 
@@ -433,7 +431,6 @@ MISSION CLARITY ASSESSMENT:
 ├─ Success Metrics: ${clarity.successMetrics}/10
 ├─ Timeline Definition: ${clarity.timelineDefinition}/10
 ├─ Scope Boundaries: ${clarity.scopeBoundaries}/10
-├─ Vision Alignment: ${clarity.visionAlignment}/10
 └─ AI Analysis: ${clarity.reasoning}`;
   }
 

@@ -326,7 +326,8 @@ export class WorkflowService {
       console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
 
       // Create agent memory for execution context
-      const agentMemory = createAgentMemory('Workflow execution context');
+      const agentMemory = createAgentMemory();
+      agentMemory.addMessage('system', 'Workflow execution context');
 
       // Create initial execution context
       const initialExecution: Execution = {

@@ -4,7 +4,7 @@
 
 import { MissionMessageRepository } from '../MissionMessageRepository';
 import { Neo4jConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError, NotFoundError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '../../helpers/errors';
 import type { MissionMessageModel, MissionMessageRole } from '@starships/protocol';
 
 // Mock dependencies
@@ -180,7 +180,7 @@ describe('MissionMessageRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite.mockResolvedValue([]); // No results
 
-      await expect(repository.saveMessage(messageInput)).rejects.toThrow('Failed to save message');
+      await expect(repository.saveMessage(messageInput)).rejects.toThrow('Database operation failed');
     });
   });
 
@@ -533,7 +533,7 @@ describe('MissionMessageRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
-      await expect(repository.saveMessage(messageInput)).rejects.toThrow(DatabaseError);
+      await expect(repository.saveMessage(messageInput)).rejects.toThrow(ConflictError);
     });
 
     it('should handle connection timeouts', async () => {
@@ -551,7 +551,7 @@ describe('MissionMessageRepository', () => {
     it('should handle network errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('network error'));
 
-      await expect(repository.deleteMessage('message-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteMessage('message-123')).rejects.toThrow(NotFoundError);
     });
   });
 

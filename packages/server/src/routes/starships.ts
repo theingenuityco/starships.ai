@@ -74,6 +74,86 @@ router.get('/starships', authMiddleware, async (req: Request, res: Response): Pr
   }
 });
 
+// POST /starships/create-paid - Create paid starship with pending payment status (OpenAPI pattern)
+router.post('/starships/create-paid', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user!.id;
+    const { name, plan, billingPeriod } = req.body;
+
+    console.log('[STARSHIP-CREATE-PAID] Starting paid starship creation for user:', userId);
+
+    // Validate required fields
+    if (!name || !plan || !billingPeriod) {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
+        required_fields: ['name', 'plan', 'billingPeriod'],
+        provided: { name: !!name, plan: !!plan, billingPeriod: !!billingPeriod },
+      });
+      return;
+    }
+
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      sendError(res, 'VALIDATION_ERROR', 'Name must be a non-empty string', 400, {
+        field: 'name',
+      });
+      return;
+    }
+
+    // Validate paid plan only
+    if (!['cruiser', 'draught'].includes(plan)) {
+      sendError(res, 'INVALID_INPUT', 'Invalid paid plan', 400, {
+        field: 'plan',
+        allowed_values: ['cruiser', 'draught'],
+        provided: plan,
+      });
+      return;
+    }
+
+    // Validate billing period
+    if (!['monthly', 'yearly'].includes(billingPeriod)) {
+      sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
+        field: 'billingPeriod',
+        allowed_values: ['monthly', 'yearly'],
+        provided: billingPeriod,
+      });
+      return;
+    }
+
+    console.log('[STARSHIP-CREATE-PAID] Creating paid starship...');
+    
+    const slug = await starshipRepo.generateUniqueSlug(name.trim(), userId);
+    const starship = await starshipRepo.create({
+      ownerId: userId,
+      name: name.trim(),
+      class: plan,
+      slug,
+      status: 'pending_payment',
+      plan,
+      billingPeriod
+    });
+
+    // Create Stripe checkout session
+    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
+      userId,
+      starshipId: starship.id,
+      starshipSlug: starship.slug,
+      plan,
+      billingPeriod
+    });
+
+    sendSuccess(res, {
+      starship,
+      checkoutUrl,
+      message: 'Starship created. Redirect to checkout to complete payment.'
+    }, 201);
+
+  } catch (error) {
+    if (!handleCommonError(error, res, 'creating paid starship')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create paid starship');
+    }
+  }
+});
+
 // POST /starships - Create new starship (OpenAPI pattern)
 router.post('/starships', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -194,7 +274,10 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response): P
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
-    sendSuccess(res, starship, 201);
+    sendSuccess(res, {
+      starship,
+      message: 'Starship created successfully'
+    }, 201);
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating starship')) {

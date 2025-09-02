@@ -20,7 +20,7 @@ import { getServerConfig } from '@starships/env-config';
 
 // Route imports
 import agentRoutes from './routes/agents';
-import sessionRoutes from './routes/session';
+import sessionRoutes from './routes/sessions';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
@@ -100,7 +100,7 @@ initializeWebhookRoutes({
 
 
 // Public pricing endpoint - must be before auth-protected routes
-app.get('/api/starships/pricing', async (req, res) => {
+app.get('/api/v1/starships/pricing', async (req, res) => {
   try {
     const { SubscriptionService } = await import('./services/SubscriptionService');
     const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
@@ -120,7 +120,7 @@ app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api', starshipRoutes);
+app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
 // app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
 app.use('/api/missions', missionRoutes);

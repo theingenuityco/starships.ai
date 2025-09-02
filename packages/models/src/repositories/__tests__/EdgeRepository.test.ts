@@ -84,11 +84,11 @@ describe('EdgeRepository', () => {
       });
     });
 
-    it('should generate ref when not provided', async () => {
-      const edgeDataWithoutRef = {
+    it('should use provided ref value', async () => {
+      const edgeDataWithRef = {
         from: 'node-1',
         to: 'node-2',
-        ref: ''  // Empty ref should fall back to generated ID
+        ref: 'custom-edge-ref'
       };
 
       mockConnection.executeQuery
@@ -96,9 +96,9 @@ describe('EdgeRepository', () => {
         .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]);
       mockConnection.executeWrite.mockResolvedValue([]);
 
-      const result = await repository.createEdge('blueprint-123', edgeDataWithoutRef);
+      const result = await repository.createEdge('blueprint-123', edgeDataWithRef);
 
-      expect(result.ref).toEqual(result.id); // ref should equal the generated id
+      expect(result.ref).toEqual('custom-edge-ref');
     });
 
     it('should throw ValidationError for missing required parameters', async () => {

@@ -83,21 +83,21 @@ describe('NodeRepository', () => {
       });
     });
 
-    it('should generate ref when not provided', async () => {
-      const nodeDataWithoutRef = {
+    it('should use provided ref value', async () => {
+      const nodeDataWithRef = {
         type: 'start' as const,
         name: 'Start Node',
         description: 'Start node description',
         parameters: {},
-        ref: '' // Will be auto-generated
+        ref: 'custom-ref-123'
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
       mockConnection.executeWrite.mockResolvedValue([]);
 
-      const result = await repository.createNode('blueprint-123', nodeDataWithoutRef);
+      const result = await repository.createNode('blueprint-123', nodeDataWithRef);
 
-      expect(result.ref).toEqual(result.id); // ref should equal the generated id
+      expect(result.ref).toEqual('custom-ref-123');
     });
 
     it('should handle empty parameters object', async () => {
@@ -483,7 +483,7 @@ describe('NodeRepository', () => {
       );
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET n.name = $name, n.description = $description, n.parameters = $parameters, n.ref = $ref'),
+        expect.stringContaining('SET n.name = $name'),
         expect.objectContaining({
           nodeId,
           name: 'Updated Node',

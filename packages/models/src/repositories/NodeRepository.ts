@@ -29,15 +29,13 @@ export class NodeRepository extends BaseRepository {
       const node: NodeModel = {
         id: nodeId,
         ...nodeData,
-        parameters: nodeData.parameters || {},
-        ref: nodeData.ref || nodeId
+        parameters: nodeData.parameters || {}
       };
 
       // Serialize parameters as JSON string for Neo4j storage
       const nodeProps = {
         ...node,
-        parameters: JSON.stringify(node.parameters),
-        ref: node.ref
+        parameters: JSON.stringify(node.parameters)
       };
 
       await connection.executeWrite(`

@@ -44,8 +44,7 @@ export class EdgeRepository extends BaseRepository {
 
       const edge: EdgeModel = {
         id: edgeId,
-        ...edgeData,
-        ref: edgeData.ref || edgeId
+        ...edgeData
       };
 
       // Create relationship between nodes

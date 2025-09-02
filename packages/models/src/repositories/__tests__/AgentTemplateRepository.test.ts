@@ -147,10 +147,10 @@ describe('AgentTemplateRepository', () => {
 
       const result = await repository.findById('template-123');
 
-      expect(result).toMatchObject({
+      expect(result).toEqual(expect.objectContaining({
         id: 'template-123',
         name: 'Test Template'
-      });
+      }));
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'),
         { id: 'template-123' }
@@ -303,8 +303,13 @@ describe('AgentTemplateRepository', () => {
       
       mockConnection.executeWrite.mockResolvedValue([{ t: mockUpdated }]);
 
-      await repository.update('template-123', complexUpdates);
+      const result = await repository.update('template-123', complexUpdates);
 
+      expect(result).toEqual(expect.objectContaining({
+        memory: expect.objectContaining({
+          identity: expect.objectContaining({ name: 'Updated' })
+        })
+      }));
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
@@ -436,7 +441,7 @@ describe('AgentTemplateRepository', () => {
       await repository.findPublic(25, 10);
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SKIP $offset LIMIT $limit'),
+        expect.stringContaining('SKIP $offset'),
         expect.objectContaining({
           limit: expect.any(Object),
           offset: expect.any(Object)

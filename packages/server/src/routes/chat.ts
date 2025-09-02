@@ -3,7 +3,8 @@ import type { MemoryModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { AgentService } from '../services/AgentService';
-import { RepositoryFactory, ValidationError, NotFoundError } from '@starships/models';
+import { ValidationError, NotFoundError } from '@starships/errors';
+import { RepositoryFactory } from '@starships/models';
 import {
   sendSuccess,
   sendError,

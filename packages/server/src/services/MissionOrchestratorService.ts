@@ -11,7 +11,7 @@ import { MissionService } from './MissionService';
 import { RepositoryFactory } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
-import { ErrorFactory, InternalServerError } from '@starships/models';
+import { ErrorFactory, InternalServerError } from '@starships/errors';
 import type {
   MissionMessageModel,
   MissionChatResponse,

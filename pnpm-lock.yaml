@@ -278,11 +278,27 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
 
+  packages/errors:
+    dependencies:
+      uuid:
+        specifier: ^10.0.0
+        version: 10.0.0
+    devDependencies:
+      '@types/uuid':
+        specifier: ^10.0.0
+        version: 10.0.0
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.3
+
   packages/models:
     dependencies:
       '@starships/autopilot':
         specifier: workspace:*
         version: link:../autopilot
+      '@starships/errors':
+        specifier: workspace:*
+        version: link:../errors
       '@starships/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -360,6 +376,9 @@ importers:
       '@starships/env-config':
         specifier: workspace:*
         version: link:../env-config
+      '@starships/errors':
+        specifier: workspace:*
+        version: link:../errors
       '@starships/models':
         specifier: workspace:*
         version: link:../models

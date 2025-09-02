@@ -6,7 +6,7 @@
  */
 
 import { logger } from './index';
-import { BaseError, ErrorCategory } from '../errors';
+import { BaseError, ErrorCategory } from '@starships/errors';
 
 /**
  * Error severity levels

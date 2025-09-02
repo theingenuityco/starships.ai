@@ -1,0 +1,32 @@
+{
+  "name": "@starships/errors",
+  "version": "1.0.0",
+  "description": "Comprehensive error handling system for Starships.ai",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "starships",
+    "errors",
+    "typescript",
+    "error-handling"
+  ],
+  "author": "Starships.ai Team",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

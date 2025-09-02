@@ -5,7 +5,7 @@
  * performance monitoring, and error tracking capabilities.
  */
 
-import { BaseError, ErrorUtils } from '../errors';
+import { BaseError, ErrorUtils } from '@starships/errors';
 
 /**
  * Log levels in order of severity

@@ -2,7 +2,7 @@
  * Memory Unit Tests
  */
 
-import { Memory, Message, MemoryParams } from '../Memory';
+import { Memory, Message } from '../Memory';
 
 describe('Memory', () => {
   let memory: Memory;

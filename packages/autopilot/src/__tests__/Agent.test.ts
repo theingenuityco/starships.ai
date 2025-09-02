@@ -5,7 +5,7 @@
 import { Agent } from '../Agent';
 import { Engine } from '../engine/Engine';
 import { AgentMemory, AgentMemoryState } from '../AgentMemory';
-import { AgentNodeParameters, Blueprint, Execution, Node, Edge } from '../types';
+import { AgentNodeParameters, Blueprint, Execution } from '../types';
 
 // Mock the Engine
 jest.mock('../engine/Engine');
@@ -636,7 +636,7 @@ describe('Agent', () => {
     it('should create new Engine instance for clone', () => {
       const initialEngineCallCount = MockedEngine.mock.calls.length;
       
-      const cloned = agent.clone();
+      agent.clone();
       
       expect(MockedEngine.mock.calls.length).toBe(initialEngineCallCount + 1);
     });
@@ -781,7 +781,7 @@ describe('Agent', () => {
     it('should create new Engine instance for updated agent', () => {
       const initialEngineCallCount = MockedEngine.mock.calls.length;
       
-      const updated = agent.updateParameters({ name: 'UpdatedAgent' });
+      agent.updateParameters({ name: 'UpdatedAgent' });
       
       expect(MockedEngine.mock.calls.length).toBe(initialEngineCallCount + 1);
     });

@@ -160,9 +160,7 @@ describe('HttpRequest', () => {
         headers: { 'content-type': 'application/json' },
         data: { success: true },
         config: { 
-          url: 'https://api.example.com/test',
-          headers: {},
-          method: 'GET'
+          url: 'https://api.example.com/test'
         }
       } as AxiosResponse;
 

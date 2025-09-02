@@ -44,8 +44,8 @@ export function initializeStarshipRoutes(deps: {
   userRepo = deps.userRepository;
 }
 
-// GET / - Get user's starships
-router.get('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /starships - Get user's starships (OpenAPI pattern)
+router.get('/starships', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
     const { page, limit, error: paginationError } = validatePagination(
@@ -74,8 +74,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
   }
 });
 
-// POST / - Create new starship
-router.post('/', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships - Create new starship (OpenAPI pattern)
+router.post('/starships', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
     const { name, class: starshipClass, plan, billingPeriod } = req.body;
@@ -203,8 +203,8 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
   }
 });
 
-// GET /:id - Get specific starship (supports both ID and slug)
-router.get('/:idOrSlug', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /starships/:id - Get specific starship (supports both ID and slug) (OpenAPI pattern)
+router.get('/starships/:idOrSlug', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { idOrSlug } = req.params;
     const userId = (req as any).user!.id;
@@ -248,8 +248,8 @@ router.get('/:idOrSlug', authMiddleware, async (req: Request, res: Response): Pr
   }
 });
 
-// POST /:id/agents/:agentId - Deploy agent to starship
-router.post('/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships/:id/agents/:agentId - Deploy agent to starship (OpenAPI pattern)
+router.post('/starships/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id: starshipId, agentId } = req.params;
 
@@ -316,8 +316,8 @@ router.post('/:id/agents/:agentId', authMiddleware, async (req: Request, res: Re
   }
 });
 
-// DELETE /:id/agents/:agentId - Remove agent from starship
-router.delete('/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// DELETE /starships/:id/agents/:agentId - Remove agent from starship (OpenAPI pattern)
+router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id: starshipId, agentId } = req.params;
 
@@ -370,8 +370,8 @@ router.delete('/:id/agents/:agentId', authMiddleware, async (req: Request, res: 
   }
 });
 
-// PUT /:id - Update starship (name, status, class)
-router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// PUT /starships/:id - Update starship (name, status, class) (OpenAPI pattern)
+router.put('/starships/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
@@ -474,8 +474,8 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
   }
 });
 
-// DELETE /:id - Cancel subscription first, then delete starship
-router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// DELETE /starships/:id - Cancel subscription first, then delete starship (OpenAPI pattern)
+router.delete('/starships/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
@@ -564,8 +564,8 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
   }
 });
 
-// GET /:id/agents - Get detailed agent information for starship
-router.get('/:id/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /starships/:id/agents - Get detailed agent information for starship (OpenAPI pattern)
+router.get('/starships/:id/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
@@ -615,8 +615,8 @@ router.get('/:id/agents', authMiddleware, async (req: Request, res: Response): P
 
 // Move these routes to separate endpoints following OpenAPI pattern
 
-// GET /pricing - Get pricing data (moved to separate pricing endpoint)
-router.get('/pricing', async (req: Request, res: Response): Promise<void> => {
+// GET /starships/pricing - Get pricing data (OpenAPI pattern)
+router.get('/starships/pricing', async (req: Request, res: Response): Promise<void> => {
   try {
     const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
     const pricing = await subscriptionService.getPricingData();
@@ -628,8 +628,8 @@ router.get('/pricing', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST /checkout-sessions - Create checkout session
-router.post('/checkout-sessions', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships/checkout-sessions - Create checkout session (OpenAPI pattern)
+router.post('/starships/checkout-sessions', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { starshipName, plan, billingPeriod } = req.body;
     const userId = (req as any).user?.id;
@@ -685,8 +685,8 @@ router.post('/checkout-sessions', authMiddleware, async (req: Request, res: Resp
   }
 });
 
-// POST /:id/billing-portal - Create billing portal session
-router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships/:id/billing-portal - Create billing portal session (OpenAPI pattern)
+router.post('/starships/:id/billing-portal', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user?.id;
@@ -715,8 +715,8 @@ router.post('/:id/billing-portal', authMiddleware, async (req: Request, res: Res
   }
 });
 
-// POST /:id/retry-payment - Retry payment for pending starship
-router.post('/:id/retry-payment', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships/:id/retry-payment - Retry payment for pending starship (OpenAPI pattern)
+router.post('/starships/:id/retry-payment', authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user?.id;

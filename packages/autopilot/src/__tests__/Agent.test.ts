@@ -315,8 +315,8 @@ describe('Agent', () => {
     it('should merge with initial execution if provided', async () => {
       const initialExecution: Partial<Execution> = {
         currentNodeRef: 'start',
-        status: 'in_progress',
-        executionResults: new Map([['test', { status: 'completed', data: 'test-data' }]])
+        status: 'running',
+        executionResults: new Map([['test', { nodeRef: 'test', data: 'test-data' }]])
       };
 
       await agent.execute(initialExecution as Execution);
@@ -331,8 +331,8 @@ describe('Agent', () => {
         })
       );
       
-      const executionArg = mockEngine.execute.mock.calls[0][1];
-      expect(executionArg.executionResults.get('test')).toEqual({ status: 'completed', data: 'test-data' });
+      const executionArg = mockEngine.execute.mock.calls[0][1]!;
+      expect(executionArg.executionResults.get('test')).toEqual({ nodeRef: 'test', data: 'test-data' });
     });
 
     it('should always include agent memory in execution', async () => {
@@ -340,7 +340,7 @@ describe('Agent', () => {
       
       await agent.execute();
       
-      const executionArg = mockEngine.execute.mock.calls[0][1];
+      const executionArg = mockEngine.execute.mock.calls[0][1]!;
       expect(executionArg.agentMemory).toBe(agent.getMemory());
       expect(executionArg.agentMemory.getMessageHistory()).toHaveLength(1);
     });
@@ -348,7 +348,7 @@ describe('Agent', () => {
     it('should return execution result from engine', async () => {
       const mockResult: Execution = {
         status: 'completed',
-        executionResults: new Map([['result', { status: 'completed', data: 'final-result' }]]),
+        executionResults: new Map([['result', { nodeRef: 'result', data: 'final-result' }]]),
         agentMemory: agent.getMemory()
       };
       
@@ -544,7 +544,7 @@ describe('Agent', () => {
 
     it('should accumulate multiple validation errors', () => {
       const invalidParams = {
-        // Missing name
+        name: '', // Empty name
         model: '', // Empty model
         temperature: 5, // Invalid temperature
         maxTokens: -1, // Invalid maxTokens
@@ -571,7 +571,7 @@ describe('Agent', () => {
   describe('clone', () => {
     beforeEach(() => {
       // Setup agent with full data for thorough cloning test
-      agent.addToMemory('system', 'System prompt');
+      agent.addToMemory('user', 'System prompt');
       agent.addToMemory('user', 'User message');
     });
 
@@ -826,7 +826,7 @@ describe('Agent', () => {
           { ref: 'decision', type: 'conditional', name: 'Decision', description: 'Decision node', parameters: {} },
           { ref: 'agent1', type: 'agent', name: 'Agent 1', description: 'First agent', parameters: {} },
           { ref: 'agent2', type: 'agent', name: 'Agent 2', description: 'Second agent', parameters: {} },
-          { ref: 'http', type: 'http-request', name: 'HTTP Call', description: 'HTTP request', parameters: {} },
+          { ref: 'http', type: 'http_request', name: 'HTTP Call', description: 'HTTP request', parameters: {} },
           { ref: 'output', type: 'output', name: 'Output', description: 'Output node', parameters: {} },
           { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
         ],

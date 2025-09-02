@@ -251,7 +251,7 @@ describe('LLM', () => {
       await llm.execute(execution);
 
       const httpRequestCall = MockedHttpRequest.mock.calls[0][0];
-      expect(httpRequestCall.body.messages).toEqual([
+      expect((httpRequestCall.body as any).messages).toEqual([
         { role: 'system', content: 'You are helpful' },
         { role: 'user', content: 'Previous message' },
         { role: 'user', content: 'Hello, how can I help you?' }
@@ -276,14 +276,14 @@ describe('LLM', () => {
       await customLlm.execute();
 
       const httpRequestCall = MockedHttpRequest.mock.calls[0][0];
-      expect(httpRequestCall.headers['Authorization']).toBe('Bearer custom-key');
-      expect(httpRequestCall.body.model).toBe('anthropic/claude-3-opus');
-      expect(httpRequestCall.body.temperature).toBe(0.5);
-      expect(httpRequestCall.body.max_tokens).toBe(500);
-      expect(httpRequestCall.body.top_p).toBe(0.8);
-      expect(httpRequestCall.body.frequency_penalty).toBe(0.2);
-      expect(httpRequestCall.body.presence_penalty).toBe(-0.2);
-      expect(httpRequestCall.body.stream).toBe(true);
+      expect(httpRequestCall.headers!['Authorization']).toBe('Bearer custom-key');
+      expect((httpRequestCall.body as any).model).toBe('anthropic/claude-3-opus');
+      expect((httpRequestCall.body as any).temperature).toBe(0.5);
+      expect((httpRequestCall.body as any).max_tokens).toBe(500);
+      expect((httpRequestCall.body as any).top_p).toBe(0.8);
+      expect((httpRequestCall.body as any).frequency_penalty).toBe(0.2);
+      expect((httpRequestCall.body as any).presence_penalty).toBe(-0.2);
+      expect((httpRequestCall.body as any).stream).toBe(true);
       expect(httpRequestCall.timeout).toBe(20000);
     });
 

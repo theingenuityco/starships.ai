@@ -159,7 +159,11 @@ describe('HttpRequest', () => {
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
         data: { success: true },
-        config: { url: 'https://api.example.com/test' }
+        config: { 
+          url: 'https://api.example.com/test',
+          headers: {},
+          method: 'GET'
+        }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -638,7 +642,7 @@ describe('HttpRequest', () => {
     it('should fail validation with invalid HTTP method', () => {
       const invalidParams = {
         url: 'https://api.example.com/test',
-        method: 'INVALID'
+        method: 'INVALID' as any
       } as HttpRequestNodeParameters;
       const invalidRequest = new HttpRequest(invalidParams);
       
@@ -733,7 +737,7 @@ describe('HttpRequest', () => {
     it('should accumulate multiple validation errors', () => {
       const invalidParams = {
         url: 'invalid-url',
-        method: 'INVALID',
+        method: 'INVALID' as any,
         timeout: 500,
         retries: -1,
         authentication: { type: 'bearer' }

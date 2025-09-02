@@ -33,7 +33,7 @@ export default function MissionsPage({ params }: MissionsPageProps) {
 
   if (loading) {
     return (
-      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+      <div className="h-full bg-background p-8 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
       </div>
     );
@@ -41,7 +41,7 @@ export default function MissionsPage({ params }: MissionsPageProps) {
 
   if (error || !starship) {
     return (
-      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+      <div className="h-full bg-background p-8 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 mb-2">⚠️ Error</div>
           <p className="text-muted-foreground">{error || 'Starship not found'}</p>
@@ -51,7 +51,7 @@ export default function MissionsPage({ params }: MissionsPageProps) {
   }
 
   return (
-    <div className="h-full command-deck-bg p-8">
+    <div className="h-full bg-background p-8">
       <div className="max-w-6xl mx-auto">
         <MissionList starshipId={starship.id} starshipSlug={slug} showCreateButton={true} />
       </div>

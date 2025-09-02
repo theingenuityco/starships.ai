@@ -1,33 +1,15 @@
 import React from 'react';
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { ProximityState } from '@/hooks/useProximityDetection';
-
-interface CommandDeckState {
-  visibility: 'collapsed' | 'partial' | 'expanded';
-  proximityState: ProximityState;
-  lastInteraction: Date;
-  hasFocus: boolean;
-  isHovered: boolean;
-}
 
 interface StarshipUIState {
   // UI-only state
   activeStarshipId: string | null;
   currentRoute: string;
-  commandDeck: CommandDeckState;
   
   // UI actions
   setActiveStarship: (id: string | null) => void;
   navigateTo: (route: string) => void;
-  
-  // Command deck actions
-  setCommandDeckVisibility: (visibility: CommandDeckState['visibility']) => void;
-  updateProximityState: (proximityState: ProximityState) => void;
-  expandCommandDeck: () => void;
-  collapseCommandDeck: () => void;
-  setCommandDeckFocus: (hasFocus: boolean) => void;
-  setCommandDeckHover: (isHovered: boolean) => void;
 }
 
 export const useStarshipUIStore = create<StarshipUIState>()(
@@ -37,13 +19,6 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         // Initial state
         activeStarshipId: null,
         currentRoute: '/',
-        commandDeck: {
-          visibility: 'collapsed',
-          proximityState: 'far',
-          lastInteraction: new Date(),
-          hasFocus: false,
-          isHovered: false
-        },
 
         // UI actions
         setActiveStarship: (id: string | null) => {
@@ -61,68 +36,12 @@ export const useStarshipUIStore = create<StarshipUIState>()(
 
         navigateTo: (route: string) =>
           set({ currentRoute: route }, false, 'ui/navigate'),
-
-        // Command deck actions
-        setCommandDeckVisibility: (visibility) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              visibility,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/setVisibility'),
-
-        updateProximityState: (proximityState) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              proximityState,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/updateProximity'),
-
-        expandCommandDeck: () =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              visibility: 'expanded',
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/expand'),
-
-        collapseCommandDeck: () =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              visibility: 'collapsed',
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/collapse'),
-
-        setCommandDeckFocus: (hasFocus) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              hasFocus,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/setFocus'),
-
-        setCommandDeckHover: (isHovered) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              isHovered,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/setHover'),
       }),
       {
         name: 'starship-ui-store',
         partialize: (state) => ({
           activeStarshipId: state.activeStarshipId,
           currentRoute: state.currentRoute,
-          // Don't persist command deck state - should reset on reload
         })
       }
     ),

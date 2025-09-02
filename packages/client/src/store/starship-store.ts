@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { ProximityState } from '@/hooks/useProximityDetection';
 import { starshipAPI, type Starship } from '@/lib/api';
 import { extractErrorMessage } from '@/lib/error-utils';
 import type { StarshipAgentsResponse } from '@starships/protocol';
@@ -14,14 +13,6 @@ interface UpdateStarshipRequest {
 
 interface UpdateStarshipStatusRequest {
   status: 'active' | 'inactive';
-}
-
-interface CommandDeckState {
-  visibility: 'collapsed' | 'partial' | 'expanded';
-  proximityState: ProximityState;
-  lastInteraction: Date;
-  hasFocus: boolean;
-  isHovered: boolean;
 }
 
 interface StarshipState {
@@ -46,9 +37,6 @@ interface StarshipState {
   
   // Agent data cache
   starshipAgents: Record<string, StarshipAgentsResponse>;
-  
-  // Command deck state (preserved)
-  commandDeck: CommandDeckState;
   
   // Legacy fields for backward compatibility (derived from active starship)
   get class(): 'scout' | 'cruiser' | 'draught';
@@ -81,14 +69,6 @@ interface StarshipActions {
   clearErrors: () => void;
   clearError: (errorType: 'update' | 'delete' | 'status' | 'agents') => void;
   
-  // Command deck actions (preserved)
-  setCommandDeckVisibility: (visibility: CommandDeckState['visibility']) => void;
-  updateProximityState: (proximityState: ProximityState) => void;
-  expandCommandDeck: () => void;
-  collapseCommandDeck: () => void;
-  setCommandDeckFocus: (hasFocus: boolean) => void;
-  setCommandDeckHover: (isHovered: boolean) => void;
-  
   // Legacy actions for backward compatibility
   navigateTo: (route: string) => void;
 }
@@ -120,14 +100,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
         starshipAgents: {},
         
         currentRoute: '/',
-        
-        commandDeck: {
-          visibility: 'collapsed',
-          proximityState: 'far',
-          lastInteraction: new Date(),
-          hasFocus: false,
-          isHovered: false
-        },
 
         // Computed properties for backward compatibility
         get class() {
@@ -399,61 +371,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
         },
 
 
-        // Command deck actions (preserved)
-        setCommandDeckVisibility: (visibility) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              visibility,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/setVisibility'),
-
-        updateProximityState: (proximityState) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              proximityState,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/updateProximity'),
-
-        expandCommandDeck: () =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              visibility: 'expanded',
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/expand'),
-
-        collapseCommandDeck: () =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              visibility: 'collapsed',
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/collapse'),
-
-        setCommandDeckFocus: (hasFocus) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              hasFocus,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/setFocus'),
-
-        setCommandDeckHover: (isHovered) =>
-          set((state) => ({
-            commandDeck: {
-              ...state.commandDeck,
-              isHovered,
-              lastInteraction: new Date()
-            }
-          }), false, 'commandDeck/setHover'),
-
         // Legacy actions for backward compatibility
         navigateTo: (route) =>
           set({ currentRoute: route }, false, 'navigation/navigate')
@@ -464,7 +381,6 @@ export const useStarshipStore = create<StarshipState & StarshipActions>()(
           activeStarshipId: state.activeStarshipId,
           currentRoute: state.currentRoute,
           // Don't persist starships array - reload from API
-          // Don't persist command deck state - should reset on reload
         })
       }
     ),

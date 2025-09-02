@@ -60,6 +60,11 @@ export class AgentMemory extends Memory {
   constructor(params: AgentMemoryParams = {}) {
     // Call parent constructor first
     super(params);
+    
+    // Initialize state from params if provided
+    if (params.state) {
+      this.state = { ...this.state, ...params.state };
+    }
   }
 
   /**
@@ -149,11 +154,16 @@ export class AgentMemory extends Memory {
    */
   toMessages(): Message[] {
     const messages: Message[] = [];
+    const allMessages = super.getMessages();
     
-    // Add structured system context if available
+    // Add system messages first
+    const systemMessages = allMessages.filter(msg => msg.role === 'system');
+    messages.push(...systemMessages);
+    
+    // Add structured system context if available and no system messages exist
     const systemContext = this.buildSystemContext();
-    if (systemContext) {
-      messages.push({
+    if (systemContext && systemMessages.length === 0) {
+      messages.unshift({
         id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         role: 'system',
@@ -161,13 +171,9 @@ export class AgentMemory extends Memory {
       });
     }
 
-    // Add all other messages (excluding system messages we'll replace)
-    const nonSystemMessages = super.getMessages().filter(msg => msg.role !== 'system');
+    // Add all non-system messages
+    const nonSystemMessages = allMessages.filter(msg => msg.role !== 'system');
     messages.push(...nonSystemMessages);
-
-    // Add any remaining system messages that aren't part of structured context
-    const remainingSystemMessages = super.getMessages().filter(msg => msg.role === 'system');
-    messages.push(...remainingSystemMessages);
 
     return messages;
   }

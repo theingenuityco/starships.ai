@@ -2,7 +2,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, XCircle } from 'lucide-react';
-import api from '@/lib/api';
+import { starshipAPI } from '@/lib/api';
 
 interface PaymentStatusBannerProps {
   starship: {
@@ -16,9 +16,9 @@ interface PaymentStatusBannerProps {
 export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
   const handleManageSubscription = async () => {
     try {
-      const response = await api.post(`/api/starships/${starship.id}/billing-portal`);
-      if (response.data.url) {
-        window.location.href = response.data.url;
+      const response = await starshipAPI.createBillingPortal(starship.id);
+      if (response.url) {
+        window.location.href = response.url;
       }
     } catch (error) {
       console.error('Failed to open billing portal:', error);
@@ -27,9 +27,9 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
 
   const handleRetryPayment = async () => {
     try {
-      const response = await api.post(`/api/starships/${starship.id}/retry-payment`);
-      if (response.data.checkoutUrl) {
-        window.location.href = response.data.checkoutUrl;
+      const response = await starshipAPI.retryPayment(starship.id);
+      if (response.checkoutUrl) {
+        window.location.href = response.checkoutUrl;
       }
     } catch (error) {
       console.error('Failed to retry payment:', error);

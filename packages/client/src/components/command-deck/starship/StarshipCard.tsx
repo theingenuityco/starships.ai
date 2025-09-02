@@ -29,8 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useStarshipStore } from '@/store/starship-store'
 import { cn } from '@/lib/utils'
-import type { Starship } from '@/lib/api'
-import api from '@/lib/api'
+import { starshipAPI, type Starship } from '@/lib/api'
 import { toast } from 'sonner'
 
 interface StarshipCardProps {
@@ -166,9 +165,10 @@ export function StarshipCard({
   const handleRetryPayment = async (e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      const response = await api.post(`/api/starships/${starship.id}/retry-payment`)
-      if (response.data.checkoutUrl) {
-        window.location.href = response.data.checkoutUrl
+      // Use the typed API method instead of direct api call
+      const response = await starshipAPI.retryPayment(starship.id)
+      if (response.checkoutUrl) {
+        window.location.href = response.checkoutUrl
       }
     } catch (error) {
       console.error('Failed to retry payment:', error)
@@ -179,9 +179,10 @@ export function StarshipCard({
   const handleManageSubscription = async (e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      const response = await api.post(`/api/starships/${starship.id}/billing-portal`)
-      if (response.data.url) {
-        window.location.href = response.data.url
+      // Use the typed API method instead of direct api call
+      const response = await starshipAPI.createBillingPortal(starship.id)
+      if (response.url) {
+        window.location.href = response.url
       }
     } catch (error) {
       console.error('Failed to open billing portal:', error)

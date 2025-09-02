@@ -52,8 +52,8 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   const { user, userName, userEmail, isAuthenticated } = useAuth();
   const pathname = usePathname();
 
-  // Extract starships from the response
-  const starships = starshipsData?.starships || [];
+  // Extract starships from the response with better error handling
+  const starships = Array.isArray(starshipsData?.starships) ? starshipsData.starships : [];
   const loading = isLoading || createStarshipMutation.isPending;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,22 +81,30 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   }, [autoOpenCreate]);
 
   // Filter starships based on search query and active filter
-  const filteredStarships = starships.filter((starship: any) => {
+  const filteredStarships = Array.isArray(starships) ? starships.filter((starship: any) => {
+    // Ensure starship object has required properties
+    if (!starship || typeof starship !== 'object') return false;
+    
+    // Safely access properties with fallbacks
+    const name = starship.name || '';
+    const starshipClass = starship.class || '';
+    const status = starship.status || '';
+    
     // Search filter
-    const matchesSearch = starship.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      starship.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      starship.status.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      starshipClass.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      status.toLowerCase().includes(searchQuery.toLowerCase());
     
     // Status/type filter
     const matchesFilter =
       activeFilter === 'all' ||
-      (activeFilter === 'active' && starship.status === 'active') ||
-      (activeFilter === 'inactive' && starship.status === 'inactive') ||
-      (activeFilter === 'scout' && starship.class === 'scout') ||
-      (activeFilter === 'cruiser' && starship.class === 'cruiser');
+      (activeFilter === 'active' && status === 'active') ||
+      (activeFilter === 'inactive' && status === 'inactive') ||
+      (activeFilter === 'scout' && starshipClass === 'scout') ||
+      (activeFilter === 'cruiser' && starshipClass === 'cruiser');
     
     return matchesSearch && matchesFilter;
-  });
+  }) : [];
 
   const handleStarshipSelect = (starshipId: string) => {
     setActiveStarship(starshipId);
@@ -126,13 +134,13 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     // TanStack Query handles refetching automatically
   };
 
-  // Fleet overview stats
+  // Fleet overview stats with safety checks
   const fleetStats = {
-    total: starships.length,
-    active: starships.filter((s: any) => s.status === 'active').length,
-    inactive: starships.filter((s: any) => s.status === 'inactive').length,
-    scouts: starships.filter((s: any) => s.class === 'scout').length,
-    cruisers: starships.filter((s: any) => s.class === 'cruiser').length
+    total: Array.isArray(starships) ? starships.length : 0,
+    active: Array.isArray(starships) ? starships.filter((s: any) => s?.status === 'active').length : 0,
+    inactive: Array.isArray(starships) ? starships.filter((s: any) => s?.status === 'inactive').length : 0,
+    scouts: Array.isArray(starships) ? starships.filter((s: any) => s?.class === 'scout').length : 0,
+    cruisers: Array.isArray(starships) ? starships.filter((s: any) => s?.class === 'cruiser').length : 0
   };
 
   if (isLoading && starships.length === 0) {

@@ -164,9 +164,13 @@ export function loadKindeRuntimeConfig(): ServerEnvironmentConfig {
 export function loadApiRuntimeConfig(): { apiUrl: string; serverUrl: string; enableAuthTestingBackdoor: boolean } {
   // Use environment variables that can be set at runtime
   // These replace the NEXT_PUBLIC_ variables that were baked in at build time
-  const apiUrl = process.env.API_URL || 'http://localhost:4000/api';
-  const serverUrl = process.env.SERVER_URL || 'http://localhost:4000';
+  const apiUrl = process.env.API_URL!;
+  const serverUrl = process.env.SERVER_URL!;
   const enableAuthTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
+  
+  if (!apiUrl || !serverUrl) {
+    throw new Error('API_URL and SERVER_URL must be provided as environment variables');
+  }
   
   return { apiUrl, serverUrl, enableAuthTestingBackdoor };
 }

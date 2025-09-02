@@ -3,6 +3,7 @@
  */
 
 import type { Response } from 'express';
+import { BaseError, ErrorUtils } from '@starships/errors';
 
 // Standard response interfaces
 export interface ApiResponse<T = any> {
@@ -187,7 +188,14 @@ export function validateUUID(id: string, fieldName: string): {
 export function handleCommonError(error: any, res: Response, context: string): boolean {
   console.error(`Error in ${context}:`, error);
 
-  // Handle known error types
+  // Check if it's already a structured error from @starships/errors
+  if (ErrorUtils.isApplicationError(error)) {
+    const response = error.toResponse();
+    sendError(res, response.code, response.message, response.statusCode, response.details);
+    return true;
+  }
+
+  // Handle known error types by name for backward compatibility
   if (error.name === 'ValidationError' || error.constructor.name === 'ValidationError') {
     sendError(res, ERROR_CODES.VALIDATION_ERROR, error.message, 400, {
       field: error.field,

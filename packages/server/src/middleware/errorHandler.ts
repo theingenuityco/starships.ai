@@ -17,7 +17,6 @@ import {
   NetworkError,
   InternalServerError,
   ServiceUnavailableError,
-  ErrorFactory,
 } from '@starships/errors';
 
 // Define local types that were previously imported from protocol
@@ -429,9 +428,11 @@ export function asyncHandler<T extends Request, U extends Response>(
  * Not found handler middleware
  */
 export function notFoundHandler(req: Request, res: Response, next: NextFunction): void {
-  const error = ErrorFactory.notFound(
+  const error = new NotFoundError(
+    `${req.method} ${req.path} not found`,
     'Endpoint',
     `${req.method} ${req.path}`,
+    undefined,
     req.get('X-Request-ID'),
     req.path
   );
@@ -551,7 +552,6 @@ export { ErrorLogger, DEFAULT_CONFIG as defaultErrorHandlerConfig };
 
 // Export error classes for convenience
 export {
-  ErrorFactory,
   DatabaseError,
   ValidationError,
   AuthenticationError,

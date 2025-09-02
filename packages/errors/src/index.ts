@@ -325,6 +325,50 @@ export class InternalServerError extends BaseError {
 }
 
 /**
+ * Rate Limit Error (429)
+ */
+export class RateLimitError extends BaseError {
+  public readonly limit?: number;
+  public readonly retryAfter?: number;
+  public readonly remainingAttempts?: number;
+
+  constructor(
+    message: string = 'Rate limit exceeded',
+    limit?: number,
+    retryAfter?: number,
+    remainingAttempts?: number,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(
+      message,
+      'RATE_LIMIT_ERROR',
+      429,
+      ErrorCategory.RATE_LIMIT,
+      details,
+      requestId,
+      path
+    );
+    this.limit = limit;
+    this.retryAfter = retryAfter;
+    this.remainingAttempts = remainingAttempts;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      details: {
+        ...this.details,
+        limit: this.limit,
+        retryAfter: this.retryAfter,
+        remainingAttempts: this.remainingAttempts,
+      },
+    };
+  }
+}
+
+/**
  * Service Unavailable Error (503)
  */
 export class ServiceUnavailableError extends BaseError {
@@ -365,55 +409,6 @@ export class ServiceUnavailableError extends BaseError {
 }
 
 /**
- * Error factory for creating errors with context
- */
-export class ErrorFactory {
-  /**
-   * Create error with request context
-   */
-  static createWithContext(
-    ErrorClass: new (...args: any[]) => BaseError,
-    message: string,
-    requestId?: string,
-    path?: string,
-    ...additionalArgs: any[]
-  ): BaseError {
-    return new ErrorClass(message, ...additionalArgs, requestId, path);
-  }
-
-  /**
-   * Create validation error with field context
-   */
-  static validation(
-    message: string,
-    field?: string,
-    requestId?: string,
-    path?: string
-  ): ValidationError {
-    return new ValidationError(message, field, undefined, requestId, path);
-  }
-
-  /**
-   * Create not found error with entity context
-   */
-  static notFound(
-    entityType: string,
-    entityId: string,
-    requestId?: string,
-    path?: string
-  ): NotFoundError {
-    return new NotFoundError(
-      `${entityType} with ID ${entityId} not found`,
-      entityType,
-      entityId,
-      undefined,
-      requestId,
-      path
-    );
-  }
-}
-
-/**
  * Error utilities for common operations
  */
 export class ErrorUtils {
@@ -433,8 +428,96 @@ export class ErrorUtils {
     }
 
     // Handle specific error types
-    if (error?.name === 'ValidationError') {
-      return new ValidationError(error.message, error.field, undefined, requestId, path);
+    if (error?.name === 'ValidationError' || error?.type === 'validation') {
+      return new ValidationError(
+        error.message || 'Validation failed',
+        error.field,
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'UnauthorizedError' || error?.status === 401) {
+      return new AuthenticationError(
+        error.message || 'Authentication failed',
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'ForbiddenError' || error?.status === 403) {
+      return new AuthorizationError(
+        error.message || 'Access denied',
+        undefined, // requiredPermission
+        undefined, // userRole
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'NotFoundError' || error?.status === 404) {
+      return new NotFoundError(
+        error.message || 'Resource not found',
+        'Resource',
+        'unknown',
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'ConflictError' || error?.status === 409) {
+      return new ConflictError(
+        error.message || 'Conflict occurred',
+        undefined,
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    // Handle database errors
+    if (
+      error?.name === 'DatabaseError' ||
+      error?.code?.startsWith('ER_') ||
+      error?.code?.startsWith('SQLITE_')
+    ) {
+      return new DatabaseError(
+        error.message || 'Database operation failed',
+        'database_operation',
+        undefined,
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    // Handle network/HTTP errors
+    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' || error?.code === 'ETIMEDOUT') {
+      return new NetworkError(
+        error.message || 'Network operation failed',
+        'external_service',
+        undefined,
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    // Handle rate limit errors
+    if (error?.status === 429 || error?.name === 'TooManyRequestsError') {
+      return new RateLimitError(
+        error.message || 'Rate limit exceeded',
+        error.limit,
+        error.retryAfter,
+        error.remainingAttempts,
+        { originalError: error },
+        requestId,
+        path
+      );
     }
 
     // Default to internal server error

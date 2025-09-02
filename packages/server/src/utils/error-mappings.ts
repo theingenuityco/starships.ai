@@ -7,7 +7,7 @@
 
 import {
   ErrorCategory,
-} from '@starships/models';
+} from '@starships/errors';
 
 // Define StandardErrorCode locally since it's server-specific
 type StandardErrorCode =

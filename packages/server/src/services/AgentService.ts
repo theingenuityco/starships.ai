@@ -10,6 +10,7 @@ import { AgentRepository, RepositoryFactory } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
+import { ValidationError, NotFoundError, InternalServerError } from '@starships/errors';
 import getStore, { type MemoryStore } from '../store';
 
 export interface AgentOptions {
@@ -210,7 +211,7 @@ export class AgentService {
     if (request.blueprint) {
       const validation = this.validateBlueprint(request.blueprint);
       if (!validation.valid) {
-        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
       }
     }
 
@@ -269,7 +270,7 @@ export class AgentService {
     if (updates.blueprint) {
       const validation = this.validateBlueprint(updates.blueprint);
       if (!validation.valid) {
-        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
       }
     }
 
@@ -327,7 +328,7 @@ export class AgentService {
     const { agentId, userId, message, sessionId } = request;
 
     if (!agentId) {
-      throw new Error('agentId is required for agent chat');
+      throw new ValidationError('agentId is required for agent chat', 'agentId');
     }
 
     console.log('🚀 [AGENT-SERVICE] Starting agent chat:', {
@@ -344,7 +345,7 @@ export class AgentService {
 
     if (!dbAgent) {
       console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
-      throw new Error(`Agent ${agentId} not found`);
+      throw new NotFoundError(`Agent ${agentId} not found`, 'Agent', agentId);
     }
 
     console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
@@ -473,7 +474,7 @@ export class AgentService {
       // Get database agent
       const dbAgent = await this.agentRepository.findById(context.agentId);
       if (!dbAgent) {
-        throw new Error(`Agent ${context.agentId} not found`);
+        throw new NotFoundError(`Agent ${context.agentId} not found`, 'Agent', context.agentId);
       }
 
       // Create agent instance
@@ -628,7 +629,7 @@ export class AgentService {
    */
   private extractResponse(executionResult: any): string {
     if (executionResult.status !== 'completed') {
-      throw new Error(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`);
+      throw new InternalServerError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`);
     }
 
     // Look for LLM response in execution results

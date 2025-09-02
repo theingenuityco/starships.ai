@@ -49,7 +49,7 @@ export {
   NetworkError,
   ServiceUnavailableError,
   InternalServerError,
-  ErrorFactory,
+  RateLimitError,
   ErrorUtils,
   ErrorCategory
 } from '@starships/errors';

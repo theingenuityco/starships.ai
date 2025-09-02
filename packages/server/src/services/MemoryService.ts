@@ -15,6 +15,7 @@ import type {
   SearchMemoriesResponse,
   MemoryFilters
 } from '@starships/protocol';
+import { NotFoundError } from '@starships/errors';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface MemoryServiceOptions {
@@ -325,7 +326,7 @@ export class MemoryService {
     // Get current memory
     const memory = await this.memoryRepository.findById(memoryId);
     if (!memory) {
-      throw new Error(`Memory ${memoryId} not found`);
+      throw new NotFoundError(`Memory ${memoryId} not found`, 'Memory', memoryId);
     }
 
     // Add message to existing messages
@@ -359,7 +360,7 @@ export class MemoryService {
     // Get current memory
     const memory = await this.memoryRepository.findById(memoryId);
     if (!memory) {
-      throw new Error(`Memory ${memoryId} not found`);
+      throw new NotFoundError(`Memory ${memoryId} not found`, 'Memory', memoryId);
     }
 
     return await this.memoryRepository.update(memoryId, {
@@ -562,7 +563,7 @@ export class MemoryService {
     // Get source memory
     const sourceMemory = await this.memoryRepository.findById(sourceMemoryId);
     if (!sourceMemory) {
-      throw new Error(`Source memory ${sourceMemoryId} not found`);
+      throw new NotFoundError(`Source memory ${sourceMemoryId} not found`, 'Memory', sourceMemoryId);
     }
 
     // Create cloned memory
@@ -602,7 +603,7 @@ export class MemoryService {
     // Get all memories
     const targetMemory = await this.memoryRepository.findById(targetMemoryId);
     if (!targetMemory) {
-      throw new Error(`Target memory ${targetMemoryId} not found`);
+      throw new NotFoundError(`Target memory ${targetMemoryId} not found`, 'Memory', targetMemoryId);
     }
 
     const sourceMemories = await Promise.all(
@@ -612,7 +613,7 @@ export class MemoryService {
     // Check for missing source memories
     const missingMemories = sourceMemoryIds.filter((id, index) => !sourceMemories[index]);
     if (missingMemories.length > 0) {
-      throw new Error(`Source memories not found: ${missingMemories.join(', ')}`);
+      throw new NotFoundError(`Source memories not found: ${missingMemories.join(', ')}`, 'Memory', missingMemories[0]);
     }
 
     // Merge messages and metadata

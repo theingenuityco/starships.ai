@@ -407,37 +407,12 @@ router.get('/missions/:id/clarity', async (req: Request, res: Response): Promise
 
     const clarity = await MissionService.getMissionClarity(id);
 
-    res.json({ 
-      success: true, 
-      data: clarity 
-    });
+    sendSuccess(res, clarity);
 
   } catch (error) {
-    console.error('Error fetching mission clarity:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'fetching mission clarity')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch mission clarity');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'MISSION_NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 
@@ -474,37 +449,12 @@ router.get('/missions/:id/workflow', async (req: Request, res: Response): Promis
 
     // Return null workflow when not found instead of 404 error
     // This allows the UI to display "No workflow data available" gracefully
-    res.json({ 
-      success: true, 
-      data: { workflow, agents } 
-    });
+    sendSuccess(res, { workflow, agents });
 
   } catch (error) {
-    console.error('Error fetching mission workflow:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'fetching mission workflow')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch mission workflow');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'WORKFLOW_NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 
@@ -516,21 +466,17 @@ router.put('/missions/:id/workflow/approval', async (req: Request, res: Response
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'User not authenticated',
-        code: 'UNAUTHORIZED'
-      });
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
     
     validateUUID(id, 'id');
     
     if (approvalStatus !== 'approved' && approvalStatus !== 'rejected') {
-      res.status(400).json({
-        success: false,
-        error: 'approvalStatus must be either "approved" or "rejected"',
-        code: 'VALIDATION_ERROR'
+      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'approvalStatus must be either "approved" or "rejected"', 400, {
+        field: 'approvalStatus',
+        allowed_values: ['approved', 'rejected'],
+        provided: approvalStatus,
       });
       return;
     }
@@ -547,42 +493,17 @@ router.put('/missions/:id/workflow/approval', async (req: Request, res: Response
     // This will trigger the workflow state transition
     await orchestrator.handleUserMessage(id, userId, message);
 
-    res.json({ 
-      success: true,
-      data: {
-        approvalStatus,
-        message: approvalStatus === 'approved'
-          ? 'Workflow approved, transitioning to execution phase' 
-          : 'Workflow rejected, generating revised workflow'
-      }
+    sendSuccess(res, {
+      approvalStatus,
+      message: approvalStatus === 'approved'
+        ? 'Workflow approved, transitioning to execution phase'
+        : 'Workflow rejected, generating revised workflow'
     });
 
   } catch (error) {
-    console.error('Error approving mission workflow:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'approving mission workflow')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to approve mission workflow');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'WORKFLOW_NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 
@@ -593,11 +514,7 @@ router.post('/missions/:id/regenerate-workflow', async (req: Request, res: Respo
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ 
-        success: false, 
-        error: 'User not authenticated',
-        code: 'UNAUTHORIZED'
-      });
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
 
@@ -610,37 +527,12 @@ router.post('/missions/:id/regenerate-workflow', async (req: Request, res: Respo
     const orchestrator = MissionOrchestratorService.getInstance();
     await orchestrator.handleUserMessage(id, userId, 'Please generate a new execution workflow for this mission.');
 
-    res.json({ 
-      success: true,
-      data: { message: 'Workflow regeneration initiated' }
-    });
+    sendSuccess(res, { message: 'Workflow regeneration initiated' });
 
   } catch (error) {
-    console.error('Error regenerating mission workflow:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'regenerating mission workflow')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to regenerate mission workflow');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'WORKFLOW_NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 
@@ -651,10 +543,7 @@ router.get('/missions/:id/execution-status', async (req: Request, res: Response)
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ 
-        success: false,
-        error: 'User not authenticated' 
-      });
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
 
@@ -662,37 +551,15 @@ router.get('/missions/:id/execution-status', async (req: Request, res: Response)
 
     const mission = await MissionService.getMissionById(id);
     
-    res.json({
-      success: true,
-      data: {
-        executionState: null, // Execution state now managed by autopilot workflow system
-        phase: mission.phase
-      }
+    sendSuccess(res, {
+      executionState: null, // Execution state now managed by autopilot workflow system
+      phase: mission.phase
     });
 
   } catch (error) {
-    console.error('Error getting execution status:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error)
-      });
-      return;
+    if (!handleCommonError(error, res, 'getting mission execution status')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to get mission execution status');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: 'Mission not found'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
-    });
   }
 });
 

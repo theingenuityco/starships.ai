@@ -177,16 +177,16 @@ router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, re
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({
-        success: false,
-        error: 'User not authenticated',
-        code: 'UNAUTHORIZED'
-      });
+      sendError(res, "AUTHENTICATION_REQUIRED", 'User not authenticated', 401);
       return;
     }
 
     // Validate memoryId is a UUID
-    validateUUID(memoryId, 'memoryId');
+    const memoryValidation = validateUUID(memoryId, 'memoryId');
+    if (!memoryValidation.isValid && memoryValidation.error) {
+      sendError(res, memoryValidation.error.code, memoryValidation.error.message, 400, memoryValidation.error.details);
+      return;
+    }
 
     // Parse limit and offset parameters
     const limit = Math.floor(parseInt(req.query.limit as string) || 50);
@@ -194,19 +194,19 @@ router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, re
     
     // Validate limit range
     if (limit < 1 || limit > 200) {
-      res.status(400).json({
-        success: false,
-        error: 'Limit must be between 1 and 200',
-        code: 'VALIDATION_ERROR'
+      sendError(res, "VALIDATION_ERROR", 'Limit must be between 1 and 200', 400, {
+        field: 'limit',
+        provided: limit,
+        constraint: 'between 1 and 200',
       });
       return;
     }
 
     if (offset < 0) {
-      res.status(400).json({
-        success: false,
-        error: 'Offset must be non-negative',
-        code: 'VALIDATION_ERROR'
+      sendError(res, "VALIDATION_ERROR", 'Offset must be non-negative', 400, {
+        field: 'offset',
+        provided: offset,
+        constraint: 'non-negative',
       });
       return;
     }
@@ -217,10 +217,9 @@ router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, re
     // First, verify the memory exists
     const memory = await memoryRepository.findById(memoryId);
     if (!memory) {
-      res.status(404).json({
-        success: false,
-        error: 'Memory not found',
-        code: 'MEMORY_NOT_FOUND'
+      sendError(res, "RESOURCE_NOT_FOUND", 'Memory not found', 404, {
+        resource: 'memory',
+        id: memoryId,
       });
       return;
     }
@@ -229,43 +228,18 @@ router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, re
     const allMessages = await messageRepository.findByMemoryId(memoryId);
     const messages = allMessages.slice(offset, offset + limit);
 
-    res.json({
-      success: true,
-      data: {
-        messages,
-        memoryId,
-        total: allMessages.length,
-        limit,
-        offset
-      }
+    sendSuccess(res, {
+      messages,
+      memoryId,
+      total: allMessages.length,
+      limit,
+      offset
     });
 
   } catch (error) {
-    console.error('Session messages fetch error:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'fetching session messages')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to fetch session messages');
     }
-    
-    if (error instanceof NotFoundError) {
-      res.status(404).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'NOT_FOUND'
-      });
-      return;
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 
@@ -394,22 +368,9 @@ router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Res
     sendSuccess(res, sessionData, 200, paginationMeta);
 
   } catch (error) {
-    console.error('Session details fetch error:', error);
-    
-    if (error instanceof ValidationError) {
-      res.status(400).json({
-        success: false,
-        error: getErrorMessage(error),
-        code: 'VALIDATION_ERROR'
-      });
-      return;
+    if (!handleCommonError(error, res, 'fetching session details')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to fetch session details');
     }
-    
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      code: 'INTERNAL_SERVER_ERROR'
-    });
   }
 });
 

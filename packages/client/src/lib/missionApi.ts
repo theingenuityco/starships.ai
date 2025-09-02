@@ -42,13 +42,12 @@ async function apiRequest<T>(
       data: options.body ? JSON.parse(options.body) : undefined,
     });
 
-    // Handle server response format { success: true, data: actualData }
-    if (response.data && typeof response.data === 'object' && 'success' in response.data) {
-      return { data: response.data.data };
-    }
-    return { data: response.data };
+    // Handle standardized API response format { data: T, meta?: ... }
+    return { data: response.data.data };
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error || error.message || 'Network error';
+    // Handle standardized error response format { error: { code, message, details } }
+    const errorData = error.response?.data?.error;
+    const errorMessage = errorData?.message || error.message || 'Network error';
     return { error: errorMessage };
   }
 }

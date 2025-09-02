@@ -103,6 +103,7 @@ export class ErrorMonitor {
   private alertRules: Map<string, AlertRule> = new Map();
   private metrics: ErrorMetrics;
   private correlationGroups: Map<string, string[]> = new Map();
+  private cleanupIntervalId?: NodeJS.Timeout;
 
   constructor(config: Partial<ErrorMonitorConfig> = {}) {
     this.config = {
@@ -568,7 +569,7 @@ export class ErrorMonitor {
   private startCleanupScheduler(): void {
     const cleanupInterval = 24 * 60 * 60 * 1000; // 24 hours
     
-    setInterval(() => {
+    this.cleanupIntervalId = setInterval(() => {
       this.cleanupOldErrors();
     }, cleanupInterval);
   }
@@ -597,7 +598,17 @@ export class ErrorMonitor {
    */
   private generateOccurrenceId(): string {
     return `err_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  }
+    }
+  
+    /**
+     * Clean up resources (for testing)
+     */
+    public cleanup(): void {
+      if (this.cleanupIntervalId) {
+        clearInterval(this.cleanupIntervalId);
+        this.cleanupIntervalId = undefined;
+      }
+    }
 }
 
 // Global error monitor instance

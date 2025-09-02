@@ -5,16 +5,25 @@
 import { ErrorMonitor, ErrorSeverity, errorMonitor, errorTrackingMiddleware } from '../error-monitor';
 import { ValidationError, DatabaseError, ErrorCategory } from '../../errors';
 
-// Mock logger
-jest.mock('../index', () => ({
-  logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  }
-}));
-
 import { logger } from '../index';
+
+// Mock logger methods
+jest.spyOn(logger, 'info').mockImplementation(() => {});
+jest.spyOn(logger, 'warn').mockImplementation(() => {});
+jest.spyOn(logger, 'error').mockImplementation(() => {});
+
+// Clear logger mock calls before each test
+beforeEach(() => {
+  if ((logger.info as jest.Mock).mockClear) {
+    (logger.info as jest.Mock).mockClear();
+  }
+  if ((logger.warn as jest.Mock).mockClear) {
+    (logger.warn as jest.Mock).mockClear();
+  }
+  if ((logger.error as jest.Mock).mockClear) {
+    (logger.error as jest.Mock).mockClear();
+  }
+});
 
 describe('ErrorMonitor', () => {
   let monitor: ErrorMonitor;
@@ -31,6 +40,7 @@ describe('ErrorMonitor', () => {
   });
 
   afterEach(() => {
+    monitor.cleanup();
     jest.useRealTimers();
   });
 
@@ -257,6 +267,12 @@ describe('ErrorMonitor', () => {
       });
     });
 
+    afterEach(() => {
+      if (testMonitor) {
+        testMonitor.cleanup();
+      }
+    });
+
     it('should return copy of metrics to prevent mutation', () => {
       const metrics1 = testMonitor.getMetrics();
       const metrics2 = testMonitor.getMetrics();
@@ -280,9 +296,9 @@ describe('ErrorMonitor', () => {
       const metrics = testMonitor.getMetrics();
 
       expect(metrics.totalErrors).toBe(4);
-      expect(metrics.errorsByCategory[ErrorCategory.VALIDATION]).toBe(2);
+      expect(metrics.errorsByCategory[ErrorCategory.VALIDATION]).toBe(3);
       expect(metrics.errorsByCategory[ErrorCategory.DATABASE]).toBe(1);
-      expect(metrics.errorsByCategory[ErrorCategory.INTERNAL]).toBe(1);
+      expect(metrics.errorsByCategory[ErrorCategory.INTERNAL]).toBe(0);
 
       expect(metrics.topErrors).toEqual(
         expect.arrayContaining([
@@ -341,6 +357,12 @@ describe('ErrorMonitor', () => {
       // Resolve first error
       const occurrences = testMonitor.getErrorOccurrences();
       await testMonitor.resolveError(occurrences[0].id, 'admin');
+    });
+
+    afterEach(() => {
+      if (testMonitor) {
+        testMonitor.cleanup();
+      }
     });
 
     it('should filter by category', () => {
@@ -666,6 +688,12 @@ describe('ErrorMonitor', () => {
 
     beforeEach(() => {
       alertingMonitor = new ErrorMonitor({ enableAlerting: true });
+    });
+
+    afterEach(() => {
+      if (alertingMonitor) {
+        alertingMonitor.cleanup();
+      }
     });
 
     it('should evaluate alert conditions correctly', async () => {

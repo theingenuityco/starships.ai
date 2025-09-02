@@ -20,6 +20,7 @@ import {
   NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
+import type { StandardErrorCode } from '@starships/errors';
 import {
   sendSuccess,
   sendError,
@@ -27,7 +28,6 @@ import {
   validateUUID,
   validatePagination,
   createPaginationMeta,
-  ERROR_CODES,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -127,7 +127,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching missions')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch missions');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch missions');
     }
   }
 });
@@ -148,7 +148,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching mission')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch mission');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch mission');
     }
   }
 });
@@ -159,7 +159,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
 
@@ -167,28 +167,28 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     // Validate required fields
     if (!createRequest.starshipId) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'starshipId is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'starshipId is required', 400, {
         field: 'starshipId',
       });
       return;
     }
     
     if (!createRequest.name) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'name is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'name is required', 400, {
         field: 'name',
       });
       return;
     }
     
     if (!createRequest.description) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'description is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'description is required', 400, {
         field: 'description',
       });
       return;
     }
 
     if (!createRequest.agentIds || !Array.isArray(createRequest.agentIds)) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'agentIds must be an array', 400, {
+      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'agentIds must be an array', 400, {
         field: 'agentIds',
         provided: typeof createRequest.agentIds,
       });
@@ -196,7 +196,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     }
 
     if (createRequest.agentIds.length === 0) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'At least one agent must be assigned to the mission', 400, {
+      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'At least one agent must be assigned to the mission', 400, {
         field: 'agentIds',
         constraint: 'min_length_1',
       });
@@ -214,7 +214,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     for (let i = 0; i < createRequest.agentIds.length; i++) {
       const agentId = createRequest.agentIds[i];
       if (typeof agentId !== 'string') {
-        sendError(res, ERROR_CODES.VALIDATION_ERROR, `agentIds[${i}] must be a string`, 400, {
+        sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, `agentIds[${i}] must be a string`, 400, {
           field: `agentIds[${i}]`,
           provided: typeof agentId,
         });
@@ -233,7 +233,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating mission')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create mission');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to create mission');
     }
   }
 });
@@ -246,7 +246,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
 
@@ -258,7 +258,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 
     // Ensure at least one field is being updated
     if (!updates || Object.keys(updates).length === 0) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'At least one field must be provided for update', 400, {
+      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'At least one field must be provided for update', 400, {
         field: 'updates',
         message: 'Request body must contain at least one field to update',
       });
@@ -270,7 +270,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 
   } catch (error) {
     if (!handleCommonError(error, res, 'updating mission')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to update mission');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to update mission');
     }
   }
 });
@@ -282,7 +282,7 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
 
@@ -297,7 +297,7 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
 
   } catch (error) {
     if (!handleCommonError(error, res, 'deleting mission')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to delete mission');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to delete mission');
     }
   }
 });
@@ -310,7 +310,7 @@ router.post('/:id/messages', async (req: Request, res: Response): Promise<void> 
     const userId = req.user?.id;
 
     if (!userId) {
-      sendError(res, ERROR_CODES.UNAUTHORIZED, 'User not authenticated', 401);
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
       return;
     }
 
@@ -321,7 +321,7 @@ router.post('/:id/messages', async (req: Request, res: Response): Promise<void> 
     }
 
     if (!content || typeof content !== 'string') {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'Message content is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'Message content is required', 400, {
         field: 'content',
       });
       return;
@@ -339,18 +339,18 @@ router.post('/:id/messages', async (req: Request, res: Response): Promise<void> 
     if (error instanceof Error && 'code' in error) {
       const errorCode = (error as any).code;
       let statusCode = 500;
-      let mappedErrorCode: string = ERROR_CODES.INTERNAL_SERVER_ERROR;
+      let mappedErrorCode: StandardErrorCode = 'INTERNAL_SERVER_ERROR';
       
       // Map error codes to appropriate HTTP status codes
       if (errorCode === 'MISSION_MESSAGE_INVALID') {
         statusCode = 400;
-        mappedErrorCode = ERROR_CODES.VALIDATION_ERROR;
+        mappedErrorCode = 'VALIDATION_ERROR';
       } else if (errorCode === 'MISSION_ORCHESTRATOR_NOT_FOUND') {
         statusCode = 404;
-        mappedErrorCode = ERROR_CODES.RESOURCE_NOT_FOUND;
+        mappedErrorCode = 'RESOURCE_NOT_FOUND';
       } else if (errorCode === 'MISSION_MESSAGE_SEND_FAILED' || errorCode === 'MISSION_CHAT_FAILED') {
         statusCode = 500;
-        mappedErrorCode = ERROR_CODES.INTERNAL_SERVER_ERROR;
+        mappedErrorCode = 'INTERNAL_SERVER_ERROR';
       }
 
       sendError(res, mappedErrorCode, error.message || 'Failed to send message', statusCode, {
@@ -360,7 +360,7 @@ router.post('/:id/messages', async (req: Request, res: Response): Promise<void> 
     }
     
     if (!handleCommonError(error, res, 'sending mission message')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to send message');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to send message');
     }
   }
 });
@@ -393,7 +393,7 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
 
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching message history')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to fetch message history');
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch message history');
     }
   }
 });

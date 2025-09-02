@@ -24,8 +24,9 @@ export class LlmHandler extends BaseHandler {
       
       // Check if LLM execution was successful
       if (llmResult.status === 'completed') {
+        const responseData = llmResult.data as { status: number; statusText: string; headers: unknown; body: unknown; url?: string; llmResponse: string; model: string };
         return this.createSuccessResult(execution, {
-          ...llmResult.data,
+          ...responseData,
           output: `LLM ${params.model} completed successfully`
         });
       } else {

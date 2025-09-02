@@ -348,6 +348,48 @@ export default function HomePage() {
             </div>
           </div>
           
+          {/* Hero CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.4, duration: 0.8 }}
+            className="mt-12 flex flex-col sm:flex-row gap-4 justify-center items-center"
+          >
+            {/* Launch Button - Always visible */}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                size="lg"
+                onClick={handleLaunch}
+                className="relative bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground px-8 py-4 text-lg rounded-full shadow-lg shadow-primary/25 border border-primary/20 backdrop-blur-sm overflow-hidden group"
+              >
+                <span className="relative z-10">
+                  <Rocket className="w-5 h-5 mr-2 inline" />
+                  {isAuthenticated
+                    ? (hasExistingStarships ? 'Enter Command Deck' : 'Launch Your Starship')
+                    : 'Begin Your Journey'
+                  }
+                </span>
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  initial={{ x: '-100%' }}
+                  whileHover={{ x: '100%' }}
+                  transition={{ duration: 0.6 }}
+                />
+              </Button>
+            </motion.div>
+
+            {/* Login Button - Only for unauthenticated users */}
+            {!isAuthenticated && (
+              <DynamicLoginButton
+                size="lg"
+                variant="outline"
+                className="px-8 py-4 text-lg rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
+                showIcon={true}
+              >
+                Sign In
+              </DynamicLoginButton>
+            )}
+          </motion.div>
           
         </motion.div>
         

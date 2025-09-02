@@ -3,31 +3,14 @@
  */
 
 import type { Response } from 'express';
-import { BaseError, ErrorUtils, type StandardErrorCode } from '@starships/errors';
-
-// Standard response interfaces
-export interface ApiResponse<T = any> {
-  data: T;
-  meta?: {
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      has_next: boolean;
-      has_prev: boolean;
-    };
-    filters?: Record<string, any>;
-    sort?: Record<string, any>;
-  };
-}
-
-export interface ApiErrorResponse {
-  error: {
-    code: string;
-    message: string;
-    details?: Record<string, any>;
-  };
-}
+import { BaseError, ErrorUtils } from '@starships/errors';
+import type {
+  ApiResponse,
+  ApiErrorResponse,
+  ApiResponseMeta,
+  PaginationMeta,
+  StandardErrorCode
+} from '@starships/protocol';
 
 
 /**
@@ -37,7 +20,7 @@ export function sendSuccess<T>(
   res: Response,
   data: T,
   statusCode: number = 200,
-  meta?: ApiResponse<T>['meta']
+  meta?: ApiResponseMeta
 ): void {
   const response: ApiResponse<T> = { data };
   if (meta) {
@@ -73,7 +56,7 @@ export function createPaginationMeta(
   page: number,
   limit: number,
   total: number
-): ApiResponse['meta'] {
+): ApiResponseMeta {
   return {
     pagination: {
       page,

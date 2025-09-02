@@ -133,26 +133,3 @@ export interface CreateStarshipRequest {
   class: StarshipClass;
   slug?: string; // Optional - will be auto-generated if not provided
 }
-
-// ============================================================================
-// GENERIC API TYPES
-// ============================================================================
-
-/**
- * Generic API response wrapper
- */
-export interface ApiResponse<T = unknown> {
-  success?: boolean;
-  message?: string;
-  error?: string;
-  data?: T;
-}
-
-/**
- * Generic API error structure
- */
-export interface ApiError {
-  error: string;
-  code?: number;
-  details?: unknown;
-}

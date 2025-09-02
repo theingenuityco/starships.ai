@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { starshipAPI, Starship } from '@/lib/api'
+import { useStarships } from '@/hooks/useStarships'
+import { Starship } from '@/lib/api'
 import {
   Select,
   SelectContent,
@@ -27,27 +27,8 @@ export function StarshipSelector({
   disabled = false,
   className,
 }: StarshipSelectorProps) {
-  const [starships, setStarships] = useState<Starship[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const loadStarships = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const data = await starshipAPI.getUserStarshipsList()
-        setStarships(data)
-      } catch (err) {
-        console.error('Failed to load starships:', err)
-        setError('Failed to load starships')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadStarships()
-  }, [])
+  const { data: starshipsData, isLoading: loading, error } = useStarships()
+  const starships = starshipsData?.starships || []
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     switch (starshipClass) {
@@ -71,7 +52,7 @@ export function StarshipSelector({
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-destructive/5 border-destructive/20">
         <AlertCircle className="w-4 h-4 text-destructive" />
-        <span className="text-sm text-destructive">{error}</span>
+        <span className="text-sm text-destructive">{error?.message || 'Failed to load starships'}</span>
       </div>
     )
   }

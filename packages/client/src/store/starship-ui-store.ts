@@ -65,36 +65,3 @@ export function useStarshipUIHydration() {
     }
   }, [setActiveStarship, activeStarshipId]);
 }
-
-// For backward compatibility, export a hook that provides the legacy interface
-export function useStarshipStore() {
-  console.warn('useStarshipStore is deprecated. Use TanStack Query hooks from @/hooks/useStarships instead for data operations, and useStarshipUIStore for UI state.');
-  
-  const uiStore = useStarshipUIStore();
-  
-  // Return a compatible interface that directs users to the new hooks
-  return {
-    ...uiStore,
-    // Deprecated fields - return sensible defaults
-    starships: [],
-    loading: false,
-    error: null,
-    // Deprecated methods - log warnings
-    loadUserStarships: () => {
-      console.warn('loadUserStarships is deprecated. Use useStarships() hook from @/hooks/useStarships instead.');
-      return Promise.resolve();
-    },
-    createStarship: () => {
-      console.warn('createStarship is deprecated. Use useCreateStarship() hook from @/hooks/useStarships instead.');
-      return Promise.resolve({} as any);
-    },
-    updateStarship: () => {
-      console.warn('updateStarship is deprecated. Use useUpdateStarship() hook from @/hooks/useStarships instead.');
-      return Promise.resolve();
-    },
-    deleteStarship: () => {
-      console.warn('deleteStarship is deprecated. Use useDeleteStarship() hook from @/hooks/useStarships instead.');
-      return Promise.resolve();
-    },
-  };
-}

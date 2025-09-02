@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { v4 as uuidv4 } from 'uuid';
-import type { Edge } from '@starships/autopilot';
 import type { EdgeModel } from '@starships/protocol';
 
 export class EdgeRepository extends BaseRepository {
@@ -196,15 +195,15 @@ export class EdgeRepository extends BaseRepository {
         }], 'updateEdge');
       }
 
+      // Check if edge exists first
+      const currentEdge = await this.getEdgeById(edgeId);
+      if (!currentEdge) {
+        this.handleNotFound('Edge', edgeId, 'updateEdge');
+      }
+
       // For edges, we typically only update by recreating the relationship
       // since we can't easily update the from/to relationships in Neo4j
       if (updates.from !== undefined || updates.to !== undefined) {
-        // Get current edge details
-        const currentEdge = await this.getEdgeById(edgeId);
-        if (!currentEdge) {
-          this.handleNotFound('Edge', edgeId, 'updateEdge');
-        }
-
         const connection = getConnection();
         
         // Delete old relationship

@@ -1,5 +1,5 @@
 /**
- * Performance utility functions for vision refinement services
+ * Performance utility functions for server services
  * Provides debouncing, memoization, and caching capabilities
  */
 

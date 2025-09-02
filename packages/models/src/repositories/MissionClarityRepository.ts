@@ -26,10 +26,10 @@ export class MissionClarityRepository extends BaseRepository {
   async upsertByMissionId(missionId: string, request: CreateMissionClarityRequest): Promise<MissionClarityModel> {
     return this.executeWithErrorHandling(async () => {
       // Validate required fields
-      this.validateRequired(request, ['missionId', 'objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment', 'reasoning', 'iteration'], 'upsert');
+      this.validateRequired(request, ['missionId', 'objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'reasoning', 'iteration'], 'upsert');
       
       // Validate score ranges (0-10)
-      const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment'];
+      const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries'];
       for (const field of scoreFields) {
         const score = request[field as keyof CreateMissionClarityRequest] as number;
         if (typeof score !== 'number' || score < 0 || score > 10) {
@@ -41,14 +41,13 @@ export class MissionClarityRepository extends BaseRepository {
         }
       }
 
-      // Calculate overall score as average of 5 dimensions
+      // Calculate overall score as average of 4 dimensions
       const overallScore = (
         request.objectiveClarity +
         request.successMetrics +
         request.timelineDefinition +
-        request.scopeBoundaries +
-        request.visionAlignment
-      ) / 5;
+        request.scopeBoundaries
+      ) / 4;
 
       const now = new Date().toISOString();
       
@@ -66,7 +65,6 @@ export class MissionClarityRepository extends BaseRepository {
           mc.successMetrics = $successMetrics,
           mc.timelineDefinition = $timelineDefinition,
           mc.scopeBoundaries = $scopeBoundaries,
-          mc.visionAlignment = $visionAlignment,
           mc.overallScore = $overallScore,
           mc.reasoning = $reasoning,
           mc.iteration = $iteration,
@@ -82,7 +80,6 @@ export class MissionClarityRepository extends BaseRepository {
         successMetrics: request.successMetrics,
         timelineDefinition: request.timelineDefinition,
         scopeBoundaries: request.scopeBoundaries,
-        visionAlignment: request.visionAlignment,
         overallScore,
         reasoning: request.reasoning,
         iteration: request.iteration,
@@ -147,7 +144,7 @@ export class MissionClarityRepository extends BaseRepository {
       };
 
       // Add score fields with validation
-      const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment'];
+      const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries'];
       const providedScores: number[] = [];
 
       for (const field of scoreFields) {
@@ -189,11 +186,10 @@ export class MissionClarityRepository extends BaseRepository {
           request.objectiveClarity ?? currentClarity!.objectiveClarity,
           request.successMetrics ?? currentClarity!.successMetrics,
           request.timelineDefinition ?? currentClarity!.timelineDefinition,
-          request.scopeBoundaries ?? currentClarity!.scopeBoundaries,
-          request.visionAlignment ?? currentClarity!.visionAlignment
+          request.scopeBoundaries ?? currentClarity!.scopeBoundaries
         ];
 
-        const overallScore = allScores.reduce((sum, score) => sum + score, 0) / 5;
+        const overallScore = allScores.reduce((sum, score) => sum + score, 0) / 4;
         setClauses.push('mc.overallScore = $overallScore');
         params.overallScore = overallScore;
       }

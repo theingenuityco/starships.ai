@@ -101,7 +101,6 @@ StarshipClass.displayName = 'StarshipClass';
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [hasVision, setHasVision] = useState(false);
   const [hasExistingStarships, setHasExistingStarships] = useState(false);
   const { isAuthenticated, isLoading, userName } = useAuth();
   const starships = useStarshipStore(state => state.starships);
@@ -337,7 +336,7 @@ export default function HomePage() {
                 className="flex items-center gap-3 text-sm text-muted-foreground/60"
               >
                 <div className="h-px w-12 bg-gradient-to-r from-transparent to-muted-foreground/30" />
-                <span>Where vision meets intelligence</span>
+                <span>Where ideas meet intelligence</span>
                 <div className="h-px w-12 bg-gradient-to-l from-transparent to-muted-foreground/30" />
               </motion.div>
             </div>
@@ -451,7 +450,7 @@ export default function HomePage() {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">You</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    You arrive with an idea, a vision of what could be. The journey begins here.
+                    You arrive with an idea, a concept of what could be. The journey begins here.
                   </p>
                 </div>
               </div>
@@ -519,7 +518,7 @@ export default function HomePage() {
             >
               <SystemCard
                 icon={Brain}
-                title="Vision Chamber"
+                title="Command Deck"
                 description="Transform your concept into something concrete. Not just documentation, but a living blueprint that evolves as you learn. Your idea, refined by intelligence that sees what you might miss."
                 imageContent={
                   <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm flex items-center justify-center">
@@ -828,7 +827,7 @@ export default function HomePage() {
               }}
               viewport={{ once: false, margin: "-10%" }}
             >
-              Each class shapes your strategy and scale. Start small or go big—your Vision determines the path.
+              Each class shapes your strategy and scale. Start small or go big—your goals determine the path.
             </motion.p>
           </motion.div>
 
@@ -891,7 +890,7 @@ export default function HomePage() {
             >
               <StarshipClass
                 name="Dreadnought Class"
-                description="Maximum capability for complex, multi-faceted Visions. Built for large-scale operations."
+                description="Maximum capability for complex, multi-faceted projects. Built for large-scale operations."
                 features={[
                   "12+ Crew Members",
                   "Unlimited Expeditions",
@@ -918,7 +917,7 @@ export default function HomePage() {
           >
             <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Launch?</h2>
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              Your Vision awaits. Build your Starship, assemble your Crew, and embark on the journey 
+              Your journey awaits. Build your Starship, assemble your Crew, and embark on the journey
               that transforms intention into reality.
             </p>
             {isAuthenticated ? (
@@ -972,7 +971,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-6 md:mb-0 text-center md:text-left">
               <p className="text-muted-foreground mb-2">
-                © 2025 Starships.ai - Where Vision meets Intelligence
+                © 2025 Starships.ai - Where Ideas meet Intelligence
               </p>
               <p className="text-muted-foreground text-sm">
                 🪐 Manifested by <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline">The Ingenuity Co</a>

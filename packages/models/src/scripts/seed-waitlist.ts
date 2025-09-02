@@ -49,7 +49,7 @@ export async function seedWaitlist(): Promise<void> {
           logger.debug(`Waitlist: Email already exists: ${email} (status: ${existing.status})`);
         } else {
           // Add the email
-          await waitlistRepo.addApprovedEmail(email, 'system', notes);
+          await waitlistRepo.addApprovedEmail(email, notes);
           addedCount++;
           logger.info(`Waitlist: Added approved email: ${email}`);
         }

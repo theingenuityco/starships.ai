@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
-import { MessageSquare, Bot, Sparkles, Clock, ChevronRight } from 'lucide-react'
+import { MessageSquare, Bot, Clock, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { chatAPI } from '@/lib/api'
 import type { Session, SessionSourceType } from '@starships/protocol'
 
-interface ChatSessionsSidebarProps {
+interface SessionsSidebarProps {
   starshipId: string
   currentSessionId?: string | null
   onSessionSelect?: (sessionId: string | null) => void
@@ -15,12 +15,12 @@ interface ChatSessionsSidebarProps {
 }
 
 
-export function ChatSessionsSidebar({ 
+export function SessionsSidebar({ 
   starshipId, 
   currentSessionId, 
   onSessionSelect, 
   className = "" 
-}: ChatSessionsSidebarProps) {
+}: SessionsSidebarProps) {
   const { isAuthenticated, userId } = useAuth()
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)

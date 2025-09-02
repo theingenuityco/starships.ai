@@ -30,8 +30,7 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 
 ### Key Features
 - ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components
-- ✅ **Vision Chamber Integration**: Full-screen consciousness planning with auto-influence engine
-- ✅ **Command Deck**: Mission control dashboard (placeholder for future expansion)
+- ✅ **Command Deck**: Mission control dashboard with comprehensive controls
 - ✅ **Responsive Design**: Mobile-first with adaptive layouts
 - ✅ **Modern UI**: shadcn/ui components with glassmorphism effects
 - ✅ **Type Safety**: Full TypeScript with strict mode
@@ -44,7 +43,6 @@ src/
 ├── app/                          # Next.js App Router
 │   ├── client-layout.tsx        # Main layout with navigation sidebar
 │   ├── command-deck/page.tsx    # Command Deck dashboard page
-│   ├── vision-chamber/page.tsx  # Vision Chamber full-screen page
 │   ├── crew/page.tsx            # Crew management page
 │   ├── drive/page.tsx           # Starship drive systems page
 │   ├── expeditions/page.tsx     # Expeditions management page
@@ -56,13 +54,6 @@ src/
 │   │   ├── NavigationSection.tsx # Section groupings component
 │   │   ├── NavigationItem.tsx   # Individual nav items component
 │   │   └── StarshipSelector.tsx # Starship selection dropdown
-│   ├── consciousness/           # Vision Chamber implementation
-│   │   └── VisionChamber/       # 1,500+ lines sophisticated implementation
-│   │       ├── index.tsx        # Main Vision Chamber component
-│   │       ├── VisionCore/      # Core vision management
-│   │       ├── GoalsMatrix/     # Goals CRUD interface
-│   │       ├── ConstraintsGrid/ # Constraints management
-│   │       └── shared/          # Auto-influence engine & types
 │   ├── command-deck/            # Command Deck functionality
 │   │   ├── dashboard/           # Dashboard modules
 │   │   └── modules/             # Quick action modules
@@ -135,31 +126,10 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 
 ### Route Structure
 - **Command Deck**: `/command-deck` - Mission control dashboard
-- **Vision Chamber**: `/vision-chamber` - Consciousness planning (replaces `/core`)
 - **Core Systems**: `/crew`, `/drive` - Starship management
 - **Operations**: `/expeditions`, `/logbook`, `/sibil` - Mission operations
 
-## 🧠 Vision Chamber Integration
-
-### Features
-- **Auto-Influence Engine**: 342-line pattern matching system for intelligent suggestions
-- **Goals Matrix**: Full CRUD interface for mission objectives
-- **Constraints Grid**: Category-based constraint management
-- **Maker-Checker Flow**: Change management and approval workflows
-- **Real-time Suggestions**: Context-aware recommendations based on vision changes
-
-### State Management
-- **Zustand Store**: 556-line sophisticated state management
-- **Persistence**: State maintained across navigation changes
-- **Auto-Sync**: Real-time updates between components
-
 ## 💾 Data Persistence
-
-### Vision & Goals
-- **Storage**: Zustand store with persistence
-- **Components**: Vision statements, goals, constraints
-- **Auto-influence**: Suggestion engine with pattern matching
-- **State Sync**: Maintained across route navigation
 
 ### Starship Management
 - **Starship Selection**: Multi-starship support with status tracking

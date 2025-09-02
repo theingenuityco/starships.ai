@@ -42,7 +42,13 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
       starshipId: starshipId,
       timestamp: new Date().toISOString(),
       version: '1.0.0',
-      metadata: metadata || {}
+      metadata: metadata || {},
+      // Provide defaults for required fields
+      threadDepth: 0,
+      processingStatus: 'pending',
+      messageType: role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
+      importance: 'medium',
+      hasAttachments: false
     });
   };
 
@@ -120,7 +126,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         // Get memory store
         const store = getStore();
 
-        // Use the full agent engine with all features (vision, tools, memory)
+        // Use the full agent engine with all features (tools, memory)
         const typingSpeed = request.typingSpeed || 75; // chars per second
         const typewriterEnabled = request.typewriterEnabled !== false;
         

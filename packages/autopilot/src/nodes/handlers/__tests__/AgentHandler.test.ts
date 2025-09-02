@@ -4,7 +4,7 @@
 
 import { AgentHandler } from '../AgentHandler';
 import { Node, Execution, AgentNodeParameters } from '../../../types';
-import { AgentMemoryConfig } from '../../../AgentMemory';
+import { AgentMemoryState } from '../../../AgentMemory';
 
 interface AgentExecutionResult {
   agentName: string;
@@ -41,7 +41,7 @@ describe('AgentHandler', () => {
           purpose: {
             primary: 'Help customers with their inquiries'
           }
-        } as AgentMemoryConfig,
+        } as AgentMemoryState,
         temperature: 0.7,
         maxTokens: 500,
         timeout: 5000,
@@ -91,7 +91,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Basic Agent',
         model: 'openai/gpt-4',
-        memory: {} as AgentMemoryConfig,
+        memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -166,7 +166,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Test Agent',
         model: 'openai/gpt-4',
-        memory: {} as AgentMemoryConfig,
+        memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       
@@ -188,7 +188,7 @@ describe('AgentHandler', () => {
     it('should fail validation when name is missing', () => {
       const paramsWithoutName = {
         model: 'openai/gpt-4',
-        memory: {} as AgentMemoryConfig,
+        memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint()
       } as unknown as AgentNodeParameters;
       
@@ -216,7 +216,7 @@ describe('AgentHandler', () => {
     it('should fail validation when model is missing', () => {
       const paramsWithoutModel = {
         name: 'Test Agent',
-        memory: {} as AgentMemoryConfig,
+        memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint()
       } as unknown as AgentNodeParameters;
       
@@ -242,7 +242,7 @@ describe('AgentHandler', () => {
 
     it('should fail validation when both name and model are missing', () => {
       const paramsWithoutRequiredParams = {
-        memory: {} as AgentMemoryConfig,
+        memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint()
       } as unknown as AgentNodeParameters;
       
@@ -287,7 +287,7 @@ describe('AgentHandler', () => {
       const paramsWithEmptyValues = {
         name: '',
         model: '',
-        memory: {} as AgentMemoryConfig,
+        memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint()
       } as AgentNodeParameters;
       

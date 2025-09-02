@@ -225,7 +225,6 @@ export class MessageRepository extends BaseRepository {
 
   async getMessageThread(messageId: string, includeParents = true, includeChildren = true, maxDepth = 10): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
       const thread: MessageModel[] = [];
 
       // Get the root message
@@ -251,23 +250,27 @@ export class MessageRepository extends BaseRepository {
     }, 'getMessageThread', 'Message', messageId);
   }
 
-  private async getParentMessages(parentId: string, maxDepth: number, currentDepth = 0): Promise<MessageModel[]> {
-    if (currentDepth >= maxDepth) return [];
+  private async getParentMessages(parentId: string, maxDepth: number, currentDepth = 0, visited: Set<string> = new Set()): Promise<MessageModel[]> {
+    if (currentDepth >= maxDepth || visited.has(parentId)) return [];
+    
+    visited.add(parentId);
     
     const parent = await this.findById(parentId);
     if (!parent) return [];
     
     const parents = [parent];
     if (parent.parentMessageId) {
-      const grandParents = await this.getParentMessages(parent.parentMessageId, maxDepth, currentDepth + 1);
+      const grandParents = await this.getParentMessages(parent.parentMessageId, maxDepth, currentDepth + 1, visited);
       parents.unshift(...grandParents);
     }
     
     return parents;
   }
 
-  private async getChildMessages(parentId: string, maxDepth: number, currentDepth = 0): Promise<MessageModel[]> {
-    if (currentDepth >= maxDepth) return [];
+  private async getChildMessages(parentId: string, maxDepth: number, currentDepth = 0, visited: Set<string> = new Set()): Promise<MessageModel[]> {
+    if (currentDepth >= maxDepth || visited.has(parentId)) return [];
+    
+    visited.add(parentId);
     
     const connection = getConnection();
     const result = await connection.executeQuery<{ m: MessageModel }>(
@@ -276,11 +279,27 @@ export class MessageRepository extends BaseRepository {
     );
     
     const children = result.map((record) => this.deserializeComplexFields(record.m));
-    const allChildren: MessageModel[] = [...children];
+    const allChildren: MessageModel[] = [];
+    const seenIds = new Set<string>();
     
+    // Process each child
     for (const child of children) {
-      const grandChildren = await this.getChildMessages(child.id, maxDepth, currentDepth + 1);
-      allChildren.push(...grandChildren);
+      // Skip if we've already processed this message ID
+      if (seenIds.has(child.id)) continue;
+      
+      seenIds.add(child.id);
+      allChildren.push(child);
+      
+      // Recursively get grandchildren
+      const grandChildren = await this.getChildMessages(child.id, maxDepth, currentDepth + 1, visited);
+      
+      // Add grandchildren, avoiding duplicates
+      for (const grandChild of grandChildren) {
+        if (!seenIds.has(grandChild.id)) {
+          seenIds.add(grandChild.id);
+          allChildren.push(grandChild);
+        }
+      }
     }
     
     return allChildren;

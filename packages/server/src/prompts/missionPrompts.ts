@@ -14,9 +14,6 @@ export interface MissionContextData {
     class: string;
     status: string;
   };
-  vision?: {
-    statement: string;
-  };
   clarity?: {
     overallScore: number;
     iteration: number;
@@ -24,7 +21,6 @@ export interface MissionContextData {
     successMetrics: number;
     timelineDefinition: number;
     scopeBoundaries: number;
-    visionAlignment: number;
     reasoning: string;
   };
 }

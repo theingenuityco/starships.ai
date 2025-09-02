@@ -46,7 +46,6 @@ const starships = await starshipRepo.findAll();
 - **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`)
 - **Agents**: AI entities deployed on starships with specific roles and capabilities
 - **Missions**: Task execution contexts with phases and messaging
-- **Vision**: Strategic goals and objectives for each starship
 
 ### Repository Factory
 Centralized repository management with synchronous access for Socket.IO compatibility:
@@ -91,9 +90,7 @@ try {
 | **MissionRepository** | Mission lifecycle management |
 | **MissionMessageRepository** | Mission communication logs |
 | **MissionClarityRepository** | Mission requirement analysis |
-| **VisionRepository** | Starship vision and goals |
 | **WorkflowRepository** | Workflow definitions and execution |
-| **LLMRepository** | LLM provider configurations |
 | **NativeToolApiKeyRepository** | API key management |
 | **WaitlistRepository** | User onboarding queue |
 
@@ -103,9 +100,6 @@ try {
 ```bash
 # Run database migrations
 npm run migrate
-
-# Seed LLM models
-npm run seed:llm
 
 # Seed waitlist data
 npm run seed:waitlist
@@ -271,7 +265,6 @@ LOG_METRICS=true
   "dev": "tsx watch src/index.ts",
   "build": "tsc --build tsconfig.json",
   "migrate": "tsx src/scripts/migration-runner.ts",
-  "seed:llm": "tsx src/scripts/seed-llm-models.ts",
   "backup:create": "tsx src/scripts/backup-cli.ts create",
   "monitor": "tsx src/scripts/performance-monitor.ts",
   "db-cli": "tsx src/scripts/db-cli.ts"

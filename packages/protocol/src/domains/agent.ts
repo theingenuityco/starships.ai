@@ -7,7 +7,7 @@
 
 // Import autopilot types at the top level
 import type {
-  AgentMemoryConfig,
+  AgentMemoryState,
   Blueprint,
   AgentNodeParameters
 } from '@starships/autopilot';
@@ -58,7 +58,7 @@ export interface CreateAgentRequest {
 
   // Autopilot-specific fields (optional for backward compatibility)
   blueprint?: Blueprint;
-  memory?: AgentMemoryConfig;
+  memory?: AgentMemoryState;
   timeout?: number;
 }
 

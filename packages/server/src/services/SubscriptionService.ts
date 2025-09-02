@@ -166,8 +166,8 @@ export class SubscriptionService {
       // Only collect payment method if needed (skips for $0 total)
       payment_method_collection: 'if_required',
       // Redirect to starship-specific page after payment
-      // The vision-chamber is a good landing page for new starships
-      success_url: `${baseUrl}/ship/${params.starshipSlug}/vision-chamber?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      // The command deck is a good landing page for new starships
+      success_url: `${baseUrl}/ship/${params.starshipSlug}/command-deck?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/starships/create/cancel`,
       metadata: {
         starshipId: params.starshipId, // CRITICAL: Pass starshipId, not name

@@ -5,7 +5,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*"],
   "exclude": ["dist"],

@@ -56,6 +56,19 @@ module.exports = {
   // Clear mocks between tests
   clearMocks: true,
   
-  // Verbose output
-  verbose: true
+  // Disable verbose output for faster execution
+  verbose: false,
+  
+  // Disable coverage collection for faster execution by default
+  collectCoverage: false,
+  
+  // Increase test timeout for slow tests
+  testTimeout: 10000,
+  
+  // Run tests in parallel for better performance
+  maxWorkers: '50%',
+  
+  // Cache transformation results for faster subsequent runs
+  cache: true,
+  cacheDirectory: '.jest-cache'
 };

@@ -26,33 +26,7 @@ export class StarshipRepository extends BaseRepository {
     }
   }
 
-  /**
-   * Validate starship class
-   */
-  private validateStarshipClass(starshipClass: StarshipModel['class']): void {
-    const validClasses: StarshipModel['class'][] = ['scout', 'cruiser', 'draught'];
-    if (!validClasses.includes(starshipClass)) {
-      this.handleValidationError([{ 
-        field: 'class', 
-        message: `Starship class must be one of: ${validClasses.join(', ')}. Got: ${starshipClass}`,
-        value: starshipClass
-      }]);
-    }
-  }
-
-  /**
-   * Validate starship status
-   */
-  private validateStarshipStatus(status: StarshipModel['status']): void {
-    const validStatuses: StarshipModel['status'][] = ['active', 'inactive', 'restricted', 'disabled', 'pending_payment'];
-    if (!validStatuses.includes(status)) {
-      this.handleValidationError([{ 
-        field: 'status', 
-        message: `Starship status must be one of: ${validStatuses.join(', ')}. Got: ${status}`,
-        value: status
-      }]);
-    }
-  }
+  // Validation removed - relying on database constraints instead
 
 
   async findAll(): Promise<StarshipModel[]> {
@@ -119,11 +93,6 @@ export class StarshipRepository extends BaseRepository {
       // Generate unique slug if not provided
       const slug = entity.slug || await this.generateUniqueSlug(entity.name, entity.ownerId);
       
-      // Validate status using the validation method
-      if (entity.status) {
-        this.validateStarshipStatus(entity.status);
-      }
-      
       const starship: StarshipModel = {
         ...entity,
         id: uuidv4(),
@@ -164,11 +133,6 @@ export class StarshipRepository extends BaseRepository {
         if (existingStarship) {
           updates.slug = await this.generateUniqueSlug(updates.name, existingStarship.ownerId);
         }
-      }
-      
-      // Validate status using the validation method
-      if (updates.status) {
-        this.validateStarshipStatus(updates.status);
       }
       
       const updateProps = {
@@ -300,9 +264,7 @@ export class StarshipRepository extends BaseRepository {
   async updateStatus(starshipId: string, status: StarshipModel['status']): Promise<boolean> {
     const connection = getConnection();
     
-    // Validate status using the validation method
-    this.validateStarshipStatus(status);
-    
+    // Database constraints will validate the status values
     const result = await connection.executeWrite<{ count: number }>(
       `MATCH (s:Starship) WHERE s.id = $starshipId
        SET s.status = $status, s.updatedAt = $timestamp
@@ -536,14 +498,7 @@ export class StarshipRepository extends BaseRepository {
   async cleanupAbandonedStarship(starshipId: string): Promise<void> {
     const connection = getConnection();
     
-    // Delete associated vision first
-    await connection.executeWrite(
-      `MATCH (v:Vision {starshipId: $starshipId})
-       DELETE v`,
-      { starshipId }
-    );
-    
-    // Then delete the starship
+    // Delete the starship
     await connection.executeWrite(
       `MATCH (s:Starship {id: $starshipId})
        DELETE s`,
@@ -558,7 +513,7 @@ export class StarshipRepository extends BaseRepository {
    * @param additionalFields - Additional fields to update
    */
   async updatePaymentStatus(
-    starshipId: string, 
+    starshipId: string,
     status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
     additionalFields?: Partial<StarshipModel>
   ): Promise<void> {
@@ -574,5 +529,69 @@ export class StarshipRepository extends BaseRepository {
        SET s += $updates`,
       { id: starshipId, updates }
     );
+  }
+
+  /**
+   * Get all memories for a starship using Neo4j relationships
+   * @param starshipId - The starship ID
+   * @returns Array of memories belonging to this starship
+   */
+  async getMemories(starshipId: string): Promise<any[]> {
+    if (!starshipId) {
+      throw new Error('Starship ID is required');
+    }
+
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ m: any }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
+       RETURN m ORDER BY m.createdAt DESC`,
+      { starshipId }
+    );
+    return result.map((record) => record.m);
+  }
+
+  /**
+   * Get memory count for a starship
+   * @param starshipId - The starship ID
+   * @returns Number of memories
+   */
+  async getMemoryCount(starshipId: string): Promise<number> {
+    if (!starshipId) {
+      throw new Error('Starship ID is required');
+    }
+
+    const connection = getConnection();
+    const result = await connection.executeQuery<{ count: number }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
+       RETURN count(m) as count`,
+      { starshipId }
+    );
+
+    return Number(result[0]?.count || 0);
+  }
+
+  /**
+   * Remove a specific memory from a starship (deletes the memory and relationship)
+   * @param starshipId - The starship ID
+   * @param memoryId - The memory ID
+   * @returns True if memory was removed
+   */
+  async removeMemory(starshipId: string, memoryId: string): Promise<boolean> {
+    if (!starshipId) {
+      throw new Error('Starship ID is required');
+    }
+    if (!memoryId) {
+      throw new Error('Memory ID is required');
+    }
+
+    const connection = getConnection();
+    const result = await connection.executeWrite<{ deletedCount: number }>(
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory {id: $memoryId})
+       DETACH DELETE m
+       RETURN count(m) as deletedCount`,
+      { starshipId, memoryId }
+    );
+
+    return result[0]?.deletedCount > 0;
   }
 }

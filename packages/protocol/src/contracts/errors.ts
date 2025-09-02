@@ -2,6 +2,7 @@
  * Error Types for Starships.ai
  *
  * Contains only error types and enums needed across the platform.
+ * These types are imported and used by the error package implementations.
  */
 
 /**

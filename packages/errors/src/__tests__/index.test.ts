@@ -23,7 +23,7 @@ describe('BaseError', () => {
   it('should create error with required properties', () => {
     class TestError extends BaseError {
       constructor(message: string) {
-        super(message, 'TEST_ERROR', 400, ErrorCategory.VALIDATION);
+        super(message, 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION);
       }
     }
 
@@ -32,7 +32,7 @@ describe('BaseError', () => {
     expect(error).toBeInstanceOf(Error);
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('Test message');
-    expect(error.code).toBe('TEST_ERROR');
+    expect(error.code).toBe('VALIDATION_ERROR');
     expect(error.statusCode).toBe(400);
     expect(error.category).toBe(ErrorCategory.VALIDATION);
     expect(error.name).toBe('TestError');
@@ -44,7 +44,7 @@ describe('BaseError', () => {
       constructor() {
         super(
           'Test message',
-          'TEST_ERROR',
+          'VALIDATION_ERROR',
           400,
           ErrorCategory.VALIDATION,
           { extra: 'data' },
@@ -66,7 +66,7 @@ describe('BaseError', () => {
       constructor() {
         super(
           'Test message',
-          'TEST_ERROR',
+          'VALIDATION_ERROR',
           400,
           ErrorCategory.VALIDATION,
           { extra: 'data' },
@@ -80,7 +80,7 @@ describe('BaseError', () => {
     const response = error.toResponse();
 
     (global as any).validateErrorResponse(response);
-    expect(response.code).toBe('TEST_ERROR');
+    expect(response.code).toBe('VALIDATION_ERROR');
     expect(response.message).toBe('Test message');
     expect(response.statusCode).toBe(400);
     expect(response.category).toBe(ErrorCategory.VALIDATION);
@@ -92,7 +92,7 @@ describe('BaseError', () => {
   it('should convert to JSON format', () => {
     class TestError extends BaseError {
       constructor() {
-        super('Test message', 'TEST_ERROR', 400, ErrorCategory.VALIDATION);
+        super('Test message', 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION);
       }
     }
 
@@ -101,7 +101,7 @@ describe('BaseError', () => {
 
     (global as any).validateErrorJSON(json);
     expect(json.name).toBe('TestError');
-    expect(json.code).toBe('TEST_ERROR');
+    expect(json.code).toBe('VALIDATION_ERROR');
     expect(json.message).toBe('Test message');
     expect(json.statusCode).toBe(400);
     expect(json.category).toBe(ErrorCategory.VALIDATION);
@@ -156,7 +156,7 @@ describe('NotFoundError', () => {
     
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('User not found');
-    expect(error.code).toBe('NOT_FOUND_ERROR');
+    expect(error.code).toBe('RESOURCE_NOT_FOUND');
     expect(error.statusCode).toBe(404);
     expect(error.category).toBe(ErrorCategory.NOT_FOUND);
     expect(error.entityType).toBe('User');
@@ -193,7 +193,7 @@ describe('AuthenticationError', () => {
     
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('Authentication required');
-    expect(error.code).toBe('AUTHENTICATION_ERROR');
+    expect(error.code).toBe('AUTHENTICATION_REQUIRED');
     expect(error.statusCode).toBe(401);
     expect(error.category).toBe(ErrorCategory.AUTHENTICATION);
   });
@@ -225,7 +225,7 @@ describe('AuthorizationError', () => {
     
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('Access denied');
-    expect(error.code).toBe('AUTHORIZATION_ERROR');
+    expect(error.code).toBe('ACCESS_DENIED');
     expect(error.statusCode).toBe(403);
     expect(error.category).toBe(ErrorCategory.AUTHORIZATION);
     expect(error.requiredPermission).toBeUndefined();
@@ -272,7 +272,7 @@ describe('ConflictError', () => {
     
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('Resource already exists');
-    expect(error.code).toBe('CONFLICT_ERROR');
+    expect(error.code).toBe('RESOURCE_CONFLICT');
     expect(error.statusCode).toBe(409);
     expect(error.category).toBe(ErrorCategory.CONFLICT);
     expect(error.conflictType).toBeUndefined();
@@ -402,7 +402,7 @@ describe('RateLimitError', () => {
     
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('Rate limit exceeded');
-    expect(error.code).toBe('RATE_LIMIT_ERROR');
+    expect(error.code).toBe('RATE_LIMIT_EXCEEDED');
     expect(error.statusCode).toBe(429);
     expect(error.category).toBe(ErrorCategory.RATE_LIMIT);
     expect(error.limit).toBeUndefined();
@@ -436,7 +436,7 @@ describe('ServiceUnavailableError', () => {
     
     expect(error).toBeInstanceOf(BaseError);
     expect(error.message).toBe('Service temporarily unavailable');
-    expect(error.code).toBe('SERVICE_UNAVAILABLE_ERROR');
+    expect(error.code).toBe('SERVICE_UNAVAILABLE');
     expect(error.statusCode).toBe(503);
     expect(error.category).toBe(ErrorCategory.SERVICE_UNAVAILABLE);
     expect(error.service).toBeUndefined();

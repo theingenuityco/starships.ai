@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Zap } from 'lucide-react'
 import Link from 'next/link'
+import { starshipAPI } from '@/lib/api'
 
 interface DrivePageContentProps {
   slug: string
@@ -19,9 +20,8 @@ export function DrivePageContent({ slug }: DrivePageContentProps) {
     const fetchStarship = async () => {
       try {
         setStarshipLoading(true)
-        const { default: api } = await import('@/lib/api')
-        const response = await api.get(`/api/starships/${slug}`)
-        setStarship(response.data.starship)
+        const response = await starshipAPI.getStarshipBySlug(slug)
+        setStarship(response.starship)
       } catch (error) {
         console.error('Failed to fetch starship:', error)
       } finally {

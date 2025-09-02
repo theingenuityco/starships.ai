@@ -596,13 +596,13 @@ export const chatAPI = {
 
 // Simplified Starship API - TanStack Query handles all caching
 export const starshipAPI = {
-  // Get user's starships
+  // Get user's starships - server returns { data: starships[] } (note: no wrapper object)
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
-    api.get('/api/v1/starships').then(res => res.data),
+    api.get('/api/v1/starships').then(res => ({ starships: res.data })),
 
   // Get user's starships list (simple list for dropdowns)
   getUserStarshipsList: (): Promise<Starship[]> =>
-    api.get('/api/v1/starships').then(res => res.data.starships || res.data),
+    api.get('/api/v1/starships').then(res => res.data),
 
   // Create new starship
   createStarship: (data: {

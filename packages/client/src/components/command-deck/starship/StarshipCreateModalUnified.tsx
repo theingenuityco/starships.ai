@@ -255,7 +255,8 @@ export function StarshipCreateModalUnified({
           
           console.log('[STARSHIP-CREATE] Received response:', response);
           
-          const checkoutUrl = (response as any).data.checkoutUrl;
+          // API client already unwraps the server's { data: ... } wrapper
+          const checkoutUrl = response.checkoutUrl;
           
           if (checkoutUrl) {
             console.log('[STARSHIP-CREATE] Redirecting to checkout:', checkoutUrl);

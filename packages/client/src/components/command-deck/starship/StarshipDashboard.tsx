@@ -14,8 +14,15 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { useStarshipStore } from '@/store/starship-store';
-import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
+import {
+  useStarships,
+  useCreateStarship,
+  useUpdateStarship,
+  useDeleteStarship,
+  useUpdateStarshipStatus,
+  useStarshipAgents
+} from '@/hooks/useStarships';
+import { useStarshipUIStore } from '@/store/starship-ui-store';
 import { StarshipCard } from './StarshipCard';
 import { StarshipCreateModalUnified } from './StarshipCreateModalUnified';
 import { StarshipEditModal } from './StarshipEditModal';
@@ -33,23 +40,21 @@ interface StarshipDashboardProps {
 }
 
 export function StarshipDashboard({ className, autoOpenCreate = false, onCreateSuccess }: StarshipDashboardProps) {
-  const {
-    starships,
-    activeStarshipId,
-    loading,
-    error,
-    clearErrors
-  } = useStarshipStore();
-
+  // Use new hooks
+  const { data: starshipsData, isLoading, error, refetch } = useStarships();
+  const createStarshipMutation = useCreateStarship();
+  const updateStarshipMutation = useUpdateStarship();
+  const deleteStarshipMutation = useDeleteStarship();
+  const updateStatusMutation = useUpdateStarshipStatus();
+  
+  // UI state
+  const { activeStarshipId, setActiveStarship } = useStarshipUIStore();
   const { user, userName, userEmail, isAuthenticated } = useAuth();
   const pathname = usePathname();
 
-  // Use the centralized loader hook with controlled refetch behavior
-  const { loadStarships, isLoading: loadingStarships } = useStarshipsLoader({
-    enabled: true,
-    refetchOnWindowFocus: true,
-    refetchOnVisibilityChange: true
-  });
+  // Extract starships from the response
+  const starships = starshipsData?.starships || [];
+  const loading = isLoading || createStarshipMutation.isPending;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive' | 'scout' | 'cruiser'>('all');
@@ -57,14 +62,6 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   const [editingStarship, setEditingStarship] = useState<string | null>(null);
   const [deletingStarship, setDeletingStarship] = useState<string | null>(null);
   const [statusManagingStarship, setStatusManagingStarship] = useState<string | null>(null);
-
-  // Only reload when pathname changes to /fleet
-  useEffect(() => {
-    if (pathname === '/fleet') {
-      // Small delay to ensure navigation is complete
-      setTimeout(() => loadStarships(), 100);
-    }
-  }, [pathname]);
 
   // Auto-open create modal for onboarding
   useEffect(() => {
@@ -84,14 +81,14 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   }, [autoOpenCreate]);
 
   // Filter starships based on search query and active filter
-  const filteredStarships = starships.filter(starship => {
+  const filteredStarships = starships.filter((starship: any) => {
     // Search filter
     const matchesSearch = starship.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       starship.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
       starship.status.toLowerCase().includes(searchQuery.toLowerCase());
     
     // Status/type filter
-    const matchesFilter = 
+    const matchesFilter =
       activeFilter === 'all' ||
       (activeFilter === 'active' && starship.status === 'active') ||
       (activeFilter === 'inactive' && starship.status === 'inactive') ||
@@ -102,7 +99,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
   });
 
   const handleStarshipSelect = (starshipId: string) => {
-    useStarshipStore.setState({ activeStarshipId: starshipId });
+    setActiveStarship(starshipId);
   };
 
   const handleCreateSuccess = async () => {
@@ -111,43 +108,34 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
     if (onCreateSuccess) {
       onCreateSuccess();
     }
-    // Refresh the starships list after creation with a small delay to avoid race conditions
-    // This ensures the modal close animation completes and avoids conflicting with auto-refresh
-    setTimeout(() => {
-      if (!loading) {
-        loadStarships();
-      }
-    }, 300);
+    // TanStack Query will automatically refetch after mutations, no need to manually refetch
   };
 
   const handleEditSuccess = () => {
     setEditingStarship(null);
-    // Refresh the starships list after edit
-    loadStarships();
+    // TanStack Query handles refetching automatically
   };
 
   const handleDeleteSuccess = () => {
     setDeletingStarship(null);
-    // Refresh the starships list after deletion
-    loadStarships();
+    // TanStack Query handles refetching automatically
   };
 
   const handleStatusUpdateSuccess = () => {
     setStatusManagingStarship(null);
-    // Refresh the starships list after status update
-    loadStarships();
+    // TanStack Query handles refetching automatically
   };
 
   // Fleet overview stats
   const fleetStats = {
     total: starships.length,
-    active: starships.filter(s => s.status === 'active').length,
-    inactive: starships.filter(s => s.status === 'inactive').length,
-    scouts: starships.filter(s => s.class === 'scout').length,
-    cruisers: starships.filter(s => s.class === 'cruiser').length
+    active: starships.filter((s: any) => s.status === 'active').length,
+    inactive: starships.filter((s: any) => s.status === 'inactive').length,
+    scouts: starships.filter((s: any) => s.class === 'scout').length,
+    cruisers: starships.filter((s: any) => s.class === 'cruiser').length
   };
 
-  if (loadingStarships && starships.length === 0) {
+  if (isLoading && starships.length === 0) {
     return (
       <div className={cn("h-full flex items-center justify-center bg-gradient-to-br from-background to-muted/5", className)}>
         <motion.div
@@ -187,10 +175,10 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
               </div>
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold">Unable to Access Fleet</h3>
-                <p className="text-sm text-muted-foreground">{error}</p>
+                <p className="text-sm text-muted-foreground">{error?.message || 'An error occurred'}</p>
               </div>
-              <Button 
-                onClick={() => { clearErrors(); loadStarships(); }}
+              <Button
+                onClick={() => refetch()}
                 className="bg-primary/90 hover:bg-primary"
               >
                 Try Again
@@ -511,7 +499,7 @@ export function StarshipDashboard({ className, autoOpenCreate = false, onCreateS
         ) : (
           <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <AnimatePresence mode="popLayout">
-              {filteredStarships.map((starship, index) => (
+              {filteredStarships.map((starship: any, index: number) => (
                 <motion.div
                   key={starship.id}
                   layout

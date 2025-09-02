@@ -30,7 +30,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useStarshipStore } from '@/store/starship-store';
+import { useStarships, useUpdateStarship } from '@/hooks/useStarships';
 import { cn } from '@/lib/utils';
 
 interface StarshipEditModalProps {
@@ -108,19 +108,15 @@ const STARSHIP_STATUSES = {
   }
 } as const;
 
-export function StarshipEditModal({ 
-  starshipId, 
-  open, 
-  onOpenChange, 
-  onSuccess 
+export function StarshipEditModal({
+  starshipId,
+  open,
+  onOpenChange,
+  onSuccess
 }: StarshipEditModalProps) {
-  const { 
-    starships, 
-    updateStarship, 
-    loadingUpdate, 
-    updateError, 
-    clearError 
-  } = useStarshipStore();
+  // Use new hooks
+  const { data: starshipsData } = useStarships();
+  const updateStarshipMutation = useUpdateStarship();
 
   const [formData, setFormData] = useState<StarshipEditFormData>({
     name: '',
@@ -134,7 +130,8 @@ export function StarshipEditModal({
   const [starshipClasses, setStarshipClasses] = useState<Record<string, any>>({});
   const [classesLoading, setClassesLoading] = useState(true);
 
-  const starship = starships.find(s => s.id === starshipId);
+  const starships = starshipsData?.starships || [];
+  const starship = starships.find((s: any) => s.id === starshipId);
 
   // Initialize form data when starship is loaded
   useEffect(() => {
@@ -154,13 +151,13 @@ export function StarshipEditModal({
     }
   }, [starship]);
 
-  // Clear errors when modal opens
+  // Clear errors and reset mutation when modal opens
   useEffect(() => {
     if (open) {
-      clearError('update');
       setErrors({});
+      updateStarshipMutation.reset();
     }
-  }, [open, clearError]);
+  }, [open]);
 
   // Track changes
   useEffect(() => {
@@ -221,7 +218,6 @@ export function StarshipEditModal({
       newErrors.name = 'Name must be less than 50 characters';
     }
 
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -229,24 +225,26 @@ export function StarshipEditModal({
   const handleSubmit = async () => {
     if (!validateForm() || !starship) return;
 
-    try {
-      const updates: any = {};
-      
-      if (formData.name !== starship.name) {
-        updates.name = formData.name;
-      }
-      if (formData.status !== starship.status) {
-        updates.status = formData.status;
-      }
-      if (formData.class !== starship.class) {
-        updates.class = formData.class;
-      }
-
-      await updateStarship(starshipId, updates);
-      onSuccess();
-    } catch (error) {
-      console.error('Failed to update starship:', error);
+    const updates: any = {};
+    
+    if (formData.name !== starship.name) {
+      updates.name = formData.name;
     }
+    if (formData.status !== starship.status) {
+      updates.status = formData.status;
+    }
+    if (formData.class !== starship.class) {
+      updates.class = formData.class;
+    }
+
+    updateStarshipMutation.mutate(
+      { id: starshipId, updates },
+      {
+        onSuccess: () => {
+          onSuccess();
+        }
+      }
+    );
   };
 
   const handleClose = () => {
@@ -264,7 +262,7 @@ export function StarshipEditModal({
       });
     }
     setErrors({});
-    clearError('update');
+    updateStarshipMutation.reset();
   };
 
   if (!starship) {
@@ -444,7 +442,7 @@ export function StarshipEditModal({
           )}
 
           {/* Error Display */}
-          {updateError && (
+          {updateStarshipMutation.error && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -452,7 +450,9 @@ export function StarshipEditModal({
             >
               <div className="flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 text-destructive" />
-                <span className="text-sm text-destructive">{updateError}</span>
+                <span className="text-sm text-destructive">
+                  {updateStarshipMutation.error?.response?.data?.error || updateStarshipMutation.error?.message || 'Failed to update starship'}
+                </span>
               </div>
             </motion.div>
           )}
@@ -465,10 +465,10 @@ export function StarshipEditModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loadingUpdate || !hasChanges}
+            disabled={updateStarshipMutation.isPending || !hasChanges}
             className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
           >
-            {loadingUpdate ? (
+            {updateStarshipMutation.isPending ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Updating...

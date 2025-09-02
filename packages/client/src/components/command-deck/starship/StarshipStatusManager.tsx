@@ -25,7 +25,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useStarshipStore } from '@/store/starship-store';
+import { useStarships, useUpdateStarshipStatus } from '@/hooks/useStarships';
 import { cn } from '@/lib/utils';
 
 interface StarshipStatusManagerProps {
@@ -101,24 +101,21 @@ const STARSHIP_STATUSES = {
   }
 } as const;
 
-export function StarshipStatusManager({ 
-  starshipId, 
-  open, 
-  onOpenChange, 
-  onSuccess 
+export function StarshipStatusManager({
+  starshipId,
+  open,
+  onOpenChange,
+  onSuccess
 }: StarshipStatusManagerProps) {
-  const { 
-    starships, 
-    updateStarshipStatus, 
-    loadingStatusUpdate, 
-    statusUpdateError, 
-    clearError 
-  } = useStarshipStore();
+  // Use new hooks
+  const { data: starshipsData } = useStarships();
+  const updateStatusMutation = useUpdateStarshipStatus();
 
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'inactive'>('active');
   const [step, setStep] = useState(1);
 
-  const starship = starships.find(s => s.id === starshipId);
+  const starships = starshipsData?.starships || [];
+  const starship = starships.find((s: any) => s.id === starshipId);
   const currentStatus = starship?.status || 'inactive';
   const statusData = STARSHIP_STATUSES[selectedStatus];
 
@@ -137,9 +134,9 @@ export function StarshipStatusManager({
   // Clear errors when modal opens
   useEffect(() => {
     if (open) {
-      clearError('status');
+      updateStatusMutation.reset();
     }
-  }, [open, clearError]);
+  }, [open]);
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     switch (starshipClass) {
@@ -153,13 +150,15 @@ export function StarshipStatusManager({
   const handleStatusUpdate = async () => {
     if (!starship || selectedStatus === currentStatus) return;
 
-    try {
-      await updateStarshipStatus(starshipId, selectedStatus);
-      onSuccess();
-      handleClose();
-    } catch (error) {
-      console.error('Failed to update starship status:', error);
-    }
+    updateStatusMutation.mutate(
+      { id: starshipId, status: selectedStatus },
+      {
+        onSuccess: () => {
+          onSuccess();
+          handleClose();
+        }
+      }
+    );
   };
 
   const handleClose = () => {
@@ -172,7 +171,7 @@ export function StarshipStatusManager({
       setSelectedStatus(userSelectableStatus);
     }
     setStep(1);
-    clearError('status');
+    updateStatusMutation.reset();
   };
 
   const handleNext = () => {
@@ -404,7 +403,7 @@ export function StarshipStatusManager({
           )}
 
           {/* Error Display */}
-          {statusUpdateError && (
+          {updateStatusMutation.error && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -412,7 +411,9 @@ export function StarshipStatusManager({
             >
               <div className="flex items-center space-x-2">
                 <AlertCircle className="w-4 h-4 text-destructive" />
-                <span className="text-sm text-destructive">{statusUpdateError}</span>
+                <span className="text-sm text-destructive">
+                  {updateStatusMutation.error?.response?.data?.error || updateStatusMutation.error?.message || 'Failed to update status'}
+                </span>
               </div>
             </motion.div>
           )}
@@ -425,7 +426,7 @@ export function StarshipStatusManager({
           </Button>
           
           {step === 1 ? (
-            <Button 
+            <Button
               onClick={handleNext}
               disabled={!hasStatusChange}
               className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
@@ -440,10 +441,10 @@ export function StarshipStatusManager({
               </Button>
               <Button
                 onClick={handleStatusUpdate}
-                disabled={loadingStatusUpdate || !hasStatusChange}
+                disabled={updateStatusMutation.isPending || !hasStatusChange}
                 className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
               >
-                {loadingStatusUpdate ? (
+                {updateStatusMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Updating...

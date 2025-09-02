@@ -82,7 +82,7 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-// Health check routes (comprehensive)
+// Health check routes (comprehensive) - keeping this separate for monitoring
 app.use('/health', healthRoutes);
 
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
@@ -113,17 +113,17 @@ app.get('/api/v1/starships/pricing', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/health', healthRoutes);
-app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unauthenticated access
+app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentTemplateRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
 app.use('/api/v1', memoryRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/users', userRoutes);
+app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', missionRoutes); // Updated to OpenAPI standard with v1 prefix
 // app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
-app.use('/api/missions', missionRoutes);
 app.use('/api', nativeApiKeysRoutes);
 
 // Add 404 handler for unmatched routes

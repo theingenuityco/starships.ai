@@ -1,4 +1,4 @@
-import { SessionInterface } from '@/components/chat/SessionInterface'
+import { SessionInterface } from '@/components/session/SessionInterface'
 
 export default function SessionPage() {
   return <SessionInterface />

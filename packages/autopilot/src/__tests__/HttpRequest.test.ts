@@ -162,8 +162,10 @@ describe('HttpRequest', () => {
         config: { 
           url: 'https://api.example.com/test',
           method: 'get',
-          headers: {}
-        }
+          headers: { 'content-type': 'application/json' }
+        },
+        request: {},
+        statusCode: 200
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -193,9 +195,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 201,
         statusText: 'Created',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { id: 1, name: 'John Doe' },
-        config: { url: 'https://api.example.com/users', method: 'post', headers: {} }
+        config: { url: 'https://api.example.com/users', method: 'post', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -203,8 +205,8 @@ describe('HttpRequest', () => {
       const result = await postRequest.execute();
 
       expect(result.status).toBe('completed');
-      expect(result.data?.status).toBe(201);
-      expect(result.data?.body).toEqual({ id: 1, name: 'John Doe' });
+      expect((result.data as { status: number; body: unknown })?.status).toBe(201);
+      expect((result.data as { status: number; body: unknown })?.body).toEqual({ id: 1, name: 'John Doe' });
 
       // Verify axios was called with correct config
       expect(axiosInstance).toHaveBeenCalledWith({
@@ -231,9 +233,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { authenticated: true },
-        config: { url: 'https://api.example.com/secured', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/secured', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -264,9 +266,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { authenticated: true },
-        config: { url: 'https://api.example.com/secured', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/secured', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -300,9 +302,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { authenticated: true },
-        config: { url: 'https://api.example.com/secured', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/secured', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -333,9 +335,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { slow: true },
-        config: { url: 'https://api.example.com/slow', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/slow', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -360,9 +362,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 302,
         statusText: 'Found',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: {},
-        config: { url: 'https://api.example.com/redirect', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/redirect', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -386,7 +388,7 @@ describe('HttpRequest', () => {
       const retryRequest = new HttpRequest(retryParams);
       
       // Mock setTimeout to speed up tests
-      jest.spyOn(global, 'setTimeout').mockImplementation((callback: any) => {
+      jest.spyOn(global, 'setTimeout').mockImplementation((callback: () => void) => {
         callback();
         return {} as NodeJS.Timeout;
       });
@@ -395,9 +397,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: { success: true },
-        config: { url: 'https://api.example.com/unstable', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/unstable', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       // Fail first two attempts, succeed on third
@@ -424,7 +426,7 @@ describe('HttpRequest', () => {
       const retryRequest = new HttpRequest(retryParams);
       
       // Mock setTimeout
-      jest.spyOn(global, 'setTimeout').mockImplementation((callback: any) => {
+      jest.spyOn(global, 'setTimeout').mockImplementation((callback: () => void) => {
         callback();
         return {} as NodeJS.Timeout;
       });
@@ -518,9 +520,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: {},
-        config: { url: 'https://api.example.com/test', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/test', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -545,9 +547,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: {},
-        config: { url: 'https://api.example.com/test', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/test', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -576,9 +578,9 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: {},
+        headers: { 'content-type': 'application/json' },
         data: {},
-        config: { url: 'https://api.example.com/test', method: 'get', headers: {} }
+        config: { url: 'https://api.example.com/test', method: 'get', headers: { 'content-type': 'application/json' } }
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);

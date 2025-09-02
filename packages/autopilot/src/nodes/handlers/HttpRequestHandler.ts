@@ -24,8 +24,9 @@ export class HttpRequestHandler extends BaseHandler {
       
       // Check if HTTP request execution was successful
       if (httpResult.status === 'completed') {
+        const responseData = httpResult.data as { status: number; statusText: string; headers: unknown; body: unknown; url?: string };
         return this.createSuccessResult(execution, {
-          ...httpResult.data,
+          ...responseData,
           output: `HTTP ${params.method} request to ${params.url} completed successfully`
         });
       } else {

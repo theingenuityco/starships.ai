@@ -62,7 +62,8 @@ export class LLM {
       
       // Check if HTTP request execution was successful
       if (httpResult.status === 'completed' && httpResult.data) {
-        const llmResponse = this.extractLlmResponse(httpResult.data.body);
+        const responseData = httpResult.data as { body: unknown; status: number; statusText: string; headers: unknown; url?: string };
+        const llmResponse = this.extractLlmResponse(responseData.body);
         
         // Add LLM response to agent memory if execution context is provided
         if (execution?.agentMemory) {
@@ -74,7 +75,7 @@ export class LLM {
         return {
           status: 'completed',
           data: {
-            ...httpResult.data,
+            ...responseData,
             llmResponse,
             model: this.params.model
           }

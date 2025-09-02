@@ -22,7 +22,7 @@ export interface Message {
  * Memory state configuration for base Memory class
  * Pure state container - messages are handled separately by Memory class
  */
-export interface MemoryState extends Record<string, any> {
+export interface MemoryState extends Record<string, unknown> {
 }
 
 /**

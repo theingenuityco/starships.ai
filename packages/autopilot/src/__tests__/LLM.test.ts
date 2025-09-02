@@ -32,7 +32,7 @@ describe('LLM', () => {
       getParameters: jest.fn(),
       clone: jest.fn(),
       updateParameters: jest.fn()
-    } as any;
+    } as unknown;
     
     // Make constructor return our mock
     MockedHttpRequest.mockImplementation(() => mockHttpRequest);
@@ -175,8 +175,8 @@ describe('LLM', () => {
       const result = await llm.execute();
 
       expect(result.status).toBe('completed');
-      expect(result.data?.llmResponse).toBe('This is the LLM response');
-      expect(result.data?.model).toBe('openai/gpt-4');
+      expect((result.data as { llmResponse: string; model: string })?.llmResponse).toBe('This is the LLM response');
+      expect((result.data as { llmResponse: string; model: string })?.model).toBe('openai/gpt-4');
       expect(result.error).toBeUndefined();
       
       expect(MockedHttpRequest).toHaveBeenCalledTimes(1);
@@ -197,7 +197,7 @@ describe('LLM', () => {
       const result = await llm.execute(execution);
 
       expect(result.status).toBe('completed');
-      expect(result.data?.llmResponse).toBe('This is the LLM response');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('This is the LLM response');
       
       // Should add assistant response to memory
       const messages = execution.agentMemory.getMessageHistory();
@@ -340,7 +340,7 @@ describe('LLM', () => {
       });
 
       let result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('OpenAI response');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('OpenAI response');
 
       // Test string response
       mockHttpRequest.execute.mockResolvedValueOnce({
@@ -351,7 +351,7 @@ describe('LLM', () => {
       });
 
       result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('Direct string response');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('Direct string response');
 
       // Test content field
       mockHttpRequest.execute.mockResolvedValueOnce({
@@ -362,7 +362,7 @@ describe('LLM', () => {
       });
 
       result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('Content field response');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('Content field response');
 
       // Test text field
       mockHttpRequest.execute.mockResolvedValueOnce({
@@ -373,7 +373,7 @@ describe('LLM', () => {
       });
 
       result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('Text field response');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('Text field response');
 
       // Test fallback to JSON string
       mockHttpRequest.execute.mockResolvedValueOnce({
@@ -384,7 +384,7 @@ describe('LLM', () => {
       });
 
       result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('{"unknown":"format","data":[1,2,3]}');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('{"unknown":"format","data":[1,2,3]}');
     });
 
     it('should handle malformed response body gracefully', async () => {
@@ -398,7 +398,7 @@ describe('LLM', () => {
       const result = await llm.execute();
 
       expect(result.status).toBe('completed');
-      expect(result.data?.llmResponse).toBe('{"choices":null}');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('{"choices":null}');
     });
 
     it('should not add to memory if no execution context provided', async () => {
@@ -885,12 +885,12 @@ describe('LLM', () => {
       });
 
       const result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('');
     });
 
     it('should handle parsing errors in response extraction gracefully', async () => {
       // Create a circular reference that will cause JSON.stringify to fail
-      const circularObj: any = { data: 'test' };
+      const circularObj: unknown = { data: 'test' };
       circularObj.self = circularObj;
 
       mockHttpRequest.execute.mockResolvedValue({
@@ -901,7 +901,7 @@ describe('LLM', () => {
       });
 
       const result = await llm.execute();
-      expect(result.data?.llmResponse).toBe('');
+      expect((result.data as { llmResponse: string })?.llmResponse).toBe('');
     });
   });
 });

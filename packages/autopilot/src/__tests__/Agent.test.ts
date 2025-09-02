@@ -24,7 +24,7 @@ describe('Agent', () => {
     mockEngine = {
       execute: jest.fn(),
       hasHandler: jest.fn()
-    } as any;
+    } as unknown;
     
     // Make constructor return our mock
     MockedEngine.mockImplementation(() => mockEngine);

@@ -2,9 +2,10 @@
  * Jest setup file for errors package tests
  */
 
-import { BaseError, ValidationError, NotFoundError, AuthenticationError, AuthorizationError, 
-         ConflictError, DatabaseError, NetworkError, InternalServerError, RateLimitError, 
-         ServiceUnavailableError, ErrorCategory } from '../index';
+import { BaseError, ValidationError, NotFoundError, AuthenticationError, AuthorizationError,
+         ConflictError, DatabaseError, NetworkError, InternalServerError, RateLimitError,
+         ServiceUnavailableError } from '../index';
+import { ErrorCategory } from '@starships/protocol';
 
 // Mock console methods to reduce noise in tests
 global.console = {

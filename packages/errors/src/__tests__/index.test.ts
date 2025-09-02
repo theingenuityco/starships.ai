@@ -14,10 +14,10 @@ import {
   InternalServerError,
   RateLimitError,
   ServiceUnavailableError,
-  ErrorCategory,
-  ErrorUtils,
-  ErrorDetails
+  ErrorUtils
 } from '../index';
+import { ErrorCategory } from '@starships/protocol';
+import type { ErrorDetails } from '@starships/protocol';
 
 describe('BaseError', () => {
   it('should create error with required properties', () => {

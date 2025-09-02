@@ -3,7 +3,8 @@ import type { SessionModel, SessionSourceType } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth';
 import { SessionService } from '../services/SessionService';
-import { ValidationError, NotFoundError, StandardErrorCode } from '@starships/errors';
+import { ValidationError, NotFoundError } from '@starships/errors';
+import type { StandardErrorCode } from '@starships/protocol';
 import { RepositoryFactory } from '@starships/models';
 import {
   sendSuccess,

@@ -156,6 +156,161 @@ export class NotFoundError extends BaseError {
 }
 
 /**
+ * Authentication Error (401)
+ */
+export class AuthenticationError extends BaseError {
+  constructor(
+    message: string = 'Authentication required',
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(
+      message,
+      'AUTHENTICATION_ERROR',
+      401,
+      ErrorCategory.AUTHENTICATION,
+      details,
+      requestId,
+      path
+    );
+  }
+}
+
+/**
+ * Authorization Error (403)
+ */
+export class AuthorizationError extends BaseError {
+  public readonly requiredPermission?: string;
+  public readonly userRole?: string;
+
+  constructor(
+    message: string = 'Access denied',
+    requiredPermission?: string,
+    userRole?: string,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(
+      message,
+      'AUTHORIZATION_ERROR',
+      403,
+      ErrorCategory.AUTHORIZATION,
+      details,
+      requestId,
+      path
+    );
+    this.requiredPermission = requiredPermission;
+    this.userRole = userRole;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      details: {
+        ...this.details,
+        requiredPermission: this.requiredPermission,
+        userRole: this.userRole,
+      },
+    };
+  }
+}
+
+/**
+ * Conflict Error (409)
+ */
+export class ConflictError extends BaseError {
+  public readonly conflictType?: string;
+
+  constructor(
+    message: string,
+    conflictType?: string,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(message, 'CONFLICT_ERROR', 409, ErrorCategory.CONFLICT, details, requestId, path);
+    this.conflictType = conflictType;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      details: {
+        ...this.details,
+        conflictType: this.conflictType,
+      },
+    };
+  }
+}
+
+/**
+ * Database Error (500)
+ */
+export class DatabaseError extends BaseError {
+  public readonly operation?: string;
+  public readonly query?: string;
+
+  constructor(
+    message: string,
+    operation?: string,
+    query?: string,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(message, 'DATABASE_ERROR', 500, ErrorCategory.DATABASE, details, requestId, path);
+    this.operation = operation;
+    this.query = query;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      details: {
+        ...this.details,
+        operation: this.operation,
+        // Don't expose query in production for security
+        ...(process.env.NODE_ENV !== 'production' && { query: this.query }),
+      },
+    };
+  }
+}
+
+/**
+ * Network Error (503)
+ */
+export class NetworkError extends BaseError {
+  public readonly service?: string;
+  public readonly endpoint?: string;
+
+  constructor(
+    message: string,
+    service?: string,
+    endpoint?: string,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(message, 'NETWORK_ERROR', 503, ErrorCategory.NETWORK, details, requestId, path);
+    this.service = service;
+    this.endpoint = endpoint;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      details: {
+        ...this.details,
+        service: this.service,
+        endpoint: this.endpoint,
+      },
+    };
+  }
+}
+
+/**
  * Internal Server Error (500)
  */
 export class InternalServerError extends BaseError {
@@ -166,6 +321,46 @@ export class InternalServerError extends BaseError {
     path?: string
   ) {
     super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path);
+  }
+}
+
+/**
+ * Service Unavailable Error (503)
+ */
+export class ServiceUnavailableError extends BaseError {
+  public readonly service?: string;
+  public readonly retryAfter?: number;
+
+  constructor(
+    message: string = 'Service temporarily unavailable',
+    service?: string,
+    retryAfter?: number,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(
+      message,
+      'SERVICE_UNAVAILABLE_ERROR',
+      503,
+      ErrorCategory.SERVICE_UNAVAILABLE,
+      details,
+      requestId,
+      path
+    );
+    this.service = service;
+    this.retryAfter = retryAfter;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      details: {
+        ...this.details,
+        service: this.service,
+        retryAfter: this.retryAfter,
+      },
+    };
   }
 }
 

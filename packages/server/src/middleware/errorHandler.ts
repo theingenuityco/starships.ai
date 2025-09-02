@@ -16,8 +16,9 @@ import {
   DatabaseError,
   NetworkError,
   InternalServerError,
+  ServiceUnavailableError,
   ErrorFactory,
-} from '@starships/models';
+} from '@starships/errors';
 
 import type {
   ErrorSeverity,
@@ -580,26 +581,8 @@ export {
   ConflictError,
   NetworkError,
   InternalServerError,
-} from '@starships/models';
-
-// Create ServiceUnavailableError as an alias for InternalServerError
-export class ServiceUnavailableError extends InternalServerError {
-  constructor(
-    message: string,
-    service?: string,
-    retryAfter?: number,
-    requestId?: string
-  ) {
-    super(
-      message,
-      {
-        service,
-        retryAfter,
-      },
-      requestId
-    );
-  }
-}
+  ServiceUnavailableError,
+} from '@starships/errors';
 
 // Create ErrorHandlerUtils as a utility class
 export class ErrorHandlerUtils {

@@ -45,8 +45,8 @@ const getErrorMessage = (error: unknown): string => {
   return String(error);
 };
 
-// GET / - Get all missions with optional filters and sorting (OpenAPI pattern)
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+// GET /missions - Get all missions with optional filters and sorting (OpenAPI pattern)
+router.get('/missions', async (req: Request, res: Response): Promise<void> => {
   try {
     const { page, limit, error: paginationError } = validatePagination(
       req.query.page as string,
@@ -132,8 +132,8 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// GET /:id - Get a specific mission by ID (OpenAPI pattern)
-router.get('/:id', async (req: Request, res: Response): Promise<void> => {
+// GET /missions/:id - Get a specific mission by ID (OpenAPI pattern)
+router.get('/missions/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -153,8 +153,8 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST / - Create a new mission (OpenAPI pattern)
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+// POST /missions - Create a new mission (OpenAPI pattern)
+router.post('/missions', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
 
@@ -238,8 +238,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// PUT /:id - Update an existing mission (OpenAPI pattern)
-router.put('/:id', async (req: Request, res: Response): Promise<void> => {
+// PUT /missions/:id - Update an existing mission (OpenAPI pattern)
+router.put('/missions/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const updates: UpdateMissionRequest = req.body;
@@ -275,8 +275,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// DELETE /:id - Delete a mission (OpenAPI pattern)
-router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+// DELETE /missions/:id - Delete a mission (OpenAPI pattern)
+router.delete('/missions/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -302,8 +302,8 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST /:id/messages - Send message to mission orchestrator (OpenAPI pattern)
-router.post('/:id/messages', async (req: Request, res: Response): Promise<void> => {
+// POST /missions/:id/messages - Send message to mission orchestrator (OpenAPI pattern)
+router.post('/missions/:id/messages', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { content } = req.body as SendMissionMessageRequest;
@@ -365,8 +365,8 @@ router.post('/:id/messages', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-// GET /:id/messages - Get message history for a mission with pagination (OpenAPI pattern)
-router.get('/:id/messages', async (req: Request, res: Response): Promise<void> => {
+// GET /missions/:id/messages - Get message history for a mission with pagination (OpenAPI pattern)
+router.get('/missions/:id/messages', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -398,8 +398,8 @@ router.get('/:id/messages', async (req: Request, res: Response): Promise<void> =
   }
 });
 
-// GET /:id/clarity - Get mission clarity assessment (OpenAPI pattern)
-router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> => {
+// GET /missions/:id/clarity - Get mission clarity assessment (OpenAPI pattern)
+router.get('/missions/:id/clarity', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -441,8 +441,8 @@ router.get('/:id/clarity', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-// GET /:id/workflow - Get mission workflow details (OpenAPI pattern)
-router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> => {
+// GET /missions/:id/workflow - Get mission workflow details (OpenAPI pattern)
+router.get('/missions/:id/workflow', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     validateUUID(id, 'id');
@@ -508,8 +508,8 @@ router.get('/:id/workflow', async (req: Request, res: Response): Promise<void> =
   }
 });
 
-// PUT /:id/workflow/approval - Approve or reject mission workflow (OpenAPI pattern)
-router.put('/:id/workflow/approval', async (req: Request, res: Response): Promise<void> => {
+// PUT /missions/:id/workflow/approval - Approve or reject mission workflow (OpenAPI pattern)
+router.put('/missions/:id/workflow/approval', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { approvalStatus, rejectionReason } = req.body;
@@ -586,8 +586,8 @@ router.put('/:id/workflow/approval', async (req: Request, res: Response): Promis
   }
 });
 
-// POST /:id/regenerate-workflow - Regenerate mission workflow (OpenAPI pattern)
-router.post('/:id/regenerate-workflow', async (req: Request, res: Response): Promise<void> => {
+// POST /missions/:id/regenerate-workflow - Regenerate mission workflow (OpenAPI pattern)
+router.post('/missions/:id/regenerate-workflow', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -644,8 +644,8 @@ router.post('/:id/regenerate-workflow', async (req: Request, res: Response): Pro
   }
 });
 
-// GET /:id/execution-status - Get mission execution status (OpenAPI pattern)
-router.get('/:id/execution-status', async (req: Request, res: Response): Promise<void> => {
+// GET /missions/:id/execution-status - Get mission execution status (OpenAPI pattern)
+router.get('/missions/:id/execution-status', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;

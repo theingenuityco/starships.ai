@@ -25,8 +25,8 @@ const getWaitlistService = () => {
   }
 };
 
-// POST /check - Check if an email is approved for early access (OpenAPI pattern)
-router.post('/check', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+// POST /waitlist/check - Check if an email is approved for early access (OpenAPI pattern)
+router.post('/waitlist/check', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
 
@@ -86,8 +86,8 @@ router.post('/check', asyncHandler(async (req: Request, res: Response): Promise<
   }
 }));
 
-// GET /status - Check current session status (OpenAPI pattern)
-router.get('/status', (req: Request, res: Response): void => {
+// GET /waitlist/status - Check current session status (OpenAPI pattern)
+router.get('/waitlist/status', (req: Request, res: Response): void => {
   try {
     const validatedEmail = req.cookies?.waitlist_validated;
     
@@ -113,8 +113,8 @@ router.get('/status', (req: Request, res: Response): void => {
   }
 });
 
-// POST /logout - Clear waitlist session (OpenAPI pattern)
-router.post('/logout', (req: Request, res: Response): void => {
+// POST /waitlist/logout - Clear waitlist session (OpenAPI pattern)
+router.post('/waitlist/logout', (req: Request, res: Response): void => {
   try {
     res.clearCookie('waitlist_validated');
     

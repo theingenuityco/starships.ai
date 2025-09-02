@@ -53,7 +53,7 @@ interface HealthCheckResponse {
 }
 
 // GET /health - Basic health check endpoint (OpenAPI pattern)
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+router.get('/health', async (req: Request, res: Response): Promise<void> => {
   const requestId = ErrorUtils.generateRequestId();
   const startTime = Date.now();
 
@@ -175,7 +175,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // GET /health/detailed - Detailed health check endpoint (OpenAPI pattern)
-router.get('/detailed', async (req: Request, res: Response): Promise<void> => {
+router.get('/health/detailed', async (req: Request, res: Response): Promise<void> => {
   const requestId = ErrorUtils.generateRequestId();
   const startTime = Date.now();
 
@@ -330,7 +330,7 @@ router.get('/detailed', async (req: Request, res: Response): Promise<void> => {
 });
 
 // GET /health/ready - Readiness probe endpoint (OpenAPI pattern)
-router.get('/ready', async (req: Request, res: Response): Promise<void> => {
+router.get('/health/ready', async (req: Request, res: Response): Promise<void> => {
   try {
     // Check if system is ready to accept requests
     const connection = getConnection();
@@ -357,7 +357,7 @@ router.get('/ready', async (req: Request, res: Response): Promise<void> => {
 });
 
 // GET /health/live - Liveness probe endpoint (OpenAPI pattern)
-router.get('/live', (req: Request, res: Response): void => {
+router.get('/health/live', (req: Request, res: Response): void => {
   // Simple liveness check - if we can respond, we're alive
   sendSuccess(res, {
     status: 'alive',
@@ -367,7 +367,7 @@ router.get('/live', (req: Request, res: Response): void => {
 });
 
 // GET /health/metrics - System metrics endpoint (OpenAPI pattern)
-router.get('/metrics', (req: Request, res: Response): void => {
+router.get('/health/metrics', (req: Request, res: Response): void => {
   try {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();

@@ -66,10 +66,11 @@ api.interceptors.request.use(
 
     // Check if this is an authenticated endpoint
     const requiresAuth =
-      config.url?.includes('/api/starships') ||
-      config.url?.includes('/api/agents') ||
-      config.url?.includes('/api/users') ||
-      config.url?.includes('/api/chat')
+      config.url?.includes('/api/v1/starships') ||
+      config.url?.includes('/api/v1/agents') ||
+      config.url?.includes('/api/v1/users') ||
+      config.url?.includes('/api/v1/sessions') ||
+      config.url?.includes('/api/v1/missions')
 
     if (requiresAuth) {
       console.log('[API] Authenticated endpoint detected, waiting for token provider...')
@@ -301,7 +302,7 @@ export const agentAPI = {
     }
 
     console.log('[API] Fetching all agents from server')
-    const data = await api.get('/api/agents').then((res: AxiosResponse<Agent[]>) => {
+    const data = await api.get('/api/v1/agents').then((res: AxiosResponse<Agent[]>) => {
       console.log('[API] Received agents from server:', res.data.length)
       return res.data
     })
@@ -318,7 +319,7 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/agents/starship/${starshipId}`)
+      .get(`/api/v1/starships/${starshipId}/agents`)
       .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -331,7 +332,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api.get(`/api/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data)
+    const data = await api.get(`/api/v1/agents/${id}`).then((res: AxiosResponse<Agent>) => res.data)
     apiCache.set(cacheKey, data)
     return data
   },
@@ -339,7 +340,7 @@ export const agentAPI = {
   // CRUD methods with cache invalidation
   create: async (agent: CreateAgentRequest): Promise<Agent> => {
     console.log('[API] Creating new agent:', agent.name)
-    const data = await api.post('/api/agents', agent).then((res: AxiosResponse<Agent>) => {
+    const data = await api.post('/api/v1/agents', agent).then((res: AxiosResponse<Agent>) => {
       console.log('[API] Agent created successfully:', res.data.id, 'authorId:', res.data.authorId)
       return res.data
     })
@@ -350,14 +351,14 @@ export const agentAPI = {
 
   update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
     const data = await api
-      .put(`/api/agents/${id}`, updates)
+      .put(`/api/v1/agents/${id}`, updates)
       .then((res: AxiosResponse<Agent>) => res.data)
     invalidateAgentCaches(id)
     return data
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/agents/${id}`)
+    await api.delete(`/api/v1/agents/${id}`)
     invalidateAgentCaches(id)
   },
 
@@ -370,7 +371,7 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/agents?category=${category}`)
+      .get(`/api/v1/agents?category=${category}`)
       .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -384,7 +385,7 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/agents?authorId=${authorId}`)
+      .get(`/api/v1/users/${authorId}/agents`)
       .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -398,7 +399,7 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/agents/public?limit=${limit}&offset=${offset}`)
+      .get(`/api/v1/agents/public?limit=${limit}&offset=${offset}`)
       .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -412,9 +413,17 @@ export const agentAPI = {
     }
 
     const data = await api
-      .get(`/api/agents/search?q=${encodeURIComponent(query)}`)
+      .get(`/api/v1/agents/search?q=${encodeURIComponent(query)}`)
       .then((res: AxiosResponse<Agent[]>) => res.data)
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
+    return data
+  },
+
+  // Get agent analytics
+  getAnalytics: async (id: string): Promise<any> => {
+    const data = await api
+      .get(`/api/v1/agents/${id}/analytics`)
+      .then((res: AxiosResponse<any>) => res.data)
     return data
   },
 }
@@ -429,7 +438,7 @@ export const templateAPI = {
     }
 
     const data = await api
-      .get('/api/agent-templates')
+      .get('/api/v1/agent-templates')
       .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -443,7 +452,7 @@ export const templateAPI = {
     }
 
     const data = await api
-      .get(`/api/agent-templates/${id}`)
+      .get(`/api/v1/agent-templates/${id}`)
       .then((res: AxiosResponse<AgentTemplate>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -457,7 +466,7 @@ export const templateAPI = {
     }
 
     const data = await api
-      .get(`/api/agent-templates?category=${category}`)
+      .get(`/api/v1/agent-templates?category=${category}`)
       .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -471,7 +480,7 @@ export const templateAPI = {
     }
 
     const data = await api
-      .get(`/api/agent-templates?authorId=${authorId}`)
+      .get(`/api/v1/agent-templates?authorId=${authorId}`)
       .then((res: AxiosResponse<AgentTemplate[]>) => res.data)
     apiCache.set(cacheKey, data)
     return data
@@ -489,7 +498,7 @@ export const templateAPI = {
       }
 
       const data = await api
-        .post(`/api/agent-templates/${templateId}/create-agent`, requestBody)
+        .post(`/api/v1/agent-templates/${templateId}/agents`, requestBody)
         .then((res: AxiosResponse<Agent>) => res.data)
 
       // Invalidate agent caches since we've created a new agent
@@ -510,7 +519,7 @@ export const templateAPI = {
     try {
       console.log('[API] Converting agent to template:', agentId)
       const data = await api
-        .post(`/api/agent-templates/convert-from-agent/${agentId}`)
+        .post(`/api/v1/agent-templates/from-agents/${agentId}`)
         .then((res: AxiosResponse<AgentTemplate>) => {
           console.log('[API] Agent converted to template successfully:', res.data.id)
           return res.data
@@ -529,25 +538,27 @@ export const templateAPI = {
 }
 
 export const chatAPI = {
-  // Send message directly to /api/chat endpoint
+  // Send message to session endpoint
   sendMessage: async (request: ChatRequest): Promise<Message> => {
-    const backendRequest = toBackendRequest(request)
-    const response = await api.post('/api/chat', backendRequest)
-    const backendResponse = response.data as ChatBackendResponse
+    const sessionId = request.sessionId || `agent-${request.agentId}`
+    const response = await api.post(`/api/v1/sessions/${sessionId}/messages`, {
+      agentId: request.agentId,
+      message: request.message
+    })
 
-    // Convert backend response to client Message format
+    // Convert response to client Message format
     return {
       id: generateId(),
-      content: backendResponse.reply,
+      content: response.data.reply || response.data.content,
       role: 'assistant',
       timestamp: new Date().toISOString(),
-      sessionId: request.sessionId || `agent-${request.agentId}`,
+      sessionId: sessionId,
     }
   },
 
   // Get chat messages by session ID from database
   getMessagesBySession: async (sessionId: string, limit: number = 50, offset: number = 0): Promise<Message[]> => {
-    const response = await api.get(`/api/chat/messages/${sessionId}`, {
+    const response = await api.get(`/api/v1/sessions/${sessionId}`, {
       params: { limit, offset }
     })
     
@@ -556,13 +567,13 @@ export const chatAPI = {
     }
 
     // Convert database messages to client Message format
-    const dbMessages = response.data.data.messages
-    return dbMessages.map((dbMsg: any) => ({
+    const messages = response.data.messages || []
+    return messages.map((dbMsg: any) => ({
       id: dbMsg.id,
       content: dbMsg.content,
       role: dbMsg.role as 'user' | 'assistant',
       timestamp: dbMsg.timestamp,
-      sessionId: dbMsg.session_id,
+      sessionId: dbMsg.session_id || sessionId,
       ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content })
     }))
   },
@@ -570,13 +581,13 @@ export const chatAPI = {
   // Get chat sessions by starship ID
   getSessionsByStarship: (starshipId: string): Promise<{ sessions: Session[] }> =>
     api
-      .get(`/api/chat/sessions/starship/${starshipId}`)
+      .get(`/api/v1/starships/${starshipId}/sessions`)
       .then((res: AxiosResponse<{ sessions: Session[] }>) => res.data),
 
   // Clear memory for a session
   clearMemory: (sessionId: string): Promise<{ message: string }> =>
     api
-      .delete(`/api/chat/${sessionId}/memory`)
+      .delete(`/api/v1/sessions/${sessionId}/memory`)
       .then((res: AxiosResponse<{ message: string }>) => res.data),
 }
 
@@ -587,7 +598,7 @@ export const chatAPI = {
 export const starshipAPI = {
   // Get user's starships
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
-    api.get('/api/starships').then(res => res.data),
+    api.get('/api/v1/starships').then(res => res.data),
 
   // Get user's starships list (simple list for dropdowns)
   getUserStarshipsList: async (): Promise<Starship[]> => {
@@ -597,7 +608,7 @@ export const starshipAPI = {
       return cached
     }
 
-    const data = await api.get('/api/starships').then(res => res.data.starships)
+    const data = await api.get('/api/v1/starships').then(res => res.data.starships || res.data)
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes
     return data
   },
@@ -606,8 +617,10 @@ export const starshipAPI = {
   createStarship: (data: {
     name: string
     class: 'scout' | 'cruiser' | 'draught'
-  }): Promise<{ starship: Starship }> => {
-    return api.post('/api/starships', data).then(res => res.data);
+    plan?: string
+    billingPeriod?: string
+  }): Promise<{ starship: Starship; checkoutUrl?: string }> => {
+    return api.post('/api/v1/starships', data).then(res => res.data);
   },
 
   // Get starship details with caching (supports both ID and slug)
@@ -622,7 +635,7 @@ export const starshipAPI = {
       return cached
     }
 
-    const data = await api.get(`/api/starships/${idOrSlug}`).then(res => res.data)
+    const data = await api.get(`/api/v1/starships/${idOrSlug}`).then(res => res.data)
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes since starship data changes frequently
     return data
   },
@@ -636,7 +649,7 @@ export const starshipAPI = {
 
   // Update starship details with cache invalidation
   updateStarship: async (id: string, updates: UpdateStarshipRequest): Promise<StarshipResponse> => {
-    const data = await api.put(`/api/starships/${id}`, updates).then(res => res.data)
+    const data = await api.put(`/api/v1/starships/${id}`, updates).then(res => res.data)
     // Invalidate starship cache since details changed
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
     apiCache.invalidatePattern('^starships:') // Invalidate all starship caches
@@ -644,13 +657,13 @@ export const starshipAPI = {
   },
 
   // Delete starship with cache invalidation
-  deleteStarship: async (id: string): Promise<{ 
+  deleteStarship: async (id: string): Promise<{
     message: string;
     starshipId: string;
     subscriptionCancelled: boolean;
     refundInfo: string | null;
   }> => {
-    const data = await api.delete(`/api/starships/${id}`).then(res => res.data)
+    const data = await api.delete(`/api/v1/starships/${id}`).then(res => res.data)
     // Invalidate all starship caches
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
     apiCache.invalidatePattern('^starships:')
@@ -662,7 +675,7 @@ export const starshipAPI = {
     id: string,
     status: UpdateStarshipStatusRequest['status']
   ): Promise<StarshipResponse> => {
-    const data = await api.patch(`/api/starships/${id}/status`, { status }).then(res => res.data)
+    const data = await api.patch(`/api/v1/starships/${id}/status`, { status }).then(res => res.data)
     // Invalidate starship cache since status changed
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
     apiCache.invalidatePattern('^starships:')
@@ -677,7 +690,7 @@ export const starshipAPI = {
       return cached
     }
 
-    const data = await api.get(`/api/starships/${id}/agents`).then(res => res.data)
+    const data = await api.get(`/api/v1/starships/${id}/agents`).then(res => res.data)
     apiCache.set(cacheKey, data, 1 * 60 * 1000) // Cache for 1 minute since agent data changes frequently
     return data
   },
@@ -685,7 +698,7 @@ export const starshipAPI = {
   // Deploy agent to starship with cache invalidation
   deployAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
     const data = await api
-      .post(`/api/starships/${starshipId}/agents/${agentId}/deploy`)
+      .post(`/api/v1/starships/${starshipId}/agents/${agentId}`)
       .then(res => res.data)
     // Invalidate starship cache since agent deployment changes starship state
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
@@ -696,12 +709,36 @@ export const starshipAPI = {
   // Remove agent from starship with cache invalidation
   removeAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
     const data = await api
-      .delete(`/api/starships/${starshipId}/agents/${agentId}`)
+      .delete(`/api/v1/starships/${starshipId}/agents/${agentId}`)
       .then(res => res.data)
     // Invalidate starship cache since agent removal changes starship state
     apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
     apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
     return data
+  },
+
+  // Get pricing data
+  getPricing: async (): Promise<any> => {
+    return api.get('/api/v1/starships/pricing').then(res => res.data)
+  },
+
+  // Create checkout session
+  createCheckoutSession: async (data: {
+    starshipName: string
+    plan: string
+    billingPeriod: string
+  }): Promise<{ url: string }> => {
+    return api.post('/api/v1/starships/checkout-sessions', data).then(res => res.data)
+  },
+
+  // Create billing portal session
+  createBillingPortal: async (starshipId: string): Promise<{ url: string }> => {
+    return api.post(`/api/v1/starships/${starshipId}/billing-portal`).then(res => res.data)
+  },
+
+  // Retry payment for pending starship
+  retryPayment: async (starshipId: string): Promise<{ checkoutUrl: string; message: string }> => {
+    return api.post(`/api/v1/starships/${starshipId}/retry-payment`).then(res => res.data)
   },
 }
 
@@ -839,17 +876,26 @@ export const userAPI = {
     name?: string
     avatar?: string
   }): Promise<SyncedUser> => {
-    const response = await api.post('/api/users/sync', userData)
+    const response = await api.post('/api/v1/users/sync', userData)
     return response.data as SyncedUser
   },
 
   // Get user by ID
   getById: (id: string): Promise<SyncedUser> =>
-    api.get(`/api/users/${id}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+    api.get(`/api/v1/users/${id}`).then((res: AxiosResponse<SyncedUser>) => res.data),
 
   // Get user by Kinde ID
   getByKindeId: (kindeId: string): Promise<SyncedUser> =>
-    api.get(`/api/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+    api.get(`/api/v1/users/kinde/${kindeId}`).then((res: AxiosResponse<SyncedUser>) => res.data),
+}
+
+// Memory API
+export const memoryAPI = {
+  // Reset memory for agent and user
+  resetMemory: async (agentId: string): Promise<{ message: string }> => {
+    const response = await api.post('/api/v1/memory/reset', { agentId })
+    return response.data
+  },
 }
 
 

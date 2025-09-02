@@ -87,7 +87,7 @@ export const missionApi = {
     }
 
     const queryString = searchParams.toString();
-    const endpoint = `/api/missions${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/v1/missions${queryString ? `?${queryString}` : ''}`;
     
     return apiRequest<MissionListResponse>(endpoint);
   },
@@ -96,7 +96,7 @@ export const missionApi = {
    * Get mission by ID
    */
   async getMissionById(id: string): Promise<ApiResponse<MissionResponse>> {
-    return apiRequest<MissionResponse>(`/api/missions/${id}`);
+    return apiRequest<MissionResponse>(`/api/v1/missions/${id}`);
   },
 
   /**
@@ -108,6 +108,9 @@ export const missionApi = {
     sort?: MissionSort
   ): Promise<ApiResponse<MissionListResponse>> {
     const searchParams = new URLSearchParams();
+    
+    // Add starshipId to query parameters
+    searchParams.set('starshipId', starshipId);
     
     if (filters?.status && filters.status.length > 0) {
       filters.status.forEach(status => searchParams.append('status', status));
@@ -126,7 +129,7 @@ export const missionApi = {
     }
 
     const queryString = searchParams.toString();
-    const endpoint = `/api/missions/starship/${starshipId}${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/v1/missions${queryString ? `?${queryString}` : ''}`;
     
     return apiRequest<MissionListResponse>(endpoint);
   },
@@ -135,7 +138,7 @@ export const missionApi = {
    * Create a new mission
    */
   async createMission(request: CreateMissionRequest): Promise<ApiResponse<MissionResponse>> {
-    return apiRequest<MissionResponse>('/api/missions', {
+    return apiRequest<MissionResponse>('/api/v1/missions', {
       method: 'POST',
       body: JSON.stringify(request)
     });
@@ -148,7 +151,7 @@ export const missionApi = {
     id: string,
     updates: UpdateMissionRequest
   ): Promise<ApiResponse<MissionResponse>> {
-    return apiRequest<MissionResponse>(`/api/missions/${id}`, {
+    return apiRequest<MissionResponse>(`/api/v1/missions/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates)
     });
@@ -158,7 +161,7 @@ export const missionApi = {
    * Delete a mission
    */
   async deleteMission(id: string): Promise<ApiResponse<void>> {
-    return apiRequest<void>(`/api/missions/${id}`, {
+    return apiRequest<void>(`/api/v1/missions/${id}`, {
       method: 'DELETE'
     });
   },
@@ -186,28 +189,28 @@ export const missionApi = {
    * Chat functions
    */
   async sendMessage(missionId: string, content: string): Promise<ApiResponse<MissionChatResponse>> {
-    return apiRequest<MissionChatResponse>(`/api/missions/${missionId}/messages`, {
+    return apiRequest<MissionChatResponse>(`/api/v1/missions/${missionId}/messages`, {
       method: 'POST',
       body: JSON.stringify({ content })
     });
   },
 
   async getMessageHistory(missionId: string): Promise<ApiResponse<{ messages: MissionMessageModel[] }>> {
-    return apiRequest<{ messages: MissionMessageModel[] }>(`/api/missions/${missionId}/messages`);
+    return apiRequest<{ messages: MissionMessageModel[] }>(`/api/v1/missions/${missionId}/messages`);
   },
 
   /**
    * Get mission clarity assessment
    */
   async getMissionClarity(missionId: string): Promise<ApiResponse<MissionClarityModel | null>> {
-    return apiRequest<MissionClarityModel | null>(`/api/missions/${missionId}/clarity`);
+    return apiRequest<MissionClarityModel | null>(`/api/v1/missions/${missionId}/clarity`);
   },
 
   /**
    * Get mission workflow details
    */
   async getMissionWorkflow(missionId: string): Promise<ApiResponse<WorkflowResponse | null>> {
-    return apiRequest<WorkflowResponse | null>(`/api/missions/${missionId}/workflow`);
+    return apiRequest<WorkflowResponse | null>(`/api/v1/missions/${missionId}/workflow`);
   },
 
 
@@ -215,9 +218,9 @@ export const missionApi = {
    * Approve or reject mission workflow
    */
   async approveMissionWorkflow(missionId: string, approved: boolean, reason?: string): Promise<ApiResponse<{ approved: boolean; message: string }>> {
-    return apiRequest<{ approved: boolean; message: string }>(`/api/missions/${missionId}/workflow/approval`, {
+    return apiRequest<{ approved: boolean; message: string }>(`/api/v1/missions/${missionId}/workflow/approval`, {
       method: 'PUT',
-      body: JSON.stringify({ approved, rejectionReason: reason })
+      body: JSON.stringify({ approvalStatus: approved ? 'approved' : 'rejected', rejectionReason: reason })
     });
   },
 
@@ -225,7 +228,7 @@ export const missionApi = {
    * Regenerate mission workflow
    */
   async regenerateMissionWorkflow(missionId: string): Promise<ApiResponse<{ message: string }>> {
-    return apiRequest<{ message: string }>(`/api/missions/${missionId}/regenerate-workflow`, {
+    return apiRequest<{ message: string }>(`/api/v1/missions/${missionId}/regenerate-workflow`, {
       method: 'POST'
     });
   },
@@ -235,6 +238,6 @@ export const missionApi = {
    * Get mission execution status
    */
   async getExecutionStatus(missionId: string): Promise<ApiResponse<{ executionState: any | null; phase: MissionPhase }>> {
-    return apiRequest<{ executionState: any | null; phase: MissionPhase }>(`/api/missions/${missionId}/execution-status`);
+    return apiRequest<{ executionState: any | null; phase: MissionPhase }>(`/api/v1/missions/${missionId}/execution-status`);
   }
 };

@@ -869,7 +869,7 @@ describe('ExecutionRepository', () => {
     });
 
     it('should handle very deep nested objects', async () => {
-      let deepObject: any = {};
+      const deepObject: any = {};
       let current = deepObject;
       
       // Create deeply nested object

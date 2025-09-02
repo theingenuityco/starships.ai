@@ -722,7 +722,7 @@ describe('PerformanceMonitor', () => {
       performanceMonitor.recordQuery('SINGLETON_TEST', 100);
 
       // Import the same instance (simulated)
-      const { performanceMonitor: importedMonitor } = require('../performance-monitor');
+      const { performanceMonitor: importedMonitor } = jest.requireActual('../performance-monitor');
       
       const stats = importedMonitor.getStats();
       expect(stats.totalQueries).toBeGreaterThan(0);

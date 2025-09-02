@@ -9,8 +9,6 @@
 import { ErrorCategory } from '@starships/protocol';
 import type { StandardErrorCode } from '@starships/protocol';
 
-// Re-export types for backward compatibility
-export type { StandardErrorCode } from '@starships/protocol';
 
 /**
  * HTTP status code mapping for error codes
@@ -318,9 +316,3 @@ export class ErrorMappingUtils {
       .map(([code]) => code as StandardErrorCode);
   }
 }
-
-// Legacy function exports for backward compatibility
-export const getHttpStatusCode = ErrorMappingUtils.getHttpStatusCode;
-export const getErrorCategory = ErrorMappingUtils.getErrorCategory;
-export const isRetryableError = ErrorMappingUtils.isRetryableError;
-export const shouldLogError = ErrorMappingUtils.shouldLogError;

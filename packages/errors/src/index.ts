@@ -8,10 +8,6 @@
 import { ErrorCategory } from '@starships/protocol';
 import type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
 
-// Re-export types for backward compatibility
-export { ErrorCategory } from '@starships/protocol';
-export type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
-
 /**
  * Base application error class
  */

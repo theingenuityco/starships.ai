@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
-import { useStarshipStore } from '@/store/starship-store'
+import { useStarships } from '@/hooks/useStarships'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -34,7 +34,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [starshipLoading, setStarshipLoading] = useState(true)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
-  const { starships } = useStarshipStore()
+  const { data: starshipsResponse } = useStarships()
+  const starships = starshipsResponse?.starships || []
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])

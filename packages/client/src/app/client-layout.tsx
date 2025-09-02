@@ -73,7 +73,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     )
   }
 
-  // Hide navigation on all fleet-level routes (only show inside starship context)
+  // Hide navigation on all routes except starship routes (only show inside starship context)
   const shouldHideNavigation = !pathname.startsWith('/ship/')
 
   // Regular pages with conditional navigation sidebar

@@ -45,7 +45,7 @@ export function DrivePageContent({ slug }: DrivePageContentProps) {
             className="text-muted-foreground hover:text-foreground"
             asChild
           >
-            <Link href="/fleet">
+            <Link href="/">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Fleet
             </Link>

@@ -18,8 +18,8 @@ export default function CheckoutCancel() {
           <p className="text-muted-foreground">
             No charges were made. You can try again anytime.
           </p>
-          <Button onClick={() => router.push('/fleet')}>
-            Back to Fleet
+          <Button onClick={() => router.push('/')}>
+            Back to Home
           </Button>
         </CardContent>
       </Card>

@@ -594,24 +594,15 @@ export const chatAPI = {
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
 
-// NEW: Enhanced Starship API
+// Simplified Starship API - TanStack Query handles all caching
 export const starshipAPI = {
   // Get user's starships
   getUserStarships: (): Promise<{ starships: Starship[] }> =>
     api.get('/api/v1/starships').then(res => res.data),
 
   // Get user's starships list (simple list for dropdowns)
-  getUserStarshipsList: async (): Promise<Starship[]> => {
-    const cacheKey = 'starships:list'
-    const cached = apiCache.get<Starship[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get('/api/v1/starships').then(res => res.data.starships || res.data)
-    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes
-    return data
-  },
+  getUserStarshipsList: (): Promise<Starship[]> =>
+    api.get('/api/v1/starships').then(res => res.data.starships || res.data),
 
   // Create new starship
   createStarship: (data: {
@@ -619,103 +610,47 @@ export const starshipAPI = {
     class: 'scout' | 'cruiser' | 'draught'
     plan?: string
     billingPeriod?: string
-  }): Promise<{ starship: Starship; checkoutUrl?: string }> => {
-    return api.post('/api/v1/starships', data).then(res => res.data);
-  },
+  }): Promise<{ starship: Starship; checkoutUrl?: string }> =>
+    api.post('/api/v1/starships', data).then(res => res.data),
 
-  // Get starship details with caching (supports both ID and slug)
-  getStarship: async (
-    idOrSlug: string
-  ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> => {
-    const cacheKey = CACHE_KEYS.STARSHIP_BY_ID(idOrSlug)
-    const cached = apiCache.get<{ starship: Starship; agents: Agent[]; availableSlots: number }>(
-      cacheKey
-    )
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/starships/${idOrSlug}`).then(res => res.data)
-    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache for 2 minutes since starship data changes frequently
-    return data
-  },
+  // Get starship details (supports both ID and slug)
+  getStarship: (idOrSlug: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
+    api.get(`/api/v1/starships/${idOrSlug}`).then(res => res.data),
 
   // Get starship by slug specifically
-  getStarshipBySlug: async (
-    slug: string
-  ): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> => {
-    return starshipAPI.getStarship(slug)
-  },
+  getStarshipBySlug: (slug: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
+    api.get(`/api/v1/starships/${slug}`).then(res => res.data),
 
-  // Update starship details with cache invalidation
-  updateStarship: async (id: string, updates: UpdateStarshipRequest): Promise<StarshipResponse> => {
-    const data = await api.put(`/api/v1/starships/${id}`, updates).then(res => res.data)
-    // Invalidate starship cache since details changed
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
-    apiCache.invalidatePattern('^starships:') // Invalidate all starship caches
-    return data
-  },
+  // Update starship details
+  updateStarship: (id: string, updates: UpdateStarshipRequest): Promise<StarshipResponse> =>
+    api.put(`/api/v1/starships/${id}`, updates).then(res => res.data),
 
-  // Delete starship with cache invalidation
-  deleteStarship: async (id: string): Promise<{
+  // Delete starship
+  deleteStarship: (id: string): Promise<{
     message: string;
     starshipId: string;
     subscriptionCancelled: boolean;
     refundInfo: string | null;
-  }> => {
-    const data = await api.delete(`/api/v1/starships/${id}`).then(res => res.data)
-    // Invalidate all starship caches
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
-    apiCache.invalidatePattern('^starships:')
-    return data
-  },
+  }> => api.delete(`/api/v1/starships/${id}`).then(res => res.data),
 
-  // Update starship status specifically with cache invalidation
-  updateStarshipStatus: async (
+  // Update starship status
+  updateStarshipStatus: (
     id: string,
     status: UpdateStarshipStatusRequest['status']
-  ): Promise<StarshipResponse> => {
-    const data = await api.patch(`/api/v1/starships/${id}/status`, { status }).then(res => res.data)
-    // Invalidate starship cache since status changed
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(id))
-    apiCache.invalidatePattern('^starships:')
-    return data
-  },
+  ): Promise<StarshipResponse> =>
+    api.patch(`/api/v1/starships/${id}/status`, { status }).then(res => res.data),
 
   // Get detailed agent information for starship
-  getStarshipAgents: async (id: string): Promise<StarshipAgentsResponse> => {
-    const cacheKey = CACHE_KEYS.STARSHIP_AGENTS(id)
-    const cached = apiCache.get<StarshipAgentsResponse>(cacheKey)
-    if (cached) {
-      return cached
-    }
+  getStarshipAgents: (id: string): Promise<StarshipAgentsResponse> =>
+    api.get(`/api/v1/starships/${id}/agents`).then(res => res.data),
 
-    const data = await api.get(`/api/v1/starships/${id}/agents`).then(res => res.data)
-    apiCache.set(cacheKey, data, 1 * 60 * 1000) // Cache for 1 minute since agent data changes frequently
-    return data
-  },
+  // Deploy agent to starship
+  deployAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
+    api.post(`/api/v1/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
 
-  // Deploy agent to starship with cache invalidation
-  deployAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
-    const data = await api
-      .post(`/api/v1/starships/${starshipId}/agents/${agentId}`)
-      .then(res => res.data)
-    // Invalidate starship cache since agent deployment changes starship state
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
-    return data
-  },
-
-  // Remove agent from starship with cache invalidation
-  removeAgent: async (starshipId: string, agentId: string): Promise<{ message: string }> => {
-    const data = await api
-      .delete(`/api/v1/starships/${starshipId}/agents/${agentId}`)
-      .then(res => res.data)
-    // Invalidate starship cache since agent removal changes starship state
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_BY_ID(starshipId))
-    apiCache.invalidate(CACHE_KEYS.STARSHIP_AGENTS(starshipId))
-    return data
-  },
+  // Remove agent from starship
+  removeAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
+    api.delete(`/api/v1/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
 
   // Get pricing data
   getPricing: async (): Promise<any> => {

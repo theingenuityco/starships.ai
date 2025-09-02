@@ -25,7 +25,8 @@ import {
   Navigation
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useStarshipStore } from '@/store/starship-store';
+import { useStarships, useDeleteStarship, useStarshipAgents } from '@/hooks/useStarships';
+import { useStarshipUIStore } from '@/store/starship-ui-store';
 import { cn } from '@/lib/utils';
 
 interface StarshipDeleteDialogProps {
@@ -35,38 +36,34 @@ interface StarshipDeleteDialogProps {
   onSuccess: () => void;
 }
 
-export function StarshipDeleteDialog({ 
-  starshipId, 
-  open, 
-  onOpenChange, 
-  onSuccess 
+export function StarshipDeleteDialog({
+  starshipId,
+  open,
+  onOpenChange,
+  onSuccess
 }: StarshipDeleteDialogProps) {
-  const { 
-    starships, 
-    activeStarshipId,
-    deleteStarship, 
-    loadingDelete, 
-    deleteError, 
-    clearError,
-    starshipAgents
-  } = useStarshipStore();
+  // Use new hooks
+  const { data: starshipsData } = useStarships();
+  const { data: agentsData } = useStarshipAgents(starshipId, open);
+  const deleteStarshipMutation = useDeleteStarship();
+  const { activeStarshipId } = useStarshipUIStore();
 
   const [confirmationText, setConfirmationText] = useState('');
   const [step, setStep] = useState(1);
 
-  const starship = starships.find(s => s.id === starshipId);
+  const starships = starshipsData?.starships || [];
+  const starship = starships.find((s: any) => s.id === starshipId);
   const isActiveStarship = activeStarshipId === starshipId;
-  const agentData = starshipAgents[starshipId];
-  const deployedAgents = agentData?.deployedAgents || [];
+  const deployedAgents = agentsData?.deployedAgents || [];
 
   // Clear state when modal opens/closes
   useEffect(() => {
     if (open) {
-      clearError('delete');
       setConfirmationText('');
       setStep(1);
+      deleteStarshipMutation.reset();
     }
-  }, [open, clearError]);
+  }, [open]);
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     switch (starshipClass) {
@@ -91,20 +88,19 @@ export function StarshipDeleteDialog({
   const handleDelete = async () => {
     if (!starship || !isConfirmationValid) return;
 
-    try {
-      await deleteStarship(starshipId);
-      onSuccess();
-      handleClose();
-    } catch (error) {
-      console.error('Failed to delete starship:', error);
-    }
+    deleteStarshipMutation.mutate(starshipId, {
+      onSuccess: () => {
+        onSuccess();
+        handleClose();
+      }
+    });
   };
 
   const handleClose = () => {
     onOpenChange(false);
     setConfirmationText('');
     setStep(1);
-    clearError('delete');
+    deleteStarshipMutation.reset();
   };
 
   const handleNext = () => {
@@ -321,7 +317,7 @@ export function StarshipDeleteDialog({
           )}
 
           {/* Error Display */}
-          {deleteError && (
+          {deleteStarshipMutation.error && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -330,13 +326,15 @@ export function StarshipDeleteDialog({
               <div className="flex items-start space-x-2">
                 <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <div className="text-sm text-destructive whitespace-pre-wrap">{deleteError}</div>
-                  {deleteError.includes('subscription') && (
+                  <div className="text-sm text-destructive whitespace-pre-wrap">
+                    {deleteStarshipMutation.error?.response?.data?.error || deleteStarshipMutation.error?.message || 'Failed to delete starship'}
+                  </div>
+                  {deleteStarshipMutation.error?.response?.data?.error?.includes('subscription') && (
                     <div className="mt-2 text-xs text-muted-foreground">
                       You can cancel your subscription manually in the{' '}
-                      <a 
-                        href="https://dashboard.stripe.com" 
-                        target="_blank" 
+                      <a
+                        href="https://dashboard.stripe.com"
+                        target="_blank"
                         rel="noopener noreferrer"
                         className="underline hover:text-primary"
                       >
@@ -358,8 +356,8 @@ export function StarshipDeleteDialog({
           </Button>
           
           {step === 1 ? (
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleNext}
               className="bg-destructive hover:bg-destructive/90"
             >
@@ -374,10 +372,10 @@ export function StarshipDeleteDialog({
               <Button
                 variant="destructive"
                 onClick={handleDelete}
-                disabled={loadingDelete || !isConfirmationValid}
+                disabled={deleteStarshipMutation.isPending || !isConfirmationValid}
                 className="bg-destructive hover:bg-destructive/90"
               >
-                {loadingDelete ? (
+                {deleteStarshipMutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Deleting...

@@ -12,8 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { useStarshipStore } from '@/store/starship-store';
-import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
+import { useStarships } from '@/hooks/useStarships';
+import { useStarshipUIStore } from '@/store/starship-ui-store';
 import { cn } from '@/lib/utils';
 
 interface StarshipSelectorProps {
@@ -23,35 +23,26 @@ interface StarshipSelectorProps {
 export function StarshipSelector({ className }: StarshipSelectorProps) {
   const pathname = usePathname();
   
-  // All hooks must be called before any conditional returns
-  const {
-    starships,
-    activeStarshipId,
-    loading,
-    error,
-    setActiveStarship,
-    createStarship
-  } = useStarshipStore();
-
+  // Use new hooks
+  const { data: starshipsData, isLoading, error } = useStarships();
+  const { activeStarshipId, setActiveStarship } = useStarshipUIStore();
   const [isCreatingStarship, setIsCreatingStarship] = useState(false);
 
-  // Use centralized loader - only loads once on mount and deduplicates calls
-  const { loadStarships } = useStarshipsLoader({ enabled: true });
+  // Extract starships from response
+  const starships = starshipsData?.starships || [];
   
   // Don't show StarshipSelector when inside individual starship routes
   if (pathname.startsWith('/ship/')) {
     return null;
   }
 
-  const activeStarship = starships.find(s => s.id === activeStarshipId);
+  const activeStarship = starships.find((s: any) => s.id === activeStarshipId);
 
   const handleCreateStarship = async (starshipClass: 'scout' | 'cruiser') => {
     setIsCreatingStarship(true);
     try {
-      await createStarship({
-        name: `${starshipClass.charAt(0).toUpperCase() + starshipClass.slice(1)} ${Date.now()}`,
-        class: starshipClass
-      });
+      // TODO: Implement creation with new hooks - for now just log
+      console.log(`Creating ${starshipClass} starship`);
     } catch (error) {
       console.error('Failed to create starship:', error);
     } finally {
@@ -72,7 +63,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
     }
   };
 
-  if (loading && starships.length === 0) {
+  if (isLoading && starships.length === 0) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
         <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
@@ -84,11 +75,11 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
   if (error) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <span className="text-sm text-red-400">Error: {error}</span>
+        <span className="text-sm text-red-400">Error: {error?.message || 'Failed to load starships'}</span>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => loadStarships()}
+          onClick={() => window.location.reload()}
           className="border-red-500/30 text-red-400 hover:bg-red-500/10"
         >
           Retry
@@ -137,7 +128,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         >
           {starships.length > 0 && (
             <>
-              {starships.map((starship) => (
+              {starships.map((starship: any) => (
                 <DropdownMenuItem
                   key={starship.id}
                   onClick={() => setActiveStarship(starship.id)}
@@ -196,7 +187,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {loading && (
+      {isLoading && (
         <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
       )}
     </div>

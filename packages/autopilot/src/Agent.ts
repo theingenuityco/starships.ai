@@ -96,14 +96,14 @@ export class Agent {
    * Get agent nodes
    */
   getNodes(): Node[] {
-    return [...this.params.blueprint.nodes];
+    return this.params.blueprint.nodes.map(node => ({ ...node }));
   }
 
   /**
    * Get agent edges
    */
   getEdges(): Edge[] {
-    return [...this.params.blueprint.edges];
+    return this.params.blueprint.edges.map(edge => ({ ...edge }));
   }
 
   /**

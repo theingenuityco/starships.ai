@@ -15,7 +15,7 @@ export class HttpRequest {
     // Store HTTP request parameters with deep copy to avoid mutations
     this.params = {
       ...params,
-      headers: { ...params.headers },
+      headers: params.headers ? { ...params.headers } : undefined,
       authentication: params.authentication ? { ...params.authentication } : undefined
     };
   }
@@ -130,10 +130,10 @@ export class HttpRequest {
         };
       } else {
         // If we get here, all retries failed
-        const errorMessage = lastError?.message || 'HTTP request failed';
+        const errorMessage = lastError?.message || 'Unknown error';
         return {
           status: 'failed',
-          error: new Error(`HTTP request failed: ${errorMessage}`)
+          error: new Error(`HTTP request execution failed: ${errorMessage}`)
         };
       }
     } catch (error) {

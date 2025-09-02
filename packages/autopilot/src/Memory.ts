@@ -116,6 +116,9 @@ export class Memory {
    * Get last N messages
    */
   getLastMessages(count: number): Message[] {
+    if (count <= 0) {
+      return [];
+    }
     return this.messages.slice(-count);
   }
 

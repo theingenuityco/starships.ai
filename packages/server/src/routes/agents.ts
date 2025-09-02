@@ -14,7 +14,6 @@ import {
   validateUUID,
   validatePagination,
   createPaginationMeta,
-  ERROR_CODES,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -63,7 +62,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
       const starship = await starshipRepository.findById(starshipId as string);
       
       if (!starship) {
-        sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Starship not found', 404, {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
           resource: 'starship',
           id: starshipId,
         });
@@ -71,7 +70,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
       }
       
       if (starship.ownerId !== req.user!.id) {
-        sendError(res, ERROR_CODES.FORBIDDEN, 'Access denied to this starship', 403);
+        sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
         return;
       }
       
@@ -124,7 +123,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
 
   } catch (error) {
     if (!handleCommonError(error, res, 'loading agents')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to load agents');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load agents');
     }
   }
 });
@@ -159,7 +158,7 @@ router.get('/public', authMiddleware, async (req: Request, res: Response): Promi
 
   } catch (error) {
     if (!handleCommonError(error, res, 'loading public agents')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to load public agents');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load public agents');
     }
   }
 });
@@ -170,7 +169,7 @@ router.get('/search', authMiddleware, async (req: Request, res: Response): Promi
     const query = req.query.q as string;
     
     if (!query) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'Search query is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'Search query is required', 400, {
         field: 'q',
         description: 'Query parameter "q" is required for search',
       });
@@ -182,7 +181,7 @@ router.get('/search', authMiddleware, async (req: Request, res: Response): Promi
 
   } catch (error) {
     if (!handleCommonError(error, res, 'searching agents')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to search agents');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to search agents');
     }
   }
 });
@@ -198,7 +197,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
     const agent = await AgentService.getAgent(req.params.id);
     if (!agent) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
@@ -209,7 +208,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
   } catch (error) {
     if (!handleCommonError(error, res, 'getting agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to get agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
     }
   }
 });
@@ -221,7 +220,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     
     // Validate required fields
     if (!createRequest.starshipId) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'starshipId is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'starshipId is required', 400, {
         field: 'starshipId',
         description: 'All agents must be assigned to a starship. Please provide a valid starshipId.',
       });
@@ -229,7 +228,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
     }
 
     if (!createRequest.name) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'name is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'name is required', 400, {
         field: 'name',
       });
       return;
@@ -262,7 +261,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response): Promise<vo
 
   } catch (error) {
     if (!handleCommonError(error, res, 'creating agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to create agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create agent');
     }
   }
 });
@@ -290,7 +289,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
     
     const agent = await AgentService.updateAgent(req.params.id, updates);
     if (!agent) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
@@ -301,7 +300,7 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response): Promise<
 
   } catch (error) {
     if (!handleCommonError(error, res, 'updating agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to update agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent');
     }
   }
 });
@@ -317,7 +316,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
 
     const deleted = await AgentService.deleteAgent(req.params.id);
     if (!deleted) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
@@ -329,7 +328,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response): Promi
 
   } catch (error) {
     if (!handleCommonError(error, res, 'deleting agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to delete agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete agent');
     }
   }
 });
@@ -345,7 +344,7 @@ router.get('/:id/analytics', authMiddleware, async (req: Request, res: Response)
 
     const analytics = await AgentService.getAgentAnalytics(req.params.id);
     if (!analytics) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
@@ -356,7 +355,7 @@ router.get('/:id/analytics', authMiddleware, async (req: Request, res: Response)
 
   } catch (error) {
     if (!handleCommonError(error, res, 'getting agent analytics')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to get agent analytics');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent analytics');
     }
   }
 });
@@ -373,7 +372,7 @@ router.post('/:id/ratings', authMiddleware, async (req: Request, res: Response):
     const { rating } = req.body;
     
     if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-      sendError(res, ERROR_CODES.VALIDATION_ERROR, 'Rating must be a number between 1 and 5', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'Rating must be a number between 1 and 5', 400, {
         field: 'rating',
         constraint: 'range_1_to_5',
         provided: rating,
@@ -383,7 +382,7 @@ router.post('/:id/ratings', authMiddleware, async (req: Request, res: Response):
 
     const result = await AgentService.rateAgent(req.params.id, req.user!.id, rating);
     if (!result) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
@@ -394,7 +393,7 @@ router.post('/:id/ratings', authMiddleware, async (req: Request, res: Response):
 
   } catch (error) {
     if (!handleCommonError(error, res, 'rating agent')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to rate agent');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to rate agent');
     }
   }
 });
@@ -410,7 +409,7 @@ router.post('/:id/usage', authMiddleware, async (req: Request, res: Response): P
 
     const result = await AgentService.trackUsage(req.params.id);
     if (!result) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
@@ -421,7 +420,7 @@ router.post('/:id/usage', authMiddleware, async (req: Request, res: Response): P
 
   } catch (error) {
     if (!handleCommonError(error, res, 'tracking agent usage')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to track usage');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to track usage');
     }
   }
 });
@@ -440,7 +439,7 @@ router.put('/:id/starship', authMiddleware, async (req: Request, res: Response):
     }
     
     if (!starshipId) {
-      sendError(res, ERROR_CODES.REQUIRED_FIELD_MISSING, 'starshipId is required', 400, {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'starshipId is required', 400, {
         field: 'starshipId',
         description: 'starshipId is required to update agent starship assignment',
       });
@@ -461,7 +460,7 @@ router.put('/:id/starship', authMiddleware, async (req: Request, res: Response):
     
     const agent = await AgentService.updateAgent(agentId, { starshipId } as UpdateAgentRequest);
     if (!agent) {
-      sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, 'Agent not found', 404, {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: agentId,
       });
@@ -475,7 +474,7 @@ router.put('/:id/starship', authMiddleware, async (req: Request, res: Response):
 
   } catch (error) {
     if (!handleCommonError(error, res, 'updating agent starship assignment')) {
-      sendError(res, ERROR_CODES.INTERNAL_SERVER_ERROR, 'Failed to update agent starship assignment');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent starship assignment');
     }
   }
 });

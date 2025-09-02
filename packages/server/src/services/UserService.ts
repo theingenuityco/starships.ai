@@ -1,5 +1,6 @@
 import { RepositoryFactory } from '@starships/models';
 import { UserModel } from '@starships/protocol';
+import { StarshipService } from './StarshipService';
 
 interface KindeUserData {
   kindeId: string;
@@ -63,6 +64,16 @@ export class UserService {
       });
 
       console.log(`[USER-SYNC] Created new user: ${newUser.id}`);
+
+      // Create a starship for the new user
+      try {
+        const starship = await StarshipService.createDefaultStarship(newUser.id);
+        console.log(`[USER-SYNC] Created default starship for user: ${newUser.id}, starship: ${starship.id}`);
+      } catch (starshipError) {
+        console.error(`[USER-SYNC] Failed to create default starship for user ${newUser.id}:`, starshipError);
+        // Don't fail user creation if starship creation fails
+      }
+
       return newUser;
     } catch (error) {
       console.error('[USER-SYNC] Failed to sync user:', error);
@@ -104,4 +115,5 @@ export class UserService {
     const userRepo = RepositoryFactory.getUserRepository();
     return await userRepo.findByEmail(email);
   }
+
 }

@@ -20,7 +20,7 @@ import { getServerConfig } from '@starships/env-config';
 
 // Route imports
 import agentRoutes from './routes/agents';
-import chatRoutes from './routes/chat';
+import sessionRoutes from './routes/session';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
@@ -117,7 +117,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unauthenticated access
 app.use('/api/agents', agentRoutes);
 app.use('/api/agent-templates', agentTemplateRoutes);
-app.use('/api/chat', chatRoutes);
+app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
 app.use('/api/memory', memoryRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', starshipRoutes);

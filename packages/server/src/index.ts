@@ -115,7 +115,7 @@ app.get('/api/starships/pricing', async (req, res) => {
 // API Routes
 app.use('/api/health', healthRoutes);
 app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unauthenticated access
-app.use('/api/agents', agentRoutes);
+app.use('/api/v1/agents', agentRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/agent-templates', agentTemplateRoutes);
 app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
 app.use('/api/memory', memoryRoutes);

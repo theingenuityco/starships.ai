@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from 'axios'
+import type { ApiResponse } from '@starships/protocol'
 
 import { getApiBaseUrl } from './env'
 import {
@@ -18,6 +19,9 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 })
+
+// Simple helper to extract data from ApiResponse<T> - enforces response contract
+const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
 
 // Token provider function for dynamic token retrieval
 let getTokenFunction: (() => Promise<string | null>) | null = null
@@ -291,10 +295,6 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   }
 }
 
-// Helper function to extract data from standardized API responses
-function extractResponseData<T>(response: AxiosResponse<{ data: T; meta?: any }>): T {
-  return response.data.data;
-}
 
 // API functions with caching
 export const agentAPI = {
@@ -602,96 +602,6 @@ export const chatAPI = {
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
 
-// Simplified Starship API - TanStack Query handles all caching
-export const starshipAPI = {
-  // Get user's starships - server returns { data: starships[] } (note: no wrapper object)
-  getUserStarships: (): Promise<{ starships: Starship[] }> =>
-    api.get('/api/v1/starships').then(res => ({ starships: res.data })),
-
-  // Get user's starships list (simple list for dropdowns)
-  getUserStarshipsList: (): Promise<Starship[]> =>
-    api.get('/api/v1/starships').then(res => res.data),
-
-  // Create new starship
-  createStarship: (data: {
-    name: string
-    class: 'scout' | 'cruiser' | 'draught'
-    plan?: string
-    billingPeriod?: string
-  }): Promise<{ starship: Starship; checkoutUrl?: string }> =>
-    api.post('/api/v1/starships', data).then(res => res.data),
-
-  // Create paid starship with pending payment status
-  createPaidStarship: (data: {
-    name: string
-    plan: 'cruiser' | 'draught'
-    billingPeriod: 'monthly' | 'yearly'
-  }): Promise<{ starship: Starship; checkoutUrl: string; message: string }> =>
-    api.post('/api/v1/starships/create-paid', data).then(res => res.data),
-
-  // Get starship details (supports both ID and slug)
-  getStarship: (idOrSlug: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
-    api.get(`/api/v1/starships/${idOrSlug}`).then(res => res.data),
-
-  // Get starship by slug specifically
-  getStarshipBySlug: (slug: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
-    api.get(`/api/v1/starships/${slug}`).then(res => res.data),
-
-  // Update starship details
-  updateStarship: (id: string, updates: UpdateStarshipRequest): Promise<StarshipResponse> =>
-    api.put(`/api/v1/starships/${id}`, updates).then(res => res.data),
-
-  // Delete starship
-  deleteStarship: (id: string): Promise<{
-    message: string;
-    starshipId: string;
-    subscriptionCancelled: boolean;
-    refundInfo: string | null;
-  }> => api.delete(`/api/v1/starships/${id}`).then(res => res.data),
-
-  // Update starship status
-  updateStarshipStatus: (
-    id: string,
-    status: UpdateStarshipStatusRequest['status']
-  ): Promise<StarshipResponse> =>
-    api.patch(`/api/v1/starships/${id}/status`, { status }).then(res => res.data),
-
-  // Get detailed agent information for starship
-  getStarshipAgents: (id: string): Promise<StarshipAgentsResponse> =>
-    api.get(`/api/v1/starships/${id}/agents`).then(res => res.data),
-
-  // Deploy agent to starship
-  deployAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
-    api.post(`/api/v1/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
-
-  // Remove agent from starship
-  removeAgent: (starshipId: string, agentId: string): Promise<{ message: string }> =>
-    api.delete(`/api/v1/starships/${starshipId}/agents/${agentId}`).then(res => res.data),
-
-  // Get pricing data
-  getPricing: async (): Promise<any> => {
-    return api.get('/api/v1/starships/pricing').then(res => res.data)
-  },
-
-  // Create checkout session
-  createCheckoutSession: async (data: {
-    starshipName: string
-    plan: string
-    billingPeriod: string
-  }): Promise<{ url: string }> => {
-    return api.post('/api/v1/starships/checkout-sessions', data).then(res => res.data)
-  },
-
-  // Create billing portal session
-  createBillingPortal: async (starshipId: string): Promise<{ url: string }> => {
-    return api.post(`/api/v1/starships/${starshipId}/billing-portal`).then(res => res.data)
-  },
-
-  // Retry payment for pending starship
-  retryPayment: async (starshipId: string): Promise<{ checkoutUrl: string; message: string }> => {
-    return api.post(`/api/v1/starships/${starshipId}/retry-payment`).then(res => res.data)
-  },
-}
 
 
 // MCP Server API response types

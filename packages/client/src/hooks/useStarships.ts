@@ -1,7 +1,19 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { starshipAPI, type Starship, type UpdateStarshipRequest } from '@/lib/api';
+import api from '@/lib/api';
+import type { AxiosResponse } from 'axios';
+import type {
+  ApiResponse,
+  StarshipModel,
+  UpdateStarshipRequest,
+  StarshipResponse,
+  StarshipAgentsResponse,
+  AgentModel
+} from '@starships/protocol';
+
+// Helper to extract data from ApiResponse<T> - enforces response contract
+const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data;
 
 // Centralized query keys
 export const STARSHIP_QUERY_KEYS = {
@@ -19,8 +31,9 @@ export function useStarships() {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.list(),
     queryFn: async () => {
-      const response = await starshipAPI.getUserStarships();
-      return response;
+      const response = await api.get('/api/v1/starships');
+      const starships = extractResponseData<StarshipModel[]>(response);
+      return { starships };
     },
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
@@ -34,8 +47,8 @@ export function useStarship(idOrSlug: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.detail(idOrSlug),
     queryFn: async () => {
-      const response = await starshipAPI.getStarship(idOrSlug);
-      return response;
+      const response = await api.get(`/api/v1/starships/${idOrSlug}`);
+      return extractResponseData<{ starship: StarshipModel; agents: AgentModel[]; availableSlots: number }>(response);
     },
     enabled: !!idOrSlug && enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -48,8 +61,8 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.agents(starshipId),
     queryFn: async () => {
-      const response = await starshipAPI.getStarshipAgents(starshipId);
-      return response;
+      const response = await api.get(`/api/v1/starships/${starshipId}/agents`);
+      return extractResponseData<StarshipAgentsResponse>(response);
     },
     enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -67,8 +80,8 @@ export function useCreateStarship() {
       name: string;
       class: 'scout' | 'cruiser' | 'draught';
     }) => {
-      const response = await starshipAPI.createStarship(data);
-      return response;
+      const response = await api.post('/api/v1/starships', data);
+      return extractResponseData<{ starship: StarshipModel; checkoutUrl?: string }>(response);
     },
     onSuccess: (data) => {
       // Invalidate and refetch starships list
@@ -102,8 +115,8 @@ export function useUpdateStarship() {
 
   return useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: UpdateStarshipRequest }) => {
-      const response = await starshipAPI.updateStarship(id, updates);
-      return response;
+      const response = await api.put(`/api/v1/starships/${id}`, updates);
+      return extractResponseData<StarshipResponse>(response);
     },
     onMutate: async ({ id, updates }) => {
       // Cancel any outgoing refetches
@@ -119,7 +132,7 @@ export function useUpdateStarship() {
         if (!old?.starships) return old;
         return {
           ...old,
-          starships: old.starships.map((starship: Starship) =>
+          starships: old.starships.map((starship: StarshipModel) =>
             starship.id === id ? { ...starship, ...updates } : starship
           ),
         };
@@ -166,8 +179,13 @@ export function useDeleteStarship() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await starshipAPI.deleteStarship(id);
-      return response;
+      const response = await api.delete(`/api/v1/starships/${id}`);
+      return extractResponseData<{
+        message: string;
+        starshipId: string;
+        subscriptionCancelled: boolean;
+        refundInfo: string | null;
+      }>(response);
     },
     onMutate: async (id) => {
       // Cancel any outgoing refetches
@@ -181,7 +199,7 @@ export function useDeleteStarship() {
         if (!old?.starships) return old;
         return {
           ...old,
-          starships: old.starships.filter((starship: Starship) => starship.id !== id),
+          starships: old.starships.filter((starship: StarshipModel) => starship.id !== id),
         };
       });
 
@@ -220,8 +238,8 @@ export function useUpdateStarshipStatus() {
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: 'active' | 'inactive' }) => {
-      const response = await starshipAPI.updateStarshipStatus(id, status);
-      return response;
+      const response = await api.patch(`/api/v1/starships/${id}/status`, { status });
+      return extractResponseData<StarshipResponse>(response);
     },
     onMutate: async ({ id, status }) => {
       // Cancel any outgoing refetches
@@ -237,7 +255,7 @@ export function useUpdateStarshipStatus() {
         if (!old?.starships) return old;
         return {
           ...old,
-          starships: old.starships.map((starship: Starship) =>
+          starships: old.starships.map((starship: StarshipModel) =>
             starship.id === id ? { ...starship, status } : starship
           ),
         };
@@ -284,8 +302,8 @@ export function useDeployAgent() {
 
   return useMutation({
     mutationFn: async ({ starshipId, agentId }: { starshipId: string; agentId: string }) => {
-      const response = await starshipAPI.deployAgent(starshipId, agentId);
-      return response;
+      const response = await api.post(`/api/v1/starships/${starshipId}/agents/${agentId}`);
+      return extractResponseData<{ message: string }>(response);
     },
     onSuccess: (data, variables) => {
       // Invalidate starship agents to refetch
@@ -309,8 +327,8 @@ export function useRemoveAgent() {
 
   return useMutation({
     mutationFn: async ({ starshipId, agentId }: { starshipId: string; agentId: string }) => {
-      const response = await starshipAPI.removeAgent(starshipId, agentId);
-      return response;
+      const response = await api.delete(`/api/v1/starships/${starshipId}/agents/${agentId}`);
+      return extractResponseData<{ message: string }>(response);
     },
     onSuccess: (data, variables) => {
       // Invalidate starship agents to refetch
@@ -333,8 +351,8 @@ export function useStarshipBySlug(slug: string) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.bySlug(slug),
     queryFn: async () => {
-      const response = await starshipAPI.getStarshipBySlug(slug);
-      return response;
+      const response = await api.get(`/api/v1/starships/${slug}`);
+      return extractResponseData<{ starship: StarshipModel; agents: AgentModel[]; availableSlots: number }>(response);
     },
     enabled: !!slug,
     staleTime: 1 * 60 * 1000, // 1 minute

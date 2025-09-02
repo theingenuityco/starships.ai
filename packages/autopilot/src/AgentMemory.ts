@@ -116,14 +116,25 @@ export class AgentMemory extends Memory {
    * Get agent identity
    */
   getIdentity(): AgentIdentity | undefined {
-    return this.state.identity ? { ...this.state.identity } : undefined;
+    if (!this.state.identity) return undefined;
+    
+    return {
+      ...this.state.identity,
+      expertise: this.state.identity.expertise ? [...this.state.identity.expertise] : undefined
+    };
   }
 
   /**
    * Get agent purpose
    */
   getPurpose(): AgentPurpose | undefined {
-    return this.state.purpose ? { ...this.state.purpose } : undefined;
+    if (!this.state.purpose) return undefined;
+    
+    return {
+      ...this.state.purpose,
+      secondary: this.state.purpose.secondary ? [...this.state.purpose.secondary] : undefined,
+      constraints: this.state.purpose.constraints ? [...this.state.purpose.constraints] : undefined
+    };
   }
 
   /**

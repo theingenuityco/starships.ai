@@ -5,7 +5,7 @@
 import { BlueprintRepository } from '../BlueprintRepository';
 import { NodeRepository } from '../NodeRepository';
 import { EdgeRepository } from '../EdgeRepository';
-import { ValidationError, NotFoundError, DatabaseError } from '../../helpers/errors';
+import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
 // Mock dependencies

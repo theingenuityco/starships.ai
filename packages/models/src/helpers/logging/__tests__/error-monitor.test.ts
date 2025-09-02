@@ -3,7 +3,7 @@
  */
 
 import { ErrorMonitor, ErrorSeverity, errorMonitor, errorTrackingMiddleware } from '../error-monitor';
-import { ValidationError, DatabaseError, ErrorCategory } from '../../errors';
+import { ValidationError, DatabaseError, ErrorCategory } from '@starships/errors';
 
 import { logger } from '../index';
 

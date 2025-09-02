@@ -11,7 +11,7 @@ import {
   NotFoundError,
   ConflictError,
   ValidationError
-} from '../helpers/errors';
+} from '@starships/errors';
 
 // Local error context interface
 interface ErrorContext {

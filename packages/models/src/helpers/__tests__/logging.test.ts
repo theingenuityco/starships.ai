@@ -13,7 +13,7 @@ import {
   HealthMonitor,
   RequestContext
 } from '../logging';
-import { ValidationError } from '../errors';
+import { ValidationError } from '@starships/errors';
 
 describe('Logging and Monitoring System', () => {
   beforeEach(() => {

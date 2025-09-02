@@ -4,7 +4,7 @@
 
 import { MissionClarityRepository } from '../MissionClarityRepository';
 import { Neo4jConnection, getConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
 import type { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
 
 // Mock dependencies

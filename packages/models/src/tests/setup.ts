@@ -2,7 +2,7 @@
  * Jest setup file for models package tests
  */
 
-import { BaseError, ValidationError, NotFoundError, DatabaseError, ConflictError } from '../helpers/errors';
+import { BaseError, ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
 
 // Mock console methods to reduce noise in tests
 global.console = {

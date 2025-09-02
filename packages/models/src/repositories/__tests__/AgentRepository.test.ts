@@ -4,7 +4,7 @@
 
 import { AgentRepository } from '../AgentRepository';
 import { getConnection } from '../../helpers/database';
-import { ValidationError, NotFoundError, DatabaseError, ConflictError } from '../../helpers/errors';
+import { ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
 import type { AgentModel } from '@starships/protocol';
 
 // Mock the database connection

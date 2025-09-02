@@ -4,7 +4,7 @@
 
 import { SessionRepository } from '../SessionRepository';
 import { Neo4jConnection, getConnection } from '../../helpers/database';
-import { ValidationError, DatabaseError, ConflictError } from '../../helpers/errors';
+import { ValidationError, DatabaseError, ConflictError } from '@starships/errors';
 import type { SessionModel } from '@starships/protocol';
 
 // Mock dependencies

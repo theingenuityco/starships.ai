@@ -8,6 +8,7 @@
   "exclude": ["dist"],
   "references": [
     { "path": "../protocol" },
-    { "path": "../models" }
+    { "path": "../models" },
+    { "path": "../errors" }
   ]
 }

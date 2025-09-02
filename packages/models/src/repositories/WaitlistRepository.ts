@@ -1,6 +1,6 @@
 import { Neo4jConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { ValidationError, DatabaseError } from '../helpers/errors';
+import { ValidationError, DatabaseError } from '@starships/errors';
 import { WaitlistEntryModel } from '@starships/protocol';
 
 export class WaitlistRepository extends BaseRepository {

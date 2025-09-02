@@ -4,7 +4,7 @@
 
 import { MemoryRepository } from '../MemoryRepository';
 import { Neo4jConnection, getConnection } from '../../helpers/database';
-import { DatabaseError, ConflictError } from '../../helpers/errors';
+import { DatabaseError, ConflictError } from '@starships/errors';
 import type { MemoryModel } from '@starships/protocol';
 
 // Mock dependencies

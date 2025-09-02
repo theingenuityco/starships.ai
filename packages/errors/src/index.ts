@@ -1,33 +1,11 @@
 /**
- * Comprehensive Error Handling System for Starships.ai
+ * Lean Error Handling System for Starships.ai
  *
- * This module provides a standardized error hierarchy with proper categorization,
- * error codes, and structured error responses for consistent error handling
- * across all layers of the application.
+ * Contains only the core error classes that are actually needed.
  */
 
-import { v4 as uuidv4 } from 'uuid';
-
 /**
- * Base error interface for all application errors
- */
-export interface ErrorDetails {
-  code: string;
-  message: string;
-  details?: any;
-  timestamp: string;
-  requestId?: string;
-  path?: string;
-  field?: string;
-  entityType?: string;
-  entityId?: string;
-  constraintType?: string;
-  statusCode: number;
-  category: ErrorCategory;
-}
-
-/**
- * Error categories for classification and monitoring
+ * Error categories for classification
  */
 export enum ErrorCategory {
   VALIDATION = 'validation',
@@ -40,6 +18,23 @@ export enum ErrorCategory {
   RATE_LIMIT = 'rate_limit',
   SERVICE_UNAVAILABLE = 'service_unavailable',
   INTERNAL = 'internal',
+}
+
+/**
+ * Base error interface
+ */
+export interface ErrorDetails {
+  code: string;
+  message: string;
+  details?: any;
+  timestamp: string;
+  requestId?: string;
+  path?: string;
+  statusCode: number;
+  category: ErrorCategory;
+  field?: string;
+  entityType?: string;
+  entityId?: string;
 }
 
 /**
@@ -114,7 +109,6 @@ export abstract class BaseError extends Error {
 
 /**
  * Validation Error (400)
- * Used for input validation failures, malformed requests, etc.
  */
 export class ValidationError extends BaseError {
   public readonly field?: string;
@@ -133,8 +127,36 @@ export class ValidationError extends BaseError {
 }
 
 /**
+ * Not Found Error (404)
+ */
+export class NotFoundError extends BaseError {
+  public readonly entityType: string;
+  public readonly entityId: string;
+
+  constructor(
+    message: string,
+    entityType: string,
+    entityId: string,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(message, 'NOT_FOUND_ERROR', 404, ErrorCategory.NOT_FOUND, details, requestId, path);
+    this.entityType = entityType;
+    this.entityId = entityId;
+  }
+
+  toResponse(): ErrorDetails {
+    return {
+      ...super.toResponse(),
+      entityType: this.entityType,
+      entityId: this.entityId,
+    };
+  }
+}
+
+/**
  * Authentication Error (401)
- * Used for authentication failures, invalid tokens, etc.
  */
 export class AuthenticationError extends BaseError {
   constructor(
@@ -157,7 +179,6 @@ export class AuthenticationError extends BaseError {
 
 /**
  * Authorization Error (403)
- * Used for permission/access control failures
  */
 export class AuthorizationError extends BaseError {
   public readonly requiredPermission?: string;
@@ -197,38 +218,7 @@ export class AuthorizationError extends BaseError {
 }
 
 /**
- * Not Found Error (404)
- * Used when requested resources don't exist
- */
-export class NotFoundError extends BaseError {
-  public readonly entityType: string;
-  public readonly entityId: string;
-
-  constructor(
-    message: string,
-    entityType: string,
-    entityId: string,
-    details?: any,
-    requestId?: string,
-    path?: string
-  ) {
-    super(message, 'NOT_FOUND_ERROR', 404, ErrorCategory.NOT_FOUND, details, requestId, path);
-    this.entityType = entityType;
-    this.entityId = entityId;
-  }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      entityType: this.entityType,
-      entityId: this.entityId,
-    };
-  }
-}
-
-/**
  * Conflict Error (409)
- * Used for resource conflicts, duplicate entries, etc.
  */
 export class ConflictError extends BaseError {
   public readonly conflictType?: string;
@@ -256,43 +246,7 @@ export class ConflictError extends BaseError {
 }
 
 /**
- * Constraint Violation Error (400/409)
- * Used for database constraint violations
- */
-export class ConstraintViolationError extends BaseError {
-  public readonly constraintType: 'unique' | 'foreign_key' | 'check';
-
-  constructor(
-    message: string,
-    constraintType: 'unique' | 'foreign_key' | 'check',
-    details?: any,
-    requestId?: string,
-    path?: string
-  ) {
-    const statusCode = constraintType === 'unique' ? 409 : 400;
-    super(
-      message,
-      'CONSTRAINT_VIOLATION_ERROR',
-      statusCode,
-      ErrorCategory.CONFLICT,
-      details,
-      requestId,
-      path
-    );
-    this.constraintType = constraintType;
-  }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      constraintType: this.constraintType,
-    };
-  }
-}
-
-/**
  * Database Error (500)
- * Used for database connection issues, query failures, etc.
  */
 export class DatabaseError extends BaseError {
   public readonly operation?: string;
@@ -325,8 +279,7 @@ export class DatabaseError extends BaseError {
 }
 
 /**
- * Network Error (502/503)
- * Used for external service communication failures
+ * Network Error (503)
  */
 export class NetworkError extends BaseError {
   public readonly service?: string;
@@ -358,24 +311,48 @@ export class NetworkError extends BaseError {
 }
 
 /**
- * Rate Limit Error (429)
- * Used when rate limits are exceeded
+ * Internal Server Error (500)
  */
-export class RateLimitError extends BaseError {
-  public readonly limit: number;
-  public readonly resetTime?: Date;
-
+export class InternalServerError extends BaseError {
   constructor(
-    message: string = 'Rate limit exceeded',
-    limit: number,
-    resetTime?: Date,
+    message: string = 'Internal server error',
     details?: any,
     requestId?: string,
     path?: string
   ) {
-    super(message, 'RATE_LIMIT_ERROR', 429, ErrorCategory.RATE_LIMIT, details, requestId, path);
+    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path);
+  }
+}
+
+/**
+ * Rate Limit Error (429)
+ */
+export class RateLimitError extends BaseError {
+  public readonly limit?: number;
+  public readonly retryAfter?: number;
+  public readonly remainingAttempts?: number;
+
+  constructor(
+    message: string = 'Rate limit exceeded',
+    limit?: number,
+    retryAfter?: number,
+    remainingAttempts?: number,
+    details?: any,
+    requestId?: string,
+    path?: string
+  ) {
+    super(
+      message,
+      'RATE_LIMIT_ERROR',
+      429,
+      ErrorCategory.RATE_LIMIT,
+      details,
+      requestId,
+      path
+    );
     this.limit = limit;
-    this.resetTime = resetTime;
+    this.retryAfter = retryAfter;
+    this.remainingAttempts = remainingAttempts;
   }
 
   toResponse(): ErrorDetails {
@@ -384,7 +361,8 @@ export class RateLimitError extends BaseError {
       details: {
         ...this.details,
         limit: this.limit,
-        resetTime: this.resetTime?.toISOString(),
+        retryAfter: this.retryAfter,
+        remainingAttempts: this.remainingAttempts,
       },
     };
   }
@@ -392,7 +370,6 @@ export class RateLimitError extends BaseError {
 
 /**
  * Service Unavailable Error (503)
- * Used when services are temporarily unavailable
  */
 export class ServiceUnavailableError extends BaseError {
   public readonly service?: string;
@@ -431,82 +408,9 @@ export class ServiceUnavailableError extends BaseError {
   }
 }
 
-/**
- * Internal Server Error (500)
- * Used for unexpected internal errors
- */
-export class InternalServerError extends BaseError {
-  constructor(
-    message: string = 'Internal server error',
-    details?: any,
-    requestId?: string,
-    path?: string
-  ) {
-    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path);
-  }
-}
-
-/**
- * Error factory for creating errors with context
- */
-export class ErrorFactory {
-  /**
-   * Create error with request context
-   */
-  static createWithContext(
-    ErrorClass: new (...args: any[]) => BaseError,
-    message: string,
-    requestId?: string,
-    path?: string,
-    ...additionalArgs: any[]
-  ): BaseError {
-    return new ErrorClass(message, ...additionalArgs, requestId, path);
-  }
-
-  /**
-   * Create validation error with field context
-   */
-  static validation(
-    message: string,
-    field?: string,
-    requestId?: string,
-    path?: string
-  ): ValidationError {
-    return new ValidationError(message, field, undefined, requestId, path);
-  }
-
-  /**
-   * Create not found error with entity context
-   */
-  static notFound(
-    entityType: string,
-    entityId: string,
-    requestId?: string,
-    path?: string
-  ): NotFoundError {
-    return new NotFoundError(
-      `${entityType} with ID ${entityId} not found`,
-      entityType,
-      entityId,
-      undefined,
-      requestId,
-      path
-    );
-  }
-
-  /**
-   * Create database error with operation context
-   */
-  static database(
-    message: string,
-    operation?: string,
-    query?: string,
-    requestId?: string,
-    path?: string
-  ): DatabaseError {
-    return new DatabaseError(message, operation, query, undefined, requestId, path);
-  }
-}
+// Export error mapping utilities
+export * from './mappings';
+export type { StandardErrorCode } from './mappings';
 
 /**
  * Error utilities for common operations
@@ -528,15 +432,93 @@ export class ErrorUtils {
     }
 
     // Handle specific error types
-    if (error?.name === 'ValidationError') {
-      return new ValidationError(error.message, error.field, undefined, requestId, path);
+    if (error?.name === 'ValidationError' || error?.type === 'validation') {
+      return new ValidationError(
+        error.message || 'Validation failed',
+        error.field,
+        { originalError: error },
+        requestId,
+        path
+      );
     }
 
-    if (error?.name === 'CastError' || error?.name === 'TypeError') {
-      return new ValidationError(
-        'Invalid data format',
+    if (error?.name === 'UnauthorizedError' || error?.status === 401) {
+      return new AuthenticationError(
+        error.message || 'Authentication failed',
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'ForbiddenError' || error?.status === 403) {
+      return new AuthorizationError(
+        error.message || 'Access denied',
+        undefined, // requiredPermission
+        undefined, // userRole
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'NotFoundError' || error?.status === 404) {
+      return new NotFoundError(
+        error.message || 'Resource not found',
+        'Resource',
+        'unknown',
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    if (error?.name === 'ConflictError' || error?.status === 409) {
+      return new ConflictError(
+        error.message || 'Conflict occurred',
         undefined,
-        { originalError: error.message },
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    // Handle database errors
+    if (
+      error?.name === 'DatabaseError' ||
+      error?.code?.startsWith('ER_') ||
+      error?.code?.startsWith('SQLITE_')
+    ) {
+      return new DatabaseError(
+        error.message || 'Database operation failed',
+        'database_operation',
+        undefined,
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    // Handle network/HTTP errors
+    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' || error?.code === 'ETIMEDOUT') {
+      return new NetworkError(
+        error.message || 'Network operation failed',
+        'external_service',
+        undefined,
+        { originalError: error },
+        requestId,
+        path
+      );
+    }
+
+    // Handle rate limit errors
+    if (error?.status === 429 || error?.name === 'TooManyRequestsError') {
+      return new RateLimitError(
+        error.message || 'Rate limit exceeded',
+        error.limit,
+        error.retryAfter,
+        error.remainingAttempts,
+        { originalError: error },
         requestId,
         path
       );
@@ -555,7 +537,7 @@ export class ErrorUtils {
    * Generate correlation ID for request tracking
    */
   static generateRequestId(): string {
-    return uuidv4();
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
@@ -576,10 +558,3 @@ export class ErrorUtils {
     };
   }
 }
-
-// Re-export legacy error classes for backward compatibility
-export {
-  ValidationError as LegacyValidationError,
-  ConstraintViolationError as LegacyConstraintViolationError,
-  NotFoundError as LegacyNotFoundError,
-};

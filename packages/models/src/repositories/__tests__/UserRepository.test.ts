@@ -3,7 +3,7 @@
  */
 
 import { UserRepository } from '../UserRepository';
-import { ValidationError, NotFoundError } from '../../helpers/errors';
+import { ValidationError, NotFoundError } from '@starships/errors';
 import { UserModel } from '@starships/protocol';
 
 // Mock the database connection

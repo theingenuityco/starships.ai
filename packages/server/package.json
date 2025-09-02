@@ -21,6 +21,7 @@
     "@notionhq/client": "^4.0.2",
     "@starships/autopilot": "workspace:*",
     "@starships/env-config": "workspace:*",
+    "@starships/errors": "workspace:*",
     "@starships/models": "workspace:*",
     "@starships/protocol": "workspace:*",
     "@types/cookie-parser": "^1.4.9",

@@ -9,7 +9,7 @@ import type {
   UpdateExecutionRequest, 
   ExecutionStatus 
 } from '../ExecutionRepository';
-import { ValidationError, DatabaseError } from '../../helpers/errors';
+import { ValidationError, DatabaseError } from '@starships/errors';
 
 // Mock the database connection and helpers
 jest.mock('../../helpers/database', () => ({

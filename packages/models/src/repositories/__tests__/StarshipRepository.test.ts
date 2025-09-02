@@ -3,7 +3,7 @@
  */
 
 import { StarshipRepository } from '../StarshipRepository';
-import { ValidationError, NotFoundError } from '../../helpers/errors';
+import { ValidationError, NotFoundError } from '@starships/errors';
 import { StarshipModel } from '@starships/protocol';
 
 // Mock the database connection

@@ -124,7 +124,7 @@ export default function HomePage() {
       if (isAuthenticated) {
         // If user has starships, redirect to first one, otherwise stay on main page to create
         if (hasExistingStarships && starships && starships.length > 0) {
-          window.location.href = `/ship/${starships[0].slug}`;
+          window.location.href = `/ship/${starships[0].slug}/chat`;
         } else {
           // Stay on current page - they can create a starship here
           setLaunching(false);

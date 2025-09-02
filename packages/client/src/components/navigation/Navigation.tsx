@@ -22,7 +22,7 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: "Starship Systems",
     items: [
-      { href: `/ship/${starshipSlug}/chat`, label: "Unified Chat", icon: MessageSquare, status: "optimal" },
+      { href: `/ship/${starshipSlug}/session`, label: "Session", icon: MessageSquare, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
       { href: `/ship/${starshipSlug}/missions`, label: "Missions", icon: Target, status: "optimal" }
     ]

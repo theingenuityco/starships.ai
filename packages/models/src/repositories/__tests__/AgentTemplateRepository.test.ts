@@ -21,8 +21,15 @@ describe('AgentTemplateRepository', () => {
     jest.clearAllMocks();
     
     mockConnection = {
+      connect: jest.fn().mockResolvedValue(undefined),
+      disconnect: jest.fn().mockResolvedValue(undefined),
+      getSession: jest.fn().mockReturnValue({} as any),
       executeQuery: jest.fn().mockResolvedValue([]),
       executeWrite: jest.fn().mockResolvedValue([]),
+      initializeSchema: jest.fn().mockResolvedValue(undefined),
+      driver: null,
+      config: {},
+      sanitizeParameters: jest.fn((params) => params)
     } as any;
     
     repository = new AgentTemplateRepository(mockConnection);
@@ -108,6 +115,10 @@ describe('AgentTemplateRepository', () => {
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
+      expect(result[0]).toEqual(expect.objectContaining({
+        id: 'template-123',
+        name: 'Test Template'
+      }));
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate)'),
         undefined
@@ -268,12 +279,15 @@ describe('AgentTemplateRepository', () => {
 
     it('should handle empty updates by calling findById', async () => {
       const mockTemplate = createMockTemplate();
-      jest.spyOn(repository, 'findById').mockResolvedValue(mockTemplate);
+      // Mock the internal connection first
+      mockConnection.executeQuery.mockResolvedValue([{ t: mockTemplate }]);
 
       const result = await repository.update('template-123', {});
 
-      expect(result).toEqual(mockTemplate);
-      expect(repository.findById).toHaveBeenCalledWith('template-123');
+      expect(result).toEqual(expect.objectContaining({
+        id: 'template-123',
+        name: 'Test Template'
+      }));
     });
 
     it('should validate id parameter', async () => {

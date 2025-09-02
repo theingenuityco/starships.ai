@@ -151,7 +151,12 @@ app.use('/api', nativeApiKeysRoutes);
 app.use(notFoundHandler);
 
 // Add centralized error handling middleware (must be last)
-app.use(errorHandler());
+app.use(errorHandler({
+  includeStackTrace: process.env.NODE_ENV === 'development',
+  environment: process.env.NODE_ENV || 'development',
+  service: 'starships-api',
+  ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
+}));
 
 // Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);

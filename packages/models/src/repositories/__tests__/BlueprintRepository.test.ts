@@ -28,6 +28,9 @@ describe('BlueprintRepository', () => {
   let mockEdgeRepo: jest.Mocked<EdgeRepository>;
 
   beforeEach(() => {
+    // Clear all mocks before each test
+    jest.clearAllMocks();
+    
     repository = new BlueprintRepository();
     mockConnection = {
       executeQuery: jest.fn(),
@@ -38,8 +41,6 @@ describe('BlueprintRepository', () => {
     // Get mocked instances
     mockNodeRepo = (repository as any).nodeRepo;
     mockEdgeRepo = (repository as any).edgeRepo;
-
-    jest.clearAllMocks();
   });
 
   describe('constructor', () => {
@@ -244,8 +245,8 @@ describe('BlueprintRepository', () => {
   describe('getAllBlueprints', () => {
     it('should return all blueprints with nodes and edges', async () => {
       const mockBlueprints = [
-        { id: 'blueprint-1', name: 'Blueprint 1', metadata: '{}' },
-        { id: 'blueprint-2', name: 'Blueprint 2', metadata: '{}' }
+        { id: 'blueprint-1', name: 'Blueprint 1', metadata: {} },
+        { id: 'blueprint-2', name: 'Blueprint 2', metadata: {} }
       ];
 
       mockConnection.executeQuery.mockResolvedValue([
@@ -444,8 +445,8 @@ describe('BlueprintRepository', () => {
     it('should return blueprints filtered by category', async () => {
       const category = 'automation';
       const mockBlueprints = [
-        { id: 'blueprint-1', name: 'Blueprint 1', category, metadata: '{}' },
-        { id: 'blueprint-2', name: 'Blueprint 2', category, metadata: '{}' }
+        { id: 'blueprint-1', name: 'Blueprint 1', category, metadata: {} },
+        { id: 'blueprint-2', name: 'Blueprint 2', category, metadata: {} }
       ];
 
       mockConnection.executeQuery.mockResolvedValue([

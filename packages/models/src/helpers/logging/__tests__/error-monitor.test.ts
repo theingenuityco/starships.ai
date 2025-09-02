@@ -246,9 +246,20 @@ describe('ErrorMonitor', () => {
   });
 
   describe('getMetrics', () => {
+    let testMonitor: ErrorMonitor;
+    
+    beforeEach(() => {
+      // Use a separate monitor instance for these tests to avoid contamination
+      testMonitor = new ErrorMonitor({
+        enableAlerting: false,
+        enableMetrics: true,
+        retentionDays: 1
+      });
+    });
+
     it('should return copy of metrics to prevent mutation', () => {
-      const metrics1 = monitor.getMetrics();
-      const metrics2 = monitor.getMetrics();
+      const metrics1 = testMonitor.getMetrics();
+      const metrics2 = testMonitor.getMetrics();
 
       expect(metrics1).not.toBe(metrics2); // Different objects
       expect(metrics1).toEqual(metrics2); // But same content
@@ -263,10 +274,10 @@ describe('ErrorMonitor', () => {
       ];
 
       for (const error of errors) {
-        await monitor.trackError(error);
+        await testMonitor.trackError(error);
       }
 
-      const metrics = monitor.getMetrics();
+      const metrics = testMonitor.getMetrics();
 
       expect(metrics.totalErrors).toBe(4);
       expect(metrics.errorsByCategory[ErrorCategory.VALIDATION]).toBe(2);
@@ -285,10 +296,10 @@ describe('ErrorMonitor', () => {
     it('should limit top errors to 10', async () => {
       // Create 15 different errors
       for (let i = 0; i < 15; i++) {
-        await monitor.trackError(createTestError(`ERROR_${i}`));
+        await testMonitor.trackError(createTestError(`ERROR_${i}`));
       }
 
-      const metrics = monitor.getMetrics();
+      const metrics = testMonitor.getMetrics();
 
       expect(metrics.topErrors).toHaveLength(10);
     });
@@ -296,9 +307,9 @@ describe('ErrorMonitor', () => {
     it('should track errors by hour', async () => {
       const error = createTestError();
 
-      await monitor.trackError(error);
+      await testMonitor.trackError(error);
 
-      const metrics = monitor.getMetrics();
+      const metrics = testMonitor.getMetrics();
       const currentHour = new Date().toISOString().substring(0, 13);
 
       expect(metrics.errorsByHour[currentHour]).toBe(1);
@@ -333,8 +344,9 @@ describe('ErrorMonitor', () => {
     });
 
     it('should filter by category', () => {
-      const validationErrors = monitor.getErrorOccurrences({ 
-        category: ErrorCategory.VALIDATION 
+      const validationErrors = testMonitor.getErrorOccurrences({
+        category: ErrorCategory.VALIDATION,
+        resolved: false
       });
 
       expect(validationErrors).toHaveLength(1);
@@ -342,8 +354,8 @@ describe('ErrorMonitor', () => {
     });
 
     it('should filter by severity', () => {
-      const highSeverityErrors = monitor.getErrorOccurrences({ 
-        severity: ErrorSeverity.HIGH 
+      const highSeverityErrors = testMonitor.getErrorOccurrences({
+        severity: ErrorSeverity.HIGH
       });
 
       expect(highSeverityErrors).toHaveLength(1);
@@ -351,15 +363,15 @@ describe('ErrorMonitor', () => {
     });
 
     it('should filter by resolved status', () => {
-      const unresolvedErrors = monitor.getErrorOccurrences({ resolved: false });
-      const resolvedErrors = monitor.getErrorOccurrences({ resolved: true });
+      const unresolvedErrors = testMonitor.getErrorOccurrences({ resolved: false });
+      const resolvedErrors = testMonitor.getErrorOccurrences({ resolved: true });
 
       expect(unresolvedErrors).toHaveLength(2);
       expect(resolvedErrors).toHaveLength(1);
     });
 
     it('should apply limit', () => {
-      const limitedErrors = monitor.getErrorOccurrences({ limit: 2 });
+      const limitedErrors = testMonitor.getErrorOccurrences({ limit: 2 });
 
       expect(limitedErrors).toHaveLength(2);
     });
@@ -369,11 +381,11 @@ describe('ErrorMonitor', () => {
       const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
       const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
-      const recentErrors = monitor.getErrorOccurrences({
+      const recentErrors = testMonitor.getErrorOccurrences({
         startTime: oneHourAgo.toISOString()
       });
 
-      const veryRecentErrors = monitor.getErrorOccurrences({
+      const veryRecentErrors = testMonitor.getErrorOccurrences({
         startTime: oneHourAgo.toISOString(),
         endTime: now.toISOString()
       });
@@ -383,7 +395,7 @@ describe('ErrorMonitor', () => {
     });
 
     it('should return errors sorted by timestamp (newest first)', () => {
-      const errors = monitor.getErrorOccurrences();
+      const errors = testMonitor.getErrorOccurrences();
 
       for (let i = 1; i < errors.length; i++) {
         const prevTime = new Date(errors[i - 1].timestamp).getTime();
@@ -393,7 +405,7 @@ describe('ErrorMonitor', () => {
     });
 
     it('should combine multiple filters', () => {
-      const filteredErrors = monitor.getErrorOccurrences({
+      const filteredErrors = testMonitor.getErrorOccurrences({
         category: ErrorCategory.DATABASE,
         severity: ErrorSeverity.HIGH,
         resolved: false,

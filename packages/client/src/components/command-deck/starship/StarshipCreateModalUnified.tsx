@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 import { useStarshipStore } from '@/store/starship-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/api';
+import api, { starshipAPI } from '@/lib/api';
 
 interface StarshipCreateModalUnifiedProps {
   open: boolean;
@@ -238,15 +238,15 @@ export function StarshipCreateModalUnified({
         setCreatingPaidStarship(true);
         
         try {
-          const response = await api.post('/api/starships/create-paid', {
+          const response = await starshipAPI.createPaidStarship({
             name: formData.name,
-            plan: formData.class,
+            plan: formData.class as 'cruiser' | 'draught',
             billingPeriod: billingPeriod
           });
           
-          if (response.data.checkoutUrl) {
+          if (response.checkoutUrl) {
             // Keep loading state while redirecting to Stripe
-            window.location.href = response.data.checkoutUrl;
+            window.location.href = response.checkoutUrl;
           } else {
             throw new Error('No checkout URL received');
           }

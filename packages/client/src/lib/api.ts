@@ -613,6 +613,14 @@ export const starshipAPI = {
   }): Promise<{ starship: Starship; checkoutUrl?: string }> =>
     api.post('/api/v1/starships', data).then(res => res.data),
 
+  // Create paid starship with pending payment status
+  createPaidStarship: (data: {
+    name: string
+    plan: 'cruiser' | 'draught'
+    billingPeriod: 'monthly' | 'yearly'
+  }): Promise<{ starship: Starship; checkoutUrl: string; message: string }> =>
+    api.post('/api/v1/starships/create-paid', data).then(res => res.data),
+
   // Get starship details (supports both ID and slug)
   getStarship: (idOrSlug: string): Promise<{ starship: Starship; agents: Agent[]; availableSlots: number }> =>
     api.get(`/api/v1/starships/${idOrSlug}`).then(res => res.data),

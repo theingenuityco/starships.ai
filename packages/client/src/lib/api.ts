@@ -545,59 +545,7 @@ export const templateAPI = {
   },
 }
 
-export const chatAPI = {
-  // Send message to session endpoint
-  sendMessage: async (request: ChatRequest): Promise<Message> => {
-    const sessionId = request.sessionId || `agent-${request.agentId}`
-    const response = await api.post(`/api/v1/sessions/${sessionId}/messages`, {
-      agentId: request.agentId,
-      message: request.message
-    })
-
-    // Convert response to client Message format
-    return {
-      id: generateId(),
-      content: response.data.reply || response.data.content,
-      role: 'assistant',
-      timestamp: new Date().toISOString(),
-      sessionId: sessionId,
-    }
-  },
-
-  // Get chat messages by session ID from database
-  getMessagesBySession: async (sessionId: string, limit: number = 50, offset: number = 0): Promise<Message[]> => {
-    const response = await api.get(`/api/v1/sessions/${sessionId}`, {
-      params: { limit, offset }
-    })
-    
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to fetch messages')
-    }
-
-    // Convert database messages to client Message format
-    const messages = response.data.messages || []
-    return messages.map((dbMsg: any) => ({
-      id: dbMsg.id,
-      content: dbMsg.content,
-      role: dbMsg.role as 'user' | 'assistant',
-      timestamp: dbMsg.timestamp,
-      sessionId: dbMsg.session_id || sessionId,
-      ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content })
-    }))
-  },
-
-  // Get chat sessions by starship ID
-  getSessionsByStarship: (starshipId: string): Promise<{ sessions: Session[] }> =>
-    api
-      .get(`/api/v1/starships/${starshipId}/sessions`)
-      .then((res: AxiosResponse<{ sessions: Session[] }>) => res.data),
-
-  // Clear memory for a session
-  clearMemory: (sessionId: string): Promise<{ message: string }> =>
-    api
-      .delete(`/api/v1/sessions/${sessionId}/memory`)
-      .then((res: AxiosResponse<{ message: string }>) => res.data),
-}
+// Note: chatAPI functionality has been moved to useSessions hooks for better integration with TanStack Query
 
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
@@ -764,5 +712,34 @@ export const memoryAPI = {
 function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
 }
+
+// Starship API functions for compatibility
+export const starshipAPI = {
+  // Get starship by slug
+  getStarshipBySlug: async (slug: string): Promise<{ starship: Starship }> => {
+    const response = await api.get(`/api/v1/starships/${slug}`);
+    const data = extractResponseData<{ starship: Starship; agents: any[]; availableSlots: number }>(response);
+    return { starship: data.starship };
+  },
+
+  // Get user's starships list
+  getUserStarshipsList: async (): Promise<Starship[]> => {
+    const response = await api.get('/api/v1/starships');
+    const data = extractResponseData<Starship[]>(response);
+    return data;
+  },
+
+  // Create billing portal session
+  createBillingPortal: async (starshipId: string): Promise<{ url: string }> => {
+    const response = await api.post(`/api/v1/starships/${starshipId}/billing-portal`);
+    return response.data;
+  },
+
+  // Retry payment for starship
+  retryPayment: async (starshipId: string): Promise<{ checkoutUrl: string; message: string }> => {
+    const response = await api.post(`/api/v1/starships/${starshipId}/retry-payment`);
+    return response.data;
+  }
+};
 
 export default api

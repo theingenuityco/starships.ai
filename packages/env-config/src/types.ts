@@ -7,6 +7,9 @@ export interface ServerEnvironmentConfig {
   NODE_ENV: string;
   LOG_LEVEL: string;
 
+  // URLs
+  CLIENT_URL: string;
+
   // Deployment
   REDEPLOY_SECRET: string;
 

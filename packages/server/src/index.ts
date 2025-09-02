@@ -16,6 +16,7 @@ import {
   createConnection,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';
+import { getServerConfig } from '@starships/env-config';
 
 // Route imports
 import agentRoutes from './routes/agents';
@@ -36,56 +37,34 @@ import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
 import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
 import healthRoutes from './routes/health';
 
+// Load server configuration
+const config = getServerConfig();
+
 /**
- * Validate required environment variables
+ * Validate URL format
  */
-function validateEnvironmentVariables() {
-  const requiredVars = ['CLIENT_URL', 'NEXT_PUBLIC_API_URL', 'NEO4J_URI', 'NEO4J_USERNAME', 'NEO4J_PASSWORD'];
-
-  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
-
-  if (missingVars.length > 0) {
-    console.error('❌ Missing required environment variables:');
-    missingVars.forEach((varName) => {
-      console.error(`   - ${varName}`);
-    });
-    console.error('');
-    console.error('Please ensure these variables are set in your .env file.');
-    console.error('You can copy .env.example to .env and fill in the values.');
+function validateUrlFormat(url: string, name: string) {
+  if (url && !url.match(/^https?:\/\/.+/)) {
+    console.error(`❌ ${name} must be a valid HTTP/HTTPS URL`);
+    console.error(`   Current value: ${url}`);
     process.exit(1);
   }
-
-  // Validate CLIENT_URL format
-  const clientUrl = process.env.CLIENT_URL;
-  if (clientUrl && !clientUrl.match(/^https?:\/\/.+/)) {
-    console.error('❌ CLIENT_URL must be a valid HTTP/HTTPS URL');
-    console.error(`   Current value: ${clientUrl}`);
-    process.exit(1);
-  }
-
-  // Validate NEXT_PUBLIC_API_URL format
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (apiUrl && !apiUrl.match(/^https?:\/\/.+/)) {
-    console.error('❌ NEXT_PUBLIC_API_URL must be a valid HTTP/HTTPS URL');
-    console.error(`   Current value: ${apiUrl}`);
-    process.exit(1);
-  }
-
-  console.log('✅ Environment variables validated successfully');
 }
 
 const app: express.Application = express();
-const PORT = process.env.PORT || 3001;
+const PORT = config.PORT || 3001;
 
-// Validate environment variables before starting server
-validateEnvironmentVariables();
+// Validate URL formats
+validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
+// Note: NEXT_PUBLIC_API_URL validation is handled by client config
+console.log('✅ Environment variables validated successfully');
 
 // Initialize Neo4j database connection
 const dbConnection = createConnection({
-  uri: process.env.NEO4J_URI!,
-  username: process.env.NEO4J_USERNAME!,
-  password: process.env.NEO4J_PASSWORD!,
-  database: process.env.NEO4J_DATABASE,
+  uri: config.NEO4J_URI,
+  username: config.NEO4J_USERNAME,
+  password: config.NEO4J_PASSWORD,
+  database: config.NEO4J_DATABASE,
 });
 
 // Core repositories
@@ -152,8 +131,8 @@ app.use(notFoundHandler);
 
 // Add centralized error handling middleware (must be last)
 app.use(errorHandler({
-  includeStackTrace: process.env.NODE_ENV === 'development',
-  environment: process.env.NODE_ENV || 'development',
+  includeStackTrace: config.NODE_ENV === 'development',
+  environment: config.NODE_ENV,
   service: 'starships-api',
   ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
 }));

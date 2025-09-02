@@ -11,8 +11,8 @@ import {
 
 const router: Router = Router();
 
-// POST /sync - Sync Kinde user to local database (OpenAPI pattern)
-router.post("/sync", async (req: Request, res: Response): Promise<void> => {
+// POST /users/sync - Sync Kinde user to local database (OpenAPI pattern)
+router.post("/users/sync", async (req: Request, res: Response): Promise<void> => {
   try {
     const { kindeId, email, name, avatar } = req.body;
     
@@ -59,8 +59,8 @@ router.post("/sync", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// GET /:id - Get user by ID (OpenAPI pattern)
-router.get("/:id", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /users/:id - Get user by ID (OpenAPI pattern)
+router.get("/users/:id", authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -90,8 +90,8 @@ router.get("/:id", authMiddleware, async (req: Request, res: Response): Promise<
   }
 });
 
-// GET /kinde/:kindeId - Get user by Kinde ID (OpenAPI pattern)
-router.get("/kinde/:kindeId", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /users/kinde/:kindeId - Get user by Kinde ID (OpenAPI pattern)
+router.get("/users/kinde/:kindeId", authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { kindeId } = req.params;
 

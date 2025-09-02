@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { DynamicLoginButton } from '@/components/auth/DynamicLoginButton';
 import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
-import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
-import { useStarshipStore } from '@/store/starship-store';
+import { useStarships } from '@/hooks/useStarships';
 const StarfieldBackground = lazy(() => import('@/components/StarfieldBackground').then(module => ({ default: module.StarfieldBackground })));
 import {
   Sparkles,
@@ -101,25 +100,20 @@ StarshipClass.displayName = 'StarshipClass';
 export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [launching, setLaunching] = useState(false);
-  const [hasExistingStarships, setHasExistingStarships] = useState(false);
   const { isAuthenticated, isLoading, userName } = useAuth();
-  const starships = useStarshipStore(state => state.starships);
   
-  // Use centralized loader - only loads when authenticated
-  useStarshipsLoader({ enabled: !!(isAuthenticated && !isLoading) });
-
+  // Use TanStack Query to fetch starships - only when authenticated
+  const {
+    data: starshipsData,
+    isLoading: starshipsLoading
+  } = useStarships();
+  
+  const starships = starshipsData?.starships || [];
+  const hasExistingStarships = starships.length > 0;
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    // Check for existing starships
-    if (starships && starships.length > 0) {
-      setHasExistingStarships(true);
-    }
-  }, [starships]);
-
 
   if (!mounted || isLoading) return null;
 

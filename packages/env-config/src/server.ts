@@ -153,3 +153,18 @@ export function loadKindeRuntimeConfig(): ServerEnvironmentConfig {
   
   return config;
 }
+
+/**
+ * Loads runtime API configuration for server-side routes
+ * This enables environment-specific API URLs without rebuilding
+ * Following the same pattern as loadKindeRuntimeConfig
+ */
+export function loadApiRuntimeConfig(): { apiUrl: string; serverUrl: string; enableAuthTestingBackdoor: boolean } {
+  // Use environment variables that can be set at runtime
+  // These replace the NEXT_PUBLIC_ variables that were baked in at build time
+  const apiUrl = process.env.API_URL || 'http://localhost:4000/api';
+  const serverUrl = process.env.SERVER_URL || 'http://localhost:4000';
+  const enableAuthTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
+  
+  return { apiUrl, serverUrl, enableAuthTestingBackdoor };
+}

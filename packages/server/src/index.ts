@@ -40,7 +40,7 @@ import healthRoutes from './routes/health';
  * Validate required environment variables
  */
 function validateEnvironmentVariables() {
-  const requiredVars = ['CLIENT_URL', 'NEXT_PUBLIC_API_URL', 'NEO4J_URI', 'NEO4J_USERNAME', 'NEO4J_PASSWORD'];
+  const requiredVars = ['CLIENT_URL', 'API_URL', 'NEO4J_URI', 'NEO4J_USERNAME', 'NEO4J_PASSWORD'];
 
   const missingVars = requiredVars.filter((varName) => !process.env[varName]);
 
@@ -63,10 +63,10 @@ function validateEnvironmentVariables() {
     process.exit(1);
   }
 
-  // Validate NEXT_PUBLIC_API_URL format
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  // Validate API_URL format (runtime variable, not NEXT_PUBLIC)
+  const apiUrl = process.env.API_URL;
   if (apiUrl && !apiUrl.match(/^https?:\/\/.+/)) {
-    console.error('❌ NEXT_PUBLIC_API_URL must be a valid HTTP/HTTPS URL');
+    console.error('❌ API_URL must be a valid HTTP/HTTPS URL');
     console.error(`   Current value: ${apiUrl}`);
     process.exit(1);
   }

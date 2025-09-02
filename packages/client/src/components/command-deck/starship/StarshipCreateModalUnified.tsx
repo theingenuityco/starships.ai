@@ -26,10 +26,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { useStarshipStore } from '@/store/starship-store';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import api, { starshipAPI } from '@/lib/api';
+import { useCreateStarship, useStarships } from '@/hooks/useStarships';
 
 interface StarshipCreateModalUnifiedProps {
   open: boolean;
@@ -91,13 +91,15 @@ const getClassStats = (classId: string) => {
   return stats[classId as keyof typeof stats] || { speed: 50, agility: 50, capacity: 50, efficiency: 50 };
 };
 
-export function StarshipCreateModalUnified({ 
-  open, 
-  onOpenChange, 
+export function StarshipCreateModalUnified({
+  open,
+  onOpenChange,
   onSuccess,
-  isOnboarding = false 
+  isOnboarding = false
 }: StarshipCreateModalUnifiedProps) {
-  const { createStarship, loading, starships } = useStarshipStore();
+  const { data: starshipsData } = useStarships();
+  const starships = starshipsData?.starships || [];
+  const createStarshipMutation = useCreateStarship();
   const router = useRouter();
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [creatingPaidStarship, setCreatingPaidStarship] = useState(false);
@@ -207,7 +209,7 @@ export function StarshipCreateModalUnified({
     try {
       if (formData.class === 'scout') {
         // Check Scout limit (max 3 starships)
-        const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
+        const scoutStarships = starships?.filter((s: any) => s.class === 'scout') || [];
         if (scoutStarships.length >= 3) {
           toast.error('Scout plan limit reached', {
             description: 'You can only create up to 3 Scout starships. Please upgrade to Cruiser or Draught plan for more starships.',
@@ -222,7 +224,8 @@ export function StarshipCreateModalUnified({
           class: formData.class
         };
         
-        const newStarship = await createStarship(starshipData);
+        const response = await createStarshipMutation.mutateAsync(starshipData);
+        const newStarship = response.starship;
         
         
         onSuccess();
@@ -233,24 +236,37 @@ export function StarshipCreateModalUnified({
           router.push(`/ship/${newStarship.slug}/command-deck`);
         }
       } else {
-        // Paid starship - create starship first, then redirect to Stripe checkout  
+        // Paid starship - create starship first, then redirect to Stripe checkout
         // Use new create-paid endpoint that creates starship with pending_payment status
         setCreatingPaidStarship(true);
         
         try {
+          console.log('[STARSHIP-CREATE] Creating paid starship:', {
+            name: formData.name,
+            plan: formData.class,
+            billingPeriod: billingPeriod
+          });
+          
           const response = await starshipAPI.createPaidStarship({
             name: formData.name,
             plan: formData.class as 'cruiser' | 'draught',
             billingPeriod: billingPeriod
           });
           
-          if (response.checkoutUrl) {
+          console.log('[STARSHIP-CREATE] Received response:', response);
+          
+          const checkoutUrl = (response as any).data.checkoutUrl;
+          
+          if (checkoutUrl) {
+            console.log('[STARSHIP-CREATE] Redirecting to checkout:', checkoutUrl);
             // Keep loading state while redirecting to Stripe
-            window.location.href = response.checkoutUrl;
+            window.location.href = checkoutUrl;
           } else {
-            throw new Error('No checkout URL received');
+            console.error('[STARSHIP-CREATE] No checkout URL in response:', response);
+            throw new Error(`No checkout URL received. Response: ${JSON.stringify(response)}`);
           }
         } catch (error) {
+          console.error('[STARSHIP-CREATE] Error creating paid starship:', error);
           setCreatingPaidStarship(false);
           throw error;
         }
@@ -452,7 +468,7 @@ export function StarshipCreateModalUnified({
               {/* Modern Card Grid with padding for badges */}
               <div className="grid grid-cols-1 gap-4 px-1 py-3">
                 {Object.entries(starshipClasses).map(([key, classData], index) => {
-                  const scoutStarships = starships?.filter(s => s.class === 'scout') || [];
+                  const scoutStarships = starships?.filter((s: any) => s.class === 'scout') || [];
                   const isScoutLimitReached = key === 'scout' && scoutStarships.length >= 3;
                   const isSelected = formData.class === key;
                   const isPaid = classData.pricing?.monthly > 0;
@@ -668,10 +684,10 @@ export function StarshipCreateModalUnified({
               ) : (
                 <Button
                   onClick={handleSubmit}
-                  disabled={loading || creatingPaidStarship}
+                  disabled={createStarshipMutation.isPending || creatingPaidStarship}
                   className="flex items-center space-x-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 >
-                  {(loading || creatingPaidStarship) ? (
+                  {(createStarshipMutation.isPending || creatingPaidStarship) ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>{creatingPaidStarship ? 'Preparing checkout...' : 'Creating...'}</span>

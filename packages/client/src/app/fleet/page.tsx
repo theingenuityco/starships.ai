@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AuthGate } from '@/components/auth/AuthGate';
-import { StarshipDashboard } from '@/components/starships/StarshipDashboard';
+import { Fleet } from '@/components/starships/Fleet';
 import { useOnboardingSession } from '@/hooks/useOnboardingSession';
 import { toast } from 'sonner';
 
@@ -151,8 +151,8 @@ export default function ShipsPage() {
   return (
     <AuthGate>
       <div className="h-screen w-screen overflow-hidden">
-        <StarshipDashboard 
-          autoOpenCreate={shouldOpenCreate} 
+        <Fleet
+          autoOpenCreate={shouldOpenCreate}
           onCreateSuccess={handleCreateSuccess}
         />
       </div>

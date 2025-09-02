@@ -7,17 +7,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useStarships } from '@/hooks/useStarships';
 
-interface StarshipDashboardProps {
+interface FleetProps {
   autoOpenCreate?: boolean;
   onCreateSuccess?: () => void;
   className?: string;
 }
 
-export function StarshipDashboard({ 
+export function Fleet({ 
   autoOpenCreate, 
   onCreateSuccess, 
   className 
-}: StarshipDashboardProps) {
+}: FleetProps) {
   const { data: starships, isLoading } = useStarships();
   
   if (isLoading) {

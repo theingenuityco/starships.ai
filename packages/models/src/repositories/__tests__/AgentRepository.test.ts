@@ -264,11 +264,11 @@ describe('AgentRepository', () => {
             props: expect.objectContaining({
               name: 'Test Agent',
               starshipId: 'starship-123',
-              id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+              id: 'test-uuid-1234',
             })
           })
         );
-        expect(result.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+        expect(result.id).toBe('test-uuid-1234');
         expect(result.name).toBe('Test Agent');
       });
 
@@ -294,7 +294,7 @@ describe('AgentRepository', () => {
           expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
           expect.objectContaining({
             starshipId: 'starship-123',
-            agentId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            agentId: 'test-uuid-1234',
           })
         );
       });

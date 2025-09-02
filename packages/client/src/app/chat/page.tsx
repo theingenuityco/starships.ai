@@ -1,5 +1,5 @@
-import { UnifiedChatInterface } from '@/components/chat/UnifiedChatInterface'
+import { SessionInterface } from '@/components/chat/SessionInterface'
 
 export default function ChatPage() {
-  return <UnifiedChatInterface />
+  return <SessionInterface />
 }

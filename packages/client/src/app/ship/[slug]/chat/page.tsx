@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { UnifiedChatInterface } from '@/components/chat/UnifiedChatInterface';
+import { SessionInterface } from '@/components/chat/SessionInterface';
 import { SessionsSidebar } from '@/components/chat/SessionsSidebar';
 import { starshipAPI, type Starship } from '@/lib/api';
 
@@ -72,7 +72,7 @@ export default function StarshipChatPage() {
       
       {/* Main Chat Interface */}
       <div className="flex-1 min-w-0">
-        <UnifiedChatInterface starshipId={starship.id} />
+        <SessionInterface starshipId={starship.id} />
       </div>
     </div>
   );

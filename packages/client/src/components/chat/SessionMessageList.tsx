@@ -8,22 +8,22 @@ import type { Message } from '@/lib/agent-socket-api'
 import type { ChatMode } from './ChatModeSelector'
 import { useSessionMessages, type Message as SessionMessage } from '@/hooks/useSessions'
 
-interface UnifiedMessageListProps {
+interface SessionMessageListProps {
   mode: ChatMode
   sessionId: string | null
   starshipId?: string
-  onMessageAdded?: (message: UnifiedMessage) => void
+  onMessageAdded?: (message: SessionMessage) => void
 }
 
-// Union type for unified messages
-type UnifiedMessage = Message
+// Union type for session messages
+type SessionMessageType = Message
 
-export function UnifiedMessageList({
+export function SessionMessageList({
   mode,
   sessionId,
   starshipId,
   onMessageAdded
-}: UnifiedMessageListProps) {
+}: SessionMessageListProps) {
   // Use TanStack Query to fetch messages
   const {
     data: messages = [],
@@ -31,10 +31,10 @@ export function UnifiedMessageList({
     error: queryError
   } = useSessionMessages(sessionId || '', !!sessionId)
   
-  const error = queryError ? 'Failed to load chat history' : null
+  const error = queryError ? 'Failed to load session history' : null
 
   // Convert session messages to unified message format
-  const unifiedMessages: UnifiedMessage[] = messages.map((msg: SessionMessage) => ({
+  const sessionMessages: SessionMessageType[] = messages.map((msg: SessionMessage) => ({
     id: msg.id,
     content: msg.content,
     role: msg.role,
@@ -42,14 +42,14 @@ export function UnifiedMessageList({
     sessionId: msg.sessionId,
     // Add mode-specific fields based on message structure
     agentId: sessionId?.split(':')[0]?.replace('agent-', '')
-  } as UnifiedMessage))
+  } as SessionMessageType))
 
   // Add new message to the list (for real-time updates)
-  const addMessage = (newMessage: UnifiedMessage) => {
+  const addMessage = (newMessage: SessionMessageType) => {
     // Note: With TanStack Query, real-time updates should be handled
     // by invalidating queries or using optimistic updates in mutations
     // This function is kept for compatibility but may not be needed
-    onMessageAdded?.(newMessage)
+    onMessageAdded?.(newMessage as SessionMessage)
   }
 
   // Expose method to parent component for compatibility
@@ -84,7 +84,7 @@ export function UnifiedMessageList({
         className="h-full"
       >
         <MessageList
-          messages={unifiedMessages}
+          messages={sessionMessages}
           loading={loading}
           error={error}
           MessageComponent={getMessageComponent() as any}

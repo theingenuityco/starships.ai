@@ -12,7 +12,7 @@ import type { Agent } from '@/lib/api'
 import type { ChatMode } from './ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
 
-interface UnifiedMessageInputProps {
+interface SessionMessageInputProps {
   mode: ChatMode
   selectedAgent?: Agent | null
   provider?: 'openai' | 'anthropic'
@@ -27,7 +27,7 @@ interface UnifiedMessageInputProps {
   children?: React.ReactNode // For footer content
 }
 
-export function UnifiedMessageInput({
+export function SessionMessageInput({
   mode,
   selectedAgent,
   provider = 'openai',
@@ -40,7 +40,7 @@ export function UnifiedMessageInput({
   disabled = false,
   minimal = false,
   children
-}: UnifiedMessageInputProps) {
+}: SessionMessageInputProps) {
   const { userId } = useAuth()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -229,7 +229,7 @@ export function UnifiedMessageInput({
   // Expose handleSuggestionSubmit for parent component
   const inputRef = useRef({ handleSuggestionSubmit })
   if (typeof window !== 'undefined') {
-    (window as any).unifiedMessageInputRef = inputRef
+    (window as any).sessionMessageInputRef = inputRef
   }
 
   return (

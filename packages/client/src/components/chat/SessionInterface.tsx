@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Users, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
-import { UnifiedMessageInput } from './UnifiedMessageInput'
-import { UnifiedMessageList } from './UnifiedMessageList'
+import { SessionMessageInput } from './SessionMessageInput'
+import { SessionMessageList } from './SessionMessageList'
 import { ChatModeSelector } from './ChatModeSelector'
 import { AgentSelector } from './AgentSelector'
 import { ProviderSelector } from './ProviderSelector'
@@ -14,15 +14,15 @@ import type { Agent } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 export type ChatMode = 'agent'
 
-interface UnifiedChatInterfaceProps {
+interface SessionInterfaceProps {
   defaultMode?: ChatMode
   starshipId?: string
 }
 
-export function UnifiedChatInterface({
+export function SessionInterface({
   defaultMode = 'agent',
   starshipId
-}: UnifiedChatInterfaceProps) {
+}: SessionInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected } = useSocketConnection()
   
@@ -65,7 +65,7 @@ export function UnifiedChatInterface({
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
           </div>
-          <p className="text-muted-foreground">Initializing chat session...</p>
+          <p className="text-muted-foreground">Initializing session...</p>
         </motion.div>
       </div>
     )
@@ -83,7 +83,7 @@ export function UnifiedChatInterface({
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
             <Users className="w-8 h-8 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Please sign in to start chatting</p>
+          <p className="text-muted-foreground">Please sign in to start a session</p>
         </motion.div>
       </div>
     )
@@ -91,20 +91,20 @@ export function UnifiedChatInterface({
 
   // Handle session start - receive actual database session ID
   const handleSessionStart = (sessionId: string) => {
-    console.log('[UnifiedChatInterface] Session started with ID:', sessionId)
+    console.log('[SessionInterface] Session started with ID:', sessionId)
     setCurrentSessionId(sessionId)
   }
 
   // Handle first message to trigger layout transition
-  const handleFirstMessage = (message: Message) => {
+  const handleFirstMessage = (_message: Message) => {
     setHasMessages(true)
     setRefreshMessages(prev => prev + 1)
   }
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
-    if (typeof window !== 'undefined' && (window as any).unifiedMessageInputRef) {
-      const inputRef = (window as any).unifiedMessageInputRef
+    if (typeof window !== 'undefined' && (window as any).sessionMessageInputRef) {
+      const inputRef = (window as any).sessionMessageInputRef
       if (inputRef.current?.handleSuggestionSubmit) {
         inputRef.current.handleSuggestionSubmit(suggestion)
       }
@@ -122,7 +122,7 @@ export function UnifiedChatInterface({
             transition={{ duration: 0.4, ease: 'easeInOut' }}
             className="flex-1 min-h-0 overflow-hidden"
           >
-            <UnifiedMessageList
+            <SessionMessageList
               mode={chatMode}
               sessionId={currentSessionId}
               starshipId={starshipId}
@@ -193,7 +193,7 @@ export function UnifiedChatInterface({
               }}
               className="relative"
             >
-              <UnifiedMessageInput
+              <SessionMessageInput
                 mode={chatMode}
                 selectedAgent={selectedAgent}
                 provider={provider}
@@ -250,7 +250,7 @@ export function UnifiedChatInterface({
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </UnifiedMessageInput>
+              </SessionMessageInput>
             </motion.div>
 
             {/* Suggestions - Only shown when no messages */}

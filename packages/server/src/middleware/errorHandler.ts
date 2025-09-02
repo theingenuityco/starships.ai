@@ -17,6 +17,7 @@ import {
   NetworkError,
   InternalServerError,
   ServiceUnavailableError,
+  StandardErrorCode,
 } from '@starships/errors';
 
 // Define local types that were previously imported from protocol
@@ -37,7 +38,7 @@ interface ErrorResponse {
   };
 }
 
-type StandardErrorCode = string; // Simplified type for now
+// StandardErrorCode now imported from @starships/errors
 
 // ============================================================================
 // UTILITY FUNCTIONS

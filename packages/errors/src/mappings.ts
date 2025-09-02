@@ -1,16 +1,16 @@
 /**
- * Error Mapping Utilities for Server
+ * Error Mapping System for Starships.ai
  * 
  * HTTP status code mappings and error categorization logic
- * for server-side error handling and API responses.
+ * for standardized error handling across all packages.
  */
 
-import {
-  ErrorCategory,
-} from '@starships/errors';
+import { ErrorCategory } from './index';
 
-// Define StandardErrorCode locally since it's server-specific
-type StandardErrorCode =
+/**
+ * Standard error codes used across the Starships.ai platform
+ */
+export type StandardErrorCode =
   | 'VALIDATION_ERROR' | 'INVALID_INPUT' | 'MISSING_REQUIRED_FIELD' | 'INVALID_FORMAT'
   | 'INVALID_RANGE' | 'INVALID_TYPE' | 'EXPEDITION_CANNOT_MODIFY' | 'EXPEDITION_CANNOT_DELETE'
   | 'EXPEDITION_INVALID_STATUS' | 'TASK_CANNOT_ASSIGN' | 'TASK_CANNOT_COMPLETE'
@@ -263,45 +263,73 @@ export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
   'AGENT_NOT_AVAILABLE': ErrorCategory.SERVICE_UNAVAILABLE,
 };
 
-
 /**
- * Get HTTP status code for an error code
+ * Error mapping utilities
  */
-export function getHttpStatusCode(errorCode: StandardErrorCode): number {
-  return ERROR_HTTP_STATUS_MAP[errorCode] || 500;
+export class ErrorMappingUtils {
+  /**
+   * Get HTTP status code for an error code
+   */
+  static getHttpStatusCode(errorCode: StandardErrorCode): number {
+    return ERROR_HTTP_STATUS_MAP[errorCode] || 500;
+  }
+
+  /**
+   * Get error category for an error code
+   */
+  static getErrorCategory(errorCode: StandardErrorCode): ErrorCategory {
+    return ERROR_CATEGORY_MAP[errorCode] || ErrorCategory.INTERNAL;
+  }
+
+  /**
+   * Check if an error is retryable based on its category and code
+   */
+  static isRetryableError(errorCode: StandardErrorCode): boolean {
+    const retryableErrors: StandardErrorCode[] = [
+      'TIMEOUT_ERROR',
+      'REQUEST_TIMEOUT',
+      'OPERATION_TIMEOUT',
+      'DATABASE_TIMEOUT',
+      'NETWORK_ERROR',
+      'CONNECTION_FAILED',
+      'SERVICE_UNREACHABLE',
+      'SERVICE_UNAVAILABLE',
+      'RATE_LIMIT_EXCEEDED',
+      'DATABASE_CONNECTION_FAILED',
+      'INTERNAL_SERVER_ERROR',
+    ];
+    
+    return retryableErrors.includes(errorCode);
+  }
+
+  /**
+   * Check if an error should be logged based on its status code
+   */
+  static shouldLogError(statusCode: number): boolean {
+    return statusCode >= 500;
+  }
+
+  /**
+   * Get all error codes for a specific category
+   */
+  static getErrorCodesByCategory(category: ErrorCategory): StandardErrorCode[] {
+    return Object.entries(ERROR_CATEGORY_MAP)
+      .filter(([, errorCategory]) => errorCategory === category)
+      .map(([code]) => code as StandardErrorCode);
+  }
+
+  /**
+   * Get all error codes for a specific HTTP status code
+   */
+  static getErrorCodesByStatusCode(statusCode: number): StandardErrorCode[] {
+    return Object.entries(ERROR_HTTP_STATUS_MAP)
+      .filter(([, httpStatus]) => httpStatus === statusCode)
+      .map(([code]) => code as StandardErrorCode);
+  }
 }
 
-/**
- * Get error category for an error code
- */
-export function getErrorCategory(errorCode: StandardErrorCode): ErrorCategory {
-  return ERROR_CATEGORY_MAP[errorCode] || ErrorCategory.INTERNAL;
-}
-
-/**
- * Check if an error is retryable based on its category and code
- */
-export function isRetryableError(errorCode: StandardErrorCode): boolean {
-  const retryableErrors: StandardErrorCode[] = [
-    'TIMEOUT_ERROR',
-    'REQUEST_TIMEOUT',
-    'OPERATION_TIMEOUT',
-    'DATABASE_TIMEOUT',
-    'NETWORK_ERROR',
-    'CONNECTION_FAILED',
-    'SERVICE_UNREACHABLE',
-    'SERVICE_UNAVAILABLE',
-    'RATE_LIMIT_EXCEEDED',
-    'DATABASE_CONNECTION_FAILED',
-    'INTERNAL_SERVER_ERROR',
-  ];
-  
-  return retryableErrors.includes(errorCode);
-}
-
-/**
- * Check if an error should be logged based on its status code
- */
-export function shouldLogError(statusCode: number): boolean {
-  return statusCode >= 500;
-}
+// Legacy function exports for backward compatibility
+export const getHttpStatusCode = ErrorMappingUtils.getHttpStatusCode;
+export const getErrorCategory = ErrorMappingUtils.getErrorCategory;
+export const isRetryableError = ErrorMappingUtils.isRetryableError;
+export const shouldLogError = ErrorMappingUtils.shouldLogError;

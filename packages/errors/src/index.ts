@@ -408,6 +408,10 @@ export class ServiceUnavailableError extends BaseError {
   }
 }
 
+// Export error mapping utilities
+export * from './mappings';
+export type { StandardErrorCode } from './mappings';
+
 /**
  * Error utilities for common operations
  */

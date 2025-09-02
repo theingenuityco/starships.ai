@@ -1,6 +1,6 @@
 import { generateId } from './utils';
 import SocketClient from './socket-client';
-import type { ChatRequest, ChatStreamChunk, ChatStreamError, ChatResponse, ChatTypingData } from '@starships/protocol';
+import type { SessionRequest, SessionStreamChunk, SessionError, SessionResponse, ChatTypingData } from '@starships/protocol';
 
 export interface Message {
   id: string;
@@ -29,7 +29,7 @@ export const agentSocketAPI = {
     agentId: string,
     request: { sessionId?: string; message: string },
     callbacks: {
-      onChunk: (chunk: ChatStreamChunk, accumulatedContent: string) => void;
+      onChunk: (chunk: SessionStreamChunk, accumulatedContent: string) => void;
       onComplete: (message: Message) => void;
       onError: (error: string) => void;
       onTypingStart?: () => void;
@@ -48,7 +48,7 @@ export const agentSocketAPI = {
     let accumulatedContent = '';
     let isAborted = false;
 
-    const socketRequest: ChatRequest = {
+    const socketRequest: SessionRequest = {
       source: 'agent',
       agentId: agentId,
       sessionId: request.sessionId,
@@ -60,7 +60,7 @@ export const agentSocketAPI = {
     };
 
 
-    const handleStreamChunk = (chunk: ChatStreamChunk) => {
+    const handleStreamChunk = (chunk: SessionStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content;
@@ -73,7 +73,7 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamComplete = (chunk: ChatStreamChunk) => {
+    const handleStreamComplete = (chunk: SessionStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
         const finalMessage: Message = {
           id: generateId(),
@@ -90,7 +90,7 @@ export const agentSocketAPI = {
       }
     };
 
-    const handleStreamError = (error: ChatStreamError) => {
+    const handleStreamError = (error: SessionError) => {
       if (error.streamId === streamId && error.agentId === agentId && !isAborted) {
         callbacks.onError(error.message);
         cleanup();

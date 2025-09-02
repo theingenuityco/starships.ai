@@ -18,13 +18,13 @@ export interface TypewriterChunk {
 }
 
 // Import unified types from protocol
-import type { ChatStreamChunk } from '@starships/protocol';
+import type { SessionStreamChunk } from '@starships/protocol';
 
-export type AgentSocketStreamChunk = ChatStreamChunk & {
+export type AgentSocketStreamChunk = SessionStreamChunk & {
   source: 'agent';
   agentId: string;
   typewriter?: TypewriterChunk;
 };
 
 // Re-export for external use
-export type { ChatStreamChunk };
+export type { SessionStreamChunk };

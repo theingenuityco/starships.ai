@@ -20,7 +20,7 @@ import {
   NotFoundError,
 } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
-import type { StandardErrorCode } from '@starships/errors';
+import type { StandardErrorCode } from '@starships/protocol';
 import {
   sendSuccess,
   sendError,

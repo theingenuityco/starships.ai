@@ -50,9 +50,11 @@ export {
   ServiceUnavailableError,
   InternalServerError,
   RateLimitError,
-  ErrorUtils,
-  ErrorCategory
+  ErrorUtils
 } from '@starships/errors';
+
+// Export error types from @starships/protocol package
+export { ErrorCategory } from '@starships/protocol';
 
 
 

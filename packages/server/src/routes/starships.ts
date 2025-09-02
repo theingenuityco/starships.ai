@@ -17,7 +17,7 @@ import {
 import type { StarshipModel } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
-import type { StandardErrorCode } from '@starships/errors';
+import type { StandardErrorCode } from '@starships/protocol';
 import {
   sendSuccess,
   sendError,

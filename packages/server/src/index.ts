@@ -82,8 +82,6 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-// Health check routes (comprehensive) - keeping this separate for monitoring
-app.use('/health', healthRoutes);
 
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies

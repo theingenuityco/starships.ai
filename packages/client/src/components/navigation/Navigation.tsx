@@ -3,8 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { motion } from 'motion/react';
 import {
-  Users, BookOpen,
-  Zap, Command,
+  Users, Command,
   Target, MessageSquare
 } from 'lucide-react';
 import { UserProfile } from '@/components/auth/UserProfile';
@@ -25,13 +24,6 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
       { href: `/ship/${starshipSlug}/session`, label: "Session", icon: MessageSquare, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
       { href: `/ship/${starshipSlug}/missions`, label: "Missions", icon: Target, status: "optimal" }
-    ]
-  },
-  {
-    title: "Coming Soon",
-    items: [
-      { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "optimal" },
-      { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" }
     ]
   }
 ];

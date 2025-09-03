@@ -44,9 +44,7 @@ src/
 │   ├── client-layout.tsx        # Main layout with navigation sidebar
 │   ├── command-deck/page.tsx    # Command Deck dashboard page
 │   ├── crew/page.tsx            # Crew management page
-│   ├── drive/page.tsx           # Starship drive systems page
 │   ├── expeditions/page.tsx     # Expeditions management page
-│   ├── logbook/page.tsx         # Mission logbook page
 │   └── sibil/page.tsx           # AI assistant page
 ├── components/
 │   ├── navigation/              # Clean navigation system
@@ -126,8 +124,8 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 
 ### Route Structure
 - **Command Deck**: `/command-deck` - Mission control dashboard
-- **Core Systems**: `/crew`, `/drive` - Starship management
-- **Operations**: `/expeditions`, `/logbook`, `/sibil` - Mission operations
+- **Core Systems**: `/crew` - Starship management
+- **Operations**: `/expeditions`, `/sibil` - Mission operations
 
 ## 💾 Data Management
 

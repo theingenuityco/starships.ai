@@ -16,7 +16,7 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
  * Get complete environment configuration with typed keys
  * Reads from root .env file and returns all environment variables with proper typing
  */
-export function getConfig(): EnvironmentConfig {
+export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_CLIENT_PORT = 3000;
   const DEFAULT_SERVER_PORT = 4000;
 

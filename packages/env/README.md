@@ -1,6 +1,6 @@
 # @starships/env
 
-A simplified environment configuration package for starships.ai that provides a single `getConfig()` function to read all environment variables from the root `.env` file with typed keys.
+A simplified environment configuration package for starships.ai that provides a single `getEnvConfig()` function to read all environment variables from the root `.env` file with typed keys.
 
 ## Overview
 
@@ -14,11 +14,11 @@ This package replaces the more complex `@starships/env-config` with a lean, sing
 ## Usage
 
 ```typescript
-import { getConfig } from '@starships/env';
+import { getEnvConfig } from '@starships/env';
 
-const config = getConfig();
+const config = getEnvConfig();
 
-console.log(config.PORT); // number
+console.log(config.SERVER_PORT); // number
 console.log(config.NODE_ENV); // string
 console.log(config.NEO4J_URI); // string
 // ... all other environment variables with proper typing
@@ -26,7 +26,7 @@ console.log(config.NEO4J_URI); // string
 
 ## Available Configuration
 
-The `getConfig()` function returns an `EnvironmentConfig` object with all environment variables properly typed, including:
+The `getEnvConfig()` function returns an `EnvironmentConfig` object with all environment variables properly typed, including:
 
 ### Server Configuration
 - `SERVER_PORT` (number) - Server port, defaults to 4000
@@ -88,8 +88,8 @@ Replace imports:
 // Before
 import { getConfig } from '@starships/env-config';
 
-// After  
-import { getConfig } from '@starships/env';
+// After
+import { getEnvConfig } from '@starships/env';
 ```
 
-The `getConfig()` function now returns the complete configuration object instead of requiring separate client/server configurations.
+The `getEnvConfig()` function now returns the complete configuration object instead of requiring separate client/server configurations.

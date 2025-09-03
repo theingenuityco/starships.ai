@@ -16,7 +16,6 @@ import type {
   MemoryFilters
 } from '@starships/protocol';
 import { NotFoundError } from '@starships/errors';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface MemoryServiceOptions {
   includeStats?: boolean;
@@ -52,8 +51,8 @@ export class MemoryService {
     const repository = RepositoryFactory.getMemoryRepository();
     
     // Process initial messages if provided and convert to Message format
-    const messages = (request.initialMessages || []).map(msg => ({
-      id: uuidv4(),
+    const messages = (request.initialMessages || []).map((msg, index) => ({
+      id: `msg_${Date.now()}_${index}`,
       timestamp: new Date().toISOString(),
       role: msg.role,
       content: msg.content,
@@ -77,8 +76,8 @@ export class MemoryService {
     const repository = RepositoryFactory.getMemoryRepository();
     
     // Process initial messages if provided and convert to Message format
-    const messages = (request.initialMessages || []).map(msg => ({
-      id: uuidv4(),
+    const messages = (request.initialMessages || []).map((msg, index) => ({
+      id: `msg_${Date.now()}_${index}`,
       timestamp: new Date().toISOString(),
       role: msg.role,
       content: msg.content,
@@ -166,8 +165,8 @@ export class MemoryService {
     });
 
     // Process initial messages if provided and convert to Message format
-    const messages = (request.initialMessages || []).map(msg => ({
-      id: uuidv4(),
+    const messages = (request.initialMessages || []).map((msg, index) => ({
+      id: `msg_${Date.now()}_${index}`,
       timestamp: new Date().toISOString(),
       role: msg.role,
       content: msg.content,
@@ -200,8 +199,8 @@ export class MemoryService {
     });
 
     // Process initial messages if provided and convert to Message format
-    const messages = (request.initialMessages || []).map(msg => ({
-      id: uuidv4(),
+    const messages = (request.initialMessages || []).map((msg, index) => ({
+      id: `msg_${Date.now()}_${index}`,
       timestamp: new Date().toISOString(),
       role: msg.role,
       content: msg.content,
@@ -332,7 +331,7 @@ export class MemoryService {
     // Add message to existing messages
     const currentMessages = (memory.state as any).messages || [];
     const updatedMessages = [...currentMessages, {
-      id: uuidv4(),
+      id: `msg_${Date.now()}_${currentMessages.length}`,
       timestamp: new Date().toISOString(),
       ...message
     }];

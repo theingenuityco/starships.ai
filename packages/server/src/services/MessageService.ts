@@ -21,7 +21,6 @@ import type {
   BulkMessageRequest,
   BulkMessageResponse
 } from '@starships/protocol';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface MessageServiceOptions {
   includeStats?: boolean;
@@ -223,7 +222,8 @@ export class MessageService {
     conversationId: string;
     systemMessage?: MessageModel;
   }> {
-    const conversationId = uuidv4();
+    // Generate conversation ID using timestamp + random suffix for uniqueness
+    const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     console.log('💬 [MESSAGE-SERVICE] Starting conversation:', {
       conversationId,

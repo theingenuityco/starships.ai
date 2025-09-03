@@ -1,10 +1,13 @@
-import { getConnection } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import type { EdgeModel } from '@starships/protocol';
 
 export class EdgeRepository extends BaseRepository {
-  constructor() {
+  private connection: Neo4jConnection;
+
+  constructor(connection?: Neo4jConnection) {
     super('EdgeRepository');
+    this.connection = connection || getConnection();
   }
 
   async createEdge(blueprintId: string, edgeData: Omit<EdgeModel, 'id'>): Promise<EdgeModel> {
@@ -12,7 +15,7 @@ export class EdgeRepository extends BaseRepository {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'createEdge');
       this.validateRequired(edgeData, ['from', 'to'], 'createEdge');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(
@@ -90,7 +93,7 @@ export class EdgeRepository extends BaseRepository {
         }], 'createEdges');
       }
 
-      const connection = getConnection();
+      const connection = this.connection;
       
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(
@@ -163,7 +166,7 @@ export class EdgeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'getEdgesByBlueprintId');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       const result = await connection.executeQuery<{ edgeId: string; fromId: string; toId: string; ref: string }>(
         `MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(from:Node)
@@ -185,7 +188,7 @@ export class EdgeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ edgeId }, ['edgeId'], 'getEdgeById');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       const result = await connection.executeQuery<{ edgeId: string; fromId: string; toId: string; ref: string }>(
         `MATCH (from:Node)-[r:FLOWS_TO {id: $edgeId}]->(to:Node)
@@ -226,7 +229,7 @@ export class EdgeRepository extends BaseRepository {
       // For edges, we typically only update by recreating the relationship
       // since we can't easily update the from/to relationships in Neo4j
       if (updates.from !== undefined || updates.to !== undefined) {
-        const connection = getConnection();
+        const connection = this.connection;
         
         // Delete old relationship
         await connection.executeWrite(
@@ -260,7 +263,7 @@ export class EdgeRepository extends BaseRepository {
 
       // If only ref is being updated
       if (updates.ref !== undefined) {
-        const connection = getConnection();
+        const connection = this.connection;
         
         await connection.executeWrite(
           'MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() SET r.ref = $ref',
@@ -277,7 +280,7 @@ export class EdgeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ edgeId }, ['edgeId'], 'deleteEdge');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       // Check if edge exists
       const existingResult = await connection.executeQuery<{ edgeId: string }>(
@@ -303,7 +306,7 @@ export class EdgeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'deleteEdgesByBlueprintId');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(
@@ -328,7 +331,7 @@ export class EdgeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ fromNodeId }, ['fromNodeId'], 'getEdgesByFromNode');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       const result = await connection.executeQuery<{ edgeId: string; fromId: string; toId: string; ref: string }>(
         `MATCH (from:Node {id: $fromNodeId})-[r:FLOWS_TO]->(to:Node)
@@ -349,7 +352,7 @@ export class EdgeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ toNodeId }, ['toNodeId'], 'getEdgesByToNode');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       const result = await connection.executeQuery<{ edgeId: string; fromId: string; toId: string; ref: string }>(
         `MATCH (from:Node)-[r:FLOWS_TO]->(to:Node {id: $toNodeId})

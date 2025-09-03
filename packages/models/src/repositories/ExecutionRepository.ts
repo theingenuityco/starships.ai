@@ -1,4 +1,4 @@
-import { getConnection } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
 
@@ -46,8 +46,11 @@ export interface UpdateExecutionRequest {
  * ExecutionRepository - Database operations for workflow executions
  */
 export class ExecutionRepository extends BaseRepository {
-  constructor() {
+  private connection: Neo4jConnection;
+
+  constructor(connection?: Neo4jConnection) {
     super('ExecutionRepository');
+    this.connection = connection || getConnection();
   }
 
   /**
@@ -81,7 +84,7 @@ export class ExecutionRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(request, ['workflowId'], 'create');
 
-      const connection = getConnection();
+      const connection = this.connection;
       const now = new Date().toISOString();
 
       const executionData = {
@@ -93,7 +96,7 @@ export class ExecutionRepository extends BaseRepository {
 
       const executionForStorage = this.serializeComplexFields(executionData as ExecutionModel);
 
-      const execution = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionForStorage);
+      const execution = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionForStorage, this.connection);
 
       // Create relationship with workflow
       await connection.executeWrite(
@@ -108,7 +111,7 @@ export class ExecutionRepository extends BaseRepository {
 
   async findById(id: string): Promise<ExecutionModel | null> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ e: ExecutionModel }>(
         'MATCH (e:Execution) WHERE e.id = $id RETURN e',
         { id }
@@ -121,7 +124,7 @@ export class ExecutionRepository extends BaseRepository {
 
   async findByWorkflowId(workflowId: string): Promise<ExecutionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ e: ExecutionModel }>(
         'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
         { workflowId }
@@ -133,7 +136,7 @@ export class ExecutionRepository extends BaseRepository {
 
   async update(id: string, updates: UpdateExecutionRequest): Promise<ExecutionModel | null> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const now = new Date().toISOString();
       
       // Handle status transitions
@@ -157,7 +160,7 @@ export class ExecutionRepository extends BaseRepository {
 
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeWrite<{ deletedCount: number }>(
         'MATCH (e:Execution) WHERE e.id = $id DETACH DELETE e RETURN count(e) as deletedCount',
         { id }
@@ -168,7 +171,7 @@ export class ExecutionRepository extends BaseRepository {
 
   async findByStatus(status: ExecutionStatus): Promise<ExecutionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ e: ExecutionModel }>(
         'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
         { status }
@@ -180,7 +183,7 @@ export class ExecutionRepository extends BaseRepository {
 
   async findActiveExecutions(): Promise<ExecutionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ e: ExecutionModel }>(
         'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
       );

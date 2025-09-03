@@ -1,10 +1,13 @@
-import { getConnection } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '../helpers/database';
 import { SessionModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 
 export class SessionRepository extends BaseRepository {
-  constructor() {
+  private connection: Neo4jConnection;
+
+  constructor(connection?: Neo4jConnection) {
     super('SessionRepository');
+    this.connection = connection || getConnection();
   }
 
   async findAll(): Promise<SessionModel[]> {
@@ -19,7 +22,7 @@ export class SessionRepository extends BaseRepository {
 
   async findById(id: string): Promise<SessionModel | null> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ s: any }>(
         'MATCH (s:SessionModel) WHERE s.id = $id RETURN s',
         { id }
@@ -30,7 +33,7 @@ export class SessionRepository extends BaseRepository {
 
   async findByUserId(userId: string): Promise<SessionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ s: any }>(
         'MATCH (s:SessionModel) WHERE s.created_by = $userId RETURN s ORDER BY s.last_activity_at DESC',
         { userId }
@@ -41,7 +44,7 @@ export class SessionRepository extends BaseRepository {
 
   async findByStarshipId(starshipId: string): Promise<SessionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ s: any }>(
         'MATCH (s:SessionModel) WHERE s.starship_id = $starshipId RETURN s ORDER BY s.last_activity_at DESC',
         { starshipId }
@@ -52,7 +55,7 @@ export class SessionRepository extends BaseRepository {
 
   async findByAgentId(agentId: string): Promise<SessionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ s: any }>(
         'MATCH (s:SessionModel) WHERE s.agent_id = $agentId RETURN s ORDER BY s.last_activity_at DESC',
         { agentId }
@@ -63,7 +66,7 @@ export class SessionRepository extends BaseRepository {
 
   async findActiveByUser(userId: string): Promise<SessionModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeQuery<{ s: any }>(
         'MATCH (s:SessionModel) WHERE s.created_by = $userId AND s.status = $status RETURN s ORDER BY s.last_activity_at DESC',
         { userId, status: 'active' }
@@ -91,7 +94,7 @@ export class SessionRepository extends BaseRepository {
         metadata: entity.metadata ? JSON.stringify(entity.metadata) : null
       };
       
-      const result = await this.createEntityWithAutoId<any>('SessionModel', sessionData);
+      const result = await this.createEntityWithAutoId<any>('SessionModel', sessionData, this.connection);
       
       return this.mapToSession(result);
     }, 'create', 'Session');
@@ -99,7 +102,7 @@ export class SessionRepository extends BaseRepository {
 
   async update(id: string, updates: Partial<SessionModel>): Promise<SessionModel | null> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       
       const setFields = [];
       const params: any = { id };
@@ -151,7 +154,7 @@ export class SessionRepository extends BaseRepository {
 
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       const result = await connection.executeWrite<{ deletedCount: number }>(
         'MATCH (s:SessionModel) WHERE s.id = $id DETACH DELETE s RETURN count(s) as deletedCount',
         { id }
@@ -163,7 +166,7 @@ export class SessionRepository extends BaseRepository {
 
   async updateActivity(id: string): Promise<void> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       await connection.executeWrite(
         'MATCH (s:SessionModel) WHERE s.id = $id SET s.last_activity_at = $timestamp',
         { id, timestamp: new Date().toISOString() }
@@ -173,7 +176,7 @@ export class SessionRepository extends BaseRepository {
 
   async incrementMessageCount(id: string, increment: number = 1): Promise<void> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       await connection.executeWrite(
         'MATCH (s:SessionModel) WHERE s.id = $id SET s.message_count = s.message_count + $increment, s.last_activity_at = $timestamp',
         { id, increment, timestamp: new Date().toISOString() }
@@ -183,7 +186,7 @@ export class SessionRepository extends BaseRepository {
 
   async updateTokenCount(id: string, tokens: number): Promise<void> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       await connection.executeWrite(
         'MATCH (s:SessionModel) WHERE s.id = $id SET s.total_tokens = s.total_tokens + $tokens, s.last_activity_at = $timestamp',
         { id, tokens, timestamp: new Date().toISOString() }
@@ -193,7 +196,7 @@ export class SessionRepository extends BaseRepository {
 
   async markAsCompleted(id: string): Promise<void> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       await connection.executeWrite(
         'MATCH (s:SessionModel) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
         { id, status: 'completed', timestamp: new Date().toISOString() }
@@ -203,7 +206,7 @@ export class SessionRepository extends BaseRepository {
 
   async archiveSession(id: string): Promise<void> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       await connection.executeWrite(
         'MATCH (s:SessionModel) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
         { id, status: 'archived', timestamp: new Date().toISOString() }

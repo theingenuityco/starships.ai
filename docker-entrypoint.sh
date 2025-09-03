@@ -118,13 +118,10 @@ else
     fi
 fi
 
-# Runtime configuration: SERVER_URL is now used for both REST API and WebSocket connections
-# This replaces the previous dual configuration (API_URL and SERVER_URL)
-if [ -n "$SERVER_URL" ]; then
-    echo "  - Backend Server: $SERVER_URL (REST API and WebSocket)"
-elif [ -n "$NEXT_PUBLIC_API_URL" ]; then
-    # Legacy support for NEXT_PUBLIC_API_URL
-    echo "  - Backend API (Legacy): $NEXT_PUBLIC_API_URL"
+if [ -n "$NEXT_PUBLIC_API_URL" ]; then
+    echo "  - Backend API: $NEXT_PUBLIC_API_URL"
+elif [ -n "$SERVER_URL" ]; then
+    echo "  - Backend: $SERVER_URL"
 else
     # No hardcoded fallback - must be configured
     echo "  - Backend service starting..."

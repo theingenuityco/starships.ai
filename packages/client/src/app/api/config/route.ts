@@ -4,7 +4,6 @@ import { loadApiRuntimeConfig } from '@starships/env-config';
 /**
  * Runtime Configuration Endpoint
  * Returns runtime configuration for client-side services
- * Following the same pattern as Kinde runtime configuration
  */
 export async function GET() {
   try {

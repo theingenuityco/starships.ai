@@ -248,7 +248,6 @@ export interface Message {
 // User Interface (from backend)
 export interface SyncedUser {
   id: string
-  kindeId?: string
   username: string
   email?: string
   displayName?: string

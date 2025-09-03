@@ -16,7 +16,7 @@ interface AuthState {
 }
 
 /**
- * JWT-based authentication hook to replace Kinde
+ * JWT-based authentication hook
  */
 export function useJwtAuth() {
   const [state, setState] = useState<AuthState>({
@@ -253,6 +253,5 @@ export function useJwtAuth() {
     userEmail: syncedUser?.email || state.user?.email,
     userName: syncedUser?.displayName || state.user?.name,
     userAvatar: syncedUser?.avatar || state.user?.avatar,
-    kindeUser: state.user, // For backward compatibility
   };
 }

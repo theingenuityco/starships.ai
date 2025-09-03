@@ -29,7 +29,6 @@ class SocketClient {
     }
 
     // Fetch server URL at runtime (not build time!)
-    // Following the same pattern as Kinde runtime configuration
     let serverUrl = 'http://localhost:4000';
     try {
       const response = await fetch('/api/config');

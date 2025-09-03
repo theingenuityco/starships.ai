@@ -26,7 +26,7 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 - **State Management**: TanStack Query for data operations + Zustand for UI state
 - **Animations**: Framer Motion for smooth transitions
 - **Theme**: next-themes for dark/light mode
-- **Authentication**: Kinde integration
+- **Authentication**: JWT-based authentication
 
 ### Key Features
 - ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components

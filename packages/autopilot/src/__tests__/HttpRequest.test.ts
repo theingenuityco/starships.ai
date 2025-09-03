@@ -2,7 +2,7 @@
  * HttpRequest Unit Tests
  */
 
-import axios, { AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosResponse, AxiosError, AxiosHeaders } from 'axios';
 import { HttpRequest } from '../HttpRequest';
 import { HttpRequestNodeParameters } from '../types';
 
@@ -157,12 +157,12 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { success: true },
         config: { 
           url: 'https://api.example.com/test',
           method: 'get',
-          headers: { 'content-type': 'application/json' }
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
         },
         request: {},
         statusCode: 200
@@ -195,9 +195,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 201,
         statusText: 'Created',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { id: 1, name: 'John Doe' },
-        config: { url: 'https://api.example.com/users', method: 'post', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/users', 
+          method: 'post', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -233,9 +238,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { authenticated: true },
-        config: { url: 'https://api.example.com/secured', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/secured', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -266,9 +276,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { authenticated: true },
-        config: { url: 'https://api.example.com/secured', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/secured', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -302,9 +317,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { authenticated: true },
-        config: { url: 'https://api.example.com/secured', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/secured', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -335,9 +355,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { slow: true },
-        config: { url: 'https://api.example.com/slow', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/slow', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -362,9 +387,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 302,
         statusText: 'Found',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: {},
-        config: { url: 'https://api.example.com/redirect', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/redirect', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -397,9 +427,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: { success: true },
-        config: { url: 'https://api.example.com/unstable', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/unstable', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       // Fail first two attempts, succeed on third
@@ -520,9 +555,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: {},
-        config: { url: 'https://api.example.com/test', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/test', 
+          method: 'get', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -547,9 +587,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: {},
-        config: { url: 'https://api.example.com/test', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/test', 
+          method: 'head', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);
@@ -578,9 +623,14 @@ describe('HttpRequest', () => {
       const mockResponse: AxiosResponse = {
         status: 200,
         statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
+        headers: new AxiosHeaders({ 'content-type': 'application/json' }),
         data: {},
-        config: { url: 'https://api.example.com/test', method: 'get', headers: { 'content-type': 'application/json' } }
+        config: { 
+          url: 'https://api.example.com/test', 
+          method: 'post', 
+          headers: new AxiosHeaders({ 'content-type': 'application/json' })
+        },
+        request: {}
       } as AxiosResponse;
 
       axiosInstance.mockResolvedValueOnce(mockResponse);

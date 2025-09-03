@@ -31,7 +31,6 @@ const mockDriver = {
   id: 'user-123',
   username: 'testuser',
   email: 'test@example.com',
-  kindeId: 'kinde-123',
   displayName: 'Test User',
   createdAt: '2024-01-01T00:00:00.000Z',
   ...overrides

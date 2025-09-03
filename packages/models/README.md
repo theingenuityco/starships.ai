@@ -87,7 +87,7 @@ try {
 | **StarshipRepository** | Starship CRUD, agent deployment, status management |
 | **AgentRepository** | Agent management, template instantiation |
 | **AgentTemplateRepository** | Reusable agent configurations |
-| **UserRepository** | User accounts and Kinde integration |
+| **UserRepository** | User accounts and authentication |
 | **MissionRepository** | Mission lifecycle management |
 | **MissionMessageRepository** | Mission communication logs |
 | **MissionClarityRepository** | Mission requirement analysis |

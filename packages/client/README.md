@@ -205,8 +205,8 @@ CMD ["npm", "start"]
 
 3. **Chat History Lost**
    - Check browser localStorage quota
-   - Verify session ID consistency
    - Check for incognito/private browsing mode
+   - Verify backend session endpoints are accessible
 
 4. **TypeScript Errors**
    ```bash

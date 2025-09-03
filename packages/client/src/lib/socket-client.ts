@@ -28,7 +28,18 @@ class SocketClient {
       return;
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000';
+    // Fetch server URL at runtime (not build time!)
+    // Following the same pattern as Kinde runtime configuration
+    let serverUrl = 'http://localhost:4000';
+    try {
+      const response = await fetch('/api/config');
+      if (response.ok) {
+        const config = await response.json();
+        serverUrl = config.serverUrl || serverUrl;
+      }
+    } catch (error) {
+      console.warn('[SOCKET CLIENT] Using default server URL:', error);
+    }
     
     this.socket = io(serverUrl, {
       auth: { token },

@@ -204,18 +204,14 @@ export class WorkflowRepository extends BaseRepository {
 
       // For backward compatibility, also create Neo4j relationship during transition
       if (workflow.starshipId) {
-        try {
-          await connection.executeWrite(
-            `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
-             CREATE (w)-[:DEPLOYED_ON {
-               deployedAt: $timestamp,
-               deployedBy: 'system'
-             }]->(s)`,
-            { starshipId: workflow.starshipId, workflowId: workflow.id, timestamp: now }
-          );
-        } catch (error) {
-          console.warn('Failed to create Neo4j relationship for new workflow:', error);
-        }
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
+           CREATE (w)-[:DEPLOYED_ON {
+             deployedAt: $timestamp,
+             deployedBy: 'system'
+           }]->(s)`,
+          { starshipId: workflow.starshipId, workflowId: workflow.id, timestamp: now }
+        );
       }
 
       // Deserialize complex fields before returning

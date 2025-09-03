@@ -243,7 +243,8 @@ describe('WorkflowRepository', () => {
           id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
           name: 'Test Workflow',
           authorId: 'author-123',
-          usageCount: 0
+          usageCount: 0,
+          starshipId: 'starship-123' // Include starshipId to trigger relationship creation
         };
         
         // Mock createEntityWithAutoId format

@@ -184,7 +184,6 @@ jobs:
             --from-literal=NEO4J_USERNAME="${{ secrets.NEO4J_USERNAME }}" \
             --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
             --from-literal=NEO4J_DATABASE="${{ secrets.NEO4J_DATABASE }}" \
-            --from-literal=API_URL="${{ vars.API_URL }}" \
             --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
             --from-literal=ENABLE_AUTH_TESTING_BACKDOOR="${{ vars.ENABLE_AUTH_TESTING_BACKDOOR }}" \
             --from-literal=KINDE_SITE_URL="${{ vars.KINDE_SITE_URL }}" \

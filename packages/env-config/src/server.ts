@@ -158,19 +158,18 @@ export function loadKindeRuntimeConfig(): ServerEnvironmentConfig {
 
 /**
  * Loads runtime API configuration for server-side routes
- * This enables environment-specific API URLs without rebuilding
+ * This enables environment-specific server URLs without rebuilding
  * Following the same pattern as loadKindeRuntimeConfig
  */
-export function loadApiRuntimeConfig(): { apiUrl: string; serverUrl: string; enableAuthTestingBackdoor: boolean } {
+export function loadApiRuntimeConfig(): { serverUrl: string; enableAuthTestingBackdoor: boolean } {
   // Use environment variables that can be set at runtime
   // These replace the NEXT_PUBLIC_ variables that were baked in at build time
-  const apiUrl = process.env.API_URL!;
   const serverUrl = process.env.SERVER_URL!;
   const enableAuthTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
   
-  if (!apiUrl || !serverUrl) {
-    throw new Error('API_URL and SERVER_URL must be provided as environment variables');
+  if (!serverUrl) {
+    throw new Error('SERVER_URL must be provided as environment variable');
   }
   
-  return { apiUrl, serverUrl, enableAuthTestingBackdoor };
+  return { serverUrl, enableAuthTestingBackdoor };
 }

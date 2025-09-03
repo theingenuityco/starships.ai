@@ -21,12 +21,15 @@ describe('NodeRepository', () => {
   let mockConnection: any;
 
   beforeEach(() => {
-    repository = new NodeRepository();
+    // Create fresh mock connection for each test
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    repository = new NodeRepository();
+    
+    // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
 

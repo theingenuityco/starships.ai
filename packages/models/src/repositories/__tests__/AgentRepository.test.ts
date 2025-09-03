@@ -24,12 +24,15 @@ describe('AgentRepository', () => {
   let mockConnection: any;
 
   beforeEach(() => {
-    repository = new AgentRepository();
+    // Create fresh mock connection for each test
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    repository = new AgentRepository();
+    
+    // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
 
@@ -307,12 +310,33 @@ describe('AgentRepository', () => {
       });
 
       it('should create Neo4j relationship', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
+        const mockCreatedAgent = {
+          id: 'test-uuid-1234',
+          name: 'Test Agent',
+          description: 'Test Description',
+          model: 'gpt-4',
+          temperature: 0.7,
+          maxTokens: 1000,
+          timeout: 30000,
+          version: '1.0.0',
+          category: 'general',
+          starshipId: 'starship-123',
+          memory: '{"data":"test"}',
+          blueprint: '{"type":"test","nodes":[],"edges":[]}',
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String),
+          usageCount: 0
+        };
+
+        // Mock createEntityWithAutoId call first, then relationship creation
+        mockConnection.executeWrite
+          .mockResolvedValueOnce([{ n: mockCreatedAgent }]) // createEntityWithAutoId
+          .mockResolvedValueOnce([]); // relationship creation
 
         await repository.create(mockAgentData);
 
         expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2); // Once for agent, once for relationship
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
+        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2,
           expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
           expect.objectContaining({
             starshipId: 'starship-123',

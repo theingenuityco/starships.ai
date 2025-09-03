@@ -48,11 +48,13 @@ describe('EdgeRepository', () => {
 
     it('should create edge successfully', async () => {
       const blueprintId = 'blueprint-123';
+      const mockEdgeId = 'edge-456';
       
       // Mock blueprint exists
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }]) // Blueprint check
-        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]); // Nodes check
+        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]) // Nodes check
+        .mockResolvedValueOnce([{ edgeId: mockEdgeId, ref: 'test-edge' }]); // Edge ID retrieval
       
       mockConnection.executeWrite.mockResolvedValue([]);
 
@@ -69,18 +71,17 @@ describe('EdgeRepository', () => {
       );
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (from)-[:FLOWS_TO {id: $edgeId, ref: $ref}]->(to)'),
+        expect.stringContaining('CREATE (from)-[:FLOWS_TO {id: randomUUID(), ref: $ref}]->(to)'),
         expect.objectContaining({
           blueprintId,
           fromId: 'node-1',
           toId: 'node-2',
-          edgeId: expect.any(String),
           ref: 'test-edge'
         })
       );
 
       expect(result).toMatchObject({
-        id: expect.any(String),
+        id: mockEdgeId,
         from: 'node-1',
         to: 'node-2',
         ref: 'test-edge'
@@ -96,7 +97,8 @@ describe('EdgeRepository', () => {
 
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: 'blueprint-123' }])
-        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]);
+        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }])
+        .mockResolvedValueOnce([{ edgeId: 'edge-456', ref: 'custom-edge-ref' }]); // Edge ID retrieval
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.createEdge('blueprint-123', edgeDataWithRef);
@@ -149,11 +151,13 @@ describe('EdgeRepository', () => {
         ['end', 'node-3']
       ]);
 
-      // Mock blueprint exists
+      // Mock blueprint exists, then node checks, then edge ID retrieval queries
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }]) // Blueprint check
         .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]) // First edge nodes check
-        .mockResolvedValueOnce([{ fromId: 'node-2', toId: 'node-3' }]); // Second edge nodes check
+        .mockResolvedValueOnce([{ edgeId: 'edge-1', ref: 'start-process' }]) // First edge ID retrieval
+        .mockResolvedValueOnce([{ fromId: 'node-2', toId: 'node-3' }]) // Second edge nodes check
+        .mockResolvedValueOnce([{ edgeId: 'edge-2', ref: 'process-end' }]); // Second edge ID retrieval
       
       mockConnection.executeWrite.mockResolvedValue([]);
 
@@ -161,13 +165,13 @@ describe('EdgeRepository', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({
-        id: expect.any(String),
+        id: 'edge-1',
         from: 'node-1', // Mapped from 'start'
         to: 'node-2',   // Mapped from 'process'
         ref: 'start-process'
       });
       expect(result[1]).toMatchObject({
-        id: expect.any(String),
+        id: 'edge-2',
         from: 'node-2', // Mapped from 'process'
         to: 'node-3',   // Mapped from 'end'
         ref: 'process-end'
@@ -180,7 +184,9 @@ describe('EdgeRepository', () => {
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }])
         .mockResolvedValueOnce([{ fromId: 'start', toId: 'process' }])
-        .mockResolvedValueOnce([{ fromId: 'process', toId: 'end' }]);
+        .mockResolvedValueOnce([{ edgeId: 'edge-1', ref: 'start-process' }])
+        .mockResolvedValueOnce([{ fromId: 'process', toId: 'end' }])
+        .mockResolvedValueOnce([{ edgeId: 'edge-2', ref: 'process-end' }]);
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.createEdges(blueprintId, validEdgesData);
@@ -194,8 +200,9 @@ describe('EdgeRepository', () => {
 
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }]) // Blueprint exists
-        .mockResolvedValueOnce([]) // First edge nodes don't exist
-        .mockResolvedValueOnce([{ fromId: 'process', toId: 'end' }]); // Second edge nodes exist
+        .mockResolvedValueOnce([]) // First edge nodes don't exist (skipped)
+        .mockResolvedValueOnce([{ fromId: 'process', toId: 'end' }]) // Second edge nodes exist
+        .mockResolvedValueOnce([{ edgeId: 'edge-2', ref: 'process-end' }]); // Second edge ID retrieval
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -230,12 +237,13 @@ describe('EdgeRepository', () => {
 
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: 'blueprint-123' }])
-        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]);
+        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }])
+        .mockResolvedValueOnce([{ edgeId: 'edge-123', ref: null }]); // Edge ID retrieval
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.createEdges('blueprint-123', edgesWithoutRef);
 
-      expect(result[0].ref).toEqual(result[0].id);
+      expect(result[0].ref).toEqual('edge-123'); // Should use edge ID as ref
     });
   });
 
@@ -667,7 +675,8 @@ describe('EdgeRepository', () => {
       // Mock create edge
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }])
-        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]);
+        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }])
+        .mockResolvedValueOnce([{ edgeId: 'edge-123', ref: 'test-edge' }]); // Edge ID retrieval
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const createdEdge = await repository.createEdge(blueprintId, edgeData);
@@ -703,7 +712,9 @@ describe('EdgeRepository', () => {
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }])
         .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }])
-        .mockResolvedValueOnce([{ fromId: 'node-2', toId: 'node-3' }]);
+        .mockResolvedValueOnce([{ edgeId: 'edge-1', ref: 'start-middle' }]) // First edge ID retrieval
+        .mockResolvedValueOnce([{ fromId: 'node-2', toId: 'node-3' }])
+        .mockResolvedValueOnce([{ edgeId: 'edge-2', ref: 'middle-end' }]); // Second edge ID retrieval
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const createdEdges = await repository.createEdges(blueprintId, edgesData, idMapping);
@@ -768,7 +779,8 @@ describe('EdgeRepository', () => {
 
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: 'blueprint-123' }])
-        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]);
+        .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }])
+        .mockResolvedValueOnce([{ edgeId: 'edge-123', ref: longRef }]); // Edge ID retrieval
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.createEdge('blueprint-123', edgeData);

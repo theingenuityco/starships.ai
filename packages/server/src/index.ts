@@ -20,6 +20,7 @@ import { migrationRunner, seedWaitlist } from '@starships/models';
 import { getServerConfig } from '@starships/env-config';
 
 // Route imports
+import authRoutes from './routes/auth';
 import agentRoutes from './routes/agents';
 import sessionRoutes from './routes/sessions';
 import memoryRoutes from './routes/memory';
@@ -112,6 +113,7 @@ app.get('/api/v1/starships/pricing', async (req, res) => {
 });
 
 // API Routes
+app.use('/api/v1/auth', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix

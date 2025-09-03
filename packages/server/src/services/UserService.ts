@@ -116,4 +116,26 @@ export class UserService {
     return await userRepo.findByEmail(email);
   }
 
+  /**
+   * Get user by email with password (for authentication)
+   */
+  static async getUserByEmailWithPassword(email: string): Promise<UserModel | null> {
+    const userRepo = new UserRepository();
+    return await userRepo.findByEmailWithPassword(email);
+  }
+
+  /**
+   * Create user with password (for registration)
+   */
+  static async createUser(userData: {
+    email: string;
+    password: string;
+    name?: string;
+    displayName?: string;
+    username?: string;
+  }): Promise<UserModel> {
+    const userRepo = new UserRepository();
+    return await userRepo.createWithPassword(userData);
+  }
+
 }

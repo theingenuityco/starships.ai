@@ -18,6 +18,7 @@ export interface UserModel {
   email?: string;
   displayName?: string;
   avatar?: string;
+  password?: string; // For local authentication
   createdAt: string;
   
   // Stripe integration
@@ -37,6 +38,7 @@ export interface CreateUserRequest {
   email?: string;
   displayName?: string;
   avatar?: string;
+  password?: string;
   stripeCustomerId?: string;
 }
 

@@ -38,6 +38,9 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     DEFAULT_TEMPERATURE: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
     DEFAULT_MAX_TOKENS: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
     
+    // JWT Authentication
+    JWT_SECRET: process.env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production',
+    
     KINDE_CLIENT_ID: process.env.KINDE_CLIENT_ID,
     KINDE_CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET,
     KINDE_ISSUER_URL: process.env.KINDE_ISSUER_URL,

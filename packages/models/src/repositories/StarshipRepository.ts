@@ -3,17 +3,12 @@ import { StarshipModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 
-/**
- * Neo4j-based starship repository
- */
 export class StarshipRepository extends BaseRepository {
   constructor() {
     super('StarshipRepository');
   }
 
-  /**
-   * Validate UUID format
-   */
+  /** Validate UUID format */
   private validateUUID(id: string, fieldName: string): void {
     if (!id || typeof id !== 'string') {
       this.handleValidationError([{ field: fieldName, message: `${fieldName} is required and must be a string` }]);
@@ -25,7 +20,6 @@ export class StarshipRepository extends BaseRepository {
     }
   }
 
-  // Validation removed - relying on database constraints instead
 
 
   async findAll(): Promise<StarshipModel[]> {
@@ -355,9 +349,6 @@ export class StarshipRepository extends BaseRepository {
   }
 
 
-  // ============================================================================
-  // STRIPE INTEGRATION METHODS
-  // ============================================================================
 
   async findBySubscriptionId(subscriptionId: string): Promise<StarshipModel | null> {
     const connection = getConnection();
@@ -402,15 +393,7 @@ export class StarshipRepository extends BaseRepository {
     return result[0]?.count || 0;
   }
 
-  // ============================================================================
-  // WEBHOOK IDEMPOTENCY METHODS
-  // ============================================================================
-
-  /**
-   * Check if a Stripe webhook event has already been processed
-   * @param eventId - The Stripe event ID
-   * @returns true if event was already processed
-   */
+  /** Check if a Stripe webhook event has already been processed */
   async isEventProcessed(eventId: string): Promise<boolean> {
     const connection = getConnection();
     const result = await connection.executeQuery(
@@ -420,11 +403,7 @@ export class StarshipRepository extends BaseRepository {
     return result.length > 0;
   }
 
-  /**
-   * Mark a Stripe webhook event as processed
-   * @param eventId - The Stripe event ID
-   * @param eventType - The type of Stripe event
-   */
+  /** Mark a Stripe webhook event as processed */
   async markEventProcessed(eventId: string, eventType?: string): Promise<void> {
     const connection = getConnection();
     await connection.executeWrite(
@@ -437,11 +416,7 @@ export class StarshipRepository extends BaseRepository {
     );
   }
 
-  /**
-   * Update Starship with Stripe Customer ID
-   * @param starshipId - The Starship ID
-   * @param stripeCustomerId - The Stripe Customer ID
-   */
+  /** Update Starship with Stripe Customer ID */
   async updateStripeCustomer(
     starshipId: string, 
     stripeCustomerId: string
@@ -455,10 +430,7 @@ export class StarshipRepository extends BaseRepository {
     );
   }
 
-  /**
-   * Find Starship by Stripe Customer ID
-   * @param customerId - The Stripe Customer ID
-   */
+  /** Find Starship by Stripe Customer ID */
   async findByStripeCustomerId(customerId: string): Promise<StarshipModel | null> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ s: StarshipModel }>(
@@ -468,11 +440,7 @@ export class StarshipRepository extends BaseRepository {
     return result[0]?.s || null;
   }
 
-  /**
-   * Find all pending payment starships older than specified hours
-   * @param hours - Number of hours to consider a starship abandoned
-   * @returns Array of abandoned starships
-   */
+  /** Find all pending payment starships older than specified hours */
   async findAbandonedPendingStarships(hours: number = 24): Promise<StarshipModel[]> {
     const connection = getConnection();
     const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
@@ -489,10 +457,7 @@ export class StarshipRepository extends BaseRepository {
     return result.map(record => record.s);
   }
 
-  /**
-   * Clean up abandoned pending starships
-   * @param starshipId - The starship ID to clean up
-   */
+  /** Clean up abandoned pending starships */
   async cleanupAbandonedStarship(starshipId: string): Promise<void> {
     const connection = getConnection();
     
@@ -504,12 +469,7 @@ export class StarshipRepository extends BaseRepository {
     );
   }
 
-  /**
-   * Update starship payment status
-   * @param starshipId - The starship ID
-   * @param status - New status
-   * @param additionalFields - Additional fields to update
-   */
+  /** Update starship payment status */
   async updatePaymentStatus(
     starshipId: string,
     status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
@@ -529,11 +489,7 @@ export class StarshipRepository extends BaseRepository {
     );
   }
 
-  /**
-   * Get all memories for a starship using Neo4j relationships
-   * @param starshipId - The starship ID
-   * @returns Array of memories belonging to this starship
-   */
+  /** Get all memories for a starship using Neo4j relationships */
   async getMemories(starshipId: string): Promise<any[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');

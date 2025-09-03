@@ -1,7 +1,4 @@
-/**
- * Simple Performance Monitor
- * Provides basic performance tracking for database operations
- */
+/** Performance Monitor for database operations */
 
 export interface QueryMetrics {
   operation: string;
@@ -16,9 +13,7 @@ class PerformanceMonitor {
   private metrics: QueryMetrics[] = [];
   private maxMetrics = 1000; // Keep last 1000 metrics
 
-  /**
-   * Record a database query performance metric
-   */
+  /** Record database query performance */
   recordQuery(
     operation: string,
     duration: number,
@@ -48,9 +43,7 @@ class PerformanceMonitor {
     }
   }
 
-  /**
-   * Get performance statistics
-   */
+  /** Get performance statistics */
   getStats(): {
     totalQueries: number;
     averageDuration: number;
@@ -78,16 +71,12 @@ class PerformanceMonitor {
     };
   }
 
-  /**
-   * Clear all metrics
-   */
+  /** Clear all metrics */
   clear(): void {
     this.metrics = [];
   }
 
-  /**
-   * Get metrics for a specific operation
-   */
+  /** Get metrics for operation */
   getMetricsForOperation(operation: string): QueryMetrics[] {
     return this.metrics.filter((metric) => metric.operation === operation);
   }

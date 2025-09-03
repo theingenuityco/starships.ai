@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { RepositoryFactory } from '@starships/models';
+import { StarshipRepository, AgentRepository } from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import { Request, Response } from 'express';
 import { getConnection } from '@starships/models';
@@ -146,7 +146,7 @@ router.post('/agent-templates/:templateId/agents', authMiddleware, async (req: R
     // If no starshipId provided, get user's first active starship as fallback
     if (!targetStarshipId) {
       try {
-        const starshipRepository = await RepositoryFactory.getStarshipRepository();
+        const starshipRepository = new StarshipRepository();
         const userStarships = await starshipRepository.findByOwner(userId);
 
         // Find the first active starship
@@ -180,7 +180,7 @@ router.post('/agent-templates/:templateId/agents', authMiddleware, async (req: R
 
       // Validate provided starshipId exists and belongs to user
       try {
-        const starshipRepository = await RepositoryFactory.getStarshipRepository();
+        const starshipRepository = new StarshipRepository();
         const starship = await starshipRepository.findById(targetStarshipId);
 
         if (!starship) {
@@ -260,7 +260,7 @@ router.post('/agent-templates/from-agents/:agentId', authMiddleware, async (req:
 
     // Check if agent exists and is public
     console.log('[TEMPLATE] Getting agent repository...');
-    const agentRepository = RepositoryFactory.getAgentRepository();
+    const agentRepository = new AgentRepository();
     console.log('[TEMPLATE] Finding agent by ID:', agentId);
     const agent = await agentRepository.findById(agentId);
 

@@ -6,7 +6,7 @@ Data access layer and repository implementations for Starships.ai - a space-them
 
 This package provides:
 - **Neo4j Database Integration** - Graph database connectivity and session management
-- **Repository Pattern** - Standardized data access with the Repository Factory
+- **Repository Pattern** - Standardized data access with direct repository imports
 - **Error Handling** - Unified error system with proper categorization
 - **Performance Monitoring** - Built-in logging and performance tracking
 - **Migration System** - Database schema management and seeding
@@ -15,10 +15,12 @@ This package provides:
 ## Quick Start
 
 ```typescript
-import { 
-  RepositoryFactory, 
+import {
+  StarshipRepository,
+  AgentRepository,
+  UserRepository,
   createConnection,
-  Neo4jConfig 
+  Neo4jConfig
 } from '@starships/models';
 
 // 1. Initialize database connection
@@ -32,11 +34,8 @@ const config: Neo4jConfig = {
 const connection = createConnection(config);
 await connection.connect();
 
-// 2. Initialize repositories
-await RepositoryFactory.initialize();
-
-// 3. Use repositories
-const starshipRepo = RepositoryFactory.getStarshipRepository();
+// 2. Use repositories directly
+const starshipRepo = new StarshipRepository();
 const starships = await starshipRepo.findAll();
 ```
 
@@ -47,15 +46,17 @@ const starships = await starshipRepo.findAll();
 - **Agents**: AI entities deployed on starships with specific roles and capabilities
 - **Missions**: Task execution contexts with phases and messaging
 
-### Repository Factory
-Centralized repository management with synchronous access for Socket.IO compatibility:
+### Direct Repository Usage
+Direct repository instantiation for clean and simple data access:
 
 ```typescript
-// Get repository instances
-const starshipRepo = RepositoryFactory.getStarshipRepository();
-const agentRepo = RepositoryFactory.getAgentRepository();
-const missionRepo = RepositoryFactory.getMissionRepository();
-const userRepo = RepositoryFactory.getUserRepository();
+// Import and instantiate repositories directly
+import { StarshipRepository, AgentRepository, MissionRepository, UserRepository } from '@starships/models';
+
+const starshipRepo = new StarshipRepository();
+const agentRepo = new AgentRepository();
+const missionRepo = new MissionRepository();
+const userRepo = new UserRepository();
 ```
 
 ### Error Handling
@@ -133,7 +134,8 @@ npm run validate-schema
 
 ### Starship Operations
 ```typescript
-const starshipRepo = RepositoryFactory.getStarshipRepository();
+import { StarshipRepository } from '@starships/models';
+const starshipRepo = new StarshipRepository();
 
 // Create a new starship
 const starship = await starshipRepo.create({
@@ -151,7 +153,8 @@ const slots = await starshipRepo.getAvailableSlots(starship.id);
 
 ### Mission Management
 ```typescript
-const missionRepo = RepositoryFactory.getMissionRepository();
+import { MissionRepository } from '@starships/models';
+const missionRepo = new MissionRepository();
 
 // Create mission
 const mission = await missionRepo.createMission({
@@ -163,16 +166,17 @@ const mission = await missionRepo.createMission({
 });
 
 // Update mission status
-await missionRepo.updateMission(mission.id, { 
+await missionRepo.updateMission(mission.id, {
   status: 'active',
-  phase: 'execution' 
+  phase: 'execution'
 });
 ```
 
 ### Agent Template System
 ```typescript
-const templateRepo = RepositoryFactory.getAgentTemplateRepository();
+import { AgentTemplateRepository, AgentRepository } from '@starships/models';
 
+const templateRepo = new AgentTemplateRepository();
 // Create reusable template
 const template = await templateRepo.create({
   name: 'Data Analyst',
@@ -181,7 +185,7 @@ const template = await templateRepo.create({
 });
 
 // Instantiate from template
-const agentRepo = RepositoryFactory.getAgentRepository();
+const agentRepo = new AgentRepository();
 const agent = await agentRepo.createFromTemplate(
   template.id,
   'starship-123',
@@ -191,7 +195,8 @@ const agent = await agentRepo.createFromTemplate(
 
 ### Workflow Management
 ```typescript
-const workflowRepo = RepositoryFactory.getWorkflowRepository();
+import { WorkflowRepository } from '@starships/models';
+const workflowRepo = new WorkflowRepository();
 
 // Create workflow
 const workflow = await workflowRepo.create({
@@ -299,14 +304,10 @@ LOG_METRICS=true
 Monitor system health:
 
 ```typescript
-import { HealthMonitor, RepositoryFactory } from '@starships/models';
+import { HealthMonitor } from '@starships/models';
 
-// Check repository initialization
-const status = RepositoryFactory.getInitializationStatus();
-console.log('Repositories ready:', status.isInitialized);
-
-// Overall health check
-const health = RepositoryFactory.getHealthCheck();
+// Monitor system health directly
+const health = await HealthMonitor.getSystemHealth();
 console.log('System status:', health.status);
 ```
 

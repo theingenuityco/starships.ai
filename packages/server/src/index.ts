@@ -13,6 +13,8 @@ import {
   UserRepository,
   StarshipRepository,
   createConnection,
+  getConnection,
+  WaitlistRepository,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';
 import { getServerConfig } from '@starships/env-config';
@@ -153,14 +155,10 @@ httpServer.listen(PORT, async () => {
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
 
-    // Initialize RepositoryFactory AFTER database connection is established
-    console.log('🔧 Initializing RepositoryFactory...');
-    await RepositoryFactory.initialize();
-    console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
-
-    // Ensure WaitlistRepository is properly initialized
+    // Initialize WaitlistRepository with database connection
     try {
-      RepositoryFactory.getWaitlistRepository();
+      const waitlistConnection = getConnection();
+      const waitlistRepo = new WaitlistRepository(waitlistConnection);
       console.log('✅ WaitlistRepository initialized and ready');
     } catch (error) {
       console.error('❌ Failed to initialize WaitlistRepository:', error);

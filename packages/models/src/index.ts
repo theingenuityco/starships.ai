@@ -32,8 +32,6 @@ export { WorkflowRepository } from './repositories/WorkflowRepository';
 export { MemoryRepository } from './repositories/MemoryRepository';
 export { MessageRepository } from './repositories/MessageRepository';
 
-// Factory for creating repositories
-export { RepositoryFactory } from './repositories';
 
 
 

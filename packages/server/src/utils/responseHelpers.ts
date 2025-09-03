@@ -146,7 +146,7 @@ export function handleCommonError(error: any, res: Response, context: string): b
   // Check if it's already a structured error from @starships/errors
   if (ErrorUtils.isApplicationError(error)) {
     const response = error.toResponse();
-    sendError(res, response.code as StandardErrorCode, response.message, response.statusCode, response.details);
+    sendError(res, response.code as StandardErrorCode, response.message, response.statusCode, response.details as Record<string, any> | undefined);
     return true;
   }
 

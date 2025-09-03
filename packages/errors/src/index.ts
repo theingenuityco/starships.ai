@@ -7,9 +7,10 @@
 // Import types from protocol package
 import { ErrorCategory } from '@starships/protocol';
 import type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
+import type { ErrorContext } from './context';
 
 /**
- * Base application error class
+ * Base application error class with unified ErrorContext support
  */
 export abstract class BaseError extends Error {
   public readonly code: StandardErrorCode;
@@ -19,6 +20,7 @@ export abstract class BaseError extends Error {
   public readonly requestId?: string;
   public readonly path?: string;
   public readonly details?: any;
+  public readonly context?: ErrorContext;
 
   constructor(
     message: string,
@@ -27,7 +29,8 @@ export abstract class BaseError extends Error {
     category: ErrorCategory,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -35,9 +38,10 @@ export abstract class BaseError extends Error {
     this.statusCode = statusCode;
     this.category = category;
     this.timestamp = new Date().toISOString();
-    this.requestId = requestId;
-    this.path = path;
+    this.requestId = requestId || context?.requestId;
+    this.path = path || context?.metadata?.path;
     this.details = details;
+    this.context = context;
 
     // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, new.target.prototype);
@@ -60,6 +64,20 @@ export abstract class BaseError extends Error {
   }
 
   /**
+   * Get the error context if available
+   */
+  getContext(): ErrorContext | undefined {
+    return this.context;
+  }
+
+  /**
+   * Check if error has context from specific layer
+   */
+  hasContextFromLayer(layer: string): boolean {
+    return this.context?.layer === layer;
+  }
+
+  /**
    * Convert error to JSON for logging
    */
   toJSON(): Record<string, any> {
@@ -74,6 +92,16 @@ export abstract class BaseError extends Error {
       path: this.path,
       details: this.details,
       stack: this.stack,
+      context: this.context ? {
+        layer: this.context.layer,
+        component: this.context.component,
+        operation: this.context.operation,
+        resource: this.context.resource,
+        resourceId: this.context.resourceId,
+        userId: this.context.userId,
+        timestamp: this.context.timestamp.toISOString(),
+        metadata: this.context.metadata
+      } : undefined,
     };
   }
 }
@@ -84,8 +112,15 @@ export abstract class BaseError extends Error {
 export class ValidationError extends BaseError {
   public readonly field?: string;
 
-  constructor(message: string, field?: string, details?: any, requestId?: string, path?: string) {
-    super(message, 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path);
+  constructor(
+    message: string,
+    field?: string,
+    details?: any,
+    requestId?: string,
+    path?: string,
+    context?: ErrorContext
+  ) {
+    super(message, 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path, context);
     this.field = field;
   }
 
@@ -110,9 +145,10 @@ export class NotFoundError extends BaseError {
     entityId: string,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
-    super(message, 'RESOURCE_NOT_FOUND', 404, ErrorCategory.NOT_FOUND, details, requestId, path);
+    super(message, 'RESOURCE_NOT_FOUND', 404, ErrorCategory.NOT_FOUND, details, requestId, path, context);
     this.entityType = entityType;
     this.entityId = entityId;
   }
@@ -134,7 +170,8 @@ export class AuthenticationError extends BaseError {
     message: string = 'Authentication required',
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
     super(
       message,
@@ -143,7 +180,8 @@ export class AuthenticationError extends BaseError {
       ErrorCategory.AUTHENTICATION,
       details,
       requestId,
-      path
+      path,
+      context
     );
   }
 }
@@ -161,7 +199,8 @@ export class AuthorizationError extends BaseError {
     userRole?: string,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
     super(
       message,
@@ -170,7 +209,8 @@ export class AuthorizationError extends BaseError {
       ErrorCategory.AUTHORIZATION,
       details,
       requestId,
-      path
+      path,
+      context
     );
     this.requiredPermission = requiredPermission;
     this.userRole = userRole;
@@ -199,9 +239,10 @@ export class ConflictError extends BaseError {
     conflictType?: string,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
-    super(message, 'RESOURCE_CONFLICT', 409, ErrorCategory.CONFLICT, details, requestId, path);
+    super(message, 'RESOURCE_CONFLICT', 409, ErrorCategory.CONFLICT, details, requestId, path, context);
     this.conflictType = conflictType;
   }
 
@@ -229,9 +270,10 @@ export class DatabaseError extends BaseError {
     query?: string,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
-    super(message, 'DATABASE_ERROR', 500, ErrorCategory.DATABASE, details, requestId, path);
+    super(message, 'DATABASE_ERROR', 500, ErrorCategory.DATABASE, details, requestId, path, context);
     this.operation = operation;
     this.query = query;
   }
@@ -262,9 +304,10 @@ export class NetworkError extends BaseError {
     endpoint?: string,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
-    super(message, 'NETWORK_ERROR', 503, ErrorCategory.NETWORK, details, requestId, path);
+    super(message, 'NETWORK_ERROR', 503, ErrorCategory.NETWORK, details, requestId, path, context);
     this.service = service;
     this.endpoint = endpoint;
   }
@@ -289,9 +332,10 @@ export class InternalServerError extends BaseError {
     message: string = 'Internal server error',
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
-    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path);
+    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path, context);
   }
 }
 
@@ -310,7 +354,8 @@ export class RateLimitError extends BaseError {
     remainingAttempts?: number,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
     super(
       message,
@@ -319,7 +364,8 @@ export class RateLimitError extends BaseError {
       ErrorCategory.RATE_LIMIT,
       details,
       requestId,
-      path
+      path,
+      context
     );
     this.limit = limit;
     this.retryAfter = retryAfter;
@@ -352,7 +398,8 @@ export class ServiceUnavailableError extends BaseError {
     retryAfter?: number,
     details?: any,
     requestId?: string,
-    path?: string
+    path?: string,
+    context?: ErrorContext
   ) {
     super(
       message,
@@ -361,7 +408,8 @@ export class ServiceUnavailableError extends BaseError {
       ErrorCategory.SERVICE_UNAVAILABLE,
       details,
       requestId,
-      path
+      path,
+      context
     );
     this.service = service;
     this.retryAfter = retryAfter;
@@ -381,6 +429,9 @@ export class ServiceUnavailableError extends BaseError {
 
 // Export error mapping utilities
 export * from './mappings';
+
+// Export error context utilities
+export * from './context';
 
 /**
  * Error utilities for common operations

@@ -163,18 +163,28 @@ describe('UserRepository', () => {
         createdAt: expect.any(String)
       };
 
-      mockConnection.executeWrite.mockResolvedValue([{ u: createdUser }]);
+      mockConnection.executeWrite.mockResolvedValue([{ n: createdUser }]);
 
       const result = await repository.create(userData);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MERGE (u:User {kindeId: $kindeId})'),
+        expect.stringContaining('MERGE (n:User'),
         expect.objectContaining({
-          kindeId: 'kinde-123',
-          email: 'test@example.com',
-          username: 'testuser',
-          displayName: 'Test User',
-          avatar: 'avatar-url'
+          match: expect.objectContaining({
+            kindeId: 'kinde-123'
+          }),
+          create: expect.objectContaining({
+            email: 'test@example.com',
+            username: 'testuser',
+            displayName: 'Test User',
+            avatar: 'avatar-url'
+          }),
+          update: expect.objectContaining({
+            email: 'test@example.com',
+            username: 'testuser',
+            displayName: 'Test User',
+            avatar: 'avatar-url'
+          })
         })
       );
       expect(result).toEqual(createdUser);
@@ -204,7 +214,7 @@ describe('UserRepository', () => {
         displayName: 'Updated Name'
       });
 
-      mockConnection.executeWrite.mockResolvedValue([{ u: existingUser }]);
+      mockConnection.executeWrite.mockResolvedValue([{ n: existingUser }]);
 
       const result = await repository.create(userData);
 
@@ -389,7 +399,7 @@ describe('UserRepository', () => {
 
       // Then create user
       const createdUser = global.createMockUser(kindeUserData);
-      mockConnection.executeWrite.mockResolvedValue([{ u: createdUser }]);
+      mockConnection.executeWrite.mockResolvedValue([{ n: createdUser }]);
 
       const existingUser = await repository.findByKindeId(kindeUserData.kindeId);
       expect(existingUser).toBeNull();

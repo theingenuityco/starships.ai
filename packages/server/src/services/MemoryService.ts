@@ -5,7 +5,7 @@
  * Orchestrates between database persistence (MemoryRepository) and business logic.
  */
 
-import { MemoryRepository, RepositoryFactory } from '@starships/models';
+import { MemoryRepository } from '@starships/models';
 import type {
   MemoryModel,
   CreateMemoryRequest,
@@ -40,116 +40,6 @@ export class MemoryService {
     this.memoryRepository = new MemoryRepository();
   }
 
-  // ============================================================================
-  // STATIC APIs FOR BACKWARD COMPATIBILITY
-  // ============================================================================
-
-  /**
-   * Create memory - Static method
-   */
-  static async createMemory(request: CreateMemoryRequest): Promise<MemoryModel> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    
-    // Process initial messages if provided and convert to Message format
-    const messages = (request.initialMessages || []).map((msg, index) => ({
-      id: `msg_${Date.now()}_${index}`,
-      timestamp: new Date().toISOString(),
-      role: msg.role,
-      content: msg.content,
-      metadata: msg.metadata
-    }));
-    
-    return await repository.create({
-      state: {
-        ...request.state,
-        messages
-      },
-      version: '1.0.0',
-      starshipId: request.starshipId
-    });
-  }
-
-  /**
-   * Create agent memory - Static method
-   */
-  static async createAgentMemory(request: CreateAgentMemoryRequest): Promise<MemoryModel> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    
-    // Process initial messages if provided and convert to Message format
-    const messages = (request.initialMessages || []).map((msg, index) => ({
-      id: `msg_${Date.now()}_${index}`,
-      timestamp: new Date().toISOString(),
-      role: msg.role,
-      content: msg.content,
-      metadata: msg.metadata
-    }));
-    
-    return await repository.create({
-      state: {
-        ...request.state,
-        messages,
-        identity: request.identity,
-        purpose: request.purpose,
-        space: request.space,
-      },
-      version: '1.0.0',
-      starshipId: request.starshipId
-    });
-  }
-
-  /**
-   * Get memory by ID - Static method
-   */
-  static async getMemory(memoryId: string): Promise<MemoryModel | null> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    return await repository.findById(memoryId);
-  }
-
-  /**
-   * Update memory - Static method
-   */
-  static async updateMemory(memoryId: string, updates: UpdateMemoryRequest): Promise<MemoryModel | null> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    return await repository.update(memoryId, updates as Partial<MemoryModel>);
-  }
-
-  /**
-   * Delete memory - Static method
-   */
-  static async deleteMemory(memoryId: string): Promise<boolean> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    return await repository.delete(memoryId);
-  }
-
-  /**
-   * Get memories by starship - Static method
-   */
-  static async getMemoriesByStarship(starshipId: string): Promise<MemoryModel[]> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    return await repository.findByStarshipId(starshipId);
-  }
-
-  /**
-   * Get memories by agent - Static method
-   */
-  static async getMemoriesByAgent(agentId: string): Promise<MemoryModel[]> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    return await repository.findByAgentId(agentId);
-  }
-
-  /**
-   * Search memories - Static method
-   */
-  static async searchMemories(request: SearchMemoriesRequest): Promise<SearchMemoriesResponse> {
-    const repository = RepositoryFactory.getMemoryRepository();
-    const memories = await repository.searchMemories(request.query, {});
-
-    return {
-      memories,
-      total: memories.length,
-      searchQuery: request.query
-    };
-  }
 
   // ============================================================================
   // MEMORY MANAGEMENT APIs

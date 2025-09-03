@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import dotenvExpand from 'dotenv-expand';
 import * as path from 'path';
 import { EnvironmentConfig } from './types';
 
@@ -7,7 +8,8 @@ const rootEnvPath = path.resolve(__dirname, '../../../.env');
 
 // Only run dotenv config on server-side to prevent browser TTY errors
 if (typeof window === 'undefined' && typeof process !== 'undefined') {
-  dotenv.config({ path: rootEnvPath });
+  const envConfig = dotenv.config({ path: rootEnvPath });
+  dotenvExpand.expand(envConfig);
 }
 
 /**
@@ -16,7 +18,7 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
  */
 export function getConfig(): EnvironmentConfig {
   const DEFAULT_CLIENT_PORT = 3000;
-  const DEFAULT_SERVER_PORT = 3000;
+  const DEFAULT_SERVER_PORT = 4000;
 
   return {
     // Server Configuration

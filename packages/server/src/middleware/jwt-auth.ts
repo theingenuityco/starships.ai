@@ -1,7 +1,7 @@
 /**
  * JWT Authentication Middleware
  *
- * Replaces Kinde authentication with our own JWT-based system
+ * JWT-based authentication system for secure user authentication
  */
 
 import { Request, Response, NextFunction } from 'express';

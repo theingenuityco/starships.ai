@@ -41,12 +41,10 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
     socket.on('session:start-stream', async (request: SessionRequest) => {
       if (request.source !== 'agent' || !request.agentId) return;
       
-      // Get current userId (may be temporary or resolved)
+      // Get current userId
       const currentUserId = socket.data.userId;
-      const kindeId = socket.data.kindeId;
-      const isUserResolved = socket.data.userResolved;
       
-      console.log(`[AGENT SOCKET] Starting stream for user ${currentUserId} (resolved: ${isUserResolved}), agent ${request.agentId}:`, request.streamId);
+      console.log(`[AGENT SOCKET] Starting stream for user ${currentUserId}, agent ${request.agentId}:`, request.streamId);
 
       try {
         // Validate request
@@ -99,36 +97,13 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
             throw new Error('Session not found');
           }
           
-          // Enhanced user validation - handle both temporary and resolved user IDs
-          let userMatches = false;
-          
-          if (isUserResolved) {
-            // If user is resolved, use direct comparison
-            userMatches = existingSession.userId === currentUserId;
-          } else {
-            // If user is not resolved yet, try to match against Kinde ID
-            // We need to get the user by Kinde ID and check if it matches the session
-            try {
-              const user = await UserService.getUserByKindeId(kindeId);
-              if (user) {
-                userMatches = existingSession.userId === user.id;
-                // Update socket with resolved user ID for future requests
-                socket.data.userId = user.id;
-                socket.data.userResolved = true;
-                console.log(`[AGENT SOCKET] Resolved user during session validation: ${kindeId} -> ${user.id}`);
-              }
-            } catch (userLookupError) {
-              console.error(`[AGENT SOCKET] Failed to resolve user during session validation:`, userLookupError);
-            }
-          }
-          
           // Validate session ownership and agent match
+          const userMatches = existingSession.userId === currentUserId;
+          
           if (!userMatches || existingSession.agentId !== request.agentId) {
             console.error(`[AGENT SOCKET] Session validation failed:`, {
               sessionUserId: existingSession.userId,
               currentUserId: currentUserId,
-              kindeId: kindeId,
-              userResolved: isUserResolved,
               userMatches: userMatches,
               sessionAgentId: existingSession.agentId,
               requestAgentId: request.agentId
@@ -174,7 +149,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         const sessionRequest: SessionRequest = {
           source: 'agent',
           agentId: request.agentId,
-          userId: socket.data.userId, // Use current (potentially updated) userId
+          userId: currentUserId,
           message: request.message,
           sessionId: sessionId, // Use the session ID
           stream: true // Enable true streaming

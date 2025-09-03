@@ -70,49 +70,49 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           return;
         }
 
-        // Handle session - use provided sessionId or create new one
+        // Handle session - ONLY use provided sessionId, do NOT create sessions via socket
         let sessionId: string;
-        if (request.sessionId) {
-          // Validate provided session belongs to user and agent
-          try {
-            const existingSession = await SessionService.getSessionById(request.sessionId);
-            if (existingSession && existingSession.userId === userId && existingSession.agentId === request.agentId) {
-              sessionId = request.sessionId;
-              await SessionService.updateSessionActivity(sessionId);
-              console.log(`✅ [AGENT SESSION] Using existing session: ${sessionId}`);
-            } else {
-              throw new Error('Invalid or mismatched session');
-            }
-          } catch (error) {
-            console.warn(`⚠️ [AGENT SESSION] Invalid session ${request.sessionId}, creating new one:`, error);
-            // Fall through to create new session
-            const newSession = await SessionService.createSession({
-              source: 'agent',
-              userId,
-              agentId: request.agentId,
-              starshipId: agent.starshipId,
-              metadata: {
-                createdVia: 'socket-stream',
-                agentName: agent.name || 'Unknown Agent'
-              }
-            });
-            sessionId = newSession.id;
-            console.log(`✅ [AGENT SESSION] Created new session: ${sessionId}`);
-          }
-        } else {
-          // No sessionId provided, create new session
-          const newSession = await SessionService.createSession({
-            source: 'agent',
-            userId,
+        if (!request.sessionId) {
+          socket.emit('session:stream-error', {
+            streamId: request.streamId,
             agentId: request.agentId,
-            starshipId: agent.starshipId,
-            metadata: {
-              createdVia: 'socket-stream',
-              agentName: agent.name || 'Unknown Agent'
-            }
+            errorCode: 'SESSION_REQUIRED',
+            message: 'sessionId is required. Sessions must be created via API endpoints, not WebSocket.',
+            timestamp: Date.now(),
+            recoverable: false
           });
-          sessionId = newSession.id;
-          console.log(`✅ [AGENT SESSION] Created new session: ${sessionId}`);
+          return;
+        }
+
+        // Validate provided session belongs to user and agent
+        try {
+          const existingSession = await SessionService.getSessionById(request.sessionId);
+          
+          // Check if session exists
+          if (!existingSession) {
+            throw new Error('Session not found');
+          }
+          
+          // Validate session ownership and agent match
+          if (existingSession.userId !== userId || existingSession.agentId !== request.agentId) {
+            throw new Error('Session access denied - ownership or agent mismatch');
+          }
+          
+          sessionId = request.sessionId;
+          await SessionService.updateSessionActivity(sessionId);
+          console.log(`✅ [AGENT SESSION] Using existing session: ${sessionId}`);
+          
+        } catch (error) {
+          console.error(`❌ [AGENT SESSION] Session validation failed for ${request.sessionId}:`, error);
+          socket.emit('session:stream-error', {
+            streamId: request.streamId,
+            agentId: request.agentId,
+            errorCode: 'SESSION_ACCESS_DENIED',
+            message: error instanceof Error ? error.message : 'Session validation failed',
+            timestamp: Date.now(),
+            recoverable: false
+          });
+          return;
         }
 
         // Store user message with proper session reference

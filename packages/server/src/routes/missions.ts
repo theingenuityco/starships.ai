@@ -15,10 +15,6 @@ import type {
   MissionSort,
   SendMissionMessageRequest
 } from '@starships/protocol';
-import {
-  ValidationError,
-  NotFoundError,
-} from '@starships/models';
 import { authMiddleware } from '../middleware/auth';
 import type { StandardErrorCode } from '@starships/protocol';
 import {

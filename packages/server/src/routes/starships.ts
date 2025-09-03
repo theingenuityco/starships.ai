@@ -9,15 +9,9 @@ import type {
   AgentRepository,
   UserRepository,
 } from '@starships/models';
-import {
-  ValidationError,
-  ConflictError as ConstraintViolationError,
-  NotFoundError,
-} from '@starships/models';
 import type { StarshipModel } from '@starships/protocol';
 import { authMiddleware } from '../middleware/auth';
 import { SubscriptionService } from '../services/SubscriptionService';
-import type { StandardErrorCode } from '@starships/protocol';
 import {
   sendSuccess,
   sendError,

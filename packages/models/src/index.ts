@@ -5,13 +5,9 @@ export type { Neo4jConfig } from './helpers/database';
 // Utils
 export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
-
-// Repository implementations
+// Repositories
 export { AgentRepository } from './repositories/AgentRepository';
 export { UserRepository } from './repositories/UserRepository';
-export { WaitlistRepository } from './repositories/WaitlistRepository';
-
-// Aether Core Repository implementations
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { MissionRepository } from './repositories/MissionRepository';
 export { MissionMessageRepository } from './repositories/MissionMessageRepository';
@@ -19,44 +15,15 @@ export { BlueprintRepository } from './repositories/BlueprintRepository';
 export { NodeRepository } from './repositories/NodeRepository';
 export { EdgeRepository } from './repositories/EdgeRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';
-
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
-
-// NEW: Agent Templates
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
-
-// NEW: Workflows
 export { WorkflowRepository } from './repositories/WorkflowRepository';
-
-// NEW: Memory and Message repositories
+export { SessionRepository } from './repositories/SessionRepository'
 export { MemoryRepository } from './repositories/MemoryRepository';
 export { MessageRepository } from './repositories/MessageRepository';
+export { WaitlistRepository } from './repositories/WaitlistRepository';
 
-
-
-
-// Export error classes from @starships/errors package
-export {
-  BaseError,
-  ValidationError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  ConflictError,
-  DatabaseError,
-  NetworkError,
-  ServiceUnavailableError,
-  InternalServerError,
-  RateLimitError,
-  ErrorUtils
-} from '@starships/errors';
-
-// Export error types from @starships/protocol package
-export { ErrorCategory } from '@starships/protocol';
-
-
-
-// NEW: Export structured logging and monitoring system
+// Logging
 export {
   Logger,
   PerformanceMonitor,
@@ -72,11 +39,6 @@ export type {
   HealthStatus
 } from './helpers/logging';
 
-
-
-// All domain model types have been moved to @starships/protocol
-// Repository implementations remain in this package for data access
-
-// Export scripts
+// Scripts
 export { seedWaitlist } from './scripts/seed-waitlist';
 export { migrationRunner } from './scripts/migration-runner';

@@ -90,9 +90,7 @@ export interface CreateMessageRequest {
 /**
  * Request to update a message
  */
-export interface UpdateMessageRequest extends Partial<CreateMessageRequest> {
-  // Simplified update request
-}
+export type UpdateMessageRequest = Partial<CreateMessageRequest>
 
 // ============================================================================
 // MESSAGE COLLECTION-SPECIFIC TYPES

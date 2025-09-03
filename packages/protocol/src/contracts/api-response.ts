@@ -8,7 +8,7 @@
 import type { StandardErrorCode } from './errors';
 
 // Standard success response structure
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data: T;
   meta?: ApiResponseMeta;
 }
@@ -16,8 +16,8 @@ export interface ApiResponse<T = any> {
 // Metadata structure for API responses
 export interface ApiResponseMeta {
   pagination?: PaginationMeta;
-  filters?: Record<string, any>;
-  sort?: Record<string, any>;
+  filters?: Record<string, unknown>;
+  sort?: Record<string, unknown>;
 }
 
 // Pagination metadata
@@ -34,6 +34,6 @@ export interface ApiErrorResponse {
   error: {
     code: StandardErrorCode;
     message: string;
-    details?: Record<string, any>;
+    details?: Record<string, unknown>;
   };
 }

@@ -2,7 +2,6 @@ import { getConnection } from '../helpers/database';
 import { StarshipModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Neo4j-based starship repository
@@ -93,9 +92,8 @@ export class StarshipRepository extends BaseRepository {
       // Generate unique slug if not provided
       const slug = entity.slug || await this.generateUniqueSlug(entity.name, entity.ownerId);
       
-      const starship: StarshipModel = {
+      const starshipProps = {
         ...entity,
-        id: uuidv4(),
         slug,
         maxAgents,
         maxActiveMissions,
@@ -104,7 +102,8 @@ export class StarshipRepository extends BaseRepository {
         updatedAt: new Date().toISOString(),
       };
 
-      await connection.executeWrite('CREATE (s:Starship $props) RETURN s', { props: starship });
+      // Use Neo4j auto-generated ID
+      const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', starshipProps);
 
       // Create relationship with owner
       await connection.executeWrite(
@@ -313,10 +312,9 @@ export class StarshipRepository extends BaseRepository {
       return optimizedSlug;
     }
 
-    // FALLBACK: If somehow still collides, use UUID suffix
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const uuidSuffix = require('uuid').v4().substring(0, 8);
-    const fallbackSlug = `${baseSlug}-${uuidSuffix}`;
+    // FALLBACK: If somehow still collides, use timestamp-based fallback
+    const fallbackSuffix = `${timestamp}-${Math.random().toString(36).substring(2, 12)}`;
+    const fallbackSlug = `${baseSlug}-${fallbackSuffix}`;
 
     console.log('[STARSHIP-SLUG] Using fallback slug:', fallbackSlug);
     return fallbackSlug;

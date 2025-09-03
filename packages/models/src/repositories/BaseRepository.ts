@@ -419,6 +419,87 @@ export abstract class BaseRepository {
   }
 
   // ============================================================================
+  // SIMPLIFIED ENTITY CREATION HELPERS
+  // ============================================================================
+
+  /**
+   * Create a new entity with automatic ID generation
+   * This method automatically generates a UUID for the entity using Neo4j's randomUUID()
+   *
+   * @param nodeLabel - Neo4j node label (e.g., 'User', 'Starship')
+   * @param properties - Object properties to set on the node (excluding id)
+   * @returns The created entity with generated ID
+   */
+  protected async createEntityWithAutoId<T>(
+    nodeLabel: string,
+    properties: Record<string, any>
+  ): Promise<T> {
+    const connection = await import('../helpers/database').then(m => m.getConnection());
+    
+    // Remove any existing 'id' from properties - Neo4j will generate it
+    const { id, ...propsWithoutId } = properties;
+    
+    const result = await connection.executeWrite<{ n: T }>(
+      `CREATE (n:${nodeLabel})
+       SET n.id = randomUUID(),
+           n += $props
+       RETURN n`,
+      { props: propsWithoutId }
+    );
+    
+    return result[0].n;
+  }
+
+  /**
+   * MERGE (upsert) operation with automatic ID generation on CREATE
+   * Uses MERGE for upsert operations while ensuring ID is only set on CREATE
+   *
+   * @param nodeLabel - Neo4j node label
+   * @param matchProperties - Properties used for MERGE matching
+   * @param createProperties - Properties set only on CREATE
+   * @param updateProperties - Properties set only on MATCH
+   * @returns The merged entity
+   */
+  protected async mergeEntityWithAutoId<T>(
+    nodeLabel: string,
+    matchProperties: Record<string, any>,
+    createProperties: Record<string, any> = {},
+    updateProperties: Record<string, any> = {}
+  ): Promise<T> {
+    const connection = await import('../helpers/database').then(m => m.getConnection());
+    
+    // Remove ID from all property sets - Neo4j will generate it
+    const { id: _, ...matchProps } = matchProperties;
+    const { id: __, ...createProps } = createProperties;
+    const { id: ___, ...updateProps } = updateProperties;
+
+    let cypher = `MERGE (n:${nodeLabel} {${Object.keys(matchProps).map(key => `${key}: $match.${key}`).join(', ')}})`;
+    
+    if (Object.keys(createProps).length > 0) {
+      cypher += `\nON CREATE SET n.id = randomUUID(), n += $create`;
+    } else {
+      cypher += `\nON CREATE SET n.id = randomUUID()`;
+    }
+    
+    if (Object.keys(updateProps).length > 0) {
+      cypher += `\nON MATCH SET n += $update`;
+    }
+    
+    cypher += `\nRETURN n`;
+
+    const parameters: Record<string, any> = { match: matchProps };
+    if (Object.keys(createProps).length > 0) {
+      parameters.create = createProps;
+    }
+    if (Object.keys(updateProps).length > 0) {
+      parameters.update = updateProps;
+    }
+
+    const result = await connection.executeWrite<{ n: T }>(cypher, parameters);
+    return result[0].n;
+  }
+
+  // ============================================================================
   // UTILITY METHODS
   // ============================================================================
 

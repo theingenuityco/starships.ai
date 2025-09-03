@@ -1,6 +1,5 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import {
   MissionModel,
   MissionStatus,
@@ -65,7 +64,6 @@ export class MissionRepository extends BaseRepository {
       }
 
       const connection = getConnection();
-      const id = uuidv4();
       const now = new Date().toISOString();
 
       // Check if starship exists
@@ -78,9 +76,8 @@ export class MissionRepository extends BaseRepository {
         this.handleNotFound('Starship', request.starshipId, 'create');
       }
 
-      // Create the mission
-      const missionData = {
-        id,
+      // Create the mission with auto-generated ID
+      const missionProps = {
         starshipId: request.starshipId,
         name: request.name,
         description: request.description,
@@ -93,12 +90,8 @@ export class MissionRepository extends BaseRepository {
         createdBy: userId
       };
 
-      await connection.executeWrite(
-        'CREATE (m:MissionModel $props) RETURN m',
-        { props: missionData }
-      );
-
-      return missionData as MissionModel;
+      const mission = await this.createEntityWithAutoId<MissionModel>('MissionModel', missionProps);
+      return mission;
     }, 'create', 'MissionModel');
   }
 

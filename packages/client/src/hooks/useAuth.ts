@@ -18,31 +18,17 @@ export function useAuth() {
     accessTokenRaw,
   } = useKindeBrowserClient()
 
-  const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
-  const [syncLoading, setSyncLoading] = useState(false)
-  const [syncError, setSyncError] = useState<string | null>(null)
-  const [enableTestingBackdoor, setEnableTestingBackdoor] = useState(false)
-
-  // Fetch runtime configuration for testing backdoor
-  useEffect(() => {
-    fetch('/api/config')
-      .then(res => res.json())
-      .then(config => {
-        if (config.enableAuthTestingBackdoor) {
-          setEnableTestingBackdoor(true)
-        }
-      })
-      .catch(() => {
-        // Default to false if config fetch fails
-      })
-  }, [])
-
   // TESTING BACKDOOR: Only activate when explicitly enabled
+  const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
   const shouldUseTestingBackdoor = enableTestingBackdoor && !kindeLoading && !isAuthenticated
   
   if (shouldUseTestingBackdoor) {
     console.log('[AUTH] Testing backdoor activated - auth testing mode enabled')
   }
+
+  const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   // Auto-sync user when Kinde authentication completes
   useEffect(() => {

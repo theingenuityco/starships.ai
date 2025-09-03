@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadApiRuntimeConfig } from '@starships/env-config';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Load API URL at runtime (not build time!)
-    const { apiUrl } = loadApiRuntimeConfig();
-    
-    const response = await fetch(`${apiUrl}/waitlist/check`, {
+    const response = await fetch(`${API_BASE_URL}/api/waitlist/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

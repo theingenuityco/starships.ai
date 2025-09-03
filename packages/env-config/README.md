@@ -63,7 +63,6 @@ All environment variables are loaded from the root `.env` file.
 
 ### Client Variables (Next.js)
 - `NEXT_PUBLIC_API_URL` - Backend API URL
-- `KINDE_*` - Kinde authentication configuration
 
 ## Validation
 

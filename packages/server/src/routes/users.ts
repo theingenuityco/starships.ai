@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { UserService } from "../services/UserService";
 import type { Request, Response } from "express";
-import { authMiddleware } from "../middleware/auth";
+import { jwtAuthMiddleware } from "../middleware/jwt-auth";
 import {
   sendSuccess,
   sendError,
@@ -60,7 +60,7 @@ router.post("/users/sync", async (req: Request, res: Response): Promise<void> =>
 });
 
 // GET /users/:id - Get user by ID (OpenAPI pattern)
-router.get("/users/:id", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get("/users/:id", jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -91,7 +91,7 @@ router.get("/users/:id", authMiddleware, async (req: Request, res: Response): Pr
 });
 
 // GET /users/kinde/:kindeId - Get user by Kinde ID (OpenAPI pattern)
-router.get("/users/kinde/:kindeId", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get("/users/kinde/:kindeId", jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { kindeId } = req.params;
 

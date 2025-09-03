@@ -7,8 +7,7 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { getConnection } from '@starships/models';
-import { RepositoryFactory } from '@starships/models';
+import { getConnection, StarshipRepository, UserRepository, AgentRepository } from '@starships/models';
 import { logger } from '@starships/models';
 import { ErrorUtils } from '@starships/errors';
 import {
@@ -88,7 +87,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     // Check repository health
     try {
       const repoStart = Date.now();
-      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const starshipRepo = new StarshipRepository();
       
       // Test basic repository functionality
       await starshipRepo.findAll();
@@ -226,26 +225,26 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
     }
 
     // Check all repository types
-    const repositoryTypes = [
-      'StarshipRepository',
-      'UserRepository',
-      'AgentRepository',
+    const repositories = [
+      { name: 'starshiprepository', instance: () => new StarshipRepository() },
+      { name: 'userrepository', instance: () => new UserRepository() },
+      { name: 'agentrepository', instance: () => new AgentRepository() },
     ];
 
-    for (const repoType of repositoryTypes) {
+    for (const repo of repositories) {
       try {
         const repoStart = Date.now();
-        const repo = (RepositoryFactory as any)[`get${repoType}`]();
+        const repoInstance = repo.instance();
         
         // Test basic functionality
-        await repo.findAll();
+        await repoInstance.findAll();
         
-        healthCheck.services[repoType.toLowerCase()] = {
+        healthCheck.services[repo.name] = {
           status: 'healthy',
           responseTime: Date.now() - repoStart,
         };
       } catch (error) {
-        healthCheck.services[repoType.toLowerCase()] = {
+        healthCheck.services[repo.name] = {
           status: 'degraded',
           error: error instanceof Error ? error.message : 'Repository error',
         };
@@ -337,7 +336,7 @@ router.get('/health/ready', async (req: Request, res: Response): Promise<void> =
     await connection.executeQuery('RETURN 1 as readiness_check');
     
     // Check if essential repositories are available
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     await starshipRepo.findAll();
 
     sendSuccess(res, {

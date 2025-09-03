@@ -3,7 +3,7 @@
  * Business logic layer for mission operations
  */
 
-import { RepositoryFactory } from '@starships/models';
+import { MissionRepository, StarshipRepository, AgentRepository, MissionClarityRepository } from '@starships/models';
 import { MissionOrchestratorService } from './MissionOrchestratorService';
 import { MissionEventService } from './MissionEventService';
 import type {
@@ -28,9 +28,9 @@ export class MissionService {
    * Create a new mission
    */
   static async createMission(request: CreateMissionRequest, userId: string): Promise<MissionModel> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
-    const agentRepo = RepositoryFactory.getAgentRepository();
+    const missionRepo = new MissionRepository();
+    const starshipRepo = new StarshipRepository();
+    const agentRepo = new AgentRepository();
 
     // Verify that the starship exists and user has access
     try {
@@ -111,7 +111,7 @@ export class MissionService {
    * Get mission by ID
    */
   static async getMissionById(id: string): Promise<MissionModel> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
     return await missionRepo.getMissionById(id);
   }
 
@@ -122,7 +122,7 @@ export class MissionService {
     filters?: MissionFilters,
     sort?: MissionSort
   ): Promise<MissionListResponse> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
     return await missionRepo.getAllMissions(filters, sort);
   }
 
@@ -134,8 +134,8 @@ export class MissionService {
     filters?: MissionFilters,
     sort?: MissionSort
   ): Promise<MissionListResponse> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const missionRepo = new MissionRepository();
+    const starshipRepo = new StarshipRepository();
 
     // Verify starship exists
     try {
@@ -157,8 +157,8 @@ export class MissionService {
     id: string,
     updates: UpdateMissionRequest
   ): Promise<MissionModel> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
-    const agentRepo = RepositoryFactory.getAgentRepository();
+    const missionRepo = new MissionRepository();
+    const agentRepo = new AgentRepository();
     const missionEventService = MissionEventService.getInstance();
 
     // Get existing mission first
@@ -231,7 +231,7 @@ export class MissionService {
    * Delete a mission
    */
   static async deleteMission(id: string): Promise<void> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
 
     // Get existing mission to check business rules
     const existingMission = await missionRepo.getMissionById(id);
@@ -295,7 +295,7 @@ export class MissionService {
     byStatus: Record<MissionStatus, number>;
     recentMissions: MissionModel[];
   }> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
     
     const allMissions = await missionRepo.getMissionModelsByStarshipId(starshipId);
     const missions = allMissions.missions;
@@ -354,8 +354,8 @@ export class MissionService {
    * Get mission clarity assessment
    */
   static async getMissionClarity(missionId: string): Promise<MissionClarityModel | null> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
-    const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+    const missionRepo = new MissionRepository();
+    const clarityRepo = new MissionClarityRepository();
 
     // Verify mission exists first
     try {
@@ -375,7 +375,7 @@ export class MissionService {
    * Get workflow for a mission - temporary implementation using WorkflowService until MissionWorkflow is fully implemented
    */
   static async getWorkflowByMissionId(missionId: string): Promise<any | null> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
     
     // Verify mission exists first
     try {
@@ -399,7 +399,7 @@ export class MissionService {
     approvalStatus: 'pending' | 'approved' | 'rejected';
     rejectionReason?: string;
   }): Promise<any | null> {
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
     
     // Verify mission exists first
     try {

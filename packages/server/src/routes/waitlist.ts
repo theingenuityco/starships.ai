@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { RepositoryFactory } from '@starships/models';
+import { WaitlistRepository, getConnection } from '@starships/models';
 import { WaitlistService } from '../services/WaitlistService';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
@@ -15,7 +15,8 @@ const router: Router = Router();
 // Initialize waitlist service with proper error handling
 const getWaitlistService = () => {
   try {
-    const waitlistRepo = RepositoryFactory.getWaitlistRepository();
+    const connection = getConnection();
+    const waitlistRepo = new WaitlistRepository(connection);
     return new WaitlistService(waitlistRepo);
   } catch (error) {
     logger.error('Failed to get WaitlistRepository:', {

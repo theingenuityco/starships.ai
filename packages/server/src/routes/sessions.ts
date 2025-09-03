@@ -5,7 +5,7 @@ import { authMiddleware } from '../middleware/auth';
 import { SessionService } from '../services/SessionService';
 import { ValidationError, NotFoundError } from '@starships/errors';
 import type { StandardErrorCode } from '@starships/protocol';
-import { RepositoryFactory } from '@starships/models';
+import { MessageRepository, MemoryRepository } from '@starships/models';
 import {
   sendSuccess,
   sendError,
@@ -211,8 +211,8 @@ router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, re
       return;
     }
 
-    const messageRepository = RepositoryFactory.getMessageRepository();
-    const memoryRepository = RepositoryFactory.getMemoryRepository();
+    const messageRepository = new MessageRepository();
+    const memoryRepository = new MemoryRepository();
     
     // First, verify the memory exists
     const memory = await memoryRepository.findById(memoryId);
@@ -352,7 +352,7 @@ router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Res
     }
 
     const offset = (pagination.page - 1) * pagination.limit;
-    const messageRepository = RepositoryFactory.getMessageRepository();
+    const messageRepository = new MessageRepository();
     
     // Fetch session messages with pagination (using sessionId as conversationId for compatibility)
     const messages = await messageRepository.findByConversationId(sessionId, pagination.limit, offset);

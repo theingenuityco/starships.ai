@@ -2,7 +2,7 @@ import type { Server as SocketIOServer, Socket } from 'socket.io';
 import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
-import { RepositoryFactory } from '@starships/models';
+import { MessageRepository } from '@starships/models';
 import { SessionService } from '../services/SessionService';
 import { UserService } from '../services/UserService';
 import getStore from '../store';
@@ -17,7 +17,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
   };
   
   const storeMessage = async (starshipId: string, role: 'user' | 'assistant' | 'system', content: string, metadata?: any): Promise<void> => {
-    const messageRepo = RepositoryFactory.getMessageRepository();
+    const messageRepo = new MessageRepository();
     await messageRepo.create({
       role,
       content,

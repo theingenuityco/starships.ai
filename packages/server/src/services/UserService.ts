@@ -1,4 +1,4 @@
-import { RepositoryFactory } from '@starships/models';
+import { UserRepository } from '@starships/models';
 import { UserModel } from '@starships/protocol';
 import { StarshipService } from './StarshipService';
 
@@ -18,7 +18,7 @@ export class UserService {
    * Creates new user or updates existing user
    */
   static async syncUser(kindeData: KindeUserData): Promise<UserModel> {
-    const userRepo = RepositoryFactory.getUserRepository();
+    const userRepo = new UserRepository();
 
     try {
       // First, try to find existing user by Kinde ID
@@ -85,7 +85,7 @@ export class UserService {
    * Get user by internal ID
    */
   static async getUserById(id: string): Promise<UserModel | null> {
-    const userRepo = RepositoryFactory.getUserRepository();
+    const userRepo = new UserRepository();
     return await userRepo.findById(id);
   }
 
@@ -95,7 +95,7 @@ export class UserService {
   static async getUserByKindeId(kindeId: string): Promise<UserModel | null> {
     try {
       console.log(`[USER-SERVICE] Getting user repository for Kinde ID: ${kindeId}`);
-      const userRepo = RepositoryFactory.getUserRepository();
+      const userRepo = new UserRepository();
       console.log(`[USER-SERVICE] Repository obtained, executing findByKindeId for: ${kindeId}`);
       const result = await userRepo.findByKindeId(kindeId);
       console.log(`[USER-SERVICE] findByKindeId completed for ${kindeId}, result: ${result ? 'found' : 'not found'}`);
@@ -112,7 +112,7 @@ export class UserService {
    * Get user by email
    */
   static async getUserByEmail(email: string): Promise<UserModel | null> {
-    const userRepo = RepositoryFactory.getUserRepository();
+    const userRepo = new UserRepository();
     return await userRepo.findByEmail(email);
   }
 

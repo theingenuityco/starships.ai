@@ -1,4 +1,4 @@
-import { RepositoryFactory } from '@starships/models';
+import { StarshipRepository } from '@starships/models';
 import { getRandomStarshipName } from '../utils/starshipNames';
 
 /**
@@ -9,7 +9,7 @@ export class StarshipService {
    * Create a default starship for a new user
    */
   static async createDefaultStarship(userId: string) {
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     
     try {
       // Generate a random name for the starship

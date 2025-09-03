@@ -6,7 +6,7 @@
  * stateless execution engine (autopilot Workflow).
  */
 
-import { WorkflowRepository, RepositoryFactory } from '@starships/models';
+import { WorkflowRepository } from '@starships/models';
 import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
 import { Workflow, Blueprint, Execution, AgentMemory } from '@starships/autopilot';
 
@@ -393,7 +393,7 @@ export class WorkflowService {
     const warnings: string[] = [];
 
     try {
-      const workflowRepo = RepositoryFactory.getWorkflowRepository();
+      const workflowRepo = new WorkflowRepository();
       const dbWorkflow = await workflowRepo.findById(workflowId);
 
       if (!dbWorkflow) {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Router as ExpressRouter } from 'express';
 import { authMiddleware } from '../middleware/auth';
-import { RepositoryFactory } from '@starships/models';
+import { StarshipRepository, NativeToolApiKeyRepository } from '@starships/models';
 import type { StandardErrorCode } from '@starships/protocol';
 import {
   sendSuccess,
@@ -33,7 +33,7 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
     }
 
     // Verify user owns this starship
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
     if (!starship || starship.ownerId !== userId) {
@@ -42,7 +42,7 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
     }
 
     // Get API keys (returns decrypted keys)
-    const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+    const apiKeyRepo = new NativeToolApiKeyRepository();
     const apiKeys = await apiKeyRepo.getAllApiKeys(starshipId);
 
     // Return keys with masked values for security
@@ -94,7 +94,7 @@ router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req
     }
 
     // Verify user owns this starship
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
     if (!starship || starship.ownerId !== userId) {
@@ -103,7 +103,7 @@ router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req
     }
 
     // Save the API key (it will be encrypted)
-    const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+    const apiKeyRepo = new NativeToolApiKeyRepository();
     await apiKeyRepo.saveApiKey(starshipId, toolName, apiKey);
     
     // Save additional config if provided - commented out since GitHub was removed
@@ -140,7 +140,7 @@ router.delete('/starships/:starshipId/native-api-keys/:toolName', authMiddleware
     }
 
     // Verify user owns this starship
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
     if (!starship || starship.ownerId !== userId) {
@@ -149,7 +149,7 @@ router.delete('/starships/:starshipId/native-api-keys/:toolName', authMiddleware
     }
 
     // Delete the API key
-    const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+    const apiKeyRepo = new NativeToolApiKeyRepository();
     await apiKeyRepo.deleteApiKey(starshipId, toolName);
 
     sendSuccess(res, { message: 'API key deleted successfully' });

@@ -6,7 +6,7 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { AgentRepository, RepositoryFactory } from '@starships/models';
+import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { Agent, AgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
@@ -340,7 +340,7 @@ export class AgentService {
     });
 
     // Get agent from database
-    const agentRepo = RepositoryFactory.getAgentRepository();
+    const agentRepo = new AgentRepository();
     const dbAgent = await agentRepo.findById(agentId);
 
     if (!dbAgent) {
@@ -414,7 +414,7 @@ export class AgentService {
     warnings: string[];
   }> {
     try {
-      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agentRepo = new AgentRepository();
       const dbAgent = await agentRepo.findById(agentId);
 
       if (!dbAgent) {

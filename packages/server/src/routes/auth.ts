@@ -9,6 +9,8 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { SignJWT, jwtVerify } from 'jose';
 import { UserService } from '../services/UserService';
+import { StarshipService } from '../services/StarshipService';
+import { StarshipRepository } from '@starships/models';
 import { loadServerEnvironment } from '@starships/env-config';
 import {
   sendSuccess,
@@ -62,8 +64,18 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       username: email.split('@')[0],
     });
 
+    // Create default starship for the new user
+    let defaultStarship;
+    try {
+      defaultStarship = await StarshipService.createDefaultStarship(user.id);
+      console.log(`[AUTH] Created default starship for user: ${user.id}`);
+    } catch (error) {
+      console.error(`[AUTH] Failed to create default starship for user ${user.id}:`, error);
+      // Continue with registration even if starship creation fails
+    }
+
     // Generate JWT token
-    const token = await new SignJWT({ 
+    const token = await new SignJWT({
       sub: user.id,
       email: user.email,
       name: user.displayName || user.username
@@ -85,6 +97,11 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
         avatar: user.avatar,
       },
       token,
+      defaultStarship: defaultStarship ? {
+        id: defaultStarship.id,
+        slug: defaultStarship.slug,
+        name: defaultStarship.name,
+      } : null,
     }, 201);
 
   } catch (error: any) {
@@ -123,8 +140,23 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
+    // Get user's starships for redirect purpose
+    let firstStarship = null;
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(user.id);
+      // Find the first active starship
+      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      if (firstStarship) {
+        console.log(`[AUTH] Found first starship for redirect: ${firstStarship.name} (${firstStarship.slug})`);
+      }
+    } catch (error) {
+      console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);
+      // Continue with login even if starship fetch fails
+    }
+
     // Generate JWT token
-    const token = await new SignJWT({ 
+    const token = await new SignJWT({
       sub: user.id,
       email: user.email,
       name: user.displayName || user.username
@@ -146,6 +178,11 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
         avatar: user.avatar,
       },
       token,
+      firstStarship: firstStarship ? {
+        id: firstStarship.id,
+        slug: firstStarship.slug,
+        name: firstStarship.name,
+      } : null,
     });
 
   } catch (error: any) {

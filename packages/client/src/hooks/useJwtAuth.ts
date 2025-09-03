@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { userAPI, type SyncedUser, setTokenProvider } from '@/lib/api'
 
 export interface AuthUser {
@@ -19,6 +20,7 @@ interface AuthState {
  * JWT-based authentication hook
  */
 export function useJwtAuth() {
+  const router = useRouter();
   const [state, setState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -90,7 +92,7 @@ export function useJwtAuth() {
       const data = await response.json();
 
       if (response.ok && data.data) {
-        const { user, token } = data.data;
+        const { user, token, firstStarship } = data.data;
         setStoredToken(token);
         setState({
           user,
@@ -99,6 +101,13 @@ export function useJwtAuth() {
           error: null
         });
         console.log('[JWT-AUTH] User logged in:', user.email);
+        
+        // Redirect to first starship's session if available
+        if (firstStarship) {
+          console.log('[JWT-AUTH] Redirecting to starship session:', firstStarship.slug);
+          router.push(`/ship/${firstStarship.slug}/session`);
+        }
+        
         return { success: true };
       } else {
         const errorMessage = data.error?.message || 'Login failed';
@@ -137,7 +146,7 @@ export function useJwtAuth() {
       const data = await response.json();
 
       if (response.ok && data.data) {
-        const { user, token } = data.data;
+        const { user, token, defaultStarship } = data.data;
         setStoredToken(token);
         setState({
           user,
@@ -146,6 +155,13 @@ export function useJwtAuth() {
           error: null
         });
         console.log('[JWT-AUTH] User registered:', user.email);
+        
+        // Redirect to newly created default starship's session if available
+        if (defaultStarship) {
+          console.log('[JWT-AUTH] Redirecting to new starship session:', defaultStarship.slug);
+          router.push(`/ship/${defaultStarship.slug}/session`);
+        }
+        
         return { success: true };
       } else {
         const errorMessage = data.error?.message || 'Registration failed';

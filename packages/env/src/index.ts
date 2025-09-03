@@ -32,14 +32,6 @@ export function getConfig(): EnvironmentConfig {
     CLIENT_URL: process.env.CLIENT_URL || `http://localhost:${DEFAULT_CLIENT_PORT}`,
     SERVER_URL: process.env.SERVER_URL || `http://localhost:${DEFAULT_SERVER_PORT}`,
 
-    // Deployment
-    REDEPLOY_SECRET: process.env.REDEPLOY_SECRET || '',
-
-    // External Services
-    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
-    OPEN_WEBUI_BASE_URL: process.env.OPEN_WEBUI_BASE_URL,
-    ENABLE_AUTH_TESTING_BACKDOOR: process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true',
-
     // Neo4j Database Configuration
     NEO4J_URI: process.env.NEO4J_URI || 'bolt://localhost:7687',
     NEO4J_USERNAME: process.env.NEO4J_USERNAME || 'neo4j',
@@ -51,18 +43,15 @@ export function getConfig(): EnvironmentConfig {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     
     // Default Model Configuration
-    DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || '',
+    DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',
     DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
-    DEFAULT_MODEL_ID: process.env.DEFAULT_MODEL_ID || 'default-openai-gpt4',
-    DEFAULT_TEMPERATURE: parseFloat(process.env.DEFAULT_TEMPERATURE || '0.7'),
-    DEFAULT_MAX_TOKENS: parseInt(process.env.DEFAULT_MAX_TOKENS || '4096', 10),
 
     // JWT Authentication Configuration
-    JWT_SECRET: process.env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production',
+    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
     
     // Stripe Configuration
-    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || (process.env.NODE_ENV === 'production' ? '' : 'sk_test_dummy_key_for_development'),
-    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || (process.env.NODE_ENV === 'production' ? '' : 'pk_test_dummy_key_for_development'),
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     
     // Stripe Price IDs

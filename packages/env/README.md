@@ -29,36 +29,40 @@ console.log(config.NEO4J_URI); // string
 The `getConfig()` function returns an `EnvironmentConfig` object with all environment variables properly typed, including:
 
 ### Server Configuration
-- `PORT` (number) - Server port, defaults to 4000
-- `NODE_ENV` (string) - Environment, defaults to 'development' 
+- `SERVER_PORT` (number) - Server port, defaults to 4000
+- `CLIENT_PORT` (number) - Client port, defaults to 3000
+- `NODE_ENV` (string) - Environment, defaults to 'development'
 - `LOG_LEVEL` (string) - Log level, defaults to 'info'
 
 ### URLs
+- `PUBLIC_URL` (string) - Public URL, defaults to 'http://localhost:3000'
 - `CLIENT_URL` (string) - Frontend URL, defaults to 'http://localhost:3000'
 - `SERVER_URL` (string) - Backend URL, defaults to 'http://localhost:4000'
 
 ### Database Configuration
-- `NEO4J_URI` (string) - Neo4j connection URI
-- `NEO4J_USERNAME` (string) - Neo4j username
-- `NEO4J_PASSWORD` (string) - Neo4j password
-- `NEO4J_DATABASE` (string) - Neo4j database name
+- `NEO4J_URI` (string) - Neo4j connection URI, defaults to 'bolt://localhost:7687'
+- `NEO4J_USERNAME` (string) - Neo4j username, defaults to 'neo4j'
+- `NEO4J_PASSWORD` (string) - Neo4j password, defaults to 'password'
+- `NEO4J_DATABASE` (string) - Neo4j database name, defaults to 'neo4j'
 
 ### LLM Provider Configuration
 - `OPENAI_API_KEY` (string, optional) - OpenAI API key
 - `ANTHROPIC_API_KEY` (string, optional) - Anthropic API key
-- `DEFAULT_LLM_PROVIDER` ('openai' | 'anthropic' | '') - Default provider
-- `DEFAULT_CHAT_MODEL` (string) - Default model name
-- `DEFAULT_MODEL_ID` (string) - Default model ID
-- `DEFAULT_TEMPERATURE` (number) - Default temperature
-- `DEFAULT_MAX_TOKENS` (number) - Default max tokens
+- `DEFAULT_LLM_PROVIDER` ('openai' | 'anthropic' | '') - Default provider, defaults to 'openai'
+- `DEFAULT_CHAT_MODEL` (string) - Default model name, defaults to 'gpt-4o'
 
 ### Authentication & Payments
 - `JWT_SECRET` (string) - JWT signing secret
 - `STRIPE_SECRET_KEY` (string) - Stripe secret key
 - `STRIPE_PUBLISHABLE_KEY` (string) - Stripe publishable key
 - `STRIPE_WEBHOOK_SECRET` (string, optional) - Stripe webhook secret
+- `STRIPE_PRICE_CRUISER_MONTHLY` (string, optional) - Stripe price ID for cruiser monthly plan
+- `STRIPE_PRICE_CRUISER_YEARLY` (string, optional) - Stripe price ID for cruiser yearly plan
+- `STRIPE_PRICE_DRAUGHT_MONTHLY` (string, optional) - Stripe price ID for draught monthly plan
+- `STRIPE_PRICE_DRAUGHT_YEARLY` (string, optional) - Stripe price ID for draught yearly plan
 
-And many more...
+### Analytics
+- `NEXT_PUBLIC_GA_MEASUREMENT_ID` (string, optional) - Google Analytics measurement ID
 
 ## Development
 

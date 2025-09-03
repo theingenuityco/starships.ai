@@ -20,7 +20,7 @@ import type {
 import {
   ValidationError,
   NotFoundError,
-} from '@starships/models';
+} from '@starships/errors';
 
 export class MissionService {
   

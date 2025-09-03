@@ -18,7 +18,6 @@ import type {
   MissionModel,
   MissionPhase,
   MissionClarityModel,
-  UpdateBlueprintApprovalRequest,
   CreateMissionClarityRequest
 } from '@starships/protocol';
 import type { BlueprintModel } from '@starships/protocol';

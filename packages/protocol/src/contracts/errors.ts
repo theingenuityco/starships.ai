@@ -61,7 +61,7 @@ export type StandardErrorCode =
 export interface ErrorDetails {
   code: StandardErrorCode;
   message: string;
-  details?: any;
+  details?: unknown;
   timestamp: string;
   requestId?: string;
   path?: string;

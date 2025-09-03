@@ -35,7 +35,8 @@ export interface ServerEnvironmentConfig {
   DEFAULT_TEMPERATURE: number;
   DEFAULT_MAX_TOKENS: number;
 
-  
+  // JWT Authentication Configuration
+  JWT_SECRET: string;
 
   // Kinde Authentication Configuration (Server-side)
   // These are optional to allow runtime resolution

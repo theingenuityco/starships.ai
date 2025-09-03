@@ -62,11 +62,36 @@ export class UserRepository extends BaseRepository {
 
   async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
-      this.validateRequired(entity, ['kindeId', 'email'], 'create');
+      // For new auth system, require email instead of kindeId
+      this.validateRequired(entity, ['email'], 'create');
       
       const createdAt = new Date().toISOString();
       
-      // Use MERGE to prevent duplicate users with same kindeId with automatic ID generation
+      // For password-based auth, use email as unique identifier
+      if (entity.password && !entity.kindeId) {
+        const user = await this.mergeEntityWithAutoId<UserModel>(
+          'User',
+          { email: entity.email },
+          {
+            username: entity.username,
+            email: entity.email,
+            displayName: entity.displayName,
+            avatar: entity.avatar,
+            password: entity.password,
+            createdAt: createdAt
+          },
+          {
+            displayName: entity.displayName || undefined,
+            avatar: entity.avatar || undefined,
+            username: entity.username || undefined,
+            password: entity.password || undefined
+          }
+        );
+        return user;
+      }
+      
+      // Original Kinde-based creation for backward compatibility
+      this.validateRequired(entity, ['kindeId'], 'create');
       const user = await this.mergeEntityWithAutoId<UserModel>(
         'User',
         { kindeId: entity.kindeId },
@@ -164,5 +189,50 @@ export class UserRepository extends BaseRepository {
         { userId, stripeCustomerId }
       );
     }, 'updateStripeCustomerId', 'User', userId);
+  }
+
+  // Auth-specific methods
+  async findByEmailWithPassword(email: string): Promise<UserModel | null> {
+    return this.executeWithErrorHandling(async () => {
+      const connection = getConnection();
+      const result = await connection.executeQuery<{ u: UserModel }>(
+        'MATCH (u:User) WHERE u.email = $email RETURN u',
+        { email: email }
+      );
+      return result.length > 0 ? result[0].u : null;
+    }, 'findByEmailWithPassword', 'User', email);
+  }
+
+  async createWithPassword(userData: {
+    email: string;
+    password: string;
+    name?: string;
+    displayName?: string;
+    username?: string;
+  }): Promise<UserModel> {
+    return this.executeWithErrorHandling(async () => {
+      this.validateRequired(userData, ['email', 'password'], 'createWithPassword');
+      
+      const createdAt = new Date().toISOString();
+      const username = userData.username || userData.email.split('@')[0];
+      
+      const user = await this.mergeEntityWithAutoId<UserModel>(
+        'User',
+        { email: userData.email },
+        {
+          username: username,
+          email: userData.email,
+          displayName: userData.displayName || userData.name,
+          password: userData.password,
+          createdAt: createdAt
+        },
+        {
+          displayName: userData.displayName || userData.name || undefined,
+          password: userData.password || undefined
+        }
+      );
+      
+      return user;
+    }, 'createWithPassword', 'User');
   }
 } 

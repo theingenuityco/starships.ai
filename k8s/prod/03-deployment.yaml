@@ -107,30 +107,6 @@ spec:
               name: starships-secrets
               key: NEO4J_DATABASE
         
-        # Kinde OAuth URLs (from secrets for flexibility across environments)
-        - name: KINDE_SITE_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_SITE_URL
-        - name: KINDE_POST_LOGIN_REDIRECT_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_POST_LOGIN_REDIRECT_URL
-        - name: KINDE_POST_LOGOUT_REDIRECT_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_POST_LOGOUT_REDIRECT_URL
-        
-        # Security: Disable debug modes
-        - name: KINDE_DEBUG_MODE
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: KINDE_DEBUG_MODE
-        
         # API Keys from Secrets
         - name: OPENAI_API_KEY
           valueFrom:
@@ -157,11 +133,6 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: STRIPE_PUBLISHABLE_KEY
-        
-        # Pull Kinde secrets
-        envFrom:
-        - secretRef:
-            name: kinde-auth-secret
         
         # Resource Limits
         resources:

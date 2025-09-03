@@ -25,7 +25,7 @@ spec:
   - host: dev.starships.ai
     http:
       paths:
-      # Auth routes must go to frontend (Next.js/Kinde handles these)
+      # Auth routes must go to frontend (Next.js handles these)
       # This must come BEFORE the general /api rule
       - path: /api/auth
         pathType: Prefix

@@ -499,14 +499,16 @@ export abstract class BaseRepository {
    */
   protected async createEntityWithAutoId<T>(
     nodeLabel: string,
-    properties: Record<string, any>
+    properties: Record<string, any>,
+    connection?: any
   ): Promise<T> {
-    const connection = await import('../helpers/database').then(m => m.getConnection());
+    // Use provided connection or get from module - this helps with testing
+    const conn = connection || (await import('../helpers/database').then(m => m.getConnection()));
     
     // Remove any existing 'id' from properties - Neo4j will generate it
     const { id, ...propsWithoutId } = properties;
     
-    const result = await connection.executeWrite<{ n: T }>(
+    const result = await conn.executeWrite(
       `CREATE (n:${nodeLabel})
        SET n.id = randomUUID(),
            n += $props
@@ -525,15 +527,18 @@ export abstract class BaseRepository {
    * @param matchProperties - Properties used for MERGE matching
    * @param createProperties - Properties set only on CREATE
    * @param updateProperties - Properties set only on MATCH
+   * @param connection - Optional database connection (for testing)
    * @returns The merged entity
    */
   protected async mergeEntityWithAutoId<T>(
     nodeLabel: string,
     matchProperties: Record<string, any>,
     createProperties: Record<string, any> = {},
-    updateProperties: Record<string, any> = {}
+    updateProperties: Record<string, any> = {},
+    connection?: any
   ): Promise<T> {
-    const connection = await import('../helpers/database').then(m => m.getConnection());
+    // Use provided connection or get from module - this helps with testing
+    const conn = connection || (await import('../helpers/database').then(m => m.getConnection()));
     
     // Remove ID from all property sets - Neo4j will generate it
     const { id: _, ...matchProps } = matchProperties;
@@ -562,7 +567,7 @@ export abstract class BaseRepository {
       parameters.update = updateProps;
     }
 
-    const result = await connection.executeWrite<{ n: T }>(cypher, parameters);
+    const result = await conn.executeWrite(cypher, parameters);
     return result[0].n;
   }
 

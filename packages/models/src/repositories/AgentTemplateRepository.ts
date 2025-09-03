@@ -123,7 +123,7 @@ export class AgentTemplateRepository extends BaseRepository {
         blueprintIsString: typeof templateData.blueprint === 'string'
       });
 
-      const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData);
+      const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
       
       console.log('[Repository] Created successfully, deserializing...');
       
@@ -371,7 +371,7 @@ export class AgentTemplateRepository extends BaseRepository {
     };
 
     // Create agent with auto-generated ID
-    const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData);
+    const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData, this.connection);
     
     // Create relationship with starship
     try {
@@ -495,7 +495,7 @@ export class AgentTemplateRepository extends BaseRepository {
         previewPrompts: [],
       };
 
-      const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData);
+      const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
       const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawCreated));
 
       // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists

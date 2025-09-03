@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { AuthGate } from '@/components/auth/AuthGate'
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { DriveContent } from '@/components/drive/DriveContent'
 
 interface PageProps {
@@ -20,8 +20,8 @@ export default async function StarshipDrivePage({ params }: PageProps) {
   const { slug } = await params
 
   return (
-    <AuthGate>
+    <JwtAuthGate>
       <DriveContent slug={slug} />
-    </AuthGate>
+    </JwtAuthGate>
   )
 }

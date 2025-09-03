@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { Navigation } from '@/components/navigation/Navigation'
-import { AuthGate } from '@/components/auth/AuthGate'
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { useJwtAuth } from '@/hooks/useJwtAuth'
 import { useState, useEffect } from 'react'
 import { Menu } from 'lucide-react'
@@ -78,7 +78,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   // Regular pages with conditional navigation sidebar
   return (
-    <AuthGate>
+    <JwtAuthGate>
       <div className="h-screen flex relative overflow-hidden">
         {/* Navigation Sidebar with gutter (16px) - conditionally rendered */}
         {!shouldHideNavigation && (
@@ -128,6 +128,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </motion.main>
         </AnimatePresence>
       </div>
-    </AuthGate>
+    </JwtAuthGate>
   )
 }

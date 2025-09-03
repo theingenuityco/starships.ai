@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { AuthGate } from '@/components/auth/AuthGate';
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate';
 import { cn } from '@/lib/utils';
 
 interface PageLayoutProps {
@@ -65,7 +65,7 @@ export function PageLayout({
   );
 
   if (requireAuth) {
-    return <AuthGate>{content}</AuthGate>;
+    return <JwtAuthGate>{content}</JwtAuthGate>;
   }
 
   return content;

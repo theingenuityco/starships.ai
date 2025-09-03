@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { AuthGate } from '@/components/auth/AuthGate';
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate';
 import { LogbookContent } from '@/components/logbook/LogbookContent';
 
 interface PageProps {
@@ -20,8 +20,8 @@ export default async function StarshipLogbookPage({ params }: PageProps) {
   const { slug } = await params;
   
   return (
-    <AuthGate>
+    <JwtAuthGate>
       <LogbookContent slug={slug} />
-    </AuthGate>
+    </JwtAuthGate>
   );
 }

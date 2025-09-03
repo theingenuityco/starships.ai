@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Agent } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { ChatInterface } from '@/components/session/ChatInterface'
-import { AuthGate } from '@/components/auth/AuthGate'
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Users } from 'lucide-react'
 
 export default function CrewPage() {
@@ -21,7 +21,7 @@ export default function CrewPage() {
   }
 
   return (
-    <AuthGate>
+    <JwtAuthGate>
       <div className="grid grid-cols-[350px_1fr] h-full">
         {/* Left sidebar - fixed width */}
         <div className="border-r bg-card shadow-sm overflow-hidden">
@@ -84,6 +84,6 @@ export default function CrewPage() {
           )}
         </div>
       </div>
-    </AuthGate>
+    </JwtAuthGate>
   )
 }

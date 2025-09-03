@@ -703,8 +703,18 @@ describe('ExecutionRepository', () => {
         executionData: { input: 'test' }
       };
 
-      // Create execution
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-123',
+        workflowId,
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: '{"input":"test"}'
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
       const execution = await repository.create(createRequest);
 
       // Update to running
@@ -742,7 +752,18 @@ describe('ExecutionRepository', () => {
         executionData: complexExecutionData
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-456',
+        workflowId: 'complex-workflow',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify(complexExecutionData)
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(createRequest);
 
@@ -791,7 +812,18 @@ describe('ExecutionRepository', () => {
         executionData: largeExecutionData
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-789',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify(largeExecutionData)
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(request);
 
@@ -939,7 +971,18 @@ describe('ExecutionRepository', () => {
         executionData: { deep: deepObject }
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-deep',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify({ deep: deepObject })
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(request);
 
@@ -963,7 +1006,18 @@ describe('ExecutionRepository', () => {
         executionData: mixedTypeData
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-mixed',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify(mixedTypeData)
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(request);
 

@@ -47,38 +47,63 @@ describe('NodeRepository', () => {
 
     it('should create node successfully', async () => {
       const blueprintId = 'blueprint-123';
+      const mockNodeId = 'node-456';
 
-      mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]); // Blueprint exists
-      mockConnection.executeWrite.mockResolvedValue([]);
+      // Mock blueprint exists check
+      mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]);
+      
+      // Mock createEntityWithAutoId - the first executeWrite call
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'agent',
+            name: 'Test Node',
+            description: 'A test node',
+            parameters: '{"config":"test"}',
+            ref: 'test-node'
+          }
+        }])
+        // Mock relationship creation - the second executeWrite call
+        .mockResolvedValueOnce([]);
 
       const result = await repository.createNode(blueprintId, validNodeData);
 
+      // Verify blueprint check
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
         { blueprintId }
       );
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)'),
-        {
-          blueprintId,
-          nodeProps: expect.objectContaining({
-            id: expect.any(String),
+      // Verify node creation (createEntityWithAutoId)
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
+        expect.stringContaining('CREATE (n:Node)'),
+        expect.objectContaining({
+          props: expect.objectContaining({
             type: 'agent',
             name: 'Test Node',
             description: 'A test node',
-            parameters: '{"config":"test"}', // Should be serialized
+            parameters: '{"config":"test"}',
             ref: 'test-node'
           })
-        }
+        })
+      );
+
+      // Verify relationship creation
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2,
+        expect.stringContaining('MATCH (b:Blueprint {id: $blueprintId}), (n:Node {id: $nodeId})'),
+        expect.objectContaining({
+          blueprintId,
+          nodeId: mockNodeId
+        })
       );
 
       expect(result).toMatchObject({
-        id: expect.any(String),
+        id: mockNodeId,
         type: 'agent',
         name: 'Test Node',
         description: 'A test node',
-        parameters: { config: 'test' },
+        parameters: { config: 'test' }, // Should be deserialized in response
         ref: 'test-node'
       });
     });
@@ -91,9 +116,21 @@ describe('NodeRepository', () => {
         parameters: {},
         ref: 'custom-ref-123'
       };
+      const mockNodeId = 'node-456';
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'start',
+            name: 'Start Node',
+            description: 'Start node description',
+            parameters: '{}',
+            ref: 'custom-ref-123'
+          }
+        }])
+        .mockResolvedValueOnce([]);
 
       const result = await repository.createNode('blueprint-123', nodeDataWithRef);
 
@@ -108,16 +145,28 @@ describe('NodeRepository', () => {
         parameters: {},
         ref: 'end-node'
       };
+      const mockNodeId = 'node-456';
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'end',
+            name: 'End Node',
+            description: 'End node description',
+            parameters: '{}',
+            ref: 'end-node'
+          }
+        }])
+        .mockResolvedValueOnce([]);
 
       const result = await repository.createNode('blueprint-123', nodeData);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
         expect.anything(),
         expect.objectContaining({
-          nodeProps: expect.objectContaining({
+          props: expect.objectContaining({
             parameters: '{}' // Empty object should be serialized
           })
         })
@@ -132,16 +181,28 @@ describe('NodeRepository', () => {
         ref: 'agent-node'
         // parameters is undefined
       } as any;
+      const mockNodeId = 'node-456';
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'agent',
+            name: 'Agent Node',
+            description: 'Agent node description',
+            parameters: '{}',
+            ref: 'agent-node'
+          }
+        }])
+        .mockResolvedValueOnce([]);
 
       const result = await repository.createNode('blueprint-123', nodeData);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
         expect.anything(),
         expect.objectContaining({
-          nodeProps: expect.objectContaining({
+          props: expect.objectContaining({
             parameters: '{}' // Should default to empty object
           })
         })
@@ -180,20 +241,31 @@ describe('NodeRepository', () => {
 
     it('should create multiple nodes and return ID mapping', async () => {
       const blueprintId = 'blueprint-123';
+      const mockNodeIds = ['node-1', 'node-2', 'node-3'];
 
-      mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]); // Blueprint exists
-      mockConnection.executeWrite.mockResolvedValue([]);
+      // Mock blueprint exists check
+      mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]);
+      
+      // Mock createEntityWithAutoId calls for each node + relationship creation
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[0], type: 'start', name: 'Start', description: 'Start node', parameters: '{}', ref: 'start' } }])
+        .mockResolvedValueOnce([]) // relationship creation
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[1], type: 'agent', name: 'Process', description: 'Process node', parameters: '{"config":"test"}', ref: 'process' } }])
+        .mockResolvedValueOnce([]) // relationship creation
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[2], type: 'end', name: 'End', description: 'End node', parameters: '{}', ref: 'end' } }])
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.createNodes(blueprintId, validNodesData);
 
       expect(result.nodes).toHaveLength(3);
       expect(result.idMapping.size).toBe(2); // Only nodes with aiId get mapped
 
-      expect(result.idMapping.get('start')).toEqual(result.nodes[0].id);
-      expect(result.idMapping.get('process')).toEqual(result.nodes[1].id);
+      expect(result.idMapping.get('start')).toEqual(mockNodeIds[0]);
+      expect(result.idMapping.get('process')).toEqual(mockNodeIds[1]);
       expect(result.idMapping.has('end')).toBe(false); // No aiId provided
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(3); // One call per node
+      // Each node requires 2 executeWrite calls: createEntity + relationship
+      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(6);
     });
 
     it('should create nodes without aiId mapping', async () => {
@@ -201,9 +273,14 @@ describe('NodeRepository', () => {
         { type: 'start' as const, name: 'Start', description: 'Start node', parameters: {}, ref: 'start' },
         { type: 'end' as const, name: 'End', description: 'End node', parameters: {}, ref: 'end' }
       ];
+      const mockNodeIds = ['node-1', 'node-2'];
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[0], type: 'start', name: 'Start', description: 'Start node', parameters: '{}', ref: 'start' } }])
+        .mockResolvedValueOnce([]) // relationship creation
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[1], type: 'end', name: 'End', description: 'End node', parameters: '{}', ref: 'end' } }])
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.createNodes('blueprint-123', nodesWithoutAiId);
 
@@ -250,16 +327,28 @@ describe('NodeRepository', () => {
           }
         }
       ];
+      const mockNodeId = 'node-complex';
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'agent',
+            name: 'Complex Agent',
+            description: 'Complex agent node',
+            ref: 'complex-agent',
+            parameters: JSON.stringify(complexNodesData[0].parameters)
+          }
+        }])
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.createNodes('blueprint-123', complexNodesData);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
         expect.anything(),
         expect.objectContaining({
-          nodeProps: expect.objectContaining({
+          props: expect.objectContaining({
             parameters: expect.stringContaining('"model":"gpt-4"')
           })
         })
@@ -709,25 +798,47 @@ describe('NodeRepository', () => {
         ref: 'lifecycle'
       };
 
-      // Mock create node
+      const mockNodeId = 'lifecycle-node-123';
+      
+      // Mock create node - blueprint check + createEntity + relationship
       mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'agent',
+            name: 'Lifecycle Node',
+            description: 'Node for lifecycle testing',
+            parameters: '{"config":"test"}',
+            ref: 'lifecycle'
+          }
+        }])
+        .mockResolvedValueOnce([]); // relationship creation
 
       const createdNode = await repository.createNode(blueprintId, nodeData);
 
-      // Mock update node
-      mockConnection.executeQuery.mockResolvedValue([{ n: createdNode }]);
+      // Mock update node - existence check + update
+      mockConnection.executeQuery.mockResolvedValue([{ n: { id: mockNodeId } }]);
       mockConnection.executeWrite.mockResolvedValue([{
-        n: { ...createdNode, name: 'Updated Node', parameters: '{"updated":true}' }
+        n: {
+          id: mockNodeId,
+          type: 'agent',
+          name: 'Updated Node',
+          description: 'Node for lifecycle testing',
+          parameters: '{"updated":true}',
+          ref: 'lifecycle'
+        }
       }]);
 
       await repository.updateNode(createdNode.id, { name: 'Updated Node', parameters: { updated: true } });
 
-      // Mock delete node
-      mockConnection.executeQuery.mockResolvedValue([{ n: createdNode }]);
+      // Mock delete node - existence check + delete
+      mockConnection.executeQuery.mockResolvedValue([{ n: { id: mockNodeId } }]);
+      mockConnection.executeWrite.mockResolvedValue([]);
+      
       await repository.deleteNode(createdNode.id);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(3); // create, update, delete
+      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(4); // create + relationship + update + delete
     });
 
     it('should handle bulk node operations with ID mapping', async () => {
@@ -738,22 +849,32 @@ describe('NodeRepository', () => {
         { type: 'end' as const, name: 'End', description: 'End node', parameters: {}, ref: 'end', aiId: 'ai-end' }
       ];
 
-      // Mock create nodes
+      const mockNodeIds = ['start-node', 'middle-node', 'end-node'];
+      
+      // Mock create nodes - blueprint check + 3 node creations + 3 relationships
       mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[0], type: 'start', name: 'Start', description: 'Start node', parameters: '{}', ref: 'start' } }])
+        .mockResolvedValueOnce([]) // relationship
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[1], type: 'agent', name: 'Middle', description: 'Middle node', parameters: '{}', ref: 'middle' } }])
+        .mockResolvedValueOnce([]) // relationship
+        .mockResolvedValueOnce([{ n: { id: mockNodeIds[2], type: 'end', name: 'End', description: 'End node', parameters: '{}', ref: 'end' } }])
+        .mockResolvedValueOnce([]); // relationship
 
       const result = await repository.createNodes(blueprintId, nodesData);
 
       // Verify ID mapping is created correctly
-      expect(result.idMapping.get('ai-start')).toBeDefined();
-      expect(result.idMapping.get('ai-middle')).toBeDefined();
-      expect(result.idMapping.get('ai-end')).toBeDefined();
+      expect(result.idMapping.get('ai-start')).toEqual(mockNodeIds[0]);
+      expect(result.idMapping.get('ai-middle')).toEqual(mockNodeIds[1]);
+      expect(result.idMapping.get('ai-end')).toEqual(mockNodeIds[2]);
 
-      // Mock delete all nodes
+      // Mock delete all nodes - blueprint check + delete
       mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]);
+      mockConnection.executeWrite.mockResolvedValue([]);
+      
       await repository.deleteNodesByBlueprintId(blueprintId);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(4); // 3 creates + 1 bulk delete
+      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(7); // 6 for creates (3 nodes + 3 relationships) + 1 bulk delete
     });
   });
 

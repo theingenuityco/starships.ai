@@ -254,17 +254,39 @@ describe('AgentRepository', () => {
       };
 
       it('should create agent successfully', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
+        const mockCreatedAgent = {
+          id: 'test-uuid-1234',
+          name: 'Test Agent',
+          description: 'Test Description',
+          model: 'gpt-4',
+          temperature: 0.7,
+          maxTokens: 1000,
+          timeout: 30000,
+          version: '1.0.0',
+          category: 'general',
+          starshipId: 'starship-123',
+          memory: '{"data":"test"}',
+          blueprint: '{"type":"test","nodes":[],"edges":[]}',
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String),
+          usageCount: 0
+        };
+
+        // Mock createEntityWithAutoId call
+        mockConnection.executeWrite
+          .mockResolvedValueOnce([{ n: mockCreatedAgent }]) // createEntityWithAutoId
+          .mockResolvedValueOnce([]); // relationship creation
 
         const result = await repository.create(mockAgentData);
 
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          'CREATE (a:Agent $props) RETURN a',
+        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
+          expect.stringContaining('CREATE (n:Agent)'),
           expect.objectContaining({
             props: expect.objectContaining({
               name: 'Test Agent',
               starshipId: 'starship-123',
-              id: 'test-uuid-1234',
+              memory: '{"data":"test"}',
+              blueprint: '{"type":"test","nodes":[],"edges":[]}'
             })
           })
         );

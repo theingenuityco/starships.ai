@@ -75,12 +75,16 @@ export const agentSocketAPI = {
 
     const handleStreamComplete = (chunk: SessionStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
+        // Extract sessionId from server's metadata or fallback to provided sessionId
+        const serverSessionId = chunk.metadata?.sessionId as string;
+        const finalSessionId = serverSessionId || request.sessionId || 'unknown';
+        
         const finalMessage: Message = {
           id: generateId(),
           content: chunk.content,
           role: 'assistant',
           timestamp: new Date(chunk.timestamp).toISOString(),
-          sessionId: 'session-' + streamId, // Generate session ID from stream ID
+          sessionId: finalSessionId, // Use server-provided sessionId
           agentId: chunk.agentId,
           streaming: false,
           usage: undefined // Usage not available in stream chunks

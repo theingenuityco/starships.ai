@@ -3,29 +3,10 @@ import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@star
 import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import { RepositoryFactory } from '@starships/models';
+import { SessionService } from '../services/SessionService';
 import getStore from '../store';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
-  // Helper functions for agent session management using MessageRepository
-  const getOrCreateAgentSession = async (userId: string, agentId: string): Promise<string> => {
-    const messageRepo = RepositoryFactory.getMessageRepository();
-    
-    // Get agent to retrieve starship_id for proper session association
-    const agent = await AgentService.getAgent(agentId);
-    if (!agent) {
-      console.error(`❌ [AGENT SESSION] Agent not found: ${agentId}`);
-      return `session-${agentId}-${userId}-${Date.now()}`;
-    }
-
-    // CRITICAL FIX: Ensure agent has a starshipId before creating session
-    if (!agent.starshipId) {
-      console.error(`❌ [AGENT SESSION] Agent ${agentId} has no starshipId assigned - using fallback session`);
-      return `session-${agentId}-${userId}-${Date.now()}`;
-    }
-    
-    // For now, just return a session ID based on agent and user
-    return `session-${agentId}-${userId}`;
-  };
   
   const isSessionActive = (session: any): boolean => {
     const lastActivity = new Date(session.last_activity_at);
@@ -75,32 +56,70 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           return;
         }
 
-        // Get or create session ID
-        const sessionId = await getOrCreateAgentSession(userId, request.agentId);
-        
-        console.log(`✅ [AGENT SESSION] Using session: ${sessionId} for agent ${request.agentId}`);
-
-        // Get agent to get starshipId for message storage
+        // Get agent first to validate and get starshipId
         const agent = await AgentService.getAgent(request.agentId);
-        const starshipId = agent?.starshipId || 'unknown';
-
-        // Store user message
-        await storeMessage(starshipId, 'user', request.message, {
-          streamId: request.streamId
-        });
-
-        // Verify agent exists (reuse the agent variable from above)
-        if (!agent) {
+        if (!agent || !agent.starshipId) {
           socket.emit('session:stream-error', {
             streamId: request.streamId,
             agentId: request.agentId,
             errorCode: 'AGENT_NOT_FOUND',
-            message: `Agent ${request.agentId} not found`,
+            message: `Agent ${request.agentId} not found or has no starshipId`,
             timestamp: Date.now(),
             recoverable: false
           });
           return;
         }
+
+        // Handle session - use provided sessionId or create new one
+        let sessionId: string;
+        if (request.sessionId) {
+          // Validate provided session belongs to user and agent
+          try {
+            const existingSession = await SessionService.getSessionById(request.sessionId);
+            if (existingSession && existingSession.userId === userId && existingSession.agentId === request.agentId) {
+              sessionId = request.sessionId;
+              await SessionService.updateSessionActivity(sessionId);
+              console.log(`✅ [AGENT SESSION] Using existing session: ${sessionId}`);
+            } else {
+              throw new Error('Invalid or mismatched session');
+            }
+          } catch (error) {
+            console.warn(`⚠️ [AGENT SESSION] Invalid session ${request.sessionId}, creating new one:`, error);
+            // Fall through to create new session
+            const newSession = await SessionService.createSession({
+              source: 'agent',
+              userId,
+              agentId: request.agentId,
+              starshipId: agent.starshipId,
+              metadata: {
+                createdVia: 'socket-stream',
+                agentName: agent.name || 'Unknown Agent'
+              }
+            });
+            sessionId = newSession.id;
+            console.log(`✅ [AGENT SESSION] Created new session: ${sessionId}`);
+          }
+        } else {
+          // No sessionId provided, create new session
+          const newSession = await SessionService.createSession({
+            source: 'agent',
+            userId,
+            agentId: request.agentId,
+            starshipId: agent.starshipId,
+            metadata: {
+              createdVia: 'socket-stream',
+              agentName: agent.name || 'Unknown Agent'
+            }
+          });
+          sessionId = newSession.id;
+          console.log(`✅ [AGENT SESSION] Created new session: ${sessionId}`);
+        }
+
+        // Store user message with proper session reference
+        await storeMessage(agent.starshipId, 'user', request.message, {
+          streamId: request.streamId,
+          sessionId: sessionId
+        });
 
         // Send typing start indication
         socket.emit('session:typing-start', { userId, sessionId, isTyping: true });
@@ -181,12 +200,13 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           }
 
           // Store assistant message
-          await storeMessage(starshipId, 'assistant', fullResponse, {
+          await storeMessage(agent.starshipId, 'assistant', fullResponse, {
             streamId: request.streamId,
+            sessionId: sessionId,
             usage: response.usage
           });
 
-          // Send completion
+          // Send completion with sessionId in metadata
           socket.emit('session:typing-stop', { userId, sessionId, isTyping: false });
           socket.emit('session:stream-complete', {
             source: 'agent' as const,
@@ -194,7 +214,10 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
             agentId: request.agentId,
             type: 'complete',
             content: fullResponse,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            metadata: {
+              sessionId: sessionId
+            }
           });
         } catch (agentError) {
           console.error(`[AGENT SOCKET] Agent engine error:`, agentError);

@@ -1,8 +1,12 @@
 /**
- * Base Repository with Standardized Error Handling
- * 
- * Provides common error handling patterns and utilities for all repositories
- * in the expedition system.
+ * @fileoverview Base Repository with Standardized Error Handling and Utilities
+ *
+ * This module provides the foundational repository class that all data access
+ * repositories extend from. It includes comprehensive error handling, validation
+ * utilities, and common database operation patterns for the Starships.ai platform.
+ *
+ * @author Starships.ai Development Team
+ * @version 1.0.0
  */
 
 import {
@@ -10,47 +14,95 @@ import {
   DatabaseError,
   NotFoundError,
   ConflictError,
-  ValidationError
+  ValidationError,
+  ErrorContextUtils,
+  ErrorLayer
 } from '@starships/errors';
-
-// Local error context interface
-interface ErrorContext {
-  service: string;
-  operation: string;
-  resource?: string;
-  resourceId?: string;
-  metadata?: Record<string, any>;
-}
+import type { RepositoryErrorContext } from '@starships/errors';
 
 // ============================================================================
 // BASE REPOSITORY CLASS
 // ============================================================================
 
 /**
- * Base repository class with standardized error handling
+ * Abstract base repository class providing standardized error handling,
+ * validation utilities, and common database operation patterns.
+ *
+ * All repository classes should extend this base class to ensure consistent
+ * error handling and validation across the data access layer.
+ *
+ * @abstract
+ * @class BaseRepository
+ *
+ * @example
+ * ```typescript
+ * export class UserRepository extends BaseRepository {
+ *   constructor() {
+ *     super('UserRepository');
+ *   }
+ *
+ *   async findById(id: string): Promise<UserModel | null> {
+ *     return this.executeWithErrorHandling(async () => {
+ *       // Database operations here
+ *     }, 'findById', 'User', id);
+ *   }
+ * }
+ * ```
  */
 export abstract class BaseRepository {
+  /** The name of the repository service for logging and error tracking */
   protected serviceName: string;
 
+  /**
+   * Constructor for BaseRepository
+   *
+   * @param serviceName - Name of the repository service (e.g., 'UserRepository')
+   */
   constructor(serviceName: string) {
     this.serviceName = serviceName;
   }
 
   /**
    * Create error context for repository operations
+   *
+   * @param operation - The operation being performed
+   * @param resource - The type of resource (optional)
+   * @param resourceId - The specific resource ID (optional)
+   * @param additionalMetadata - Additional metadata (optional)
+   * @returns Repository error context object with operation details
+   *
+   * @protected
    */
-  protected createContext(operation: string, resource?: string, resourceId?: string): ErrorContext {
-    return {
-      service: this.serviceName,
-      operation,
+  protected createContext(
+    operation: string,
+    resource?: string,
+    resourceId?: string,
+    additionalMetadata?: Record<string, any>
+  ): RepositoryErrorContext {
+    return ErrorContextUtils.repository(this.serviceName, operation, {
       resource,
       resourceId,
-      metadata: { component: 'repository' }
-    };
+      metadata: {
+        component: 'repository',
+        ...additionalMetadata
+      }
+    });
   }
 
   /**
-   * Handle database errors and convert to standardized errors
+   * Handle database errors and convert to standardized error types
+   *
+   * This method analyzes various database error types and converts them into
+   * standardized application errors with proper context and error codes.
+   *
+   * @param error - The original database error
+   * @param operation - The operation that caused the error
+   * @param resource - The resource type being operated on (optional)
+   * @param resourceId - The specific resource ID (optional)
+   * @throws {ConflictError} For constraint violations
+   * @throws {DatabaseError} For connection, timeout, or query errors
+   *
+   * @protected
    */
   protected handleDatabaseError(
     error: any,
@@ -58,7 +110,9 @@ export abstract class BaseRepository {
     resource?: string,
     resourceId?: string
   ): never {
-    const context = this.createContext(operation, resource, resourceId);
+    const context = this.createContext(operation, resource, resourceId, {
+      originalError: error.message || error.toString()
+    });
 
     // Handle specific database error types
     if (this.isConstraintViolationError(error)) {
@@ -66,8 +120,9 @@ export abstract class BaseRepository {
         'Database constraint violation',
         'database_constraint',
         { resource: resource || 'Resource', originalError: error.message },
-        context.operation,
-        `${context.service}/${context.operation}`
+        context.requestId,
+        `${context.component}/${context.operation}`,
+        context
       );
     }
 
@@ -77,8 +132,9 @@ export abstract class BaseRepository {
         'connection',
         undefined,
         { originalError: error.message },
-        context.operation,
-        `${context.service}/${context.operation}`
+        context.requestId,
+        `${context.component}/${context.operation}`,
+        context
       );
     }
 
@@ -88,8 +144,9 @@ export abstract class BaseRepository {
         'timeout',
         undefined,
         { originalError: error.message },
-        context.operation,
-        `${context.service}/${context.operation}`
+        context.requestId,
+        `${context.component}/${context.operation}`,
+        context
       );
     }
 
@@ -99,8 +156,9 @@ export abstract class BaseRepository {
         'query',
         undefined,
         { originalError: error.message },
-        context.operation,
-        `${context.service}/${context.operation}`
+        context.requestId,
+        `${context.component}/${context.operation}`,
+        context
       );
     }
 
@@ -110,48 +168,78 @@ export abstract class BaseRepository {
       context.operation,
       undefined,
       { originalError: error.message || 'Unknown database error' },
-      context.operation,
-      `${context.service}/${context.operation}`
+      context.requestId,
+      `${context.component}/${context.operation}`,
+      context
     );
   }
 
   /**
-   * Handle not found scenarios
+   * Handle not found scenarios with standardized error response
+   *
+   * @param resource - Type of resource that was not found
+   * @param resourceId - ID of the resource that was not found (optional)
+   * @param operation - Operation that was being performed (optional)
+   * @throws {NotFoundError} Always throws a standardized not found error
+   *
+   * @protected
    */
   protected handleNotFound(
     resource: string,
     resourceId?: string,
     operation?: string
   ): never {
+    const context = this.createContext(operation || 'find', resource, resourceId);
+    
     throw new NotFoundError(
       `${resource} ${resourceId ? `with ID ${resourceId}` : ''} not found`,
       resource,
       resourceId || 'unknown',
       undefined,
-      operation || 'find',
-      `${this.serviceName}/${operation || 'find'}`
+      context.requestId,
+      `${context.component}/${context.operation}`,
+      context
     );
   }
 
   /**
-   * Handle validation errors
+   * Handle validation errors with detailed field-level error information
+   *
+   * @param fieldErrors - Array of field validation errors
+   * @param operation - Operation that triggered validation (optional)
+   * @throws {ValidationError} Always throws a standardized validation error
+   *
+   * @protected
    */
   protected handleValidationError(
     fieldErrors: Array<{ field: string; message: string; value?: any }>,
     operation?: string
   ): never {
+    const context = this.createContext(operation || 'validate', undefined, undefined, {
+      fieldErrors
+    });
+    
     const message = fieldErrors.map(e => `${e.field}: ${e.message}`).join(', ');
     throw new ValidationError(
       message,
       fieldErrors[0]?.field,
       { fieldErrors },
-      operation || 'validate',
-      `${this.serviceName}/${operation || 'validate'}`
+      context.requestId,
+      `${context.component}/${context.operation}`,
+      context
     );
   }
 
   /**
-   * Handle conflict errors
+   * Handle conflict errors such as duplicate resources or constraint violations
+   *
+   * @param resource - Type of resource causing the conflict
+   * @param conflictReason - Human-readable reason for the conflict
+   * @param operation - Operation that caused the conflict (optional)
+   * @param resourceId - ID of the conflicting resource (optional)
+   * @throws {ConflictError} Always throws a standardized conflict error
+   *
+   * @protected
    */
   protected handleConflict(
     resource: string,
@@ -159,17 +247,36 @@ export abstract class BaseRepository {
     operation?: string,
     resourceId?: string
   ): never {
+    const context = this.createContext(operation || 'create', resource, resourceId, {
+      conflictReason
+    });
+    
     throw new ConflictError(
       conflictReason,
       'resource_conflict',
       { resource, resourceId },
-      operation || 'create',
-      `${this.serviceName}/${operation || 'create'}`
+      context.requestId,
+      `${context.component}/${context.operation}`,
+      context
     );
   }
 
   /**
-   * Wrap repository operations with error handling
+   * Wrap asynchronous repository operations with standardized error handling
+   *
+   * This method provides a consistent way to handle errors across all repository
+   * operations, ensuring that database errors are properly converted to application
+   * errors with appropriate context and error codes.
+   *
+   * @template T - Return type of the operation
+   * @param operation - The async operation to execute
+   * @param operationName - Name of the operation for error context
+   * @param resource - Resource type being operated on (optional)
+   * @param resourceId - Specific resource ID (optional)
+   * @returns Promise resolving to the operation result
+   * @throws {BaseError} Standardized application errors based on the underlying error
+   *
+   * @protected
    */
   protected async executeWithErrorHandling<T>(
     operation: () => Promise<T>,
@@ -191,7 +298,17 @@ export abstract class BaseRepository {
   }
 
   /**
-   * Wrap synchronous operations with error handling
+   * Wrap synchronous repository operations with standardized error handling
+   *
+   * @template T - Return type of the operation
+   * @param operation - The synchronous operation to execute
+   * @param operationName - Name of the operation for error context
+   * @param resource - Resource type being operated on (optional)
+   * @param resourceId - Specific resource ID (optional)
+   * @returns The operation result
+   * @throws {BaseError} Standardized application errors based on the underlying error
+   *
+   * @protected
    */
   protected executeWithErrorHandlingSync<T>(
     operation: () => T,
@@ -535,13 +652,18 @@ export abstract class BaseRepository {
     resource?: string,
     resourceId?: string
   ): never {
+    const context = this.createContext(operation || 'unknown', resource, resourceId, {
+      businessLogicCode: code
+    });
+    
     throw new DatabaseError(
       message,
       operation || 'unknown',
       undefined,
       { code, resource, resourceId },
-      operation || 'unknown',
-      `${this.serviceName}/${operation || 'unknown'}`
+      context.requestId,
+      `${context.component}/${context.operation}`,
+      context
     );
   }
 }

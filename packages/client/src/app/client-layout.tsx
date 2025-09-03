@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { Navigation } from '@/components/navigation/Navigation'
 import { AuthGate } from '@/components/auth/AuthGate'
-import { useAuth } from '@/hooks/useAuth'
+import { useJwtAuth } from '@/hooks/useJwtAuth'
 import { useState, useEffect } from 'react'
 import { Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -38,7 +38,7 @@ const pageVariants = {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  useAuth() // Keep the hook call but don't destructure unused values
+  useJwtAuth() // Keep the hook call but don't destructure unused values
   const isDashboard = pathname === '/'
   const isWaitlist = pathname === '/waitlist'
 

@@ -27,6 +27,7 @@
       "outputs": ["dist/**"]
     },
     "@starships/errors#build": {
+      "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
@@ -55,6 +56,7 @@
       "outputs": []
     },
     "@starships/errors#lint": {
+      "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -83,6 +85,7 @@
       "outputs": []
     },
     "@starships/errors#type-check": {
+      "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
@@ -96,6 +99,7 @@
       "outputs": []
     },
     "@starships/errors#test": {
+      "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],
       "outputs": []
     },

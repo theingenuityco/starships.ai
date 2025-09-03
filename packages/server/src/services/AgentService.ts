@@ -8,7 +8,7 @@
 
 import { AgentRepository, RepositoryFactory } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
+import { Agent, AgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
 import { ValidationError, NotFoundError, InternalServerError } from '@starships/errors';
 import getStore, { type MemoryStore } from '../store';
@@ -593,7 +593,7 @@ export class AgentService {
     }
   ): Promise<AgentMemory> {
     // Initialize memory with default prompt
-    const memory = createAgentMemory();
+    const memory = new AgentMemory();
     memory.addMessage('system', 'You are a helpful AI assistant.');
 
     // Set structured context from database configuration

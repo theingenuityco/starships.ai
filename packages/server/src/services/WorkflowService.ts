@@ -8,7 +8,7 @@
 
 import { WorkflowRepository, RepositoryFactory } from '@starships/models';
 import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
-import { Workflow, Blueprint, Execution, createAgentMemory } from '@starships/autopilot';
+import { Workflow, Blueprint, Execution, AgentMemory } from '@starships/autopilot';
 
 export interface WorkflowOptions {
   includeMemory?: boolean;
@@ -326,7 +326,7 @@ export class WorkflowService {
       console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
 
       // Create agent memory for execution context
-      const agentMemory = createAgentMemory();
+      const agentMemory = new AgentMemory();
       agentMemory.addMessage('system', 'Workflow execution context');
 
       // Create initial execution context

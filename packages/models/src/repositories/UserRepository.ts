@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { UserModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 
 export class UserRepository extends BaseRepository {
   constructor() {
@@ -65,39 +64,28 @@ export class UserRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(entity, ['kindeId', 'email'], 'create');
       
-      const connection = getConnection();
-      const id = uuidv4();
       const createdAt = new Date().toISOString();
       
-      // Use MERGE to prevent duplicate users with same kindeId
-      // This is atomic and thread-safe
-      const result = await connection.executeWrite<{ u: UserModel }>(
-        `MERGE (u:User {kindeId: $kindeId})
-        ON CREATE SET 
-          u.id = $id,
-          u.username = $username,
-          u.email = $email,
-          u.displayName = $displayName,
-          u.avatar = $avatar,
-          u.createdAt = $createdAt
-        ON MATCH SET
-          u.email = $email,
-          u.displayName = COALESCE($displayName, u.displayName),
-          u.avatar = COALESCE($avatar, u.avatar),
-          u.username = COALESCE($username, u.username)
-        RETURN u`,
-        { 
-          id: id, 
-          createdAt: createdAt, 
-          kindeId: entity.kindeId,
-          username: entity.username, 
+      // Use MERGE to prevent duplicate users with same kindeId with automatic ID generation
+      const user = await this.mergeEntityWithAutoId<UserModel>(
+        'User',
+        { kindeId: entity.kindeId },
+        {
+          username: entity.username,
           email: entity.email,
           displayName: entity.displayName,
-          avatar: entity.avatar
+          avatar: entity.avatar,
+          createdAt: createdAt
+        },
+        {
+          email: entity.email,
+          displayName: entity.displayName || undefined,
+          avatar: entity.avatar || undefined,
+          username: entity.username || undefined
         }
       );
       
-      return result[0].u;
+      return user;
     }, 'create', 'User');
   }
 

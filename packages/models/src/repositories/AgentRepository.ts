@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import type { AgentModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
@@ -16,7 +15,7 @@ export class AgentRepository extends BaseRepository {
   /**
    * Serialize complex objects for Neo4j storage
    */
-  private serializeComplexFields(agent: AgentModel): any {
+  private serializeComplexFields(agent: AgentModel | any): any {
     return {
       ...agent,
       blueprint: agent.blueprint ? JSON.stringify(agent.blueprint) : null,
@@ -181,8 +180,8 @@ export class AgentRepository extends BaseRepository {
       const connection = getConnection();
       const now = new Date().toISOString();
       
-      // Create agent with only essential fields from AgentNodeParameters + database fields
-      const agent: AgentModel = {
+      // Create agent properties without ID (Neo4j will generate it)
+      const agentProps = {
         // Core AgentNodeParameters fields
         name: entity.name as string,
         description: entity.description as string | undefined,
@@ -194,7 +193,6 @@ export class AgentRepository extends BaseRepository {
         blueprint: entity.blueprint as any, // BaseBlueprint
         
         // Database-specific fields
-        id: uuidv4(),
         createdAt: now,
         updatedAt: now,
         version: this.getSafeValue(entity.version, '1.0.0') as string,
@@ -205,9 +203,10 @@ export class AgentRepository extends BaseRepository {
       };
 
       // Serialize complex objects for Neo4j storage
-      const agentForStorage = this.serializeComplexFields(agent);
+      const agentForStorage = this.serializeComplexFields(agentProps);
 
-      await connection.executeWrite('CREATE (a:Agent $props) RETURN a', { props: agentForStorage });
+      // Use automatic ID generation
+      const agent = await this.createEntityWithAutoId<AgentModel>('Agent', agentForStorage);
       
       // For backward compatibility, also create Neo4j relationship during transition
       try {

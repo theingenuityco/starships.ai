@@ -22,6 +22,16 @@ export function loadKindeRuntimeConfig() {
   throw new Error('Kinde runtime config not available in browser environment');
 }
 
+export function loadApiRuntimeConfig() {
+  if (typeof window === 'undefined') {
+    // Only import server module in Node.js environment
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { loadApiRuntimeConfig } = require('./server');
+    return loadApiRuntimeConfig();
+  }
+  throw new Error('API runtime config not available in browser environment');
+}
+
 export function getClientConfig() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { loadClientEnvironment } = require('./client');

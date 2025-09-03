@@ -97,8 +97,6 @@ RUN --mount=type=secret,id=stripe_secret_key \
     --mount=type=secret,id=kinde_site_url \
     --mount=type=secret,id=kinde_post_login_redirect_url \
     --mount=type=secret,id=kinde_post_logout_redirect_url \
-    --mount=type=secret,id=next_public_api_url \
-    --mount=type=secret,id=next_public_server_url \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
     STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
     KINDE_CLIENT_ID=$(cat /run/secrets/kinde_client_id 2>/dev/null || echo "") \
@@ -107,9 +105,6 @@ RUN --mount=type=secret,id=stripe_secret_key \
     KINDE_SITE_URL=$(cat /run/secrets/kinde_site_url 2>/dev/null || echo "") \
     KINDE_POST_LOGIN_REDIRECT_URL=$(cat /run/secrets/kinde_post_login_redirect_url 2>/dev/null || echo "") \
     KINDE_POST_LOGOUT_REDIRECT_URL=$(cat /run/secrets/kinde_post_logout_redirect_url 2>/dev/null || echo "") \
-    NEXT_PUBLIC_API_URL=$(cat /run/secrets/next_public_api_url 2>/dev/null || echo "http://localhost:4000/api") \
-    NEXT_PUBLIC_SERVER_URL=$(cat /run/secrets/next_public_server_url 2>/dev/null || echo "http://localhost:4000") \
-    NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR=false \
     pnpm run build
 
 # Create necessary directories

@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import type { MemoryModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
@@ -109,8 +108,7 @@ export class MemoryRepository extends BaseRepository {
       const now = new Date().toISOString();
       const { starshipId, ...memoryData } = entity;
       
-      const memory: MemoryModel = {
-        id: uuidv4(),
+      const memoryCreateData = {
         createdAt: now,
         updatedAt: now,
         version: memoryData.version || '1.0.0',
@@ -119,16 +117,17 @@ export class MemoryRepository extends BaseRepository {
       };
 
       // Handle AgentMemory specific fields if they exist
-      const memoryForStorage = this.serializeComplexFields(memory);
+      const memoryForStorage = this.serializeComplexFields(memoryCreateData as MemoryModel);
 
+      const memory = await this.createEntityWithAutoId<MemoryModel>('Memory', memoryForStorage);
+
+      // Create relationship with starship
       await connection.executeWrite(
-        `MATCH (s:Starship {id: $starshipId})
-         CREATE (m:Memory $props)
-         CREATE (s)-[:HAS_MEMORY {createdAt: $createdAt}]->(m)
-         RETURN m`,
+        `MATCH (s:Starship {id: $starshipId}), (m:Memory {id: $memoryId})
+         CREATE (s)-[:HAS_MEMORY {createdAt: $createdAt}]->(m)`,
         {
-          props: memoryForStorage,
           starshipId,
+          memoryId: memory.id,
           createdAt: now
         }
       );

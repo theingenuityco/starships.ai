@@ -1,6 +1,5 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import type { NodeModel } from '@starships/protocol';
 
 export class NodeRepository extends BaseRepository {
@@ -14,7 +13,6 @@ export class NodeRepository extends BaseRepository {
       this.validateRequired(nodeData, ['type', 'name'], 'createNode');
 
       const connection = getConnection();
-      const nodeId = uuidv4();
 
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(
@@ -26,27 +24,27 @@ export class NodeRepository extends BaseRepository {
         this.handleNotFound('Blueprint', blueprintId, 'createNode');
       }
 
-      const node: NodeModel = {
-        id: nodeId,
-        ...nodeData,
-        parameters: nodeData.parameters || {}
-      };
-
-      // Serialize parameters as JSON string for Neo4j storage
+      // Prepare node data with serialized parameters
       const nodeProps = {
-        ...node,
-        parameters: JSON.stringify(node.parameters)
+        ...nodeData,
+        parameters: JSON.stringify(nodeData.parameters || {})
       };
 
+      const node = await this.createEntityWithAutoId<NodeModel>('Node', nodeProps);
+
+      // Create relationship with blueprint
       await connection.executeWrite(`
-        MATCH (b:Blueprint {id: $blueprintId})
-        CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)
+        MATCH (b:Blueprint {id: $blueprintId}), (n:Node {id: $nodeId})
+        CREATE (b)-[:CONTAINS]->(n)
       `, {
         blueprintId,
-        nodeProps
+        nodeId: node.id
       });
 
-      return node;
+      return {
+        ...node,
+        parameters: nodeData.parameters || {}
+      };
     }, 'createNode', 'Node');
   }
 
@@ -78,35 +76,44 @@ export class NodeRepository extends BaseRepository {
       const idMapping = new Map<string, string>();
 
       for (const nodeData of nodesData) {
-        const nodeId = uuidv4();
         const { aiId, ...nodeWithoutAiId } = nodeData as any;
         
-        const node: NodeModel = {
-          id: nodeId,
-          ...nodeWithoutAiId
-        };
-
-        // Serialize parameters as JSON string for Neo4j storage
+        // Prepare node data with serialized parameters
         const nodeProps = {
-          ...node,
-          parameters: JSON.stringify(node.parameters || {}),
-          ref: node.ref || nodeId
+          ...nodeWithoutAiId,
+          parameters: JSON.stringify(nodeWithoutAiId.parameters || {}),
+          ref: nodeWithoutAiId.ref || null
         };
 
+        const node = await this.createEntityWithAutoId<NodeModel>('Node', nodeProps);
+
+        // Set ref to node ID if not provided
+        if (!node.ref) {
+          node.ref = node.id;
+          await connection.executeWrite(
+            'MATCH (n:Node {id: $nodeId}) SET n.ref = $ref',
+            { nodeId: node.id, ref: node.id }
+          );
+        }
+
+        // Create relationship with blueprint
         await connection.executeWrite(`
-          MATCH (b:Blueprint {id: $blueprintId})
-          CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)
+          MATCH (b:Blueprint {id: $blueprintId}), (n:Node {id: $nodeId})
+          CREATE (b)-[:CONTAINS]->(n)
         `, {
           blueprintId,
-          nodeProps
+          nodeId: node.id
         });
 
         // Map AI-provided ID to real UUID for edge creation
         if (aiId) {
-          idMapping.set(aiId, nodeId);
+          idMapping.set(aiId, node.id);
         }
         
-        nodes.push(node);
+        nodes.push({
+          ...node,
+          parameters: nodeWithoutAiId.parameters || {}
+        });
       }
 
       return { nodes, idMapping };

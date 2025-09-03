@@ -2,7 +2,6 @@ import { getConnection } from '../helpers/database';
 import type { WorkflowModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
-import { v4 as uuidv4 } from 'uuid';
 import { Blueprint } from '@starships/autopilot';
 
 /**
@@ -166,7 +165,6 @@ export class WorkflowRepository extends BaseRepository {
       this.validateRequired(entity, ['name', 'authorId'], 'create');
 
       const connection = getConnection();
-      const id = uuidv4();
       const now = new Date().toISOString();
 
       // Create default blueprint if none provided
@@ -176,8 +174,8 @@ export class WorkflowRepository extends BaseRepository {
         metadata: {}
       };
 
-      // Create workflow with only essential fields from WorkflowNodeParameters + database fields
-      const workflow: WorkflowModel = {
+      // Create workflow data with only essential fields from WorkflowNodeParameters + database fields
+      const workflowData = {
         // Core WorkflowNodeParameters fields
         blueprint: (entity.blueprint && typeof entity.blueprint === 'object' && 'nodes' in entity.blueprint)
           ? entity.blueprint as Blueprint
@@ -185,7 +183,6 @@ export class WorkflowRepository extends BaseRepository {
         timeout: this.getSafeValue(entity.timeout, 30000) as number,
         
         // Database fields
-        id,
         name: entity.name as string,
         createdAt: now,
         updatedAt: now,
@@ -201,9 +198,9 @@ export class WorkflowRepository extends BaseRepository {
         allowedStarshipClasses: entity.allowedStarshipClasses as string[] | undefined
       };
 
-      const workflowForStorage = this.serializeComplexFields(workflow);
+      const workflowForStorage = this.serializeComplexFields(workflowData as unknown as WorkflowModel);
 
-      await connection.executeWrite('CREATE (w:Workflow $props) RETURN w', { props: workflowForStorage });
+      const workflow = await this.createEntityWithAutoId<WorkflowModel>('Workflow', workflowForStorage);
 
       // For backward compatibility, also create Neo4j relationship during transition
       if (workflow.starshipId) {

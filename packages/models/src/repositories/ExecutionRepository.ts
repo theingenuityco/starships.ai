@@ -1,6 +1,5 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
 
 /**
@@ -83,20 +82,18 @@ export class ExecutionRepository extends BaseRepository {
       this.validateRequired(request, ['workflowId'], 'create');
 
       const connection = getConnection();
-      const id = uuidv4();
       const now = new Date().toISOString();
 
-      const execution: ExecutionModel = {
-        id,
+      const executionData = {
         workflowId: request.workflowId,
         status: 'pending',
         createdAt: now,
         executionData: request.executionData
       };
 
-      const executionForStorage = this.serializeComplexFields(execution);
+      const executionForStorage = this.serializeComplexFields(executionData as ExecutionModel);
 
-      await connection.executeWrite('CREATE (e:Execution $props) RETURN e', { props: executionForStorage });
+      const execution = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionForStorage);
 
       // Create relationship with workflow
       await connection.executeWrite(

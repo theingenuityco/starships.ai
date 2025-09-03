@@ -7,7 +7,6 @@ erDiagram
     %% Core User and Starship System
     User {
         string id PK
-        string kindeId UK
         string username
         string email
         string displayName
@@ -303,7 +302,6 @@ graph TD
 ### Security & Integration
 - **API Key Management**: `NativeToolApiKey` stores encrypted tool credentials per starship
 - **Stripe Integration**: `StripeEvent` ensures webhook idempotency; `User.stripeCustomerId` and `Starship.stripeCustomerId` link to Stripe
-- **Authentication**: `User.kindeId` provides external auth integration
 
 ### Technical Implementation Notes
 - **Neo4j Relationships**: Repository code maintains both FK references and Neo4j relationship patterns

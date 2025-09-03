@@ -91,20 +91,8 @@ RUN echo "Cache bust: ${CACHE_BUST}"
 # Secrets are only available during this RUN command, not in the final image
 RUN --mount=type=secret,id=stripe_secret_key \
     --mount=type=secret,id=stripe_publishable_key \
-    --mount=type=secret,id=kinde_client_id \
-    --mount=type=secret,id=kinde_client_secret \
-    --mount=type=secret,id=kinde_issuer_url \
-    --mount=type=secret,id=kinde_site_url \
-    --mount=type=secret,id=kinde_post_login_redirect_url \
-    --mount=type=secret,id=kinde_post_logout_redirect_url \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
     STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
-    KINDE_CLIENT_ID=$(cat /run/secrets/kinde_client_id 2>/dev/null || echo "") \
-    KINDE_CLIENT_SECRET=$(cat /run/secrets/kinde_client_secret 2>/dev/null || echo "") \
-    KINDE_ISSUER_URL=$(cat /run/secrets/kinde_issuer_url 2>/dev/null || echo "") \
-    KINDE_SITE_URL=$(cat /run/secrets/kinde_site_url 2>/dev/null || echo "") \
-    KINDE_POST_LOGIN_REDIRECT_URL=$(cat /run/secrets/kinde_post_login_redirect_url 2>/dev/null || echo "") \
-    KINDE_POST_LOGOUT_REDIRECT_URL=$(cat /run/secrets/kinde_post_logout_redirect_url 2>/dev/null || echo "") \
     pnpm run build
 
 # Create necessary directories

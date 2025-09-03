@@ -28,7 +28,7 @@ const JWT_AUDIENCE = 'starships-users';
  * Register new user
  * POST /auth/register
  */
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password, name } = req.body;
 
@@ -99,7 +99,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
  * Login user
  * POST /auth/login
  */
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
+router.post('/auth/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
@@ -160,7 +160,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
  * Get current user
  * GET /auth/me
  */
-router.get('/me', async (req: Request, res: Response): Promise<void> => {
+router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
@@ -213,7 +213,7 @@ router.get('/me', async (req: Request, res: Response): Promise<void> => {
  * Logout user (client-side token removal)
  * POST /auth/logout
  */
-router.post('/logout', (req: Request, res: Response): void => {
+router.post('/auth/logout', (req: Request, res: Response): void => {
   // With JWT, logout is primarily handled client-side by removing the token
   // Server-side logout would require a token blacklist, which adds complexity
   console.log('[AUTH] User logged out');

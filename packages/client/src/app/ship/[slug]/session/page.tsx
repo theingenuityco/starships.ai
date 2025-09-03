@@ -12,6 +12,7 @@ export default function StarshipSessionPage() {
   const [starship, setStarship] = useState<Starship | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStarshipData = async () => {
@@ -63,16 +64,18 @@ export default function StarshipSessionPage() {
       <div className="w-80 shrink-0">
         <SessionsSidebar
           starshipId={starship.id}
-          onSessionSelect={(sessionId) => {
-            // TODO: Handle session selection
-            console.log('Selected session:', sessionId);
-          }}
+          currentSessionId={currentSessionId}
+          onSessionSelect={setCurrentSessionId}
         />
       </div>
       
       {/* Main Session Interface */}
       <div className="flex-1 min-w-0">
-        <SessionInterface starshipId={starship.id} />
+        <SessionInterface
+          starshipId={starship.id}
+          sessionId={currentSessionId}
+          onSessionChange={setCurrentSessionId}
+        />
       </div>
     </div>
   );
